@@ -140,7 +140,7 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
 
     let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
-        AnyMessage::AI(AIMessage::builder().content("hello").build()),
+        AnyMessage::AIMessage(AIMessage::builder().content("hello").build()),
         HumanMessage::builder()
             .content("how are you")
             .build()
@@ -432,7 +432,7 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
             .content("What is 1 + 2")
             .build()
             .into(),
-        AnyMessage::AI(
+        AnyMessage::AIMessage(
             AIMessage::builder()
                 .content("")
                 .tool_calls(vec![agent_chain_core::messages::ToolCall {
@@ -480,7 +480,7 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
             .content("What is 1 + 2")
             .build()
             .into(),
-        AnyMessage::AI(
+        AnyMessage::AIMessage(
             AIMessage::builder()
                 .content(vec![
                     serde_json::json!({"type": "text", "text": "some text"}),
@@ -536,7 +536,7 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
             .content("What is 1 + 2")
             .build()
             .into(),
-        AnyMessage::AI(
+        AnyMessage::AIMessage(
             AIMessage::builder()
                 .content("")
                 .tool_calls(vec![agent_chain_core::messages::ToolCall {
@@ -805,8 +805,8 @@ async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::E
         SystemMessage::builder().content("hello").build().into(),
         HumanMessage::builder().content("hello").build().into(),
         HumanMessage::builder().content("hello").build().into(),
-        AnyMessage::AI(AIMessage::builder().content("hello").build()),
-        AnyMessage::AI(AIMessage::builder().content("hello").build()),
+        AnyMessage::AIMessage(AIMessage::builder().content("hello").build()),
+        AnyMessage::AIMessage(AIMessage::builder().content("hello").build()),
         HumanMessage::builder()
             .content("how are you")
             .build()
@@ -937,7 +937,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
             .content("What is 1 + 2")
             .build()
             .into(),
-        AnyMessage::AI(
+        AnyMessage::AIMessage(
             AIMessage::builder()
                 .content("")
                 .tool_calls(vec![agent_chain_core::messages::ToolCall {
@@ -954,7 +954,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
             .tool_call_id("example_1")
             .build()
             .into(),
-        AnyMessage::AI(AIMessage::builder().content(r#"{"result": 3}"#).build()),
+        AnyMessage::AIMessage(AIMessage::builder().content(r#"{"result": 3}"#).build()),
         HumanMessage::builder()
             .content("What is 3 + 4")
             .build()
@@ -1176,7 +1176,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                AnyMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_response,
             ]
             .into(),

@@ -371,7 +371,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message.clone(),
-                AnyMessage::AI(tool_call_message.clone()),
+                AnyMessage::AIMessage(tool_call_message.clone()),
                 tool_message.clone(),
             ]
             .into(),
@@ -389,9 +389,9 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                AnyMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_message,
-                AnyMessage::AI(resp_message),
+                AnyMessage::AIMessage(resp_message),
                 follow_up,
             ]
             .into(),
@@ -451,7 +451,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message.clone(),
-                AnyMessage::AI(tool_call_message.clone()),
+                AnyMessage::AIMessage(tool_call_message.clone()),
                 tool_message.clone(),
             ]
             .into(),
@@ -469,9 +469,9 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                AnyMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_message,
-                AnyMessage::AI(resp_message),
+                AnyMessage::AIMessage(resp_message),
                 follow_up,
             ]
             .into(),

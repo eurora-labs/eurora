@@ -268,7 +268,7 @@ impl BaseMessagePromptTemplate for ChatMessagePromptTemplate {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![AnyMessage::Chat(
+        Ok(vec![AnyMessage::ChatMessage(
             ChatMessage::builder()
                 .content(text)
                 .role(&self.role)
@@ -294,7 +294,7 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<AnyMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(AnyMessage::Chat(
+        Ok(AnyMessage::ChatMessage(
             ChatMessage::builder()
                 .content(text)
                 .role(&self.role)
@@ -395,14 +395,14 @@ macro_rules! message_prompt_template {
 
 message_prompt_template!(
     HumanMessagePromptTemplate,
-    Human,
+    HumanMessage,
     HumanMessage,
     "Human Message"
 );
-message_prompt_template!(AIMessagePromptTemplate, AI, AIMessage, "AI Message");
+message_prompt_template!(AIMessagePromptTemplate, AIMessage, AIMessage, "AI Message");
 message_prompt_template!(
     SystemMessagePromptTemplate,
-    System,
+    SystemMessage,
     SystemMessage,
     "System Message"
 );
@@ -1040,6 +1040,7 @@ submit_constructor!(ChatPromptTemplate);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::BaseMessage;
 
     #[test]
     fn test_messages_placeholder() {
@@ -1158,7 +1159,7 @@ mod tests {
     #[test]
     fn test_from_messages_with_base_message() {
         let template = ChatPromptTemplate::from_messages(vec![
-            AnyMessage::System(SystemMessage::builder().content("hello").build()).into(),
+            AnyMessage::SystemMessage(SystemMessage::builder().content("hello").build()).into(),
             ("human", "Hi {name}").into(),
         ])
         .unwrap();
@@ -1228,8 +1229,8 @@ mod tests {
             .messages(HashMap::from([(
                 "history".to_string(),
                 vec![
-                    AnyMessage::Human(HumanMessage::builder().content("Hi").build()),
-                    AnyMessage::AI(AIMessage::builder().content("Hello!").build()),
+                    AnyMessage::HumanMessage(HumanMessage::builder().content("Hi").build()),
+                    AnyMessage::AIMessage(AIMessage::builder().content("Hello!").build()),
                 ],
             )]))
             .build();

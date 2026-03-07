@@ -295,7 +295,7 @@ impl ChatOllama {
         let messages: Vec<std::borrow::Cow<'_, AnyMessage>> = messages
             .iter()
             .map(|msg| {
-                if let AnyMessage::AI(ai) = msg {
+                if let AnyMessage::AIMessage(ai) = msg {
                     let is_v1 = ai
                         .response_metadata
                         .get("output_version")
@@ -309,7 +309,7 @@ impl ChatOllama {
                         );
                         let mut new_ai = ai.clone();
                         new_ai.content = new_content;
-                        return std::borrow::Cow::Owned(AnyMessage::AI(new_ai));
+                        return std::borrow::Cow::Owned(AnyMessage::AIMessage(new_ai));
                     }
                 }
                 std::borrow::Cow::Borrowed(msg)
@@ -320,12 +320,12 @@ impl ChatOllama {
 
         for msg in messages.iter() {
             let formatted = match msg.as_ref() {
-                AnyMessage::System(m) => serde_json::json!({
+                AnyMessage::SystemMessage(m) => serde_json::json!({
                     "role": "system",
                     "content": m.content.as_text(),
                     "images": [],
                 }),
-                AnyMessage::Human(m) => {
+                AnyMessage::HumanMessage(m) => {
                     let (content, images) = extract_content_and_images(&m.content);
                     serde_json::json!({
                         "role": "user",
@@ -333,7 +333,7 @@ impl ChatOllama {
                         "images": images,
                     })
                 }
-                AnyMessage::AI(m) => {
+                AnyMessage::AIMessage(m) => {
                     let mut message = serde_json::json!({
                         "role": "assistant",
                         "content": m.content.as_text(),
@@ -351,18 +351,18 @@ impl ChatOllama {
 
                     message
                 }
-                AnyMessage::Tool(m) => serde_json::json!({
+                AnyMessage::ToolMessage(m) => serde_json::json!({
                     "role": "tool",
                     "content": m.content,
                     "images": [],
                     "tool_call_id": m.tool_call_id,
                 }),
-                AnyMessage::Chat(m) => serde_json::json!({
+                AnyMessage::ChatMessage(m) => serde_json::json!({
                     "role": m.role,
                     "content": m.content,
                     "images": [],
                 }),
-                AnyMessage::Remove(_) => continue,
+                AnyMessage::RemoveMessage(_) => continue,
                 _ => {
                     return Err(Error::Other(
                         "Received unsupported message type for Ollama.".to_string(),
@@ -921,7 +921,7 @@ impl ChatOllama {
 
         let (content, usage_metadata, tool_calls, chunk_additional_kwargs) =
             match &final_chunk.message {
-                AnyMessage::AI(ai) => (
+                AnyMessage::AIMessage(ai) => (
                     ai.text(),
                     ai.usage_metadata.clone(),
                     ai.tool_calls.clone(),
@@ -1571,7 +1571,7 @@ mod tests {
     #[test]
     fn test_format_messages_with_images() {
         let model = ChatOllama::new("llama3.2-vision");
-        let messages = vec![AnyMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             crate::messages::HumanMessage::builder()
                 .content(MessageContent::Parts(vec![
                     ContentPart::Text {
@@ -1597,7 +1597,7 @@ mod tests {
     #[test]
     fn test_format_messages_rejects_unsupported_types() {
         let model = ChatOllama::new("llama3.1");
-        let messages = vec![AnyMessage::Function(
+        let messages = vec![AnyMessage::FunctionMessage(
             crate::messages::FunctionMessage::builder()
                 .name("fn_name")
                 .content("content")

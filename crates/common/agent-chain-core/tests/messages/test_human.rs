@@ -1,4 +1,5 @@
 use agent_chain_core::load::Serializable;
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
     ContentBlock, ContentPart, HumanMessage, HumanMessageChunk, ImageContentBlock, ImageSource,
     MessageContent, SystemMessageChunk, TextContentBlock,

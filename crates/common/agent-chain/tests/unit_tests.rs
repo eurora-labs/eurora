@@ -54,8 +54,8 @@ fn test_init_minimal_reasoning_effort() {
 fn test_get_request_payload_basic() {
     let llm = ChatOpenAI::new("gpt-4o-2024-08-06");
     let messages = vec![
-        AnyMessage::System(SystemMessage::builder().content("hello").build()),
-        AnyMessage::Human(HumanMessage::builder().content("how are you").build()),
+        AnyMessage::SystemMessage(SystemMessage::builder().content("hello").build()),
+        AnyMessage::HumanMessage(HumanMessage::builder().content("how are you").build()),
     ];
     let payload = llm.build_request_payload(&messages, None, None, false);
 
@@ -76,7 +76,7 @@ fn test_minimal_reasoning_effort_payload_chat_completions() {
         .max_tokens(100u32)
         .build();
 
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hello").build(),
     )];
     let payload = llm.build_request_payload(&messages, None, None, false);
@@ -95,7 +95,7 @@ fn test_minimal_reasoning_effort_payload_responses_api() {
         .use_responses_api(true)
         .build();
 
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hello").build(),
     )];
     let payload = llm.build_responses_api_payload(&messages, None, None, false);
@@ -124,7 +124,7 @@ fn test_verbosity_parameter_payload() {
         .use_responses_api(true)
         .build();
 
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hello").build(),
     )];
     let payload = llm.build_responses_api_payload(&messages, None, None, false);
@@ -140,7 +140,7 @@ fn test_service_tier() {
         .model("o4-mini")
         .service_tier("flex")
         .build();
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("Hello").build(),
     )];
     let payload = llm.build_request_payload(&messages, None, None, false);
@@ -159,7 +159,7 @@ fn test_extra_body_parameter() {
         .extra_body(extra)
         .build();
 
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("Hello").build(),
     )];
     let payload = llm.build_request_payload(&messages, None, None, false);
@@ -185,7 +185,7 @@ fn test_extra_body_with_model_kwargs() {
         .temperature(0.5)
         .extra_body(extra)
         .build();
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("Hello").build(),
     )];
     let payload = llm.build_request_payload(&messages, None, None, false);
@@ -316,9 +316,9 @@ fn test_get_ls_params() {
 fn test_format_messages() {
     let llm = ChatOpenAI::new("gpt-4o");
     let messages = vec![
-        AnyMessage::System(SystemMessage::builder().content("You are helpful.").build()),
-        AnyMessage::Human(HumanMessage::builder().content("Hello!").build()),
-        AnyMessage::AI(AIMessage::builder().content("Hi there!").build()),
+        AnyMessage::SystemMessage(SystemMessage::builder().content("You are helpful.").build()),
+        AnyMessage::HumanMessage(HumanMessage::builder().content("Hello!").build()),
+        AnyMessage::AIMessage(AIMessage::builder().content("Hi there!").build()),
     ];
 
     let formatted = llm.format_messages(&messages);
@@ -346,7 +346,7 @@ fn test_format_messages_with_tool_calls() {
         ])
         .build();
 
-    let messages = vec![AnyMessage::AI(ai_msg)];
+    let messages = vec![AnyMessage::AIMessage(ai_msg)];
     let formatted = llm.format_messages(&messages);
 
     assert_eq!(formatted[0]["role"], "assistant");
@@ -361,7 +361,7 @@ fn test_format_messages_with_tool_calls() {
 #[test]
 fn test_format_messages_tool_message() {
     let llm = ChatOpenAI::new("gpt-4o");
-    let messages = vec![AnyMessage::Tool(
+    let messages = vec![AnyMessage::ToolMessage(
         ToolMessage::builder()
             .content("sunny")
             .tool_call_id("call_123")
@@ -379,7 +379,7 @@ fn test_format_messages_tool_message() {
 #[test]
 fn test_format_messages_for_responses_api_tool_message() {
     let llm = ChatOpenAI::new("gpt-4o");
-    let messages = vec![AnyMessage::Tool(
+    let messages = vec![AnyMessage::ToolMessage(
         ToolMessage::builder()
             .content(r#"{"temperature": 72, "conditions": "sunny"}"#)
             .tool_call_id("call_123")
@@ -412,7 +412,7 @@ fn test_format_messages_for_responses_api_ai_with_tool_calls() {
         ])
         .build();
 
-    let result = llm.format_messages_for_responses_api(&[AnyMessage::AI(ai_msg)]);
+    let result = llm.format_messages_for_responses_api(&[AnyMessage::AIMessage(ai_msg)]);
 
     assert!(!result.is_empty());
     let function_call = result.iter().find(|r| r["type"] == "function_call");
@@ -427,17 +427,17 @@ fn test_format_messages_for_responses_api_ai_with_tool_calls() {
 fn test_format_messages_for_responses_api_multiple_types() {
     let llm = ChatOpenAI::new("gpt-4o");
     let messages = vec![
-        AnyMessage::System(
+        AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content("You are a helpful assistant.")
                 .build(),
         ),
-        AnyMessage::Human(
+        AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content("What's the weather?")
                 .build(),
         ),
-        AnyMessage::AI(
+        AnyMessage::AIMessage(
             AIMessage::builder()
                 .content("")
                 .tool_calls(vec![
@@ -449,7 +449,7 @@ fn test_format_messages_for_responses_api_multiple_types() {
                 ])
                 .build(),
         ),
-        AnyMessage::Tool(
+        AnyMessage::ToolMessage(
             ToolMessage::builder()
                 .content("Sunny, 72F")
                 .tool_call_id("call_123")

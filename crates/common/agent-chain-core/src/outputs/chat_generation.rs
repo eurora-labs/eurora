@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::ops::Add;
 
 use crate::load::Serializable;
-use crate::messages::AnyMessage;
+use crate::messages::{AnyMessage, BaseMessage};
 
 pub const CHAT_GENERATION_TYPE: &str = "ChatGeneration";
 pub const CHAT_GENERATION_CHUNK_TYPE: &str = "ChatGenerationChunk";

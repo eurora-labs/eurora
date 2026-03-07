@@ -3,7 +3,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
-use super::base::{get_msg_title_repr, is_interactive_env, merge_content};
+use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env, merge_content};
 use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
 use crate::utils::merge::{merge_dicts, merge_lists};
 
@@ -17,6 +17,36 @@ pub struct SystemMessage {
     pub additional_kwargs: HashMap<String, serde_json::Value>,
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl BaseMessage for SystemMessage {
+    fn id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn content(&self) -> &MessageContent {
+        &self.content
+    }
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn set_id(&mut self, id: String) {
+        self.id = Some(id);
+    }
+
+    fn message_type(&self) -> &'static str {
+        "system"
+    }
+
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
 }
 
 impl Serialize for SystemMessage {
@@ -72,14 +102,6 @@ impl SystemMessage {
             additional_kwargs,
             response_metadata,
         }
-    }
-
-    pub fn set_id(&mut self, id: String) {
-        self.id = Some(id);
-    }
-
-    pub fn message_type(&self) -> &'static str {
-        "system"
     }
 
     pub fn content_list(&self) -> Vec<serde_json::Value> {

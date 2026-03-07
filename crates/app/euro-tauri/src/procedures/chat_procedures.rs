@@ -84,10 +84,10 @@ impl ChatApi for ChatApiImpl {
 
                 for message in messages {
                     match &message {
-                        AnyMessage::System(m) => {
+                        AnyMessage::SystemMessage(m) => {
                             let _ = thread_manager.add_system_message(m).await;
                         }
-                        AnyMessage::Human(m) => {
+                        AnyMessage::HumanMessage(m) => {
                             let _ = thread_manager.add_hidden_human_message(m).await;
                         }
                         _ => {

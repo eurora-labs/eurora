@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use agent_chain_core::chat_history::{BaseChatMessageHistory, InMemoryChatMessageHistory};
-use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage, SystemMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain_core::runnables::base::Runnable;
 use agent_chain_core::runnables::config::RunnableConfig;
 use agent_chain_core::runnables::history::{
@@ -34,15 +34,15 @@ fn make_session_factory(
 }
 
 fn human(content: &str) -> AnyMessage {
-    AnyMessage::Human(HumanMessage::builder().content(content).build())
+    AnyMessage::HumanMessage(HumanMessage::builder().content(content).build())
 }
 
 fn ai(content: &str) -> AnyMessage {
-    AnyMessage::AI(AIMessage::builder().content(content).build())
+    AnyMessage::AIMessage(AIMessage::builder().content(content).build())
 }
 
 fn system(content: &str) -> AnyMessage {
-    AnyMessage::System(SystemMessage::builder().content(content).build())
+    AnyMessage::SystemMessage(SystemMessage::builder().content(content).build())
 }
 
 fn concat_human_messages() -> HistoryRunnable {
@@ -50,11 +50,11 @@ fn concat_human_messages() -> HistoryRunnable {
         let human_contents: Vec<String> = messages
             .iter()
             .filter_map(|m| match m {
-                AnyMessage::Human(h) => Some(h.content.as_text()),
+                AnyMessage::HumanMessage(h) => Some(h.content.as_text()),
                 _ => None,
             })
             .collect();
-        Ok(vec![AnyMessage::AI(
+        Ok(vec![AnyMessage::AIMessage(
             AIMessage::builder()
                 .content(format!("you said: {}", human_contents.join("\n")))
                 .build(),
@@ -65,7 +65,7 @@ fn concat_human_messages() -> HistoryRunnable {
 fn length_runnable() -> HistoryRunnable {
     HistoryRunnable::from_fn(|messages, _config| {
         let count = messages.len();
-        Ok(vec![AnyMessage::AI(
+        Ok(vec![AnyMessage::AIMessage(
             AIMessage::builder().content(count.to_string()).build(),
         )])
     })
@@ -392,7 +392,7 @@ fn test_dict_input_with_history_messages_key() {
             .collect::<Vec<_>>()
             .join(", ");
         let response = format!("history={}, question={}", history.len(), question_text);
-        let output = vec![AnyMessage::AI(
+        let output = vec![AnyMessage::AIMessage(
             AIMessage::builder().content(response).build(),
         )];
         serde_json::to_value(&output).map_err(|e| Error::Other(format!("ser: {}", e)))
@@ -463,11 +463,11 @@ fn test_dict_input_with_output_messages_key() {
         let human_texts: Vec<String> = messages
             .iter()
             .filter_map(|m| match m {
-                AnyMessage::Human(_) => Some(m.content().to_string()),
+                AnyMessage::HumanMessage(_) => Some(m.content().to_string()),
                 _ => None,
             })
             .collect();
-        let response = AnyMessage::AI(
+        let response = AnyMessage::AIMessage(
             AIMessage::builder()
                 .content(format!("you said: {}", human_texts.join(", ")))
                 .build(),
@@ -536,7 +536,7 @@ fn test_get_input_messages_normalization() {
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0].content(), "hello");
     assert!(
-        matches!(msgs[0], AnyMessage::Human(_)),
+        matches!(msgs[0], AnyMessage::HumanMessage(_)),
         "string input should become HumanMessage"
     );
 
@@ -582,7 +582,7 @@ fn test_get_output_messages_normalization() {
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0].content(), "response");
     assert!(
-        matches!(msgs[0], AnyMessage::AI(_)),
+        matches!(msgs[0], AnyMessage::AIMessage(_)),
         "string output should become AIMessage"
     );
 

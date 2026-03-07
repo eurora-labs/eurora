@@ -608,7 +608,7 @@ async fn test_invoke_with_human_message_list() {
     let llm = FakeListLLM::builder()
         .responses(vec!["message response".to_string()])
         .build();
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("Hello").build(),
     )];
     let input = LanguageModelInput::from(messages);
@@ -855,12 +855,12 @@ async fn test_invoke_with_multiple_messages() {
         .responses(vec!["multi message response".to_string()])
         .build();
     let messages = vec![
-        AnyMessage::System(
+        AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content("You are a helper.")
                 .build(),
         ),
-        AnyMessage::Human(HumanMessage::builder().content("What is 2+2?").build()),
+        AnyMessage::HumanMessage(HumanMessage::builder().content("What is 2+2?").build()),
     ];
     let result = llm
         .invoke(LanguageModelInput::from(messages), None)
@@ -874,7 +874,7 @@ async fn test_ainvoke_with_human_message_list() {
     let llm = FakeListLLM::builder()
         .responses(vec!["async message response".to_string()])
         .build();
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("Hello").build(),
     )];
     let result = llm

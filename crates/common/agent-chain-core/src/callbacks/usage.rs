@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use uuid::Uuid;
 
-use crate::messages::{AnyMessage, UsageMetadata};
+use crate::messages::{AnyMessage, BaseMessage, UsageMetadata};
 use crate::outputs::ChatResult;
 
 use super::base::BaseCallbackHandler;
@@ -62,14 +62,14 @@ impl BaseCallbackHandler for UsageMetadataCallbackHandler {
         let (usage_metadata, model_name) = match first_generation {
             Some(generation) => {
                 let usage = match &generation.message {
-                    AnyMessage::AI(ai_msg) => ai_msg.usage_metadata.clone(),
+                    AnyMessage::AIMessage(ai_msg) => ai_msg.usage_metadata.clone(),
                     _ => None,
                 };
 
                 let model = generation
                     .message
                     .response_metadata()
-                    .and_then(|meta| meta.get("model_name"))
+                    .get("model_name")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
 

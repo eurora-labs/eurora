@@ -1,5 +1,5 @@
 use super::ai::{AIMessage, AIMessageChunk};
-use super::base::{AnyMessage, AnyMessageChunk};
+use super::base::{AnyMessage, AnyMessageChunk, BaseMessage};
 use super::chat::{ChatMessage, ChatMessageChunk};
 use super::function::{FunctionMessage, FunctionMessageChunk};
 use super::human::{HumanMessage, HumanMessageChunk};
@@ -11,7 +11,7 @@ pub type MessageLikeRepresentation = serde_json::Value;
 
 pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
     match message {
-        AnyMessage::Human(m) => AnyMessageChunk::Human(
+        AnyMessage::HumanMessage(m) => AnyMessageChunk::HumanMessageChunk(
             HumanMessageChunk::builder()
                 .content(m.content.clone())
                 .maybe_id(m.id.clone())
@@ -20,7 +20,7 @@ pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        AnyMessage::AI(m) => {
+        AnyMessage::AIMessage(m) => {
             let mut chunk = AIMessageChunk::builder()
                 .content(m.content.clone())
                 .maybe_id(m.id.clone())
@@ -32,9 +32,9 @@ pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build();
             chunk.init_tool_calls();
-            AnyMessageChunk::AI(chunk)
+            AnyMessageChunk::AIMessageChunk(chunk)
         }
-        AnyMessage::System(m) => AnyMessageChunk::System(
+        AnyMessage::SystemMessage(m) => AnyMessageChunk::SystemMessageChunk(
             SystemMessageChunk::builder()
                 .content(m.content.clone())
                 .maybe_id(m.id.clone())
@@ -43,7 +43,7 @@ pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        AnyMessage::Tool(m) => AnyMessageChunk::Tool(
+        AnyMessage::ToolMessage(m) => AnyMessageChunk::ToolMessageChunk(
             ToolMessageChunk::builder()
                 .content(m.content.clone())
                 .tool_call_id(m.tool_call_id.clone())
@@ -55,7 +55,7 @@ pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        AnyMessage::Chat(m) => AnyMessageChunk::Chat(
+        AnyMessage::ChatMessage(m) => AnyMessageChunk::ChatMessageChunk(
             ChatMessageChunk::builder()
                 .content(m.content.clone())
                 .role(m.role.clone())
@@ -65,7 +65,7 @@ pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        AnyMessage::Function(m) => AnyMessageChunk::Function(
+        AnyMessage::FunctionMessage(m) => AnyMessageChunk::FunctionMessageChunk(
             FunctionMessageChunk::builder()
                 .content(m.content.clone())
                 .name(m.name.clone())
@@ -74,7 +74,7 @@ pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        AnyMessage::Remove(_) => {
+        AnyMessage::RemoveMessage(_) => {
             panic!("Cannot convert RemoveMessage to chunk")
         }
     }
@@ -89,16 +89,16 @@ pub fn get_buffer_string(messages: &[AnyMessage], human_prefix: &str, ai_prefix:
         .iter()
         .map(|m| {
             let role = match m {
-                AnyMessage::Human(_) => human_prefix,
-                AnyMessage::System(_) => "System",
-                AnyMessage::AI(_) => ai_prefix,
-                AnyMessage::Tool(_) => "Tool",
-                AnyMessage::Chat(c) => &c.role,
-                AnyMessage::Function(_) => "Function",
-                AnyMessage::Remove(_) => "Remove",
+                AnyMessage::HumanMessage(_) => human_prefix,
+                AnyMessage::SystemMessage(_) => "System",
+                AnyMessage::AIMessage(_) => ai_prefix,
+                AnyMessage::ToolMessage(_) => "Tool",
+                AnyMessage::ChatMessage(c) => &c.role,
+                AnyMessage::FunctionMessage(_) => "Function",
+                AnyMessage::RemoveMessage(_) => "Remove",
             };
             let mut message = format!("{}: {}", role, m.text());
-            if let AnyMessage::AI(ai_msg) = m
+            if let AnyMessage::AIMessage(ai_msg) = m
                 && let Some(function_call) = ai_msg.additional_kwargs.get("function_call")
             {
                 message.push_str(&function_call.to_string());
@@ -206,7 +206,7 @@ pub fn convert_to_message(message: &serde_json::Value) -> Result<AnyMessage, Str
     }
 
     if let Some(s) = message.as_str() {
-        return Ok(AnyMessage::Human(
+        return Ok(AnyMessage::HumanMessage(
             HumanMessage::builder().content(s).build(),
         ));
     }
@@ -264,14 +264,14 @@ fn create_message_from_role(
     };
 
     match role {
-        "human" | "user" => Ok(AnyMessage::Human(
+        "human" | "user" => Ok(AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
                 .maybe_id(id.map(|i| i.to_string()))
                 .build(),
         )),
-        "ai" | "assistant" => Ok(AnyMessage::AI(
+        "ai" | "assistant" => Ok(AnyMessage::AIMessage(
             AIMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
@@ -279,7 +279,7 @@ fn create_message_from_role(
                 .tool_calls(parsed_tool_calls)
                 .build(),
         )),
-        "system" => Ok(AnyMessage::System(
+        "system" => Ok(AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content(content)
                 .maybe_name(name.map(|n| n.to_string()))
@@ -296,11 +296,11 @@ fn create_message_from_role(
                 "__openai_role__".to_string(),
                 serde_json::Value::String("developer".to_string()),
             );
-            Ok(AnyMessage::System(msg))
+            Ok(AnyMessage::SystemMessage(msg))
         }
         "function" => {
             let fn_name = name.ok_or("Function messages require a name")?;
-            Ok(AnyMessage::Function(
+            Ok(AnyMessage::FunctionMessage(
                 FunctionMessage::builder()
                     .name(fn_name)
                     .content(content)
@@ -310,7 +310,7 @@ fn create_message_from_role(
         }
         "tool" => {
             let tc_id = tool_call_id.ok_or("Tool messages require a tool_call_id")?;
-            Ok(AnyMessage::Tool(
+            Ok(AnyMessage::ToolMessage(
                 ToolMessage::builder()
                     .content(content)
                     .tool_call_id(tc_id)
@@ -321,11 +321,11 @@ fn create_message_from_role(
         }
         "remove" => {
             let msg_id = id.unwrap_or("");
-            Ok(AnyMessage::Remove(
+            Ok(AnyMessage::RemoveMessage(
                 RemoveMessage::builder().id(msg_id).build(),
             ))
         }
-        _ => Ok(AnyMessage::Chat(
+        _ => Ok(AnyMessage::ChatMessage(
             ChatMessage::builder()
                 .content(content)
                 .role(role)
@@ -379,17 +379,17 @@ pub fn filter_messages(
         let mut msg = msg.clone();
         match exclude_tool_calls {
             Some(ExcludeToolCalls::All) => {
-                if let AnyMessage::AI(ref ai_msg) = msg
+                if let AnyMessage::AIMessage(ref ai_msg) = msg
                     && !ai_msg.tool_calls.is_empty()
                 {
                     continue;
                 }
-                if matches!(msg, AnyMessage::Tool(_)) {
+                if matches!(msg, AnyMessage::ToolMessage(_)) {
                     continue;
                 }
             }
             Some(ExcludeToolCalls::Ids(ids)) => {
-                if let AnyMessage::AI(ref ai_msg) = msg
+                if let AnyMessage::AIMessage(ref ai_msg) = msg
                     && !ai_msg.tool_calls.is_empty()
                 {
                     let remaining_tool_calls: Vec<ToolCall> = ai_msg
@@ -402,7 +402,7 @@ pub fn filter_messages(
                         continue;
                     }
                     if remaining_tool_calls.len() != ai_msg.tool_calls.len() {
-                        msg = AnyMessage::AI(
+                        msg = AnyMessage::AIMessage(
                             AIMessage::builder()
                                 .content(ai_msg.content.clone())
                                 .maybe_id(ai_msg.id.clone())
@@ -416,7 +416,7 @@ pub fn filter_messages(
                         );
                     }
                 }
-                if let AnyMessage::Tool(ref tool_msg) = msg
+                if let AnyMessage::ToolMessage(ref tool_msg) = msg
                     && ids.contains(&tool_msg.tool_call_id)
                 {
                     continue;
@@ -470,7 +470,7 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
             continue;
         };
 
-        if matches!(msg, AnyMessage::Tool(_))
+        if matches!(msg, AnyMessage::ToolMessage(_))
             || std::mem::discriminant(&last) != std::mem::discriminant(msg)
         {
             merged.push(last);
@@ -480,12 +480,12 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
             let mut curr_chunk = msg_to_chunk(msg);
 
             match &mut curr_chunk {
-                AnyMessageChunk::AI(c) => c.response_metadata.clear(),
-                AnyMessageChunk::Human(c) => c.response_metadata.clear(),
-                AnyMessageChunk::System(c) => c.response_metadata.clear(),
-                AnyMessageChunk::Tool(c) => c.response_metadata.clear(),
-                AnyMessageChunk::Chat(c) => c.response_metadata.clear(),
-                AnyMessageChunk::Function(c) => c.response_metadata.clear(),
+                AnyMessageChunk::AIMessageChunk(c) => c.response_metadata.clear(),
+                AnyMessageChunk::HumanMessageChunk(c) => c.response_metadata.clear(),
+                AnyMessageChunk::SystemMessageChunk(c) => c.response_metadata.clear(),
+                AnyMessageChunk::ToolMessageChunk(c) => c.response_metadata.clear(),
+                AnyMessageChunk::ChatMessageChunk(c) => c.response_metadata.clear(),
+                AnyMessageChunk::FunctionMessageChunk(c) => c.response_metadata.clear(),
             }
 
             if !chunk_separator.is_empty() {
@@ -498,32 +498,32 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
                         matches!(curr_content, super::content::MessageContent::Text(_));
                     if last_is_str && curr_is_str {
                         match &mut curr_chunk {
-                            AnyMessageChunk::AI(c) => {
+                            AnyMessageChunk::AIMessageChunk(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            AnyMessageChunk::Human(c) => {
+                            AnyMessageChunk::HumanMessageChunk(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            AnyMessageChunk::System(c) => {
+                            AnyMessageChunk::SystemMessageChunk(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            AnyMessageChunk::Chat(c) => {
+                            AnyMessageChunk::ChatMessageChunk(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            AnyMessageChunk::Function(c) => {
+                            AnyMessageChunk::FunctionMessageChunk(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
                             }
-                            AnyMessageChunk::Tool(c) => {
+                            AnyMessageChunk::ToolMessageChunk(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
@@ -535,7 +535,7 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
 
             let mut merged_chunk = last_chunk + curr_chunk;
 
-            if let AnyMessageChunk::AI(ref mut ai_chunk) = merged_chunk {
+            if let AnyMessageChunk::AIMessageChunk(ref mut ai_chunk) = merged_chunk {
                 ai_chunk.init_tool_calls();
             }
 
@@ -575,14 +575,14 @@ pub fn count_tokens_approximately(messages: &[AnyMessage], config: &CountTokensC
 
         message_chars += message.text().len();
 
-        if let AnyMessage::AI(ai_msg) = message
+        if let AnyMessage::AIMessage(ai_msg) = message
             && !ai_msg.tool_calls.is_empty()
         {
             let tool_calls_str = format!("{:?}", ai_msg.tool_calls);
             message_chars += tool_calls_str.len();
         }
 
-        if let AnyMessage::Tool(tool_msg) = message {
+        if let AnyMessage::ToolMessage(tool_msg) = message {
             message_chars += tool_msg.tool_call_id.len();
         }
 
@@ -605,10 +605,10 @@ pub fn count_tokens_approximately(messages: &[AnyMessage], config: &CountTokensC
 
 fn get_message_openai_role(message: &AnyMessage) -> &'static str {
     match message {
-        AnyMessage::AI(_) => "assistant",
-        AnyMessage::Human(_) => "user",
-        AnyMessage::Tool(_) => "tool",
-        AnyMessage::System(msg) => {
+        AnyMessage::AIMessage(_) => "assistant",
+        AnyMessage::HumanMessage(_) => "user",
+        AnyMessage::ToolMessage(_) => "tool",
+        AnyMessage::SystemMessage(msg) => {
             if msg
                 .additional_kwargs
                 .get("__openai_role__")
@@ -620,8 +620,8 @@ fn get_message_openai_role(message: &AnyMessage) -> &'static str {
                 "system"
             }
         }
-        AnyMessage::Function(_) => "function",
-        AnyMessage::Chat(c) => match c.role.as_str() {
+        AnyMessage::FunctionMessage(_) => "function",
+        AnyMessage::ChatMessage(c) => match c.role.as_str() {
             "user" => "user",
             "assistant" => "assistant",
             "system" => "system",
@@ -629,7 +629,7 @@ fn get_message_openai_role(message: &AnyMessage) -> &'static str {
             "tool" => "tool",
             _ => "user",
         },
-        AnyMessage::Remove(_) => "remove",
+        AnyMessage::RemoveMessage(_) => "remove",
     }
 }
 
@@ -668,19 +668,17 @@ fn convert_single_to_openai_message(
         oai_msg["name"] = serde_json::json!(name);
     }
 
-    if let AnyMessage::Tool(tool_msg) = message {
+    if let AnyMessage::ToolMessage(tool_msg) = message {
         oai_msg["tool_call_id"] = serde_json::json!(tool_msg.tool_call_id);
     }
 
-    if let AnyMessage::AI(ai_msg) = message
+    if let AnyMessage::AIMessage(ai_msg) = message
         && !ai_msg.tool_calls.is_empty()
     {
         oai_msg["tool_calls"] = serde_json::json!(convert_to_openai_tool_calls(&ai_msg.tool_calls));
     }
 
-    if let Some(additional_kwargs) = message.additional_kwargs()
-        && let Some(refusal) = additional_kwargs.get("refusal")
-    {
+    if let Some(refusal) = message.additional_kwargs().get("refusal") {
         oai_msg["refusal"] = refusal.clone();
     }
 
@@ -719,7 +717,7 @@ fn convert_single_to_openai_message(
                     content_blocks.push(block.clone());
                 }
                 "tool_use" => {
-                    if let AnyMessage::AI(ai_msg) = message {
+                    if let AnyMessage::AIMessage(ai_msg) = message {
                         let block_id = block.get("id").and_then(|i| i.as_str()).unwrap_or("");
                         let already_in_tool_calls = ai_msg
                             .tool_calls
@@ -763,7 +761,7 @@ fn convert_single_to_openai_message(
                         .status(super::tool::ToolStatus::from(status.to_string()))
                         .build();
                     tool_messages.extend(convert_single_to_openai_message(
-                        &AnyMessage::Tool(tool_msg),
+                        &AnyMessage::ToolMessage(tool_msg),
                         text_format,
                         include_id,
                     ));
@@ -1128,7 +1126,7 @@ where
 
     let system_message = if config.include_system
         && !messages.is_empty()
-        && matches!(messages.first(), Some(AnyMessage::System(_)))
+        && matches!(messages.first(), Some(AnyMessage::SystemMessage(_)))
     {
         Some(messages.remove(0))
     } else {
@@ -1173,47 +1171,49 @@ where
 
 fn create_message_with_content(original: &AnyMessage, content: &str) -> AnyMessage {
     match original {
-        AnyMessage::Human(m) => AnyMessage::Human(
+        AnyMessage::HumanMessage(m) => AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        AnyMessage::AI(m) => AnyMessage::AI(
+        AnyMessage::AIMessage(m) => AnyMessage::AIMessage(
             AIMessage::builder()
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        AnyMessage::System(m) => AnyMessage::System(
+        AnyMessage::SystemMessage(m) => AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        AnyMessage::Tool(m) => {
+        AnyMessage::ToolMessage(m) => {
             let new_msg = ToolMessage::builder()
                 .content(content)
                 .tool_call_id(&m.tool_call_id)
                 .maybe_id(m.id.clone())
                 .build();
-            AnyMessage::Tool(new_msg)
+            AnyMessage::ToolMessage(new_msg)
         }
-        AnyMessage::Chat(m) => AnyMessage::Chat(
+        AnyMessage::ChatMessage(m) => AnyMessage::ChatMessage(
             ChatMessage::builder()
                 .content(content)
                 .role(&m.role)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        AnyMessage::Function(m) => AnyMessage::Function(
+        AnyMessage::FunctionMessage(m) => AnyMessage::FunctionMessage(
             FunctionMessage::builder()
                 .name(&m.name)
                 .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),
-        AnyMessage::Remove(m) => AnyMessage::Remove(RemoveMessage::builder().id(&m.id).build()),
+        AnyMessage::RemoveMessage(m) => {
+            AnyMessage::RemoveMessage(RemoveMessage::builder().id(&m.id).build())
+        }
     }
 }
 

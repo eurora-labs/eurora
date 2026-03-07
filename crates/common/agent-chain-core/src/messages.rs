@@ -16,10 +16,10 @@ pub use ai::{
 };
 
 pub use base::{
-    AnyMessage, AnyMessageChunk, HasId, MergeableContent, extract_reasoning_from_additional_kwargs,
-    get_bolded_text, get_msg_title_repr, is_interactive_env, merge_content, merge_content_complex,
-    merge_content_vec, message_to_dict as base_message_to_dict,
-    messages_to_dict as base_messages_to_dict,
+    AnyMessage, AnyMessageChunk, BaseMessage, HasId, MergeableContent,
+    extract_reasoning_from_additional_kwargs, get_bolded_text, get_msg_title_repr,
+    is_interactive_env, merge_content, merge_content_complex, merge_content_vec,
+    message_to_dict as base_message_to_dict, messages_to_dict as base_messages_to_dict,
 };
 
 pub use chat::{ChatMessage, ChatMessageChunk};
@@ -57,3 +57,14 @@ pub use utils::{
     merge_message_runs, merge_message_runs_runnable, message_chunk_to_message, message_from_dict,
     message_to_dict, messages_from_dict, messages_to_dict, trim_messages, trim_messages_runnable,
 };
+
+pub mod prelude {
+    pub use super::ai::{AIMessage, AIMessageChunk};
+    pub use super::base::{AnyMessage, AnyMessageChunk, BaseMessage};
+    pub use super::chat::{ChatMessage, ChatMessageChunk};
+    pub use super::function::{FunctionMessage, FunctionMessageChunk};
+    pub use super::human::{HumanMessage, HumanMessageChunk};
+    pub use super::modifier::RemoveMessage;
+    pub use super::system::{SystemMessage, SystemMessageChunk};
+    pub use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
+}

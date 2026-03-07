@@ -3,7 +3,6 @@
 fn test_all_imports() {
     use agent_chain_core::messages::AIMessage;
     use agent_chain_core::messages::AIMessageChunk;
-    use agent_chain_core::messages::AnyMessage;
     use agent_chain_core::messages::ChatMessage;
     use agent_chain_core::messages::ChatMessageChunk;
     use agent_chain_core::messages::FunctionMessage;
@@ -15,6 +14,7 @@ fn test_all_imports() {
     use agent_chain_core::messages::SystemMessageChunk;
     use agent_chain_core::messages::ToolMessage;
     use agent_chain_core::messages::ToolMessageChunk;
+    use agent_chain_core::messages::{AnyMessage, BaseMessage};
 
     use agent_chain_core::messages::InvalidToolCall;
     use agent_chain_core::messages::ToolCall;
@@ -100,28 +100,30 @@ fn test_base_message_variants() {
         SystemMessage, ToolMessage,
     };
 
-    let _human = AnyMessage::Human(HumanMessage::builder().content("test").build());
-    let _ai = AnyMessage::AI(AIMessage::builder().content("test").build());
-    let _system = AnyMessage::System(SystemMessage::builder().content("test").build());
-    let _chat = AnyMessage::Chat(ChatMessage::builder().content("test").role("user").build());
-    let _function = AnyMessage::Function(
+    let _human = AnyMessage::HumanMessage(HumanMessage::builder().content("test").build());
+    let _ai = AnyMessage::AIMessage(AIMessage::builder().content("test").build());
+    let _system = AnyMessage::SystemMessage(SystemMessage::builder().content("test").build());
+    let _chat =
+        AnyMessage::ChatMessage(ChatMessage::builder().content("test").role("user").build());
+    let _function = AnyMessage::FunctionMessage(
         FunctionMessage::builder()
             .content("test")
             .name("func")
             .build(),
     );
-    let _tool = AnyMessage::Tool(
+    let _tool = AnyMessage::ToolMessage(
         ToolMessage::builder()
             .content("test")
             .tool_call_id("call-123")
             .build(),
     );
-    let _remove = AnyMessage::Remove(RemoveMessage::builder().id("msg-123").build());
+    let _remove = AnyMessage::RemoveMessage(RemoveMessage::builder().id("msg-123").build());
 }
 
 #[test]
 #[allow(unused_imports)]
 fn test_trait_imports() {
+    use agent_chain_core::messages::prelude::*;
     let msg = agent_chain_core::messages::HumanMessage::builder()
         .content("test")
         .build();

@@ -188,16 +188,16 @@ impl ChatAnthropic {
 
         for msg in messages {
             match msg {
-                AnyMessage::System(m) => {
+                AnyMessage::SystemMessage(m) => {
                     system_message = Some(m.content.as_text().to_string());
                 }
-                AnyMessage::Human(m) => {
+                AnyMessage::HumanMessage(m) => {
                     thread.push(serde_json::json!({
                         "role": "user",
                         "content": m.content.as_text()
                     }));
                 }
-                AnyMessage::AI(m) => {
+                AnyMessage::AIMessage(m) => {
                     let mut content: Vec<serde_json::Value> = Vec::new();
 
                     if !m.content.is_empty() {
@@ -221,7 +221,7 @@ impl ChatAnthropic {
                         "content": content
                     }));
                 }
-                AnyMessage::Tool(m) => {
+                AnyMessage::ToolMessage(m) => {
                     thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
@@ -231,7 +231,7 @@ impl ChatAnthropic {
                         }]
                     }));
                 }
-                AnyMessage::Chat(m) => {
+                AnyMessage::ChatMessage(m) => {
                     let role = match m.role.as_str() {
                         "user" | "human" => "user",
                         "assistant" | "ai" => "assistant",
@@ -242,7 +242,7 @@ impl ChatAnthropic {
                         "content": m.content
                     }));
                 }
-                AnyMessage::Function(m) => {
+                AnyMessage::FunctionMessage(m) => {
                     thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
@@ -252,7 +252,7 @@ impl ChatAnthropic {
                         }]
                     }));
                 }
-                AnyMessage::Remove(_) => {
+                AnyMessage::RemoveMessage(_) => {
                     continue;
                 }
             }
@@ -343,7 +343,7 @@ impl ChatAnthropic {
             return Err(Error::other("No generations returned"));
         }
         match result.generations[0].message.clone() {
-            AnyMessage::AI(msg) => Ok(msg),
+            AnyMessage::AIMessage(msg) => Ok(msg),
             _ => Err(Error::other("Expected AI message")),
         }
     }

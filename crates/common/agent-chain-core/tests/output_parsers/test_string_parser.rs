@@ -46,7 +46,7 @@ fn test_str_output_parser_parse_unicode() {
 fn test_str_output_parser_invoke_with_message() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(AnyMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
     assert_eq!(result, "Hello from AI");
 }
 
@@ -54,7 +54,9 @@ fn test_str_output_parser_invoke_with_message() {
 fn test_str_output_parser_invoke_with_human_message() {
     let parser = StrOutputParser::new();
     let message = HumanMessage::builder().content("Hello from human").build();
-    let result = parser.invoke(AnyMessage::Human(message), None).unwrap();
+    let result = parser
+        .invoke(AnyMessage::HumanMessage(message), None)
+        .unwrap();
     assert_eq!(result, "Hello from human");
 }
 
@@ -62,7 +64,7 @@ fn test_str_output_parser_invoke_with_human_message() {
 fn test_str_output_parser_invoke_with_ai_message() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(AnyMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
     assert_eq!(result, "Hello from AI");
 }
 
@@ -79,7 +81,7 @@ fn test_str_output_parser_parse_result_with_chat_generation() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Chat generated text").build();
     let chat_generation = ChatGeneration::builder()
-        .message(AnyMessage::AI(message))
+        .message(AnyMessage::AIMessage(message))
         .build();
     let generation = Generation::builder().text(&chat_generation.text).build();
     let result = parser.parse_result(&[generation], false).unwrap();
@@ -156,7 +158,7 @@ async fn test_str_output_parser_with_model_chain() {
 
     let model_output = model
         ._generate(
-            vec![AnyMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("input").build(),
             )],
             None,
@@ -180,7 +182,7 @@ async fn test_str_output_parser_with_model_stream() {
 
     let stream = model
         ._stream(
-            vec![AnyMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("input").build(),
             )],
             None,
@@ -204,7 +206,7 @@ async fn test_str_output_parser_with_model_stream() {
 fn test_str_output_parser_with_empty_content() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("").build();
-    let result = parser.invoke(AnyMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
     assert_eq!(result, "");
 }
 

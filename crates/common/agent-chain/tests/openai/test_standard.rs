@@ -830,7 +830,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                AnyMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_message,
             ]
             .into(),

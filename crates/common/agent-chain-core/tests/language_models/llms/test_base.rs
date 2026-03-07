@@ -95,7 +95,7 @@ fn test_convert_message_sequence_input() {
     let llm = FakeListLLM::builder()
         .responses(vec!["r".to_string()])
         .build();
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hi").build(),
     )];
     let result = llm
@@ -402,7 +402,7 @@ async fn test_generate_prompt_with_message_input() {
     let llm = FakeListLLM::builder()
         .responses(vec!["chat_resp".to_string()])
         .build();
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hi there").build(),
     )];
     let result = llm

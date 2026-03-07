@@ -5,19 +5,19 @@ use agent_chain_core::language_models::{
     FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig,
     LanguageModelInput, ModelProfile,
 };
-use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage, SystemMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use async_trait::async_trait;
 use futures::StreamExt;
 
 fn create_messages() -> Vec<AnyMessage> {
     vec![
-        AnyMessage::System(
+        AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content("You are a test user.")
                 .build(),
         ),
-        AnyMessage::Human(
+        AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content("Hello, I am a test user.")
                 .build(),
@@ -27,12 +27,12 @@ fn create_messages() -> Vec<AnyMessage> {
 
 fn create_messages_2() -> Vec<AnyMessage> {
     vec![
-        AnyMessage::System(
+        AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content("You are a test user.")
                 .build(),
         ),
-        AnyMessage::Human(
+        AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content("Hello, I not a test user.")
                 .build(),
@@ -903,10 +903,10 @@ async fn test_generate_basic() {
     let model = FakeListChatModel::builder()
         .responses(vec!["gen1".to_string(), "gen2".to_string()])
         .build();
-    let messages1 = vec![AnyMessage::Human(
+    let messages1 = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("test1").build(),
     )];
-    let messages2 = vec![AnyMessage::Human(
+    let messages2 = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("test2").build(),
     )];
 
@@ -925,12 +925,12 @@ fn test_generate_from_stream_accumulates_chunks() {
 
     let chunks = vec![
         ChatGenerationChunk::builder()
-            .message(AnyMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content("hello").build(),
             ))
             .build(),
         ChatGenerationChunk::builder()
-            .message(AnyMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content(" world").build(),
             ))
             .build(),
@@ -947,7 +947,7 @@ fn test_generate_from_stream_single_chunk() {
 
     let chunks = vec![
         ChatGenerationChunk::builder()
-            .message(AnyMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content("single").build(),
             ))
             .build(),
@@ -972,12 +972,12 @@ async fn test_agenerate_from_stream_accumulates_chunks() {
 
     let chunks = vec![
         Ok(ChatGenerationChunk::builder()
-            .message(AnyMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content("hello").build(),
             ))
             .build()),
         Ok(ChatGenerationChunk::builder()
-            .message(AnyMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content(" world").build(),
             ))
             .build()),
@@ -1111,14 +1111,14 @@ fn test_convert_input_from_string() {
         .convert_input(LanguageModelInput::from("hello world"))
         .unwrap();
     assert_eq!(result.len(), 1);
-    assert!(matches!(&result[0], AnyMessage::Human(_)));
+    assert!(matches!(&result[0], AnyMessage::HumanMessage(_)));
     assert_eq!(result[0].content(), "hello world");
 }
 
 #[test]
 fn test_convert_input_from_message_sequence() {
     let model = agent_chain_core::FakeChatModel::builder().build();
-    let messages = vec![AnyMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hi").build(),
     )];
     let result = model
@@ -1135,7 +1135,7 @@ async fn test_generate_single_message_list() {
         .build();
     let result = model
         .generate(
-            vec![vec![AnyMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hello").build(),
             )]],
             GenerateConfig::default(),
@@ -1153,13 +1153,13 @@ async fn test_generate_multiple_message_lists() {
     let result = model
         .generate(
             vec![
-                vec![AnyMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p1").build(),
                 )],
-                vec![AnyMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p2").build(),
                 )],
-                vec![AnyMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p3").build(),
                 )],
             ],
@@ -1177,7 +1177,7 @@ async fn test_generate_returns_chat_result() {
         .build();
     let result = model
         .generate(
-            vec![vec![AnyMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )]],
             GenerateConfig::default(),
@@ -1200,7 +1200,7 @@ async fn test_agenerate_single_message_list() {
         .build();
     let result = model
         .agenerate(
-            vec![vec![AnyMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hello").build(),
             )]],
             GenerateConfig::default(),
@@ -1218,10 +1218,10 @@ async fn test_agenerate_multiple_message_lists() {
     let result = model
         .agenerate(
             vec![
-                vec![AnyMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p1").build(),
                 )],
-                vec![AnyMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p2").build(),
                 )],
             ],
@@ -1239,7 +1239,7 @@ async fn test_agenerate_returns_chat_result() {
         .build();
     let result = model
         .agenerate(
-            vec![vec![AnyMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )]],
             GenerateConfig::default(),
@@ -1268,7 +1268,7 @@ async fn test_simple_chat_model_generate_wraps_call() {
     let model = agent_chain_core::FakeChatModel::builder().build();
     let result = model
         ._generate(
-            vec![AnyMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hello").build(),
             )],
             None,
@@ -1285,7 +1285,7 @@ async fn test_simple_fake_chat_generate_returns_chat_result() {
     let model = agent_chain_core::FakeChatModel::builder().build();
     let result = model
         ._generate(
-            vec![AnyMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )],
             None,
@@ -1294,7 +1294,10 @@ async fn test_simple_fake_chat_generate_returns_chat_result() {
         .await
         .unwrap();
     assert_eq!(result.generations.len(), 1);
-    assert!(matches!(result.generations[0].message, AnyMessage::AI(_)));
+    assert!(matches!(
+        result.generations[0].message,
+        AnyMessage::AIMessage(_)
+    ));
 }
 
 #[tokio::test]
@@ -1302,7 +1305,7 @@ async fn test_simple_fake_chat_agenerate_returns_chat_result() {
     let model = agent_chain_core::FakeChatModel::builder().build();
     let result = model
         ._generate(
-            vec![AnyMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )],
             None,

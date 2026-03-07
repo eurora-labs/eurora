@@ -253,7 +253,7 @@ impl RunnableWithMessageHistory {
         };
 
         if let Some(s) = value.as_str() {
-            return Ok(vec![AnyMessage::Human(
+            return Ok(vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content(s).build(),
             )]);
         }
@@ -325,7 +325,7 @@ impl RunnableWithMessageHistory {
         };
 
         if let Some(s) = value.as_str() {
-            return Ok(vec![AnyMessage::AI(
+            return Ok(vec![AnyMessage::AIMessage(
                 AIMessage::builder().content(s).build(),
             )]);
         }
