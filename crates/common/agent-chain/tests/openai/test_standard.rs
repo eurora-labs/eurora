@@ -2,7 +2,7 @@ use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_core::ToolChoice;
 use agent_chain_core::language_models::ToolLike;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, ToolCall, ToolMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage, ToolCall, ToolMessage};
 use futures::StreamExt;
 
 const MODEL: &str = "gpt-4o-mini";
@@ -109,7 +109,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
         AIMessage::builder().content("hello").build().into(),
         HumanMessage::builder()
@@ -130,7 +130,7 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
         HumanMessage::builder()
             .content("how are you")
@@ -426,7 +426,7 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
@@ -474,7 +474,7 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
@@ -522,7 +522,7 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
@@ -692,7 +692,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
     let model = make_model();
     let structured = model.with_structured_output(joke_schema, false)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Tell me a joke about cats.")
             .build()
@@ -805,7 +805,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(weather_tool)], None)?;
 
-    let input_message: BaseMessage = HumanMessage::builder()
+    let input_message: AnyMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")
         .build()
         .into();
@@ -819,7 +819,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(tool_call.name, "get_weather");
 
     // Step 2: Simulate tool execution
-    let tool_message: BaseMessage = ToolMessage::builder()
+    let tool_message: AnyMessage = ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
         .build()
@@ -830,7 +830,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                BaseMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_message,
             ]
             .into(),
@@ -1259,7 +1259,7 @@ async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(random_image_schema)], None)?;
 
     // OpenAI image_url format in ToolMessage
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("get a random diagram using the tool and describe it")
             .build()
@@ -1322,7 +1322,7 @@ async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(random_pdf_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Get a random PDF and relay the title verbatim.")
             .build()
@@ -1382,7 +1382,7 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["fav_color"]
     });
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         SystemMessage::builder()
             .content("you're a good assistant")
             .build()
@@ -1424,7 +1424,7 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
     assert!(!result.text().is_empty());
 
     // Test thinking blocks
-    let messages2: Vec<BaseMessage> = vec![
+    let messages2: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("Hello").build().into(),
         AIMessage::builder()
             .content(MessageContent::Parts(vec![

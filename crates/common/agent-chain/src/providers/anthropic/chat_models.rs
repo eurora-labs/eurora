@@ -16,7 +16,7 @@ use crate::chat_models::{BaseChatModel, ChatModelConfig, LangSmithParams};
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
 use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
-use crate::messages::{AIMessage, BaseMessage, ToolCall};
+use crate::messages::{AIMessage, AnyMessage, ToolCall};
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
 use crate::runnables::base::Runnable;
 use crate::tools::ToolDefinition;
@@ -182,25 +182,22 @@ impl ChatAnthropic {
     }
 
     /// Convert messages to Anthropic API format.
-    fn format_messages(
-        &self,
-        messages: &[BaseMessage],
-    ) -> (Option<String>, Vec<serde_json::Value>) {
+    fn format_messages(&self, messages: &[AnyMessage]) -> (Option<String>, Vec<serde_json::Value>) {
         let mut system_message = None;
         let mut thread = Vec::new();
 
         for msg in messages {
             match msg {
-                BaseMessage::System(m) => {
+                AnyMessage::SystemMessage(m) => {
                     system_message = Some(m.content.as_text().to_string());
                 }
-                BaseMessage::Human(m) => {
+                AnyMessage::HumanMessage(m) => {
                     thread.push(serde_json::json!({
                         "role": "user",
                         "content": m.content.as_text()
                     }));
                 }
-                BaseMessage::AI(m) => {
+                AnyMessage::AIMessage(m) => {
                     let mut content: Vec<serde_json::Value> = Vec::new();
 
                     if !m.content.is_empty() {
@@ -224,7 +221,7 @@ impl ChatAnthropic {
                         "content": content
                     }));
                 }
-                BaseMessage::Tool(m) => {
+                AnyMessage::ToolMessage(m) => {
                     thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
@@ -234,7 +231,7 @@ impl ChatAnthropic {
                         }]
                     }));
                 }
-                BaseMessage::Chat(m) => {
+                AnyMessage::ChatMessage(m) => {
                     let role = match m.role.as_str() {
                         "user" | "human" => "user",
                         "assistant" | "ai" => "assistant",
@@ -245,7 +242,7 @@ impl ChatAnthropic {
                         "content": m.content
                     }));
                 }
-                BaseMessage::Function(m) => {
+                AnyMessage::FunctionMessage(m) => {
                     thread.push(serde_json::json!({
                         "role": "user",
                         "content": [{
@@ -255,7 +252,7 @@ impl ChatAnthropic {
                         }]
                     }));
                 }
-                BaseMessage::Remove(_) => {
+                AnyMessage::RemoveMessage(_) => {
                     continue;
                 }
             }
@@ -267,7 +264,7 @@ impl ChatAnthropic {
     /// Build the request payload.
     fn build_request_payload(
         &self,
-        messages: &[BaseMessage],
+        messages: &[AnyMessage],
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
     ) -> serde_json::Value {
@@ -346,7 +343,7 @@ impl ChatAnthropic {
             return Err(Error::other("No generations returned"));
         }
         match result.generations[0].message.clone() {
-            BaseMessage::AI(msg) => Ok(msg),
+            AnyMessage::AIMessage(msg) => Ok(msg),
             _ => Err(Error::other("Expected AI message")),
         }
     }
@@ -403,7 +400,7 @@ impl BaseChatModel for ChatAnthropic {
 
     async fn _generate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -424,7 +421,7 @@ impl BaseChatModel for ChatAnthropic {
 
     async fn generate_with_tools(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
@@ -527,7 +524,7 @@ impl ChatAnthropic {
     /// Internal generate implementation.
     async fn _generate_internal(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -544,7 +541,7 @@ impl ChatAnthropic {
     /// Internal generate with tools implementation.
     async fn generate_with_tools_internal(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,

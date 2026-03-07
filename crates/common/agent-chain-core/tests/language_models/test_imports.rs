@@ -8,7 +8,6 @@ fn test_all_imports() {
         "LLM",
         "LangSmithParams",
         "LanguageModelInput",
-        "LanguageModelOutput",
         "LanguageModelLike",
         "get_tokenizer",
         "FakeMessagesListChatModel",
@@ -24,7 +23,7 @@ fn test_all_imports() {
 
     assert_eq!(
         EXPECTED_ALL.len(),
-        19,
-        "Expected 19 exports from language_models module"
+        18,
+        "Expected 18 exports from language_models module"
     );
 }

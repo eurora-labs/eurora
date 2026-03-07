@@ -90,12 +90,12 @@ fn test_convert_prompt_value_input() {
 
 #[test]
 fn test_convert_message_sequence_input() {
-    use agent_chain_core::messages::{BaseMessage, HumanMessage};
+    use agent_chain_core::messages::{AnyMessage, HumanMessage};
 
     let llm = FakeListLLM::builder()
         .responses(vec!["r".to_string()])
         .build();
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hi").build(),
     )];
     let result = llm
@@ -397,12 +397,12 @@ async fn test_agenerate_prompt_converts_prompt_values() {
 
 #[tokio::test]
 async fn test_generate_prompt_with_message_input() {
-    use agent_chain_core::messages::{BaseMessage, HumanMessage};
+    use agent_chain_core::messages::{AnyMessage, HumanMessage};
 
     let llm = FakeListLLM::builder()
         .responses(vec!["chat_resp".to_string()])
         .build();
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hi there").build(),
     )];
     let result = llm

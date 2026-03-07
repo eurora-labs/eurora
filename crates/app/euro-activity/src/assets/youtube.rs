@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{AnyMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::NativeYoutubeAsset;
 use serde::{Deserialize, Serialize};
@@ -68,7 +68,7 @@ impl AssetFunctionality for YoutubeAsset {
         Some("youtube")
     }
 
-    fn construct_messages(&self) -> Vec<BaseMessage> {
+    fn construct_messages(&self) -> Vec<AnyMessage> {
         let transcript_content = format!(
             "The user is watching a YouTube video titled '{}'. \
              Here's the transcript of the video: \n {}",
@@ -210,7 +210,7 @@ mod tests {
         );
         let messages = AssetFunctionality::construct_messages(&asset);
         assert_eq!(messages.len(), 1);
-        assert!(matches!(messages[0], BaseMessage::Human(_)));
+        assert!(matches!(messages[0], AnyMessage::HumanMessage(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(chip.is_some());
     }

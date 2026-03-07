@@ -288,7 +288,7 @@ async fn test_convert_cached_generations_legacy_format() {
 
     cache.clear();
 
-    let messages = vec![agent_chain_core::messages::BaseMessage::from("legacy test")];
+    let messages = vec![agent_chain_core::messages::AnyMessage::from("legacy test")];
     let prompt_key = serde_json::to_string(&messages).unwrap();
     let llm_string = model._get_llm_string(None, None);
 

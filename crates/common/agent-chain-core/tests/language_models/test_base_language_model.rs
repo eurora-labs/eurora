@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use agent_chain_core::language_models::{
     BaseLanguageModel, FakeListLLM, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput, get_token_ids_default,
+    get_token_ids_default,
 };
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::prompt_values::StringPromptValue;
 
 #[cfg(test)]
@@ -241,7 +241,7 @@ mod test_language_model_input {
 
     #[test]
     fn test_language_model_input_accepts_message_sequence() {
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello").build(),
         )];
         let input: LanguageModelInput = messages.into();
@@ -261,7 +261,7 @@ mod test_language_model_input {
 
         assert_eq!(messages.len(), 1);
         match &messages[0] {
-            BaseMessage::Human(m) => {
+            AnyMessage::HumanMessage(m) => {
                 assert_eq!(m.content.as_text(), "hello");
             }
             _ => panic!("Expected Human message"),
@@ -277,34 +277,19 @@ mod test_language_model_input {
 }
 
 #[cfg(test)]
-mod test_language_model_output {
+mod test_ai_message_output {
     use super::*;
 
     #[test]
-    fn test_language_model_output_accepts_string() {
-        let output: LanguageModelOutput = "test output".to_string().into();
-        assert_eq!(output.text(), "test output");
-    }
-
-    #[test]
-    fn test_language_model_output_accepts_ai_message() {
+    fn test_ai_message_text() {
         let message = AIMessage::builder().content("test message").build();
-        let output: LanguageModelOutput = message.into();
-        assert_eq!(output.text(), "test message");
+        assert_eq!(message.text(), "test message");
     }
 
     #[test]
-    fn test_language_model_output_into_text() {
-        let output: LanguageModelOutput = "hello".to_string().into();
-        let text = output.into_text();
-        assert_eq!(text, "hello");
-    }
-
-    #[test]
-    fn test_language_model_output_message_variant() {
-        let ai_message = AIMessage::builder().content("direct message").build();
-        let output = LanguageModelOutput::message(ai_message);
-        assert_eq!(output.text(), "direct message");
+    fn test_ai_message_content() {
+        let message = AIMessage::builder().content("direct message").build();
+        assert_eq!(message.text(), "direct message");
     }
 }
 
@@ -491,8 +476,8 @@ mod test_base_language_model_trait {
             .build();
 
         let messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hi").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hello").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hi").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hello").build()),
         ];
 
         let result = model.get_num_tokens_from_messages(&messages, None);
@@ -507,7 +492,7 @@ mod test_base_language_model_trait {
             .responses(vec!["response".to_string()])
             .build();
 
-        let messages: Vec<BaseMessage> = vec![];
+        let messages: Vec<AnyMessage> = vec![];
 
         let result = model.get_num_tokens_from_messages(&messages, None);
         assert_eq!(result, 0);
@@ -624,7 +609,7 @@ mod test_get_num_tokens_from_messages_edge_cases {
         let model = FakeListLLM::builder()
             .responses(vec!["response".to_string()])
             .build();
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello world").build(),
         )];
         let result = model.get_num_tokens_from_messages(&messages, None);

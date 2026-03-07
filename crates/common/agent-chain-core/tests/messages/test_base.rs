@@ -1,5 +1,6 @@
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    AIMessage, BaseMessage, ContentBlock, ContentPart, HumanMessage, HumanMessageChunk,
+    AIMessage, AnyMessage, ContentBlock, ContentPart, HumanMessage, HumanMessageChunk,
     MergeableContent, MessageContent, SystemMessage, SystemMessageChunk, TextContentBlock,
     extract_reasoning_from_additional_kwargs, get_msg_title_repr, merge_content,
     merge_content_complex, message_to_dict, messages_to_dict,
@@ -254,7 +255,7 @@ fn test_message_to_dict_human_message() {
         .id("msg1".to_string())
         .name("user1".to_string())
         .build();
-    let result = message_to_dict(&BaseMessage::Human(msg));
+    let result = message_to_dict(&AnyMessage::HumanMessage(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "human");
     assert_eq!(
         result
@@ -294,7 +295,7 @@ fn test_message_to_dict_ai_message() {
         .content("Hi there")
         .id("ai1".to_string())
         .build();
-    let result = message_to_dict(&BaseMessage::AI(msg));
+    let result = message_to_dict(&AnyMessage::AIMessage(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "ai");
     assert_eq!(
         result
@@ -323,7 +324,7 @@ fn test_message_to_dict_system_message() {
     let msg = SystemMessage::builder()
         .content("You are a helpful assistant")
         .build();
-    let result = message_to_dict(&BaseMessage::System(msg));
+    let result = message_to_dict(&AnyMessage::SystemMessage(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "system");
     assert_eq!(
         result
@@ -349,7 +350,7 @@ fn test_message_to_dict_with_additional_kwargs() {
         .content("Hello")
         .additional_kwargs(additional_kwargs)
         .build();
-    let result = message_to_dict(&BaseMessage::AI(msg));
+    let result = message_to_dict(&AnyMessage::AIMessage(msg));
     assert_eq!(
         result
             .get("data")
@@ -369,9 +370,9 @@ fn test_message_to_dict_with_additional_kwargs() {
 #[test]
 fn test_messages_to_dict_multiple_messages() {
     let messages = vec![
-        BaseMessage::System(SystemMessage::builder().content("System").build()),
-        BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-        BaseMessage::AI(AIMessage::builder().content("Hi").build()),
+        AnyMessage::SystemMessage(SystemMessage::builder().content("System").build()),
+        AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+        AnyMessage::AIMessage(AIMessage::builder().content("Hi").build()),
     ];
     let result = messages_to_dict(&messages);
     assert_eq!(result.len(), 3);
@@ -382,7 +383,7 @@ fn test_messages_to_dict_multiple_messages() {
 
 #[test]
 fn test_messages_to_dict_empty_list() {
-    let messages: Vec<BaseMessage> = vec![];
+    let messages: Vec<AnyMessage> = vec![];
     let result = messages_to_dict(&messages);
     assert!(result.is_empty());
 }
@@ -769,7 +770,7 @@ fn test_pretty_print_does_not_raise_ai() {
     let msg = AIMessage::builder()
         .content("I'm doing well, thanks!")
         .build();
-    let base = BaseMessage::AI(msg);
+    let base = AnyMessage::AIMessage(msg);
     base.pretty_print(); // Should not panic
 }
 

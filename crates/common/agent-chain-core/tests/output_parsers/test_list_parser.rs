@@ -1,4 +1,4 @@
-use agent_chain_core::ParserInput;
+use agent_chain_core::messages::AnyMessage;
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, CommaSeparatedListOutputParser,
     MarkdownListOutputParser, NumberedListOutputParser,
@@ -7,7 +7,7 @@ use futures::StreamExt;
 
 async fn transform_add<P: BaseTransformOutputParser<Output = Vec<String>>>(
     parser: &P,
-    chunks: Vec<ParserInput>,
+    chunks: Vec<AnyMessage>,
 ) -> Vec<String> {
     let input_stream = futures::stream::iter(chunks);
     parser
@@ -22,7 +22,7 @@ async fn transform_add<P: BaseTransformOutputParser<Output = Vec<String>>>(
 
 async fn transform_list<P: BaseTransformOutputParser<Output = Vec<String>>>(
     parser: &P,
-    chunks: Vec<ParserInput>,
+    chunks: Vec<AnyMessage>,
 ) -> Vec<Vec<String>> {
     let input_stream = futures::stream::iter(chunks);
     parser
@@ -32,42 +32,42 @@ async fn transform_list<P: BaseTransformOutputParser<Output = Vec<String>>>(
         .await
 }
 
-fn char_chunks(text: &str) -> Vec<ParserInput> {
+fn char_chunks(text: &str) -> Vec<AnyMessage> {
     text.chars()
-        .map(|c| ParserInput::from(c.to_string()))
+        .map(|c| AnyMessage::from(c.to_string()))
         .collect()
 }
 
-fn line_chunks(text: &str) -> Vec<ParserInput> {
+fn line_chunks(text: &str) -> Vec<AnyMessage> {
     let mut chunks = Vec::new();
     let mut start = 0;
     for (idx, ch) in text.char_indices() {
         if ch == '\n' {
-            chunks.push(ParserInput::from(&text[start..=idx]));
+            chunks.push(AnyMessage::from(&text[start..=idx]));
             start = idx + 1;
         }
     }
     if start < text.len() {
-        chunks.push(ParserInput::from(&text[start..]));
+        chunks.push(AnyMessage::from(&text[start..]));
     }
     chunks
 }
 
-fn word_chunks(text: &str) -> Vec<ParserInput> {
+fn word_chunks(text: &str) -> Vec<AnyMessage> {
     text.split(' ')
         .enumerate()
         .map(|(i, word)| {
             if i > 0 {
-                ParserInput::from(format!(" {word}"))
+                AnyMessage::from(format!(" {word}"))
             } else {
-                ParserInput::from(word)
+                AnyMessage::from(word)
             }
         })
         .collect()
 }
 
-fn single_chunk(text: &str) -> Vec<ParserInput> {
-    vec![ParserInput::from(text)]
+fn single_chunk(text: &str) -> Vec<AnyMessage> {
+    vec![AnyMessage::from(text)]
 }
 
 #[tokio::test]

@@ -867,7 +867,7 @@ impl crate::callbacks::BaseCallbackHandler for LogStreamCallbackHandlerBridge {
     fn on_chat_model_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
-        messages: &[Vec<crate::messages::BaseMessage>],
+        messages: &[Vec<crate::messages::AnyMessage>],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,

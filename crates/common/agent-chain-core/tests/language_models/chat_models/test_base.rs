@@ -5,19 +5,19 @@ use agent_chain_core::language_models::{
     FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig,
     LanguageModelInput, ModelProfile,
 };
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, SystemMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use async_trait::async_trait;
 use futures::StreamExt;
 
-fn create_messages() -> Vec<BaseMessage> {
+fn create_messages() -> Vec<AnyMessage> {
     vec![
-        BaseMessage::System(
+        AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content("You are a test user.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content("Hello, I am a test user.")
                 .build(),
@@ -25,14 +25,14 @@ fn create_messages() -> Vec<BaseMessage> {
     ]
 }
 
-fn create_messages_2() -> Vec<BaseMessage> {
+fn create_messages_2() -> Vec<AnyMessage> {
     vec![
-        BaseMessage::System(
+        AnyMessage::SystemMessage(
             SystemMessage::builder()
                 .content("You are a test user.")
                 .build(),
         ),
-        BaseMessage::Human(
+        AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .content("Hello, I not a test user.")
                 .build(),
@@ -106,7 +106,7 @@ impl BaseChatModel for ModelWithGenerateOnly {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -120,7 +120,7 @@ impl BaseChatModel for ModelWithGenerateOnly {
 async fn test_astream_fallback_to_ainvoke() {
     let model = ModelWithGenerateOnly::new();
 
-    let chunks: Vec<BaseMessage> = {
+    let chunks: Vec<AnyMessage> = {
         let result = model
             ._generate(vec![], None, None)
             .await
@@ -186,7 +186,7 @@ impl BaseChatModel for ModelWithSyncStream {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -195,7 +195,7 @@ impl BaseChatModel for ModelWithSyncStream {
 
     fn _stream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -283,7 +283,7 @@ impl BaseChatModel for ModelWithAsyncStream {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -292,7 +292,7 @@ impl BaseChatModel for ModelWithAsyncStream {
 
     async fn _astream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -399,7 +399,7 @@ impl BaseChatModel for NoStreamingModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -488,7 +488,7 @@ impl BaseChatModel for StreamingModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -499,7 +499,7 @@ impl BaseChatModel for StreamingModel {
 
     fn _stream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -681,7 +681,7 @@ impl BaseChatModel for LSParamsModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -894,7 +894,7 @@ async fn test_stream_basic() {
     }
 
     assert_eq!(chunks.len(), 5);
-    let text: String = chunks.iter().map(|c| c.text.as_str()).collect();
+    let text: String = chunks.iter().map(|c| c.message.text()).collect();
     assert_eq!(text, "hello");
 }
 
@@ -903,10 +903,10 @@ async fn test_generate_basic() {
     let model = FakeListChatModel::builder()
         .responses(vec!["gen1".to_string(), "gen2".to_string()])
         .build();
-    let messages1 = vec![BaseMessage::Human(
+    let messages1 = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("test1").build(),
     )];
-    let messages2 = vec![BaseMessage::Human(
+    let messages2 = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("test2").build(),
     )];
 
@@ -925,12 +925,12 @@ fn test_generate_from_stream_accumulates_chunks() {
 
     let chunks = vec![
         ChatGenerationChunk::builder()
-            .message(BaseMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content("hello").build(),
             ))
             .build(),
         ChatGenerationChunk::builder()
-            .message(BaseMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content(" world").build(),
             ))
             .build(),
@@ -947,7 +947,7 @@ fn test_generate_from_stream_single_chunk() {
 
     let chunks = vec![
         ChatGenerationChunk::builder()
-            .message(BaseMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content("single").build(),
             ))
             .build(),
@@ -972,12 +972,12 @@ async fn test_agenerate_from_stream_accumulates_chunks() {
 
     let chunks = vec![
         Ok(ChatGenerationChunk::builder()
-            .message(BaseMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content("hello").build(),
             ))
             .build()),
         Ok(ChatGenerationChunk::builder()
-            .message(BaseMessage::AI(
+            .message(AnyMessage::AIMessage(
                 AIMessage::builder().content(" world").build(),
             ))
             .build()),
@@ -1111,14 +1111,14 @@ fn test_convert_input_from_string() {
         .convert_input(LanguageModelInput::from("hello world"))
         .unwrap();
     assert_eq!(result.len(), 1);
-    assert!(matches!(&result[0], BaseMessage::Human(_)));
+    assert!(matches!(&result[0], AnyMessage::HumanMessage(_)));
     assert_eq!(result[0].content(), "hello world");
 }
 
 #[test]
 fn test_convert_input_from_message_sequence() {
     let model = agent_chain_core::FakeChatModel::builder().build();
-    let messages = vec![BaseMessage::Human(
+    let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hi").build(),
     )];
     let result = model
@@ -1135,7 +1135,7 @@ async fn test_generate_single_message_list() {
         .build();
     let result = model
         .generate(
-            vec![vec![BaseMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hello").build(),
             )]],
             GenerateConfig::default(),
@@ -1153,13 +1153,13 @@ async fn test_generate_multiple_message_lists() {
     let result = model
         .generate(
             vec![
-                vec![BaseMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p1").build(),
                 )],
-                vec![BaseMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p2").build(),
                 )],
-                vec![BaseMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p3").build(),
                 )],
             ],
@@ -1177,7 +1177,7 @@ async fn test_generate_returns_chat_result() {
         .build();
     let result = model
         .generate(
-            vec![vec![BaseMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )]],
             GenerateConfig::default(),
@@ -1200,7 +1200,7 @@ async fn test_agenerate_single_message_list() {
         .build();
     let result = model
         .agenerate(
-            vec![vec![BaseMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hello").build(),
             )]],
             GenerateConfig::default(),
@@ -1218,10 +1218,10 @@ async fn test_agenerate_multiple_message_lists() {
     let result = model
         .agenerate(
             vec![
-                vec![BaseMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p1").build(),
                 )],
-                vec![BaseMessage::Human(
+                vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p2").build(),
                 )],
             ],
@@ -1239,7 +1239,7 @@ async fn test_agenerate_returns_chat_result() {
         .build();
     let result = model
         .agenerate(
-            vec![vec![BaseMessage::Human(
+            vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )]],
             GenerateConfig::default(),
@@ -1268,7 +1268,7 @@ async fn test_simple_chat_model_generate_wraps_call() {
     let model = agent_chain_core::FakeChatModel::builder().build();
     let result = model
         ._generate(
-            vec![BaseMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hello").build(),
             )],
             None,
@@ -1285,7 +1285,7 @@ async fn test_simple_fake_chat_generate_returns_chat_result() {
     let model = agent_chain_core::FakeChatModel::builder().build();
     let result = model
         ._generate(
-            vec![BaseMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )],
             None,
@@ -1294,7 +1294,10 @@ async fn test_simple_fake_chat_generate_returns_chat_result() {
         .await
         .unwrap();
     assert_eq!(result.generations.len(), 1);
-    assert!(matches!(result.generations[0].message, BaseMessage::AI(_)));
+    assert!(matches!(
+        result.generations[0].message,
+        AnyMessage::AIMessage(_)
+    ));
 }
 
 #[tokio::test]
@@ -1302,7 +1305,7 @@ async fn test_simple_fake_chat_agenerate_returns_chat_result() {
     let model = agent_chain_core::FakeChatModel::builder().build();
     let result = model
         ._generate(
-            vec![BaseMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )],
             None,

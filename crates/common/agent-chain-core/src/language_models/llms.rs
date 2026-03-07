@@ -8,6 +8,7 @@ use serde_json::Value;
 use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
+use crate::messages::BaseMessage;
 use crate::outputs::{
     ChatGeneration, ChatResult, Generation, GenerationChunk, GenerationType, LLMResult, RunInfo,
 };
@@ -101,8 +102,8 @@ fn extract_text(generation: &GenerationType) -> String {
     match generation {
         GenerationType::Generation(g) => g.text.clone(),
         GenerationType::GenerationChunk(g) => g.text.clone(),
-        GenerationType::ChatGeneration(g) => g.text.to_string(),
-        GenerationType::ChatGenerationChunk(g) => g.text.to_string(),
+        GenerationType::ChatGeneration(g) => g.message.text(),
+        GenerationType::ChatGenerationChunk(g) => g.message.text(),
     }
 }
 
