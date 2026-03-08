@@ -64,7 +64,7 @@ use crate::chat_models::{
 };
 use crate::error::{Error, Result};
 use crate::language_models::ChatGenerationStream;
-use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
 use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
 use crate::messages::{
     AIMessage, AnyMessage, ContentPart, ImageDetail, ImageSource, InvalidToolCall, MessageContent,
@@ -2728,13 +2728,12 @@ impl BaseLanguageModel for ChatOpenAI {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations = Vec::new();
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self
                 ._generate_internal(messages, stop.clone(), None)
                 .await?;
@@ -3060,9 +3059,8 @@ impl BaseChatModel for ChatOpenAI {
         &self,
         schema: serde_json::Value,
         include_raw: bool,
-    ) -> Result<
-        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
-    > {
+    ) -> Result<Box<dyn Runnable<Input = Vec<AnyMessage>, Output = serde_json::Value> + Send + Sync>>
+    {
         let tool_name = extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
@@ -3135,9 +3133,8 @@ impl ChatOpenAI {
         method: Option<&str>,
         strict: Option<bool>,
         tools: Option<&[ToolLike]>,
-    ) -> Result<
-        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
-    > {
+    ) -> Result<Box<dyn Runnable<Input = Vec<AnyMessage>, Output = serde_json::Value> + Send + Sync>>
+    {
         let method = method.unwrap_or("function_calling");
 
         match method {
@@ -3279,11 +3276,10 @@ impl ChatOpenAI {
     /// Invoke the model with input and optional stop sequences.
     pub async fn invoke_with_stop(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessage> {
-        let messages = input.to_messages();
-        let result = self._generate_internal(messages, stop, None).await?;
+        let result = self._generate_internal(input, stop, None).await?;
         Self::extract_ai_message(result)
     }
 

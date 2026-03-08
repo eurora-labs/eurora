@@ -600,11 +600,10 @@ mod test_parrot_fake_chat_model {
 
     #[tokio::test]
     async fn test_invoke_with_string_input() {
-        use agent_chain_core::language_models::LanguageModelInput;
-
         let model = ParrotFakeChatModel::builder().build();
-        let input = LanguageModelInput::Text("Hello string".to_string());
-        let messages = input.to_messages();
+        let messages = vec![AnyMessage::HumanMessage(
+            HumanMessage::builder().content("Hello string").build(),
+        )];
         let result = model._generate(messages, None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "Hello string");
     }
@@ -1088,7 +1087,7 @@ mod test_generic_fake_chat_model_additional {
 #[cfg(test)]
 mod test_parrot_fake_chat_model_additional {
     use agent_chain_core::ParrotFakeChatModel;
-    use agent_chain_core::language_models::{BaseChatModel, LanguageModelInput};
+    use agent_chain_core::language_models::BaseChatModel;
     use agent_chain_core::messages::{AnyMessage, BaseMessage, HumanMessage, SystemMessage};
 
     #[tokio::test]
@@ -1108,8 +1107,9 @@ mod test_parrot_fake_chat_model_additional {
     #[tokio::test]
     async fn test_ainvoke_with_string() {
         let model = ParrotFakeChatModel::builder().build();
-        let input = LanguageModelInput::Text("echo this string".to_string());
-        let messages = input.to_messages();
+        let messages = vec![AnyMessage::HumanMessage(
+            HumanMessage::builder().content("echo this string").build(),
+        )];
         let result = model._generate(messages, None, None).await.unwrap();
         assert_eq!(result.generations[0].message.content(), "echo this string");
     }

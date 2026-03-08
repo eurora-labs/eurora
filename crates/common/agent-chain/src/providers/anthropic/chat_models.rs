@@ -14,7 +14,7 @@ use crate::ToolChoice;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::chat_models::{BaseChatModel, ChatModelConfig, LangSmithParams};
 use crate::error::{Error, Result};
-use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
 use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
 use crate::messages::{AIMessage, AnyMessage, ToolCall};
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
@@ -365,13 +365,12 @@ impl BaseLanguageModel for ChatAnthropic {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations = Vec::new();
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self
                 ._generate_internal(messages, stop.clone(), None)
                 .await?;
@@ -448,9 +447,8 @@ impl BaseChatModel for ChatAnthropic {
         &self,
         schema: serde_json::Value,
         include_raw: bool,
-    ) -> Result<
-        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
-    > {
+    ) -> Result<Box<dyn Runnable<Input = Vec<AnyMessage>, Output = serde_json::Value> + Send + Sync>>
+    {
         let tool_name = extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;

@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use agent_chain_core::caches::{BaseCache, InMemoryCache};
 use agent_chain_core::language_models::{
-    BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM, LanguageModelInput,
-    get_prompts_from_cache, update_cache,
+    BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM, get_prompts_from_cache,
+    update_cache,
 };
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use agent_chain_core::outputs::{Generation, GenerationType, LLMResult};
 use futures::StreamExt;
 use serde_json::json;
@@ -17,9 +18,15 @@ async fn test_batch() {
     let output = llm
         .batch(
             vec![
-                LanguageModelInput::from("foo"),
-                LanguageModelInput::from("bar"),
-                LanguageModelInput::from("foo"),
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("foo").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("bar").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("foo").build(),
+                )],
             ],
             None,
         )
@@ -36,9 +43,15 @@ async fn test_abatch() {
     let output = llm
         .batch(
             vec![
-                LanguageModelInput::from("foo"),
-                LanguageModelInput::from("bar"),
-                LanguageModelInput::from("foo"),
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("foo").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("bar").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("foo").build(),
+                )],
             ],
             None,
         )
@@ -70,37 +83,33 @@ fn test_convert_string_input() {
     let llm = FakeListLLM::builder()
         .responses(vec!["r".to_string()])
         .build();
-    let result = llm
-        .convert_input(LanguageModelInput::from("hello world"))
-        .unwrap();
-    assert_eq!(result, "hello world");
+    let result = llm.convert_input(vec![AnyMessage::HumanMessage(
+        HumanMessage::builder().content("hello world").build(),
+    )]);
+    assert_eq!(result, "human: hello world");
 }
 
 #[test]
 fn test_convert_prompt_value_input() {
-    use agent_chain_core::prompt_values::StringPromptValue;
+    use agent_chain_core::prompt_values::{PromptValue, StringPromptValue};
 
     let llm = FakeListLLM::builder()
         .responses(vec!["r".to_string()])
         .build();
     let pv = StringPromptValue::new("already a prompt value");
-    let result = llm.convert_input(LanguageModelInput::from(pv)).unwrap();
-    assert_eq!(result, "already a prompt value");
+    let result = llm.convert_input(pv.to_messages());
+    assert_eq!(result, "human: already a prompt value");
 }
 
 #[test]
 fn test_convert_message_sequence_input() {
-    use agent_chain_core::messages::{AnyMessage, HumanMessage};
-
     let llm = FakeListLLM::builder()
         .responses(vec!["r".to_string()])
         .build();
     let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("hi").build(),
     )];
-    let result = llm
-        .convert_input(LanguageModelInput::from(messages))
-        .unwrap();
+    let result = llm.convert_input(messages);
     assert!(result.contains("hi"));
 }
 
@@ -360,8 +369,12 @@ async fn test_generate_prompt_converts_prompt_values() {
     let result = llm
         .generate_prompt(
             vec![
-                LanguageModelInput::from("hello"),
-                LanguageModelInput::from("world"),
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("hello").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("world").build(),
+                )],
             ],
             None,
             None,
@@ -385,7 +398,13 @@ async fn test_agenerate_prompt_converts_prompt_values() {
         .responses(vec!["async_resp".to_string()])
         .build();
     let result = llm
-        .generate_prompt(vec![LanguageModelInput::from("hello")], None, None)
+        .generate_prompt(
+            vec![vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("hello").build(),
+            )]],
+            None,
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.generations.len(), 1);
@@ -397,8 +416,6 @@ async fn test_agenerate_prompt_converts_prompt_values() {
 
 #[tokio::test]
 async fn test_generate_prompt_with_message_input() {
-    use agent_chain_core::messages::{AnyMessage, HumanMessage};
-
     let llm = FakeListLLM::builder()
         .responses(vec!["chat_resp".to_string()])
         .build();
@@ -406,7 +423,7 @@ async fn test_generate_prompt_with_message_input() {
         HumanMessage::builder().content("hi there").build(),
     )];
     let result = llm
-        .generate_prompt(vec![LanguageModelInput::from(messages)], None, None)
+        .generate_prompt(vec![messages], None, None)
         .await
         .unwrap();
     assert_eq!(result.generations.len(), 1);
@@ -443,7 +460,12 @@ async fn test_invoke() {
         .responses(vec!["hello".to_string()])
         .build();
     let result = llm
-        .invoke(LanguageModelInput::from("prompt"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("prompt").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result, "hello");
@@ -593,9 +615,15 @@ async fn test_batch_with_exceptions() {
     let results = llm
         .batch_with_exceptions(
             vec![
-                LanguageModelInput::from("p1"),
-                LanguageModelInput::from("p2"),
-                LanguageModelInput::from("p3"),
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p1").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p2").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p3").build(),
+                )],
             ],
             None,
         )
