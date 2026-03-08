@@ -5,14 +5,14 @@ use async_trait::async_trait;
 use futures::Stream;
 use serde_json::Value;
 
-use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
+use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig};
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
+use crate::messages::AnyMessage;
 use crate::messages::BaseMessage;
 use crate::outputs::{
     ChatGeneration, ChatResult, Generation, GenerationChunk, GenerationType, LLMResult, RunInfo,
 };
-use crate::prompt_values::PromptValue;
 use crate::runnables::RunnableConfig;
 
 pub type LLMStream = Pin<Box<dyn Stream<Item = Result<GenerationChunk>> + Send>>;
@@ -139,35 +139,20 @@ pub trait BaseLLM: BaseLanguageModel {
         Ok(Box::pin(futures::stream::empty()))
     }
 
-    fn convert_input(&self, input: LanguageModelInput) -> Result<String> {
-        match input {
-            LanguageModelInput::Text(s) => Ok(s),
-            LanguageModelInput::StringPrompt(p) => Ok(p.to_string()),
-            LanguageModelInput::ChatPrompt(p) => {
-                let messages = p.to_messages();
-                let parts: Vec<String> = messages
-                    .iter()
-                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
-                    .collect();
-                Ok(parts.join("\n"))
-            }
-            LanguageModelInput::ImagePrompt(p) => Ok(p.image_url.url.clone().unwrap_or_default()),
-            LanguageModelInput::Messages(m) => {
-                let parts: Vec<String> = m
-                    .iter()
-                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
-                    .collect();
-                Ok(parts.join("\n"))
-            }
-        }
+    fn convert_input(&self, input: Vec<AnyMessage>) -> String {
+        let parts: Vec<String> = input
+            .iter()
+            .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
+            .collect();
+        parts.join("\n")
     }
 
     async fn invoke(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
     ) -> Result<String> {
-        let prompt = self.convert_input(input)?;
+        let prompt = self.convert_input(input);
 
         let generate_config = if let Some(cfg) = config {
             LLMGenerateConfig::from_runnable_config(cfg)
@@ -338,17 +323,14 @@ pub trait BaseLLM: BaseLanguageModel {
 
     async fn batch(
         &self,
-        inputs: Vec<LanguageModelInput>,
+        inputs: Vec<Vec<AnyMessage>>,
         config: Option<&RunnableConfig>,
     ) -> Result<Vec<String>> {
         if inputs.is_empty() {
             return Ok(Vec::new());
         }
 
-        let prompts: Vec<String> = inputs
-            .into_iter()
-            .map(|i| self.convert_input(i))
-            .collect::<Result<Vec<_>>>()?;
+        let prompts: Vec<String> = inputs.into_iter().map(|i| self.convert_input(i)).collect();
 
         let generate_config = if let Some(cfg) = config {
             LLMGenerateConfig::from_runnable_config(cfg)
@@ -371,7 +353,7 @@ pub trait BaseLLM: BaseLanguageModel {
 
     async fn batch_with_exceptions(
         &self,
-        inputs: Vec<LanguageModelInput>,
+        inputs: Vec<Vec<AnyMessage>>,
         config: Option<&RunnableConfig>,
     ) -> Vec<Result<String>> {
         let mut results = Vec::new();
@@ -383,11 +365,11 @@ pub trait BaseLLM: BaseLanguageModel {
 
     async fn stream(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
         stop: Option<Vec<String>>,
     ) -> Result<LLMStream> {
-        let prompt = self.convert_input(input)?;
+        let prompt = self.convert_input(input);
 
         let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
             (
@@ -472,11 +454,11 @@ pub trait BaseLLM: BaseLanguageModel {
 
     async fn astream(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
         stop: Option<Vec<String>>,
     ) -> Result<LLMStream> {
-        let prompt = self.convert_input(input)?;
+        let prompt = self.convert_input(input);
 
         let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
             (
@@ -561,10 +543,10 @@ pub trait BaseLLM: BaseLanguageModel {
 
     async fn ainvoke(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
     ) -> Result<String> {
-        let prompt = self.convert_input(input)?;
+        let prompt = self.convert_input(input);
 
         let generate_config = if let Some(cfg) = config {
             LLMGenerateConfig::from_runnable_config(cfg)
@@ -740,17 +722,14 @@ pub trait BaseLLM: BaseLanguageModel {
 
     async fn abatch(
         &self,
-        inputs: Vec<LanguageModelInput>,
+        inputs: Vec<Vec<AnyMessage>>,
         config: Option<&RunnableConfig>,
     ) -> Result<Vec<String>> {
         if inputs.is_empty() {
             return Ok(Vec::new());
         }
 
-        let prompts: Vec<String> = inputs
-            .into_iter()
-            .map(|i| self.convert_input(i))
-            .collect::<Result<Vec<_>>>()?;
+        let prompts: Vec<String> = inputs.into_iter().map(|i| self.convert_input(i)).collect();
 
         let generate_config = if let Some(cfg) = config {
             LLMGenerateConfig::from_runnable_config(cfg)

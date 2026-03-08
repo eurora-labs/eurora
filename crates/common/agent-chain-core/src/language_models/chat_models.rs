@@ -7,7 +7,7 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput};
+use super::base::{BaseLanguageModel, LangSmithParams, LanguageModelConfig};
 use super::model_profile::ModelProfile;
 use crate::GenerationType;
 use crate::callbacks::{BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks};
@@ -982,16 +982,12 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    fn convert_input(&self, input: LanguageModelInput) -> Result<Vec<AnyMessage>> {
-        Ok(input.to_messages())
-    }
-
     async fn invoke(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
     ) -> Result<AIMessage> {
-        let messages = self.convert_input(input)?;
+        let messages = input;
 
         let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
             (
@@ -1033,10 +1029,10 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn ainvoke(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
     ) -> Result<AIMessage> {
-        let messages = self.convert_input(input)?;
+        let messages = input;
 
         let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
             (
@@ -1095,11 +1091,11 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn stream(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessageChunkStream> {
-        let messages = self.convert_input(input)?;
+        let messages = input;
         let has_tools = false;
 
         if !self._should_stream(false, has_tools, Some(true), None) {
@@ -1252,11 +1248,11 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn astream(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessageChunkStream> {
-        let messages = self.convert_input(input)?;
+        let messages = input;
         let has_tools = false;
 
         if !self._should_stream(true, has_tools, Some(true), None) {
@@ -1449,7 +1445,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         &self,
         schema: Value,
         include_raw: bool,
-    ) -> Result<Box<dyn Runnable<Input = LanguageModelInput, Output = Value> + Send + Sync>> {
+    ) -> Result<Box<dyn Runnable<Input = Vec<AnyMessage>, Output = Value> + Send + Sync>> {
         let tool_name = extract_tool_name_from_schema(&schema)?;
 
         let tool_like = ToolLike::Schema(schema);
@@ -1475,26 +1471,18 @@ pub trait BaseChatModel: BaseLanguageModel {
 
     async fn generate_prompt(
         &self,
-        prompts: &[LanguageModelInput],
+        prompts: Vec<Vec<AnyMessage>>,
         config: GenerateConfig,
     ) -> Result<LLMResult> {
-        let prompt_messages: Vec<Vec<AnyMessage>> = prompts
-            .iter()
-            .map(|p| self.convert_input(p.clone()))
-            .collect::<Result<_>>()?;
-        self.generate(prompt_messages, config).await
+        self.generate(prompts, config).await
     }
 
     async fn agenerate_prompt(
         &self,
-        prompts: &[LanguageModelInput],
+        prompts: Vec<Vec<AnyMessage>>,
         config: GenerateConfig,
     ) -> Result<LLMResult> {
-        let prompt_messages: Vec<Vec<AnyMessage>> = prompts
-            .iter()
-            .map(|p| self.convert_input(p.clone()))
-            .collect::<Result<_>>()?;
-        self.agenerate(prompt_messages, config).await
+        self.agenerate(prompts, config).await
     }
 
     fn get_identifying_params(&self) -> HashMap<String, Value> {
@@ -1663,7 +1651,7 @@ where
 
 #[async_trait]
 impl Runnable for ChatModelRunnable {
-    type Input = LanguageModelInput;
+    type Input = Vec<AnyMessage>;
     type Output = AIMessage;
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
@@ -1715,7 +1703,7 @@ impl std::fmt::Debug for StructuredOutputWithRaw {
 
 #[async_trait]
 impl Runnable for StructuredOutputWithRaw {
-    type Input = LanguageModelInput;
+    type Input = Vec<AnyMessage>;
     type Output = Value;
 
     fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {

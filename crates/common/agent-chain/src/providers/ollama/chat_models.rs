@@ -39,7 +39,7 @@ use crate::chat_models::{
 };
 use crate::error::{Error, Result};
 use crate::language_models::ToolLike;
-use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
 use crate::messages::{AIMessage, AnyMessage, ContentPart, ImageSource, MessageContent, ToolCall};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
 use crate::runnables::base::Runnable;
@@ -625,13 +625,12 @@ impl BaseLanguageModel for ChatOllama {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations = Vec::new();
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self
                 ._generate_internal(messages, stop.clone(), None)
                 .await?;
@@ -820,9 +819,8 @@ impl BaseChatModel for ChatOllama {
         &self,
         schema: serde_json::Value,
         include_raw: bool,
-    ) -> Result<
-        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
-    > {
+    ) -> Result<Box<dyn Runnable<Input = Vec<AnyMessage>, Output = serde_json::Value> + Send + Sync>>
+    {
         let tool_name = crate::language_models::extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;

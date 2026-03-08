@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use agent_chain_core::caches::InMemoryCache;
-use agent_chain_core::language_models::{BaseChatModel, LanguageModelInput};
+use agent_chain_core::language_models::BaseChatModel;
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use agent_chain_core::{FakeListChatModel, set_llm_cache};
 use serial_test::serial;
 
@@ -18,19 +19,34 @@ async fn test_local_cache_sync() {
         .build();
 
     let result = model
-        .invoke(LanguageModelInput::from("How are you?"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .invoke(LanguageModelInput::from("How are you?"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .invoke(LanguageModelInput::from("meow?"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("meow?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "goodbye");
@@ -51,19 +67,34 @@ async fn test_local_cache_async() {
         .build();
 
     let result = model
-        .ainvoke(LanguageModelInput::from("How are you?"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(LanguageModelInput::from("How are you?"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(LanguageModelInput::from("meow?"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("meow?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "goodbye");
@@ -86,19 +117,34 @@ async fn test_global_cache_sync() {
         .build();
 
     let result = model
-        .invoke(LanguageModelInput::from("How are you?"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .invoke(LanguageModelInput::from("How are you?"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .invoke(LanguageModelInput::from("nice"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("nice").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "goodbye");
@@ -119,19 +165,34 @@ async fn test_global_cache_async() {
         .build();
 
     let result = model
-        .ainvoke(LanguageModelInput::from("How are you?"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(LanguageModelInput::from("How are you?"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(LanguageModelInput::from("nice"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("nice").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "goodbye");
@@ -149,13 +210,23 @@ async fn test_no_cache_sync() {
         .build();
 
     let result = model
-        .invoke(LanguageModelInput::from("How are you?"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .invoke(LanguageModelInput::from("How are you?"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "goodbye");
@@ -175,13 +246,23 @@ async fn test_no_cache_async() {
         .build();
 
     let result = model
-        .ainvoke(LanguageModelInput::from("How are you?"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(LanguageModelInput::from("How are you?"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("How are you?").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "goodbye");
@@ -199,7 +280,12 @@ async fn test_can_swap_caches() {
         .build();
 
     let result = model
-        .invoke(LanguageModelInput::from("foo"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
@@ -211,7 +297,12 @@ async fn test_can_swap_caches() {
         .build();
 
     let result = model2
-        .invoke(LanguageModelInput::from("foo"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "different");
@@ -229,13 +320,23 @@ async fn test_cache_with_generation_objects() {
         .build();
 
     let result = model
-        .invoke(LanguageModelInput::from("test prompt"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test prompt").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
 
     let result = model
-        .invoke(LanguageModelInput::from("test prompt"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test prompt").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "hello");
@@ -251,13 +352,23 @@ async fn test_cache_preserves_message_through_round_trip() {
         .build();
 
     let result = model
-        .invoke(LanguageModelInput::from("round trip test"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("round trip test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "cached hello");
 
     let result = model
-        .invoke(LanguageModelInput::from("round trip test"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("round trip test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "cached hello");
@@ -281,7 +392,12 @@ async fn test_convert_cached_generations_legacy_format() {
         .build();
 
     let result = model
-        .invoke(LanguageModelInput::from("legacy test"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("legacy test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "first");
@@ -296,7 +412,12 @@ async fn test_convert_cached_generations_legacy_format() {
     cache.update(&prompt_key, &llm_string, legacy_generations);
 
     let result = model
-        .invoke(LanguageModelInput::from("legacy test"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("legacy test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.content, "legacy text");

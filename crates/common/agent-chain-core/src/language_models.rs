@@ -7,8 +7,7 @@ mod model_profile;
 mod utils;
 
 pub use base::{
-    BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelLike,
+    BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelLike,
 };
 
 pub use chat_models::{

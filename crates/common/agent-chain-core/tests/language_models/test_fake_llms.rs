@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use agent_chain_core::language_models::{
-    BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM, LanguageModelInput,
+    BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM,
 };
 use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use agent_chain_core::outputs::GenerationType;
@@ -37,7 +37,15 @@ async fn test_fake_list_llm_invoke_single_response() {
     let llm = FakeListLLM::builder()
         .responses(vec!["hello".to_string()])
         .build();
-    let result = llm.invoke("any prompt".into(), None).await.unwrap();
+    let result = llm
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("any prompt").build(),
+            )],
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(result, "hello");
 }
 
@@ -87,7 +95,15 @@ async fn test_fake_list_llm_ainvoke_single_response() {
     let llm = FakeListLLM::builder()
         .responses(vec!["async hello".to_string()])
         .build();
-    let result = llm.invoke("any prompt".into(), None).await.unwrap();
+    let result = llm
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("any prompt").build(),
+            )],
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(result, "async hello");
 }
 
@@ -97,11 +113,35 @@ async fn test_fake_list_llm_ainvoke_cycles_through_responses() {
         .responses(vec!["first".to_string(), "second".to_string()])
         .build();
 
-    let result = llm.invoke("prompt1".into(), None).await.unwrap();
+    let result = llm
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("prompt1").build(),
+            )],
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(result, "first");
-    let result = llm.invoke("prompt2".into(), None).await.unwrap();
+    let result = llm
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("prompt2").build(),
+            )],
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(result, "second");
-    let result = llm.invoke("prompt3".into(), None).await.unwrap();
+    let result = llm
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("prompt3").build(),
+            )],
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(result, "first");
 }
 
@@ -611,8 +651,7 @@ async fn test_invoke_with_human_message_list() {
     let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("Hello").build(),
     )];
-    let input = LanguageModelInput::from(messages);
-    let result = llm.invoke(input, None).await.unwrap();
+    let result = llm.invoke(messages, None).await.unwrap();
     assert_eq!(result, "message response");
 }
 
@@ -729,9 +768,15 @@ async fn test_batch_processing() {
     let results = llm
         .batch(
             vec![
-                LanguageModelInput::from("p1"),
-                LanguageModelInput::from("p2"),
-                LanguageModelInput::from("p3"),
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p1").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p2").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p3").build(),
+                )],
             ],
             None,
         )
@@ -748,9 +793,15 @@ async fn test_abatch_processing() {
     let results = llm
         .batch(
             vec![
-                LanguageModelInput::from("p1"),
-                LanguageModelInput::from("p2"),
-                LanguageModelInput::from("p3"),
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p1").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p2").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p3").build(),
+                )],
             ],
             None,
         )
@@ -767,9 +818,15 @@ async fn test_batch_cycles_correctly_and_updates_counter() {
     let results = llm
         .batch(
             vec![
-                LanguageModelInput::from("p1"),
-                LanguageModelInput::from("p2"),
-                LanguageModelInput::from("p3"),
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p1").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p2").build(),
+                )],
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("p3").build(),
+                )],
             ],
             None,
         )
@@ -785,7 +842,12 @@ async fn test_batch_partial_cycle_updates_counter() {
         .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
         .build();
     let results = llm
-        .batch(vec![LanguageModelInput::from("p1")], None)
+        .batch(
+            vec![vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("p1").build(),
+            )]],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(results, vec!["r1"]);
@@ -862,10 +924,7 @@ async fn test_invoke_with_multiple_messages() {
         ),
         AnyMessage::HumanMessage(HumanMessage::builder().content("What is 2+2?").build()),
     ];
-    let result = llm
-        .invoke(LanguageModelInput::from(messages), None)
-        .await
-        .unwrap();
+    let result = llm.invoke(messages, None).await.unwrap();
     assert_eq!(result, "multi message response");
 }
 
@@ -877,10 +936,7 @@ async fn test_ainvoke_with_human_message_list() {
     let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("Hello").build(),
     )];
-    let result = llm
-        .invoke(LanguageModelInput::from(messages), None)
-        .await
-        .unwrap();
+    let result = llm.invoke(messages, None).await.unwrap();
     assert_eq!(result, "async message response");
 }
 

@@ -2,8 +2,7 @@ use agent_chain_core::error::{Error, Result};
 use agent_chain_core::language_models::GenerateConfig;
 use agent_chain_core::language_models::{
     BaseChatModel, BaseLanguageModel, ChatGenerationStream, ChatModelConfig, DisableStreaming,
-    FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig,
-    LanguageModelInput, ModelProfile,
+    FakeListChatModel, GenericFakeChatModel, LangSmithParams, LanguageModelConfig, ModelProfile,
 };
 use agent_chain_core::messages::{AIMessage, AnyMessage, BaseMessage, HumanMessage, SystemMessage};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
@@ -76,13 +75,12 @@ impl BaseLanguageModel for ModelWithGenerateOnly {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<agent_chain_core::callbacks::Callbacks>,
     ) -> Result<agent_chain_core::outputs::LLMResult> {
         let mut generations = Vec::new();
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -170,7 +168,7 @@ impl BaseLanguageModel for ModelWithSyncStream {
 
     async fn generate_prompt(
         &self,
-        _prompts: Vec<LanguageModelInput>,
+        _prompts: Vec<Vec<AnyMessage>>,
         _stop: Option<Vec<String>>,
         _callbacks: Option<agent_chain_core::callbacks::Callbacks>,
     ) -> Result<agent_chain_core::outputs::LLMResult> {
@@ -267,7 +265,7 @@ impl BaseLanguageModel for ModelWithAsyncStream {
 
     async fn generate_prompt(
         &self,
-        _prompts: Vec<LanguageModelInput>,
+        _prompts: Vec<Vec<AnyMessage>>,
         _stop: Option<Vec<String>>,
         _callbacks: Option<agent_chain_core::callbacks::Callbacks>,
     ) -> Result<agent_chain_core::outputs::LLMResult> {
@@ -369,13 +367,12 @@ impl BaseLanguageModel for NoStreamingModel {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<agent_chain_core::callbacks::Callbacks>,
     ) -> Result<agent_chain_core::outputs::LLMResult> {
         let mut generations = Vec::new();
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -458,13 +455,12 @@ impl BaseLanguageModel for StreamingModel {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<agent_chain_core::callbacks::Callbacks>,
     ) -> Result<agent_chain_core::outputs::LLMResult> {
         let mut generations = Vec::new();
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -564,9 +560,7 @@ async fn test_disable_streaming_async() {
         )];
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
-    let result = model
-        .invoke(LanguageModelInput::Messages(vec![]), None)
-        .await;
+    let result = model.invoke(vec![], None).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
@@ -581,9 +575,7 @@ async fn test_disable_streaming_async() {
 #[tokio::test]
 async fn test_disable_streaming_no_streaming_model() {
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
-    let result = model
-        .invoke(LanguageModelInput::Messages(vec![]), None)
-        .await;
+    let result = model.invoke(vec![], None).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap().content, "invoke");
 
@@ -599,9 +591,7 @@ async fn test_disable_streaming_no_streaming_model_async() {
         DisableStreaming::ToolCalling,
     ] {
         let model = NoStreamingModel::new().with_disable_streaming(disable);
-        let result = model
-            .ainvoke(LanguageModelInput::Messages(vec![]), None)
-            .await;
+        let result = model.ainvoke(vec![], None).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().content, "invoke");
     }
@@ -649,7 +639,7 @@ impl BaseLanguageModel for LSParamsModel {
 
     async fn generate_prompt(
         &self,
-        _prompts: Vec<LanguageModelInput>,
+        _prompts: Vec<Vec<AnyMessage>>,
         _stop: Option<Vec<String>>,
         _callbacks: Option<agent_chain_core::callbacks::Callbacks>,
     ) -> Result<agent_chain_core::outputs::LLMResult> {
@@ -742,7 +732,7 @@ async fn test_async_batch_size() {
     let llm = FakeListChatModel::builder()
         .responses(vec!["test".to_string()])
         .build();
-    let result = llm.invoke(LanguageModelInput::Messages(vec![]), None).await;
+    let result = llm.invoke(vec![], None).await;
     assert!(result.is_ok());
 }
 
@@ -857,7 +847,12 @@ async fn test_invoke_basic() {
         .responses(vec!["hello world".to_string()])
         .build();
     let result = model
-        .invoke(LanguageModelInput::Text("test".to_string()), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            None,
+        )
         .await;
 
     assert!(result.is_ok());
@@ -870,7 +865,12 @@ async fn test_ainvoke_basic() {
         .responses(vec!["async hello".to_string()])
         .build();
     let result = model
-        .ainvoke(LanguageModelInput::Text("test".to_string()), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            None,
+        )
         .await;
 
     assert!(result.is_ok());
@@ -1102,30 +1102,6 @@ fn test_should_stream_no_handlers() {
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::BaseCallbackHandler>> =
         vec![];
     assert!(!model._should_stream(false, false, None, Some(&handlers)));
-}
-
-#[test]
-fn test_convert_input_from_string() {
-    let model = agent_chain_core::FakeChatModel::builder().build();
-    let result = model
-        .convert_input(LanguageModelInput::from("hello world"))
-        .unwrap();
-    assert_eq!(result.len(), 1);
-    assert!(matches!(&result[0], AnyMessage::HumanMessage(_)));
-    assert_eq!(result[0].content(), "hello world");
-}
-
-#[test]
-fn test_convert_input_from_message_sequence() {
-    let model = agent_chain_core::FakeChatModel::builder().build();
-    let messages = vec![AnyMessage::HumanMessage(
-        HumanMessage::builder().content("hi").build(),
-    )];
-    let result = model
-        .convert_input(LanguageModelInput::from(messages))
-        .unwrap();
-    assert_eq!(result.len(), 1);
-    assert_eq!(result[0].content(), "hi");
 }
 
 #[tokio::test]
@@ -1406,7 +1382,13 @@ async fn test_stream_injects_response_metadata() {
         GenericFakeChatModel::from_vec(vec![AIMessage::builder().content("hello world").build()]);
 
     let mut stream = model
-        .stream(LanguageModelInput::from("test"), None, None)
+        .stream(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            None,
+            None,
+        )
         .await
         .unwrap();
 
@@ -1472,7 +1454,13 @@ async fn test_stream_callback_receives_chunk_data() {
         .build();
 
     let mut stream = model
-        .stream(LanguageModelInput::from("test"), Some(&config), None)
+        .stream(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            Some(&config),
+            None,
+        )
         .await
         .unwrap();
 
@@ -1516,7 +1504,12 @@ async fn test_structured_output_with_raw_success() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(LanguageModelInput::from("test"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
 
@@ -1545,7 +1538,12 @@ async fn test_structured_output_with_raw_no_matching_tool() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(LanguageModelInput::from("test"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
 
@@ -1580,7 +1578,12 @@ async fn test_structured_output_with_raw_parse_error() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(LanguageModelInput::from("test"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
 
@@ -1618,7 +1621,12 @@ async fn test_structured_output_with_raw_serializes_message() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(LanguageModelInput::from("test"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("test").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
 
