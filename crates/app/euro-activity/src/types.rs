@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use agent_chain_core::BaseMessage;
+use agent_chain_core::AnyMessage;
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use euro_native_messaging::NativeMessage;
@@ -70,14 +70,14 @@ pub trait AssetFunctionality {
     fn get_id(&self) -> &str;
     fn get_name(&self) -> &str;
     fn get_icon(&self) -> Option<&str>;
-    fn construct_messages(&self) -> Vec<BaseMessage>;
+    fn construct_messages(&self) -> Vec<AnyMessage>;
     fn get_context_chip(&self) -> Option<ContextChip>;
 }
 
 #[enum_dispatch]
 pub trait SnapshotFunctionality {
     fn get_id(&self) -> &str;
-    fn construct_messages(&self) -> Vec<BaseMessage>;
+    fn construct_messages(&self) -> Vec<AnyMessage>;
     fn get_updated_at(&self) -> u64;
     fn get_created_at(&self) -> u64;
 }

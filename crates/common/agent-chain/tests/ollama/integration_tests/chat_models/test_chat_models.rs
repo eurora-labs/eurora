@@ -1,7 +1,7 @@
 use agent_chain::providers::ollama::{ChatOllama, OllamaFormat};
 use agent_chain_core::language_models::ToolLike;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
-use agent_chain_core::messages::{BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use futures::StreamExt;
 
 const DEFAULT_MODEL: &str = "llama3.1";
@@ -118,8 +118,7 @@ async fn test_structured_output_function_calling() -> Result<(), Box<dyn std::er
                     .content("Tell me a joke about cats.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -159,8 +158,7 @@ async fn test_structured_output_json_schema() -> Result<(), Box<dyn std::error::
             vec![HumanMessage::builder()
                 .content("Tell me a joke about cats. Respond as JSON with 'setup' and 'punchline' keys.")
                 .build()
-                .into()]
-            .into(),
+                .into()],
             None,
         )
         .await?;
@@ -213,8 +211,7 @@ async fn test_structured_output_deeply_nested() -> Result<(), Box<dyn std::error
                     )
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -254,8 +251,7 @@ async fn test_tool_streaming() -> Result<(), Box<dyn std::error::Error>> {
                     .content("What is the weather today in Boston?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -301,8 +297,7 @@ async fn test_tool_astreaming() -> Result<(), Box<dyn std::error::Error>> {
                     .content("What is the weather today in Boston?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -344,13 +339,13 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .build();
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
-    let input_message: BaseMessage = HumanMessage::builder()
+    let input_message: AnyMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")
         .build()
         .into();
 
     let tool_call_message = llm_with_tools
-        .invoke(vec![input_message.clone()].into(), None)
+        .invoke(vec![input_message.clone()], None)
         .await?;
     assert!(
         !tool_call_message.tool_calls.is_empty(),
@@ -361,7 +356,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(tool_call.name, "get_weather");
     assert!(tool_call.args.get("location").is_some());
 
-    let tool_message: BaseMessage = agent_chain_core::messages::ToolMessage::builder()
+    let tool_message: AnyMessage = agent_chain_core::messages::ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
         .build()
@@ -371,16 +366,15 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message.clone(),
-                BaseMessage::AI(tool_call_message.clone()),
+                AnyMessage::AIMessage(tool_call_message.clone()),
                 tool_message.clone(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
     assert!(!resp_message.text().is_empty());
 
-    let follow_up: BaseMessage = HumanMessage::builder()
+    let follow_up: AnyMessage = HumanMessage::builder()
         .content("Explain why that might be using a reasoning step.")
         .build()
         .into();
@@ -389,12 +383,11 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                BaseMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_message,
-                BaseMessage::AI(resp_message),
+                AnyMessage::AIMessage(resp_message),
                 follow_up,
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -424,13 +417,13 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .build();
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
-    let input_message: BaseMessage = HumanMessage::builder()
+    let input_message: AnyMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")
         .build()
         .into();
 
     let tool_call_message = llm_with_tools
-        .invoke(vec![input_message.clone()].into(), None)
+        .invoke(vec![input_message.clone()], None)
         .await?;
     assert!(
         !tool_call_message.tool_calls.is_empty(),
@@ -441,7 +434,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(tool_call.name, "get_weather");
     assert!(tool_call.args.get("location").is_some());
 
-    let tool_message: BaseMessage = agent_chain_core::messages::ToolMessage::builder()
+    let tool_message: AnyMessage = agent_chain_core::messages::ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
         .build()
@@ -451,16 +444,15 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message.clone(),
-                BaseMessage::AI(tool_call_message.clone()),
+                AnyMessage::AIMessage(tool_call_message.clone()),
                 tool_message.clone(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
     assert!(!resp_message.text().is_empty());
 
-    let follow_up: BaseMessage = HumanMessage::builder()
+    let follow_up: AnyMessage = HumanMessage::builder()
         .content("Explain why that might be using a reasoning step.")
         .build()
         .into();
@@ -469,12 +461,11 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                BaseMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_message,
-                BaseMessage::AI(resp_message),
+                AnyMessage::AIMessage(resp_message),
                 follow_up,
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;

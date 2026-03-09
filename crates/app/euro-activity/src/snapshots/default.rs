@@ -1,4 +1,4 @@
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{AnyMessage, HumanMessage};
 use serde::{Deserialize, Serialize};
 
 use crate::types::SnapshotFunctionality;
@@ -26,7 +26,7 @@ impl DefaultSnapshot {
 }
 
 impl SnapshotFunctionality for DefaultSnapshot {
-    fn construct_messages(&self) -> Vec<BaseMessage> {
+    fn construct_messages(&self) -> Vec<AnyMessage> {
         let mut content = format!("Current application state: {}", self.state);
 
         if !self.metadata.is_empty() {
@@ -54,6 +54,8 @@ impl SnapshotFunctionality for DefaultSnapshot {
 
 #[cfg(test)]
 mod tests {
+    use agent_chain_core::messages::prelude::*;
+
     use super::*;
 
     #[test]

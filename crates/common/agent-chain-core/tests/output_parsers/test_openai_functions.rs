@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{AIMessage, HumanMessage};
 use agent_chain_core::output_parsers::{JsonOutputFunctionsParser, PydanticOutputFunctionsParser};
 use agent_chain_core::outputs::ChatGeneration;
@@ -46,7 +47,7 @@ fn test_json_output_function_parser() {
         .unwrap();
     assert_eq!(result, Some(json!({"arg1": "code\ncode"})));
 
-    let additional_kwargs = chat_generation.message.additional_kwargs().unwrap();
+    let additional_kwargs = chat_generation.message.additional_kwargs();
     let function_call = additional_kwargs.get("function_call").unwrap();
     assert_eq!(
         function_call,

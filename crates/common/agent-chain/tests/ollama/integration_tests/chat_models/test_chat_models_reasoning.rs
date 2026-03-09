@@ -1,6 +1,6 @@
 use agent_chain::providers::ollama::ChatOllama;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
-use agent_chain_core::messages::{BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AnyMessage, HumanMessage};
 use futures::StreamExt;
 
 const REASONING_MODEL: &str = "deepseek-r1:1.5b";
@@ -31,8 +31,7 @@ async fn test_reasoning_stream_no_reasoning_sync() -> Result<(), Box<dyn std::er
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -74,8 +73,7 @@ async fn test_reasoning_stream_no_reasoning_async() -> Result<(), Box<dyn std::e
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -111,8 +109,7 @@ async fn test_reasoning_stream_none_sync() -> Result<(), Box<dyn std::error::Err
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -145,8 +142,7 @@ async fn test_reasoning_stream_none_async() -> Result<(), Box<dyn std::error::Er
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -180,8 +176,7 @@ async fn test_reasoning_stream_enabled_sync() -> Result<(), Box<dyn std::error::
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -217,8 +212,7 @@ async fn test_reasoning_stream_enabled_async() -> Result<(), Box<dyn std::error:
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -254,8 +248,7 @@ async fn test_reasoning_invoke_no_reasoning_sync() -> Result<(), Box<dyn std::er
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -288,8 +281,7 @@ async fn test_reasoning_invoke_no_reasoning_async() -> Result<(), Box<dyn std::e
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -321,8 +313,7 @@ async fn test_reasoning_invoke_none_sync() -> Result<(), Box<dyn std::error::Err
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -352,8 +343,7 @@ async fn test_reasoning_invoke_none_async() -> Result<(), Box<dyn std::error::Er
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -384,8 +374,7 @@ async fn test_reasoning_invoke_enabled_sync() -> Result<(), Box<dyn std::error::
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -424,8 +413,7 @@ async fn test_reasoning_invoke_enabled_async() -> Result<(), Box<dyn std::error:
                     .content(SAMPLE_PROMPT)
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -450,7 +438,7 @@ async fn test_reasoning_invoke_enabled_async() -> Result<(), Box<dyn std::error:
 
 async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    let message: BaseMessage = HumanMessage::builder()
+    let message: AnyMessage = HumanMessage::builder()
         .content(SAMPLE_PROMPT)
         .build()
         .into();
@@ -460,9 +448,7 @@ async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
         .build();
-    let result_default = llm_default
-        .invoke(vec![message.clone()].into(), None)
-        .await?;
+    let result_default = llm_default.invoke(vec![message.clone()], None).await?;
     assert!(!result_default.text().is_empty());
     assert!(!result_default.text().contains("<think>"));
     assert!(
@@ -477,9 +463,7 @@ async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error
         .num_ctx(4096u32)
         .reasoning(serde_json::json!(false))
         .build();
-    let result_disabled = llm_disabled
-        .invoke(vec![message.clone()].into(), None)
-        .await?;
+    let result_disabled = llm_disabled.invoke(vec![message.clone()], None).await?;
     assert!(!result_disabled.text().is_empty());
     assert!(!result_disabled.text().contains("<think>"));
     assert!(
@@ -494,9 +478,7 @@ async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error
         .num_ctx(4096u32)
         .reasoning(serde_json::json!(true))
         .build();
-    let result_enabled = llm_enabled
-        .invoke(vec![message.clone()].into(), None)
-        .await?;
+    let result_enabled = llm_enabled.invoke(vec![message.clone()], None).await?;
     assert!(!result_enabled.text().is_empty());
     assert!(!result_enabled.text().contains("<think>"));
     assert!(

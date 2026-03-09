@@ -39,13 +39,13 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
             "langchain".into(),
             "schema".into(),
             "messages".into(),
-            "BaseMessage".into(),
+            "AnyMessage".into(),
         ],
         vec![
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessage".into(),
+            "AnyMessage".into(),
         ],
     );
     map.insert(
@@ -53,13 +53,13 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
             "langchain".into(),
             "schema".into(),
             "messages".into(),
-            "BaseMessageChunk".into(),
+            "AnyMessageChunk".into(),
         ],
         vec![
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessageChunk".into(),
+            "AnyMessageChunk".into(),
         ],
     );
     map.insert(
@@ -904,13 +904,13 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessage".into(),
+            "AnyMessage".into(),
         ],
         vec![
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessage".into(),
+            "AnyMessage".into(),
         ],
     );
     map.insert(
@@ -918,13 +918,13 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessageChunk".into(),
+            "AnyMessageChunk".into(),
         ],
         vec![
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessageChunk".into(),
+            "AnyMessageChunk".into(),
         ],
     );
     map.insert(
@@ -1700,26 +1700,26 @@ pub static JS_SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|
         vec![
             "langchain_core".into(),
             "messages".into(),
-            "BaseMessage".into(),
+            "AnyMessage".into(),
         ],
         vec![
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessage".into(),
+            "AnyMessage".into(),
         ],
     );
     map.insert(
         vec![
             "langchain_core".into(),
             "messages".into(),
-            "BaseMessageChunk".into(),
+            "AnyMessageChunk".into(),
         ],
         vec![
             "langchain_core".into(),
             "messages".into(),
             "base".into(),
-            "BaseMessageChunk".into(),
+            "AnyMessageChunk".into(),
         ],
     );
     map.insert(

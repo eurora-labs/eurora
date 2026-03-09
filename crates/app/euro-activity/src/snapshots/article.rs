@@ -1,4 +1,4 @@
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::messages::prelude::*;
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -51,7 +51,7 @@ impl ArticleSnapshot {
 }
 
 impl SnapshotFunctionality for ArticleSnapshot {
-    fn construct_messages(&self) -> Vec<BaseMessage> {
+    fn construct_messages(&self) -> Vec<AnyMessage> {
         if let Some(highlight) = &self.highlight
             && highlight.is_empty()
         {

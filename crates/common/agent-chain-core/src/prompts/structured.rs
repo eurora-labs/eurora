@@ -7,7 +7,7 @@ use async_trait::async_trait;
 
 use crate::api::{BetaParams, warn_beta};
 use crate::error::{Error, Result};
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::prompt_values::{ChatPromptValue, PromptValue};
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
@@ -124,7 +124,7 @@ impl BasePromptTemplate for StructuredPrompt {
 }
 
 impl BaseChatPromptTemplate for StructuredPrompt {
-    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>> {
+    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
         self.chat_template.format_messages(input)
     }
 
@@ -167,6 +167,7 @@ impl Runnable for StructuredPrompt {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::BaseMessage;
     use serde_json::json;
 
     #[test]

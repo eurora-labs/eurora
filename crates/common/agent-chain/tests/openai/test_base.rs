@@ -4,7 +4,7 @@ use agent_chain_core::language_models::BaseLanguageModel;
 use agent_chain_core::language_models::ToolLike;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
 use agent_chain_core::messages::{
-    AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolCall, ToolMessage,
+    AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolCall, ToolMessage,
 };
 use agent_chain_core::outputs::GenerationType;
 use futures::StreamExt;
@@ -32,7 +32,7 @@ async fn test_chat_openai() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     let message = HumanMessage::builder().content("Hello").build();
-    let response = chat.invoke(vec![message.into()].into(), None).await?;
+    let response = chat.invoke(vec![message.into()], None).await?;
 
     assert!(!response.text().is_empty());
     Ok(())
@@ -68,7 +68,7 @@ async fn test_callable_api_key() -> Result<(), Box<dyn std::error::Error>> {
 
     let response = model
         .invoke(
-            vec![HumanMessage::builder().content("hello").build().into()].into(),
+            vec![HumanMessage::builder().content("hello").build().into()],
             None,
         )
         .await?;
@@ -101,7 +101,7 @@ async fn test_callable_api_key_async() -> Result<(), Box<dyn std::error::Error>>
 
     let response = model
         .ainvoke(
-            vec![HumanMessage::builder().content("hello").build().into()].into(),
+            vec![HumanMessage::builder().content("hello").build().into()],
             None,
         )
         .await?;
@@ -126,10 +126,7 @@ async fn test_chat_openai_system_message() -> Result<(), Box<dyn std::error::Err
         .build();
     let human_message = HumanMessage::builder().content("Hello").build();
     let response = chat
-        .invoke(
-            vec![system_message.into(), human_message.into()].into(),
-            None,
-        )
+        .invoke(vec![system_message.into(), human_message.into()], None)
         .await?;
 
     assert!(!response.text().is_empty());
@@ -152,10 +149,7 @@ async fn test_chat_openai_system_message_responses_api() -> Result<(), Box<dyn s
         .build();
     let human_message = HumanMessage::builder().content("Hello").build();
     let response = chat
-        .invoke(
-            vec![system_message.into(), human_message.into()].into(),
-            None,
-        )
+        .invoke(vec![system_message.into(), human_message.into()], None)
         .await?;
 
     assert!(!response.text().is_empty());
@@ -173,7 +167,7 @@ async fn test_chat_openai_generate() -> Result<(), Box<dyn std::error::Error>> {
         .n(2)
         .build();
 
-    let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
+    let message: AnyMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
         .generate(
             vec![vec![message.clone()], vec![message]],
@@ -228,7 +222,7 @@ async fn test_chat_openai_streaming() -> Result<(), Box<dyn std::error::Error>> 
         .build();
 
     let message = HumanMessage::builder().content("Hello").build();
-    let response = chat.invoke(vec![message.into()].into(), None).await?;
+    let response = chat.invoke(vec![message.into()], None).await?;
 
     assert!(!response.text().is_empty());
     Ok(())
@@ -248,7 +242,7 @@ async fn test_chat_openai_streaming_responses_api() -> Result<(), Box<dyn std::e
         .build();
 
     let message = HumanMessage::builder().content("Hello").build();
-    let response = chat.invoke(vec![message.into()].into(), None).await?;
+    let response = chat.invoke(vec![message.into()], None).await?;
 
     assert!(!response.text().is_empty());
     Ok(())
@@ -267,7 +261,7 @@ async fn test_chat_openai_streaming_generation_info() -> Result<(), Box<dyn std:
 
     let mut stream = chat
         .stream(
-            vec![HumanMessage::builder().content("hi").build().into()].into(),
+            vec![HumanMessage::builder().content("hi").build().into()],
             None,
             None,
         )
@@ -293,7 +287,7 @@ async fn test_chat_openai_llm_output_contains_model_name() -> Result<(), Box<dyn
         .max_tokens(MAX_TOKEN_COUNT)
         .build();
 
-    let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
+    let message: AnyMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
         .generate(
             vec![vec![message]],
@@ -321,7 +315,7 @@ async fn test_chat_openai_streaming_llm_output_contains_model_name()
         .streaming(true)
         .build();
 
-    let message: BaseMessage = HumanMessage::builder().content("Hello").build().into();
+    let message: AnyMessage = HumanMessage::builder().content("Hello").build().into();
     let result = chat
         .generate(
             vec![vec![message]],
@@ -371,8 +365,7 @@ async fn test_openai_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -383,8 +376,7 @@ async fn test_openai_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
                     .content("I'm not Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -412,8 +404,7 @@ async fn test_openai_abatch_tags_responses_api() -> Result<(), Box<dyn std::erro
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -424,8 +415,7 @@ async fn test_openai_abatch_tags_responses_api() -> Result<(), Box<dyn std::erro
                     .content("I'm not Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -447,7 +437,7 @@ async fn test_openai_invoke() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -486,8 +476,7 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -526,7 +515,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
     // Test with default stream_usage (true for openai api base)
     let mut stream = llm
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -562,7 +551,7 @@ async fn test_flex_usage_responses() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -585,7 +574,7 @@ async fn test_flex_usage_responses_streaming() -> Result<(), Box<dyn std::error:
 
     let result = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -611,8 +600,7 @@ async fn test_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -638,8 +626,7 @@ async fn test_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
                     .content("I'm PickleRick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -666,8 +653,7 @@ async fn test_async_response_metadata() -> Result<(), Box<dyn std::error::Error>
                     .content("I'm PickleRick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -694,8 +680,7 @@ async fn test_response_metadata_streaming() -> Result<(), Box<dyn std::error::Er
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -733,8 +718,7 @@ async fn test_async_response_metadata_streaming() -> Result<(), Box<dyn std::err
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -778,14 +762,14 @@ async fn test_tool_use() -> Result<(), Box<dyn std::error::Error>> {
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
 
-    let msgs: Vec<BaseMessage> = vec![
+    let msgs: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Sally has green hair, what would her username be?")
             .build()
             .into(),
     ];
 
-    let ai_msg = llm_with_tool.invoke(msgs.clone().into(), None).await?;
+    let ai_msg = llm_with_tool.invoke(msgs.clone(), None).await?;
 
     assert!(!ai_msg.tool_calls.is_empty());
     let tool_call = &ai_msg.tool_calls[0];
@@ -800,7 +784,7 @@ async fn test_tool_use() -> Result<(), Box<dyn std::error::Error>> {
     let mut follow_up_msgs = msgs;
     follow_up_msgs.push(ai_msg.into());
     follow_up_msgs.push(tool_msg.into());
-    let _response = llm_with_tool.invoke(follow_up_msgs.into(), None).await?;
+    let _response = llm_with_tool.invoke(follow_up_msgs, None).await?;
 
     Ok(())
 }
@@ -828,7 +812,7 @@ async fn test_manual_tool_call_msg() -> Result<(), Box<dyn std::error::Error>> {
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], None)?;
 
-    let msgs: Vec<BaseMessage> = vec![
+    let msgs: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Sally has green hair, what would her username be?")
             .build()
@@ -851,7 +835,7 @@ async fn test_manual_tool_call_msg() -> Result<(), Box<dyn std::error::Error>> {
             .into(),
     ];
 
-    let output = llm_with_tool.invoke(msgs.into(), None).await?;
+    let output = llm_with_tool.invoke(msgs, None).await?;
 
     assert!(!output.text().is_empty());
     // Should not have called the tool again
@@ -884,7 +868,7 @@ async fn test_manual_tool_call_msg_responses_api() -> Result<(), Box<dyn std::er
     let tool_like = ToolLike::Schema(generate_username_schema);
     let llm_with_tool = llm.bind_tools(&[tool_like], None)?;
 
-    let msgs: Vec<BaseMessage> = vec![
+    let msgs: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Sally has green hair, what would her username be?")
             .build()
@@ -907,7 +891,7 @@ async fn test_manual_tool_call_msg_responses_api() -> Result<(), Box<dyn std::er
             .into(),
     ];
 
-    let output = llm_with_tool.invoke(msgs.into(), None).await?;
+    let output = llm_with_tool.invoke(msgs, None).await?;
 
     assert!(!output.text().is_empty());
     assert!(output.tool_calls.is_empty());
@@ -960,8 +944,7 @@ async fn test_bind_tools_tool_choice() -> Result<(), Box<dyn std::error::Error>>
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -977,8 +960,7 @@ async fn test_bind_tools_tool_choice() -> Result<(), Box<dyn std::error::Error>>
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -993,8 +975,7 @@ async fn test_bind_tools_tool_choice() -> Result<(), Box<dyn std::error::Error>>
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1049,8 +1030,7 @@ async fn test_bind_tools_tool_choice_responses_api() -> Result<(), Box<dyn std::
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1095,8 +1075,7 @@ async fn test_disable_parallel_tool_calling() -> Result<(), Box<dyn std::error::
                     )
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1129,8 +1108,7 @@ async fn test_openai_structured_output() -> Result<(), Box<dyn std::error::Error
                 .content("I'm a 27 year old named Erick")
                 .build()
                 .into(),
-        ]
-        .into(),
+        ],
         None,
     )?;
 
@@ -1171,8 +1149,7 @@ async fn test_openai_response_headers() -> Result<(), Box<dyn std::error::Error>
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1205,8 +1182,7 @@ async fn test_openai_response_headers_responses_api() -> Result<(), Box<dyn std:
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1238,8 +1214,7 @@ async fn test_openai_response_headers_async() -> Result<(), Box<dyn std::error::
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1273,8 +1248,7 @@ async fn test_openai_response_headers_async_responses_api() -> Result<(), Box<dy
                     .content("I'm Pickle Rick")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1317,7 +1291,7 @@ async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Erro
         .build();
 
     // Just verify we can invoke with an image - token counting is model-dependent
-    let response = model.invoke(vec![message.into()].into(), None).await?;
+    let response = model.invoke(vec![message.into()], None).await?;
     assert!(!response.text().is_empty());
 
     Ok(())
@@ -1350,7 +1324,7 @@ async fn test_image_token_counting_png() -> Result<(), Box<dyn std::error::Error
         ]))
         .build();
 
-    let response = model.invoke(vec![message.into()].into(), None).await?;
+    let response = model.invoke(vec![message.into()], None).await?;
     assert!(!response.text().is_empty());
 
     Ok(())
@@ -1387,7 +1361,7 @@ async fn test_tool_calling_strict() -> Result<(), Box<dyn std::error::Error>> {
     let query = "What is the value of magic_function(3)? Use the tool.";
     let response = model_with_tools
         .invoke(
-            vec![HumanMessage::builder().content(query).build().into()].into(),
+            vec![HumanMessage::builder().content(query).build().into()],
             None,
         )
         .await?;
@@ -1428,7 +1402,7 @@ async fn test_tool_calling_strict_responses_api() -> Result<(), Box<dyn std::err
     let query = "What is the value of magic_function(3)? Use the tool.";
     let response = model_with_tools
         .invoke(
-            vec![HumanMessage::builder().content(query).build().into()].into(),
+            vec![HumanMessage::builder().content(query).build().into()],
             None,
         )
         .await?;
@@ -1469,8 +1443,7 @@ async fn test_structured_output_strict_function_calling() -> Result<(), Box<dyn 
                 .content("Tell me a joke about cats.")
                 .build()
                 .into(),
-        ]
-        .into(),
+        ],
         None,
     )?;
 
@@ -1510,8 +1483,7 @@ async fn test_structured_output_strict_json_schema() -> Result<(), Box<dyn std::
                 .content("Tell me a joke about cats.")
                 .build()
                 .into(),
-        ]
-        .into(),
+        ],
         None,
     )?;
 
@@ -1563,8 +1535,7 @@ async fn test_nested_structured_output_strict() -> Result<(), Box<dyn std::error
                 .content("Tell me a joke about cats.")
                 .build()
                 .into(),
-        ]
-        .into(),
+        ],
         None,
     )?;
 
@@ -1616,8 +1587,7 @@ async fn test_json_schema_openai_format() -> Result<(), Box<dyn std::error::Erro
                 .content("What is the weather in New York?")
                 .build()
                 .into(),
-        ]
-        .into(),
+        ],
         None,
     )?;
 
@@ -1653,8 +1623,7 @@ async fn test_audio_output_modality() -> Result<(), Box<dyn std::error::Error>> 
                     .content("Make me a short audio clip of you yelling")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1693,7 +1662,7 @@ async fn test_audio_input_modality() -> Result<(), Box<dyn std::error::Error>> {
         }]))
         .build();
 
-    let output = llm.invoke(vec![message.into()].into(), None).await?;
+    let output = llm.invoke(vec![message.into()], None).await?;
 
     // Audio models should return some content
     assert!(!output.text().is_empty() || output.additional_kwargs.contains_key("audio"));
@@ -1742,8 +1711,7 @@ public class User
             vec![
                 HumanMessage::builder().content(query).build().into(),
                 HumanMessage::builder().content(code).build().into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1764,8 +1732,7 @@ async fn test_stream_o_series() -> Result<(), Box<dyn std::error::Error>> {
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1795,8 +1762,7 @@ async fn test_stream_o_series_responses_api() -> Result<(), Box<dyn std::error::
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1823,8 +1789,7 @@ async fn test_astream_o_series() -> Result<(), Box<dyn std::error::Error>> {
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1854,8 +1819,7 @@ async fn test_astream_o_series_responses_api() -> Result<(), Box<dyn std::error:
                     .content("how are you")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1893,7 +1857,7 @@ async fn test_stream_response_format() -> Result<(), Box<dyn std::error::Error>>
 
     let mut stream = llm
         .astream(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
             None,
         )
@@ -1937,7 +1901,7 @@ async fn test_astream_response_format() -> Result<(), Box<dyn std::error::Error>
 
     let mut stream = llm
         .astream(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
             None,
         )
@@ -1973,8 +1937,7 @@ async fn test_o1() -> Result<(), Box<dyn std::error::Error>> {
                     .content("HOW ARE YOU")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -2000,8 +1963,7 @@ async fn test_o1_responses_api() -> Result<(), Box<dyn std::error::Error>> {
                     .content("HOW ARE YOU")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -2017,7 +1979,7 @@ async fn test_o1_stream_default_works() -> Result<(), Box<dyn std::error::Error>
     load_env();
     let mut stream = ChatOpenAI::new("o1")
         .astream(
-            vec![HumanMessage::builder().content("say 'hi'").build().into()].into(),
+            vec![HumanMessage::builder().content("say 'hi'").build().into()],
             None,
             None,
         )
@@ -2039,7 +2001,7 @@ async fn test_multi_party_conversation() -> Result<(), Box<dyn std::error::Error
     load_env();
     let llm = ChatOpenAI::new("gpt-4o-mini");
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Hi, I have black hair.")
             .name("Alice".to_string())
@@ -2057,7 +2019,7 @@ async fn test_multi_party_conversation() -> Result<(), Box<dyn std::error::Error
             .into(),
     ];
 
-    let response = llm.invoke(messages.into(), None).await?;
+    let response = llm.invoke(messages, None).await?;
     assert!(response.text().contains("Bob"));
     Ok(())
 }
@@ -2105,8 +2067,7 @@ async fn test_structured_output_and_tools() -> Result<(), Box<dyn std::error::Er
                     .content("What weighs more, a pound of feathers or a pound of gold?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -2152,7 +2113,7 @@ async fn test_tools_and_structured_output() -> Result<(), Box<dyn std::error::Er
     )?;
 
     let result = structured.invoke(
-        vec![HumanMessage::builder().content("Hello").build().into()].into(),
+        vec![HumanMessage::builder().content("Hello").build().into()],
         None,
     )?;
 
@@ -2178,9 +2139,9 @@ async fn test_prompt_cache_key_invoke() -> Result<(), Box<dyn std::error::Error>
         .model_kwargs(model_kwargs)
         .build();
 
-    let messages: Vec<BaseMessage> =
+    let messages: Vec<AnyMessage> =
         vec![HumanMessage::builder().content("Say hello").build().into()];
-    let response = chat.invoke(messages.into(), None).await?;
+    let response = chat.invoke(messages, None).await?;
 
     assert!(!response.text().is_empty());
 
@@ -2193,7 +2154,7 @@ async fn test_prompt_cache_key_invoke() -> Result<(), Box<dyn std::error::Error>
 async fn test_prompt_cache_key_usage_methods_integration() -> Result<(), Box<dyn std::error::Error>>
 {
     load_env();
-    let messages: Vec<BaseMessage> = vec![HumanMessage::builder().content("Say hi").build().into()];
+    let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Say hi").build().into()];
 
     // Test via model_kwargs
     let mut model_kwargs = HashMap::new();
@@ -2208,7 +2169,7 @@ async fn test_prompt_cache_key_usage_methods_integration() -> Result<(), Box<dyn
         .model_kwargs(model_kwargs)
         .build();
 
-    let response = chat.invoke(messages.into(), None).await?;
+    let response = chat.invoke(messages, None).await?;
     assert!(!response.text().is_empty());
 
     Ok(())
@@ -2246,8 +2207,7 @@ async fn test_schema_parsing_failures() -> Result<(), Box<dyn std::error::Error>
                     .content("respond with good")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -2291,8 +2251,7 @@ async fn test_schema_parsing_failures_responses_api() -> Result<(), Box<dyn std:
                     .content("respond with good")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -2330,8 +2289,7 @@ async fn test_schema_parsing_failures_async() -> Result<(), Box<dyn std::error::
                     .content("respond with good")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -2374,8 +2332,7 @@ async fn test_schema_parsing_failures_responses_api_async() -> Result<(), Box<dy
                     .content("respond with good")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
