@@ -535,6 +535,7 @@ impl ProtoThreadService for ThreadService {
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
             let mut full_content = String::new();
+            let mut full_reasoning = String::new();
             let mut total_input_tokens: i64 = 0;
             let mut total_output_tokens: i64 = 0;
             let mut total_reasoning_tokens: i64 = 0;
@@ -561,6 +562,9 @@ impl ProtoThreadService for ThreadService {
                             let content = chunk.content.to_string();
                             if !content.is_empty() {
                                 round_content.push_str(&content);
+                            }
+                            if let Some(reasoning) = chunk.additional_kwargs.get("reasoning_content").and_then(|v| v.as_str()) {
+                                full_reasoning.push_str(reasoning);
                             }
                             if !chunk.tool_calls.is_empty() {
                                 tool_calls.extend(chunk.tool_calls.clone());
@@ -624,13 +628,21 @@ impl ProtoThreadService for ThreadService {
             };
 
             if !full_content.is_empty() {
-                match db
-                    .create_message().thread_id(thread_id)
+                let reasoning_blocks = match full_reasoning.is_empty() {
+                    true => None,
+                    false => Some(serde_json::json!(full_reasoning)),
+                };
+
+                let save_result = db.create_message()
+                    .thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
                     .content(serde_json::json!(full_content))
+                    .maybe_reasoning_blocks(reasoning_blocks)
                     .call()
-                    .await
+                    .await;
+
+                match save_result
                 {
                     Ok(ai_message) => {
                         if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = {
