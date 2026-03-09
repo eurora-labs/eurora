@@ -54,6 +54,8 @@ impl SnapshotFunctionality for DefaultSnapshot {
 
 #[cfg(test)]
 mod tests {
+    use agent_chain_core::messages::prelude::*;
+
     use super::*;
 
     #[test]

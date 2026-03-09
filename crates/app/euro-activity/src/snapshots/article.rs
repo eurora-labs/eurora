@@ -1,4 +1,4 @@
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::messages::prelude::*;
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
