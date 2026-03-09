@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type ThreadView, type TimelineAppEvent } from '$lib/bindings/bindings.js';
+	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
@@ -9,7 +10,7 @@
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import { Spinner } from '@eurora/ui/components/spinner/index';
+	import * as InfiniteList from '@eurora/ui/custom-components/infinite-list/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
@@ -21,11 +22,10 @@
 	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
-	let threads: ThreadView[] = $state([]);
+	const threadService = inject(THREAD_SERVICE);
 	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
-	let chatsLoading = $state(true);
 	let quitDialogOpen = $state(false);
 	let username = $state('');
 
@@ -57,43 +57,21 @@
 			.is_authenticated()
 			.then((isAuthenticated) => {
 				if (!isAuthenticated) {
-					chatsLoading = false;
+					threadService.loading = false;
 					return;
 				}
 				taurpc.auth.get_username().then((name) => {
 					username = name;
 				});
-				taurpc.thread.list(10, 0).then((res) => {
-					threads = res;
-					chatsLoading = false;
-				});
-
-				unlistenPromises.push(
-					taurpc.thread.new_thread_added.on((thread) => {
-						if (!threads.some((c) => c.id === thread.id)) {
-							threads = [thread, ...threads];
-						}
-					}),
-				);
-
-				unlistenPromises.push(
-					taurpc.thread.thread_title_changed.on((thread) => {
-						for (const c of threads) {
-							if (c.id === thread.id) {
-								c.title = thread.title;
-							}
-						}
-					}),
-				);
+				threadService.init();
 			})
 			.catch((error) => {
-				chatsLoading = false;
 				goto('/onboarding');
-
 				console.error('Failed to check authentication:', error);
 			});
 
 		return () => {
+			threadService.destroy();
 			for (const p of unlistenPromises) {
 				p.then((unlisten) => unlisten());
 			}
@@ -161,45 +139,37 @@
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 		{#if sidebarState?.open}
-			{#if chatsLoading}
-				<Sidebar.Group>
-					<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
-					<Sidebar.GroupContent>
-						<div class="flex items-center justify-center py-4">
-							<Spinner />
-						</div>
-					</Sidebar.GroupContent>
-				</Sidebar.Group>
-			{:else if threads.length === 0}
-				<Empty.Root>
-					<Empty.Header>
-						<Empty.Title>No chats yet</Empty.Title>
-					</Empty.Header>
-				</Empty.Root>
-			{:else}
-				<Sidebar.Group>
-					<Sidebar.GroupLabel>Chats</Sidebar.GroupLabel>
-					<Sidebar.GroupContent>
-						<Sidebar.Menu>
-							{#each threads as item (item.id)}
-								<Sidebar.MenuItem>
-									<Sidebar.MenuButton
-										onclick={() => {
-											switchThread(item.id ?? '');
-										}}
-									>
-										{#snippet child({ props })}
-											<a {...props}>
-												<span>{item.title ?? 'New Thread'}</span>
-											</a>
-										{/snippet}
-									</Sidebar.MenuButton>
-								</Sidebar.MenuItem>
-							{/each}
-						</Sidebar.Menu>
-					</Sidebar.GroupContent>
-				</Sidebar.Group>
-			{/if}
+			<InfiniteList.Root
+				items={threadService.threads}
+				label="Chats"
+				loading={threadService.loading}
+				loadingMore={threadService.loadingMore}
+				hasMore={threadService.hasMore}
+				onLoadMore={() => threadService.loadMore()}
+			>
+				{#snippet empty()}
+					<Empty.Root>
+						<Empty.Header>
+							<Empty.Title>No chats yet</Empty.Title>
+						</Empty.Header>
+					</Empty.Root>
+				{/snippet}
+				{#snippet children(item)}
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton
+							onclick={() => {
+								switchThread(item.id ?? '');
+							}}
+						>
+							{#snippet child({ props })}
+								<a {...props}>
+									<span>{item.title ?? 'New Thread'}</span>
+								</a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				{/snippet}
+			</InfiniteList.Root>
 		{/if}
 	</Sidebar.Content>
 	{#if visibleTimelineItems.length > 0}
