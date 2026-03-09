@@ -1,3 +1,4 @@
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
     ChatMessage, ChatMessageChunk, ContentBlock, ContentPart, HumanMessageChunk, MessageContent,
 };

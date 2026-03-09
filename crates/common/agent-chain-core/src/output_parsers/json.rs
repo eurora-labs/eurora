@@ -5,7 +5,9 @@ use crate::error::{Error, Result};
 use crate::outputs::Generation;
 use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
-use super::base::{BaseOutputParser, ParserInput};
+use crate::messages::AnyMessage;
+
+use super::base::BaseOutputParser;
 use super::format_instructions::JSON_FORMAT_INSTRUCTIONS;
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
@@ -43,6 +45,16 @@ pub(crate) fn parse_json_result(text: &str, partial: bool) -> Result<Value> {
             ))
         }
     })
+}
+
+pub(crate) fn parse_json_result_partial(text: &str) -> Result<Option<Value>> {
+    match parse_json_markdown(text) {
+        Ok(v) => Ok(Some(v)),
+        Err(_) => match parse_partial_json(text, false) {
+            Ok(v) => Ok(Some(v)),
+            Err(_) => Ok(None),
+        },
+    }
 }
 
 fn format_schema_instructions(schema: &Value) -> String {
@@ -84,7 +96,7 @@ impl BaseOutputParser for JsonOutputParser {
 impl BaseTransformOutputParser for JsonOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -96,6 +108,13 @@ impl BaseTransformOutputParser for JsonOutputParser {
 impl BaseCumulativeTransformOutputParser for JsonOutputParser {
     fn diff_mode(&self) -> bool {
         self.diff
+    }
+
+    fn parse_result_partial(&self, result: &[Generation]) -> Result<Option<Value>> {
+        let first = result
+            .first()
+            .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
+        parse_json_result_partial(first.text.trim())
     }
 
     fn compute_diff(&self, prev: Option<&Value>, next: Value) -> Result<Value> {

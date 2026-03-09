@@ -13,14 +13,14 @@ mod chat_generation_tests {
     fn test_msg_with_text() {
         let msg = AIMessage::builder().content("foo").build();
         let chat_gen = ChatGeneration::builder().message(msg.into()).build();
-        assert_eq!(chat_gen.text, "foo");
+        assert_eq!(chat_gen.message.text(), "foo");
     }
 
     #[test]
     fn test_msg_no_text() {
         let msg = AIMessage::builder().content("").build();
         let chat_gen = ChatGeneration::builder().message(msg.into()).build();
-        assert_eq!(chat_gen.text, "");
+        assert_eq!(chat_gen.message.text(), "");
     }
 
     #[test]
@@ -29,7 +29,7 @@ mod chat_generation_tests {
         let chat_gen = ChatGeneration::builder()
             .message(msg.clone().into())
             .build();
-        assert_eq!(chat_gen.text, "Hello, world!");
+        assert_eq!(chat_gen.message.text(), "Hello, world!");
         assert_eq!(chat_gen.message, msg.into());
         assert_eq!(chat_gen.generation_type, "ChatGeneration");
     }
@@ -44,7 +44,7 @@ mod chat_generation_tests {
             .message(msg.into())
             .generation_info(gen_info.clone())
             .build();
-        assert_eq!(chat_gen.text, "Test");
+        assert_eq!(chat_gen.message.text(), "Test");
         assert_eq!(chat_gen.generation_info, Some(gen_info));
     }
 
@@ -63,7 +63,7 @@ mod test_chat_generation_chunk {
     fn test_creation() {
         let msg = AIMessage::builder().content("chunk").build();
         let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
-        assert_eq!(chunk.text, "chunk");
+        assert_eq!(chunk.message.text(), "chunk");
         assert_eq!(chunk.generation_type, "ChatGenerationChunk");
     }
 
@@ -74,7 +74,7 @@ mod test_chat_generation_chunk {
         let chunk1 = ChatGenerationChunk::builder().message(msg1.into()).build();
         let chunk2 = ChatGenerationChunk::builder().message(msg2.into()).build();
         let result = chunk1 + chunk2;
-        assert_eq!(result.text, "Hello, world!");
+        assert_eq!(result.message.text(), "Hello, world!");
         assert!(result.generation_info.is_none());
     }
 
@@ -99,7 +99,7 @@ mod test_chat_generation_chunk {
             .build();
 
         let result = chunk1 + chunk2;
-        assert_eq!(result.text, "Hello world");
+        assert_eq!(result.message.text(), "Hello world");
         assert!(result.generation_info.is_some());
         let info = result.generation_info.unwrap();
         assert_eq!(info.get("key1"), Some(&json!("value1")));
@@ -119,7 +119,7 @@ mod test_chat_generation_chunk {
             .build();
         let chunk2 = ChatGenerationChunk::builder().message(msg2.into()).build();
         let result = chunk1 + chunk2;
-        assert_eq!(result.text, "Hello world");
+        assert_eq!(result.message.text(), "Hello world");
         assert_eq!(result.generation_info, Some(info));
     }
 
@@ -130,7 +130,7 @@ mod test_chat_generation_chunk {
         let chunk1 = ChatGenerationChunk::builder().message(msg1.into()).build();
         let chunk2 = ChatGenerationChunk::builder().message(msg2.into()).build();
         let result = chunk1 + chunk2;
-        assert_eq!(result.text, "Hello world");
+        assert_eq!(result.message.text(), "Hello world");
         assert!(result.generation_info.is_none());
     }
 
@@ -148,7 +148,7 @@ mod test_chat_generation_chunk {
         let result = merge_chat_generation_chunks(vec![chunk1, chunk2, chunk3]);
         assert!(result.is_some());
         let result = result.unwrap();
-        assert_eq!(result.text, "ABC");
+        assert_eq!(result.message.text(), "ABC");
     }
 
     #[test]
@@ -168,7 +168,7 @@ mod test_chat_generation_chunk {
         let result = merge_chat_generation_chunks(vec![chunk1, chunk2, chunk3]);
         assert!(result.is_some());
         let result = result.unwrap();
-        assert_eq!(result.text, "ABC");
+        assert_eq!(result.message.text(), "ABC");
         assert!(result.generation_info.is_some());
         let info = result.generation_info.unwrap();
         assert_eq!(info.get("key1"), Some(&json!("value1")));
@@ -183,7 +183,7 @@ mod test_chat_generation_chunk {
             .build();
         let result = merge_chat_generation_chunks(vec![chunk]);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().text, "test");
+        assert_eq!(result.unwrap().message.text(), "test");
     }
 
     #[test]
@@ -191,10 +191,10 @@ mod test_chat_generation_chunk {
         let msg = AIMessage::builder().content("test").build();
         let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
         let chat_gen: ChatGeneration = chunk.clone().into();
-        assert_eq!(chat_gen.text, "test");
+        assert_eq!(chat_gen.message.text(), "test");
         assert_eq!(chat_gen.generation_type, "ChatGeneration");
         let converted_chunk: ChatGenerationChunk = chat_gen.into();
-        assert_eq!(converted_chunk.text, "test");
+        assert_eq!(converted_chunk.message.text(), "test");
     }
 
     #[test]
@@ -220,7 +220,7 @@ mod test_merge_chat_generation_chunks {
         let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
         let result = merge_chat_generation_chunks(vec![chunk.clone()]);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().text, "single");
+        assert_eq!(result.unwrap().message.text(), "single");
     }
 
     #[test]
@@ -231,7 +231,7 @@ mod test_merge_chat_generation_chunks {
         let chunk2 = ChatGenerationChunk::builder().message(msg2.into()).build();
         let result = merge_chat_generation_chunks(vec![chunk1, chunk2]);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().text, "Hello world");
+        assert_eq!(result.unwrap().message.text(), "Hello world");
     }
 
     #[test]
@@ -252,7 +252,7 @@ mod test_merge_chat_generation_chunks {
         ];
         let result = merge_chat_generation_chunks(chunks);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().text, "ABCD");
+        assert_eq!(result.unwrap().message.text(), "ABCD");
     }
 
     #[test]
@@ -298,7 +298,7 @@ mod test_merge_chat_generation_chunks {
         let result = merge_chat_generation_chunks(chunks);
         assert!(result.is_some());
         let merged = result.unwrap();
-        assert_eq!(merged.text, "ABC");
+        assert_eq!(merged.message.text(), "ABC");
         assert!(merged.generation_info.is_none());
     }
 
@@ -328,7 +328,7 @@ mod test_chat_generation_inheritance {
             .message(AIMessage::builder().content("test").build().into())
             .build();
         let generation = Generation::builder().text("test").build();
-        assert_eq!(chat_gen.text, generation.text);
+        assert_eq!(chat_gen.message.text(), generation.text);
         assert_eq!(chat_gen.generation_info, generation.generation_info);
     }
 
@@ -354,11 +354,11 @@ mod test_chat_generation_inheritance {
         let chunk = ChatGenerationChunk::builder()
             .message(AIMessage::builder().content("test").build().into())
             .build();
-        assert_eq!(chunk.text, "test");
+        assert_eq!(chunk.message.text(), "test");
         assert!(chunk.generation_info.is_none());
 
         let chat_gen: ChatGeneration = chunk.clone().into();
-        assert_eq!(chat_gen.text, "test");
+        assert_eq!(chat_gen.message.text(), "test");
 
         assert_eq!(chunk.generation_type, "ChatGenerationChunk");
     }
@@ -372,21 +372,21 @@ mod test_chat_generation_text_extraction {
         let chat_gen = ChatGeneration::builder()
             .message(AIMessage::builder().content("").build().into())
             .build();
-        assert_eq!(chat_gen.text, "");
+        assert_eq!(chat_gen.message.text(), "");
     }
 
     #[test]
     fn test_text_derived_from_message_content() {
         let msg = AIMessage::builder().content("from_message").build();
         let chat_gen = ChatGeneration::builder().message(msg.into()).build();
-        assert_eq!(chat_gen.text, "from_message");
+        assert_eq!(chat_gen.message.text(), "from_message");
     }
 
     #[test]
     fn test_with_human_message() {
         let msg = HumanMessage::builder().content("user input").build();
         let chat_gen = ChatGeneration::builder().message(msg.into()).build();
-        assert_eq!(chat_gen.text, "user input");
+        assert_eq!(chat_gen.message.text(), "user input");
     }
 }
 
@@ -400,7 +400,6 @@ mod test_chat_generation_serialization {
             .build();
         let data: serde_json::Value =
             serde_json::to_value(&chat_gen).expect("serialization failed");
-        assert_eq!(data["text"], "Hello");
         assert_eq!(data["type"], "ChatGeneration");
         assert!(data.get("message").is_some());
     }
@@ -426,7 +425,6 @@ mod test_chat_generation_serialization {
             .generation_info(HashMap::from([("key".to_string(), json!("val"))]))
             .build();
         let data: serde_json::Value = serde_json::to_value(&chunk).expect("serialization failed");
-        assert_eq!(data["text"], "chunk");
         assert_eq!(data["type"], "ChatGenerationChunk");
         assert_eq!(data["generation_info"]["key"], "val");
     }
@@ -440,7 +438,7 @@ mod test_chat_generation_serialization {
         let json_str = serde_json::to_string(&chat_gen).expect("serialization failed");
         let deserialized: ChatGeneration =
             serde_json::from_str(&json_str).expect("deserialization failed");
-        assert_eq!(deserialized.text, "roundtrip");
+        assert_eq!(deserialized.message.text(), "roundtrip");
         assert_eq!(deserialized.generation_type, "ChatGeneration");
         assert!(deserialized.generation_info.is_some());
         assert_eq!(
@@ -458,7 +456,7 @@ mod test_chat_generation_serialization {
         let json_str = serde_json::to_string(&chunk).expect("serialization failed");
         let deserialized: ChatGenerationChunk =
             serde_json::from_str(&json_str).expect("deserialization failed");
-        assert_eq!(deserialized.text, "chunk_rt");
+        assert_eq!(deserialized.message.text(), "chunk_rt");
         assert_eq!(deserialized.generation_type, "ChatGenerationChunk");
         assert_eq!(
             deserialized.generation_info.unwrap().get("key"),
@@ -486,7 +484,7 @@ mod test_chat_generation_chunk_merging_edge_cases {
         let result = merge_chat_generation_chunks(vec![chunk1, chunk2, chunk3]);
         assert!(result.is_some());
         let result = result.unwrap();
-        assert_eq!(result.text, "ABC");
+        assert_eq!(result.message.text(), "ABC");
         assert!(result.generation_info.is_some());
         let info = result.generation_info.unwrap();
         assert_eq!(info.get("k1"), Some(&json!("v1")));
@@ -507,7 +505,7 @@ mod test_chat_generation_chunk_merging_edge_cases {
         let result = merge_chat_generation_chunks(vec![chunk1, chunk2, chunk3]);
         assert!(result.is_some());
         let result = result.unwrap();
-        assert_eq!(result.text, "ABC");
+        assert_eq!(result.message.text(), "ABC");
         assert!(result.generation_info.is_none());
     }
 
@@ -591,7 +589,7 @@ mod test_chat_generation_chunk_merging_edge_cases {
             .generation_info(HashMap::from([("k3".to_string(), json!("v3"))]))
             .build();
         let result = c1 + c2 + c3;
-        assert_eq!(result.text, "ABC");
+        assert_eq!(result.message.text(), "ABC");
         assert!(result.generation_info.is_some());
         let info = result.generation_info.unwrap();
         assert_eq!(info.get("k1"), Some(&json!("v1")));
@@ -608,6 +606,6 @@ mod test_chat_generation_chunk_merging_edge_cases {
             .message(AIMessage::builder().content("").build().into())
             .build();
         let result = chunk1 + chunk2;
-        assert_eq!(result.text, "");
+        assert_eq!(result.message.text(), "");
     }
 }

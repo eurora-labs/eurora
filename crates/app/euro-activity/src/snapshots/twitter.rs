@@ -1,4 +1,4 @@
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{AnyMessage, HumanMessage};
 use euro_native_messaging::types::NativeTwitterSnapshot;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -149,7 +149,7 @@ impl TwitterSnapshot {
 }
 
 impl SnapshotFunctionality for TwitterSnapshot {
-    fn construct_messages(&self) -> Vec<BaseMessage> {
+    fn construct_messages(&self) -> Vec<AnyMessage> {
         let mut content = String::new();
         if let Some(context) = &self.page_context {
             content.push_str(&format!("User is viewing Twitter {} ", context));

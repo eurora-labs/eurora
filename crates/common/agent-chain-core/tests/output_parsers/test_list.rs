@@ -1,5 +1,5 @@
-use agent_chain_core::ParserInput;
 use agent_chain_core::drop_last_n;
+use agent_chain_core::messages::AnyMessage;
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, CommaSeparatedListOutputParser, ListOutputParser,
     MarkdownListOutputParser, NumberedListOutputParser,
@@ -121,7 +121,7 @@ async fn test_comma_transform_single_chunk() {
     let parser = CommaSeparatedListOutputParser::new();
     let text = "foo, bar, baz";
 
-    let input_stream = futures::stream::iter(vec![ParserInput::from(text)]);
+    let input_stream = futures::stream::iter(vec![AnyMessage::from(text)]);
     let results: Vec<Vec<String>> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -223,7 +223,7 @@ async fn test_numbered_transform_single_chunk() {
     let parser = NumberedListOutputParser::new();
     let text = "1. foo\n2. bar\n3. baz";
 
-    let input_stream = futures::stream::iter(vec![ParserInput::from(text)]);
+    let input_stream = futures::stream::iter(vec![AnyMessage::from(text)]);
     let results: Vec<Vec<String>> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -317,7 +317,7 @@ async fn test_markdown_transform_single_chunk() {
     let parser = MarkdownListOutputParser::new();
     let text = "- foo\n- bar\n- baz";
 
-    let input_stream = futures::stream::iter(vec![ParserInput::from(text)]);
+    let input_stream = futures::stream::iter(vec![AnyMessage::from(text)]);
     let results: Vec<Vec<String>> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })

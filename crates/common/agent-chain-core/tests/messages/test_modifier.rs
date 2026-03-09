@@ -1,4 +1,4 @@
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, RemoveMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, BaseMessage, HumanMessage, RemoveMessage};
 
 #[test]
 fn test_init_basic() {
@@ -96,36 +96,36 @@ fn test_multiple_remove_messages() {
 #[test]
 fn test_remove_message_in_list() {
     let messages = [
-        BaseMessage::Human(
+        AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .id("human-1".to_string())
                 .content("Hello")
                 .build(),
         ),
-        BaseMessage::AI(
+        AnyMessage::AIMessage(
             AIMessage::builder()
                 .content("Hi there!")
                 .id("ai-1".to_string())
                 .build(),
         ),
-        BaseMessage::Remove(RemoveMessage::builder().id("human-1").build()),
+        AnyMessage::RemoveMessage(RemoveMessage::builder().id("human-1").build()),
     ];
 
     assert_eq!(messages.len(), 3);
-    assert!(matches!(messages[2], BaseMessage::Remove(_)));
+    assert!(matches!(messages[2], AnyMessage::RemoveMessage(_)));
     assert_eq!(messages[2].id(), Some("human-1".to_string()));
 }
 
 #[test]
 fn test_remove_message_serialization_in_list() {
     let messages = [
-        BaseMessage::Human(
+        AnyMessage::HumanMessage(
             HumanMessage::builder()
                 .id("human-1".to_string())
                 .content("Hello")
                 .build(),
         ),
-        BaseMessage::Remove(RemoveMessage::builder().id("human-1").build()),
+        AnyMessage::RemoveMessage(RemoveMessage::builder().id("human-1").build()),
     ];
 
     let serialized: Vec<serde_json::Value> = messages
@@ -143,13 +143,13 @@ fn test_remove_message_serialization_in_list() {
         "remove"
     );
 
-    let deserialized: Vec<BaseMessage> = serialized
+    let deserialized: Vec<AnyMessage> = serialized
         .into_iter()
         .map(|s| serde_json::from_value(s).unwrap())
         .collect();
 
-    assert!(matches!(deserialized[0], BaseMessage::Human(_)));
-    assert!(matches!(deserialized[1], BaseMessage::Remove(_)));
+    assert!(matches!(deserialized[0], AnyMessage::HumanMessage(_)));
+    assert!(matches!(deserialized[1], AnyMessage::RemoveMessage(_)));
     assert_eq!(deserialized[1].id(), Some("human-1".to_string()));
 }
 
@@ -157,7 +157,7 @@ fn test_remove_message_serialization_in_list() {
 fn test_remove_message_does_not_modify_content() {
     let msg = RemoveMessage::builder().id("msg-123").build();
 
-    assert_eq!(msg.content(), "");
+    assert_eq!(msg.content().as_text(), "");
 
     assert!(msg.content_blocks().is_empty());
 }
@@ -165,7 +165,7 @@ fn test_remove_message_does_not_modify_content() {
 #[test]
 fn test_text_property_is_empty() {
     let msg = RemoveMessage::builder().id("msg-123").build();
-    assert_eq!(msg.text(), "");
+    assert_eq!(msg.content().as_text(), "");
 }
 
 #[test]

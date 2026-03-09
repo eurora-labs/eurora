@@ -1,3 +1,4 @@
+use agent_chain_core::messages::content::{ContentPart, MessageContent};
 use agent_chain_core::messages::{AIMessage, AIMessageChunk};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use serde_json::json;
@@ -133,8 +134,8 @@ mod chat_result_tests {
             .message(msg.clone().into())
             .build();
         let result = ChatResult::builder().generations(vec![chat_gen]).build();
-        assert_eq!(result.generations[0].text, "Test response");
-        if let agent_chain_core::BaseMessage::AI(ai_msg) = &result.generations[0].message {
+        assert_eq!(result.generations[0].message.text(), "Test response");
+        if let agent_chain_core::AnyMessage::AIMessage(ai_msg) = &result.generations[0].message {
             assert_eq!(
                 ai_msg.additional_kwargs.get("function_call"),
                 Some(&json!({"name": "test"}))
@@ -186,7 +187,7 @@ mod chat_result_tests {
         let result = ChatResult::builder().generations(candidates).build();
         assert_eq!(result.generations.len(), 3);
         for (i, chat_gen) in result.generations.iter().enumerate() {
-            assert_eq!(chat_gen.text, format!("Candidate {}", i + 1));
+            assert_eq!(chat_gen.message.text(), format!("Candidate {}", i + 1));
         }
     }
 }
@@ -245,7 +246,7 @@ mod chat_result_serialization_tests {
         let restored: ChatResult =
             serde_json::from_str(&json_str).expect("deserialization should succeed");
         assert_eq!(restored.generations.len(), 1);
-        assert_eq!(restored.generations[0].text, "test");
+        assert_eq!(restored.generations[0].message.text(), "test");
         let mut expected_output = HashMap::new();
         expected_output.insert("model".to_string(), json!("gpt-4"));
         assert_eq!(restored.llm_output, Some(expected_output));
@@ -355,7 +356,7 @@ mod chat_result_model_behavior_tests {
         let chat_gen: ChatGeneration = chunk.into();
         let result = ChatResult::builder().generations(vec![chat_gen]).build();
         assert_eq!(result.generations.len(), 1);
-        assert_eq!(result.generations[0].text, "chunk");
+        assert_eq!(result.generations[0].message.text(), "chunk");
     }
 
     #[test]
@@ -374,7 +375,7 @@ mod chat_result_model_behavior_tests {
             .collect();
         let result = ChatResult::builder().generations(generations).build();
         for (i, generation) in result.generations.iter().enumerate() {
-            assert_eq!(generation.text, format!("Response {i}"));
+            assert_eq!(generation.message.text(), format!("Response {i}"));
         }
     }
 
@@ -390,14 +391,18 @@ mod chat_result_model_behavior_tests {
             .build();
         let gen_list = ChatGeneration::builder()
             .message(
-                AIMessage::with_content_list(vec![json!({"text": "list content", "type": "text"})])
+                AIMessage::builder()
+                    .content(MessageContent::Parts(vec![ContentPart::Text {
+                        text: "list content".to_string(),
+                    }]))
+                    .build()
                     .into(),
             )
             .build();
         let result = ChatResult::builder()
             .generations(vec![gen_str, gen_list])
             .build();
-        assert_eq!(result.generations[0].text, "string content");
-        assert_eq!(result.generations[1].text, "list content");
+        assert_eq!(result.generations[0].message.text(), "string content");
+        assert_eq!(result.generations[1].message.text(), "list content");
     }
 }
