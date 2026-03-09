@@ -23,14 +23,13 @@
 
 	const taurpc = inject(TAURPC_SERVICE);
 	const threadService = inject(THREAD_SERVICE);
+	const sidebarState = useSidebar();
 	let timelineItems: TimelineAppEvent[] = $state([]);
 
-	let sidebarState: ReturnType<typeof useSidebar> | undefined = $state(undefined);
 	let quitDialogOpen = $state(false);
 	let username = $state('');
-
 	let visibleTimelineItems = $derived.by(() => {
-		const limit = sidebarState?.open ? 3 : 1;
+		const limit = sidebarState.open ? 3 : 1;
 		return timelineItems.slice(-limit);
 	});
 
@@ -40,8 +39,6 @@
 	}
 
 	onMount(() => {
-		sidebarState = useSidebar();
-
 		const unlistenPromises: Promise<() => void>[] = [];
 
 		unlistenPromises.push(
@@ -117,10 +114,10 @@
 	<Sidebar.Header>
 		<div class="flex items-center justify-between">
 			<div class="flex items-center gap-2">
-				<EuroraLogo class="size-7" onclick={() => sidebarState?.setOpen(true)} />
+				<EuroraLogo class="size-7" onclick={() => sidebarState.setOpen(true)} />
 			</div>
 
-			{#if sidebarState?.open}
+			{#if sidebarState.open}
 				<Sidebar.Trigger />
 			{/if}
 		</div>
@@ -138,7 +135,7 @@
 				</Sidebar.Menu>
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
-		{#if sidebarState?.open}
+		{#if sidebarState.open}
 			<InfiniteList.Root
 				items={threadService.threads}
 				label="Chats"
@@ -157,6 +154,7 @@
 				{#snippet children(item)}
 					<Sidebar.MenuItem>
 						<Sidebar.MenuButton
+							isActive={item.id === threadService.activeThreadId}
 							onclick={() => {
 								switchThread(item.id ?? '');
 							}}
@@ -201,7 +199,7 @@
 						>
 							{getFirstLetterAndCapitalize(username)}
 						</div>
-						{#if sidebarState?.open}
+						{#if sidebarState.open}
 							<span class="truncate text-sm flex-1 text-left">{username}</span>
 							<ChevronUpIcon class="size-4 shrink-0" />
 						{/if}

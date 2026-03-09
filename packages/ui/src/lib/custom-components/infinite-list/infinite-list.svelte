@@ -30,7 +30,20 @@
 		children,
 	}: InfiniteListProps<T> = $props();
 
+	function findScrollableAncestor(node: HTMLElement): HTMLElement | null {
+		let el: HTMLElement | null = node.parentElement;
+		while (el) {
+			const { overflow, overflowY } = getComputedStyle(el);
+			if (['auto', 'scroll'].some((v) => overflow.includes(v) || overflowY.includes(v))) {
+				return el;
+			}
+			el = el.parentElement;
+		}
+		return null;
+	}
+
 	function intersect(node: HTMLElement, callback: () => void) {
+		const root = findScrollableAncestor(node);
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (entries[0].isIntersecting) {
@@ -38,7 +51,7 @@
 					callback();
 				}
 			},
-			{ rootMargin: '100px' },
+			{ root, rootMargin: '100px' },
 		);
 		observer.observe(node);
 		return { destroy: () => observer.disconnect() };
