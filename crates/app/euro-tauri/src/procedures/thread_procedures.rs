@@ -11,10 +11,18 @@ pub struct ThreadView {
 }
 
 #[taurpc::ipc_type]
+pub struct ReasoningBlock {
+    pub r#type: String,
+    pub content: Option<String>,
+    pub signature: Option<String>,
+}
+
+#[taurpc::ipc_type]
 pub struct MessageView {
     pub id: Option<String>,
     pub role: String,
     pub content: String,
+    pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
 }
 
 #[taurpc::procedures(path = "thread")]
@@ -178,22 +186,54 @@ impl From<&Thread> for ThreadView {
     }
 }
 
+fn extract_reasoning_blocks(message: &AnyMessage) -> Option<Vec<ReasoningBlock>> {
+    let kwargs = message.additional_kwargs();
+    let blocks = kwargs.get("reasoning_blocks")?.as_array()?;
+    let result: Vec<ReasoningBlock> = blocks
+        .iter()
+        .filter_map(|block| {
+            let block_type = block.get("type")?.as_str()?.to_string();
+            let content = block
+                .get("content")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let signature = block
+                .get("signature")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            Some(ReasoningBlock {
+                r#type: block_type,
+                content,
+                signature,
+            })
+        })
+        .collect();
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
 impl From<&AnyMessage> for MessageView {
     fn from(message: &AnyMessage) -> Self {
         MessageView {
             id: message.id(),
             role: message.message_type().to_string(),
             content: message.content().to_string(),
+            reasoning_blocks: extract_reasoning_blocks(message),
         }
     }
 }
 
 impl From<AnyMessage> for MessageView {
     fn from(message: AnyMessage) -> Self {
+        let reasoning_blocks = extract_reasoning_blocks(&message);
         MessageView {
             id: message.id(),
             role: message.message_type().to_string(),
             content: message.content().to_string(),
+            reasoning_blocks,
         }
     }
 }
