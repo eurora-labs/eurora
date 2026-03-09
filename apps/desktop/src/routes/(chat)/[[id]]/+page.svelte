@@ -144,7 +144,13 @@
 			await goto(`/${targetThreadId}`, { replaceState: true });
 		}
 
-		await messageService.sendMessage(targetThreadId, query);
+		const streamPromise = messageService.sendMessage(targetThreadId, query);
+
+		taurpc.thread.generate_title(targetThreadId, text).then((updated) => {
+			threadService.updateThread(updated);
+		});
+
+		await streamPromise;
 		chatStatus = 'ready';
 	}
 </script>

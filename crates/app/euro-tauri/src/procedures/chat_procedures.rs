@@ -4,9 +4,7 @@ use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
 
-use crate::{
-    procedures::thread_procedures::TauRpcThreadApiEventTrigger, shared_types::SharedThreadManager,
-};
+use crate::shared_types::SharedThreadManager;
 
 #[taurpc::ipc_type]
 pub struct ResponseChunk {
@@ -85,28 +83,6 @@ impl ChatApi for ChatApiImpl {
                 }
             }
         }
-
-        let content = query.text.clone();
-        let thread_id_for_title = thread_id.clone();
-        let title_app_handle = app_handle.clone();
-        tokio::spawn(async move {
-            let result = {
-                let thread_state: tauri::State<SharedThreadManager> = title_app_handle.state();
-                let thread_manager = thread_state.lock().await;
-                thread_manager
-                    .generate_thread_title(thread_id_for_title, content)
-                    .await
-            };
-            match result {
-                Ok(thread) => {
-                    let _ = TauRpcThreadApiEventTrigger::new(title_app_handle)
-                        .thread_title_changed(thread.into());
-                }
-                Err(e) => {
-                    tracing::error!("Failed to generate thread title: {e}");
-                }
-            }
-        });
 
         let mut complete_response = String::new();
 

@@ -51,6 +51,12 @@ pub trait ThreadApi {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<MessageView>, String>;
+
+    async fn generate_title<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        content: String,
+    ) -> Result<ThreadView, String>;
 }
 
 fn thread_manager<R: Runtime>(
@@ -119,6 +125,21 @@ impl ThreadApi for ThreadApiImpl {
                 _ => Some(MessageView::from(message)),
             })
             .collect())
+    }
+
+    async fn generate_title<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        content: String,
+    ) -> Result<ThreadView, String> {
+        let thread_state = thread_manager(&app_handle)?;
+        let thread_manager = thread_state.lock().await;
+        let thread = thread_manager
+            .generate_thread_title(thread_id, content)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(thread.into())
     }
 }
 

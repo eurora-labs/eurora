@@ -60,6 +60,12 @@ export class ThreadService {
 		this.activeThreadId = thread.id;
 	}
 
+	updateThread(thread: ThreadView) {
+		this.threads = this.threads.map((t) =>
+			t.id === thread.id ? { ...t, title: thread.title } : t,
+		);
+	}
+
 	async loadMore() {
 		if (this.loadingMore || !this.hasMore) return;
 		this.loadingMore = true;
