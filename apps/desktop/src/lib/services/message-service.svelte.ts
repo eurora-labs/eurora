@@ -53,6 +53,7 @@ export class MessageService {
 		this.taurpc.thread
 			.get_messages(threadId, PAGE_SIZE, 0)
 			.then((response) => {
+				if (entry.messages.length > 0) return;
 				entry.messages = response;
 				entry.offset = response.length;
 				entry.hasMore = response.length === PAGE_SIZE;
@@ -89,36 +90,29 @@ export class MessageService {
 		}
 	}
 
-	async sendMessage(threadId: string | null, query: Query): Promise<string> {
-		const entry = threadId ? (this.cache.get(threadId) ?? this.getThread(threadId)) : null;
+	async sendMessage(threadId: string, query: Query): Promise<void> {
+		const entry = this.cache.get(threadId) ?? this.getThread(threadId);
 
-		if (entry) {
-			entry.messages.push({
-				id: null,
-				role: 'human',
-				content: query.text,
-				reasoning_blocks: null,
-			});
+		entry.messages.push({
+			id: null,
+			role: 'human',
+			content: query.text,
+			reasoning_blocks: null,
+		});
 
-			entry.messages.push({
-				id: null,
-				role: 'ai',
-				content: '',
-				reasoning_blocks: null,
-			});
-		}
+		entry.messages.push({
+			id: null,
+			role: 'ai',
+			content: '',
+			reasoning_blocks: null,
+		});
 
-		const messageIndex = entry ? entry.messages.length - 1 : -1;
+		const messageIndex = entry.messages.length - 1;
 		let agentMessage: MessageView | undefined;
 		let reasoningStartTime: number | null = null;
-
-		if (entry) {
-			entry.streaming = true;
-		}
+		entry.streaming = true;
 
 		function onEvent(response: ResponseChunk) {
-			if (!entry) return;
-
 			if (!agentMessage) {
 				agentMessage = entry.messages.at(-1);
 			}
@@ -147,33 +141,15 @@ export class MessageService {
 		}
 
 		try {
-			if (!threadId) {
-				threadId = (await this.taurpc.thread.create()).id;
-			}
-			if (!threadId) {
-				throw new Error('Failed to create thread');
-			}
-
-			const resultThreadId = await this.taurpc.chat.send_query(threadId, onEvent, query);
-
-			if (!threadId && resultThreadId) {
-				const newEntry = this.cache.get(resultThreadId);
-				if (!newEntry && entry) {
-					this.cache.set(resultThreadId, entry);
-				}
-			}
-
-			return resultThreadId;
+			await this.taurpc.chat.send_query(threadId, onEvent, query);
 		} finally {
-			if (entry) {
-				if (entry.reasoningData[messageIndex]?.isStreaming) {
-					entry.reasoningData[messageIndex].isStreaming = false;
-					entry.reasoningData[messageIndex].duration = reasoningStartTime
-						? Math.ceil((Date.now() - reasoningStartTime) / 1000)
-						: undefined;
-				}
-				entry.streaming = false;
+			if (entry.reasoningData[messageIndex]?.isStreaming) {
+				entry.reasoningData[messageIndex].isStreaming = false;
+				entry.reasoningData[messageIndex].duration = reasoningStartTime
+					? Math.ceil((Date.now() - reasoningStartTime) / 1000)
+					: undefined;
 			}
+			entry.streaming = false;
 		}
 	}
 
