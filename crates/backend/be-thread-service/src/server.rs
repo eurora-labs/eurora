@@ -544,7 +544,7 @@ impl ProtoThreadService for ThreadService {
 
             for round in 0..=MAX_TOOL_ROUNDS {
                 let provider_stream = chat_provider
-                    .astream(messages.clone().into(), None, None)
+                    .astream(messages.clone(), None, None)
                     .await
                     .map_err(|e| {
                         tracing::error!("Error in chat_stream: {}", e);
@@ -783,7 +783,7 @@ impl ProtoThreadService for ThreadService {
         );
 
         let title_provider = self.get_title_provider()?;
-        let mut title = match title_provider.invoke(messages.into(), None).await {
+        let mut title = match title_provider.invoke(messages, None).await {
             Ok(message) => message.content.to_string(),
             Err(_) => "New Chat".to_string(),
         };

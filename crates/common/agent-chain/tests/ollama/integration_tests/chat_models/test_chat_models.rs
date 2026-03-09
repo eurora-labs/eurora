@@ -118,8 +118,7 @@ async fn test_structured_output_function_calling() -> Result<(), Box<dyn std::er
                     .content("Tell me a joke about cats.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -159,8 +158,7 @@ async fn test_structured_output_json_schema() -> Result<(), Box<dyn std::error::
             vec![HumanMessage::builder()
                 .content("Tell me a joke about cats. Respond as JSON with 'setup' and 'punchline' keys.")
                 .build()
-                .into()]
-            .into(),
+                .into()],
             None,
         )
         .await?;
@@ -213,8 +211,7 @@ async fn test_structured_output_deeply_nested() -> Result<(), Box<dyn std::error
                     )
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -254,8 +251,7 @@ async fn test_tool_streaming() -> Result<(), Box<dyn std::error::Error>> {
                     .content("What is the weather today in Boston?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -301,8 +297,7 @@ async fn test_tool_astreaming() -> Result<(), Box<dyn std::error::Error>> {
                     .content("What is the weather today in Boston?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -350,7 +345,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .into();
 
     let tool_call_message = llm_with_tools
-        .invoke(vec![input_message.clone()].into(), None)
+        .invoke(vec![input_message.clone()], None)
         .await?;
     assert!(
         !tool_call_message.tool_calls.is_empty(),
@@ -373,8 +368,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
                 input_message.clone(),
                 AnyMessage::AIMessage(tool_call_message.clone()),
                 tool_message.clone(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -393,8 +387,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
                 tool_message,
                 AnyMessage::AIMessage(resp_message),
                 follow_up,
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -430,7 +423,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
         .into();
 
     let tool_call_message = llm_with_tools
-        .invoke(vec![input_message.clone()].into(), None)
+        .invoke(vec![input_message.clone()], None)
         .await?;
     assert!(
         !tool_call_message.tool_calls.is_empty(),
@@ -453,8 +446,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
                 input_message.clone(),
                 AnyMessage::AIMessage(tool_call_message.clone()),
                 tool_message.clone(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -473,8 +465,7 @@ async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
                 tool_message,
                 AnyMessage::AIMessage(resp_message),
                 follow_up,
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
