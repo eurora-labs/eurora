@@ -71,6 +71,7 @@
 			id: null,
 			role: 'human',
 			content: suggestion,
+			reasoning_blocks: null,
 		});
 
 		chatStatus = 'submitted';
@@ -103,9 +104,7 @@
 				reasoningData = {};
 				response.forEach((msg, i) => {
 					if (msg.reasoning_blocks?.length) {
-						const content = msg.reasoning_blocks
-							.map((b) => b.content ?? '')
-							.join('');
+						const content = msg.reasoning_blocks.map((b) => b.content ?? '').join('');
 						if (content) {
 							reasoningData[i] = { content, isStreaming: false };
 						}
@@ -158,6 +157,7 @@
 			id: null,
 			role: 'human',
 			content: text,
+			reasoning_blocks: null,
 		});
 
 		chatStatus = 'submitted';
@@ -182,6 +182,7 @@
 			id: null,
 			role: 'ai',
 			content: '',
+			reasoning_blocks: null,
 		});
 
 		const messageIndex = messages.length - 1;
@@ -260,7 +261,9 @@
 								duration={reasoning.duration}
 							>
 								<Reasoning.Trigger />
-								<Reasoning.Content children={reasoning.content} />
+								<Reasoning.Content>
+									<Reasoning.Response content={reasoning.content} />
+								</Reasoning.Content>
 							</Reasoning.Root>
 						{/if}
 						<Message.Content>
