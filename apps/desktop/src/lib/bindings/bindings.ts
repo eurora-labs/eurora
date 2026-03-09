@@ -16,7 +16,7 @@ export type LocalBackendInfo = { grpc_port: number; http_port: number; postgres_
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
-export type MessageView = { id: string | null; role: string; content: string }
+export type MessageView = { id: string | null; role: string; content: string; reasoning_blocks: ReasoningBlock[] | null }
 
 export type OllamaSettings = { base_url: string; model: string }
 
@@ -25,6 +25,8 @@ export type OpenAISettings = { base_url: string; model: string; title_model: str
 export type ProviderSettings = { OllamaSettings: OllamaSettings } | { OpenAISettings: OpenAISettings }
 
 export type Query = { text: string; assets: string[] }
+
+export type ReasoningBlock = { type: string; content: string | null; signature: string | null }
 
 export type ResponseChunk = { chunk: string; reasoning: string | null }
 

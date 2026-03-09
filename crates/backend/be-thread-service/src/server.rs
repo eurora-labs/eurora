@@ -630,7 +630,10 @@ impl ProtoThreadService for ThreadService {
             if !full_content.is_empty() {
                 let reasoning_blocks = match full_reasoning.is_empty() {
                     true => None,
-                    false => Some(serde_json::json!(full_reasoning)),
+                    false => Some(serde_json::json!([{
+                        "type": "thinking",
+                        "content": full_reasoning,
+                    }])),
                 };
 
                 let save_result = db.create_message()
