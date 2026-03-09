@@ -27,7 +27,7 @@ async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -47,7 +47,7 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = llm
         .ainvoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -67,7 +67,7 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut stream = llm
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -100,7 +100,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut stream = llm
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -147,7 +147,7 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
             .into(),
     ];
 
-    let result = llm.invoke(messages.into(), None).await?;
+    let result = llm.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -170,7 +170,7 @@ async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
             .into(),
     ];
 
-    let result = llm.invoke(messages.into(), None).await?;
+    let result = llm.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -191,7 +191,7 @@ async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -236,8 +236,7 @@ async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error
                     .content("Write me 2 haikus. Only include the haikus.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -280,7 +279,7 @@ async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = llm
         .invoke(
-            vec![HumanMessage::builder().content("hi").build().into()].into(),
+            vec![HumanMessage::builder().content("hi").build().into()],
             None,
         )
         .await?;
@@ -318,8 +317,7 @@ async fn test_standard_tool_calling() -> Result<(), Box<dyn std::error::Error>> 
                     .content("What is the value of magic_function(3)? Use the tool.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -356,8 +354,7 @@ async fn test_standard_tool_calling_async() -> Result<(), Box<dyn std::error::Er
                     .content("What is the value of magic_function(3)? Use the tool.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -392,8 +389,7 @@ async fn test_standard_tool_calling_no_arguments() -> Result<(), Box<dyn std::er
                     .content("Call the magic function with no arguments.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -451,7 +447,7 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
             .into(),
     ];
 
-    let result = llm_with_tools.invoke(messages.into(), None).await?;
+    let result = llm_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty() || !result.tool_calls.is_empty());
 
     Ok(())
@@ -507,7 +503,7 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
             .into(),
     ];
 
-    let result = llm_with_tools.invoke(messages.into(), None).await?;
+    let result = llm_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty() || !result.tool_calls.is_empty());
 
     Ok(())
@@ -556,7 +552,7 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
             .into(),
     ];
 
-    let result = llm_with_tools.invoke(messages.into(), None).await?;
+    let result = llm_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty() || !result.tool_calls.is_empty());
 
     Ok(())
@@ -579,8 +575,7 @@ async fn test_standard_json_mode() -> Result<(), Box<dyn std::error::Error>> {
                     .content("Return a JSON object with a 'name' key set to 'Alice'.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -623,8 +618,7 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
                     .content("Tell me a joke about cats.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -668,8 +662,7 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
                     .content("Tell me a joke about dogs.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -716,7 +709,7 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .into();
 
-    let result = llm.invoke(vec![message].into(), None).await?;
+    let result = llm.invoke(vec![message], None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -740,7 +733,7 @@ async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
     for prompt in prompts {
         let result = llm
             .invoke(
-                vec![HumanMessage::builder().content(prompt).build().into()].into(),
+                vec![HumanMessage::builder().content(prompt).build().into()],
                 None,
             )
             .await?;
@@ -769,7 +762,7 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
             let llm = llm.clone();
             async move {
                 llm.ainvoke(
-                    vec![HumanMessage::builder().content(prompt).build().into()].into(),
+                    vec![HumanMessage::builder().content(prompt).build().into()],
                     None,
                 )
                 .await
@@ -813,7 +806,7 @@ async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::E
             .into(),
     ];
 
-    let result = llm.invoke(messages.into(), None).await?;
+    let result = llm.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -867,8 +860,7 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
                     .content("What is the weather in Tokyo? Use the get_weather tool.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -891,8 +883,7 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
                     .content("What is the value of magic_function(3)? Use the magic_function tool.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -961,9 +952,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
             .into(),
     ];
 
-    let result = llm_with_tools
-        .invoke(few_shot_messages.into(), None)
-        .await?;
+    let result = llm_with_tools.invoke(few_shot_messages, None).await?;
     assert!(
         !result.tool_calls.is_empty(),
         "Model should produce a tool call after few-shot examples"
@@ -1009,8 +998,7 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
                     .content("Tell me a joke about cats.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1066,8 +1054,7 @@ async fn test_unicode_tool_call_integration() -> Result<(), Box<dyn std::error::
                     )
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1099,8 +1086,7 @@ async fn test_unicode_tool_call_integration() -> Result<(), Box<dyn std::error::
                     )
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1154,7 +1140,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
 
     // Step 1: model should request a tool call
     let tool_call_message = llm_with_tools
-        .invoke(vec![input_message.clone()].into(), None)
+        .invoke(vec![input_message.clone()], None)
         .await?;
     assert!(
         !tool_call_message.tool_calls.is_empty(),
@@ -1178,8 +1164,7 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
                 input_message,
                 AnyMessage::AIMessage(tool_call_message),
                 tool_response,
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
