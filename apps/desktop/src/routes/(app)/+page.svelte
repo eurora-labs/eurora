@@ -261,9 +261,7 @@
 								duration={reasoning.duration}
 							>
 								<Reasoning.Trigger />
-								<Reasoning.Content>
-									<Reasoning.Response content={reasoning.content} />
-								</Reasoning.Content>
+								<Reasoning.Content children={reasoning.content} />
 							</Reasoning.Root>
 						{/if}
 						<Message.Content>
