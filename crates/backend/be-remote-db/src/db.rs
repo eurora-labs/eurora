@@ -1070,6 +1070,7 @@ impl DatabaseManager {
         tool_calls: Option<serde_json::Value>,
         additional_kwargs: Option<serde_json::Value>,
         hidden_from_ui: Option<bool>,
+        reasoning_blocks: Option<serde_json::Value>,
     ) -> DbResult<Message> {
         let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
@@ -1084,15 +1085,15 @@ impl DatabaseManager {
             ),
             updated_thread AS (
                 UPDATE threads
-                SET updated_at = $10
+                SET updated_at = $11
                 WHERE id = (SELECT id FROM verified_thread)
                 RETURNING id
             ),
             inserted_message AS (
-                INSERT INTO messages (id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at)
-                SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10, $11
+                INSERT INTO messages (id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, reasoning_blocks, created_at, updated_at)
+                SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
                 FROM verified_thread vc
-                RETURNING id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at
+                RETURNING id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, reasoning_blocks, created_at, updated_at
             )
             SELECT * FROM inserted_message
             "#,
@@ -1106,6 +1107,7 @@ impl DatabaseManager {
         .bind(&tool_calls)
         .bind(&additional_kwargs)
         .bind(hidden_from_ui)
+        .bind(&reasoning_blocks)
         .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
@@ -1136,7 +1138,7 @@ impl DatabaseManager {
 
         let query = format!(
             r#"
-            SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.hidden_from_ui, m.created_at, m.updated_at
+            SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.reasoning_blocks, m.created_at, m.updated_at
             FROM messages m
             WHERE m.thread_id = $1 AND m.user_id = $2{}
             ORDER BY m.id {}
