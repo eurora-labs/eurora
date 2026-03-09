@@ -52,6 +52,20 @@ export class ThreadService {
 		);
 	}
 
+	addThread(thread: ThreadView) {
+		if (!this.threads.some((t) => t.id === thread.id)) {
+			this.threads = [thread, ...this.threads];
+			this.offset += 1;
+		}
+		this.activeThreadId = thread.id;
+	}
+
+	updateThread(thread: ThreadView) {
+		this.threads = this.threads.map((t) =>
+			t.id === thread.id ? { ...t, title: thread.title } : t,
+		);
+	}
+
 	async loadMore() {
 		if (this.loadingMore || !this.hasMore) return;
 		this.loadingMore = true;
