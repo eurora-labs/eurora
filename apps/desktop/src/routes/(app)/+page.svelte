@@ -94,11 +94,23 @@
 
 			if (!new_conv.id) {
 				messages.splice(0, messages.length);
+				reasoningData = {};
 				return;
 			}
 
 			taurpc.thread.get_messages(new_conv.id, 50, 0).then((response) => {
 				messages = response;
+				reasoningData = {};
+				response.forEach((msg, i) => {
+					if (msg.reasoning_blocks?.length) {
+						const content = msg.reasoning_blocks
+							.map((b) => b.content ?? '')
+							.join('');
+						if (content) {
+							reasoningData[i] = { content, isStreaming: false };
+						}
+					}
+				});
 			});
 		});
 
