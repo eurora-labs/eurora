@@ -1,5 +1,7 @@
 @import '@eurora/ui/main.css';
 @import 'tailwindcss';
+/* This is needed to prevent common words like "hidden" from being picked up by tailwind scanner */
+@source "../../../../packages/ui/src";
 
 *,
 ::after,
