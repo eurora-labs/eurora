@@ -3,7 +3,7 @@
 	import { CollapsibleContent } from '$lib/components/collapsible/index.js';
 	import { Streamdown } from 'svelte-streamdown';
 	import Code from 'svelte-streamdown/code';
-	import Math from 'svelte-streamdown/math';
+	import SDMath from 'svelte-streamdown/math';
 	import Mermaid from 'svelte-streamdown/mermaid';
 
 	let {
@@ -12,7 +12,7 @@
 		...restProps
 	}: { class?: string; children: string; [key: string]: any } = $props();
 
-	const components = { code: Code, math: Math, mermaid: Mermaid };
+	const components = { code: Code, math: SDMath, mermaid: Mermaid };
 	const theme = {
 		paragraph: { base: 'text-inherit' },
 		strong: { base: 'font-semibold text-inherit' },
