@@ -3,14 +3,17 @@ import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import { InjectionToken } from '@eurora/shared/context';
 
 const PAGE_SIZE = 20;
+const MAX_LOAD_RETRIES = 3;
 
 export class ThreadService {
 	threads: ThreadView[] = $state([]);
 	loading = $state(true);
 	loadingMore = $state(false);
 	hasMore = $state(true);
+	activeThreadId: string | null = $state(null);
 
 	private offset = 0;
+	private loadRetries = 0;
 	private readonly taurpc: TaurpcService;
 	private readonly unlisteners: Promise<() => void>[] = [];
 
@@ -42,6 +45,9 @@ export class ThreadService {
 					t.id === thread.id ? { ...t, title: thread.title } : t,
 				);
 			}),
+			this.taurpc.thread.current_thread_changed.on((thread) => {
+				this.activeThreadId = thread.id;
+			}),
 		);
 	}
 
@@ -53,8 +59,13 @@ export class ThreadService {
 			this.threads = [...this.threads, ...res];
 			this.offset += res.length;
 			this.hasMore = res.length === PAGE_SIZE;
+			this.loadRetries = 0;
 		} catch (error) {
 			console.error('Failed to load more threads:', error);
+			this.loadRetries += 1;
+			if (this.loadRetries >= MAX_LOAD_RETRIES) {
+				this.hasMore = false;
+			}
 		} finally {
 			this.loadingMore = false;
 		}
@@ -64,6 +75,14 @@ export class ThreadService {
 		for (const p of this.unlisteners) {
 			p.then((unlisten) => unlisten());
 		}
+		this.unlisteners.length = 0;
+		this.threads = [];
+		this.offset = 0;
+		this.loadRetries = 0;
+		this.hasMore = true;
+		this.loading = true;
+		this.loadingMore = false;
+		this.activeThreadId = null;
 	}
 }
 
