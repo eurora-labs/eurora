@@ -376,7 +376,9 @@ Don't overuse these hooks! They come with their own overhead. Only use them when
 							{#if msg.reasoning}
 								<Reasoning.Root duration={msg.reasoning.duration}>
 									<Reasoning.Trigger />
-									<Reasoning.Content children={msg.reasoning.content} />
+									<Reasoning.Content>
+										<Reasoning.Response content={msg.reasoning.content} />
+									</Reasoning.Content>
 								</Reasoning.Root>
 							{/if}
 							<Message.Content>
