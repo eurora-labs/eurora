@@ -1,6 +1,6 @@
+import { InjectionToken } from '@eurora/shared/context';
 import type { ThreadView } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-import { InjectionToken } from '@eurora/shared/context';
 
 const PAGE_SIZE = 20;
 const MAX_LOAD_RETRIES = 3;
@@ -39,6 +39,7 @@ export class ThreadService {
 					this.threads = [thread, ...this.threads];
 					this.offset += 1;
 				}
+				this.activeThreadId = thread.id;
 			}),
 			this.taurpc.thread.thread_title_changed.on((thread) => {
 				this.threads = this.threads.map((t) =>

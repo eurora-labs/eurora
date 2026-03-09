@@ -156,7 +156,11 @@
 						<Sidebar.MenuButton
 							isActive={item.id === threadService.activeThreadId}
 							onclick={() => {
-								switchThread(item.id ?? '');
+								if (!item.id) {
+									toast.error("Something went wrong: this thread doesn't exist.");
+									return;
+								}
+								switchThread(item.id);
 							}}
 						>
 							{#snippet child({ props })}
