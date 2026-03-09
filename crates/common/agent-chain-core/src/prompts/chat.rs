@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::messages::{
-    AIMessage, BaseMessage, ChatMessage, ContentPart, HumanMessage, ImageDetail, ImageSource,
+    AIMessage, AnyMessage, ChatMessage, ContentPart, HumanMessage, ImageDetail, ImageSource,
     MessageContent, SystemMessage,
 };
 use crate::prompt_values::{ChatPromptValue, PromptValue};
@@ -28,7 +28,7 @@ use super::string::{PromptTemplateFormat, StringPromptTemplate};
 #[derive(Debug, Clone, Default)]
 pub struct ChatPromptInput {
     pub variables: HashMap<String, String>,
-    pub messages: HashMap<String, Vec<BaseMessage>>,
+    pub messages: HashMap<String, Vec<AnyMessage>>,
 }
 
 #[bon::bon]
@@ -36,7 +36,7 @@ impl ChatPromptInput {
     #[builder]
     pub fn new(
         #[builder(default)] variables: HashMap<String, String>,
-        #[builder(default)] messages: HashMap<String, Vec<BaseMessage>>,
+        #[builder(default)] messages: HashMap<String, Vec<AnyMessage>>,
     ) -> Self {
         Self {
             variables,
@@ -92,8 +92,8 @@ impl MessagesPlaceholder {
 
     pub fn format_with_messages(
         &self,
-        messages: Option<Vec<BaseMessage>>,
-    ) -> Result<Vec<BaseMessage>> {
+        messages: Option<Vec<AnyMessage>>,
+    ) -> Result<Vec<AnyMessage>> {
         let value = if self.optional {
             messages.unwrap_or_default()
         } else {
@@ -125,7 +125,7 @@ impl BaseMessagePromptTemplate for MessagesPlaceholder {
         &self.input_variables
     }
 
-    fn format_messages(&self, _kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
+    fn format_messages(&self, _kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         if self.optional {
             Ok(Vec::new())
         } else {
@@ -157,12 +157,12 @@ pub trait BaseStringMessagePromptTemplate: BaseMessagePromptTemplate {
         &EMPTY
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage>;
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<AnyMessage>;
 
     fn aformat(
         &self,
         kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<BaseMessage>> + Send + '_>> {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AnyMessage>> + Send + '_>> {
         let result = self.format(kwargs);
         Box::pin(async move { result })
     }
@@ -266,9 +266,9 @@ impl BaseMessagePromptTemplate for ChatMessagePromptTemplate {
         &self.prompt.input_variables
     }
 
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>> {
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(vec![BaseMessage::Chat(
+        Ok(vec![AnyMessage::ChatMessage(
             ChatMessage::builder()
                 .content(text)
                 .role(&self.role)
@@ -292,9 +292,9 @@ impl BaseStringMessagePromptTemplate for ChatMessagePromptTemplate {
         &self.additional_kwargs
     }
 
-    fn format(&self, kwargs: &HashMap<String, String>) -> Result<BaseMessage> {
+    fn format(&self, kwargs: &HashMap<String, String>) -> Result<AnyMessage> {
         let text = StringPromptTemplate::format(&self.prompt, kwargs)?;
-        Ok(BaseMessage::Chat(
+        Ok(AnyMessage::ChatMessage(
             ChatMessage::builder()
                 .content(text)
                 .role(&self.role)
@@ -369,12 +369,9 @@ macro_rules! message_prompt_template {
                 &self.input_variables
             }
 
-            fn format_messages(
-                &self,
-                kwargs: &HashMap<String, String>,
-            ) -> Result<Vec<BaseMessage>> {
+            fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
                 let content = format_content_parts(&self.content_parts, kwargs)?;
-                Ok(vec![BaseMessage::$variant(
+                Ok(vec![AnyMessage::$variant(
                     $builder::builder().content(content).build(),
                 )])
             }
@@ -398,21 +395,21 @@ macro_rules! message_prompt_template {
 
 message_prompt_template!(
     HumanMessagePromptTemplate,
-    Human,
+    HumanMessage,
     HumanMessage,
     "Human Message"
 );
-message_prompt_template!(AIMessagePromptTemplate, AI, AIMessage, "AI Message");
+message_prompt_template!(AIMessagePromptTemplate, AIMessage, AIMessage, "AI Message");
 message_prompt_template!(
     SystemMessagePromptTemplate,
-    System,
+    SystemMessage,
     SystemMessage,
     "System Message"
 );
 
 #[derive(Clone)]
 pub enum MessageLike {
-    Message(Box<BaseMessage>),
+    Message(Box<AnyMessage>),
     Template(Box<dyn MessageLikeClone + Send + Sync>),
     Placeholder(MessagesPlaceholder),
 }
@@ -450,7 +447,7 @@ impl Clone for Box<dyn MessageLikeClone + Send + Sync> {
 pub enum MessageLikeRepresentation {
     Tuple(String, String),
     String(String),
-    Message(Box<BaseMessage>),
+    Message(Box<AnyMessage>),
     Placeholder {
         variable_name: String,
         optional: bool,
@@ -481,8 +478,8 @@ impl From<(&str, &str)> for MessageLikeRepresentation {
     }
 }
 
-impl From<BaseMessage> for MessageLikeRepresentation {
-    fn from(msg: BaseMessage) -> Self {
+impl From<AnyMessage> for MessageLikeRepresentation {
+    fn from(msg: AnyMessage) -> Self {
         Self::Message(Box::new(msg))
     }
 }
@@ -515,12 +512,12 @@ impl std::fmt::Debug for MessageLikeRepresentation {
 }
 
 pub trait BaseChatPromptTemplate: BasePromptTemplate {
-    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>>;
+    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>>;
 
     fn aformat_messages(
         &self,
         input: &ChatPromptInput,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<BaseMessage>>> + Send + '_>>
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<AnyMessage>>> + Send + '_>>
     {
         let result = self.format_messages(input);
         Box::pin(async move { result })
@@ -549,7 +546,7 @@ pub trait BaseChatPromptTemplate: BasePromptTemplate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChatPromptMessage {
-    Message(BaseMessage),
+    Message(AnyMessage),
     Human(HumanMessagePromptTemplate),
     AI(AIMessagePromptTemplate),
     System(SystemMessagePromptTemplate),
@@ -569,7 +566,7 @@ impl ChatPromptMessage {
         }
     }
 
-    fn format_messages_with_input(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>> {
+    fn format_messages_with_input(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
         match self {
             ChatPromptMessage::Message(m) => Ok(vec![m.clone()]),
             ChatPromptMessage::Human(t) => t.format_messages(&input.variables),
@@ -727,7 +724,7 @@ impl ChatPromptTemplate {
 }
 
 impl BaseChatPromptTemplate for ChatPromptTemplate {
-    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<BaseMessage>> {
+    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
         let merged_variables = self.merge_partial_and_user_variables(&input.variables);
         let merged_input = ChatPromptInput {
             variables: merged_variables,
@@ -1043,6 +1040,7 @@ submit_constructor!(ChatPromptTemplate);
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::BaseMessage;
 
     #[test]
     fn test_messages_placeholder() {
@@ -1161,7 +1159,7 @@ mod tests {
     #[test]
     fn test_from_messages_with_base_message() {
         let template = ChatPromptTemplate::from_messages(vec![
-            BaseMessage::System(SystemMessage::builder().content("hello").build()).into(),
+            AnyMessage::SystemMessage(SystemMessage::builder().content("hello").build()).into(),
             ("human", "Hi {name}").into(),
         ])
         .unwrap();
@@ -1231,8 +1229,8 @@ mod tests {
             .messages(HashMap::from([(
                 "history".to_string(),
                 vec![
-                    BaseMessage::Human(HumanMessage::builder().content("Hi").build()),
-                    BaseMessage::AI(AIMessage::builder().content("Hello!").build()),
+                    AnyMessage::HumanMessage(HumanMessage::builder().content("Hi").build()),
+                    AnyMessage::AIMessage(AIMessage::builder().content("Hello!").build()),
                 ],
             )]))
             .build();

@@ -1,4 +1,4 @@
-use agent_chain_core::BaseMessage;
+use agent_chain_core::AnyMessage;
 use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use std::sync::Arc;
@@ -106,7 +106,7 @@ impl TimelineManager {
         }
     }
 
-    pub async fn construct_messages_from_last_snapshot(&self) -> Vec<BaseMessage> {
+    pub async fn construct_messages_from_last_snapshot(&self) -> Vec<AnyMessage> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(snapshot) = activity.snapshots.last() {
@@ -119,7 +119,7 @@ impl TimelineManager {
         }
     }
 
-    pub async fn construct_messages_from_last_asset(&self) -> Vec<BaseMessage> {
+    pub async fn construct_messages_from_last_asset(&self) -> Vec<AnyMessage> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(asset) = activity.assets.last() {
@@ -132,7 +132,7 @@ impl TimelineManager {
         }
     }
 
-    pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> Vec<BaseMessage> {
+    pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> Vec<AnyMessage> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             activity
@@ -146,7 +146,7 @@ impl TimelineManager {
         }
     }
 
-    pub async fn construct_snapshot_messages_by_ids(&self, _ids: &[String]) -> Vec<BaseMessage> {
+    pub async fn construct_snapshot_messages_by_ids(&self, _ids: &[String]) -> Vec<AnyMessage> {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(snapshot) = activity.snapshots.last() {

@@ -3,7 +3,7 @@ use crate::{
     error::{Error, Result},
     types::ThreadEvent,
 };
-use agent_chain::{BaseMessage, HumanMessage, SystemMessage, messages::AIMessageChunk};
+use agent_chain::{AnyMessage, HumanMessage, SystemMessage, messages::AIMessageChunk};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
@@ -109,7 +109,7 @@ impl ThreadManager {
         Ok(response.threads.into_iter().map(Thread::from).collect())
     }
 
-    pub async fn get_current_messages(&self, limit: u32, offset: u32) -> Result<Vec<BaseMessage>> {
+    pub async fn get_current_messages(&self, limit: u32, offset: u32) -> Result<Vec<AnyMessage>> {
         let mut client = self.client();
         let id = self.current_thread.id().ok_or(Error::InvalidThreadId)?;
 
@@ -125,7 +125,7 @@ impl ThreadManager {
         Ok(response
             .messages
             .into_iter()
-            .map(BaseMessage::from)
+            .map(AnyMessage::from)
             .collect())
     }
 
@@ -148,7 +148,7 @@ impl ThreadManager {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<BaseMessage>> {
+    ) -> Result<Vec<AnyMessage>> {
         let mut client = self.client();
         let response = client
             .get_messages(GetMessagesRequest {
@@ -162,7 +162,7 @@ impl ThreadManager {
         Ok(response
             .messages
             .into_iter()
-            .map(BaseMessage::from)
+            .map(AnyMessage::from)
             .collect())
     }
 

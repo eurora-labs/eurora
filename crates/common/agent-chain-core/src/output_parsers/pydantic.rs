@@ -8,8 +8,10 @@ use serde_json::Value;
 use crate::error::{Error, Result};
 use crate::outputs::Generation;
 
-use super::base::{BaseOutputParser, ParserInput};
-use super::json::parse_json_result;
+use crate::messages::AnyMessage;
+
+use super::base::BaseOutputParser;
+use super::json::{parse_json_result, parse_json_result_partial};
 use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputParser};
 
 #[derive(Debug, Clone)]
@@ -93,7 +95,7 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
 {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -105,6 +107,18 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
     BaseCumulativeTransformOutputParser for PydanticOutputParser<T>
 {
+    fn parse_result_partial(&self, result: &[Generation]) -> Result<Option<T>> {
+        let first = result
+            .first()
+            .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
+        let Some(json_object) = parse_json_result_partial(first.text.trim())? else {
+            return Ok(None);
+        };
+        match self.parse_obj(&json_object) {
+            Ok(v) => Ok(Some(v)),
+            Err(_) => Ok(None),
+        }
+    }
 }
 
 const PYDANTIC_FORMAT_INSTRUCTIONS: &str = r#"The output should be formatted as a JSON instance that conforms to the JSON schema below.
@@ -173,11 +187,11 @@ mod tests {
     }
 
     #[test]
-    fn test_pydantic_parse_result_partial() {
+    fn test_pydantic_parse_result_partial_incomplete() {
         let parser = person_parser();
         let generations = vec![Generation::builder().text(r#"{"name": "Alice"#).build()];
-        let result = parser.parse_result(&generations, true);
-        assert!(result.is_err());
+        let result = parser.parse_result_partial(&generations).unwrap();
+        assert!(result.is_none());
     }
 
     #[test]
@@ -213,13 +227,13 @@ mod tests {
         use futures::StreamExt;
 
         let parser = person_parser();
-        let inputs: Vec<ParserInput> = vec![
-            ParserInput::from("{\"name\":"),
-            ParserInput::from(" \"Alice\", "),
-            ParserInput::from("\"age\": 30}"),
+        let inputs: Vec<AnyMessage> = vec![
+            AnyMessage::from("{\"name\":"),
+            AnyMessage::from(" \"Alice\", "),
+            AnyMessage::from("\"age\": 30}"),
         ];
         let stream = futures::stream::iter(inputs);
-        let boxed: BoxStream<ParserInput> = Box::pin(stream);
+        let boxed: BoxStream<AnyMessage> = Box::pin(stream);
         let mut output_stream = parser.transform(boxed);
 
         let mut results = Vec::new();

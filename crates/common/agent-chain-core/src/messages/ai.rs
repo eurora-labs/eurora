@@ -3,7 +3,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
-use super::base::{MergeableContent, get_msg_title_repr, merge_content_complex};
+use super::base::{BaseMessage, MergeableContent, get_msg_title_repr, merge_content_complex};
 use super::content::{ContentBlock, ContentPart, MessageContent};
 use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
@@ -134,6 +134,36 @@ pub struct AIMessage {
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
+impl BaseMessage for AIMessage {
+    fn id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn content(&self) -> &MessageContent {
+        &self.content
+    }
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn set_id(&mut self, id: String) {
+        self.id = Some(id);
+    }
+
+    fn message_type(&self) -> &'static str {
+        "ai"
+    }
+
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
+}
+
 impl Serialize for AIMessage {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -196,10 +226,6 @@ impl AIMessage {
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
         let content: MessageContent = content_list.into();
         Self::builder().content(content).build()
-    }
-
-    pub fn set_id(&mut self, id: String) {
-        self.id = Some(id);
     }
 
     pub fn text(&self) -> String {

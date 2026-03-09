@@ -7,8 +7,7 @@ mod model_profile;
 mod utils;
 
 pub use base::{
-    BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelLike, LanguageModelOutput,
+    BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelLike,
 };
 
 pub use chat_models::{
@@ -43,7 +42,3 @@ pub use utils::{
     is_openai_data_block, normalize_messages, parse_data_uri, update_chunk_content_to_blocks,
     update_message_content_to_blocks,
 };
-
-pub type BoxedLanguageModelInput = Box<dyn std::any::Any + Send + Sync>;
-
-pub type BoxedLanguageModelOutput = Box<dyn std::any::Any + Send + Sync>;
