@@ -76,7 +76,7 @@
 	});
 
 	async function createChat() {
-		threadService.createThread();
+		threadService.activeThreadId = null;
 		goto('/');
 	}
 
@@ -147,6 +147,7 @@
 									toast.error("Something went wrong: this thread doesn't exist.");
 									return;
 								}
+								threadService.activeThreadId = item.id;
 								goto(`/${item.id}`);
 							}}
 						>

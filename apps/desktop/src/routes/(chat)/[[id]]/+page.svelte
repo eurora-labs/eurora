@@ -3,6 +3,7 @@
 	import { type Query, type ContextChip, type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { MESSAGE_SERVICE } from '$lib/services/message-service.svelte.js';
+	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
@@ -38,6 +39,7 @@
 
 	let taurpc = inject(TAURPC_SERVICE);
 	let messageService = inject(MESSAGE_SERVICE);
+	let threadService = inject(THREAD_SERVICE);
 	let chatStatus = $state<ChatStatus>('ready');
 	let assets = $state<ContextChip[]>([]);
 	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
@@ -130,12 +132,19 @@
 
 	async function sendQuery(text: string, assetIds: string[] = []): Promise<void> {
 		const query: Query = { text, assets: assetIds };
-		const resultThreadId = await messageService.sendMessage(threadId, query);
+		let targetThreadId = threadId;
 
-		if (!threadId && resultThreadId) {
-			goto(`/${resultThreadId}`, { replaceState: true });
+		if (!targetThreadId) {
+			const created = await taurpc.thread.create();
+			targetThreadId = created.id;
+			if (!targetThreadId) {
+				throw new Error('Failed to create thread');
+			}
+			threadService.addThread(created);
+			await goto(`/${targetThreadId}`, { replaceState: true });
 		}
 
+		await messageService.sendMessage(targetThreadId, query);
 		chatStatus = 'ready';
 	}
 </script>
