@@ -50,8 +50,7 @@ async fn test_responses_incomplete_response() -> Result<(), Box<dyn std::error::
                     .content("Tell me a 100 word story about a bear.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -78,8 +77,7 @@ async fn test_responses_incomplete_response() -> Result<(), Box<dyn std::error::
                     .content("Tell me a 100 word story about a bear.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -124,8 +122,7 @@ async fn test_responses_web_search_responses_v1() -> Result<(), Box<dyn std::err
                     .content("What was a positive news story from today?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -152,8 +149,7 @@ async fn test_responses_web_search_responses_v1() -> Result<(), Box<dyn std::err
                     .content("what about a negative one")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -181,8 +177,7 @@ async fn test_responses_web_search_v1() -> Result<(), Box<dyn std::error::Error>
                     .content("What was a positive news story from today?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -210,8 +205,7 @@ async fn test_responses_web_search_async() -> Result<(), Box<dyn std::error::Err
                     .content("What was a positive news story from today?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -225,8 +219,7 @@ async fn test_responses_web_search_async() -> Result<(), Box<dyn std::error::Err
                     .content("What was a positive news story from today?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -275,8 +268,7 @@ async fn test_responses_function_calling_v0() -> Result<(), Box<dyn std::error::
                     .content("whats 5 * 4")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -291,8 +283,7 @@ async fn test_responses_function_calling_v0() -> Result<(), Box<dyn std::error::
                     .content("What was a positive news story from today?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -335,8 +326,7 @@ async fn test_responses_function_calling_responses_v1() -> Result<(), Box<dyn st
                     .content("whats 5 * 4")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -380,8 +370,7 @@ async fn test_responses_function_calling_v1() -> Result<(), Box<dyn std::error::
                     .content("whats 5 * 4")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -419,7 +408,7 @@ async fn test_responses_parsed_schema_v0() -> Result<(), Box<dyn std::error::Err
 
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
         .await?;
@@ -458,7 +447,7 @@ async fn test_responses_parsed_schema_responses_v1() -> Result<(), Box<dyn std::
 
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
         .await?;
@@ -497,7 +486,7 @@ async fn test_responses_parsed_schema_v1() -> Result<(), Box<dyn std::error::Err
 
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
         .await?;
@@ -535,7 +524,7 @@ async fn test_responses_parsed_schema_async() -> Result<(), Box<dyn std::error::
 
     let response = llm
         .ainvoke(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
         .await?;
@@ -566,7 +555,7 @@ async fn test_responses_parsed_dict_schema() -> Result<(), Box<dyn std::error::E
 
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
         .await?;
@@ -610,8 +599,7 @@ async fn test_responses_parsed_strict() -> Result<(), Box<dyn std::error::Error>
                     .content("Tell me a joke")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await;
@@ -646,8 +634,7 @@ async fn test_responses_parsed_strict() -> Result<(), Box<dyn std::error::Error>
                     .content("Tell me a joke about cats.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await;
@@ -676,7 +663,7 @@ async fn test_responses_parsed_dict_schema_async() -> Result<(), Box<dyn std::er
 
     let response = llm
         .ainvoke(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
         .await?;
@@ -726,7 +713,7 @@ async fn test_responses_fn_calling_and_structured_output() -> Result<(), Box<dyn
     // Structured output
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("how are ya").build().into()].into(),
+            vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
         .await?;
@@ -740,8 +727,7 @@ async fn test_responses_fn_calling_and_structured_output() -> Result<(), Box<dyn
                     .content("whats 5 * 4")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -768,7 +754,7 @@ async fn test_responses_reasoning_v0() -> Result<(), Box<dyn std::error::Error>>
 
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -794,7 +780,7 @@ async fn test_responses_reasoning_responses_v1() -> Result<(), Box<dyn std::erro
 
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -820,7 +806,7 @@ async fn test_responses_reasoning_v1() -> Result<(), Box<dyn std::error::Error>>
 
     let response = llm
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -846,8 +832,7 @@ async fn test_responses_stateful_api() -> Result<(), Box<dyn std::error::Error>>
                     .content("how are you, my name is Bobo")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -871,8 +856,7 @@ async fn test_responses_stateful_api() -> Result<(), Box<dyn std::error::Error>>
                     .content("what's my name")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -902,7 +886,7 @@ async fn test_responses_route_from_model_kwargs() -> Result<(), Box<dyn std::err
 
     let mut stream = llm
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -943,8 +927,7 @@ async fn test_responses_computer_calls() -> Result<(), Box<dyn std::error::Error
                     .content("Please open the browser.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -987,8 +970,7 @@ async fn test_responses_file_search_responses_v1() -> Result<(), Box<dyn std::er
                     .content("What is deep research by OpenAI?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1028,8 +1010,7 @@ async fn test_responses_file_search_v1() -> Result<(), Box<dyn std::error::Error
                     .content("What is deep research by OpenAI?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1060,8 +1041,7 @@ async fn test_responses_stream_reasoning_summary_v0() -> Result<(), Box<dyn std:
                     .content("What was the third tallest building in the year 2000?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1100,8 +1080,7 @@ async fn test_responses_stream_reasoning_summary_responses_v1()
                     .content("What was the third tallest building in the year 2000?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1139,8 +1118,7 @@ async fn test_responses_stream_reasoning_summary_v1() -> Result<(), Box<dyn std:
                     .content("What was the third tallest building in the year 2000?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1176,8 +1154,7 @@ async fn test_responses_code_interpreter_v0() -> Result<(), Box<dyn std::error::
                     .content("Write and run code to answer: what is 3^3?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1206,8 +1183,7 @@ async fn test_responses_code_interpreter_responses_v1() -> Result<(), Box<dyn st
                     .content("Write and run code to answer: what is 3^3?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1236,8 +1212,7 @@ async fn test_responses_code_interpreter_v1() -> Result<(), Box<dyn std::error::
                     .content("Write and run code to answer: what is 3^3?")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1271,8 +1246,7 @@ async fn test_responses_mcp_builtin() -> Result<(), Box<dyn std::error::Error>> 
                     "What transport protocols does the 2025-03-26 version of the MCP spec support?",
                 )
                 .build()
-                .into()]
-            .into(),
+                .into()],
             None,
         )
         .await?;
@@ -1311,8 +1285,7 @@ async fn test_responses_mcp_builtin_zdr() -> Result<(), Box<dyn std::error::Erro
                     )
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1358,8 +1331,7 @@ async fn test_responses_mcp_builtin_zdr_v1() -> Result<(), Box<dyn std::error::E
                     )
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1400,8 +1372,7 @@ async fn test_responses_image_gen_streaming_v0() -> Result<(), Box<dyn std::erro
                     .content("Draw a random short word in green font.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1444,8 +1415,7 @@ async fn test_responses_image_gen_streaming_responses_v1() -> Result<(), Box<dyn
                     .content("Draw a random short word in green font.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1486,8 +1456,7 @@ async fn test_responses_image_gen_streaming_v1() -> Result<(), Box<dyn std::erro
                     .content("Draw a random short word in green font.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1528,8 +1497,7 @@ async fn test_responses_image_gen_multi_turn_v0() -> Result<(), Box<dyn std::err
                     .content("Draw a random short word in green font.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1565,8 +1533,7 @@ async fn test_responses_image_gen_multi_turn_responses_v1() -> Result<(), Box<dy
                     .content("Draw a random short word in green font.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1601,8 +1568,7 @@ async fn test_responses_image_gen_multi_turn_v1() -> Result<(), Box<dyn std::err
                     .content("Draw a random short word in green font.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1629,8 +1595,7 @@ async fn test_responses_verbosity_parameter() -> Result<(), Box<dyn std::error::
                     .content("Hello, explain quantum computing.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1667,8 +1632,7 @@ async fn test_responses_custom_tool_responses_v1() -> Result<(), Box<dyn std::er
                     .content("Use the tool to evaluate 3^3.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -1683,8 +1647,7 @@ async fn test_responses_custom_tool_responses_v1() -> Result<(), Box<dyn std::er
                     .content("Use the tool to evaluate 3^3.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -1728,8 +1691,7 @@ async fn test_responses_custom_tool_v1() -> Result<(), Box<dyn std::error::Error
                     .content("Use the tool to evaluate 3^3.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
