@@ -7,7 +7,9 @@ use crate::error::{Error, Result};
 use crate::outputs::Generation;
 use crate::runnables::AddableDict;
 
-use super::base::{BaseOutputParser, ParserInput};
+use crate::messages::AnyMessage;
+
+use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
 
 static MARKDOWN_CODE_FENCE_RE: LazyLock<Regex> =
@@ -338,7 +340,7 @@ impl BaseOutputParser for XMLOutputParser {
 impl BaseTransformOutputParser for XMLOutputParser {
     fn transform<'a>(
         &'a self,
-        input: futures::stream::BoxStream<'a, ParserInput>,
+        input: futures::stream::BoxStream<'a, AnyMessage>,
     ) -> futures::stream::BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -349,7 +351,7 @@ impl BaseTransformOutputParser for XMLOutputParser {
             let mut streaming_parser = StreamingParser::new();
             let mut stream = input;
             while let Some(chunk) = stream.next().await {
-                let chunk_text = chunk.to_generation().text;
+                let chunk_text = chunk.text();
                 for dict in streaming_parser.parse(&chunk_text) {
                     match serde_json::to_value(&dict) {
                         Ok(value) => yield Ok(value),
@@ -548,13 +550,13 @@ mod tests {
         use futures::StreamExt;
 
         let parser = XMLOutputParser::new();
-        let inputs: Vec<ParserInput> = vec![
-            ParserInput::from("<root>"),
-            ParserInput::from("<item>hello</item>"),
-            ParserInput::from("</root>"),
+        let inputs: Vec<AnyMessage> = vec![
+            AnyMessage::from("<root>"),
+            AnyMessage::from("<item>hello</item>"),
+            AnyMessage::from("</root>"),
         ];
         let stream = futures::stream::iter(inputs);
-        let boxed: futures::stream::BoxStream<ParserInput> = Box::pin(stream);
+        let boxed: futures::stream::BoxStream<AnyMessage> = Box::pin(stream);
         let mut output_stream = parser.transform(boxed);
 
         let mut results = Vec::new();

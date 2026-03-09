@@ -1,32 +1,32 @@
 use async_trait::async_trait;
 use std::fmt::Display;
 
-use crate::messages::{AIMessage, BaseMessage, HumanMessage, get_buffer_string};
+use crate::messages::{AIMessage, AnyMessage, HumanMessage, get_buffer_string};
 pub use crate::runnables::run_in_executor;
 
 #[async_trait]
 pub trait BaseChatMessageHistory: Send + Sync {
-    fn messages(&self) -> Vec<BaseMessage>;
+    fn messages(&self) -> Vec<AnyMessage>;
 
-    async fn aget_messages(&self) -> Vec<BaseMessage> {
+    async fn aget_messages(&self) -> Vec<AnyMessage> {
         self.messages()
     }
 
     fn add_user_message(&mut self, message: HumanMessage) {
-        self.add_message(BaseMessage::Human(message));
+        self.add_message(AnyMessage::HumanMessage(message));
     }
 
     fn add_ai_message(&mut self, message: AIMessage) {
-        self.add_message(BaseMessage::AI(message));
+        self.add_message(AnyMessage::AIMessage(message));
     }
 
-    fn add_message(&mut self, message: BaseMessage) {
+    fn add_message(&mut self, message: AnyMessage) {
         self.add_messages(&[message]);
     }
 
-    fn add_messages(&mut self, messages: &[BaseMessage]);
+    fn add_messages(&mut self, messages: &[AnyMessage]);
 
-    async fn aadd_messages(&mut self, messages: Vec<BaseMessage>) {
+    async fn aadd_messages(&mut self, messages: Vec<AnyMessage>) {
         self.add_messages(&messages);
     }
 
@@ -43,7 +43,7 @@ pub trait BaseChatMessageHistory: Send + Sync {
 
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryChatMessageHistory {
-    messages: Vec<BaseMessage>,
+    messages: Vec<AnyMessage>,
 }
 
 impl InMemoryChatMessageHistory {
@@ -53,7 +53,7 @@ impl InMemoryChatMessageHistory {
         }
     }
 
-    pub fn with_messages(messages: Vec<BaseMessage>) -> Self {
+    pub fn with_messages(messages: Vec<AnyMessage>) -> Self {
         Self { messages }
     }
 }
@@ -66,19 +66,19 @@ impl Display for InMemoryChatMessageHistory {
 
 #[async_trait]
 impl BaseChatMessageHistory for InMemoryChatMessageHistory {
-    fn messages(&self) -> Vec<BaseMessage> {
+    fn messages(&self) -> Vec<AnyMessage> {
         self.messages.clone()
     }
 
-    async fn aget_messages(&self) -> Vec<BaseMessage> {
+    async fn aget_messages(&self) -> Vec<AnyMessage> {
         self.messages.clone()
     }
 
-    fn add_messages(&mut self, messages: &[BaseMessage]) {
+    fn add_messages(&mut self, messages: &[AnyMessage]) {
         self.messages.extend(messages.iter().cloned());
     }
 
-    async fn aadd_messages(&mut self, messages: Vec<BaseMessage>) {
+    async fn aadd_messages(&mut self, messages: Vec<AnyMessage>) {
         self.add_messages(&messages);
     }
 
@@ -94,6 +94,7 @@ impl BaseChatMessageHistory for InMemoryChatMessageHistory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::prelude::*;
 
     #[test]
     fn test_in_memory_chat_history_new() {
@@ -104,8 +105,8 @@ mod tests {
     #[test]
     fn test_in_memory_chat_history_with_messages() {
         let messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hi there!").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi there!").build()),
         ];
         let history = InMemoryChatMessageHistory::with_messages(messages.clone());
         assert_eq!(history.messages().len(), 2);
@@ -118,7 +119,7 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], BaseMessage::Human(_)));
+        assert!(matches!(&messages[0], AnyMessage::HumanMessage(_)));
         assert_eq!(messages[0].content(), "Hello!");
     }
 
@@ -130,7 +131,7 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], BaseMessage::Human(_)));
+        assert!(matches!(&messages[0], AnyMessage::HumanMessage(_)));
         assert_eq!(messages[0].content(), "Hello!");
     }
 
@@ -141,7 +142,7 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], BaseMessage::AI(_)));
+        assert!(matches!(&messages[0], AnyMessage::AIMessage(_)));
         assert_eq!(messages[0].content(), "Hi there!");
     }
 
@@ -153,17 +154,19 @@ mod tests {
 
         let messages = history.messages();
         assert_eq!(messages.len(), 1);
-        assert!(matches!(&messages[0], BaseMessage::AI(_)));
+        assert!(matches!(&messages[0], AnyMessage::AIMessage(_)));
         assert_eq!(messages[0].content(), "Hi there!");
     }
 
     #[test]
     fn test_add_message() {
         let mut history = InMemoryChatMessageHistory::new();
-        history.add_message(BaseMessage::Human(
+        history.add_message(AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello").build(),
         ));
-        history.add_message(BaseMessage::AI(AIMessage::builder().content("Hi").build()));
+        history.add_message(AnyMessage::AIMessage(
+            AIMessage::builder().content("Hi").build(),
+        ));
 
         let messages = history.messages();
         assert_eq!(messages.len(), 2);
@@ -173,9 +176,9 @@ mod tests {
     fn test_add_messages() {
         let mut history = InMemoryChatMessageHistory::new();
         let new_messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hi").build()),
-            BaseMessage::Human(HumanMessage::builder().content("How are you?").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("How are you?").build()),
         ];
         history.add_messages(&new_messages);
 
@@ -230,8 +233,8 @@ mod tests {
     async fn test_aadd_messages() {
         let mut history = InMemoryChatMessageHistory::new();
         let new_messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hello").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hi").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hello").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hi").build()),
         ];
         history.aadd_messages(new_messages).await;
 

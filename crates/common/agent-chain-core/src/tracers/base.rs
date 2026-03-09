@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::outputs::LLMResult;
 use crate::tracers::core::TracerCore;
 use crate::tracers::schemas::Run;
@@ -29,7 +29,7 @@ pub trait BaseTracer: TracerCore {
     fn handle_chat_model_start(
         &mut self,
         serialized: HashMap<String, Value>,
-        messages: &[Vec<BaseMessage>],
+        messages: &[Vec<AnyMessage>],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
         tags: Option<Vec<String>>,
@@ -289,7 +289,7 @@ pub trait AsyncBaseTracer: TracerCore + Send + Sync {
     async fn handle_chat_model_start_async(
         &mut self,
         serialized: HashMap<String, Value>,
-        messages: &[Vec<BaseMessage>],
+        messages: &[Vec<AnyMessage>],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
         tags: Option<Vec<String>>,

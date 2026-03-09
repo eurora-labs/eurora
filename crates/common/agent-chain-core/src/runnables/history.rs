@@ -11,7 +11,7 @@ use async_trait::async_trait;
 
 use crate::chat_history::BaseChatMessageHistory;
 use crate::error::{Error, Result};
-use crate::messages::{AIMessage, BaseMessage, HumanMessage};
+use crate::messages::{AIMessage, AnyMessage, HumanMessage};
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 use crate::runnables::utils::ConfigurableFieldSpec;
@@ -32,15 +32,13 @@ pub type GetSessionHistoryFn =
     Arc<dyn Fn(&HashMap<String, String>) -> Arc<Mutex<dyn BaseChatMessageHistory>> + Send + Sync>;
 
 pub struct HistoryRunnable(
-    Arc<
-        dyn Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>> + Send + Sync,
-    >,
+    Arc<dyn Fn(Vec<AnyMessage>, Option<&RunnableConfig>) -> Result<Vec<AnyMessage>> + Send + Sync>,
 );
 
 impl HistoryRunnable {
     pub fn from_fn<F>(f: F) -> Self
     where
-        F: Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>>
+        F: Fn(Vec<AnyMessage>, Option<&RunnableConfig>) -> Result<Vec<AnyMessage>>
             + Send
             + Sync
             + 'static,
@@ -50,9 +48,9 @@ impl HistoryRunnable {
 
     pub fn invoke(
         &self,
-        input: Vec<BaseMessage>,
+        input: Vec<AnyMessage>,
         config: Option<&RunnableConfig>,
-    ) -> Result<Vec<BaseMessage>> {
+    ) -> Result<Vec<AnyMessage>> {
         (self.0)(input, config)
     }
 }
@@ -127,7 +125,7 @@ impl RunnableWithMessageHistory {
         history_factory_config: Option<Vec<ConfigurableFieldSpec>>,
     ) -> Self
     where
-        F: Fn(Vec<BaseMessage>, Option<&RunnableConfig>) -> Result<Vec<BaseMessage>>
+        F: Fn(Vec<AnyMessage>, Option<&RunnableConfig>) -> Result<Vec<AnyMessage>>
             + Send
             + Sync
             + 'static,
@@ -136,7 +134,7 @@ impl RunnableWithMessageHistory {
         let runnable: HistoryInvokeFn = {
             let func = func.clone();
             Arc::new(move |input: Value, config: Option<&RunnableConfig>| {
-                let messages: Vec<BaseMessage> = serde_json::from_value(input).map_err(|e| {
+                let messages: Vec<AnyMessage> = serde_json::from_value(input).map_err(|e| {
                     Error::other(format!("Failed to deserialize input messages: {}", e))
                 })?;
                 let result = func(messages, config)?;
@@ -168,7 +166,7 @@ impl RunnableWithMessageHistory {
         let invoke_fn: HistoryInvokeFn = {
             let runnable = runnable.clone();
             Arc::new(move |input: Value, config: Option<&RunnableConfig>| {
-                let messages: Vec<BaseMessage> = serde_json::from_value(input).map_err(|e| {
+                let messages: Vec<AnyMessage> = serde_json::from_value(input).map_err(|e| {
                     Error::other(format!("Failed to deserialize input messages: {}", e))
                 })?;
                 let result = runnable.invoke(messages, config)?;
@@ -235,7 +233,7 @@ impl RunnableWithMessageHistory {
         })
     }
 
-    pub fn get_input_messages(&self, input: &Value) -> Result<Vec<BaseMessage>> {
+    pub fn get_input_messages(&self, input: &Value) -> Result<Vec<AnyMessage>> {
         let value = if let Some(obj) = input.as_object() {
             if let Some(ref key) = self.input_messages_key {
                 obj.get(key).ok_or_else(|| {
@@ -255,7 +253,7 @@ impl RunnableWithMessageHistory {
         };
 
         if let Some(s) = value.as_str() {
-            return Ok(vec![BaseMessage::Human(
+            return Ok(vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content(s).build(),
             )]);
         }
@@ -272,29 +270,29 @@ impl RunnableWithMessageHistory {
                     )));
                 }
                 let inner = &arr[0];
-                return serde_json::from_value::<Vec<BaseMessage>>(inner.clone()).map_err(|e| {
+                return serde_json::from_value::<Vec<AnyMessage>>(inner.clone()).map_err(|e| {
                     Error::other(format!(
                         "Failed to deserialize nested input messages: {}",
                         e
                     ))
                 });
             }
-            return serde_json::from_value::<Vec<BaseMessage>>(Value::Array(arr.clone()))
+            return serde_json::from_value::<Vec<AnyMessage>>(Value::Array(arr.clone()))
                 .map_err(|e| Error::other(format!("Failed to deserialize input messages: {}", e)));
         }
 
-        serde_json::from_value::<BaseMessage>(value.clone())
+        serde_json::from_value::<AnyMessage>(value.clone())
             .map(|m| vec![m])
             .map_err(|e| {
                 Error::other(format!(
-                    "Expected str, BaseMessage, or list of BaseMessage. \
+                    "Expected str, AnyMessage, or list of AnyMessage. \
                  Failed to deserialize: {}",
                     e
                 ))
             })
     }
 
-    pub fn get_output_messages(&self, output: &Value) -> Result<Vec<BaseMessage>> {
+    pub fn get_output_messages(&self, output: &Value) -> Result<Vec<AnyMessage>> {
         let value = if let Some(obj) = output.as_object() {
             let key = if let Some(ref key) = self.output_messages_key {
                 key.as_str()
@@ -327,22 +325,22 @@ impl RunnableWithMessageHistory {
         };
 
         if let Some(s) = value.as_str() {
-            return Ok(vec![BaseMessage::AI(
+            return Ok(vec![AnyMessage::AIMessage(
                 AIMessage::builder().content(s).build(),
             )]);
         }
 
         if let Some(arr) = value.as_array() {
-            return serde_json::from_value::<Vec<BaseMessage>>(Value::Array(arr.clone())).map_err(
+            return serde_json::from_value::<Vec<AnyMessage>>(Value::Array(arr.clone())).map_err(
                 |e| Error::other(format!("Failed to deserialize output messages: {}", e)),
             );
         }
 
-        serde_json::from_value::<BaseMessage>(value.clone())
+        serde_json::from_value::<AnyMessage>(value.clone())
             .map(|m| vec![m])
             .map_err(|e| {
                 Error::other(format!(
-                    "Expected str, BaseMessage, or list of BaseMessage. \
+                    "Expected str, AnyMessage, or list of AnyMessage. \
                  Failed to deserialize output: {}",
                     e
                 ))
@@ -353,7 +351,7 @@ impl RunnableWithMessageHistory {
         &self,
         input: &Value,
         history: &Arc<Mutex<dyn BaseChatMessageHistory>>,
-    ) -> Result<Vec<BaseMessage>> {
+    ) -> Result<Vec<AnyMessage>> {
         let guard = history
             .lock()
             .map_err(|e| Error::other(format!("history lock poisoned: {e}")))?;
@@ -424,7 +422,7 @@ impl RunnableWithMessageHistory {
     fn build_augmented_input(
         &self,
         input: &Value,
-        history_messages: Vec<BaseMessage>,
+        history_messages: Vec<AnyMessage>,
     ) -> Result<Value> {
         if let Some(ref history_key) = self.history_messages_key {
             let mut obj = match input.as_object() {
@@ -490,25 +488,25 @@ impl RunnableWithMessageHistory {
 
     pub fn invoke_messages(
         &self,
-        input: Vec<BaseMessage>,
+        input: Vec<AnyMessage>,
         config: Option<RunnableConfig>,
-    ) -> Result<Vec<BaseMessage>> {
+    ) -> Result<Vec<AnyMessage>> {
         let input_value = serde_json::to_value(&input)
             .map_err(|e| Error::other(format!("Failed to serialize input messages: {}", e)))?;
         let output_value = self.invoke_with_history(input_value, config)?;
-        serde_json::from_value::<Vec<BaseMessage>>(output_value)
+        serde_json::from_value::<Vec<AnyMessage>>(output_value)
             .map_err(|e| Error::other(format!("Failed to deserialize output messages: {}", e)))
     }
 
     pub async fn ainvoke_messages(
         &self,
-        input: Vec<BaseMessage>,
+        input: Vec<AnyMessage>,
         config: Option<RunnableConfig>,
-    ) -> Result<Vec<BaseMessage>> {
+    ) -> Result<Vec<AnyMessage>> {
         let input_value = serde_json::to_value(&input)
             .map_err(|e| Error::other(format!("Failed to serialize input messages: {}", e)))?;
         let output_value = self.ainvoke_with_history(input_value, config).await?;
-        serde_json::from_value::<Vec<BaseMessage>>(output_value)
+        serde_json::from_value::<Vec<AnyMessage>>(output_value)
             .map_err(|e| Error::other(format!("Failed to deserialize output messages: {}", e)))
     }
 }

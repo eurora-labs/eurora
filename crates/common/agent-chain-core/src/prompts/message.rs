@@ -1,18 +1,18 @@
 use std::collections::HashMap;
 
 use crate::error::Result;
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::utils::interactive_env::is_interactive_env;
 
 pub trait BaseMessagePromptTemplate: Send + Sync {
     fn input_variables(&self) -> &[String];
 
-    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<BaseMessage>>;
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>>;
 
     fn aformat_messages(
         &self,
         kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<BaseMessage>>> + Send + '_>>
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<AnyMessage>>> + Send + '_>>
     {
         let result = self.format_messages(kwargs);
         Box::pin(async move { result })

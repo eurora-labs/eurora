@@ -3,7 +3,9 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
-use super::base::{get_msg_title_repr, is_interactive_env};
+use crate::MessageContent;
+
+use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
 use super::content::ContentBlock;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -15,6 +17,36 @@ pub struct RemoveMessage {
     pub additional_kwargs: HashMap<String, serde_json::Value>,
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl BaseMessage for RemoveMessage {
+    fn id(&self) -> Option<String> {
+        Some(self.id.clone())
+    }
+
+    fn content(&self) -> &MessageContent {
+        MessageContent::empty()
+    }
+
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+
+    fn set_id(&mut self, id: String) {
+        self.id = id;
+    }
+
+    fn message_type(&self) -> &'static str {
+        "remove"
+    }
+
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
 }
 
 impl Serialize for RemoveMessage {
@@ -57,22 +89,6 @@ impl RemoveMessage {
             additional_kwargs,
             response_metadata,
         }
-    }
-
-    pub fn set_id(&mut self, id: String) {
-        self.id = id;
-    }
-
-    pub fn message_type(&self) -> &'static str {
-        "remove"
-    }
-
-    pub fn text(&self) -> &'static str {
-        ""
-    }
-
-    pub fn content(&self) -> &'static str {
-        ""
     }
 
     pub fn content_blocks(&self) -> Vec<ContentBlock> {

@@ -5,17 +5,14 @@ use std::collections::HashMap;
 use std::ops::Add;
 
 use crate::load::Serializable;
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 
 pub const CHAT_GENERATION_TYPE: &str = "ChatGeneration";
 pub const CHAT_GENERATION_CHUNK_TYPE: &str = "ChatGenerationChunk";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatGeneration {
-    #[serde(default)]
-    pub text: String,
-
-    pub message: BaseMessage,
+    pub message: AnyMessage,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
@@ -31,10 +28,8 @@ fn default_chat_generation_type() -> String {
 #[bon]
 impl ChatGeneration {
     #[builder]
-    pub fn new(message: BaseMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
-        let text = extract_text_from_message(&message);
+    pub fn new(message: AnyMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
         Self {
-            text,
             message,
             generation_info,
             generation_type: CHAT_GENERATION_TYPE.to_string(),
@@ -52,37 +47,9 @@ impl Serializable for ChatGeneration {
     }
 }
 
-fn extract_text_from_message(message: &BaseMessage) -> String {
-    let content = message.content();
-
-    let blocks: Option<Vec<Value>> = match content {
-        crate::messages::content::MessageContent::Parts(_) => Some(content.as_json_values()),
-        crate::messages::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
-    };
-
-    if let Some(blocks) = blocks {
-        for block in &blocks {
-            if let Some(s) = block.as_str() {
-                return s.to_string();
-            }
-            if let Some(obj) = block.as_object()
-                && let Some(Value::String(text)) = obj.get("text")
-            {
-                return text.clone();
-            }
-        }
-        return String::new();
-    }
-
-    content.to_string()
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatGenerationChunk {
-    #[serde(default)]
-    pub text: String,
-
-    pub message: BaseMessage,
+    pub message: AnyMessage,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub generation_info: Option<HashMap<String, Value>>,
@@ -98,10 +65,8 @@ fn default_chat_generation_chunk_type() -> String {
 #[bon]
 impl ChatGenerationChunk {
     #[builder]
-    pub fn new(message: BaseMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
-        let text = extract_text_from_message(&message);
+    pub fn new(message: AnyMessage, generation_info: Option<HashMap<String, Value>>) -> Self {
         Self {
-            text,
             message,
             generation_info,
             generation_type: CHAT_GENERATION_CHUNK_TYPE.to_string(),
@@ -130,10 +95,8 @@ impl Add for ChatGenerationChunk {
         let other_chunk = crate::messages::utils::msg_to_chunk(&other.message);
         let merged_chunk = self_chunk + other_chunk;
         let merged_message = crate::messages::utils::chunk_to_msg(&merged_chunk);
-        let text = extract_text_from_message(&merged_message);
 
         ChatGenerationChunk {
-            text,
             message: merged_message,
             generation_info,
             generation_type: CHAT_GENERATION_CHUNK_TYPE.to_string(),
@@ -144,7 +107,6 @@ impl Add for ChatGenerationChunk {
 impl From<ChatGeneration> for ChatGenerationChunk {
     fn from(chat_gen: ChatGeneration) -> Self {
         ChatGenerationChunk {
-            text: chat_gen.text,
             message: chat_gen.message,
             generation_info: chat_gen.generation_info,
             generation_type: CHAT_GENERATION_CHUNK_TYPE.to_string(),
@@ -155,7 +117,6 @@ impl From<ChatGeneration> for ChatGenerationChunk {
 impl From<ChatGenerationChunk> for ChatGeneration {
     fn from(chunk: ChatGenerationChunk) -> Self {
         ChatGeneration {
-            text: chunk.text,
             message: chunk.message,
             generation_info: chunk.generation_info,
             generation_type: CHAT_GENERATION_TYPE.to_string(),
@@ -181,7 +142,7 @@ mod tests {
     fn test_chat_generation_new() {
         let msg = AIMessage::builder().content("Hello, world!").build();
         let chat_gen = ChatGeneration::builder().message(msg.into()).build();
-        assert_eq!(chat_gen.text, "Hello, world!");
+        assert_eq!(chat_gen.message.text(), "Hello, world!");
         assert!(chat_gen.generation_info.is_none());
         assert_eq!(chat_gen.generation_type, CHAT_GENERATION_TYPE);
     }
@@ -195,7 +156,7 @@ mod tests {
             .message(msg.into())
             .generation_info(info.clone())
             .build();
-        assert_eq!(chat_gen.text, "Hello");
+        assert_eq!(chat_gen.message.text(), "Hello");
         assert_eq!(chat_gen.generation_info, Some(info));
     }
 
@@ -206,7 +167,7 @@ mod tests {
         let chunk1 = ChatGenerationChunk::builder().message(msg1.into()).build();
         let chunk2 = ChatGenerationChunk::builder().message(msg2.into()).build();
         let result = chunk1 + chunk2;
-        assert_eq!(result.text, "Hello, world!");
+        assert_eq!(result.message.text(), "Hello, world!");
     }
 
     #[test]
@@ -221,7 +182,7 @@ mod tests {
         let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
         let result = merge_chat_generation_chunks(vec![chunk.clone()]);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().text, "Hello");
+        assert_eq!(result.unwrap().message.text(), "Hello");
     }
 
     #[test]
@@ -236,6 +197,6 @@ mod tests {
         ];
         let result = merge_chat_generation_chunks(chunks);
         assert!(result.is_some());
-        assert_eq!(result.unwrap().text, "Hello, world!");
+        assert_eq!(result.unwrap().message.text(), "Hello, world!");
     }
 }

@@ -5,11 +5,12 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::Value;
 
-use super::base::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use super::base::{BaseLanguageModel, LanguageModelConfig};
 use super::llms::{BaseLLM, LLM, LLMConfig, LLMStream};
 use crate::caches::BaseCache;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
+use crate::messages::{AnyMessage, BaseMessage};
 use crate::outputs::{Generation, GenerationChunk, GenerationType, LLMResult};
 
 #[derive(Debug)]
@@ -92,11 +93,19 @@ impl BaseLanguageModel for FakeListLLM {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
-        let prompt_strings: Vec<String> = prompts.iter().map(|p| p.to_string()).collect();
+        let prompt_strings: Vec<String> = prompts
+            .iter()
+            .map(|msgs| {
+                msgs.iter()
+                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .collect();
         self.generate_prompts(prompt_strings, stop, None).await
     }
 
@@ -217,7 +226,7 @@ impl BaseLanguageModel for FakeStreamingListLLM {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {

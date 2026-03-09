@@ -5,7 +5,9 @@ use crate::error::{Error, Result};
 use crate::outputs::{Generation, GenerationChunk};
 use crate::runnables::RunnableConfig;
 
-use super::base::{BaseOutputParser, ParserInput};
+use crate::messages::AnyMessage;
+
+use super::base::BaseOutputParser;
 
 pub trait BaseTransformOutputParser: BaseOutputParser {
     fn parse_generation(&self, generation: &Generation) -> Result<Self::Output> {
@@ -14,7 +16,7 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
 
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -22,7 +24,7 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
         Box::pin(async_stream::stream! {
             let mut input = input;
             while let Some(chunk) = input.next().await {
-                let generation = chunk.to_generation();
+                let generation = Generation::builder().text(chunk.text()).build();
                 yield self.parse_result(&[generation], false);
             }
         })
@@ -44,9 +46,16 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
         ))
     }
 
+    fn parse_result_partial(&self, result: &[Generation]) -> Result<Option<Self::Output>> {
+        match self.parse_result(result, true) {
+            Ok(v) => Ok(Some(v)),
+            Err(_) => Ok(None),
+        }
+    }
+
     fn cumulative_transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
         _config: Option<RunnableConfig>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
@@ -60,7 +69,7 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
             let mut input = input;
 
             while let Some(chunk) = input.next().await {
-                let chunk_gen = GenerationChunk::builder().text(chunk.to_generation().text).build();
+                let chunk_gen = GenerationChunk::builder().text(chunk.text()).build();
 
                 acc_gen = Some(match acc_gen {
                     None => chunk_gen,
@@ -69,7 +78,8 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
 
                 let acc = acc_gen.as_ref().expect("just assigned Some");
                 let generation = Generation::from(acc.clone());
-                let Ok(parsed) = self.parse_result(&[generation], true) else {
+                let parsed = self.parse_result_partial(&[generation])?;
+                let Some(parsed) = parsed else {
                     continue;
                 };
 

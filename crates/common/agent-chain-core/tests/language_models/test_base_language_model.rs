@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 
 use agent_chain_core::language_models::{
-    BaseLanguageModel, FakeListLLM, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-    LanguageModelOutput, get_token_ids_default,
+    BaseLanguageModel, FakeListLLM, LangSmithParams, LanguageModelConfig, get_token_ids_default,
 };
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
-use agent_chain_core::prompt_values::StringPromptValue;
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 
 #[cfg(test)]
 mod test_lang_smith_params {
@@ -205,106 +203,19 @@ mod test_language_model_config {
 }
 
 #[cfg(test)]
-mod test_language_model_input {
+mod test_ai_message_output {
     use super::*;
 
     #[test]
-    fn test_language_model_input_accepts_string() {
-        let input: LanguageModelInput = "test string".into();
-        match input {
-            LanguageModelInput::Text(s) => assert_eq!(s, "test string"),
-            _ => panic!("Expected Text variant"),
-        }
-    }
-
-    #[test]
-    fn test_language_model_input_accepts_owned_string() {
-        let input: LanguageModelInput = String::from("test string").into();
-        match input {
-            LanguageModelInput::Text(s) => assert_eq!(s, "test string"),
-            _ => panic!("Expected Text variant"),
-        }
-    }
-
-    #[test]
-    fn test_language_model_input_accepts_prompt_value() {
-        let prompt = StringPromptValue::new("test prompt");
-        let input: LanguageModelInput = prompt.into();
-
-        match input {
-            LanguageModelInput::StringPrompt(p) => {
-                assert_eq!(p.text, "test prompt");
-            }
-            _ => panic!("Expected StringPrompt variant"),
-        }
-    }
-
-    #[test]
-    fn test_language_model_input_accepts_message_sequence() {
-        let messages = vec![BaseMessage::Human(
-            HumanMessage::builder().content("Hello").build(),
-        )];
-        let input: LanguageModelInput = messages.into();
-
-        match input {
-            LanguageModelInput::Messages(m) => {
-                assert_eq!(m.len(), 1);
-            }
-            _ => panic!("Expected Messages variant"),
-        }
-    }
-
-    #[test]
-    fn test_language_model_input_to_messages() {
-        let input: LanguageModelInput = "hello".into();
-        let messages = input.to_messages();
-
-        assert_eq!(messages.len(), 1);
-        match &messages[0] {
-            BaseMessage::Human(m) => {
-                assert_eq!(m.content.as_text(), "hello");
-            }
-            _ => panic!("Expected Human message"),
-        }
-    }
-
-    #[test]
-    fn test_language_model_input_display() {
-        let input: LanguageModelInput = "test display".into();
-        let display = format!("{}", input);
-        assert_eq!(display, "test display");
-    }
-}
-
-#[cfg(test)]
-mod test_language_model_output {
-    use super::*;
-
-    #[test]
-    fn test_language_model_output_accepts_string() {
-        let output: LanguageModelOutput = "test output".to_string().into();
-        assert_eq!(output.text(), "test output");
-    }
-
-    #[test]
-    fn test_language_model_output_accepts_ai_message() {
+    fn test_ai_message_text() {
         let message = AIMessage::builder().content("test message").build();
-        let output: LanguageModelOutput = message.into();
-        assert_eq!(output.text(), "test message");
+        assert_eq!(message.text(), "test message");
     }
 
     #[test]
-    fn test_language_model_output_into_text() {
-        let output: LanguageModelOutput = "hello".to_string().into();
-        let text = output.into_text();
-        assert_eq!(text, "hello");
-    }
-
-    #[test]
-    fn test_language_model_output_message_variant() {
-        let ai_message = AIMessage::builder().content("direct message").build();
-        let output = LanguageModelOutput::message(ai_message);
-        assert_eq!(output.text(), "direct message");
+    fn test_ai_message_content() {
+        let message = AIMessage::builder().content("direct message").build();
+        assert_eq!(message.text(), "direct message");
     }
 }
 
@@ -491,8 +402,8 @@ mod test_base_language_model_trait {
             .build();
 
         let messages = vec![
-            BaseMessage::Human(HumanMessage::builder().content("Hi").build()),
-            BaseMessage::AI(AIMessage::builder().content("Hello").build()),
+            AnyMessage::HumanMessage(HumanMessage::builder().content("Hi").build()),
+            AnyMessage::AIMessage(AIMessage::builder().content("Hello").build()),
         ];
 
         let result = model.get_num_tokens_from_messages(&messages, None);
@@ -507,7 +418,7 @@ mod test_base_language_model_trait {
             .responses(vec!["response".to_string()])
             .build();
 
-        let messages: Vec<BaseMessage> = vec![];
+        let messages: Vec<AnyMessage> = vec![];
 
         let result = model.get_num_tokens_from_messages(&messages, None);
         assert_eq!(result, 0);
@@ -624,7 +535,7 @@ mod test_get_num_tokens_from_messages_edge_cases {
         let model = FakeListLLM::builder()
             .responses(vec!["response".to_string()])
             .build();
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello world").build(),
         )];
         let result = model.get_num_tokens_from_messages(&messages, None);
@@ -641,7 +552,9 @@ mod test_generate_prompt {
         let model = FakeListLLM::builder()
             .responses(vec!["test response".to_string()])
             .build();
-        let prompts = vec![LanguageModelInput::from("Hello")];
+        let prompts = vec![vec![AnyMessage::HumanMessage(
+            HumanMessage::builder().content("Hello").build(),
+        )]];
         let result = model.generate_prompt(prompts, None, None).await.unwrap();
 
         assert_eq!(result.generations.len(), 1);
@@ -664,9 +577,15 @@ mod test_generate_prompt {
             ])
             .build();
         let prompts = vec![
-            LanguageModelInput::from("Prompt 1"),
-            LanguageModelInput::from("Prompt 2"),
-            LanguageModelInput::from("Prompt 3"),
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("Prompt 1").build(),
+            )],
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("Prompt 2").build(),
+            )],
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("Prompt 3").build(),
+            )],
         ];
         let result = model.generate_prompt(prompts, None, None).await.unwrap();
 
@@ -696,7 +615,9 @@ mod test_agenerate_prompt {
         let model = FakeListLLM::builder()
             .responses(vec!["test response".to_string()])
             .build();
-        let prompts = vec![LanguageModelInput::from("Hello")];
+        let prompts = vec![vec![AnyMessage::HumanMessage(
+            HumanMessage::builder().content("Hello").build(),
+        )]];
         let result = model.generate_prompt(prompts, None, None).await.unwrap();
 
         assert_eq!(result.generations.len(), 1);
@@ -709,8 +630,12 @@ mod test_agenerate_prompt {
             .responses(vec!["Response 1".to_string(), "Response 2".to_string()])
             .build();
         let prompts = vec![
-            LanguageModelInput::from("Prompt 1"),
-            LanguageModelInput::from("Prompt 2"),
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("Prompt 1").build(),
+            )],
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("Prompt 2").build(),
+            )],
         ];
         let result = model.generate_prompt(prompts, None, None).await.unwrap();
 

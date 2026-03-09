@@ -7,18 +7,18 @@ use async_trait::async_trait;
 use regex::Regex;
 use serde_json::Value;
 
-use super::base::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use super::base::{BaseLanguageModel, LanguageModelConfig};
 use super::chat_models::{BaseChatModel, ChatGenerationStream, ChatModelConfig};
 use crate::caches::BaseCache;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
-use crate::messages::{AIMessage, AIMessageChunk, BaseMessage, ChunkPosition};
+use crate::messages::{AIMessage, AIMessageChunk, AnyMessage, ChunkPosition};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult};
 use crate::runnables::RunnableConfig;
 
 #[derive(Debug)]
 pub struct FakeMessagesListChatModel {
-    responses: Vec<BaseMessage>,
+    responses: Vec<AnyMessage>,
     sleep: Option<Duration>,
     index: AtomicUsize,
     config: ChatModelConfig,
@@ -39,7 +39,7 @@ impl Clone for FakeMessagesListChatModel {
 impl FakeMessagesListChatModel {
     #[builder]
     pub fn new(
-        responses: Vec<BaseMessage>,
+        responses: Vec<AnyMessage>,
         sleep: Option<Duration>,
         config: Option<ChatModelConfig>,
     ) -> Self {
@@ -88,14 +88,13 @@ impl BaseLanguageModel for FakeMessagesListChatModel {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut generations = Vec::new();
 
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -118,7 +117,7 @@ impl BaseChatModel for FakeMessagesListChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -195,7 +194,7 @@ impl FakeListChatModel {
 
     pub async fn batch(
         &self,
-        inputs: Vec<LanguageModelInput>,
+        inputs: Vec<Vec<AnyMessage>>,
         config: Option<&RunnableConfig>,
     ) -> Result<Vec<AIMessage>> {
         let mut results = Vec::with_capacity(inputs.len());
@@ -207,7 +206,7 @@ impl FakeListChatModel {
 
     pub async fn abatch(
         &self,
-        inputs: Vec<LanguageModelInput>,
+        inputs: Vec<Vec<AnyMessage>>,
         config: Option<&RunnableConfig>,
     ) -> Result<Vec<AIMessage>> {
         self.batch(inputs, config).await
@@ -238,14 +237,13 @@ impl BaseLanguageModel for FakeListChatModel {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut generations = Vec::new();
 
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -277,7 +275,7 @@ impl BaseChatModel for FakeListChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -297,7 +295,7 @@ impl BaseChatModel for FakeListChatModel {
 
     fn _stream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -378,14 +376,13 @@ impl BaseLanguageModel for FakeChatModel {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut generations = Vec::new();
 
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -414,7 +411,7 @@ impl BaseChatModel for FakeChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -512,14 +509,13 @@ impl BaseLanguageModel for GenericFakeChatModel {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut generations = Vec::new();
 
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -542,7 +538,7 @@ impl BaseChatModel for GenericFakeChatModel {
 
     async fn _generate(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -566,7 +562,7 @@ impl BaseChatModel for GenericFakeChatModel {
 
     fn _stream(
         &self,
-        _messages: Vec<BaseMessage>,
+        _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -770,14 +766,13 @@ impl BaseLanguageModel for ParrotFakeChatModel {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut generations = Vec::new();
 
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self._generate(messages, stop.clone(), None).await?;
             generations.push(
                 result
@@ -800,14 +795,14 @@ impl BaseChatModel for ParrotFakeChatModel {
 
     async fn _generate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
         let last_message = messages
             .last()
             .cloned()
-            .unwrap_or_else(|| BaseMessage::AI(AIMessage::builder().content("").build()));
+            .unwrap_or_else(|| AnyMessage::AIMessage(AIMessage::builder().content("").build()));
 
         let generation = ChatGeneration::builder().message(last_message).build();
         Ok(ChatResult::builder().generations(vec![generation]).build())
@@ -817,14 +812,14 @@ impl BaseChatModel for ParrotFakeChatModel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::HumanMessage;
+    use crate::messages::prelude::*;
 
     #[tokio::test]
     async fn test_fake_messages_list_chat_model() {
         let llm = FakeMessagesListChatModel::builder()
             .responses(vec![
-                BaseMessage::AI(AIMessage::builder().content("Response 1").build()),
-                BaseMessage::AI(AIMessage::builder().content("Response 2").build()),
+                AnyMessage::AIMessage(AIMessage::builder().content("Response 1").build()),
+                AnyMessage::AIMessage(AIMessage::builder().content("Response 2").build()),
             ])
             .build();
 
@@ -863,7 +858,7 @@ mod tests {
 
         let mut result = String::new();
         while let Some(chunk) = stream.next().await {
-            let text = chunk.unwrap().text.clone();
+            let text = chunk.unwrap().message.text();
             result.push_str(&text);
         }
 
@@ -896,7 +891,7 @@ mod tests {
     async fn test_parrot_fake_chat_model() {
         let llm = ParrotFakeChatModel::builder().build();
 
-        let messages = vec![BaseMessage::Human(
+        let messages = vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content("Hello, parrot!").build(),
         )];
 

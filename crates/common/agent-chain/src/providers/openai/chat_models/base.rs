@@ -64,10 +64,10 @@ use crate::chat_models::{
 };
 use crate::error::{Error, Result};
 use crate::language_models::ChatGenerationStream;
-use crate::language_models::{BaseLanguageModel, LanguageModelConfig, LanguageModelInput};
+use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
 use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
 use crate::messages::{
-    AIMessage, BaseMessage, ContentPart, ImageDetail, ImageSource, InvalidToolCall, MessageContent,
+    AIMessage, AnyMessage, ContentPart, ImageDetail, ImageSource, InvalidToolCall, MessageContent,
     ToolCall,
 };
 use crate::outputs::ChatGenerationChunk;
@@ -644,9 +644,9 @@ fn format_annotation_from_lc(annotation: &serde_json::Value) -> serde_json::Valu
 }
 
 /// Get messages after the last AIMessage with a response ID.
-fn get_last_messages(messages: &[BaseMessage]) -> (&[BaseMessage], Option<String>) {
+fn get_last_messages(messages: &[AnyMessage]) -> (&[AnyMessage], Option<String>) {
     for i in (0..messages.len()).rev() {
-        if let BaseMessage::AI(ai_msg) = &messages[i]
+        if let AnyMessage::AIMessage(ai_msg) = &messages[i]
             && let Some(id) = ai_msg.response_metadata.get("id").and_then(|v| v.as_str())
             && id.starts_with("resp_")
         {
@@ -912,7 +912,7 @@ impl ChatOpenAI {
 
     /// Convert messages to OpenAI Chat Completions API format.
     /// Matches Python `_convert_message_to_dict`.
-    pub fn format_messages(&self, messages: &[BaseMessage]) -> Vec<serde_json::Value> {
+    pub fn format_messages(&self, messages: &[AnyMessage]) -> Vec<serde_json::Value> {
         messages
             .iter()
             .filter_map(|msg| self.convert_message_to_dict(msg))
@@ -920,9 +920,9 @@ impl ChatOpenAI {
     }
 
     /// Convert a single message to OpenAI dict format.
-    fn convert_message_to_dict(&self, msg: &BaseMessage) -> Option<serde_json::Value> {
+    fn convert_message_to_dict(&self, msg: &AnyMessage) -> Option<serde_json::Value> {
         match msg {
-            BaseMessage::System(m) => {
+            AnyMessage::SystemMessage(m) => {
                 let role = m
                     .additional_kwargs
                     .get("__openai_role__")
@@ -937,7 +937,7 @@ impl ChatOpenAI {
                 }
                 Some(message)
             }
-            BaseMessage::Human(m) => {
+            AnyMessage::HumanMessage(m) => {
                 let content = match &m.content {
                     MessageContent::Text(text) => serde_json::json!(text),
                     MessageContent::Parts(parts) => {
@@ -978,7 +978,7 @@ impl ChatOpenAI {
                 }
                 Some(message)
             }
-            BaseMessage::AI(m) => {
+            AnyMessage::AIMessage(m) => {
                 let mut message = serde_json::json!({"role": "assistant"});
 
                 let mut all_tool_calls: Vec<serde_json::Value> = m
@@ -1054,7 +1054,7 @@ impl ChatOpenAI {
 
                 Some(message)
             }
-            BaseMessage::Tool(m) => {
+            AnyMessage::ToolMessage(m) => {
                 let content = match &m.content {
                     MessageContent::Parts(parts) => {
                         let content_parts: Vec<serde_json::Value> = parts
@@ -1095,8 +1095,8 @@ impl ChatOpenAI {
                     "content": content
                 }))
             }
-            BaseMessage::Remove(_) => None,
-            BaseMessage::Chat(m) => {
+            AnyMessage::RemoveMessage(_) => None,
+            AnyMessage::ChatMessage(m) => {
                 let mut message = serde_json::json!({
                     "role": m.role,
                     "content": m.content.as_text()
@@ -1106,7 +1106,7 @@ impl ChatOpenAI {
                 }
                 Some(message)
             }
-            BaseMessage::Function(m) => Some(serde_json::json!({
+            AnyMessage::FunctionMessage(m) => Some(serde_json::json!({
                 "role": "function",
                 "name": m.name,
                 "content": m.content
@@ -1118,7 +1118,7 @@ impl ChatOpenAI {
     /// Matches Python `_construct_responses_api_input`.
     pub fn format_messages_for_responses_api(
         &self,
-        messages: &[BaseMessage],
+        messages: &[AnyMessage],
     ) -> Vec<serde_json::Value> {
         use std::collections::HashSet;
 
@@ -1126,7 +1126,7 @@ impl ChatOpenAI {
 
         for msg in messages {
             match msg {
-                BaseMessage::System(m) => {
+                AnyMessage::SystemMessage(m) => {
                     let role = m
                         .additional_kwargs
                         .get("__openai_role__")
@@ -1137,7 +1137,7 @@ impl ChatOpenAI {
                         "content": m.content.as_text()
                     }));
                 }
-                BaseMessage::Human(m) => {
+                AnyMessage::HumanMessage(m) => {
                     let content = match &m.content {
                         MessageContent::Text(text) => serde_json::json!(text),
                         MessageContent::Parts(parts) => {
@@ -1198,7 +1198,7 @@ impl ChatOpenAI {
                         input.push(serde_json::json!({"role": "user", "content": content}));
                     }
                 }
-                BaseMessage::AI(m) => {
+                AnyMessage::AIMessage(m) => {
                     let has_structured_blocks = if let MessageContent::Parts(parts) = &m.content {
                         parts.iter().any(|p| {
                             if let ContentPart::Other(block) = p {
@@ -1332,7 +1332,7 @@ impl ChatOpenAI {
                         }
                     }
                 }
-                BaseMessage::Tool(m) => {
+                AnyMessage::ToolMessage(m) => {
                     if m.additional_kwargs.get("type").and_then(|v| v.as_str())
                         == Some("computer_call_output")
                         && let Some(output) = make_computer_call_output(m)
@@ -1351,14 +1351,14 @@ impl ChatOpenAI {
                         "output": tool_output
                     }));
                 }
-                BaseMessage::Remove(_) => continue,
-                BaseMessage::Chat(m) => {
+                AnyMessage::RemoveMessage(_) => continue,
+                AnyMessage::ChatMessage(m) => {
                     input.push(serde_json::json!({
                         "role": m.role,
                         "content": m.content.as_text()
                     }));
                 }
-                BaseMessage::Function(m) => {
+                AnyMessage::FunctionMessage(m) => {
                     input.push(serde_json::json!({
                         "type": "function_call_output",
                         "name": m.name,
@@ -1375,7 +1375,7 @@ impl ChatOpenAI {
     /// Matches Python `ChatOpenAI._get_request_payload`.
     pub fn build_request_payload(
         &self,
-        messages: &[BaseMessage],
+        messages: &[AnyMessage],
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
         stream: bool,
@@ -1503,7 +1503,7 @@ impl ChatOpenAI {
     /// Matches Python `_construct_responses_api_payload`.
     pub fn build_responses_api_payload(
         &self,
-        messages: &[BaseMessage],
+        messages: &[AnyMessage],
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
         stream: bool,
@@ -1667,7 +1667,7 @@ impl ChatOpenAI {
     /// Stream responses using the Responses API.
     async fn stream_responses_api(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         tools: Option<&[serde_json::Value]>,
     ) -> Result<ChatStream> {
@@ -1942,11 +1942,11 @@ impl ChatOpenAI {
 
             let generation = if generation_info.is_empty() {
                 ChatGeneration::builder()
-                    .message(BaseMessage::AI(ai_message))
+                    .message(AnyMessage::AIMessage(ai_message))
                     .build()
             } else {
                 ChatGeneration::builder()
-                    .message(BaseMessage::AI(ai_message))
+                    .message(AnyMessage::AIMessage(ai_message))
                     .generation_info(generation_info)
                     .build()
             };
@@ -2115,7 +2115,7 @@ impl ChatOpenAI {
             .build();
 
         let generation = ChatGeneration::builder()
-            .message(BaseMessage::AI(ai_message))
+            .message(AnyMessage::AIMessage(ai_message))
             .build();
         Ok(ChatResult::builder().generations(vec![generation]).build())
     }
@@ -2210,7 +2210,7 @@ impl ChatOpenAI {
     /// Generate using the Responses API.
     async fn generate_responses_api(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatResult> {
         let url = format!("{}/responses", self.api_base);
@@ -2242,7 +2242,7 @@ impl ChatOpenAI {
     ) {
         let headers_value = serde_json::to_value(headers).unwrap_or_default();
         for generation in &mut result.generations {
-            if let BaseMessage::AI(ref mut ai) = generation.message {
+            if let AnyMessage::AIMessage(ref mut ai) = generation.message {
                 ai.response_metadata
                     .insert("headers".to_string(), headers_value.clone());
             }
@@ -2395,7 +2395,7 @@ impl ChatOpenAI {
             .next()
             .ok_or_else(|| Error::other("No generations returned"))?;
         match generation.message {
-            BaseMessage::AI(msg) => Ok(msg),
+            AnyMessage::AIMessage(msg) => Ok(msg),
             _ => Err(Error::other("Expected AI message")),
         }
     }
@@ -2403,7 +2403,7 @@ impl ChatOpenAI {
     /// Internal stream implementation for Chat Completions API.
     async fn stream_internal(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<ChatStream> {
         self.stream_internal_with_tools(messages, stop, None, None)
@@ -2412,7 +2412,7 @@ impl ChatOpenAI {
 
     async fn stream_internal_with_tools(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         tools: Option<&[ToolDefinition]>,
         tool_choice: Option<&ToolChoice>,
@@ -2638,7 +2638,7 @@ impl ChatOpenAI {
         Ok(encoding.encode_ordinary(text))
     }
 
-    pub fn get_num_tokens_from_messages(&self, messages: &[BaseMessage]) -> Result<usize> {
+    pub fn get_num_tokens_from_messages(&self, messages: &[AnyMessage]) -> Result<usize> {
         let (model, encoding) = self.get_encoding_model()?;
 
         let (tokens_per_message, tokens_per_name) = if model.starts_with("gpt-3.5-turbo-0301") {
@@ -2728,13 +2728,12 @@ impl BaseLanguageModel for ChatOpenAI {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
         let mut all_generations = Vec::new();
-        for prompt in prompts {
-            let messages = prompt.to_messages();
+        for messages in prompts {
             let result = self
                 ._generate_internal(messages, stop.clone(), None)
                 .await?;
@@ -2951,7 +2950,7 @@ impl BaseChatModel for ChatOpenAI {
 
     async fn _generate(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -2972,7 +2971,7 @@ impl BaseChatModel for ChatOpenAI {
 
     async fn _astream(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
@@ -3020,7 +3019,7 @@ impl BaseChatModel for ChatOpenAI {
 
     async fn generate_with_tools(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
@@ -3060,9 +3059,8 @@ impl BaseChatModel for ChatOpenAI {
         &self,
         schema: serde_json::Value,
         include_raw: bool,
-    ) -> Result<
-        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
-    > {
+    ) -> Result<Box<dyn Runnable<Input = Vec<AnyMessage>, Output = serde_json::Value> + Send + Sync>>
+    {
         let tool_name = extract_tool_name_from_schema(&schema)?;
         let tool_like = ToolLike::Schema(schema);
         let bound_model = self.bind_tools(&[tool_like], Some(ToolChoice::any()))?;
@@ -3135,9 +3133,8 @@ impl ChatOpenAI {
         method: Option<&str>,
         strict: Option<bool>,
         tools: Option<&[ToolLike]>,
-    ) -> Result<
-        Box<dyn Runnable<Input = LanguageModelInput, Output = serde_json::Value> + Send + Sync>,
-    > {
+    ) -> Result<Box<dyn Runnable<Input = Vec<AnyMessage>, Output = serde_json::Value> + Send + Sync>>
+    {
         let method = method.unwrap_or("function_calling");
 
         match method {
@@ -3279,18 +3276,17 @@ impl ChatOpenAI {
     /// Invoke the model with input and optional stop sequences.
     pub async fn invoke_with_stop(
         &self,
-        input: LanguageModelInput,
+        input: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
     ) -> Result<AIMessage> {
-        let messages = input.to_messages();
-        let result = self._generate_internal(messages, stop, None).await?;
+        let result = self._generate_internal(input, stop, None).await?;
         Self::extract_ai_message(result)
     }
 
     /// Internal generate implementation.
     async fn _generate_internal(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult> {
@@ -3322,7 +3318,7 @@ impl ChatOpenAI {
     /// Internal generate with tools implementation.
     async fn generate_with_tools_internal(
         &self,
-        messages: Vec<BaseMessage>,
+        messages: Vec<AnyMessage>,
         tools: &[ToolDefinition],
         tool_choice: Option<&ToolChoice>,
         stop: Option<Vec<String>>,
@@ -3691,7 +3687,7 @@ mod tests {
             .build();
 
         let model = ChatOpenAI::new("gpt-4o");
-        let formatted = model.format_messages(&[BaseMessage::AI(ai_msg)]);
+        let formatted = model.format_messages(&[AnyMessage::AIMessage(ai_msg)]);
         assert_eq!(formatted.len(), 1);
         assert!(formatted[0]["content"].is_null());
     }
@@ -3712,7 +3708,8 @@ mod tests {
         use crate::messages::SystemMessage;
         let sys = SystemMessage::builder().content("Be helpful").build();
         let model = ChatOpenAI::new("o3-mini");
-        let payload = model.build_request_payload(&[BaseMessage::System(sys)], None, None, false);
+        let payload =
+            model.build_request_payload(&[AnyMessage::SystemMessage(sys)], None, None, false);
         let messages = payload["messages"].as_array().expect("messages array");
         assert_eq!(messages[0]["role"], "developer");
     }

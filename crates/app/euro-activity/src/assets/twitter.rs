@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use agent_chain_core::{BaseMessage, HumanMessage};
+use agent_chain_core::{AnyMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet};
 use serde::{Deserialize, Serialize};
@@ -79,7 +79,7 @@ impl AssetFunctionality for TwitterAsset {
         Some("twitter")
     }
 
-    fn construct_messages(&self) -> Vec<BaseMessage> {
+    fn construct_messages(&self) -> Vec<AnyMessage> {
         let max_tweets = 20usize;
         let tweet_texts: Vec<String> = self
             .tweets
@@ -425,7 +425,7 @@ mod tests {
         let messages = AssetFunctionality::construct_messages(&asset);
         let msg = messages[0].clone();
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, BaseMessage::Human(_)));
+        assert!(matches!(msg, AnyMessage::HumanMessage(_)));
         assert!(chip.is_some());
     }
 }

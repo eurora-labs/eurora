@@ -6,7 +6,9 @@ use regex::Regex;
 
 use crate::error::Result;
 
-use super::base::{BaseOutputParser, ParserInput};
+use crate::messages::AnyMessage;
+
+use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,7 +95,7 @@ impl BaseOutputParser for CommaSeparatedListOutputParser {
 impl BaseTransformOutputParser for CommaSeparatedListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -161,7 +163,7 @@ impl BaseOutputParser for NumberedListOutputParser {
 impl BaseTransformOutputParser for NumberedListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -238,7 +240,7 @@ impl BaseOutputParser for MarkdownListOutputParser {
 impl BaseTransformOutputParser for MarkdownListOutputParser {
     fn transform<'a>(
         &'a self,
-        input: BoxStream<'a, ParserInput>,
+        input: BoxStream<'a, AnyMessage>,
     ) -> BoxStream<'a, Result<Self::Output>>
     where
         Self::Output: 'a,
@@ -269,7 +271,7 @@ impl ListOutputParser for MarkdownListOutputParser {
 
 fn list_transform<'a, P: ListOutputParser + 'a>(
     parser: &'a P,
-    input: BoxStream<'a, ParserInput>,
+    input: BoxStream<'a, AnyMessage>,
 ) -> BoxStream<'a, Result<Vec<String>>> {
     use futures::StreamExt;
 
@@ -278,7 +280,7 @@ fn list_transform<'a, P: ListOutputParser + 'a>(
         let mut input = input;
 
         while let Some(chunk) = input.next().await {
-            let chunk_content = chunk.to_generation().text;
+            let chunk_content = chunk.text();
             buffer.push_str(&chunk_content);
 
             let iter_results = parser.parse_iter(&buffer);

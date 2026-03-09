@@ -2,7 +2,7 @@ use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_core::ToolChoice;
 use agent_chain_core::language_models::ToolLike;
 use agent_chain_core::language_models::chat_models::BaseChatModel;
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage, ToolCall, ToolMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage, ToolCall, ToolMessage};
 use futures::StreamExt;
 
 const MODEL: &str = "gpt-4o-mini";
@@ -27,7 +27,7 @@ async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
     let model = make_model();
     let result = model
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -43,7 +43,7 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
     let model = make_model();
     let result = model
         .ainvoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -59,7 +59,7 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
     let model = make_model();
     let mut stream = model
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -85,7 +85,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
     let model = make_model();
     let mut stream = model
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -109,7 +109,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
         AIMessage::builder().content("hello").build().into(),
         HumanMessage::builder()
@@ -118,7 +118,7 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
             .into(),
     ];
 
-    let result = model.invoke(messages.into(), None).await?;
+    let result = model.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
     Ok(())
 }
@@ -130,7 +130,7 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
         HumanMessage::builder()
             .content("how are you")
@@ -138,7 +138,7 @@ async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::E
             .into(),
     ];
 
-    let result = model.invoke(messages.into(), None).await?;
+    let result = model.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
     Ok(())
 }
@@ -155,7 +155,7 @@ async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
         .name("Alice".to_string())
         .build();
 
-    let result = model.invoke(vec![message.into()].into(), None).await?;
+    let result = model.invoke(vec![message.into()], None).await?;
     assert!(!result.text().is_empty());
     Ok(())
 }
@@ -179,8 +179,7 @@ async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
                     .content("Say 'hello you' and nothing else")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             Some(vec!["you".to_string()]),
         )
         .await?;
@@ -198,8 +197,7 @@ async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
                     .content("Say 'hello you' and nothing else")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -220,7 +218,7 @@ async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
     let model = make_model();
     let result = model
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -259,8 +257,7 @@ async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error
                     .content("Write me 2 haikus. Only include the haikus.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
             None,
         )
@@ -321,7 +318,7 @@ async fn test_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
     let query = "What is the value of magic_function(3)? Use the tool.";
     let result = model_with_tools
         .invoke(
-            vec![HumanMessage::builder().content(query).build().into()].into(),
+            vec![HumanMessage::builder().content(query).build().into()],
             None,
         )
         .await?;
@@ -335,7 +332,7 @@ async fn test_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
     // Also test streaming
     let mut stream = model_with_tools
         .astream(
-            vec![HumanMessage::builder().content(query).build().into()].into(),
+            vec![HumanMessage::builder().content(query).build().into()],
             None,
             None,
         )
@@ -366,7 +363,7 @@ async fn test_tool_calling_async() -> Result<(), Box<dyn std::error::Error>> {
     let query = "What is the value of magic_function(3)? Use the tool.";
     let result = model_with_tools
         .ainvoke(
-            vec![HumanMessage::builder().content(query).build().into()].into(),
+            vec![HumanMessage::builder().content(query).build().into()],
             None,
         )
         .await?;
@@ -390,7 +387,7 @@ async fn test_tool_calling_with_no_arguments() -> Result<(), Box<dyn std::error:
     let query = "What is the value of magic_function_no_args()? Use the tool.";
     let result = model_with_tools
         .invoke(
-            vec![HumanMessage::builder().content(query).build().into()].into(),
+            vec![HumanMessage::builder().content(query).build().into()],
             None,
         )
         .await?;
@@ -426,7 +423,7 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
@@ -449,7 +446,7 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
             .into(),
     ];
 
-    let result = model_with_tools.invoke(messages.into(), None).await?;
+    let result = model_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -474,7 +471,7 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
@@ -497,7 +494,7 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
             .into(),
     ];
 
-    let result = model_with_tools.invoke(messages.into(), None).await?;
+    let result = model_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -522,7 +519,7 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(adder_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("What is 1 + 2")
             .build()
@@ -548,7 +545,7 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
 
     // Python only asserts isinstance(result, AIMessage), which is guaranteed by the
     // return type. Verify the invoke succeeds without error.
-    let _result = model_with_tools.invoke(messages.into(), None).await?;
+    let _result = model_with_tools.invoke(messages, None).await?;
 
     Ok(())
 }
@@ -583,8 +580,7 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
                     .content("Tell me a joke about cats.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -621,8 +617,7 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
                     .content("Tell me a joke about cats.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -660,8 +655,7 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
                     .content("My name is Alice and I'm 30.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -692,7 +686,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
     let model = make_model();
     let structured = model.with_structured_output(joke_schema, false)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Tell me a joke about cats.")
             .build()
@@ -707,7 +701,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
             .into(),
     ];
 
-    let result = structured.ainvoke(messages.into(), None).await?;
+    let result = structured.ainvoke(messages, None).await?;
     assert!(result.get("setup").is_some());
     assert!(result.get("punchline").is_some());
 
@@ -731,8 +725,7 @@ async fn test_json_mode() -> Result<(), Box<dyn std::error::Error>> {
                      Return nothing other than JSON.",
                 )
                 .build()
-                .into()]
-            .into(),
+                .into()],
             None,
         )
         .await?;
@@ -776,7 +769,7 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
         ]))
         .build();
 
-    let result = model.invoke(vec![message.into()].into(), None).await?;
+    let result = model.invoke(vec![message.into()], None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -805,21 +798,21 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
     let model = make_model();
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(weather_tool)], None)?;
 
-    let input_message: BaseMessage = HumanMessage::builder()
+    let input_message: AnyMessage = HumanMessage::builder()
         .content("What is the weather in San Francisco, CA?")
         .build()
         .into();
 
     // Step 1: Get tool call
     let tool_call_message = model_with_tools
-        .invoke(vec![input_message.clone()].into(), None)
+        .invoke(vec![input_message.clone()], None)
         .await?;
     assert!(!tool_call_message.tool_calls.is_empty());
     let tool_call = &tool_call_message.tool_calls[0];
     assert_eq!(tool_call.name, "get_weather");
 
     // Step 2: Simulate tool execution
-    let tool_message: BaseMessage = ToolMessage::builder()
+    let tool_message: AnyMessage = ToolMessage::builder()
         .content("It's sunny and 75 degrees.")
         .tool_call_id(tool_call.id.as_deref().unwrap_or(""))
         .build()
@@ -830,10 +823,9 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
         .invoke(
             vec![
                 input_message,
-                BaseMessage::AI(tool_call_message),
+                AnyMessage::AIMessage(tool_call_message),
                 tool_message,
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;
@@ -870,8 +862,7 @@ async fn test_unicode_tool_call() -> Result<(), Box<dyn std::error::Error>> {
                     "Create a customer named \u{5c0f}\u{6797}\u{82b1}\u{5b50} (Kobayashi Hanako) who is a frequent buyer.",
                 )
                 .build()
-                .into()]
-            .into(),
+                .into()],
             None,
         )
         .await?;
@@ -903,8 +894,8 @@ async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
     let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
     let input2 = vec![HumanMessage::builder().content("Hey").build().into()];
 
-    let result1 = model.invoke(input1.into(), None).await?;
-    let result2 = model.invoke(input2.into(), None).await?;
+    let result1 = model.invoke(input1, None).await?;
+    let result2 = model.invoke(input2, None).await?;
 
     assert!(!result1.text().is_empty());
     assert!(!result2.text().is_empty());
@@ -923,8 +914,8 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
     let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
     let input2 = vec![HumanMessage::builder().content("Hey").build().into()];
 
-    let result1 = model.ainvoke(input1.into(), None).await?;
-    let result2 = model.ainvoke(input2.into(), None).await?;
+    let result1 = model.ainvoke(input1, None).await?;
+    let result2 = model.ainvoke(input2, None).await?;
 
     assert!(!result1.text().is_empty());
     assert!(!result2.text().is_empty());
@@ -948,7 +939,7 @@ async fn test_invoke_with_model_override() -> Result<(), Box<dyn std::error::Err
 
     let result = model
         .invoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -977,7 +968,7 @@ async fn test_ainvoke_with_model_override() -> Result<(), Box<dyn std::error::Er
 
     let result = model
         .ainvoke(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
         .await?;
@@ -1003,7 +994,7 @@ async fn test_stream_with_model_override() -> Result<(), Box<dyn std::error::Err
 
     let mut stream = model
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -1029,7 +1020,7 @@ async fn test_astream_with_model_override() -> Result<(), Box<dyn std::error::Er
 
     let mut stream = model
         .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
         )
@@ -1077,7 +1068,7 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let result = model_any
         .invoke(
-            vec![HumanMessage::builder().content("Hello!").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello!").build().into()],
             None,
         )
         .await?;
@@ -1096,7 +1087,7 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let result = model_specific
         .invoke(
-            vec![HumanMessage::builder().content("Hello!").build().into()].into(),
+            vec![HumanMessage::builder().content("Hello!").build().into()],
             None,
         )
         .await?;
@@ -1144,7 +1135,7 @@ async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
         ]))
         .build();
 
-    let result = model.invoke(vec![message.into()].into(), None).await?;
+    let result = model.invoke(vec![message.into()], None).await?;
     assert!(!result.text().is_empty());
 
     // OpenAI Chat Completions format
@@ -1163,7 +1154,7 @@ async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
         ]))
         .build();
 
-    let result2 = model.invoke(vec![message2.into()].into(), None).await?;
+    let result2 = model.invoke(vec![message2.into()], None).await?;
     assert!(!result2.text().is_empty());
 
     Ok(())
@@ -1209,7 +1200,7 @@ async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
         ]))
         .build();
 
-    let result = model.invoke(vec![message.into()].into(), None).await?;
+    let result = model.invoke(vec![message.into()], None).await?;
     assert!(!result.text().is_empty());
 
     // OpenAI Chat Completions input_audio format
@@ -1225,7 +1216,7 @@ async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
         ]))
         .build();
 
-    let result2 = model.invoke(vec![message2.into()].into(), None).await?;
+    let result2 = model.invoke(vec![message2.into()], None).await?;
     assert!(!result2.text().is_empty());
 
     Ok(())
@@ -1259,7 +1250,7 @@ async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(random_image_schema)], None)?;
 
     // OpenAI image_url format in ToolMessage
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("get a random diagram using the tool and describe it")
             .build()
@@ -1287,7 +1278,7 @@ async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
             .into(),
     ];
 
-    let result = model_with_tools.invoke(messages.into(), None).await?;
+    let result = model_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -1322,7 +1313,7 @@ async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(random_pdf_schema)], None)?;
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder()
             .content("Get a random PDF and relay the title verbatim.")
             .build()
@@ -1351,7 +1342,7 @@ async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
             .into(),
     ];
 
-    let result = model_with_tools.invoke(messages.into(), None).await?;
+    let result = model_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     Ok(())
@@ -1382,7 +1373,7 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
         "required": ["fav_color"]
     });
 
-    let messages: Vec<BaseMessage> = vec![
+    let messages: Vec<AnyMessage> = vec![
         SystemMessage::builder()
             .content("you're a good assistant")
             .build()
@@ -1420,11 +1411,11 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let model_with_tools = model.bind_tools(&[ToolLike::Schema(color_picker)], None)?;
-    let result = model_with_tools.invoke(messages.into(), None).await?;
+    let result = model_with_tools.invoke(messages, None).await?;
     assert!(!result.text().is_empty());
 
     // Test thinking blocks
-    let messages2: Vec<BaseMessage> = vec![
+    let messages2: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("Hello").build().into(),
         AIMessage::builder()
             .content(MessageContent::Parts(vec![
@@ -1445,7 +1436,7 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
             .into(),
     ];
 
-    let result2 = model.invoke(messages2.into(), None).await?;
+    let result2 = model.invoke(messages2, None).await?;
     assert!(!result2.text().is_empty());
 
     Ok(())
@@ -1485,8 +1476,7 @@ async fn test_bind_runnables_as_tools() -> Result<(), Box<dyn std::error::Error>
                     .content("Using the tool, generate a Pirate greeting.")
                     .build()
                     .into(),
-            ]
-            .into(),
+            ],
             None,
         )
         .await?;

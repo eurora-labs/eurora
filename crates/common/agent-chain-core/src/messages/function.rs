@@ -3,7 +3,7 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 
-use super::base::merge_content;
+use super::base::{BaseMessage, merge_content};
 use super::content::MessageContent;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -15,6 +15,36 @@ pub struct FunctionMessage {
     pub additional_kwargs: HashMap<String, serde_json::Value>,
     #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
+}
+
+impl BaseMessage for FunctionMessage {
+    fn id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    fn content(&self) -> &MessageContent {
+        &self.content
+    }
+
+    fn name(&self) -> Option<String> {
+        Some(self.name.clone())
+    }
+
+    fn set_id(&mut self, id: String) {
+        self.id = Some(id);
+    }
+
+    fn message_type(&self) -> &'static str {
+        "function"
+    }
+
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
 }
 
 impl Serialize for FunctionMessage {
@@ -52,14 +82,6 @@ impl FunctionMessage {
             additional_kwargs,
             response_metadata,
         }
-    }
-
-    pub fn set_id(&mut self, id: String) {
-        self.id = Some(id);
-    }
-
-    pub fn message_type(&self) -> &'static str {
-        "function"
     }
 
     pub fn text(&self) -> String {

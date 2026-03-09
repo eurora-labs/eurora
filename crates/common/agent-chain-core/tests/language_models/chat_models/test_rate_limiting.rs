@@ -4,8 +4,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use async_trait::async_trait;
 
 use agent_chain_core::GenericFakeChatModel;
-use agent_chain_core::language_models::{BaseChatModel, ChatModelConfig, LanguageModelInput};
-use agent_chain_core::messages::AIMessage;
+use agent_chain_core::language_models::{BaseChatModel, ChatModelConfig};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::rate_limiters::BaseRateLimiter;
 
 struct CountingRateLimiter {
@@ -63,13 +63,23 @@ async fn test_rate_limit_invoke() {
     );
 
     let _ = model
-        .invoke(LanguageModelInput::from("foo"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.acquire_count(), 1);
 
     let _ = model
-        .invoke(LanguageModelInput::from("bar"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("bar").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.acquire_count(), 2);
@@ -88,19 +98,34 @@ async fn test_rate_limit_ainvoke() {
     );
 
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.aacquire_count(), 1);
 
     let _ = model
-        .ainvoke(LanguageModelInput::from("bar"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("bar").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.aacquire_count(), 2);
 
     let _ = model
-        .ainvoke(LanguageModelInput::from("baz"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("baz").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.aacquire_count(), 3);
@@ -125,14 +150,24 @@ async fn test_rate_limit_skips_cache() {
     .with_config(config);
 
     let _ = model
-        .invoke(LanguageModelInput::from("foo"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.acquire_count(), 1);
 
     for _ in 0..3 {
         let _ = model
-            .invoke(LanguageModelInput::from("foo"), None)
+            .invoke(
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("foo").build(),
+                )],
+                None,
+            )
             .await
             .unwrap();
     }
@@ -156,20 +191,35 @@ async fn test_rate_limit_stream() {
     );
 
     let result = model
-        .invoke(LanguageModelInput::from("foo"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert!(result.content.contains("hello"));
     assert_eq!(limiter.acquire_count(), 1);
 
     let _ = model
-        .invoke(LanguageModelInput::from("bar"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("bar").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.acquire_count(), 2);
 
     let _ = model
-        .invoke(LanguageModelInput::from("baz"), None)
+        .invoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("baz").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.acquire_count(), 3);
@@ -188,19 +238,34 @@ async fn test_rate_limit_astream() {
     );
 
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.aacquire_count(), 1);
 
     let _ = model
-        .ainvoke(LanguageModelInput::from("bar"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("bar").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.aacquire_count(), 2);
 
     let _ = model
-        .ainvoke(LanguageModelInput::from("baz"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("baz").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.aacquire_count(), 3);
@@ -225,14 +290,24 @@ async fn test_rate_limit_skips_cache_async() {
     .with_config(config);
 
     let _ = model
-        .ainvoke(LanguageModelInput::from("foo"), None)
+        .ainvoke(
+            vec![AnyMessage::HumanMessage(
+                HumanMessage::builder().content("foo").build(),
+            )],
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(limiter.aacquire_count(), 1);
 
     for _ in 0..3 {
         let _ = model
-            .ainvoke(LanguageModelInput::from("foo"), None)
+            .ainvoke(
+                vec![AnyMessage::HumanMessage(
+                    HumanMessage::builder().content("foo").build(),
+                )],
+                None,
+            )
             .await
             .unwrap();
     }

@@ -465,7 +465,7 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
                 async fn invoke_tool_call(
                     &self,
                     tool_call: ::agent_chain::_core::messages::ToolCall,
-                ) -> ::agent_chain::_core::messages::BaseMessage {
+                ) -> ::agent_chain::_core::messages::AnyMessage {
                     let args = &tool_call.args;
                     let args: HashMap<String, serde_json::Value> = args.as_object()
                         .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())

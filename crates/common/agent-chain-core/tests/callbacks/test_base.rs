@@ -25,7 +25,7 @@ impl BaseCallbackHandler for ChatModelStartHandler {
     fn on_chat_model_start(
         &self,
         _serialized: &HashMap<String, serde_json::Value>,
-        _messages: &[Vec<agent_chain_core::messages::BaseMessage>],
+        _messages: &[Vec<agent_chain_core::messages::AnyMessage>],
         _run_id: Uuid,
         _parent_run_id: Option<Uuid>,
         _tags: Option<&[String]>,

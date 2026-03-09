@@ -1,3 +1,4 @@
+use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
     ToolMessage, ToolMessageChunk, ToolOutputMixin, ToolStatus, default_tool_chunk_parser,
     default_tool_parser, invalid_tool_call, tool_call, tool_call_chunk,

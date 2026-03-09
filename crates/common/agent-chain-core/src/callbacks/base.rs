@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use uuid::Uuid;
 
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::outputs::ChatResult;
 
 pub trait BaseCallbackHandler: Send + Sync + Debug {
@@ -112,7 +112,7 @@ pub trait BaseCallbackHandler: Send + Sync + Debug {
     fn on_chat_model_start(
         &self,
         serialized: &HashMap<String, serde_json::Value>,
-        messages: &[Vec<BaseMessage>],
+        messages: &[Vec<AnyMessage>],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
         tags: Option<&[String]>,

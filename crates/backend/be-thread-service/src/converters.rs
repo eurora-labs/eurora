@@ -1,11 +1,11 @@
 use agent_chain::{
-    AIMessage, BaseMessage, HumanMessage, MessageContent, SystemMessage, ToolCall, ToolMessage,
+    AIMessage, AnyMessage, HumanMessage, MessageContent, SystemMessage, ToolCall, ToolMessage,
 };
 use be_remote_db::{Message, MessageType};
 
 use crate::{ThreadServiceError, ThreadServiceResult};
 
-pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceResult<BaseMessage> {
+pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceResult<AnyMessage> {
     let id = db_message.id.to_string();
 
     match db_message.message_type {
@@ -17,12 +17,12 @@ pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceR
                     HumanMessage::builder().id(id).content(parts).build()
                 }
             };
-            Ok(BaseMessage::Human(message))
+            Ok(AnyMessage::HumanMessage(message))
         }
         MessageType::System => {
             let content = parse_message_content(&db_message.content)?;
             let message = SystemMessage::builder().id(id).content(content).build();
-            Ok(BaseMessage::System(message))
+            Ok(AnyMessage::SystemMessage(message))
         }
         MessageType::Ai => {
             let content = parse_ai_content(&db_message.content)?;
@@ -32,7 +32,7 @@ pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceR
                 .content(content)
                 .tool_calls(tool_calls)
                 .build();
-            Ok(BaseMessage::AI(message))
+            Ok(AnyMessage::AIMessage(message))
         }
         MessageType::Tool => {
             let content = parse_ai_content(&db_message.content)?;
@@ -44,7 +44,7 @@ pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceR
                 .content(content)
                 .tool_call_id(tool_call_id)
                 .build();
-            Ok(BaseMessage::Tool(message))
+            Ok(AnyMessage::ToolMessage(message))
         }
     }
 }

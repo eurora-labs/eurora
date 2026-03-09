@@ -1,7 +1,6 @@
 use agent_chain_core::GenericFakeChatModel;
-use agent_chain_core::ParserInput;
 use agent_chain_core::language_models::BaseChatModel;
-use agent_chain_core::messages::{AIMessage, BaseMessage, HumanMessage};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, StrOutputParser,
 };
@@ -46,7 +45,7 @@ fn test_str_output_parser_parse_unicode() {
 fn test_str_output_parser_invoke_with_message() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
     assert_eq!(result, "Hello from AI");
 }
 
@@ -54,7 +53,9 @@ fn test_str_output_parser_invoke_with_message() {
 fn test_str_output_parser_invoke_with_human_message() {
     let parser = StrOutputParser::new();
     let message = HumanMessage::builder().content("Hello from human").build();
-    let result = parser.invoke(BaseMessage::Human(message), None).unwrap();
+    let result = parser
+        .invoke(AnyMessage::HumanMessage(message), None)
+        .unwrap();
     assert_eq!(result, "Hello from human");
 }
 
@@ -62,7 +63,7 @@ fn test_str_output_parser_invoke_with_human_message() {
 fn test_str_output_parser_invoke_with_ai_message() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
     assert_eq!(result, "Hello from AI");
 }
 
@@ -79,9 +80,11 @@ fn test_str_output_parser_parse_result_with_chat_generation() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("Chat generated text").build();
     let chat_generation = ChatGeneration::builder()
-        .message(BaseMessage::AI(message))
+        .message(AnyMessage::AIMessage(message))
         .build();
-    let generation = Generation::builder().text(&chat_generation.text).build();
+    let generation = Generation::builder()
+        .text(&chat_generation.message.text())
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, "Chat generated text");
 }
@@ -91,7 +94,7 @@ async fn test_str_output_parser_transform_string_chunks() {
     let parser = StrOutputParser::new();
     let chunks = vec!["Hello", " ", "world", "!"];
 
-    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| AnyMessage::from(*s)));
     let mut result_stream = parser.transform(Box::pin(input_stream));
 
     let mut results = Vec::new();
@@ -105,9 +108,9 @@ async fn test_str_output_parser_transform_string_chunks() {
 #[tokio::test]
 async fn test_str_output_parser_transform_message_chunks() {
     let parser = StrOutputParser::new();
-    let chunks = vec!["Hello", " ", "world"];
+    let chunks = ["Hello", " ", "world"];
 
-    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| AnyMessage::from(*s)));
     let mut result_stream = parser.transform(Box::pin(input_stream));
 
     let mut results = Vec::new();
@@ -123,7 +126,7 @@ async fn test_str_output_parser_transform_string_chunks_2() {
     let parser = StrOutputParser::new();
     let chunks = vec!["Async", " ", "test"];
 
-    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| AnyMessage::from(*s)));
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -136,9 +139,9 @@ async fn test_str_output_parser_transform_string_chunks_2() {
 #[tokio::test]
 async fn test_str_output_parser_transform_message_chunks_2() {
     let parser = StrOutputParser::new();
-    let chunks = vec!["Async", " ", "messages"];
+    let chunks = ["Async", " ", "messages"];
 
-    let input_stream = futures::stream::iter(chunks.iter().map(|s| ParserInput::from(*s)));
+    let input_stream = futures::stream::iter(chunks.iter().map(|s| AnyMessage::from(*s)));
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -156,7 +159,7 @@ async fn test_str_output_parser_with_model_chain() {
 
     let model_output = model
         ._generate(
-            vec![BaseMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("input").build(),
             )],
             None,
@@ -180,7 +183,7 @@ async fn test_str_output_parser_with_model_stream() {
 
     let stream = model
         ._stream(
-            vec![BaseMessage::Human(
+            vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("input").build(),
             )],
             None,
@@ -204,7 +207,7 @@ async fn test_str_output_parser_with_model_stream() {
 fn test_str_output_parser_with_empty_content() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("").build();
-    let result = parser.invoke(BaseMessage::AI(message), None).unwrap();
+    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
     assert_eq!(result, "");
 }
 
@@ -282,7 +285,7 @@ fn test_str_output_parser_with_long_text() {
 async fn test_str_output_parser_transform_empty_iterator() {
     let parser = StrOutputParser::new();
 
-    let input_stream = futures::stream::iter(Vec::<ParserInput>::new());
+    let input_stream = futures::stream::iter(Vec::<AnyMessage>::new());
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })
@@ -296,7 +299,7 @@ async fn test_str_output_parser_transform_empty_iterator() {
 async fn test_str_output_parser_transform_empty_iterator_2() {
     let parser = StrOutputParser::new();
 
-    let input_stream = futures::stream::iter(Vec::<ParserInput>::new());
+    let input_stream = futures::stream::iter(Vec::<AnyMessage>::new());
     let result: Vec<String> = parser
         .transform(Box::pin(input_stream))
         .filter_map(|r| async { r.ok() })

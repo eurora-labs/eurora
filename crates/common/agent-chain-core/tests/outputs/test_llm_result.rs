@@ -91,7 +91,7 @@ mod llm_result_tests {
             .build();
         assert_eq!(result.generations.len(), 2);
         if let GenerationType::ChatGeneration(cg) = &result.generations[0][0] {
-            assert_eq!(cg.text, "Chat response 1");
+            assert_eq!(cg.message.text(), "Chat response 1");
         }
     }
 
@@ -109,7 +109,7 @@ mod llm_result_tests {
             assert_eq!(gc.text, "Chunk 1");
         }
         if let GenerationType::ChatGenerationChunk(cgc) = &result.generations[1][0] {
-            assert_eq!(cgc.text, "Chunk 2");
+            assert_eq!(cgc.message.text(), "Chunk 2");
         }
     }
 
@@ -510,7 +510,7 @@ mod llm_result_flatten_tests {
             GenerationType::ChatGeneration(_)
         ));
         if let GenerationType::ChatGeneration(cg) = &flattened[0].generations[0][0] {
-            assert_eq!(cg.text, "Chat 1");
+            assert_eq!(cg.message.text(), "Chat 1");
         }
         assert_eq!(
             flattened[0]

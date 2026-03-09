@@ -1,4 +1,4 @@
-use agent_chain::BaseMessage;
+use agent_chain::AnyMessage;
 use chrono::{DateTime, TimeZone, Utc};
 use proto_gen::thread::Thread as ProtoThread;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use crate::error::{Error, Result};
 pub struct Thread {
     id: Option<Uuid>,
     title: String,
-    messages: Vec<BaseMessage>,
+    messages: Vec<AnyMessage>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -32,7 +32,7 @@ impl Thread {
         Err(Error::SetId("Thread ID is already set".to_string()))
     }
 
-    pub fn messages(&self) -> &Vec<BaseMessage> {
+    pub fn messages(&self) -> &Vec<AnyMessage> {
         &self.messages
     }
 }

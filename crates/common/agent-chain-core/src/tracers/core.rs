@@ -5,7 +5,7 @@ use chrono::Utc;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::messages::BaseMessage;
+use crate::messages::AnyMessage;
 use crate::outputs::{ChatGenerationChunk, GenerationChunk, LLMResult};
 use crate::tracers::schemas::{Run, RunEvent};
 
@@ -129,7 +129,7 @@ pub trait TracerCore: Send + Sync + Debug {
     fn create_chat_model_run(
         &self,
         serialized: HashMap<String, Value>,
-        messages: &[Vec<BaseMessage>],
+        messages: &[Vec<AnyMessage>],
         run_id: Uuid,
         parent_run_id: Option<Uuid>,
         tags: Option<Vec<String>>,

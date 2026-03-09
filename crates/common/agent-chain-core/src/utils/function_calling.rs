@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use crate::messages::{AIMessage, BaseMessage, HumanMessage, ToolMessage};
+use crate::messages::{AIMessage, AnyMessage, HumanMessage, ToolMessage};
 use crate::tools::BaseTool;
 use crate::utils::json_schema::dereference_refs;
 use crate::utils::uuid::uuid7;
@@ -422,9 +422,8 @@ pub fn tool_example_to_messages<T: Serialize>(
     tool_calls: Vec<T>,
     tool_outputs: Option<Vec<String>>,
     ai_response: Option<String>,
-) -> Vec<BaseMessage> {
-    let mut messages: Vec<BaseMessage> =
-        vec![HumanMessage::builder().content(input).build().into()];
+) -> Vec<AnyMessage> {
+    let mut messages: Vec<AnyMessage> = vec![HumanMessage::builder().content(input).build().into()];
 
     let openai_tool_calls: Vec<Value> = tool_calls
         .iter()

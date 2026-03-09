@@ -16,9 +16,8 @@ use super::utils::{merge_auth_headers, parse_url_with_auth, validate_model};
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLLM, LLMConfig, LLMStream};
-use crate::language_models::{
-    BaseLanguageModel, LangSmithParams, LanguageModelConfig, LanguageModelInput,
-};
+use crate::language_models::{BaseLanguageModel, LangSmithParams, LanguageModelConfig};
+use crate::messages::AnyMessage;
 use crate::outputs::{GenerationChunk, GenerationType, LLMResult};
 
 const DEFAULT_API_BASE: &str = "http://localhost:11434";
@@ -652,14 +651,12 @@ impl BaseLanguageModel for OllamaLLM {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         _callbacks: Option<Callbacks>,
     ) -> Result<LLMResult> {
-        let string_prompts: Vec<String> = prompts
-            .into_iter()
-            .map(|p| self.convert_input(p))
-            .collect::<Result<Vec<_>>>()?;
+        let string_prompts: Vec<String> =
+            prompts.into_iter().map(|p| self.convert_input(p)).collect();
         self.generate_prompts(string_prompts, stop, None).await
     }
 

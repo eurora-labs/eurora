@@ -8,7 +8,7 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
-use crate::messages::{AIMessage, BaseMessage};
+use crate::messages::{AIMessage, AnyMessage};
 use crate::outputs::LLMResult;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -51,130 +51,6 @@ impl LangSmithParams {
             ls_max_tokens: max_tokens,
             ls_stop: stop,
         }
-    }
-}
-
-use crate::prompt_values::{ChatPromptValue, ImagePromptValue, StringPromptValue};
-
-#[derive(Debug, Clone)]
-pub enum LanguageModelInput {
-    Text(String),
-    StringPrompt(StringPromptValue),
-    ChatPrompt(ChatPromptValue),
-    ImagePrompt(ImagePromptValue),
-    Messages(Vec<BaseMessage>),
-}
-
-impl From<String> for LanguageModelInput {
-    fn from(s: String) -> Self {
-        LanguageModelInput::Text(s)
-    }
-}
-
-impl From<&str> for LanguageModelInput {
-    fn from(s: &str) -> Self {
-        LanguageModelInput::Text(s.to_string())
-    }
-}
-
-impl From<StringPromptValue> for LanguageModelInput {
-    fn from(p: StringPromptValue) -> Self {
-        LanguageModelInput::StringPrompt(p)
-    }
-}
-
-impl From<ChatPromptValue> for LanguageModelInput {
-    fn from(p: ChatPromptValue) -> Self {
-        LanguageModelInput::ChatPrompt(p)
-    }
-}
-
-impl From<ImagePromptValue> for LanguageModelInput {
-    fn from(p: ImagePromptValue) -> Self {
-        LanguageModelInput::ImagePrompt(p)
-    }
-}
-
-impl From<Vec<BaseMessage>> for LanguageModelInput {
-    fn from(m: Vec<BaseMessage>) -> Self {
-        LanguageModelInput::Messages(m)
-    }
-}
-
-impl LanguageModelInput {
-    pub fn to_messages(&self) -> Vec<BaseMessage> {
-        use crate::prompt_values::PromptValue;
-        match self {
-            LanguageModelInput::Text(s) => {
-                vec![BaseMessage::Human(
-                    crate::messages::HumanMessage::builder()
-                        .content(s.as_str())
-                        .build(),
-                )]
-            }
-            LanguageModelInput::StringPrompt(p) => p.to_messages(),
-            LanguageModelInput::ChatPrompt(p) => p.to_messages(),
-            LanguageModelInput::ImagePrompt(p) => p.to_messages(),
-            LanguageModelInput::Messages(m) => m.clone(),
-        }
-    }
-}
-
-impl std::fmt::Display for LanguageModelInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::prompt_values::PromptValue;
-        match self {
-            LanguageModelInput::Text(s) => write!(f, "{}", s),
-            LanguageModelInput::StringPrompt(p) => write!(f, "{}", PromptValue::to_string(p)),
-            LanguageModelInput::ChatPrompt(p) => write!(f, "{}", PromptValue::to_string(p)),
-            LanguageModelInput::ImagePrompt(p) => write!(f, "{}", PromptValue::to_string(p)),
-            LanguageModelInput::Messages(m) => {
-                let joined = m
-                    .iter()
-                    .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                write!(f, "{}", joined)
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum LanguageModelOutput {
-    Message(Box<AIMessage>),
-    Text(String),
-}
-
-impl From<AIMessage> for LanguageModelOutput {
-    fn from(m: AIMessage) -> Self {
-        LanguageModelOutput::Message(Box::new(m))
-    }
-}
-
-impl From<String> for LanguageModelOutput {
-    fn from(s: String) -> Self {
-        LanguageModelOutput::Text(s)
-    }
-}
-
-impl LanguageModelOutput {
-    pub fn text(&self) -> String {
-        match self {
-            LanguageModelOutput::Message(m) => m.text(),
-            LanguageModelOutput::Text(s) => s.clone(),
-        }
-    }
-
-    pub fn into_text(self) -> String {
-        match self {
-            LanguageModelOutput::Message(m) => m.text(),
-            LanguageModelOutput::Text(s) => s,
-        }
-    }
-
-    pub fn message(m: AIMessage) -> Self {
-        LanguageModelOutput::Message(Box::new(m))
     }
 }
 
@@ -245,7 +121,7 @@ pub trait BaseLanguageModel: Send + Sync {
 
     async fn generate_prompt(
         &self,
-        prompts: Vec<LanguageModelInput>,
+        prompts: Vec<Vec<AnyMessage>>,
         stop: Option<Vec<String>>,
         callbacks: Option<Callbacks>,
     ) -> Result<LLMResult>;
@@ -299,7 +175,7 @@ pub trait BaseLanguageModel: Send + Sync {
 
     fn get_num_tokens_from_messages(
         &self,
-        messages: &[BaseMessage],
+        messages: &[AnyMessage],
         _tools: Option<&[crate::tools::ToolDefinition]>,
     ) -> usize {
         messages
@@ -313,9 +189,8 @@ pub trait BaseLanguageModel: Send + Sync {
     }
 }
 
-pub type LanguageModelLike = Arc<
-    dyn crate::runnables::base::Runnable<Input = LanguageModelInput, Output = LanguageModelOutput>,
->;
+pub type LanguageModelLike =
+    Arc<dyn crate::runnables::base::Runnable<Input = Vec<AnyMessage>, Output = AIMessage>>;
 
 #[cfg(test)]
 mod tests {
@@ -341,19 +216,9 @@ mod tests {
     }
 
     #[test]
-    fn test_language_model_input_from_str() {
-        let input: LanguageModelInput = "Hello".into();
-        match input {
-            LanguageModelInput::Text(s) => assert_eq!(s, "Hello"),
-            _ => panic!("Expected Text variant"),
-        }
-    }
-
-    #[test]
-    fn test_language_model_output_text() {
-        let output = LanguageModelOutput::Text("Hello".to_string());
+    fn test_ai_message_text() {
+        let output = AIMessage::builder().content("Hello").build();
         assert_eq!(output.text(), "Hello");
-        assert_eq!(output.into_text(), "Hello");
     }
 
     #[test]
