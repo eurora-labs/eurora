@@ -2,6 +2,7 @@ use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
 use agent_chain_core::messages::prelude::*;
 use euro_thread::{ListThreadsRequest, Thread};
+use proto_gen::thread::CreateThreadRequest;
 use tauri::{Manager, Runtime};
 
 #[taurpc::ipc_type]
@@ -36,20 +37,11 @@ pub trait ThreadApi {
     #[taurpc(event)]
     async fn current_thread_changed(thread: ThreadView);
 
-    async fn switch_thread<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-    ) -> Result<ThreadView, String>;
-
     async fn list<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         limit: u32,
         offset: u32,
     ) -> Result<Vec<ThreadView>, String>;
-
-    async fn create_empty_thread<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<ThreadView, String>;
 
     async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<ThreadView, String>;
 
@@ -91,35 +83,19 @@ impl ThreadApi for ThreadApiImpl {
         Ok(threads.into_iter().map(|thread| thread.into()).collect())
     }
 
-    async fn create_empty_thread<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<ThreadView, String> {
-        let view: ThreadView = {
-            let thread_state = thread_manager(&app_handle)?;
-            let mut thread_manager = thread_state.lock().await;
-            let thread = thread_manager
-                .create_empty_thread()
-                .await
-                .map_err(|e| e.to_string())?;
-            thread.into()
-        };
-
-        TauRpcThreadApiEventTrigger::new(app_handle)
-            .current_thread_changed(view.clone())
-            .ctx("Failed to trigger current thread changed event")?;
-
-        Ok(view)
-    }
-
     async fn create<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<ThreadView, String> {
         let thread_state = thread_manager(&app_handle)?;
-        let _thread_manager = thread_state.lock().await;
-
-        todo!()
+        let thread_manager = thread_state.lock().await;
+        let thread = thread_manager
+            .create(CreateThreadRequest {
+                title: "New Chat".to_string(),
+            })
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(thread.into())
     }
 
     async fn get_messages<R: Runtime>(
@@ -143,28 +119,6 @@ impl ThreadApi for ThreadApiImpl {
                 _ => Some(MessageView::from(message)),
             })
             .collect())
-    }
-
-    async fn switch_thread<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-    ) -> Result<ThreadView, String> {
-        let view: ThreadView = {
-            let thread_state = thread_manager(&app_handle)?;
-            let mut thread_manager = thread_state.lock().await;
-            let thread = thread_manager
-                .switch_thread(thread_id)
-                .await
-                .ctx("Failed to switch thread")?;
-            thread.into()
-        };
-
-        TauRpcThreadApiEventTrigger::new(app_handle)
-            .current_thread_changed(view.clone())
-            .ctx("Failed to trigger current thread changed event")?;
-
-        Ok(view)
     }
 }
 

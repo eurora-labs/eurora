@@ -52,6 +52,10 @@ export class ThreadService {
 		);
 	}
 
+	createThread() {
+		this.activeThreadId = null;
+	}
+
 	async loadMore() {
 		if (this.loadingMore || !this.hasMore) return;
 		this.loadingMore = true;

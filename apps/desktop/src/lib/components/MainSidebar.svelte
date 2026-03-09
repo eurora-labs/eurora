@@ -76,21 +76,8 @@
 	});
 
 	async function createChat() {
-		await taurpc.thread.create_empty_thread().catch((error) => {
-			console.error('Failed to create thread:', error);
-			toast.error(`The app encountered the following error: ${error}`, {
-				description: 'Please try again later.',
-				duration: 5000,
-				cancel: {
-					label: 'Ok',
-					onClick: () => {},
-				},
-			});
-		});
-	}
-
-	async function switchThread(id: string) {
-		await taurpc.thread.switch_thread(id);
+		threadService.createThread();
+		goto('/');
 	}
 
 	async function quit() {
@@ -160,7 +147,7 @@
 									toast.error("Something went wrong: this thread doesn't exist.");
 									return;
 								}
-								switchThread(item.id);
+								goto(`/${item.id}`);
 							}}
 						>
 							{#snippet child({ props })}
