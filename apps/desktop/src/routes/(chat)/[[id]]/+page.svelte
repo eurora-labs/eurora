@@ -1,13 +1,8 @@
 <script lang="ts">
-	import {
-		type ResponseChunk,
-		type Query,
-		type MessageView,
-		type ThreadView,
-		type ContextChip,
-		type TimelineAppEvent,
-	} from '$lib/bindings/bindings.js';
+	import { goto } from '$app/navigation';
+	import { type Query, type ContextChip, type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { MESSAGE_SERVICE } from '$lib/services/message-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
@@ -27,11 +22,7 @@
 		ChatStatus,
 	} from '@eurora/ui/components/ai-elements/prompt-input/index';
 
-	interface ReasoningData {
-		content: string;
-		isStreaming: boolean;
-		duration?: number;
-	}
+	let { data } = $props();
 
 	let copiedMessageId = $state<string | null>(null);
 
@@ -45,15 +36,25 @@
 		}, 2000);
 	}
 
-	let thread = $state<ThreadView | null>(null);
-	let messages = $state<MessageView[]>([]);
 	let taurpc = inject(TAURPC_SERVICE);
+	let messageService = inject(MESSAGE_SERVICE);
 	let chatStatus = $state<ChatStatus>('ready');
 	let assets = $state<ContextChip[]>([]);
 	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
-	let reasoningData = $state<Record<number, ReasoningData>>({});
 
+	const threadId = $derived(data.threadId);
+	const threadData = $derived(threadId ? messageService.getThread(threadId) : null);
+	const messages = $derived(threadData?.messages ?? []);
+	const reasoningData = $derived(threadData?.reasoningData ?? {});
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
+
+	$effect(() => {
+		if (threadData?.streaming) {
+			chatStatus = 'streaming';
+		} else if (chatStatus === 'streaming') {
+			chatStatus = 'ready';
+		}
+	});
 
 	const suggestions = [
 		'What are the latest trends in AI?',
@@ -67,16 +68,8 @@
 	];
 
 	function handleSuggestionClick(suggestion: string) {
-		messages.push({
-			id: null,
-			role: 'human',
-			content: suggestion,
-			reasoning_blocks: null,
-		});
-
 		chatStatus = 'submitted';
-		askQuestion(suggestion).catch((error) => {
-			messages.splice(-2);
+		sendQuery(suggestion).catch((error) => {
 			chatStatus = 'error';
 			toast.error(String(error), {
 				duration: Infinity,
@@ -90,33 +83,6 @@
 	}
 
 	onMount(() => {
-		taurpc.thread.current_thread_changed.on((new_conv) => {
-			thread = new_conv;
-
-			if (!new_conv.id) {
-				messages.splice(0, messages.length);
-				reasoningData = {};
-				return;
-			}
-
-			taurpc.thread.get_messages(new_conv.id, 50, 0).then((response) => {
-				messages = response;
-				reasoningData = {};
-				response.forEach((msg, i) => {
-					if (msg.reasoning_blocks?.length) {
-						const content = msg.reasoning_blocks.map((b) => b.content ?? '').join('');
-						if (content) {
-							reasoningData[i] = { content, isStreaming: false };
-						}
-					}
-				});
-			});
-		});
-
-		taurpc.thread.new_thread_added.on((new_thread) => {
-			thread = new_thread;
-		});
-
 		taurpc.timeline.new_assets_event.on((chips) => {
 			assets = chips;
 		});
@@ -151,18 +117,9 @@
 		const text = message.text.trim();
 		if (!text) return;
 
-		const assetIds = assets.map((a) => a.id);
-
-		messages.push({
-			id: null,
-			role: 'human',
-			content: text,
-			reasoning_blocks: null,
-		});
-
 		chatStatus = 'submitted';
-		askQuestion(text, assetIds).catch((error) => {
-			messages.splice(-2);
+		const assetIds = assets.map((a) => a.id);
+		sendQuery(text, assetIds).catch((error) => {
 			chatStatus = 'error';
 			toast.error(String(error), {
 				duration: Infinity,
@@ -171,59 +128,14 @@
 		});
 	}
 
-	async function askQuestion(text: string, assetIds: string[] = []): Promise<void> {
-		const tauRpcQuery: Query = {
-			text,
-			assets: assetIds,
-		};
+	async function sendQuery(text: string, assetIds: string[] = []): Promise<void> {
+		const query: Query = { text, assets: assetIds };
+		const resultThreadId = await messageService.sendMessage(threadId, query);
 
-		let agentMessage: MessageView | undefined;
-		messages.push({
-			id: null,
-			role: 'ai',
-			content: '',
-			reasoning_blocks: null,
-		});
-
-		const messageIndex = messages.length - 1;
-		chatStatus = 'streaming';
-		let reasoningStartTime: number | null = null;
-
-		function onEvent(response: ResponseChunk) {
-			if (!agentMessage) {
-				agentMessage = messages.at(-1);
-			}
-
-			if (response.reasoning) {
-				if (!reasoningData[messageIndex]) {
-					reasoningStartTime = Date.now();
-					reasoningData[messageIndex] = {
-						content: response.reasoning,
-						isStreaming: true,
-					};
-				} else {
-					reasoningData[messageIndex].content += response.reasoning;
-				}
-			}
-
-			if (agentMessage && agentMessage.role === 'ai' && response.chunk) {
-				if (reasoningData[messageIndex]?.isStreaming) {
-					reasoningData[messageIndex].isStreaming = false;
-					reasoningData[messageIndex].duration = reasoningStartTime
-						? Math.ceil((Date.now() - reasoningStartTime) / 1000)
-						: undefined;
-				}
-				agentMessage.content += response.chunk;
-			}
+		if (!threadId && resultThreadId) {
+			goto(`/${resultThreadId}`, { replaceState: true });
 		}
 
-		await taurpc.chat.send_query(thread?.id ?? null, onEvent, tauRpcQuery);
-		if (reasoningData[messageIndex]?.isStreaming) {
-			reasoningData[messageIndex].isStreaming = false;
-			reasoningData[messageIndex].duration = reasoningStartTime
-				? Math.ceil((Date.now() - reasoningStartTime) / 1000)
-				: undefined;
-		}
 		chatStatus = 'ready';
 	}
 </script>
