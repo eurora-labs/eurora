@@ -27,9 +27,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 			videoId = this.params.videoId;
 		}
 
-		this.params.videoTranscript = (
-			await this.youtubeTranscriptApi.fetch(videoId, ['en'])
-		).snippets;
+		this.params.videoTranscript = (await this.youtubeTranscriptApi.fetch(videoId)).snippets;
 		return this.params.videoTranscript;
 	}
 
