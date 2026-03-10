@@ -2,33 +2,63 @@
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
 	import VideoSection from '$lib/components/marketing/video-section.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
+	import * as Card from '@eurora/ui/components/card/index';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
 	import * as FeatureSection from '@eurora/ui/custom-components/feature-section/index';
+
+	const tabs = [
+		{
+			id: 'assistant',
+			label: 'Context Recognition',
+			description: 'Instant context from your browser that you can ask about',
+		},
+		{
+			id: 'browser',
+			label: 'Browser Integration',
+			description: 'Works with every browser you use',
+		},
+		{
+			id: 'cross-platform',
+			label: 'Cross Platform',
+			description: 'Native on macOS, Windows, and Linux',
+		},
+	] as const;
+
+	let activeTab = $state<(typeof tabs)[number]['id']>('assistant');
 </script>
 
-<div class="container mx-auto px-4 py-8">
-	<div class="flex flex-col items-start gap-4 mb-8">
-		<h1 class="text-3xl font-bold text-shadow-xl">
-			Never explain yourself again,
-			<br />
-			Eurora is the easiest way to use AI.
-		</h1>
-		<DownloadButton class="rounded-full" />
+<div class="mx-auto w-full max-w-[calc(60vh*16/9)] px-4">
+	<div class="flex flex-col items-start gap-2 py-6">
+		<h1 class="text-3xl font-bold text-shadow-xl">Less typing, more answers</h1>
+		<p class="text-lg text-muted-foreground">
+			The private AI platform that integrates into your OS
+		</p>
+		<DownloadButton class="rounded-full mt-2" />
 	</div>
 
 	<AutoplayVideo
 		src="https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4"
 		class="rounded-xl"
 	/>
-	<p class="mt-2 text-xs text-muted-foreground/70">
-		Video source: <a
-			href="https://www.youtube.com/watch?v=zkIcLproDGM"
-			target="_blank"
-			rel="noopener noreferrer"
-			class="underline hover:text-muted-foreground transition-colors"
-			>Lecture 1 Part 1: Introduction and Motivation</a
-		> — Alan Edelman, Steven G. Johnson | OCW MIT
-	</p>
+
+	<div class="grid grid-cols-3 gap-3 mt-4">
+		{#each tabs as tab}
+			<button type="button" class="text-left" onclick={() => (activeTab = tab.id)}>
+				<Card.Root
+					class="h-full cursor-pointer transition-colors py-3 {activeTab === tab.id
+						? 'border-primary bg-primary/5'
+						: 'hover:border-muted-foreground/25'}"
+				>
+					<Card.Header class="px-3 py-0 sm:px-4 gap-0.5">
+						<Card.Title class="text-xs sm:text-sm">{tab.label}</Card.Title>
+						<Card.Description class="text-xs hidden sm:block"
+							>{tab.description}</Card.Description
+						>
+					</Card.Header>
+				</Card.Root>
+			</button>
+		{/each}
+	</div>
 
 	<VideoSection
 		title="Seamless Integration"

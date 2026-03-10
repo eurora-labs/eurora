@@ -1,7 +1,7 @@
-import Content from '$lib/components/tabs/tabs-content.svelte';
-import List from '$lib/components/tabs/tabs-list.svelte';
-import Trigger from '$lib/components/tabs/tabs-trigger.svelte';
-import Root from '$lib/components/tabs/tabs.svelte';
+import Root from './tabs.svelte';
+import Content from './tabs-content.svelte';
+import List from './tabs-list.svelte';
+import Trigger from './tabs-trigger.svelte';
 
 export {
 	Root,
