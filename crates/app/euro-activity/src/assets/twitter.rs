@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use agent_chain_core::{AnyMessage, HumanMessage};
 use async_trait::async_trait;
-use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet};
+use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet, ParseResult};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -183,7 +183,23 @@ impl TwitterAsset {
     }
 
     pub fn try_from(asset: NativeTwitterAsset) -> Result<Self, ActivityError> {
-        let tweets: Vec<TwitterTweet> = asset.tweets.into_iter().map(TwitterTweet::from).collect();
+        let (tweets, context_type) = match asset.result {
+            ParseResult::Tweet(data) => {
+                let mut tweets: Vec<NativeTwitterTweet> = Vec::new();
+                if let Some(tweet) = data.tweet {
+                    tweets.push(tweet);
+                }
+                tweets.extend(data.replies);
+                (tweets, TwitterContextType::Thread)
+            }
+            ParseResult::Profile(data) => (data.tweets, TwitterContextType::Profile),
+            ParseResult::Home(data) => (data.tweets, TwitterContextType::Timeline),
+            ParseResult::Search(data) => (data.tweets, TwitterContextType::Search),
+            ParseResult::Notifications(data) => (data.tweets, TwitterContextType::Other),
+            ParseResult::Unsupported(_) => (vec![], TwitterContextType::Other),
+        };
+
+        let tweets: Vec<TwitterTweet> = tweets.into_iter().map(TwitterTweet::from).collect();
 
         Ok(TwitterAsset {
             id: uuid::Uuid::new_v4().to_string(),
@@ -191,7 +207,7 @@ impl TwitterAsset {
             title: asset.title,
             tweets,
             timestamp: asset.timestamp,
-            context_type: TwitterContextType::Timeline,
+            context_type,
         })
     }
 
