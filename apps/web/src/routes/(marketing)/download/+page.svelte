@@ -45,7 +45,7 @@
 	<h1 class="mb-3 text-4xl font-bold tracking-tight text-foreground">Get Eurora</h1>
 
 	{#if singleOption}
-		<DownloadButton class="size-14 text-2xl" iconClass="w-6 h-6 size-6" />
+		<DownloadButton class="size-14 text-2xl" />
 	{:else if platformDetected}
 		{@const osName = getOSDisplayName(detectedOS)}
 		<p class="mb-4 text-sm text-muted-foreground">
