@@ -28,17 +28,27 @@
 </script>
 
 <div class="mx-auto w-full max-w-[calc(60vh*16/9)] px-4">
-	<div class="flex flex-col items-start gap-2 py-6">
-		<h1 class="text-3xl font-bold text-shadow-xl">Less typing, more answers</h1>
-		<p class="text-lg text-muted-foreground">
-			The private AI platform that integrates into your OS
+	<div class="flex flex-col items-start py-12">
+		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
+			Your context. Your AI. Your terms.
+		</h1>
+		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
+			A private, open-source assistant that understands every page you visit.
 		</p>
-		<DownloadButton class="rounded-full mt-2" />
+		<div class="flex flex-col items-start gap-4 w-full md:flex-row mt-16">
+			<DownloadButton class="h-24 w-[28rem]" />
+			<div class="h-24 w-32 overflow-hidden rounded-xl shrink-0">
+				<AutoplayVideo
+					src="https://d26xptavrz5c8t.cloudfront.net/video/juice_demo.mp4"
+					class="h-full w-full object-cover"
+				/>
+			</div>
+		</div>
 	</div>
 
 	<AutoplayVideo
 		src="https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4"
-		class="rounded-xl"
+		class="rounded-xl mt-8"
 	/>
 
 	<div class="grid grid-cols-3 gap-3 mt-4">
