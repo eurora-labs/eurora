@@ -28,12 +28,14 @@
 </script>
 
 <div class="mx-auto w-full max-w-[calc(60vh*16/9)] px-4">
-	<div class="flex flex-col items-start py-12">
+	<div class="flex flex-col items-start py-12 max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
 			Your context. Your AI. Your terms.
 		</h1>
 		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
-			A private, open-source assistant that understands every page you visit.
+			A private, open-source AI assistant that reads what you read. Ask questions about any
+			YouTube video, article, or tweet — Eurora captures the transcript, content, and metadata
+			so you don't have to copy-paste a thing.
 		</p>
 		<div class="flex flex-col items-start gap-4 w-full md:flex-row mt-16">
 			<DownloadButton class="h-24 w-[28rem]" />
