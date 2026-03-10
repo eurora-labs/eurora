@@ -4,7 +4,7 @@
 		getDownloadOptions,
 		getDownloadUrl,
 		type DownloadOption,
-	} from '$lib/download/downloadService';
+	} from '$lib/services/download-service';
 	import { getArch, getOS, getOSDisplayName } from '$lib/utils/getOS';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Collapsible from '@eurora/ui/components/collapsible/index';
@@ -49,7 +49,8 @@
 	{:else if platformDetected}
 		{@const osName = getOSDisplayName(detectedOS)}
 		<p class="mb-4 text-sm text-muted-foreground">
-			Choose your {osName} architecture
+			Choose your {osName}
+			{detectedOS === 'linux' ? 'package format' : 'architecture'}
 		</p>
 		<div class="flex flex-wrap justify-center gap-3">
 			{#each downloadOptions as option}
@@ -59,7 +60,7 @@
 					onclick={() => handleDownload(option)}
 				>
 					<DownloadIcon class="size-5" />
-					{option.label} ({option.archLabel})
+					{option.label} ({option.formatLabel ?? option.archLabel})
 				</Button>
 			{/each}
 		</div>
@@ -104,7 +105,11 @@
 						>
 							<Icon class="size-4 text-muted-foreground" />
 							<span class="text-sm font-medium text-foreground">{option.label}</span>
-							<span class="text-xs text-muted-foreground">({option.archLabel})</span>
+							<span class="text-xs text-muted-foreground"
+								>({option.archLabel}{option.formatLabel
+									? ` · ${option.formatLabel}`
+									: ''})</span
+							>
 							<DownloadIcon class="ml-auto size-3.5 text-muted-foreground" />
 						</Button>
 					{/each}
