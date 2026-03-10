@@ -2,16 +2,16 @@ use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use strum_macros::AsRefStr;
 
-mod assets;
+mod article;
 mod metadata;
 pub mod proto;
-mod shared;
-mod snapshots;
+mod twitter;
+mod youtube;
 
-pub use assets::*;
+pub use article::*;
 pub use metadata::*;
-pub use shared::*;
-pub use snapshots::*;
+pub use twitter::*;
+pub use youtube::*;
 
 #[allow(clippy::enum_variant_names)]
 #[enum_dispatch]

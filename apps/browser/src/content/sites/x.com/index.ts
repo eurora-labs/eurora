@@ -7,6 +7,7 @@ import type {
 	NativeTwitterAsset,
 	NativeTwitterSnapshot,
 	NativeTwitterTweet,
+	ParseResult,
 } from '../../../shared/content/bindings';
 
 export class TwitterWatcher extends Watcher<WatcherParams> {
@@ -16,8 +17,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		super(params);
 	}
 
-	private getTweets(): NativeTwitterTweet[] {
-		const result = this.parser.parse(document);
+	private getTweets(result: ParseResult): NativeTwitterTweet[] {
 		if (result.page === 'unsupported') return [];
 		if (result.page === 'tweet') {
 			const tweets: NativeTwitterTweet[] = [];
@@ -32,9 +32,11 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_obj: TwitterBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
+		const result = this.parser.parse(document);
+
 		this.params.currentUrl = window.location.href;
 		this.params.pageTitle = document.title;
-		this.params.tweets = this.getTweets();
+		this.params.tweets = this.getTweets(result);
 
 		return { kind: 'Ok', data: null };
 	}
@@ -44,12 +46,12 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
-			const currentTweets = this.getTweets();
+			const result = this.parser.parse(document);
 
 			const reportData: NativeTwitterAsset = {
 				url: window.location.href,
 				title: document.title,
-				tweets: currentTweets,
+				result,
 				timestamp: new Date().toISOString(),
 			};
 
@@ -76,7 +78,8 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
-			const currentTweets = this.getTweets();
+			const result = this.parser.parse(document);
+			const currentTweets = this.getTweets(result);
 
 			const reportData: NativeTwitterSnapshot = {
 				tweets: currentTweets,
