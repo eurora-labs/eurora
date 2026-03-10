@@ -4,7 +4,7 @@
 		getDownloadOptions,
 		getDownloadUrl,
 		type DownloadOption,
-	} from '$lib/download/downloadService';
+	} from '$lib/services/download-service';
 	import { currentUser } from '$lib/stores/auth.js';
 	import { subscription, subscriptionLoading } from '$lib/stores/subscription.js';
 	import { getArch, getOS } from '$lib/utils/getOS';
@@ -80,7 +80,9 @@
 			<div class="flex flex-wrap gap-2">
 				{#each downloadOptions as option}
 					<Button variant="outline" class="gap-2" onclick={() => handleDownload(option)}>
-						{option.label} ({option.archLabel})
+						{option.label} ({option.archLabel}{option.formatLabel
+							? ` · ${option.formatLabel}`
+							: ''})
 						<DownloadIcon size={16} />
 					</Button>
 				{/each}
@@ -106,7 +108,9 @@
 								onclick={() => handleDownload(option)}
 							>
 								<Icon class="size-4" />
-								{option.label} ({option.archLabel})
+								{option.label} ({option.archLabel}{option.formatLabel
+									? ` · ${option.formatLabel}`
+									: ''})
 								<DownloadIcon size={14} />
 							</Button>
 						{/each}
@@ -119,7 +123,9 @@
 					{@const Icon = getOSIcon(option.os)}
 					<Button variant="outline" class="gap-2" onclick={() => handleDownload(option)}>
 						<Icon class="size-4" />
-						{option.label} ({option.archLabel})
+						{option.label} ({option.archLabel}{option.formatLabel
+							? ` · ${option.formatLabel}`
+							: ''})
 						<DownloadIcon size={14} />
 					</Button>
 				{/each}
