@@ -3,8 +3,18 @@
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Eurora Labs</title>
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-5G3S3G4Z5B"></script>
+		<script>
+			window.dataLayer = window.dataLayer || [];
+			function gtag() {
+				dataLayer.push(arguments);
+			}
+			gtag('js', new Date());
+			gtag('config', 'G-5G3S3G4Z5B');
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
