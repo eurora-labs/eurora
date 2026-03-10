@@ -1,3 +1,4 @@
+import { TwitterParser } from './parser';
 import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { TwitterBrowserMessage, WatcherParams } from './types.js';
@@ -9,27 +10,22 @@ import type {
 } from '../../../shared/content/bindings';
 
 export class TwitterWatcher extends Watcher<WatcherParams> {
+	private parser = new TwitterParser();
+
 	constructor(params: WatcherParams) {
 		super(params);
 	}
 
-	private getTweetTexts(): NativeTwitterTweet[] {
-		const tweets: NativeTwitterTweet[] = [];
-
-		const tweetElements = document.querySelectorAll('[data-testid="tweetText"]');
-
-		tweetElements.forEach((tweetElement) => {
-			const spanElement = tweetElement.querySelector('span');
-			if (spanElement && spanElement.textContent) {
-				tweets.push({
-					text: spanElement.textContent.trim(),
-					timestamp: null,
-					author: null,
-				});
-			}
-		});
-
-		return tweets;
+	private getTweets(): NativeTwitterTweet[] {
+		const result = this.parser.parse(document);
+		if (result.page === 'unsupported') return [];
+		if (result.page === 'tweet') {
+			const tweets: NativeTwitterTweet[] = [];
+			if (result.data.tweet) tweets.push(result.data.tweet);
+			tweets.push(...result.data.replies);
+			return tweets;
+		}
+		return result.data.tweets;
 	}
 
 	public async handleNew(
@@ -38,7 +34,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 	): Promise<WatcherResponse> {
 		this.params.currentUrl = window.location.href;
 		this.params.pageTitle = document.title;
-		this.params.tweets = this.getTweetTexts();
+		this.params.tweets = this.getTweets();
 
 		return { kind: 'Ok', data: null };
 	}
@@ -48,7 +44,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
-			const currentTweets = this.getTweetTexts();
+			const currentTweets = this.getTweets();
 
 			const reportData: NativeTwitterAsset = {
 				url: window.location.href,
@@ -80,7 +76,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
-			const currentTweets = this.getTweetTexts();
+			const currentTweets = this.getTweets();
 
 			const reportData: NativeTwitterSnapshot = {
 				tweets: currentTweets,
