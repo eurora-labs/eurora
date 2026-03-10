@@ -38,7 +38,7 @@
 	}
 </script>
 
-<div data-tauri-drag-region class="titlebar" class:titlebar-mac={isMac}>
+<div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
 	{#if !isMac}
 		<div class="flex items-center h-full">
 			<Button

@@ -17,7 +17,7 @@
 <Sidebar.Provider>
 	<SettingsSidebar />
 
-	<main class="relative flex-1 overflow-hidden">
+	<main class="relative flex-1 overflow-hidden bg-background">
 		<ScrollArea class="h-full">
 			<div class="mx-auto max-w-2xl px-8 py-8">
 				{@render children?.()}
