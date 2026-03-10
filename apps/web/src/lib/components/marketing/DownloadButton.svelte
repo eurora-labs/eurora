@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { getDownloadUrlForOS, type OSType, type ArchType } from '$lib/download/downloadService';
+	import {
+		getDownloadUrlForOS,
+		type OSType,
+		type ArchType,
+	} from '$lib/services/download-service';
 	import { getArch, getOS, getOSDisplayName } from '$lib/utils/getOS';
 	import { Button } from '@eurora/ui/components/button/index';
 	import DownloadIcon from '@lucide/svelte/icons/download';

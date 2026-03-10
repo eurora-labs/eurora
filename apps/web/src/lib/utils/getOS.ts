@@ -1,5 +1,5 @@
 import { UAParser } from 'ua-parser-js';
-import type { ArchType, OSType } from '$lib/download/downloadService';
+import type { ArchType, OSType } from '$lib/services/download-service';
 
 export function getOS(): OSType {
 	if (typeof navigator === 'undefined' || typeof window === 'undefined') {
