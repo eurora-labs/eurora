@@ -2,13 +2,21 @@ import {
 	createArticleAsset,
 	createArticleSnapshot,
 } from '../../../shared/content/extensions/article/util';
-import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
+import {
+	Watcher,
+	type WatcherResponse,
+	type SnapshotPolicy,
+} from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { ArticleBrowserMessage, WatcherParams } from './types.js';
 
 export class ArticleWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
 		super(params);
+	}
+
+	protected getSnapshotPolicy(): SnapshotPolicy {
+		return { type: 'manual' };
 	}
 
 	public async handleNew(

@@ -15,12 +15,18 @@ export interface CollectPayload {
 const COLLECT_TIMEOUT_MS = 25_000;
 const DEBOUNCE_MS = 500;
 
+export type SnapshotPolicy =
+	| { type: 'observe' }
+	| { type: 'manual' }
+	| { type: 'interval'; ms: number };
+
 export abstract class Watcher<T> {
 	public params: T;
 	private pendingCollect: ((response?: WatcherResponse) => void) | null = null;
 	private collectTimer: ReturnType<typeof setTimeout> | null = null;
 	private observer: MutationObserver | null = null;
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private intervalTimer: ReturnType<typeof setInterval> | null = null;
 	private hasChange = false;
 
 	constructor(params: T) {
@@ -111,6 +117,17 @@ export abstract class Watcher<T> {
 
 	public startChangeDetection(): void {
 		this.stopChangeDetection();
+		const policy = this.getSnapshotPolicy();
+
+		if (policy.type === 'manual') return;
+
+		if (policy.type === 'interval') {
+			this.intervalTimer = setInterval(() => {
+				this.onChangeDetected();
+			}, policy.ms);
+			return;
+		}
+
 		const target = this.getObserveTarget();
 		if (!target) return;
 
@@ -130,10 +147,18 @@ export abstract class Watcher<T> {
 			clearTimeout(this.debounceTimer);
 			this.debounceTimer = null;
 		}
+		if (this.intervalTimer) {
+			clearInterval(this.intervalTimer);
+			this.intervalTimer = null;
+		}
 	}
 
 	public triggerInitialChange(): void {
 		setTimeout(() => this.onChangeDetected(), 100);
+	}
+
+	protected getSnapshotPolicy(): SnapshotPolicy {
+		return { type: 'observe' };
 	}
 
 	protected getObserveTarget(): Node | null {

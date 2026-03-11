@@ -38,7 +38,7 @@
 			so you don't have to copy-paste a thing.
 		</p>
 		<div class="flex flex-col items-start gap-4 w-full md:flex-row mt-16">
-			<DownloadButton class="h-24 w-[28rem]" />
+			<DownloadButton class="h-24 w-md" />
 			<div class="h-24 w-32 overflow-hidden rounded-xl shrink-0">
 				<AutoplayVideo
 					src="https://d26xptavrz5c8t.cloudfront.net/video/juice_demo.mp4"
@@ -140,10 +140,10 @@
 	</div>
 
 	<section
-		class="relative mt-32 mb-16 flex flex-col items-center text-center overflow-hidden rounded-3xl border border-primary/10 bg-gradient-to-b from-primary/5 via-primary/10 to-primary/5 px-6 py-24 sm:px-12 sm:py-32"
+		class="relative mt-32 mb-16 flex flex-col items-center text-center overflow-hidden rounded-3xl border border-primary/10 bg-linear-to-b from-primary/5 via-primary/10 to-primary/5 px-6 py-24 sm:px-12 sm:py-32"
 	>
 		<div
-			class="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent"
+			class="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent"
 		></div>
 
 		<h2 class="relative text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">

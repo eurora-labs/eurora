@@ -3,7 +3,6 @@ export type {
 	NativeArticleSnapshot,
 	NativeMetadata,
 	NativeTwitterAsset,
-	NativeTwitterSnapshot,
 	NativeTwitterTweet,
 	NativeYoutubeAsset,
 	NativeYoutubeSnapshot,

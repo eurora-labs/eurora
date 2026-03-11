@@ -17,7 +17,7 @@ pub use config::{
     SnapshotFrequency, StrategyConfig,
 };
 pub use error::{ActivityError, ActivityResult};
-pub use snapshots::{ArticleSnapshot, DefaultSnapshot, TwitterSnapshot, YoutubeSnapshot};
+pub use snapshots::{ArticleSnapshot, DefaultSnapshot, YoutubeSnapshot};
 pub use storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
 pub use strategies::ActivityStrategy;
 pub use strategies::{ActivityReport, BrowserStrategy, DefaultStrategy, NoStrategy};
