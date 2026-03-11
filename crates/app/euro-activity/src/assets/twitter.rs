@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::{AnyMessage, ContentPart, HumanMessage, ImageSource};
 use async_trait::async_trait;
-use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet};
+use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet, ParseResult};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -20,6 +20,8 @@ pub struct TwitterTweet {
     pub likes: Option<u32>,
     pub retweets: Option<u32>,
     pub replies: Option<u32>,
+    #[serde(default)]
+    pub images: Vec<String>,
 }
 
 impl TwitterTweet {
@@ -31,15 +33,20 @@ impl TwitterTweet {
             likes: None,
             retweets: None,
             replies: None,
+            images: Vec::new(),
         }
     }
 
     pub fn get_formatted_text(&self) -> String {
-        if let Some(author) = &self.author {
+        let mut text = if let Some(author) = &self.author {
             format!("@{}: {}", author, self.text)
         } else {
             self.text.clone()
+        };
+        if !self.images.is_empty() {
+            text.push_str(&format!("\n[{} image(s) attached]", self.images.len()));
         }
+        text
     }
 
     pub fn contains_hashtag(&self, hashtag: &str) -> bool {
@@ -111,7 +118,24 @@ impl AssetFunctionality for TwitterAsset {
             ));
         }
 
-        vec![HumanMessage::builder().content(text).build().into()]
+        let main_tweet_images: Vec<&String> = self
+            .tweets
+            .first()
+            .map(|t| t.images.iter().collect())
+            .unwrap_or_default();
+
+        if main_tweet_images.is_empty() {
+            vec![HumanMessage::builder().content(text).build().into()]
+        } else {
+            let mut parts: Vec<ContentPart> = vec![ContentPart::Text { text }];
+            for image in main_tweet_images {
+                parts.push(ContentPart::Image {
+                    source: ImageSource::Url { url: image.clone() },
+                    detail: None,
+                });
+            }
+            vec![HumanMessage::builder().content(parts).build().into()]
+        }
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -139,6 +163,7 @@ impl From<NativeTwitterTweet> for TwitterTweet {
             likes: None,
             retweets: None,
             replies: None,
+            images: tweet.images,
         }
     }
 }
@@ -183,7 +208,23 @@ impl TwitterAsset {
     }
 
     pub fn try_from(asset: NativeTwitterAsset) -> Result<Self, ActivityError> {
-        let tweets: Vec<TwitterTweet> = asset.tweets.into_iter().map(TwitterTweet::from).collect();
+        let (tweets, context_type) = match asset.result {
+            ParseResult::Tweet(data) => {
+                let mut tweets: Vec<NativeTwitterTweet> = Vec::new();
+                if let Some(tweet) = data.tweet {
+                    tweets.push(tweet);
+                }
+                tweets.extend(data.replies);
+                (tweets, TwitterContextType::Thread)
+            }
+            ParseResult::Profile(data) => (data.tweets, TwitterContextType::Profile),
+            ParseResult::Home(data) => (data.tweets, TwitterContextType::Timeline),
+            ParseResult::Search(data) => (data.tweets, TwitterContextType::Search),
+            ParseResult::Notifications(data) => (data.tweets, TwitterContextType::Other),
+            ParseResult::Unsupported(_) => (vec![], TwitterContextType::Other),
+        };
+
+        let tweets: Vec<TwitterTweet> = tweets.into_iter().map(TwitterTweet::from).collect();
 
         Ok(TwitterAsset {
             id: uuid::Uuid::new_v4().to_string(),
@@ -191,7 +232,7 @@ impl TwitterAsset {
             title: asset.title,
             tweets,
             timestamp: asset.timestamp,
-            context_type: TwitterContextType::Timeline,
+            context_type,
         })
     }
 

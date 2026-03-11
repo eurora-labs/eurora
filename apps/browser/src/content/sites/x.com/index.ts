@@ -1,44 +1,49 @@
-import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
+import { TwitterParser } from './parser';
+import {
+	Watcher,
+	type WatcherResponse,
+	type SnapshotPolicy,
+} from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { TwitterBrowserMessage, WatcherParams } from './types.js';
 
 import type {
 	NativeTwitterAsset,
-	NativeTwitterSnapshot,
 	NativeTwitterTweet,
+	ParseResult,
 } from '../../../shared/content/bindings';
 
 export class TwitterWatcher extends Watcher<WatcherParams> {
+	private parser = new TwitterParser();
+
 	constructor(params: WatcherParams) {
 		super(params);
 	}
 
-	private getTweetTexts(): NativeTwitterTweet[] {
-		const tweets: NativeTwitterTweet[] = [];
+	protected getSnapshotPolicy(): SnapshotPolicy {
+		return { type: 'manual' };
+	}
 
-		const tweetElements = document.querySelectorAll('[data-testid="tweetText"]');
-
-		tweetElements.forEach((tweetElement) => {
-			const spanElement = tweetElement.querySelector('span');
-			if (spanElement && spanElement.textContent) {
-				tweets.push({
-					text: spanElement.textContent.trim(),
-					timestamp: null,
-					author: null,
-				});
-			}
-		});
-
-		return tweets;
+	private getTweets(result: ParseResult): NativeTwitterTweet[] {
+		if (result.page === 'unsupported') return [];
+		if (result.page === 'tweet') {
+			const tweets: NativeTwitterTweet[] = [];
+			if (result.data.tweet) tweets.push(result.data.tweet);
+			tweets.push(...result.data.replies);
+			return tweets;
+		}
+		return result.data.tweets;
 	}
 
 	public async handleNew(
 		_obj: TwitterBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
+		const result = await this.parser.parse(document);
+
 		this.params.currentUrl = window.location.href;
 		this.params.pageTitle = document.title;
-		this.params.tweets = this.getTweetTexts();
+		this.params.tweets = this.getTweets(result);
 
 		return { kind: 'Ok', data: null };
 	}
@@ -48,12 +53,12 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
-			const currentTweets = this.getTweetTexts();
+			const result = await this.parser.parse(document);
 
 			const reportData: NativeTwitterAsset = {
 				url: window.location.href,
 				title: document.title,
-				tweets: currentTweets,
+				result,
 				timestamp: new Date().toISOString(),
 			};
 
@@ -79,28 +84,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_obj: TwitterBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		try {
-			const currentTweets = this.getTweetTexts();
-
-			const reportData: NativeTwitterSnapshot = {
-				tweets: currentTweets,
-				timestamp: new Date().toISOString(),
-			};
-
-			return { kind: 'NativeTwitterSnapshot', data: reportData };
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			console.error('Error generating Twitter snapshot:', {
-				url: window.location.href,
-				error: errorMessage,
-			});
-
-			return {
-				kind: 'Error',
-				data: `Failed to generate Twitter snapshot: ${errorMessage}`,
-			};
-		}
+		return null;
 	}
 }
 
