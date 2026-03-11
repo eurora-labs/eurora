@@ -5,8 +5,8 @@
 		type ArchType,
 	} from '$lib/services/download-service';
 	import { getArch, getOS, getOSDisplayName } from '$lib/utils/getOS';
-	import DownloadIcon from '@lucide/svelte/icons/download';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
+	import DownloadIcon from '@lucide/svelte/icons/download';
 
 	interface Props {
 		class?: string;
@@ -32,7 +32,7 @@
 	}
 </script>
 
-<button class="download-btn {className}" onclick={handleDownload}>
+<button type="button" class="download-btn {className}" onclick={handleDownload}>
 	<span class="download-btn-bg"></span>
 	<span class="download-btn-orb download-btn-orb-1"></span>
 	<span class="download-btn-orb download-btn-orb-2"></span>
