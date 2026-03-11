@@ -13,9 +13,10 @@
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
+	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
@@ -46,18 +47,22 @@
 	let assets = $state<ContextChip[]>([]);
 	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
 	let tokenLimitMessages = $state(new Set<number>());
+	let upgradeLoading = $state(false);
 
 	function isTokenLimitError(error: unknown): boolean {
 		return String(error).includes('Monthly token limit reached');
 	}
 
 	async function handleUpgrade() {
+		if (upgradeLoading) return;
+		upgradeLoading = true;
 		try {
 			const url = await taurpc.payment.create_checkout_url();
 			await open(url);
 			goto('/no-access/upgrade');
 		} catch (e) {
 			toast.error(`Failed to start checkout: ${e}`);
+			upgradeLoading = false;
 		}
 	}
 
@@ -235,9 +240,14 @@
 										onclick={handleUpgrade}
 										variant="default"
 										size="lg"
+										disabled={upgradeLoading}
 									>
-										Upgrade Plan
-										<ArrowUpCircleIcon />
+										{#if upgradeLoading}
+											<Loader2Icon class="animate-spin" />
+										{:else}
+											Upgrade Plan
+											<ArrowUpCircleIcon />
+										{/if}
 									</Message.Action>
 								{:else}
 									<Message.Action
