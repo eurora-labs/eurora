@@ -2,10 +2,10 @@ import { BasePageParser } from '../base';
 import type { ParseResult } from '../types';
 
 export class SearchPageParser extends BasePageParser {
-	parse(doc: Document): ParseResult {
+	async parse(doc: Document): Promise<ParseResult> {
 		const params = new URLSearchParams(window.location.search);
 		const query = params.get('q') ?? '';
-		const tweets = this.extractTweets(doc);
+		const tweets = await this.extractTweets(doc);
 
 		return {
 			page: 'search',

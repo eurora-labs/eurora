@@ -6,6 +6,8 @@ pub struct NativeTwitterTweet {
     pub text: String,
     pub timestamp: Option<String>,
     pub author: Option<String>,
+    #[serde(default)]
+    pub images: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

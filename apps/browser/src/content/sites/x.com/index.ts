@@ -9,7 +9,6 @@ import type { TwitterBrowserMessage, WatcherParams } from './types.js';
 
 import type {
 	NativeTwitterAsset,
-	NativeTwitterSnapshot,
 	NativeTwitterTweet,
 	ParseResult,
 } from '../../../shared/content/bindings';
@@ -40,7 +39,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_obj: TwitterBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		const result = this.parser.parse(document);
+		const result = await this.parser.parse(document);
 
 		this.params.currentUrl = window.location.href;
 		this.params.pageTitle = document.title;
@@ -54,7 +53,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		try {
-			const result = this.parser.parse(document);
+			const result = await this.parser.parse(document);
 
 			const reportData: NativeTwitterAsset = {
 				url: window.location.href,
@@ -85,29 +84,7 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 		_obj: TwitterBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		try {
-			const result = this.parser.parse(document);
-			const currentTweets = this.getTweets(result);
-
-			const reportData: NativeTwitterSnapshot = {
-				tweets: currentTweets,
-				timestamp: new Date().toISOString(),
-			};
-
-			return { kind: 'NativeTwitterSnapshot', data: reportData };
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-
-			console.error('Error generating Twitter snapshot:', {
-				url: window.location.href,
-				error: errorMessage,
-			});
-
-			return {
-				kind: 'Error',
-				data: `Failed to generate Twitter snapshot: ${errorMessage}`,
-			};
-		}
+		return null;
 	}
 }
 

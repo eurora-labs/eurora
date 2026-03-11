@@ -39,7 +39,12 @@ export type NativeTwitterAsset = {
 	timestamp: string;
 };
 
-export type NativeTwitterTweet = { text: string; timestamp: string | null; author: string | null };
+export type NativeTwitterTweet = {
+	text: string;
+	timestamp: string | null;
+	author: string | null;
+	images?: string[];
+};
 
 export type NativeYoutubeAsset = {
 	url: string;
