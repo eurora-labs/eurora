@@ -14,9 +14,9 @@
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
