@@ -1,3 +1,6 @@
+import he from 'he';
+import striptags from 'striptags';
+
 export interface TranscriptSnippet {
 	text: string;
 	start: number;
@@ -17,24 +20,11 @@ const FORMATTING_TAGS: string[] = [
 	'sup',
 ];
 
-function getHtmlRegex(preserveFormatting: boolean): RegExp {
-	if (preserveFormatting) {
-		const formatsRegex = FORMATTING_TAGS.join('|');
-		return new RegExp(`<\\/?(?!\\/?(?:${formatsRegex})\\b).*?\\b>`, 'gi');
-	}
-	return /<[^>]*>/gi;
-}
-
-function htmlUnescape(text: string): string {
-	const doc = new DOMParser().parseFromString(text, 'text/html');
-	return doc.documentElement.textContent ?? '';
-}
-
 export function parseTranscriptXml(
 	rawXml: string,
 	preserveFormatting: boolean = false,
 ): TranscriptSnippet[] {
-	const htmlRegex = getHtmlRegex(preserveFormatting);
+	const allowedTags = preserveFormatting ? FORMATTING_TAGS : [];
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(rawXml, 'text/xml');
 	const elements = doc.querySelectorAll('text');
@@ -53,7 +43,7 @@ export function parseTranscriptXml(
 
 		if (!innerText) continue;
 
-		const text = htmlUnescape(innerText.replace(htmlRegex, ''));
+		const text = he.decode(striptags(innerText, allowedTags));
 		const start = parseFloat(el.getAttribute('start')!);
 		const duration = parseFloat(el.getAttribute('dur') || '0.0');
 
