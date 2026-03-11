@@ -4,6 +4,7 @@ import {
 	Watcher,
 	type BrowserObj,
 	type WatcherResponse,
+	type SnapshotPolicy,
 } from '../../../shared/content/extensions/watchers/watcher';
 import { ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import browser from 'webextension-polyfill';
@@ -20,6 +21,10 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
 		super(params);
 		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
+	}
+
+	protected getSnapshotPolicy(): SnapshotPolicy {
+		return { type: 'interval', ms: 5000 };
 	}
 
 	private async ensureTranscript(videoId?: string): Promise<any> {

@@ -39,8 +39,6 @@ export type NativeTwitterAsset = {
 	timestamp: string;
 };
 
-export type NativeTwitterSnapshot = { tweets: NativeTwitterTweet[]; timestamp: string };
-
 export type NativeTwitterTweet = { text: string; timestamp: string | null; author: string | null };
 
 export type NativeYoutubeAsset = {
