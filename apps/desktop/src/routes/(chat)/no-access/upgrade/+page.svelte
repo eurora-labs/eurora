@@ -76,11 +76,7 @@
 			</Button>
 		</div>
 
-		<Button
-			variant="ghost"
-			class="w-fit text-muted-foreground"
-			onclick={() => goto('/no-access')}
-		>
+		<Button variant="ghost" class="w-fit text-muted-foreground" onclick={() => goto('/')}>
 			Cancel
 		</Button>
 	</div>

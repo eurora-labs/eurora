@@ -13,9 +13,12 @@
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
+	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import CopyIcon from '@lucide/svelte/icons/copy';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import type {
@@ -43,6 +46,25 @@
 	let chatStatus = $state<ChatStatus>('ready');
 	let assets = $state<ContextChip[]>([]);
 	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
+	let tokenLimitMessages = $state(new Set<number>());
+	let upgradeLoading = $state(false);
+
+	function isTokenLimitError(error: unknown): boolean {
+		return String(error).includes('Monthly token limit reached');
+	}
+
+	async function handleUpgrade() {
+		if (upgradeLoading) return;
+		upgradeLoading = true;
+		try {
+			const url = await taurpc.payment.create_checkout_url();
+			await open(url);
+			goto('/no-access/upgrade');
+		} catch (e) {
+			toast.error(`Failed to start checkout: ${e}`);
+			upgradeLoading = false;
+		}
+	}
 
 	const threadId = $derived(data.threadId);
 	const threadData = $derived(threadId ? messageService.getThread(threadId) : null);
@@ -71,13 +93,7 @@
 
 	function handleSuggestionClick(suggestion: string) {
 		chatStatus = 'submitted';
-		sendQuery(suggestion).catch((error) => {
-			chatStatus = 'error';
-			toast.error(String(error), {
-				duration: Infinity,
-				cancel: { label: 'Ok', onClick: () => {} },
-			});
-		});
+		sendQuery(suggestion).catch((error) => handleQueryError(error));
 	}
 
 	function removeAsset(id: string) {
@@ -115,19 +131,35 @@
 		return message.role === 'human';
 	}
 
+	function handleQueryError(error: unknown) {
+		if (isTokenLimitError(error)) {
+			const msgs = threadData?.messages;
+			if (msgs) {
+				const lastIndex = msgs.length - 1;
+				const lastMsg = msgs[lastIndex];
+				if (lastMsg && lastMsg.role === 'ai') {
+					lastMsg.content =
+						"You've reached your free trial token limit for this month. Upgrade to Pro for unlimited access.";
+					tokenLimitMessages = new Set([...tokenLimitMessages, lastIndex]);
+				}
+			}
+			chatStatus = 'ready';
+		} else {
+			chatStatus = 'error';
+			toast.error(String(error), {
+				duration: Infinity,
+				cancel: { label: 'Ok', onClick: () => {} },
+			});
+		}
+	}
+
 	function handleSubmit(message: PromptInputMessage) {
 		const text = message.text.trim();
 		if (!text) return;
 
 		chatStatus = 'submitted';
 		const assetIds = assets.map((a) => a.id);
-		sendQuery(text, assetIds).catch((error) => {
-			chatStatus = 'error';
-			toast.error(String(error), {
-				duration: Infinity,
-				cancel: { label: 'Ok', onClick: () => {} },
-			});
-		});
+		sendQuery(text, assetIds).catch((error) => handleQueryError(error));
 	}
 
 	async function sendQuery(text: string, assetIds: string[] = []): Promise<void> {
@@ -202,16 +234,33 @@
 							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
 						{#if !isUser && content.trim().length > 0 && !isStreaming}
 							<Message.Actions>
-								<Message.Action
-									tooltip="Copy"
-									onclick={() => copyMessageContent(content, i)}
-								>
-									{#if copiedMessageId === String(i)}
-										<CheckIcon />
-									{:else}
-										<CopyIcon />
-									{/if}
-								</Message.Action>
+								{#if tokenLimitMessages.has(i)}
+									<Message.Action
+										tooltip="Upgrade Plan"
+										onclick={handleUpgrade}
+										variant="default"
+										size="lg"
+										disabled={upgradeLoading}
+									>
+										{#if upgradeLoading}
+											<Loader2Icon class="animate-spin" />
+										{:else}
+											Upgrade Plan
+											<ArrowUpCircleIcon />
+										{/if}
+									</Message.Action>
+								{:else}
+									<Message.Action
+										tooltip="Copy"
+										onclick={() => copyMessageContent(content, i)}
+									>
+										{#if copiedMessageId === String(i)}
+											<CheckIcon />
+										{:else}
+											<CopyIcon />
+										{/if}
+									</Message.Action>
+								{/if}
 							</Message.Actions>
 						{/if}
 					</Message.Root>
