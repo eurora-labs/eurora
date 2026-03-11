@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import { inject } from '@eurora/shared/context';
+	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import MinusIcon from '@lucide/svelte/icons/minus';
@@ -7,6 +10,8 @@
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
+
+	const user = inject(USER_SERVICE);
 
 	let maximized = $state(false);
 	let isMac = platform() === 'macos';
@@ -39,6 +44,16 @@
 </script>
 
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
+	{#if user.authenticated}
+		<div class="flex items-center h-full pointer-events-auto">
+			<Badge
+				variant={user.planLabel === 'Pro' ? 'outline' : 'secondary'}
+				class="text-xs px-2 py-0.5 {user.planLabel === 'Pro'
+					? 'select-none opacity-50'
+					: ''}">{user.planLabel}</Badge
+			>
+		</div>
+	{/if}
 	{#if !isMac}
 		<div class="flex items-center h-full">
 			<Button
@@ -76,7 +91,7 @@
 	{/if}
 </div>
 
-<style>
+<style lang="postcss">
 	.titlebar {
 		display: flex;
 		flex-shrink: 0;
