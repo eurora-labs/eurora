@@ -1,15 +1,21 @@
+import { stringifySync, type NodeList } from 'subtitle';
 import type { FetchedTranscript } from './youtube-transcript-api.js';
 
-function secondsToTimestamp(time: number, msSeparator: string = '.'): string {
-	const hours = Math.floor(time / 3600);
-	const mins = Math.floor((time % 3600) / 60);
-	const secs = Math.floor(time % 60);
-	const ms = Math.round((time - Math.floor(time)) * 1000);
-	function pad(n: number, length: number): string {
-		return String(n).padStart(length, '0');
-	}
-
-	return `${pad(hours, 2)}:${pad(mins, 2)}:${pad(secs, 2)}${msSeparator}${pad(ms, 3)}`;
+function buildCues(transcript: FetchedTranscript): NodeList {
+	const { snippets } = transcript;
+	return snippets.map((snippet, i) => {
+		const end = snippet.start + snippet.duration;
+		const nextStart = i < snippets.length - 1 ? snippets[i + 1].start : end;
+		const effectiveEnd = nextStart < end ? nextStart : end;
+		return {
+			type: 'cue' as const,
+			data: {
+				start: Math.round(snippet.start * 1000),
+				end: Math.round(effectiveEnd * 1000),
+				text: snippet.text,
+			},
+		};
+	});
 }
 
 export function formatJSON(transcript: FetchedTranscript, indent?: number): string {
@@ -21,25 +27,9 @@ export function formatText(transcript: FetchedTranscript): string {
 }
 
 export function formatSRT(transcript: FetchedTranscript): string {
-	const { snippets } = transcript;
-	const lines = snippets.map((snippet, i) => {
-		const end = snippet.start + snippet.duration;
-		const nextStart = i < snippets.length - 1 ? snippets[i + 1].start : end;
-		const effectiveEnd = nextStart < end ? nextStart : end;
-		const timeText = `${secondsToTimestamp(snippet.start, ',')} --> ${secondsToTimestamp(effectiveEnd, ',')}`;
-		return `${i + 1}\n${timeText}\n${snippet.text}`;
-	});
-	return lines.join('\n\n') + '\n';
+	return stringifySync(buildCues(transcript), { format: 'SRT' });
 }
 
 export function formatWebVTT(transcript: FetchedTranscript): string {
-	const { snippets } = transcript;
-	const lines = snippets.map((snippet, i) => {
-		const end = snippet.start + snippet.duration;
-		const nextStart = i < snippets.length - 1 ? snippets[i + 1].start : end;
-		const effectiveEnd = nextStart < end ? nextStart : end;
-		const timeText = `${secondsToTimestamp(snippet.start, '.')} --> ${secondsToTimestamp(effectiveEnd, '.')}`;
-		return `${timeText}\n${snippet.text}`;
-	});
-	return 'WEBVTT\n\n' + lines.join('\n\n') + '\n';
+	return stringifySync(buildCues(transcript), { format: 'WebVTT' });
 }
