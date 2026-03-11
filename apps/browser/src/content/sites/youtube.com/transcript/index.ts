@@ -13,8 +13,6 @@ export type {
 
 export { parseTranscriptXml } from './transcript-parser.js';
 
-export { formatJSON, formatText, formatSRT, formatWebVTT } from './formatters.js';
-
 export {
 	YouTubeTranscriptApiError,
 	CouldNotRetrieveTranscript,

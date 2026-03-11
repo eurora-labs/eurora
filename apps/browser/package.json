@@ -55,7 +55,6 @@
 		"prettier-plugin-svelte": "^3.5.0",
 		"rollup-plugin-copy": "^3.5.0",
 		"striptags": "^3.2.0",
-		"subtitle": "^4.2.2",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"sveltekit-adapter-chrome-extension": "^2.0.0",

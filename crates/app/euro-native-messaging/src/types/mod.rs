@@ -24,7 +24,6 @@ pub enum NativeMessage {
 
     NativeYoutubeSnapshot,
     NativeArticleSnapshot,
-    NativeTwitterSnapshot,
 
     NativeMetadata,
 }

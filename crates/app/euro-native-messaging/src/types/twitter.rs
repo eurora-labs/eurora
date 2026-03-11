@@ -65,9 +65,3 @@ pub struct NativeTwitterAsset {
     pub result: ParseResult,
     pub timestamp: String,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
-pub struct NativeTwitterSnapshot {
-    pub tweets: Vec<NativeTwitterTweet>,
-    pub timestamp: String,
-}

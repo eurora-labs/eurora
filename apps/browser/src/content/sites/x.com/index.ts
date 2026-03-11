@@ -1,5 +1,9 @@
 import { TwitterParser } from './parser';
-import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
+import {
+	Watcher,
+	type WatcherResponse,
+	type SnapshotPolicy,
+} from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { TwitterBrowserMessage, WatcherParams } from './types.js';
 
@@ -15,6 +19,10 @@ export class TwitterWatcher extends Watcher<WatcherParams> {
 
 	constructor(params: WatcherParams) {
 		super(params);
+	}
+
+	protected getSnapshotPolicy(): SnapshotPolicy {
+		return { type: 'manual' };
 	}
 
 	private getTweets(result: ParseResult): NativeTwitterTweet[] {
