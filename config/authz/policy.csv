@@ -4,21 +4,10 @@ g, Tier1, Free
 # ── gRPC policies ──
 # Resource = short service name (Proto prefix stripped), Action = RPC method name.
 
-# Free: read-only gRPC endpoints
-p, Free, ThreadService, ListThreads
-p, Free, ThreadService, GetThread
-p, Free, ThreadService, GetMessages
-p, Free, ActivityService, ListActivities
-
-# Tier1: paid gRPC features
-p, Tier1, ThreadService, CreateThread
-p, Tier1, ThreadService, AddHumanMessage
-p, Tier1, ThreadService, AddHiddenHumanMessage
-p, Tier1, ThreadService, AddSystemMessage
-p, Tier1, ThreadService, ChatStream
-p, Tier1, ThreadService, GenerateThreadTitle
-p, Tier1, ActivityService, InsertActivity
-p, Tier1, AssetService, CreateAsset
+# Free: all gRPC endpoints (limited externally by token count)
+p, Free, ThreadService, *
+p, Free, ActivityService, *
+p, Free, AssetService, *
 
 # ── REST policies ──
 # Resource = route template path, Action = HTTP method.
