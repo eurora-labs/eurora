@@ -35,13 +35,16 @@ export type NativeMetadata = { url: string | null; icon_base64: string | null };
 export type NativeTwitterAsset = {
 	url: string;
 	title: string;
-	tweets: NativeTwitterTweet[];
+	result: ParseResult;
 	timestamp: string;
 };
 
-export type NativeTwitterSnapshot = { tweets: NativeTwitterTweet[]; timestamp: string };
-
-export type NativeTwitterTweet = { text: string; timestamp: string | null; author: string | null };
+export type NativeTwitterTweet = {
+	text: string;
+	timestamp: string | null;
+	author: string | null;
+	images?: string[];
+};
 
 export type NativeYoutubeAsset = {
 	url: string;
@@ -57,8 +60,28 @@ export type NativeYoutubeSnapshot = {
 	video_frame_height: number;
 };
 
+export type NotificationsData = { tweets: NativeTwitterTweet[] };
+
+export type ParseResult =
+	| { page: 'tweet'; data: TweetPageData }
+	| { page: 'profile'; data: ProfilePageData }
+	| { page: 'home'; data: TimelineData }
+	| { page: 'search'; data: SearchData }
+	| { page: 'notifications'; data: NotificationsData }
+	| { page: 'unsupported'; data: UnsupportedPageData };
+
+export type ProfilePageData = { username: string; tweets: NativeTwitterTweet[] };
+
 export type RegisterFrame = { host_pid: number; browser_pid: number };
 
 export type RequestFrame = { id: number; action: string; payload: string | null };
 
 export type ResponseFrame = { id: number; action: string; payload: string | null };
+
+export type SearchData = { query: string; tweets: NativeTwitterTweet[] };
+
+export type TimelineData = { tweets: NativeTwitterTweet[] };
+
+export type TweetPageData = { tweet: NativeTwitterTweet | null; replies: NativeTwitterTweet[] };
+
+export type UnsupportedPageData = { url: string };

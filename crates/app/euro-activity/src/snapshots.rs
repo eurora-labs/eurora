@@ -5,5 +5,5 @@ pub mod youtube;
 
 pub use article::ArticleSnapshot;
 pub use default::DefaultSnapshot;
-pub use twitter::TwitterSnapshot;
+// pub use twitter::TwitterSnapshot;
 pub use youtube::YoutubeSnapshot;
