@@ -2,9 +2,9 @@ import { BasePageParser } from '../base';
 import type { ParseResult } from '../types';
 
 export class ProfilePageParser extends BasePageParser {
-	parse(doc: Document): ParseResult {
+	async parse(doc: Document): Promise<ParseResult> {
 		const username = window.location.pathname.split('/')[1] ?? '';
-		const tweets = this.extractTweets(doc);
+		const tweets = await this.extractTweets(doc);
 
 		return {
 			page: 'profile',

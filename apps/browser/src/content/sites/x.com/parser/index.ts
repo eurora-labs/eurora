@@ -44,7 +44,7 @@ const routes: Route[] = [
 const fallback = new UnsupportedPageParser();
 
 export class TwitterParser {
-	parse(doc: Document): ParseResult {
+	async parse(doc: Document): Promise<ParseResult> {
 		const pathname = window.location.pathname;
 		const route = routes.find((r) => r.match(pathname));
 		const parser = route?.parser ?? fallback;
