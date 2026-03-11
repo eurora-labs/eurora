@@ -1,6 +1,8 @@
 <script lang="ts">
 	import '$styles/styles.css';
 	import { initDependencies } from '$lib/bootstrap/deps.js';
+	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import { inject } from '@eurora/shared/context';
 	import AccessibilityPermission from '$lib/components/AccessibilityPermission.svelte';
 	import Titlebar from '$lib/components/Titlebar.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
@@ -17,6 +19,9 @@
 	let { children } = $props();
 
 	initDependencies();
+
+	const userService = inject(USER_SERVICE);
+	userService.init();
 
 	onMount(() => {
 		setMode('dark');
