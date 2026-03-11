@@ -1,10 +1,9 @@
-use std::sync::{Arc, LazyLock};
-use std::time::Duration;
-
 use agent_chain::BaseTool;
 use agent_chain::error::{Error, Result};
 use agent_chain::tools::tool;
 use serde_json::Value;
+use std::sync::{Arc, LazyLock};
+use std::time::Duration;
 
 const FIRECRAWL_BASE_URL: &str = "https://firecrawl.inference.nebul.io/v1";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
