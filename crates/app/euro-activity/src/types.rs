@@ -87,7 +87,6 @@ pub trait SnapshotFunctionality {
 pub enum ActivitySnapshot {
     YoutubeSnapshot,
     ArticleSnapshot,
-    TwitterSnapshot,
     DefaultSnapshot,
 }
 
@@ -101,9 +100,6 @@ impl TryFrom<NativeMessage> for ActivitySnapshot {
             ),
             NativeMessage::NativeArticleSnapshot(snapshot) => Ok(
                 ActivitySnapshot::ArticleSnapshot(ArticleSnapshot::from(snapshot)),
-            ),
-            NativeMessage::NativeTwitterSnapshot(snapshot) => Ok(
-                ActivitySnapshot::TwitterSnapshot(TwitterSnapshot::from(snapshot)),
             ),
             _ => Err(anyhow::anyhow!("Invalid snapshot type")),
         }
