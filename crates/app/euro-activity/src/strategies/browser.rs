@@ -312,6 +312,38 @@ impl BrowserStrategy {
         true
     }
 
+    async fn request_assets_and_snapshots(&self) {
+        let Some(sender) = self.sender.clone() else {
+            return;
+        };
+        let Some(service) = self.bridge_service else {
+            return;
+        };
+
+        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
+        if browser_pid == 0 {
+            return;
+        }
+
+        if let Ok(response) = service.send_request(browser_pid, "GET_ASSETS", None).await
+            && let Some(payload) = response.payload
+            && let Ok(native_message) = serde_json::from_str::<NativeMessage>(&payload)
+            && let Ok(asset) = ActivityAsset::try_from(native_message)
+        {
+            let _ = sender.send(ActivityReport::Assets(vec![asset]));
+        }
+
+        if let Ok(response) = service
+            .send_request(browser_pid, "GET_SNAPSHOT", None)
+            .await
+            && let Some(payload) = response.payload
+            && let Ok(native_message) = serde_json::from_str::<NativeMessage>(&payload)
+            && let Ok(snapshot) = ActivitySnapshot::try_from(native_message)
+        {
+            let _ = sender.send(ActivityReport::Snapshots(vec![snapshot]));
+        }
+    }
+
     async fn resolve_messenger_pid(&self, process_name: &str, fallback_pid: u32) -> u32 {
         if let Some(service) = &self.bridge_service
             && let Some(pid) = service.find_pid_by_browser_name(process_name).await
@@ -364,6 +396,13 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         self.init_collection().await?;
 
+        let cache_had_assets = {
+            let map = global_cache().read().await;
+            map.get(&messenger_pid)
+                .map(|c| c.asset.is_some())
+                .unwrap_or(false)
+        };
+
         if !Self::flush_cache(messenger_pid, &process_name, &sender, &self.last_url).await {
             match self.get_metadata().await {
                 Ok(metadata) => {
@@ -395,6 +434,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     tracing::warn!("Failed to get metadata: {}", err);
                 }
             }
+            self.request_assets_and_snapshots().await;
+        } else if !cache_had_assets {
+            self.request_assets_and_snapshots().await;
         }
 
         tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
