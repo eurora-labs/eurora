@@ -30,7 +30,7 @@
 <div class="mx-auto w-full max-w-[calc(60vh*16/9)] px-4">
 	<div class="flex flex-col items-start py-12 max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
-			Your context. Your AI. Your terms.
+			Less typing, more answers.
 		</h1>
 		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
 			A private, open-source AI assistant that reads what you read. Ask questions about any
