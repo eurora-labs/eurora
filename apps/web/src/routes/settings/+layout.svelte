@@ -43,11 +43,44 @@
 </script>
 
 <div class="flex min-h-screen flex-col">
-	<MenuBar />
+	<MenuBar>
+		{#snippet mobileNav(close)}
+			<nav class="flex flex-col gap-1 border-t border-border px-4 pt-3">
+				<span
+					class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+					>Settings</span
+				>
+				{#each items as item}
+					<a
+						href={item.url}
+						aria-current={item.isActive ? 'page' : undefined}
+						class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors
+							{item.isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-primary'}"
+						onclick={close}
+					>
+						{item.title}
+					</a>
+				{/each}
+				<Separator class="my-1" />
+				<button
+					type="button"
+					class="rounded-md px-3 py-1.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+					onclick={() => {
+						close();
+						contactDialogOpen = true;
+					}}
+				>
+					Contact
+				</button>
+			</nav>
+		{/snippet}
+	</MenuBar>
+
+	<ContactDialog bind:open={contactDialogOpen} showWebsiteLink={false} />
 
 	<div class="flex flex-1 flex-col pt-16">
-		<div class="mx-auto flex w-full max-w-7xl items-start gap-12 px-8 py-10">
-			<nav class="flex w-56 shrink-0 flex-col gap-0.5">
+		<div class="mx-auto flex w-full max-w-7xl items-start gap-12 py-10">
+			<nav class="hidden md:flex w-56 shrink-0 flex-col gap-0.5">
 				{#if $currentUser}
 					<div class="mb-4 flex flex-col overflow-hidden py-1 px-2">
 						{#if $subscriptionLoading}
@@ -93,8 +126,6 @@
 				>
 					Contact
 				</button>
-
-				<ContactDialog bind:open={contactDialogOpen} showWebsiteLink={false} />
 			</nav>
 
 			<main class="flex-1">
