@@ -1,21 +1,19 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import MenuBar from '$lib/components/MenuBar.svelte';
 	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
 	import {
 		subscriptionStore,
 		subscription,
 		subscriptionLoading,
 	} from '$lib/stores/subscription.js';
-	import { Button } from '@eurora/ui/components/button/index';
-	import * as Dialog from '@eurora/ui/components/dialog/index';
-	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import BoltIcon from '@lucide/svelte/icons/bolt';
-	import BookOpenIcon from '@lucide/svelte/icons/book-open';
-	import CreditCardIcon from '@lucide/svelte/icons/credit-card';
+	import { Separator } from '@eurora/ui/components/separator/index';
+	import { ContactDialog } from '@eurora/ui/custom-components/contact-dialog/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import MailIcon from '@lucide/svelte/icons/mail';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
+
+	let contactDialogOpen = $state(false);
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
 
@@ -30,9 +28,8 @@
 	);
 
 	const navItems = [
-		{ title: 'General', url: '/settings', icon: BoltIcon },
-		{ title: 'Billing', url: '/settings/billing', icon: CreditCardIcon },
-		{ title: 'Docs', url: '/settings/documentation', icon: BookOpenIcon },
+		{ title: 'General', url: '/settings' },
+		{ title: 'Billing', url: '/settings/billing' },
 	];
 
 	let items = $derived(
@@ -46,21 +43,44 @@
 </script>
 
 <div class="flex min-h-screen flex-col">
-	<header class="backdrop-blur">
-		<div class="flex h-14 w-full items-center px-6">
-			<Button
-				variant="link"
-				class="decoration-transparent gap-2.5 p-0 font-semibold"
-				href="/"
-			>
-				<EuroraLogo style="width: 2rem; height: 2rem;" />
-			</Button>
-		</div>
-	</header>
+	<MenuBar>
+		{#snippet mobileNav(close)}
+			<nav class="flex flex-col gap-1 border-t border-border px-4 pt-3">
+				<span
+					class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+					>Settings</span
+				>
+				{#each items as item}
+					<a
+						href={item.url}
+						aria-current={item.isActive ? 'page' : undefined}
+						class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors
+							{item.isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-primary'}"
+						onclick={close}
+					>
+						{item.title}
+					</a>
+				{/each}
+				<Separator class="my-1" />
+				<button
+					type="button"
+					class="rounded-md px-3 py-1.5 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+					onclick={() => {
+						close();
+						contactDialogOpen = true;
+					}}
+				>
+					Contact
+				</button>
+			</nav>
+		{/snippet}
+	</MenuBar>
+
+	<ContactDialog bind:open={contactDialogOpen} showWebsiteLink={false} />
 
 	<div class="flex flex-1 flex-col pt-16">
-		<div class="mx-auto flex w-full max-w-5xl items-start gap-12 px-8 py-10">
-			<nav class="flex w-56 shrink-0 flex-col gap-0.5">
+		<div class="mx-auto flex w-full max-w-7xl items-start gap-12 py-10">
+			<nav class="hidden md:flex w-56 shrink-0 flex-col gap-0.5">
 				{#if $currentUser}
 					<div class="mb-4 flex flex-col overflow-hidden py-1 px-2">
 						{#if $subscriptionLoading}
@@ -93,31 +113,19 @@
 						class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
 							{item.isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}"
 					>
-						<item.icon size={16} />
 						{item.title}
 					</a>
 				{/each}
 
-				<Dialog.Root>
-					<Dialog.Trigger
-						class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-					>
-						<MailIcon size={16} />
-						Contact
-					</Dialog.Trigger>
-					<Dialog.Content class="sm:max-w-1/2">
-						<Dialog.Header class="items-start">
-							<Dialog.Title>Contact Us</Dialog.Title>
-						</Dialog.Header>
-						<p>
-							Feel free to reach out to us at
-							<a href="mailto:contact@eurora-labs.com" class="inline w-fit underline"
-								>contact@eurora-labs.com</a
-							>
-							for any inquiries or feedback.
-						</p>
-					</Dialog.Content>
-				</Dialog.Root>
+				<Separator class="my-2" />
+
+				<button
+					type="button"
+					class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+					onclick={() => (contactDialogOpen = true)}
+				>
+					Contact
+				</button>
 			</nav>
 
 			<main class="flex-1">

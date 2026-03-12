@@ -21,8 +21,8 @@
 >
 	<div
 		class={cn(
-			'flex w-full flex-row items-stretch',
-			align === 'right' ? 'flex-row-reverse' : '',
+			'flex w-full flex-col md:flex-row items-stretch',
+			align === 'right' ? 'md:flex-row-reverse' : '',
 		)}
 	>
 		{@render children?.()}
