@@ -48,7 +48,7 @@ export class TwitterParser {
 		const pathname = window.location.pathname;
 		const route = routes.find((r) => r.match(pathname));
 		const parser = route?.parser ?? fallback;
-		return parser.parse(doc);
+		return await parser.parse(doc);
 	}
 }
 
