@@ -1,18 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
-
-	const navItems = [
-		{ title: 'Welcome', url: '/docs' },
-		{ title: 'Why Eurora', url: '/docs/why-eurora' },
-		{ title: 'Self-Hosting', url: '/docs/self-hosting' },
-	];
+	import { docsNavItems } from '$lib/components/docs/nav.js';
 
 	let items = $derived(
-		navItems.map((item) => ({ ...item, isActive: item.url === page.url.pathname })),
+		docsNavItems.map((item) => ({ ...item, isActive: item.url === page.url.pathname })),
 	);
 </script>
 
-<nav class="flex w-56 shrink-0 flex-col gap-0.5">
+<nav class="hidden md:flex w-56 shrink-0 flex-col gap-0.5">
 	{#each items as item (item.title)}
 		<a
 			href={item.url}
