@@ -27,7 +27,7 @@
 	let activeTab = $state<(typeof tabs)[number]['id']>('assistant');
 </script>
 
-<div class="mx-auto w-full max-w-[calc(60vh*16/9)] px-4">
+<div class="mx-auto w-full max-w-7xl px-4">
 	<div class="flex flex-col items-start py-12 max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
 			Less typing, more answers.

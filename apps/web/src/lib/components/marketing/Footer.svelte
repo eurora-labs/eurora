@@ -11,14 +11,14 @@
 			links: [
 				{ name: 'Download', href: '/download' },
 				{ name: 'Pricing', href: '/pricing' },
-				{ name: 'Browser Extension', href: '/download/browser-extension' },
+				// { name: 'Browser Extension', href: '/download/browser-extension' },
 				{ name: 'Roadmap', href: '/roadmap' },
 			],
 		},
 		company: {
 			title: 'Company',
 			links: [
-				// { name: 'About', href: '/about' },
+				{ name: 'About', href: '/about' },
 				// { name: 'Careers', href: '/careers' },
 				{ name: 'Privacy Policy', href: '/privacy-policy' },
 				// { name: 'Terms of Service', href: '/terms' },

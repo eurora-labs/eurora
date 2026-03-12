@@ -9,7 +9,6 @@
 	} from '$lib/stores/subscription.js';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { ContactDialog } from '@eurora/ui/custom-components/contact-dialog/index';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
@@ -86,16 +85,6 @@
 				{/each}
 
 				<Separator class="my-2" />
-
-				<a
-					href="/docs"
-					target="_blank"
-					rel="noopener noreferrer"
-					class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-				>
-					Docs
-					<ExternalLinkIcon size={12} class="ml-auto text-muted-foreground" />
-				</a>
 
 				<button
 					type="button"
