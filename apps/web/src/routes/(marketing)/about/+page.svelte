@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { Separator } from '@eurora/ui/components/separator/index';
 	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import GithubIcon from '@lucide/svelte/icons/github';
@@ -45,68 +44,81 @@
 
 	const laura_thommen_img = 'https://d26xptavrz5c8t.cloudfront.net/image/laura.png';
 	const andre_roelofs_img = 'https://d26xptavrz5c8t.cloudfront.net/image/andre.png';
+
+	const stats = [
+		{ value: '2025', label: 'Founded' },
+		{ value: '100%', label: 'Open Source' },
+		{ value: 'EU', label: 'Data Residency' },
+		{ value: '$0', label: 'VC Funding' },
+	];
 </script>
 
 <div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
-	<div class="mb-6">
-		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-3">Who we are</p>
-		<h1 class="text-4xl font-bold mb-4 sm:text-5xl">
-			Two people, one belief:<br />European AI should work for you.
+	<!-- Hero -->
+	<div class="text-center mb-20">
+		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-4">Who we are</p>
+		<h1 class="text-4xl font-bold mb-6 sm:text-5xl lg:text-6xl leading-tight">
+			Two people, one belief:<br />
+			<span class="text-primary">European AI should work for you.</span>
 		</h1>
-		<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+		<p class="max-w-2xl mx-auto text-lg text-muted-foreground leading-relaxed">
 			Eurora is a company based in The Netherlands, founded by two people who got tired of AI
-			tools that treat your data as the product. We're not backed by venture capital or built
-			by a faceless corporation — we decided to build something better, rooted in Europe's
-			strong tradition of privacy and user rights.
+			tools that treat your data as the product. We decided to build something better, rooted
+			in Europe's strong tradition of privacy and user rights.
 		</p>
 	</div>
 
-	<Separator class="mb-16" />
-
-	<div class="grid grid-cols-1 gap-6 mb-20 md:grid-cols-2">
-		<div class="group relative">
-			<div
-				class="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
-			></div>
-			<div class="relative rounded-2xl border border-border bg-card overflow-hidden">
-				<div class="overflow-hidden bg-muted">
-					<img
-						src={laura_thommen_img}
-						alt="Laura Thommen"
-						class="w-full transition-transform duration-500 group-hover:scale-[1.02]"
-					/>
-				</div>
-				<div class="p-6 sm:p-8">
-					<div class="flex items-center gap-3 mb-3">
-						<h2 class="text-2xl font-bold">Laura Thommen</h2>
-						<Badge variant="secondary">CEO</Badge>
+	<!-- Founders -->
+	<div class="mb-24">
+		<div class="flex flex-col gap-6 sm:flex-row sm:gap-8 items-stretch">
+			<!-- Laura -->
+			<div class="group flex-1 relative">
+				<div
+					class="absolute -inset-px rounded-2xl bg-linear-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+				></div>
+				<div
+					class="relative rounded-2xl border border-border bg-card p-6 sm:p-8 h-full flex flex-col"
+				>
+					<div class="flex items-center gap-4 mb-5">
+						<img
+							src={laura_thommen_img}
+							alt="Laura Thommen"
+							class="size-16 rounded-full object-cover ring-2 ring-border"
+						/>
+						<div>
+							<div class="flex items-center gap-2">
+								<h2 class="text-xl font-bold">Laura Thommen</h2>
+								<Badge variant="secondary">CEO</Badge>
+							</div>
+							<p class="text-sm text-muted-foreground mt-0.5">
+								30+ years in tech leadership
+							</p>
+						</div>
 					</div>
-					<p class="text-muted-foreground mb-6 leading-relaxed">
-						30+ years driving product adoption at Apple, Adobe, Avid, DDN Storage and
-						Northrop Grumman. Laura has seen firsthand how technology succeeds when it
-						puts people first — and fails when it doesn't.
+
+					<p class="text-muted-foreground leading-relaxed mb-5">
+						Drove product adoption at Apple, Adobe, Avid, DDN Storage and Northrop
+						Grumman. Laura has seen firsthand how technology succeeds when it puts
+						people first — and fails when it doesn't.
 					</p>
 
-					<div class="space-y-4">
+					<div class="space-y-3 mb-5 text-sm">
 						<div>
-							<h3 class="text-sm font-semibold mb-1">Background</h3>
-							<p class="text-sm text-muted-foreground">
-								Sales leadership to executive management. Built and scaled
-								go-to-market teams across enterprise software and hardware.
+							<p class="font-medium mb-1">Background</p>
+							<p class="text-muted-foreground">
+								Sales leadership to executive management. Built go-to-market teams
+								across enterprise software and hardware.
 							</p>
 						</div>
 						<div>
-							<h3 class="text-sm font-semibold mb-1">Education</h3>
-							<p class="text-sm text-muted-foreground">
-								MBA, Pepperdine University. BS Business Administration (Finance
-								minor), University of Southern California.
+							<p class="font-medium mb-1">Education</p>
+							<p class="text-muted-foreground">
+								MBA, Pepperdine University. BS Business Administration, USC.
 							</p>
 						</div>
 					</div>
 
-					<Separator class="my-5" />
-
-					<div class="flex gap-2">
+					<div class="flex gap-1 pt-4 border-t border-border">
 						<div class="relative">
 							{#if copiedLaura}
 								<span
@@ -136,51 +148,56 @@
 					</div>
 				</div>
 			</div>
-		</div>
 
-		<div class="group relative">
-			<div
-				class="absolute -inset-px rounded-2xl bg-gradient-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
-			></div>
-			<div class="relative rounded-2xl border border-border bg-card overflow-hidden">
-				<div class="overflow-hidden bg-muted">
-					<img
-						src={andre_roelofs_img}
-						alt="Andre Roelofs"
-						class="w-full transition-transform duration-500 group-hover:scale-[1.02]"
-					/>
-				</div>
-				<div class="p-6 sm:p-8">
-					<div class="flex items-center gap-3 mb-3">
-						<h2 class="text-2xl font-bold">Andre Roelofs</h2>
-						<Badge variant="secondary">CTO</Badge>
+			<!-- Andre -->
+			<div class="group flex-1 relative">
+				<div
+					class="absolute -inset-px rounded-2xl bg-linear-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+				></div>
+				<div
+					class="relative rounded-2xl border border-border bg-card p-6 sm:p-8 h-full flex flex-col"
+				>
+					<div class="flex items-center gap-4 mb-5">
+						<img
+							src={andre_roelofs_img}
+							alt="Andre Roelofs"
+							class="size-16 rounded-full object-cover ring-2 ring-border"
+						/>
+						<div>
+							<div class="flex items-center gap-2">
+								<h2 class="text-xl font-bold">Andre Roelofs</h2>
+								<Badge variant="secondary">CTO</Badge>
+							</div>
+							<p class="text-sm text-muted-foreground mt-0.5">
+								AI & engineering leadership
+							</p>
+						</div>
 					</div>
-					<p class="text-muted-foreground mb-6 leading-relaxed">
+
+					<p class="text-muted-foreground leading-relaxed mb-5">
 						Former Head of Engineering &amp; ML at Cuebric, where he led development of
 						award-winning AI solutions. Andre founded Eurora because he believed the
 						best AI tools shouldn't require giving up your privacy.
 					</p>
 
-					<div class="space-y-4">
+					<div class="space-y-3 mb-5 text-sm">
 						<div>
-							<h3 class="text-sm font-semibold mb-1">Background</h3>
-							<p class="text-sm text-muted-foreground">
-								Software architecture, machine learning, and computer vision. Built
-								production AI systems from research through deployment.
+							<p class="font-medium mb-1">Background</p>
+							<p class="text-muted-foreground">
+								Software architecture, machine learning, and computer vision.
+								Production AI systems from research through deployment.
 							</p>
 						</div>
 						<div>
-							<h3 class="text-sm font-semibold mb-1">Education</h3>
-							<p class="text-sm text-muted-foreground">
+							<p class="font-medium mb-1">Education</p>
+							<p class="text-muted-foreground">
 								BS Computer Science, Avans University. Graduate studies in AI,
 								Maastricht University.
 							</p>
 						</div>
 					</div>
 
-					<Separator class="my-5" />
-
-					<div class="flex gap-2">
+					<div class="flex gap-1 pt-4 border-t border-border">
 						<div class="relative">
 							{#if copiedAndre}
 								<span
@@ -223,6 +240,7 @@
 		</div>
 	</div>
 
+	<!-- Values -->
 	<div class="mb-20">
 		<h2 class="text-3xl font-bold mb-3">Why we built this</h2>
 		<p class="text-muted-foreground max-w-2xl mb-10 leading-relaxed">
@@ -263,25 +281,28 @@
 		</div>
 	</div>
 
-	<div class="mb-20">
-		<h2 class="text-3xl font-bold mb-3">Where we stand</h2>
-		<p class="text-muted-foreground max-w-2xl mb-10 leading-relaxed">
-			Eurora is young, self-funded, and growing. We're transparent about where we are because
-			trust is built on honesty, not marketing.
-		</p>
+	<!-- Stats -->
+	<div class="mb-24">
+		<div class="text-center mb-12">
+			<h2 class="text-3xl font-bold mb-3">Where we stand</h2>
+			<p class="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+				Eurora is young, self-funded, and growing. We're transparent about where we are
+				because trust is built on honesty, not marketing.
+			</p>
+		</div>
 
 		<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-			{#each [{ value: '2025', label: 'Founded' }, { value: '100%', label: 'Open Source' }, { value: 'EU', label: 'Data Residency' }, { value: '$0', label: 'VC Funding' }] as stat}
-				<div class="rounded-xl border border-border bg-card p-5 text-center">
-					<p class="text-2xl font-bold text-primary">{stat.value}</p>
-					<p class="text-sm text-muted-foreground mt-1">{stat.label}</p>
+			{#each stats as stat}
+				<div class="rounded-2xl border border-border bg-card p-6 text-center">
+					<p class="text-3xl font-bold text-primary mb-1">{stat.value}</p>
+					<p class="text-sm text-muted-foreground">{stat.label}</p>
 				</div>
 			{/each}
 		</div>
 	</div>
 
-	<div class="rounded-2xl bg-foreground/5 p-8 sm:p-12 text-center">
-		<MailIcon class="h-8 w-8 text-primary mx-auto mb-4" />
+	<!-- Contact -->
+	<div class="rounded-2xl border border-border bg-card p-8 sm:p-12 text-center">
 		<h2 class="text-2xl font-bold mb-3">Want to talk?</h2>
 		<p class="text-muted-foreground max-w-lg mx-auto mb-6">
 			Whether you have questions, feedback, or just want to say hello — we read every message.
@@ -303,9 +324,9 @@
 					target="_blank"
 					rel="noopener noreferrer"
 					aria-label={social.name}
-					class="size-12"
+					class="size-10"
 				>
-					<social.icon size={20} />
+					<social.icon size={18} />
 				</Button>
 			{/each}
 		</div>
