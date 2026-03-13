@@ -15,7 +15,7 @@ service ProtoThreadService {
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
   rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
-  rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ProtoChatStreamResponse);
+  rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ProtoAIMessageChunk);
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
 }
 

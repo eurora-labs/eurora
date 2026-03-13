@@ -40,6 +40,13 @@ impl From<InputTokenDetails> for ProtoInputTokenDetails {
             audio: details.audio,
             cache_creation: details.cache_creation,
             cache_read: details.cache_read,
+            extra: hashmap_to_json_string(
+                &details
+                    .extra
+                    .into_iter()
+                    .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
+                    .collect(),
+            ),
         }
     }
 }
@@ -60,6 +67,13 @@ impl From<OutputTokenDetails> for ProtoOutputTokenDetails {
         ProtoOutputTokenDetails {
             audio: details.audio,
             reasoning: details.reasoning,
+            extra: hashmap_to_json_string(
+                &details
+                    .extra
+                    .into_iter()
+                    .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
+                    .collect(),
+            ),
         }
     }
 }
@@ -101,9 +115,10 @@ impl From<ProtoUsageMetadata> for UsageMetadata {
 impl From<ToolCall> for ProtoToolCall {
     fn from(tc: ToolCall) -> Self {
         ProtoToolCall {
-            id: tc.id.clone().unwrap_or_default(),
+            id: tc.id.clone(),
             name: tc.name.clone(),
             args: value_to_json_string(&tc.args),
+            call_type: tc.call_type.clone(),
         }
     }
 }
@@ -112,15 +127,12 @@ impl From<ProtoToolCall> for ToolCall {
     fn from(proto: ProtoToolCall) -> Self {
         let args: serde_json::Value = serde_json::from_str(&proto.args)
             .unwrap_or(serde_json::Value::Object(Default::default()));
-        if proto.id.is_empty() {
-            ToolCall::builder().name(proto.name).args(args).build()
-        } else {
-            ToolCall::builder()
-                .name(proto.name)
-                .args(args)
-                .id(proto.id)
-                .build()
-        }
+        ToolCall::builder()
+            .name(proto.name)
+            .args(args)
+            .maybe_id(proto.id)
+            .maybe_call_type(proto.call_type)
+            .build()
     }
 }
 
@@ -131,6 +143,7 @@ impl From<ToolCallChunk> for ProtoToolCallChunk {
             args: chunk.args.clone(),
             id: chunk.id.clone(),
             index: chunk.index,
+            chunk_type: chunk.chunk_type.clone(),
         }
     }
 }
@@ -154,6 +167,7 @@ impl From<InvalidToolCall> for ProtoInvalidToolCall {
             args: itc.args,
             id: itc.id,
             error: itc.error,
+            call_type: itc.call_type,
         }
     }
 }
@@ -249,10 +263,7 @@ impl From<ImageSource> for ProtoImageSource {
                 })),
             },
             ImageSource::FileId { file_id } => ProtoImageSource {
-                source: Some(proto_image_source::Source::Url(format!(
-                    "file://{}",
-                    file_id
-                ))),
+                source: Some(proto_image_source::Source::FileId(file_id)),
             },
         }
     }
@@ -274,6 +285,7 @@ impl From<ProtoImageSource> for ImageSource {
                 media_type: b64.media_type,
                 data: b64.data,
             },
+            Some(proto_image_source::Source::FileId(file_id)) => ImageSource::FileId { file_id },
             None => ImageSource::Url { url: String::new() },
         }
     }
@@ -292,9 +304,9 @@ impl From<ContentPart> for ProtoContentPart {
                 })),
             },
             ContentPart::Other(value) => {
-                let text = serde_json::to_string(&value).unwrap_or_default();
+                let json = serde_json::to_string(&value).unwrap_or_default();
                 ProtoContentPart {
-                    part: Some(proto_content_part::Part::Text(ProtoTextPart { text })),
+                    part: Some(proto_content_part::Part::Other(json)),
                 }
             }
         }
@@ -318,6 +330,9 @@ impl From<ProtoContentPart> for ContentPart {
                         .into()
                 }),
             },
+            Some(proto_content_part::Part::Other(json)) => {
+                ContentPart::Other(serde_json::from_str(&json).unwrap_or_default())
+            }
             None => ContentPart::Text {
                 text: String::new(),
             },
@@ -450,6 +465,7 @@ impl From<HumanMessage> for ProtoHumanMessage {
             id: msg.id,
             name: msg.name,
             additional_kwargs: hashmap_to_json_string(&msg.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&msg.response_metadata),
         }
     }
 }
@@ -506,6 +522,7 @@ impl From<SystemMessage> for ProtoSystemMessage {
             id: msg.id,
             name: msg.name,
             additional_kwargs: hashmap_to_json_string(&msg.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&msg.response_metadata),
         }
     }
 }
@@ -853,7 +870,12 @@ impl From<ProtoFunctionMessageChunk> for FunctionMessageChunk {
 
 impl From<RemoveMessage> for ProtoRemoveMessage {
     fn from(msg: RemoveMessage) -> Self {
-        ProtoRemoveMessage { id: msg.id }
+        ProtoRemoveMessage {
+            id: msg.id,
+            name: msg.name,
+            additional_kwargs: hashmap_to_json_string(&msg.additional_kwargs),
+            response_metadata: hashmap_to_json_string(&msg.response_metadata),
+        }
     }
 }
 

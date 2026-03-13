@@ -9,7 +9,7 @@ use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsRe
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
-use proto_gen::agent_chain::ProtoChatStreamResponse;
+use proto_gen::agent_chain::ProtoAiMessageChunk;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
 };
@@ -253,7 +253,7 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
 }
 
 type ChatResult<T> = Result<Response<T>, Status>;
-type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ProtoChatStreamResponse, Status>> + Send>>;
+type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ProtoAiMessageChunk, Status>> + Send>>;
 
 #[tonic::async_trait]
 impl ProtoThreadService for ThreadService {
@@ -580,10 +580,7 @@ impl ProtoThreadService for ThreadService {
                                     total_cache_read_tokens += details.cache_read.unwrap_or(0);
                                 }
                             }
-                            yield ProtoChatStreamResponse {
-                                chunk: Some(chunk.into()),
-                                is_final: false,
-                            };
+                            yield chunk.into();
                         }
                         Err(e) => {
                             Err(Status::internal(e.to_string()))?;
@@ -621,11 +618,6 @@ impl ProtoThreadService for ThreadService {
                     messages.push(result_msg);
                 }
             }
-
-            yield ProtoChatStreamResponse {
-                chunk: None,
-                is_final: true,
-            };
 
             if !full_content.is_empty() {
                 let reasoning_blocks = match full_reasoning.is_empty() {
