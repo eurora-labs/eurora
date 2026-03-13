@@ -548,9 +548,7 @@ impl TracerCore for LogStreamCallbackHandler {
         };
 
         let chunk_value = if let Some(chunk_any) = chunk {
-            if let Some(gen_chunk) = chunk_any.downcast_ref::<crate::outputs::GenerationChunk>() {
-                serde_json::to_value(gen_chunk).unwrap_or(Value::String(token.to_string()))
-            } else if let Some(chat_chunk) =
+            if let Some(chat_chunk) =
                 chunk_any.downcast_ref::<crate::outputs::ChatGenerationChunk>()
             {
                 serde_json::to_value(&chat_chunk.message)
@@ -1020,7 +1018,7 @@ where
     let send_stream = bridge.get_send_stream();
 
     Box::pin(async_stream::stream! {
-        let mut astream = std::pin::pin!(runnable.astream(input, Some(config)));
+        let mut astream = std::pin::pin!(runnable.stream(input, Some(config)));
         while let Some(chunk_result) = astream.next().await {
             match chunk_result {
                 Ok(chunk) => {

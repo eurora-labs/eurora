@@ -10,7 +10,7 @@ mod prompt;
 mod string;
 mod structured;
 
-pub use base::{BasePromptTemplate, PartialValue, aformat_document, format_document};
+pub use base::{BasePromptTemplate, format_document};
 
 pub use string::{
     PromptTemplateFormat, StringPromptTemplate, check_valid_template, get_template_variables,

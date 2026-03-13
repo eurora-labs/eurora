@@ -2,6 +2,7 @@
 	import { type GeneralSettings } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
+	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Input } from '@eurora/ui/components/input/index';
@@ -11,15 +12,10 @@
 	import { onMount } from 'svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
+	const user = inject(USER_SERVICE);
 
 	let generalSettings = $state<GeneralSettings | null>(null);
 	let autostartEnabled = $state(false);
-	let authenticated = $state(false);
-	let username = $state('');
-	let email = $state('');
-	let role = $state('');
-
-	const planLabel = $derived(role === 'Tier1' ? 'Pro' : 'Free');
 
 	async function saveSettings() {
 		await taurpc.settings.set_general_settings({
@@ -29,25 +25,8 @@
 	}
 
 	onMount(async () => {
-		const [settings, isAuth] = await Promise.all([
-			taurpc.settings.get_general_settings(),
-			taurpc.auth.is_authenticated(),
-		]);
-
-		generalSettings = settings;
+		generalSettings = await taurpc.settings.get_general_settings();
 		autostartEnabled = generalSettings.autostart;
-		authenticated = isAuth;
-
-		if (authenticated) {
-			const [u, e, r] = await Promise.all([
-				taurpc.auth.get_username(),
-				taurpc.auth.get_email(),
-				taurpc.auth.get_role(),
-			]);
-			username = u;
-			email = e;
-			role = r;
-		}
 	});
 </script>
 
@@ -60,20 +39,22 @@
 	<section class="flex flex-col gap-4">
 		<h2 class="text-sm font-medium text-muted-foreground">Account</h2>
 		<Separator />
-		{#if !authenticated}
+		{#if !user.authenticated}
 			<FirstPartyLogin />
 		{:else}
 			<div class="flex items-center justify-between">
 				<span class="text-sm">Name</span>
-				<Input class="max-w-60" disabled value={username} />
+				<Input class="max-w-60" disabled value={user.username} />
 			</div>
 			<div class="flex items-center justify-between">
 				<span class="text-sm">Email</span>
-				<Input class="max-w-60" disabled value={email} />
+				<Input class="max-w-60" disabled value={user.email} />
 			</div>
 			<div class="flex items-center justify-between">
 				<span class="text-sm">Plan</span>
-				<Badge variant={planLabel === 'Pro' ? 'default' : 'secondary'}>{planLabel}</Badge>
+				<Badge variant={user.planLabel === 'Pro' ? 'default' : 'secondary'}
+					>{user.planLabel}</Badge
+				>
 			</div>
 		{/if}
 	</section>

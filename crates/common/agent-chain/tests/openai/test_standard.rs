@@ -42,7 +42,7 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
     let result = model
-        .ainvoke(
+        .invoke(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
@@ -58,7 +58,7 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
     let mut stream = model
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
@@ -84,7 +84,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let model = make_model();
     let mut stream = model
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
@@ -251,7 +251,7 @@ async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error
     load_env();
     let model = make_model();
     let mut stream = model
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("Write me 2 haikus. Only include the haikus.")
@@ -331,7 +331,7 @@ async fn test_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
 
     // Also test streaming
     let mut stream = model_with_tools
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content(query).build().into()],
             None,
             None,
@@ -362,7 +362,7 @@ async fn test_tool_calling_async() -> Result<(), Box<dyn std::error::Error>> {
 
     let query = "What is the value of magic_function(3)? Use the tool.";
     let result = model_with_tools
-        .ainvoke(
+        .invoke(
             vec![HumanMessage::builder().content(query).build().into()],
             None,
         )
@@ -574,7 +574,7 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
     let structured = model.with_structured_output(joke_schema, false)?;
 
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("Tell me a joke about cats.")
@@ -611,7 +611,7 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
     let structured = model.with_structured_output(joke_schema, false)?;
 
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("Tell me a joke about cats.")
@@ -649,7 +649,7 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
     let structured = model.with_structured_output(schema, false)?;
 
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("My name is Alice and I'm 30.")
@@ -701,7 +701,7 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
             .into(),
     ];
 
-    let result = structured.ainvoke(messages, None).await?;
+    let result = structured.invoke(messages, None).await?;
     assert!(result.get("setup").is_some());
     assert!(result.get("punchline").is_some());
 
@@ -914,8 +914,8 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
     let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
     let input2 = vec![HumanMessage::builder().content("Hey").build().into()];
 
-    let result1 = model.ainvoke(input1, None).await?;
-    let result2 = model.ainvoke(input2, None).await?;
+    let result1 = model.invoke(input1, None).await?;
+    let result2 = model.invoke(input2, None).await?;
 
     assert!(!result1.text().is_empty());
     assert!(!result2.text().is_empty());
@@ -967,7 +967,7 @@ async fn test_ainvoke_with_model_override() -> Result<(), Box<dyn std::error::Er
     let model = ChatOpenAI::new(override_model);
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
@@ -993,7 +993,7 @@ async fn test_stream_with_model_override() -> Result<(), Box<dyn std::error::Err
     let model = ChatOpenAI::new(override_model);
 
     let mut stream = model
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
@@ -1019,7 +1019,7 @@ async fn test_astream_with_model_override() -> Result<(), Box<dyn std::error::Er
     let model = ChatOpenAI::new(override_model);
 
     let mut stream = model
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,

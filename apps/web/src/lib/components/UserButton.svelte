@@ -47,7 +47,7 @@
 				</Avatar.Root>
 			</Button>
 		</DropdownMenu.Trigger>
-		<DropdownMenu.Content class="w-32 border-none" align="end">
+		<DropdownMenu.Content class="w-32 border-none" align="end" collisionPadding={8}>
 			<DropdownMenu.Group>
 				<DropdownMenu.Item onclick={handleSettings}>
 					<UserIcon class="mr-2 h-4 w-4" />

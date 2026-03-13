@@ -295,38 +295,38 @@ pub fn merge_configs(configs: Vec<Option<RunnableConfig>>) -> RunnableConfig {
 }
 
 #[allow(clippy::type_complexity)]
-pub enum VariableArgsFn<I, O> {
+pub enum SyncVariableArgsFn<I, O> {
     InputOnly(Box<dyn Fn(I) -> O + Send + Sync>),
     WithConfig(Box<dyn Fn(I, &RunnableConfig) -> O + Send + Sync>),
 }
 
-pub fn call_func_with_variable_args<I, O>(
-    func: &VariableArgsFn<I, O>,
+pub fn call_sync_func_with_variable_args<I, O>(
+    func: &SyncVariableArgsFn<I, O>,
     input: I,
     config: &RunnableConfig,
 ) -> O {
     match func {
-        VariableArgsFn::InputOnly(f) => f(input),
-        VariableArgsFn::WithConfig(f) => f(input, config),
+        SyncVariableArgsFn::InputOnly(f) => f(input),
+        SyncVariableArgsFn::WithConfig(f) => f(input, config),
     }
 }
 
 #[allow(clippy::type_complexity)]
-pub enum AsyncVariableArgsFn<I, O> {
+pub enum VariableArgsFn<I, O> {
     InputOnly(Box<dyn Fn(I) -> Pin<Box<dyn Future<Output = O> + Send>> + Send + Sync>),
     WithConfig(
         Box<dyn Fn(I, RunnableConfig) -> Pin<Box<dyn Future<Output = O> + Send>> + Send + Sync>,
     ),
 }
 
-pub async fn acall_func_with_variable_args<I, O>(
-    func: &AsyncVariableArgsFn<I, O>,
+pub async fn call_func_with_variable_args<I, O>(
+    func: &VariableArgsFn<I, O>,
     input: I,
     config: &RunnableConfig,
 ) -> O {
     match func {
-        AsyncVariableArgsFn::InputOnly(f) => f(input).await,
-        AsyncVariableArgsFn::WithConfig(f) => f(input, config.clone()).await,
+        VariableArgsFn::InputOnly(f) => f(input).await,
+        VariableArgsFn::WithConfig(f) => f(input, config.clone()).await,
     }
 }
 

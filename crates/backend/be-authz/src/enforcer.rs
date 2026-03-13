@@ -61,10 +61,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn free_cannot_create_thread() {
+    async fn free_can_create_thread() {
         let authz = test_authz().await;
         assert!(
-            !authz
+            authz
                 .enforce("Free", "ThreadService", "CreateThread")
                 .unwrap()
         );
@@ -156,6 +156,16 @@ mod tests {
             let action = parts[3];
 
             if resource.starts_with('/') {
+                continue;
+            }
+
+            if action == "*" {
+                assert!(
+                    proto_set.iter().any(|(svc, _)| *svc == resource),
+                    "Policy entry ({resource}, {action}) references unknown service. \
+                     Did a proto service get renamed or removed?"
+                );
+                checked += 1;
                 continue;
             }
 

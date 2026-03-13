@@ -71,7 +71,16 @@ where
     let name = name.into();
     let description = description.into();
 
-    let func = move |args: HashMap<String, Value>| runnable.invoke(args, None);
+    let runnable_for_async = runnable.clone();
+    let sync_func = move |_args: HashMap<String, Value>| -> Result<Value> {
+        Err(crate::error::Error::NotImplemented(
+            "Sync invoke not available; use the async coroutine path".into(),
+        ))
+    };
+    let async_func = move |args: HashMap<String, Value>| {
+        let r = runnable_for_async.clone();
+        async move { r.invoke(args, None).await }
+    };
 
     let schema = ArgsSchema::JsonSchema(serde_json::json!({
         "type": "object",
@@ -79,7 +88,7 @@ where
         "additionalProperties": true
     }));
 
-    StructuredTool::from_function(func, name, description, schema)
+    StructuredTool::from_function_with_async(sync_func, async_func, name, description, schema)
 }
 
 pub struct PropertyDef<'a> {
