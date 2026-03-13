@@ -31,41 +31,20 @@ pub struct DeleteResponse {
 pub trait RecordManager: Send + Sync {
     fn namespace(&self) -> &str;
 
-    fn create_schema(&self) -> Result<()>;
+    async fn create_schema(&self) -> Result<()>;
 
-    async fn acreate_schema(&self) -> Result<()> {
-        self.create_schema()
-    }
+    async fn get_time(&self) -> Result<f64>;
 
-    fn get_time(&self) -> Result<f64>;
-
-    async fn aget_time(&self) -> Result<f64> {
-        self.get_time()
-    }
-
-    fn update(
+    async fn update(
         &self,
         keys: &[String],
         group_ids: Option<&[Option<String>]>,
         time_at_least: Option<f64>,
     ) -> Result<()>;
 
-    async fn aupdate(
-        &self,
-        keys: &[String],
-        group_ids: Option<&[Option<String>]>,
-        time_at_least: Option<f64>,
-    ) -> Result<()> {
-        self.update(keys, group_ids, time_at_least)
-    }
+    async fn exists(&self, keys: &[String]) -> Result<Vec<bool>>;
 
-    fn exists(&self, keys: &[String]) -> Result<Vec<bool>>;
-
-    async fn aexists(&self, keys: &[String]) -> Result<Vec<bool>> {
-        self.exists(keys)
-    }
-
-    fn list_keys(
+    async fn list_keys(
         &self,
         before: Option<f64>,
         after: Option<f64>,
@@ -73,21 +52,7 @@ pub trait RecordManager: Send + Sync {
         limit: Option<usize>,
     ) -> Result<Vec<String>>;
 
-    async fn alist_keys(
-        &self,
-        before: Option<f64>,
-        after: Option<f64>,
-        group_ids: Option<&[String]>,
-        limit: Option<usize>,
-    ) -> Result<Vec<String>> {
-        self.list_keys(before, after, group_ids, limit)
-    }
-
-    fn delete_keys(&self, keys: &[String]) -> Result<()>;
-
-    async fn adelete_keys(&self, keys: &[String]) -> Result<()> {
-        self.delete_keys(keys)
-    }
+    async fn delete_keys(&self, keys: &[String]) -> Result<()>;
 }
 
 pub struct InMemoryRecordManager {
@@ -131,15 +96,15 @@ impl RecordManager for InMemoryRecordManager {
         &self.namespace_value
     }
 
-    fn create_schema(&self) -> Result<()> {
+    async fn create_schema(&self) -> Result<()> {
         Ok(())
     }
 
-    fn get_time(&self) -> Result<f64> {
+    async fn get_time(&self) -> Result<f64> {
         Ok(self.current_time())
     }
 
-    fn update(
+    async fn update(
         &self,
         keys: &[String],
         group_ids: Option<&[Option<String>]>,
@@ -190,7 +155,7 @@ impl RecordManager for InMemoryRecordManager {
         Ok(())
     }
 
-    fn exists(&self, keys: &[String]) -> Result<Vec<bool>> {
+    async fn exists(&self, keys: &[String]) -> Result<Vec<bool>> {
         let records = self
             .records
             .read()
@@ -198,7 +163,7 @@ impl RecordManager for InMemoryRecordManager {
         Ok(keys.iter().map(|k| records.contains_key(k)).collect())
     }
 
-    fn list_keys(
+    async fn list_keys(
         &self,
         before: Option<f64>,
         after: Option<f64>,
@@ -247,7 +212,7 @@ impl RecordManager for InMemoryRecordManager {
         Ok(result)
     }
 
-    fn delete_keys(&self, keys: &[String]) -> Result<()> {
+    async fn delete_keys(&self, keys: &[String]) -> Result<()> {
         let mut records = self
             .records
             .write()
@@ -261,21 +226,9 @@ impl RecordManager for InMemoryRecordManager {
 
 #[async_trait]
 pub trait DocumentIndex: Send + Sync {
-    fn upsert(&self, items: &[Document]) -> Result<UpsertResponse>;
+    async fn upsert(&self, items: &[Document]) -> Result<UpsertResponse>;
 
-    async fn aupsert(&self, items: &[Document]) -> Result<UpsertResponse> {
-        self.upsert(items)
-    }
+    async fn delete(&self, ids: Option<&[String]>) -> Result<DeleteResponse>;
 
-    fn delete(&self, ids: Option<&[String]>) -> Result<DeleteResponse>;
-
-    async fn adelete(&self, ids: Option<&[String]>) -> Result<DeleteResponse> {
-        self.delete(ids)
-    }
-
-    fn get(&self, ids: &[String]) -> Result<Vec<Document>>;
-
-    async fn aget(&self, ids: &[String]) -> Result<Vec<Document>> {
-        self.get(ids)
-    }
+    async fn get(&self, ids: &[String]) -> Result<Vec<Document>>;
 }

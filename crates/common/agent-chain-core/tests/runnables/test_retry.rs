@@ -9,8 +9,8 @@ use agent_chain_core::runnables::retry::{
     RunnableRetryExt,
 };
 
-#[test]
-fn test_retry_initialization() {
+#[tokio::test]
+async fn test_retry_initialization() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let config = RunnableRetryConfig::builder().build();
@@ -18,12 +18,12 @@ fn test_retry_initialization() {
     assert!(config.wait_exponential_jitter);
 
     let retry = RunnableRetry::new(runnable, config);
-    let result = retry.invoke(5, None).unwrap();
+    let result = retry.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_retry_initialization_custom() {
+#[tokio::test]
+async fn test_retry_initialization_custom() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let config = RunnableRetryConfig::builder()
@@ -38,12 +38,12 @@ fn test_retry_initialization_custom() {
     assert!(!config.wait_exponential_jitter);
 
     let retry = RunnableRetry::new(runnable, config);
-    let result = retry.invoke(5, None).unwrap();
+    let result = retry.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_retry_invoke_success_no_retry() {
+#[tokio::test]
+async fn test_retry_invoke_success_no_retry() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -62,13 +62,13 @@ fn test_retry_invoke_success_no_retry() {
             .build(),
     );
 
-    let result = retry.invoke(5, None).unwrap();
+    let result = retry.invoke(5, None).await.unwrap();
     assert_eq!(result, 10);
     assert_eq!(call_count.load(Ordering::SeqCst), 1);
 }
 
-#[test]
-fn test_retry_invoke_with_retryable_exception() {
+#[tokio::test]
+async fn test_retry_invoke_with_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -91,13 +91,13 @@ fn test_retry_invoke_with_retryable_exception() {
             .build(),
     );
 
-    let result = retry.invoke(5, None).unwrap();
+    let result = retry.invoke(5, None).await.unwrap();
     assert_eq!(result, 10);
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
 
-#[test]
-fn test_retry_invoke_exhausts_retries() {
+#[tokio::test]
+async fn test_retry_invoke_exhausts_retries() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -116,14 +116,14 @@ fn test_retry_invoke_exhausts_retries() {
             .build(),
     );
 
-    let result = retry.invoke(5, None);
+    let result = retry.invoke(5, None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Always fails"));
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-#[test]
-fn test_retry_invoke_non_retryable_exception() {
+#[tokio::test]
+async fn test_retry_invoke_non_retryable_exception() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -143,87 +143,14 @@ fn test_retry_invoke_non_retryable_exception() {
             .build(),
     );
 
-    let result = retry.invoke(5, None);
+    let result = retry.invoke(5, None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Runtime error"));
     assert_eq!(call_count.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
-async fn test_retry_ainvoke_success_no_retry() {
-    let call_count = Arc::new(AtomicUsize::new(0));
-    let counter = call_count.clone();
-
-    let runnable = RunnableLambda::builder()
-        .func(move |x: i32| {
-            counter.fetch_add(1, Ordering::SeqCst);
-            Ok(x * 2)
-        })
-        .build();
-
-    let retry = RunnableRetry::new(
-        runnable,
-        RunnableRetryConfig::builder()
-            .max_attempt_number(3)
-            .wait_exponential_jitter(false)
-            .build(),
-    );
-
-    let result = retry.ainvoke(5, None).await.unwrap();
-    assert_eq!(result, 10);
-    assert_eq!(call_count.load(Ordering::SeqCst), 1);
-}
-
-#[tokio::test]
-async fn test_retry_ainvoke_with_retryable_exception() {
-    let call_count = Arc::new(AtomicUsize::new(0));
-    let counter = call_count.clone();
-
-    let runnable = RunnableLambda::builder()
-        .func(move |x: i32| {
-            let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
-            if count < 3 {
-                Err(Error::other(format!("Attempt {count} failed")))
-            } else {
-                Ok(x * 2)
-            }
-        })
-        .build();
-
-    let retry = RunnableRetry::new(
-        runnable,
-        RunnableRetryConfig::builder()
-            .max_attempt_number(3)
-            .wait_exponential_jitter(false)
-            .build(),
-    );
-
-    let result = retry.ainvoke(5, None).await.unwrap();
-    assert_eq!(result, 10);
-    assert_eq!(call_count.load(Ordering::SeqCst), 3);
-}
-
-#[tokio::test]
-async fn test_retry_ainvoke_exhausts_retries() {
-    let runnable = RunnableLambda::builder()
-        .func(|_x: i32| Err::<i32, _>(Error::other("Always fails")))
-        .build();
-
-    let retry = RunnableRetry::new(
-        runnable,
-        RunnableRetryConfig::builder()
-            .max_attempt_number(2)
-            .wait_exponential_jitter(false)
-            .build(),
-    );
-
-    let result = retry.ainvoke(5, None).await;
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Always fails"));
-}
-
-#[test]
-fn test_retry_batch_partial_failures() {
+async fn test_retry_batch_partial_failures() {
     let call_counts: Arc<std::sync::Mutex<std::collections::HashMap<i32, usize>>> =
         Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
     let counts = call_counts.clone();
@@ -249,7 +176,7 @@ fn test_retry_batch_partial_failures() {
             .build(),
     );
 
-    let results = retry.batch(vec![0, 1, 2, 3], None, false);
+    let results = retry.batch(vec![0, 1, 2, 3], None, false).await;
     for (i, result) in results.iter().enumerate() {
         let expected = (i as i32) * 2;
         assert_eq!(result.as_ref().unwrap(), &expected, "input {i} failed");
@@ -262,8 +189,8 @@ fn test_retry_batch_partial_failures() {
     assert_eq!(*map.get(&3).unwrap(), 1); // No retry needed
 }
 
-#[test]
-fn test_retry_batch_with_return_exceptions() {
+#[tokio::test]
+async fn test_retry_batch_with_return_exceptions() {
     let runnable = RunnableLambda::builder()
         .func(|x: i32| {
             if x == 1 {
@@ -282,7 +209,7 @@ fn test_retry_batch_with_return_exceptions() {
             .build(),
     );
 
-    let results = retry.batch(vec![0, 1, 2], None, true);
+    let results = retry.batch(vec![0, 1, 2], None, true).await;
     assert_eq!(*results[0].as_ref().unwrap(), 0);
     assert!(results[1].is_err());
     assert!(
@@ -296,67 +223,7 @@ fn test_retry_batch_with_return_exceptions() {
 }
 
 #[tokio::test]
-async fn test_retry_abatch_partial_failures() {
-    let call_counts: Arc<std::sync::Mutex<std::collections::HashMap<i32, usize>>> =
-        Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
-    let counts = call_counts.clone();
-
-    let runnable = RunnableLambda::builder()
-        .func(move |x: i32| {
-            let mut map = counts.lock().unwrap();
-            let count = map.entry(x).or_insert(0);
-            *count += 1;
-            if (x == 1 || x == 2) && *count < 2 {
-                Err(Error::other(format!("Fail {x}")))
-            } else {
-                Ok(x * 2)
-            }
-        })
-        .build();
-
-    let retry = RunnableRetry::new(
-        runnable,
-        RunnableRetryConfig::builder()
-            .max_attempt_number(2)
-            .wait_exponential_jitter(false)
-            .build(),
-    );
-
-    let results = retry.abatch(vec![0, 1, 2, 3], None, false).await;
-    for (i, result) in results.iter().enumerate() {
-        let expected = (i as i32) * 2;
-        assert_eq!(result.as_ref().unwrap(), &expected, "input {i} failed");
-    }
-}
-
-#[tokio::test]
-async fn test_retry_abatch_with_return_exceptions() {
-    let runnable = RunnableLambda::builder()
-        .func(|x: i32| {
-            if x == 1 {
-                Err(Error::other("Always fails on 1"))
-            } else {
-                Ok(x * 2)
-            }
-        })
-        .build();
-
-    let retry = RunnableRetry::new(
-        runnable,
-        RunnableRetryConfig::builder()
-            .max_attempt_number(2)
-            .wait_exponential_jitter(false)
-            .build(),
-    );
-
-    let results = retry.abatch(vec![0, 1, 2], None, true).await;
-    assert_eq!(*results[0].as_ref().unwrap(), 0);
-    assert!(results[1].is_err());
-    assert_eq!(*results[2].as_ref().unwrap(), 4);
-}
-
-#[test]
-fn test_retry_with_exponential_jitter() {
+async fn test_retry_with_exponential_jitter() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -386,49 +253,13 @@ fn test_retry_with_exponential_jitter() {
             .build(),
     );
 
-    let result = retry.invoke(1, None).unwrap();
+    let result = retry.invoke(1, None).await.unwrap();
     assert_eq!(result, 42);
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]
-async fn test_retry_async_with_exponential_jitter() {
-    let call_count = Arc::new(AtomicUsize::new(0));
-    let counter = call_count.clone();
-
-    let runnable = RunnableLambda::builder()
-        .func(move |_x: i32| {
-            let count = counter.fetch_add(1, Ordering::SeqCst) + 1;
-            if count == 1 {
-                Err(Error::other("First attempt fails"))
-            } else {
-                Ok(42)
-            }
-        })
-        .build();
-
-    let retry = RunnableRetry::new(
-        runnable,
-        RunnableRetryConfig::builder()
-            .max_attempt_number(2)
-            .wait_exponential_jitter(true)
-            .exponential_jitter_params(
-                ExponentialJitterParams::builder()
-                    .initial(0.01)
-                    .max(0.1)
-                    .jitter(0.0)
-                    .build(),
-            )
-            .build(),
-    );
-
-    let result = retry.ainvoke(1, None).await.unwrap();
-    assert_eq!(result, 42);
-    assert_eq!(call_count.load(Ordering::SeqCst), 2);
-}
-
-#[test]
-fn test_retry_with_config() {
+async fn test_retry_with_config() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let retry = RunnableRetry::new(
@@ -445,12 +276,12 @@ fn test_retry_with_config() {
         .metadata
         .insert("key".to_string(), serde_json::json!("value"));
 
-    let result = retry.invoke(5, Some(config)).unwrap();
+    let result = retry.invoke(5, Some(config)).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_retry_config_propagation() {
+#[tokio::test]
+async fn test_retry_config_propagation() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -476,13 +307,13 @@ fn test_retry_config_propagation() {
     let mut config = RunnableConfig::default();
     config.tags.push("my-tag".to_string());
 
-    let result = retry.invoke(5, Some(config)).unwrap();
+    let result = retry.invoke(5, Some(config)).await.unwrap();
     assert_eq!(result, 10);
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-#[test]
-fn test_retry_multiple_exception_types() {
+#[tokio::test]
+async fn test_retry_multiple_exception_types() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -510,13 +341,13 @@ fn test_retry_multiple_exception_types() {
             .build(),
     );
 
-    let result = retry.invoke(5, None).unwrap();
+    let result = retry.invoke(5, None).await.unwrap();
     assert_eq!(result, 10);
     assert_eq!(call_count.load(Ordering::SeqCst), 3);
 }
 
-#[test]
-fn test_retry_batch_preserves_order() {
+#[tokio::test]
+async fn test_retry_batch_preserves_order() {
     let first_fail: Arc<std::sync::Mutex<std::collections::HashSet<i32>>> =
         Arc::new(std::sync::Mutex::new(std::collections::HashSet::from([1])));
     let fail_set = first_fail.clone();
@@ -541,46 +372,14 @@ fn test_retry_batch_preserves_order() {
             .build(),
     );
 
-    let results = retry.batch(vec![0, 1, 2], None, false);
+    let results = retry.batch(vec![0, 1, 2], None, false).await;
     assert_eq!(*results[0].as_ref().unwrap(), 0);
     assert_eq!(*results[1].as_ref().unwrap(), 1);
     assert_eq!(*results[2].as_ref().unwrap(), 2);
 }
 
 #[tokio::test]
-async fn test_retry_abatch_preserves_order() {
-    let first_fail: Arc<std::sync::Mutex<std::collections::HashSet<i32>>> =
-        Arc::new(std::sync::Mutex::new(std::collections::HashSet::from([1])));
-    let fail_set = first_fail.clone();
-
-    let runnable = RunnableLambda::builder()
-        .func(move |x: i32| {
-            let mut set = fail_set.lock().unwrap();
-            if set.contains(&x) {
-                set.remove(&x);
-                Err(Error::other("fail once"))
-            } else {
-                Ok(x)
-            }
-        })
-        .build();
-
-    let retry = RunnableRetry::new(
-        runnable,
-        RunnableRetryConfig::builder()
-            .max_attempt_number(2)
-            .wait_exponential_jitter(false)
-            .build(),
-    );
-
-    let results = retry.abatch(vec![0, 1, 2], None, false).await;
-    assert_eq!(*results[0].as_ref().unwrap(), 0);
-    assert_eq!(*results[1].as_ref().unwrap(), 1);
-    assert_eq!(*results[2].as_ref().unwrap(), 2);
-}
-
-#[test]
-fn test_retry_batch_all_fail() {
+async fn test_retry_batch_all_fail() {
     let runnable = RunnableLambda::builder()
         .func(|_x: i32| Err::<i32, _>(Error::other("Always fails")))
         .build();
@@ -593,27 +392,17 @@ fn test_retry_batch_all_fail() {
             .build(),
     );
 
-    let results = retry.batch(vec![1, 2, 3], None, true);
+    let results = retry.batch(vec![1, 2, 3], None, true).await;
     assert!(results.iter().all(|r| r.is_err()));
 }
 
-#[test]
-fn test_retry_batch_empty_input() {
-    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x)).build();
-
-    let retry = RunnableRetry::new(runnable, RunnableRetryConfig::builder().build());
-
-    let results = retry.batch(vec![], None, false);
-    assert!(results.is_empty());
-}
-
 #[tokio::test]
-async fn test_retry_abatch_empty_input() {
+async fn test_retry_batch_empty_input() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x)).build();
 
     let retry = RunnableRetry::new(runnable, RunnableRetryConfig::builder().build());
 
-    let results = retry.abatch(vec![], None, false).await;
+    let results = retry.batch(vec![], None, false).await;
     assert!(results.is_empty());
 }
 
@@ -648,8 +437,8 @@ async fn test_retry_stream_uses_invoke_with_retries() {
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-#[test]
-fn test_retry_chain_composition() {
+#[tokio::test]
+async fn test_retry_chain_composition() {
     let call_count = Arc::new(AtomicUsize::new(0));
     let counter = call_count.clone();
 
@@ -675,16 +464,19 @@ fn test_retry_chain_composition() {
 
     let reliable_step_2 = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
-    let step1_result = reliable_step_1.invoke(5, None).unwrap();
-    let step2_result = unreliable_with_retry.invoke(step1_result, None).unwrap();
-    let final_result = reliable_step_2.invoke(step2_result, None).unwrap();
+    let step1_result = reliable_step_1.invoke(5, None).await.unwrap();
+    let step2_result = unreliable_with_retry
+        .invoke(step1_result, None)
+        .await
+        .unwrap();
+    let final_result = reliable_step_2.invoke(step2_result, None).await.unwrap();
 
     assert_eq!(final_result, 13);
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-#[test]
-fn test_retry_batch_individual_tracking() {
+#[tokio::test]
+async fn test_retry_batch_individual_tracking() {
     let call_tracker: Arc<std::sync::Mutex<std::collections::HashMap<i32, Vec<i32>>>> =
         Arc::new(std::sync::Mutex::new(std::collections::HashMap::from([
             (0, Vec::new()),
@@ -717,7 +509,7 @@ fn test_retry_batch_individual_tracking() {
             .build(),
     );
 
-    let results = retry.batch(vec![0, 1, 2], None, false);
+    let results = retry.batch(vec![0, 1, 2], None, false).await;
     assert_eq!(*results[0].as_ref().unwrap(), 0);
     assert_eq!(*results[1].as_ref().unwrap(), 2);
     assert_eq!(*results[2].as_ref().unwrap(), 4);
@@ -769,22 +561,22 @@ fn test_exponential_jitter_defaults() {
     assert_eq!(params.jitter, 1.0);
 }
 
-#[test]
-fn test_retry_ext_trait() {
+#[tokio::test]
+async fn test_retry_ext_trait() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let config = RunnableRetryConfig::builder().max_attempt_number(3).build();
     let retry = runnable.with_retry_config(config);
 
-    let result = retry.invoke(1, None).unwrap();
+    let result = retry.invoke(1, None).await.unwrap();
     assert_eq!(result, 2);
 }
 
-#[test]
-fn test_with_retry_convenience() {
+#[tokio::test]
+async fn test_with_retry_convenience() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let retry = runnable.with_retry(3, false);
 
-    let result = retry.invoke(1, None).unwrap();
+    let result = retry.invoke(1, None).await.unwrap();
     assert_eq!(result, 2);
 }
 

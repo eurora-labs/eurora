@@ -210,7 +210,11 @@ impl Runnable for JsonOutputToolsParser {
     type Input = AIMessage;
     type Output = Value;
 
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+    async fn invoke(
+        &self,
+        input: Self::Input,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
         let message = crate::messages::AnyMessage::AIMessage(input);
         let generation = ChatGeneration::builder().message(message).build();
         let tool_calls = self.parse_result(&[generation], false)?;
@@ -276,7 +280,11 @@ impl Runnable for JsonOutputKeyToolsParser {
     type Input = AIMessage;
     type Output = Value;
 
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+    async fn invoke(
+        &self,
+        input: Self::Input,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
         let message = crate::messages::AnyMessage::AIMessage(input);
         let generation = ChatGeneration::builder().message(message).build();
         let tool_calls = self.parse_result(&[generation], false)?;
@@ -395,7 +403,11 @@ impl Runnable for PydanticToolsParser {
     type Input = AIMessage;
     type Output = Value;
 
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+    async fn invoke(
+        &self,
+        input: Self::Input,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
         let message = crate::messages::AnyMessage::AIMessage(input);
         let generation = ChatGeneration::builder().message(message).build();
         self.parse_result(&[generation], false)

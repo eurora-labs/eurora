@@ -3,7 +3,8 @@ use std::env;
 
 use serde_json::json;
 
-use agent_chain_core::outputs::GenerationChunk;
+use agent_chain_core::messages::AIMessage;
+use agent_chain_core::outputs::ChatGenerationChunk;
 use agent_chain_core::utils::base::{ExposeSecret, from_env, secret_from_env};
 use agent_chain_core::utils::env::EnvError;
 use agent_chain_core::utils::merge::{MergeError, merge_dicts};
@@ -310,15 +311,20 @@ fn test_secret_from_env_with_custom_error_message() {
 fn test_generation_chunk_addition_combines_metadata() {
     let mut info1 = HashMap::new();
     info1.insert("len".to_string(), json!(0));
-    let chunk1 = GenerationChunk::builder()
-        .text("")
+    let chunk1 = ChatGenerationChunk::builder()
+        .message(AIMessage::builder().content("").build().into())
         .generation_info(info1)
         .build();
 
     let mut info2 = HashMap::new();
     info2.insert("len".to_string(), json!(14));
-    let chunk2 = GenerationChunk::builder()
-        .text("Non-empty text")
+    let chunk2 = ChatGenerationChunk::builder()
+        .message(
+            AIMessage::builder()
+                .content("Non-empty text")
+                .build()
+                .into(),
+        )
         .generation_info(info2)
         .build();
 
@@ -326,11 +332,16 @@ fn test_generation_chunk_addition_combines_metadata() {
 
     let mut expected_info = HashMap::new();
     expected_info.insert("len".to_string(), json!(14));
-    let expected = GenerationChunk::builder()
-        .text("Non-empty text")
+    let expected = ChatGenerationChunk::builder()
+        .message(
+            AIMessage::builder()
+                .content("Non-empty text")
+                .build()
+                .into(),
+        )
         .generation_info(expected_info)
         .build();
 
-    assert_eq!(result.text, expected.text);
+    assert_eq!(result.message.text(), expected.message.text());
     assert_eq!(result.generation_info, expected.generation_info);
 }

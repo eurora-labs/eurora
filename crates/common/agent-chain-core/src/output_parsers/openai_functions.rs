@@ -8,8 +8,6 @@ use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputP
 use crate::error::{Error, Result};
 use crate::messages::{AnyMessage, BaseMessage};
 use crate::outputs::ChatGeneration;
-use crate::outputs::Generation;
-use crate::runnables::RunnableConfig;
 use crate::utils::json::parse_partial_json;
 
 #[derive(Debug, Clone)]
@@ -408,19 +406,17 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
 impl BaseLLMOutputParser for OutputFunctionsParser {
     type Output = Value;
 
-    fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
+    fn parse_result(&self, _result: &[ChatGeneration], _partial: bool) -> Result<Self::Output> {
         Err(Error::output_parser_simple(
             "This output parser can only be used with a chat generation.",
         ))
     }
 }
 
-impl BaseGenerationOutputParser for OutputFunctionsParser {
-    fn invoke(
-        &self,
-        input: impl Into<AnyMessage>,
-        _config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
+impl BaseGenerationOutputParser for OutputFunctionsParser {}
+
+impl OutputFunctionsParser {
+    pub fn invoke_parser(&self, input: impl Into<AnyMessage>) -> Result<Value> {
         let message: AnyMessage = input.into();
         let chat_gen = ChatGeneration::builder().message(message).build();
         self.parse_result(&[chat_gen])
@@ -436,7 +432,7 @@ impl BaseOutputParser for JsonOutputFunctionsParser {
         ))
     }
 
-    fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
+    fn parse_result(&self, _result: &[ChatGeneration], _partial: bool) -> Result<Self::Output> {
         Err(Error::output_parser_simple(
             "This output parser can only be used with a chat generation.",
         ))

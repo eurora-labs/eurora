@@ -1,5 +1,5 @@
-import type { NativeTwitterTweet } from '../../../../shared/content/bindings';
 import type { ParseResult } from './types';
+import type { NativeTwitterTweet } from '../../../../shared/content/bindings';
 
 async function imageToBase64(url: string): Promise<string | null> {
 	try {

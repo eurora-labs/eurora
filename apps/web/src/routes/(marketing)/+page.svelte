@@ -27,19 +27,19 @@
 	let activeTab = $state<(typeof tabs)[number]['id']>('assistant');
 </script>
 
-<div class="mx-auto w-full max-w-[calc(60vh*16/9)] px-4">
+<div class="mx-auto w-full max-w-7xl px-4">
 	<div class="flex flex-col items-start py-12 max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
-			Your context. Your AI. Your terms.
+			Less typing, more answers.
 		</h1>
 		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
 			A private, open-source AI assistant that reads what you read. Ask questions about any
 			YouTube video, article, or tweet — Eurora captures the transcript, content, and metadata
 			so you don't have to copy-paste a thing.
 		</p>
-		<div class="flex flex-col items-start gap-4 w-full md:flex-row mt-16">
-			<DownloadButton class="h-24 w-md" />
-			<div class="h-24 w-32 overflow-hidden rounded-xl shrink-0">
+		<div class="flex flex-col items-center gap-4 w-full md:flex-row md:items-start mt-16">
+			<DownloadButton class="h-24 w-full max-w-md" />
+			<div class="hidden md:block h-24 w-32 overflow-hidden rounded-xl shrink-0">
 				<AutoplayVideo
 					src="https://d26xptavrz5c8t.cloudfront.net/video/juice_demo.mp4"
 					class="h-full w-full object-cover"
@@ -109,7 +109,7 @@
 			</FeatureSection.Header>
 			<FeatureSection.Content class="overflow-hidden">
 				<p
-					class="flex items-center p-6 h-200 text-lg leading-relaxed text-muted-foreground sm:p-10 sm:text-xl lg:p-14"
+					class="flex items-center p-6 md:h-200 text-lg leading-relaxed text-muted-foreground sm:p-10 sm:text-xl lg:p-14"
 				>
 					We are fully Open Source. Every single line of code is available for you to see.
 					You do not have to trust us. We do everything we can to provide you with the
@@ -159,7 +159,7 @@
 			class="relative mt-10 rounded-full px-12 py-7 text-xl font-semibold shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-shadow"
 			href="/download"
 		>
-			Get Started
+			Download
 		</Button>
 	</section>
 </div>

@@ -3,8 +3,6 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::StreamExt;
-use futures::stream::BoxStream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -109,20 +107,7 @@ where
             ))
         })
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let key = &input.key;
-        let actual_input = input.input;
-
-        let runnable = self
-            .runnables
-            .get(key)
-            .ok_or_else(|| Error::other(format!("No runnable associated with key '{}'", key)))?;
-
-        runnable.invoke(actual_input, config)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -138,43 +123,9 @@ where
             .get(key)
             .ok_or_else(|| Error::other(format!("No runnable associated with key '{}'", key)))?;
 
-        runnable.ainvoke(actual_input, config).await
+        runnable.invoke(actual_input, config).await
     }
-
-    fn batch(
-        &self,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        _return_exceptions: bool,
-    ) -> Vec<Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![Err(e)],
-        };
-
-        inputs
-            .into_iter()
-            .zip(configs)
-            .map(|(router_input, config)| {
-                let runnable = self.runnables.get(&router_input.key).ok_or_else(|| {
-                    Error::other(format!(
-                        "No runnable associated with key '{}'",
-                        router_input.key
-                    ))
-                })?;
-                runnable.invoke(router_input.input, Some(config))
-            })
-            .collect()
-    }
-
-    async fn abatch(
+    async fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
@@ -209,45 +160,13 @@ where
                     });
                 Box::pin(async move {
                     let runnable = runnable?;
-                    runnable.ainvoke(router_input.input, Some(config)).await
+                    runnable.invoke(router_input.input, Some(config)).await
                 })
                     as std::pin::Pin<Box<dyn std::future::Future<Output = Result<O>> + Send>>
             })
             .collect();
 
         gather_with_concurrency(max_concurrency, futures).await
-    }
-
-    fn stream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        self.astream(input, config)
-    }
-
-    fn astream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        Box::pin(async_stream::stream! {
-            let runnable = match self.runnables.get(&input.key) {
-                Some(r) => r,
-                None => {
-                    yield Err(Error::other(format!("No runnable associated with key '{}'", input.key)));
-                    return;
-                }
-            };
-
-            let mut stream = runnable.astream(input.input, config);
-            while let Some(output) = stream.next().await {
-                yield output;
-            }
-        })
     }
 }
 
@@ -292,6 +211,7 @@ pub type DynRouterRunnable = RouterRunnable<Value, Value>;
 mod tests {
     use super::*;
     use crate::runnables::RunnableLambda;
+    use futures::StreamExt;
 
     #[test]
     fn test_router_input() {
@@ -300,29 +220,12 @@ mod tests {
         assert_eq!(input.input, 5);
     }
 
-    #[test]
-    fn test_router_runnable_invoke() {
-        let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-        let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
-
-        let router = RouterRunnable::builder()
-            .build()
-            .add("add", add)
-            .add("square", square);
-
-        let result = router.invoke(RouterInput::new("add", 5), None).unwrap();
-        assert_eq!(result, 6);
-
-        let result = router.invoke(RouterInput::new("square", 4), None).unwrap();
-        assert_eq!(result, 16);
-    }
-
-    #[test]
-    fn test_router_runnable_missing_key() {
+    #[tokio::test]
+    async fn test_router_runnable_missing_key() {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let router = RouterRunnable::builder().build().add("add", add);
 
-        let result = router.invoke(RouterInput::new("multiply", 5), None);
+        let result = router.invoke(RouterInput::new("multiply", 5), None).await;
         assert!(result.is_err());
         assert!(
             result
@@ -330,29 +233,6 @@ mod tests {
                 .to_string()
                 .contains("No runnable associated with key")
         );
-    }
-
-    #[test]
-    fn test_router_runnable_batch() {
-        let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-        let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
-
-        let router = RouterRunnable::builder()
-            .build()
-            .add("add", add)
-            .add("square", square);
-
-        let inputs = vec![
-            RouterInput::new("add", 5),
-            RouterInput::new("square", 4),
-            RouterInput::new("add", 10),
-        ];
-
-        let results = router.batch(inputs, None, false);
-        assert_eq!(results.len(), 3);
-        assert_eq!(results[0].as_ref().unwrap(), &6);
-        assert_eq!(results[1].as_ref().unwrap(), &16);
-        assert_eq!(results[2].as_ref().unwrap(), &11);
     }
 
     #[test]
@@ -383,7 +263,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_router_runnable_ainvoke() {
+    async fn test_router_runnable_invoke() {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
 
@@ -393,20 +273,20 @@ mod tests {
             .add("square", square);
 
         let result = router
-            .ainvoke(RouterInput::new("add", 5), None)
+            .invoke(RouterInput::new("add", 5), None)
             .await
             .unwrap();
         assert_eq!(result, 6);
 
         let result = router
-            .ainvoke(RouterInput::new("square", 4), None)
+            .invoke(RouterInput::new("square", 4), None)
             .await
             .unwrap();
         assert_eq!(result, 16);
     }
 
     #[tokio::test]
-    async fn test_router_runnable_abatch() {
+    async fn test_router_runnable_batch() {
         let add = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let square = RunnableLambda::builder().func(|x: i32| Ok(x * x)).build();
 
@@ -417,7 +297,7 @@ mod tests {
 
         let inputs = vec![RouterInput::new("add", 5), RouterInput::new("square", 4)];
 
-        let results = router.abatch(inputs, None, false).await;
+        let results = router.batch(inputs, None, false).await;
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].as_ref().unwrap(), &6);
         assert_eq!(results[1].as_ref().unwrap(), &16);

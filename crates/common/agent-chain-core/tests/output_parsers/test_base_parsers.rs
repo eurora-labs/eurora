@@ -5,7 +5,7 @@ use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::output_parsers::{
     BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, BaseTransformOutputParser,
 };
-use agent_chain_core::outputs::Generation;
+use agent_chain_core::outputs::ChatGeneration;
 use futures::StreamExt;
 
 fn swap_case(s: &str) -> String {
@@ -28,13 +28,13 @@ struct GenerationStrInvertCase;
 impl BaseLLMOutputParser for GenerationStrInvertCase {
     type Output = String;
 
-    fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<String> {
+    fn parse_result(&self, result: &[ChatGeneration], _partial: bool) -> Result<String> {
         if result.len() != 1 {
             return Err(agent_chain_core::error::Error::NotImplemented(
                 "This output parser can only be used with a single generation.".to_string(),
             ));
         }
-        Ok(swap_case(&result[0].text))
+        Ok(swap_case(&result[0].message.text()))
     }
 }
 
@@ -57,7 +57,7 @@ async fn test_base_generation_parser() {
 
     let parser = GenerationStrInvertCase;
     let result = parser
-        .invoke(model_output.generations[0].message.clone(), None)
+        .parse_result(&[model_output.generations[0].clone()], false)
         .unwrap();
 
     assert_eq!(result, "HeLLO");
@@ -75,13 +75,13 @@ impl BaseOutputParser for TransformStrInvertCase {
         ))
     }
 
-    fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<String> {
+    fn parse_result(&self, result: &[ChatGeneration], _partial: bool) -> Result<String> {
         if result.len() != 1 {
             return Err(agent_chain_core::error::Error::NotImplemented(
                 "This output parser can only be used with a single generation.".to_string(),
             ));
         }
-        Ok(swap_case(&result[0].text))
+        Ok(swap_case(&result[0].message.text()))
     }
 
     fn parser_type(&self) -> &str {
@@ -104,6 +104,7 @@ async fn test_base_transform_output_parser() {
             None,
             None,
         )
+        .await
         .unwrap();
 
     let input_stream = stream.filter_map(|chunk| async { chunk.ok().map(|c| c.message) });

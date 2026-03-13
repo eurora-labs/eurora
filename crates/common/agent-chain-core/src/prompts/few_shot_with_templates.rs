@@ -6,11 +6,11 @@ use async_trait::async_trait;
 use bon::bon;
 
 use crate::error::{Error, Result};
-use crate::prompt_values::StringPromptValue;
+use crate::messages::AnyMessage;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
+use super::base::BasePromptTemplate;
 use super::few_shot::ExampleSelectorClone;
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate};
@@ -33,7 +33,7 @@ pub struct FewShotPromptWithTemplates {
 
     input_variables: Vec<String>,
 
-    partial_variables: HashMap<String, PartialValue>,
+    partial_variables: HashMap<String, String>,
 
     validate_template: bool,
 }
@@ -74,7 +74,7 @@ impl FewShotPromptWithTemplates {
             prefix,
             template_format,
             input_variables,
-            partial_variables: HashMap::<String, PartialValue>::new(),
+            partial_variables: HashMap::new(),
             validate_template,
         };
         result.validate_template_variables()?;
@@ -111,7 +111,7 @@ impl FewShotPromptWithTemplates {
             prefix,
             template_format: PromptTemplateFormat::FString,
             input_variables,
-            partial_variables: HashMap::<String, PartialValue>::new(),
+            partial_variables: HashMap::new(),
             validate_template: false,
         };
         result.validate_template_variables()?;
@@ -169,7 +169,7 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
     }
 
     fn partial_variables(&self) -> HashMap<String, String> {
-        resolve_partials(&self.partial_variables)
+        self.partial_variables.clone()
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
@@ -202,10 +202,7 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
             .join(&self.example_separator))
     }
 
-    fn partial(
-        &self,
-        kwargs: HashMap<String, PartialValue>,
-    ) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
         let new_vars: Vec<_> = self
             .input_variables
             .iter()
@@ -258,31 +255,17 @@ impl BasePromptTemplate for FewShotPromptWithTemplates {
 #[async_trait]
 impl Runnable for FewShotPromptWithTemplates {
     type Input = HashMap<String, String>;
-    type Output = StringPromptValue;
+    type Output = Vec<AnyMessage>;
 
     fn name(&self) -> Option<String> {
         Some("FewShotPromptWithTemplates".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = merge_prompt_config(config, self.metadata(), self.tags());
-        self.call_with_config(
-            &|input, _config| {
-                BasePromptTemplate::validate_input(self, &input)?;
-                let text = BasePromptTemplate::format(self, &input)?;
-                Ok(StringPromptValue::new(text))
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.invoke(input, config)
+        self.format_messages(&input)
     }
 }
 
@@ -292,7 +275,7 @@ impl StringPromptTemplate for FewShotPromptWithTemplates {
     }
 
     fn partial_variables(&self) -> HashMap<String, String> {
-        resolve_partials(&self.partial_variables)
+        self.partial_variables.clone()
     }
 
     fn template_format(&self) -> PromptTemplateFormat {
