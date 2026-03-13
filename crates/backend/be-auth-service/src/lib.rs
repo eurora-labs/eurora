@@ -2,7 +2,7 @@ pub use auth_core::{Claims, Role};
 use be_auth_core::JwtConfig;
 use be_remote_db::{DatabaseManager, OAuthProvider};
 use bon::bon;
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
 use proto_gen::auth::{
@@ -228,13 +228,13 @@ impl AuthService {
         Ok(self.resolve_role(user_id).await)
     }
 
-    async fn generate_tokens(
+    fn generate_jwt_tokens(
         &self,
         user_id: &str,
         username: &str,
         email: &str,
         role: Role,
-    ) -> Result<(String, String), AuthError> {
+    ) -> Result<(String, String, Vec<u8>, DateTime<Utc>), AuthError> {
         let now = Utc::now();
         let access_exp = now + Duration::hours(self.jwt_config.access_token_expiry_hours);
         let refresh_exp = now + Duration::days(self.jwt_config.refresh_token_expiry_days);
@@ -277,10 +277,23 @@ impl AuthService {
         )
         .map_err(|e| AuthError::TokenGeneration(e.to_string()))?;
 
+        let token_hash = self.hash_refresh_token(&refresh_token);
+
+        Ok((access_token, refresh_token, token_hash, refresh_exp))
+    }
+
+    async fn generate_tokens(
+        &self,
+        user_id: &str,
+        username: &str,
+        email: &str,
+        role: Role,
+    ) -> Result<(String, String), AuthError> {
+        let (access_token, refresh_token, token_hash, refresh_exp) =
+            self.generate_jwt_tokens(user_id, username, email, role)?;
+
         let user_uuid = Uuid::parse_str(user_id)
             .map_err(|e| AuthError::Internal(format!("Invalid user ID format: {e}")))?;
-
-        let token_hash = self.hash_refresh_token(&refresh_token);
 
         self.db
             .create_refresh_token()
@@ -909,35 +922,53 @@ impl ProtoAuthService for AuthService {
         }
 
         let code_challenge = self.code_verifier_to_challenge(&code_verifier);
-        let token_hash = self.hash_login_token(&code_challenge);
+        let login_token_hash = self.hash_login_token(&code_challenge);
 
-        let (_, user) = self
+        let login_token = self
             .db
-            .consume_login_token_with_user()
-            .token_hash(&token_hash)
+            .get_login_token_by_hash()
+            .token_hash(&login_token_hash)
             .call()
             .await
             .map_err(|e| {
-                tracing::warn!("Failed to consume login token: {}", e);
+                tracing::warn!("Failed to find login token: {}", e);
                 Status::from(AuthError::InvalidToken)
             })?;
 
-        let role = self
-            .ensure_plan_and_resolve_role(user.id, &user.email)
+        let user = self
+            .db
+            .get_user()
+            .id(login_token.user_id)
+            .call()
             .await
-            .map_err(Status::from)?;
-        let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
-            .await
+            .map_err(|e| {
+                tracing::warn!("Failed to fetch user for login token: {}", e);
+                Status::from(AuthError::InvalidToken)
+            })?;
+
+        let role = self.resolve_role(user.id).await;
+
+        let (access_token, refresh_token, refresh_token_hash, refresh_exp) = self
+            .generate_jwt_tokens(&user.id.to_string(), &user.username, &user.email, role)
             .map_err(Status::from)?;
 
-        let response = TokenResponse {
+        self.db
+            .consume_login_token_and_create_refresh_token()
+            .login_token_hash(&login_token_hash)
+            .refresh_token_hash(refresh_token_hash)
+            .refresh_token_expires_at(refresh_exp)
+            .call()
+            .await
+            .map_err(|e| {
+                tracing::warn!("Failed to exchange login token: {}", e);
+                Status::from(AuthError::InvalidToken)
+            })?;
+
+        Ok(Response::new(TokenResponse {
             access_token,
             refresh_token,
             expires_in: self.jwt_config.access_token_expiry_hours * 3600,
-        };
-
-        Ok(Response::new(response))
+        }))
     }
 
     async fn associate_login_token(
