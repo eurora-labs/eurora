@@ -67,7 +67,7 @@ async fn test_local_cache_async() {
         .build();
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("How are you?").build(),
             )],
@@ -78,7 +78,7 @@ async fn test_local_cache_async() {
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("How are you?").build(),
             )],
@@ -89,7 +89,7 @@ async fn test_local_cache_async() {
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("meow?").build(),
             )],
@@ -165,7 +165,7 @@ async fn test_global_cache_async() {
         .build();
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("How are you?").build(),
             )],
@@ -176,7 +176,7 @@ async fn test_global_cache_async() {
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("How are you?").build(),
             )],
@@ -187,7 +187,7 @@ async fn test_global_cache_async() {
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("nice").build(),
             )],
@@ -246,7 +246,7 @@ async fn test_no_cache_async() {
         .build();
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("How are you?").build(),
             )],
@@ -257,7 +257,7 @@ async fn test_no_cache_async() {
     assert_eq!(result.content, "hello");
 
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("How are you?").build(),
             )],
@@ -403,7 +403,7 @@ async fn test_convert_cached_generations_legacy_format() {
         .unwrap();
     assert_eq!(result.content, "first");
 
-    cache.clear();
+    cache.clear().await;
 
     let messages = vec![agent_chain_core::messages::AnyMessage::from("legacy test")];
     let prompt_key = serde_json::to_string(&messages).unwrap();
@@ -414,7 +414,9 @@ async fn test_convert_cached_generations_legacy_format() {
             .message(AIMessage::builder().content("legacy text").build().into())
             .build(),
     ];
-    cache.update(&prompt_key, &llm_string, legacy_generations);
+    cache
+        .update(&prompt_key, &llm_string, legacy_generations)
+        .await;
 
     let result = model
         .invoke(

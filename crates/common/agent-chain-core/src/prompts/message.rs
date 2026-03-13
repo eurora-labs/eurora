@@ -9,15 +9,6 @@ pub trait BaseMessagePromptTemplate: Send + Sync {
 
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>>;
 
-    fn aformat_messages(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<AnyMessage>>> + Send + '_>>
-    {
-        let result = self.format_messages(kwargs);
-        Box::pin(async move { result })
-    }
-
     fn pretty_repr(&self, html: bool) -> String;
 
     fn pretty_print(&self) {

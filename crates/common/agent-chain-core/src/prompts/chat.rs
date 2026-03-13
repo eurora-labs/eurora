@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, merge_prompt_config};
+use super::base::BasePromptTemplate;
 use super::dict::DictPromptTemplate;
 use super::image::ImagePromptTemplate;
 use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
@@ -158,14 +158,6 @@ pub trait BaseStringMessagePromptTemplate: BaseMessagePromptTemplate {
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<AnyMessage>;
-
-    fn aformat(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<AnyMessage>> + Send + '_>> {
-        let result = self.format(kwargs);
-        Box::pin(async move { result })
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -514,15 +506,6 @@ impl std::fmt::Debug for MessageLikeRepresentation {
 pub trait BaseChatPromptTemplate: BasePromptTemplate {
     fn format_chat_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>>;
 
-    fn aformat_chat_messages(
-        &self,
-        input: &ChatPromptInput,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<AnyMessage>>> + Send + '_>>
-    {
-        let result = self.format_chat_messages(input);
-        Box::pin(async move { result })
-    }
-
     fn pretty_repr(&self, html: bool) -> String;
 
     fn pretty_print(&self) {
@@ -743,25 +726,12 @@ impl Runnable for ChatPromptTemplate {
     fn name(&self) -> Option<String> {
         Some("ChatPromptTemplate".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = merge_prompt_config(config, self.metadata(), self.tags());
-        self.call_with_config(
-            &|input: ChatPromptInput, _config| {
-                self.validate_input(&input.variables)?;
-                BaseChatPromptTemplate::format_chat_messages(self, &input)
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.invoke(input, config)
+        self.format_chat_messages(&input)
     }
 }
 

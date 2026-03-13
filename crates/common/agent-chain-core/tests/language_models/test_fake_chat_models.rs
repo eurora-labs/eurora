@@ -191,7 +191,7 @@ mod test_fake_list_chat_model {
         let model = FakeListChatModel::builder()
             .responses(vec!["hello".to_string()])
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -208,7 +208,7 @@ mod test_fake_list_chat_model {
         let model = FakeListChatModel::builder()
             .responses(vec!["ab".to_string()])
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -225,7 +225,7 @@ mod test_fake_list_chat_model {
             .responses(vec!["hello".to_string()])
             .error_on_chunk(2)
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let chunk1 = stream.next().await.unwrap();
         assert!(chunk1.is_ok()); // h
@@ -243,7 +243,7 @@ mod test_fake_list_chat_model {
         let model = FakeListChatModel::builder()
             .responses(vec!["hello".to_string()])
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -263,7 +263,7 @@ mod test_fake_list_chat_model {
             .responses(vec!["hello".to_string()])
             .error_on_chunk(2)
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut successful_chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -462,7 +462,7 @@ mod test_generic_fake_chat_model {
     async fn test_stream_splits_on_whitespace() {
         let messages = vec![AIMessage::builder().content("hello world").build()];
         let model = GenericFakeChatModel::from_vec(messages);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -500,7 +500,7 @@ mod test_generic_fake_chat_model {
             .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -529,7 +529,7 @@ mod test_generic_fake_chat_model {
             .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -545,7 +545,7 @@ mod test_generic_fake_chat_model {
     async fn test_stream_empty_content_no_kwargs() {
         let ai_msg = AIMessage::builder().content("").build();
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -827,7 +827,7 @@ mod test_fake_list_chat_model_additional {
         let model = FakeListChatModel::builder()
             .responses(vec!["x".to_string()])
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -843,7 +843,7 @@ mod test_fake_list_chat_model_additional {
         let model = FakeListChatModel::builder()
             .responses(vec!["abc".to_string()])
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -861,7 +861,7 @@ mod test_fake_list_chat_model_additional {
             .responses(vec!["hello".to_string()])
             .error_on_chunk(0)
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let first = stream.next().await.unwrap();
         assert!(first.is_err());
@@ -873,7 +873,7 @@ mod test_fake_list_chat_model_additional {
             .responses(vec!["hello".to_string()])
             .error_on_chunk(0)
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -890,7 +890,7 @@ mod test_fake_list_chat_model_additional {
         let model = FakeListChatModel::builder()
             .responses(vec!["".to_string()])
             .build();
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -982,7 +982,7 @@ mod test_generic_fake_chat_model_additional {
     async fn test_stream_with_multiple_words_preserves_whitespace() {
         let messages = vec![AIMessage::builder().content("hello world foo").build()];
         let model = GenericFakeChatModel::from_vec(messages);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -1016,7 +1016,7 @@ mod test_generic_fake_chat_model_additional {
             .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -1032,7 +1032,7 @@ mod test_generic_fake_chat_model_additional {
     async fn test_stream_chunk_position_last_no_additional_kwargs() {
         let messages = vec![AIMessage::builder().content("hi there").build()];
         let model = GenericFakeChatModel::from_vec(messages);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -1063,7 +1063,7 @@ mod test_generic_fake_chat_model_additional {
             .build();
 
         let model = GenericFakeChatModel::from_vec(vec![ai_msg]);
-        let mut stream = model._stream(vec![], None, None).unwrap();
+        let mut stream = model._stream(vec![], None, None).await.unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {
@@ -1174,7 +1174,10 @@ mod test_generic_fake_chat_model_run_manager {
         let run_manager =
             CallbackManagerForLLMRun::new(RunManagerCore::new(Uuid::new_v4(), config));
 
-        let mut stream = model._stream(vec![], None, Some(&run_manager)).unwrap();
+        let mut stream = model
+            ._stream(vec![], None, Some(&run_manager))
+            .await
+            .unwrap();
 
         let mut chunks = Vec::new();
         while let Some(chunk_result) = stream.next().await {

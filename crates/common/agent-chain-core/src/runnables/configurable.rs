@@ -291,13 +291,7 @@ where
 
         get_unique_config_specs(specs).map_err(Error::other)
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (runnable, config) = self.prepare_internal(config);
-        runnable.invoke(input, Some(config))
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -306,50 +300,9 @@ where
         Self: 'static,
     {
         let (runnable, config) = self.prepare_internal(config);
-        runnable.ainvoke(input, Some(config)).await
+        runnable.invoke(input, Some(config)).await
     }
-
-    fn batch(
-        &self,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        return_exceptions: bool,
-    ) -> Vec<Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![Err(e)],
-        };
-        let prepared: Vec<_> = configs
-            .iter()
-            .map(|c| self.prepare_internal(Some(c.clone())))
-            .collect();
-
-        let all_default = prepared.iter().all(|(r, _)| Arc::ptr_eq(r, &self.default));
-
-        if all_default {
-            let prepared_configs: Vec<_> = prepared.into_iter().map(|(_, c)| c).collect();
-            return self.default.batch(
-                inputs,
-                Some(ConfigOrList::List(prepared_configs)),
-                return_exceptions,
-            );
-        }
-
-        inputs
-            .into_iter()
-            .zip(prepared)
-            .map(|(input, (runnable, config))| runnable.invoke(input, Some(config)))
-            .collect()
-    }
-
-    async fn abatch(
+    async fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
@@ -377,7 +330,7 @@ where
             let prepared_configs: Vec<_> = prepared.into_iter().map(|(_, c)| c).collect();
             return self
                 .default
-                .abatch(
+                .batch(
                     inputs,
                     Some(ConfigOrList::List(prepared_configs)),
                     return_exceptions,
@@ -391,26 +344,13 @@ where
             .into_iter()
             .zip(prepared)
             .map(|(input, (runnable, config))| {
-                Box::pin(async move { runnable.ainvoke(input, Some(config)).await })
+                Box::pin(async move { runnable.invoke(input, Some(config)).await })
                     as std::pin::Pin<Box<dyn std::future::Future<Output = Result<O>> + Send>>
             })
             .collect();
 
         gather_with_concurrency(max_concurrency, futures).await
     }
-
-    fn stream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        let (runnable, config) = self.prepare_internal(config);
-        Box::pin(async_stream::stream! {
-            let result = runnable.invoke(input, Some(config));
-            yield result;
-        })
-    }
-
     fn transform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
@@ -419,23 +359,6 @@ where
         let (runnable, config) = self.prepare_internal(config);
         Box::pin(async_stream::stream! {
             let mut stream = runnable.transform(input, Some(config));
-            while let Some(item) = futures::StreamExt::next(&mut stream).await {
-                yield item;
-            }
-        })
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        let (runnable, config) = self.prepare_internal(config);
-        Box::pin(async_stream::stream! {
-            let mut stream = runnable.atransform(input, Some(config));
             while let Some(item) = futures::StreamExt::next(&mut stream).await {
                 yield item;
             }
@@ -621,13 +544,7 @@ where
         let specs = vec![which_spec];
         get_unique_config_specs(specs).map_err(Error::other)
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (runnable, config) = self.prepare_internal(config)?;
-        runnable.invoke(input, Some(config))
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -636,61 +553,9 @@ where
         Self: 'static,
     {
         let (runnable, config) = self.prepare_internal(config)?;
-        runnable.ainvoke(input, Some(config)).await
+        runnable.invoke(input, Some(config)).await
     }
-
-    fn batch(
-        &self,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        return_exceptions: bool,
-    ) -> Vec<Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![Err(e)],
-        };
-        let prepared: Vec<_> = configs
-            .iter()
-            .map(|c| self.prepare_internal(Some(c.clone())))
-            .collect();
-
-        let all_default = prepared.iter().all(|r| {
-            r.as_ref()
-                .map(|(runnable, _)| Arc::ptr_eq(runnable, &self.default))
-                .unwrap_or(false)
-        });
-
-        if all_default {
-            let prepared_configs: Vec<_> = prepared
-                .into_iter()
-                .filter_map(|r| r.ok())
-                .map(|(_, c)| c)
-                .collect();
-            return self.default.batch(
-                inputs,
-                Some(ConfigOrList::List(prepared_configs)),
-                return_exceptions,
-            );
-        }
-
-        inputs
-            .into_iter()
-            .zip(prepared)
-            .map(|(input, prepared_result)| match prepared_result {
-                Ok((runnable, config)) => runnable.invoke(input, Some(config)),
-                Err(e) => Err(e),
-            })
-            .collect()
-    }
-
-    async fn abatch(
+    async fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
@@ -726,7 +591,7 @@ where
                 .collect();
             return self
                 .default
-                .abatch(
+                .batch(
                     inputs,
                     Some(ConfigOrList::List(prepared_configs)),
                     return_exceptions,
@@ -742,7 +607,7 @@ where
             .map(|(input, prepared_result)| {
                 Box::pin(async move {
                     match prepared_result {
-                        Ok((runnable, config)) => runnable.ainvoke(input, Some(config)).await,
+                        Ok((runnable, config)) => runnable.invoke(input, Some(config)).await,
                         Err(e) => Err(e),
                     }
                 })
@@ -752,25 +617,6 @@ where
 
         gather_with_concurrency(max_concurrency, futures).await
     }
-
-    fn stream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        Box::pin(async_stream::stream! {
-            match self.prepare_internal(config) {
-                Ok((runnable, config)) => {
-                    let result = runnable.invoke(input, Some(config));
-                    yield result;
-                }
-                Err(e) => {
-                    yield Err(e);
-                }
-            }
-        })
-    }
-
     fn transform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
@@ -780,29 +626,6 @@ where
             match self.prepare_internal(config) {
                 Ok((runnable, config)) => {
                     let mut stream = runnable.transform(input, Some(config));
-                    while let Some(item) = futures::StreamExt::next(&mut stream).await {
-                        yield item;
-                    }
-                }
-                Err(e) => {
-                    yield Err(e);
-                }
-            }
-        })
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        Box::pin(async_stream::stream! {
-            match self.prepare_internal(config) {
-                Ok((runnable, config)) => {
-                    let mut stream = runnable.atransform(input, Some(config));
                     while let Some(item) = futures::StreamExt::next(&mut stream).await {
                         yield item;
                     }
@@ -941,18 +764,18 @@ mod tests {
         assert_eq!(config_spec.default, Some(Value::String("low".to_string())));
     }
 
-    #[test]
-    fn test_configurable_fields_invoke() {
+    #[tokio::test]
+    async fn test_configurable_fields_invoke() {
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let fields = HashMap::new();
         let configurable = runnable.configurable_fields(fields);
 
-        let result = configurable.invoke(5, None).unwrap();
+        let result = configurable.invoke(5, None).await.unwrap();
         assert_eq!(result, 10);
     }
 
-    #[test]
-    fn test_configurable_alternatives_invoke() {
+    #[tokio::test]
+    async fn test_configurable_alternatives_invoke() {
         let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let alt = RunnableLambda::builder().func(|x: i32| Ok(x * 3)).build();
 
@@ -966,7 +789,7 @@ mod tests {
             false,
         );
 
-        let result = configurable.invoke(5, None).unwrap();
+        let result = configurable.invoke(5, None).await.unwrap();
         assert_eq!(result, 10);
 
         let mut config = RunnableConfig::default();
@@ -974,12 +797,12 @@ mod tests {
             "multiplier".to_string(),
             Value::String("triple".to_string()),
         );
-        let result = configurable.invoke(5, Some(config)).unwrap();
+        let result = configurable.invoke(5, Some(config)).await.unwrap();
         assert_eq!(result, 15);
     }
 
-    #[test]
-    fn test_configurable_alternatives_unknown() {
+    #[tokio::test]
+    async fn test_configurable_alternatives_unknown() {
         let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let alternatives = HashMap::new();
 
@@ -996,22 +819,12 @@ mod tests {
             Value::String("unknown".to_string()),
         );
 
-        let result = configurable.invoke(5, Some(config));
+        let result = configurable.invoke(5, Some(config)).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
-    async fn test_configurable_fields_ainvoke() {
-        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-        let fields = HashMap::new();
-        let configurable = runnable.configurable_fields(fields);
-
-        let result = configurable.ainvoke(5, None).await.unwrap();
-        assert_eq!(result, 10);
-    }
-
-    #[tokio::test]
-    async fn test_configurable_alternatives_ainvoke() {
+    async fn test_configurable_alternatives_with_different_alt() {
         let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let alt = RunnableLambda::builder().func(|x: i32| Ok(x + 100)).build();
 
@@ -1034,12 +847,12 @@ mod tests {
             Value::String("add_hundred".to_string()),
         );
 
-        let result = configurable.ainvoke(5, Some(config)).await.unwrap();
+        let result = configurable.invoke(5, Some(config)).await.unwrap();
         assert_eq!(result, 105);
     }
 
-    #[test]
-    fn test_configurable_with_factory() {
+    #[tokio::test]
+    async fn test_configurable_with_factory() {
         let default = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
 
         let mut alternatives = HashMap::new();
@@ -1064,7 +877,7 @@ mod tests {
             Value::String("triple".to_string()),
         );
 
-        let result = configurable.invoke(5, Some(config)).unwrap();
+        let result = configurable.invoke(5, Some(config)).await.unwrap();
         assert_eq!(result, 15);
     }
 }

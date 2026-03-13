@@ -25,7 +25,7 @@ async fn test_reasoning_stream_no_reasoning_sync() -> Result<(), Box<dyn std::er
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -67,7 +67,7 @@ async fn test_reasoning_stream_no_reasoning_async() -> Result<(), Box<dyn std::e
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -103,7 +103,7 @@ async fn test_reasoning_stream_none_sync() -> Result<(), Box<dyn std::error::Err
     // reasoning=None is the default (not set)
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -136,7 +136,7 @@ async fn test_reasoning_stream_none_async() -> Result<(), Box<dyn std::error::Er
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -170,7 +170,7 @@ async fn test_reasoning_stream_enabled_sync() -> Result<(), Box<dyn std::error::
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -206,7 +206,7 @@ async fn test_reasoning_stream_enabled_async() -> Result<(), Box<dyn std::error:
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -275,7 +275,7 @@ async fn test_reasoning_invoke_no_reasoning_async() -> Result<(), Box<dyn std::e
         .build();
 
     let result = llm
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -337,7 +337,7 @@ async fn test_reasoning_invoke_none_async() -> Result<(), Box<dyn std::error::Er
         .build();
 
     let result = llm
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)
@@ -407,7 +407,7 @@ async fn test_reasoning_invoke_enabled_async() -> Result<(), Box<dyn std::error:
         .build();
 
     let result = llm
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content(SAMPLE_PROMPT)

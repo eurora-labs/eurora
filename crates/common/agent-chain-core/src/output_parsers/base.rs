@@ -13,17 +13,7 @@ pub trait BaseLLMOutputParser: Send + Sync + Debug {
     fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Self::Output>;
 }
 
-pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
-    fn invoke(
-        &self,
-        input: impl Into<AnyMessage>,
-        _config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
-        let msg: AnyMessage = input.into();
-        let generation = ChatGeneration::builder().message(msg).build();
-        self.parse_result(&[generation], false)
-    }
-}
+pub trait BaseGenerationOutputParser: BaseLLMOutputParser {}
 
 pub trait BaseOutputParser: Send + Sync + Debug {
     type Output: Send + Sync + Clone + Debug;
@@ -48,17 +38,6 @@ pub trait BaseOutputParser: Send + Sync + Debug {
     }
 
     fn parser_type(&self) -> &str;
-
-    fn invoke(
-        &self,
-        input: impl Into<AnyMessage>,
-        _config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
-        let msg: AnyMessage = input.into();
-        let generation = ChatGeneration::builder().message(msg).build();
-        self.parse_result(&[generation], false)
-    }
-
     fn into_runnable(self) -> RunnableOutputParser<Self>
     where
         Self: Sized,
@@ -101,21 +80,20 @@ where
             self.parser.parser_type()
         ))
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        self.parser.invoke(input, config)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output>
     where
         Self: 'static,
     {
         let parser = self.parser.clone();
-        run_in_executor(move || parser.invoke(input, config)).await?
+        run_in_executor(move || {
+            let generation = ChatGeneration::builder().message(input).build();
+            parser.parse_result(&[generation], false)
+        })
+        .await?
     }
 }
 
@@ -123,7 +101,7 @@ where
 mod tests {
     use super::*;
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct TestParser;
 
     impl BaseOutputParser for TestParser {
@@ -162,19 +140,22 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[test]
-    fn test_invoke_with_string() {
+    #[tokio::test]
+    async fn test_invoke_with_string() {
         let parser = TestParser;
-        let result = parser.invoke("hello", None).unwrap();
+        let runnable = parser.into_runnable();
+        use crate::messages::HumanMessage;
+        let msg = AnyMessage::HumanMessage(HumanMessage::builder().content("hello").build());
+        let result = runnable.invoke(msg, None).await.unwrap();
         assert_eq!(result, "HELLO");
     }
 
-    #[test]
-    fn test_invoke_with_message() {
+    #[tokio::test]
+    async fn test_invoke_with_message() {
         use crate::messages::HumanMessage;
-        let parser = TestParser;
+        let parser = TestParser.into_runnable();
         let msg = AnyMessage::HumanMessage(HumanMessage::builder().content("hello").build());
-        let result = parser.invoke(msg, None).unwrap();
+        let result = parser.invoke(msg, None).await.unwrap();
         assert_eq!(result, "HELLO");
     }
 

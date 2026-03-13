@@ -32,7 +32,7 @@ use syn::{
 /// - `fn foo() -> Result<String>` — Errors propagate through `BaseTool`'s error handling
 ///   (matching Python's `ToolException` behavior)
 ///
-/// When returning `Result`, errors are propagated to `BaseTool::run`/`arun` which applies
+/// When returning `Result`, errors are propagated to `BaseTool::run` which applies
 /// `handle_tool_error` and `handle_validation_error` policies — just like Python's `@tool`
 /// propagates exceptions through `BaseTool.run()`.
 ///
@@ -208,7 +208,7 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
         })
         .collect();
 
-    // --- tool_run/tool_arun param extraction (returns Err on failure) ---
+    // --- tool_run param extraction (returns Err on failure) ---
     let result_param_extractions: Vec<_> = params
         .iter()
         .map(|p| {
@@ -257,12 +257,6 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
-    let fn_call_sync = quote! {
-        fn __tool_fn(#(#param_names: #param_types),*) #fn_return_type
-            #fn_body
-        __tool_fn(#(#param_names),*)
-    };
-
     let extract_args = quote! {
         let args = match input {
             ::agent_chain::_core::tools::ToolInput::Dict(d) => d,
@@ -286,8 +280,8 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // --- Result handling differs based on whether the function returns Result<T> or T ---
 
-    // For tool_arun: serialize the successful value into ToolOutput
-    let arun_result_handling = if returns_result {
+    // For tool_run: serialize the successful value into ToolOutput
+    let run_result_handling = if returns_result {
         quote! {
             let result: #actual_return_type = { #fn_call_async };
             let value = result?;
@@ -298,34 +292,6 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
     } else {
         quote! {
             let result: #actual_return_type = { #fn_call_async };
-            let result_str = serde_json::to_string(&result)
-                .unwrap_or_else(|_| format!("{:?}", result));
-            Ok(::agent_chain::_core::tools::ToolOutput::String(result_str))
-        }
-    };
-
-    // For tool_run (sync)
-    let tool_run_body = if is_async {
-        quote! {
-            Err(::agent_chain::_core::error::Error::ToolInvocation(
-                "This is an async tool. Use async invoke instead.".to_string()
-            ))
-        }
-    } else if returns_result {
-        quote! {
-            #extract_args
-            #(#result_param_extractions)*
-            let result: #actual_return_type = { #fn_call_sync };
-            let value = result?;
-            let result_str = serde_json::to_string(&value)
-                .unwrap_or_else(|_| format!("{:?}", value));
-            Ok(::agent_chain::_core::tools::ToolOutput::String(result_str))
-        }
-    } else {
-        quote! {
-            #extract_args
-            #(#result_param_extractions)*
-            let result: #actual_return_type = { #fn_call_sync };
             let result_str = serde_json::to_string(&result)
                 .unwrap_or_else(|_| format!("{:?}", result));
             Ok(::agent_chain::_core::tools::ToolOutput::String(result_str))
@@ -434,16 +400,7 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
                     #response_format_expr
                 }
 
-                fn tool_run(
-                    &self,
-                    input: ::agent_chain::_core::tools::ToolInput,
-                    _run_manager: Option<&::agent_chain::_core::callbacks::manager::CallbackManagerForToolRun>,
-                    _config: &::agent_chain::_core::runnables::RunnableConfig,
-                ) -> ::agent_chain::_core::error::Result<::agent_chain::_core::tools::ToolOutput> {
-                    #tool_run_body
-                }
-
-                async fn tool_arun(
+                async fn tool_run(
                     &self,
                     input: ::agent_chain::_core::tools::ToolInput,
                     _run_manager: Option<&::agent_chain::_core::callbacks::manager::CallbackManagerForToolRun>,
@@ -451,7 +408,7 @@ pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
                 ) -> ::agent_chain::_core::error::Result<::agent_chain::_core::tools::ToolOutput> {
                     #extract_args
                     #(#result_param_extractions)*
-                    #arun_result_handling
+                    #run_result_handling
                 }
 
                 fn definition(&self) -> ::agent_chain::_core::tools::ToolDefinition {

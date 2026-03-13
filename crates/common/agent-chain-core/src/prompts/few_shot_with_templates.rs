@@ -10,7 +10,7 @@ use crate::messages::AnyMessage;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, merge_prompt_config};
+use super::base::BasePromptTemplate;
 use super::few_shot::ExampleSelectorClone;
 use super::prompt::PromptTemplate;
 use super::string::{PromptTemplateFormat, StringPromptTemplate};
@@ -260,25 +260,12 @@ impl Runnable for FewShotPromptWithTemplates {
     fn name(&self) -> Option<String> {
         Some("FewShotPromptWithTemplates".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = merge_prompt_config(config, self.metadata(), self.tags());
-        self.call_with_config(
-            &|input, _config| {
-                BasePromptTemplate::validate_input(self, &input)?;
-                self.format_messages(&input)
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.invoke(input, config)
+        self.format_messages(&input)
     }
 }
 

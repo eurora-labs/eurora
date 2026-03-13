@@ -81,8 +81,8 @@ fn test_interfaces() {
     );
 }
 
-#[test]
-fn test_input_messages() {
+#[tokio::test]
+async fn test_input_messages() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let factory = make_session_factory(store.clone());
@@ -100,12 +100,14 @@ fn test_input_messages() {
 
     let output = with_history
         .invoke_messages(vec![human("hello")], Some(cfg.clone()))
+        .await
         .unwrap();
     assert_eq!(output.len(), 1);
     assert_eq!(output[0].content(), "you said: hello");
 
     let output = with_history
         .invoke_messages(vec![human("good bye")], Some(cfg.clone()))
+        .await
         .unwrap();
     assert_eq!(output.len(), 1);
     assert_eq!(output[0].content(), "you said: hello\ngood bye");
@@ -120,8 +122,8 @@ fn test_input_messages() {
     assert_eq!(msgs[3].content(), "you said: hello\ngood bye");
 }
 
-#[test]
-fn test_input_messages_output_message() {
+#[tokio::test]
+async fn test_input_messages_output_message() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let factory = make_session_factory(store.clone());
@@ -139,17 +141,19 @@ fn test_input_messages_output_message() {
 
     let output = with_history
         .invoke_messages(vec![human("hi")], Some(cfg.clone()))
+        .await
         .unwrap();
     assert_eq!(output[0].content(), "1");
 
     let output = with_history
         .invoke_messages(vec![human("hi")], Some(cfg.clone()))
+        .await
         .unwrap();
     assert_eq!(output[0].content(), "3");
 }
 
-#[test]
-fn test_using_custom_config_specs() {
+#[tokio::test]
+async fn test_using_custom_config_specs() {
     #[allow(clippy::type_complexity)]
     let store: Arc<Mutex<HashMap<(String, String), Arc<Mutex<InMemoryChatMessageHistory>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
@@ -199,6 +203,7 @@ fn test_using_custom_config_specs() {
     let cfg1 = config_with(&[("user_id", "user1"), ("thread_id", "1")]);
     let result = with_history
         .invoke_messages(vec![human("hello")], Some(cfg1.clone()))
+        .await
         .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].content(), "you said: hello");
@@ -215,6 +220,7 @@ fn test_using_custom_config_specs() {
 
     let result = with_history
         .invoke_messages(vec![human("goodbye")], Some(cfg1.clone()))
+        .await
         .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].content(), "you said: hello\ngoodbye");
@@ -232,6 +238,7 @@ fn test_using_custom_config_specs() {
     let cfg2 = config_with(&[("user_id", "user2"), ("thread_id", "1")]);
     let result = with_history
         .invoke_messages(vec![human("meow")], Some(cfg2))
+        .await
         .unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].content(), "you said: meow");
@@ -254,8 +261,8 @@ fn test_using_custom_config_specs() {
     }
 }
 
-#[test]
-fn test_ignore_session_id() {
+#[tokio::test]
+async fn test_ignore_session_id() {
     let history = Arc::new(Mutex::new(InMemoryChatMessageHistory::new()));
     let factory: GetSessionHistoryFn = {
         let history = history.clone();
@@ -273,17 +280,19 @@ fn test_ignore_session_id() {
 
     let _ = with_history
         .invoke_messages(vec![human("hello")], None)
+        .await
         .unwrap();
     let _ = with_history
         .invoke_messages(vec![human("hello again")], None)
+        .await
         .unwrap();
 
     let hist = history.lock().unwrap();
     assert_eq!(hist.messages().len(), 4);
 }
 
-#[test]
-fn test_multiple_sessions() {
+#[tokio::test]
+async fn test_multiple_sessions() {
     let store: Arc<Mutex<HashMap<String, Arc<Mutex<InMemoryChatMessageHistory>>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let factory = make_session_factory(store.clone());
@@ -302,12 +311,15 @@ fn test_multiple_sessions() {
 
     let _ = with_history
         .invoke_messages(vec![human("A1")], Some(cfg_a.clone()))
+        .await
         .unwrap();
     let _ = with_history
         .invoke_messages(vec![human("B1")], Some(cfg_b.clone()))
+        .await
         .unwrap();
     let _ = with_history
         .invoke_messages(vec![human("A2")], Some(cfg_a.clone()))
+        .await
         .unwrap();
 
     let guard = store.lock().unwrap();
@@ -366,8 +378,8 @@ fn ai_as_value(content: &str) -> Value {
     serde_json::to_value(ai(content)).expect("ai message serialization should not fail")
 }
 
-#[test]
-fn test_dict_input_with_history_messages_key() {
+#[tokio::test]
+async fn test_dict_input_with_history_messages_key() {
     use agent_chain_core::error::Error;
     use agent_chain_core::runnables::history::HistoryInvokeFn;
 
@@ -412,6 +424,7 @@ fn test_dict_input_with_history_messages_key() {
             serde_json::json!({"question": [human_as_value("What is 2+2?")], "ability": "math"}),
             Some(cfg.clone()),
         )
+        .await
         .expect("first invoke should succeed");
 
     let messages: Vec<AnyMessage> =
@@ -432,6 +445,7 @@ fn test_dict_input_with_history_messages_key() {
             serde_json::json!({"question": [human_as_value("What is its inverse?")], "ability": "math"}),
             Some(cfg.clone()),
         )
+        .await
         .expect("second invoke should succeed");
 
     let messages: Vec<AnyMessage> =
@@ -448,8 +462,8 @@ fn test_dict_input_with_history_messages_key() {
     );
 }
 
-#[test]
-fn test_dict_input_with_output_messages_key() {
+#[tokio::test]
+async fn test_dict_input_with_output_messages_key() {
     use agent_chain_core::error::Error;
     use agent_chain_core::runnables::history::HistoryInvokeFn;
 
@@ -489,6 +503,7 @@ fn test_dict_input_with_output_messages_key() {
         serde_json::to_value(vec![human("hello")]).expect("input serialization should not fail");
     let output = with_history
         .invoke(input, Some(cfg.clone()))
+        .await
         .expect("invoke should succeed");
 
     assert!(

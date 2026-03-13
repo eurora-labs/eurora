@@ -3,17 +3,13 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::StreamExt;
-use futures::stream::BoxStream;
 use serde::Serialize;
 
 use crate::error::{Error, Result};
 use crate::load::{Serializable, Serialized, SerializedConstructor};
 
 use super::base::{DynRunnable, Runnable, RunnableLambda, RunnableSerializable};
-use super::config::{
-    RunnableConfig, child_config, ensure_config, finish_chain_run, start_chain_run,
-};
+use super::config::{RunnableConfig, child_config, finish_chain_run, start_chain_run};
 
 pub struct RunnableBranch<I, O>
 where
@@ -167,34 +163,7 @@ where
         }
         self.default.get_input_schema(config)
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (run_manager, config) = start_chain_run(config);
-
-        let result = (|| {
-            for (idx, (condition, runnable)) in self.branches.iter().enumerate() {
-                let condition_config = child_config(
-                    &config,
-                    &run_manager,
-                    Some(&format!("condition:{}", idx + 1)),
-                );
-                let expression_value = condition.invoke(input.clone(), Some(condition_config))?;
-
-                if expression_value {
-                    let branch_config =
-                        child_config(&config, &run_manager, Some(&format!("branch:{}", idx + 1)));
-                    return runnable.invoke(input.clone(), Some(branch_config));
-                }
-            }
-
-            let default_config = child_config(&config, &run_manager, Some("branch:default"));
-            self.default.invoke(input, Some(default_config))
-        })();
-
-        finish_chain_run(&run_manager, result)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -212,68 +181,22 @@ where
                     Some(&format!("condition:{}", idx + 1)),
                 );
                 let expression_value = condition
-                    .ainvoke(input.clone(), Some(condition_config))
+                    .invoke(input.clone(), Some(condition_config))
                     .await?;
 
                 if expression_value {
                     let branch_config =
                         child_config(&config, &run_manager, Some(&format!("branch:{}", idx + 1)));
-                    return runnable.ainvoke(input.clone(), Some(branch_config)).await;
+                    return runnable.invoke(input.clone(), Some(branch_config)).await;
                 }
             }
 
             let default_config = child_config(&config, &run_manager, Some("branch:default"));
-            self.default.ainvoke(input, Some(default_config)).await
+            self.default.invoke(input, Some(default_config)).await
         }
         .await;
 
         finish_chain_run(&run_manager, result)
-    }
-
-    fn stream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        self.astream(input, config)
-    }
-
-    fn astream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        let config = ensure_config(config);
-
-        Box::pin(async_stream::stream! {
-            'outer: {
-                for (condition, runnable) in self.branches.iter() {
-                    let expression_value = match condition.ainvoke(input.clone(), Some(config.clone())).await {
-                        Ok(v) => v,
-                        Err(e) => {
-                            yield Err(e);
-                            break 'outer;
-                        }
-                    };
-
-                    if expression_value {
-                        let mut stream = runnable.astream(input.clone(), Some(config.clone()));
-                        while let Some(chunk_result) = stream.next().await {
-                            yield chunk_result;
-                        }
-                        break 'outer;
-                    }
-                }
-
-                let mut stream = self.default.astream(input, Some(config.clone()));
-                while let Some(chunk_result) = stream.next().await {
-                    yield chunk_result;
-                }
-            }
-        })
     }
 }
 
@@ -311,42 +234,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_runnable_branch_invoke_first_condition() {
-        let branch = RunnableBranchFluentBuilder::new()
-            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
-            .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
-            .default(|_: i32| Ok("zero".to_string()))
-            .unwrap();
-
-        let result = branch.invoke(5, None).unwrap();
-        assert_eq!(result, "positive: 5");
-    }
-
-    #[test]
-    fn test_runnable_branch_invoke_second_condition() {
-        let branch = RunnableBranchFluentBuilder::new()
-            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
-            .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
-            .default(|_: i32| Ok("zero".to_string()))
-            .unwrap();
-
-        let result = branch.invoke(-3, None).unwrap();
-        assert_eq!(result, "negative: -3");
-    }
-
-    #[test]
-    fn test_runnable_branch_invoke_default() {
-        let branch = RunnableBranchFluentBuilder::new()
-            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
-            .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
-            .default(|_: i32| Ok("zero".to_string()))
-            .unwrap();
-
-        let result = branch.invoke(0, None).unwrap();
-        assert_eq!(result, "zero");
-    }
+    use futures::StreamExt;
 
     #[test]
     fn test_runnable_branch_requires_at_least_one_branch() {
@@ -397,8 +285,8 @@ mod tests {
         assert_eq!(branch.name(), None);
     }
 
-    #[test]
-    fn test_runnable_branch_with_arc_runnables() {
+    #[tokio::test]
+    async fn test_runnable_branch_with_arc_runnables() {
         let condition: DynRunnable<i32, bool> =
             Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
         let branch_runnable: DynRunnable<i32, String> = Arc::new(
@@ -418,25 +306,25 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(branch.invoke(15, None).unwrap(), "big: 15");
-        assert_eq!(branch.invoke(5, None).unwrap(), "small: 5");
+        assert_eq!(branch.invoke(15, None).await.unwrap(), "big: 15");
+        assert_eq!(branch.invoke(5, None).await.unwrap(), "small: 5");
     }
 
     #[tokio::test]
-    async fn test_runnable_branch_ainvoke() {
+    async fn test_runnable_branch_invoke() {
         let branch = RunnableBranchFluentBuilder::new()
             .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
             .branch(|x: i32| Ok(x < 0), |x: i32| Ok(format!("negative: {}", x)))
             .default(|_: i32| Ok("zero".to_string()))
             .unwrap();
 
-        let result = branch.ainvoke(5, None).await.unwrap();
+        let result = branch.invoke(5, None).await.unwrap();
         assert_eq!(result, "positive: 5");
 
-        let result = branch.ainvoke(-3, None).await.unwrap();
+        let result = branch.invoke(-3, None).await.unwrap();
         assert_eq!(result, "negative: -3");
 
-        let result = branch.ainvoke(0, None).await.unwrap();
+        let result = branch.invoke(0, None).await.unwrap();
         assert_eq!(result, "zero");
     }
 
@@ -448,18 +336,6 @@ mod tests {
             .unwrap();
 
         let mut stream = branch.stream(5, None);
-        let result = stream.next().await.unwrap().unwrap();
-        assert_eq!(result, "positive: 5");
-    }
-
-    #[tokio::test]
-    async fn test_runnable_branch_astream() {
-        let branch = RunnableBranchFluentBuilder::new()
-            .branch(|x: i32| Ok(x > 0), |x: i32| Ok(format!("positive: {}", x)))
-            .default(|_: i32| Ok("non-positive".to_string()))
-            .unwrap();
-
-        let mut stream = branch.astream(5, None);
         let result = stream.next().await.unwrap().unwrap();
         assert_eq!(result, "positive: 5");
     }

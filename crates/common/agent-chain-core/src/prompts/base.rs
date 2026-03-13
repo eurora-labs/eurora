@@ -5,27 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::messages::{AnyMessage, HumanMessage};
-use crate::runnables::config::{RunnableConfig, ensure_config};
-
-pub(super) fn merge_prompt_config(
-    config: Option<RunnableConfig>,
-    metadata: Option<&HashMap<String, serde_json::Value>>,
-    tags: Option<&[String]>,
-) -> Option<RunnableConfig> {
-    if metadata.is_none() && tags.is_none() {
-        return config;
-    }
-    let mut config = ensure_config(config);
-    if let Some(m) = metadata {
-        config
-            .metadata
-            .extend(m.iter().map(|(k, v)| (k.clone(), v.clone())));
-    }
-    if let Some(t) = tags {
-        config.tags.extend(t.iter().cloned());
-    }
-    Some(config)
-}
 
 pub trait BasePromptTemplate: Send + Sync {
     fn input_variables(&self) -> &[String];
@@ -54,28 +33,11 @@ pub trait BasePromptTemplate: Send + Sync {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String>;
 
-    fn aformat(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + '_>> {
-        let result = self.format(kwargs);
-        Box::pin(async move { result })
-    }
-
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let text = self.format(kwargs)?;
         Ok(vec![AnyMessage::HumanMessage(
             HumanMessage::builder().content(&text).build(),
         )])
-    }
-
-    fn aformat_messages(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<AnyMessage>>> + Send + '_>>
-    {
-        let result = self.format_messages(kwargs);
-        Box::pin(async move { result })
     }
 
     fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>>;
@@ -257,11 +219,6 @@ fn get_document_info(
 pub fn format_document(doc: &Document, prompt: &dyn BasePromptTemplate) -> Result<String> {
     let info = get_document_info(doc, prompt.input_variables())?;
     prompt.format(&info)
-}
-
-pub async fn aformat_document(doc: &Document, prompt: &dyn BasePromptTemplate) -> Result<String> {
-    let info = get_document_info(doc, prompt.input_variables())?;
-    prompt.aformat(&info).await
 }
 
 #[cfg(test)]

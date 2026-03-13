@@ -250,31 +250,31 @@ fn test_get_ls_params() {
     assert_eq!(params.ls_stop, Some(vec!["stop".to_string()]));
 }
 
-#[test]
-fn test_get_prompts_no_cache_returns_all_missing() {
+#[tokio::test]
+async fn test_get_prompts_no_cache_returns_all_missing() {
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let (existing, _llm_string, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], None);
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], None).await;
 
     assert!(existing.is_empty());
     assert_eq!(missing_idxs, vec![0, 1]);
     assert_eq!(missing, vec!["p1", "p2"]);
 }
 
-#[test]
-fn test_get_prompts_with_cache_all_miss() {
+#[tokio::test]
+async fn test_get_prompts_with_cache_all_miss() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let (existing, _llm_string, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache)).await;
 
     assert!(existing.is_empty());
     assert_eq!(missing_idxs, vec![0, 1]);
     assert_eq!(missing, vec!["p1", "p2"]);
 }
 
-#[test]
-fn test_get_prompts_with_cache_partial_hit() {
+#[tokio::test]
+async fn test_get_prompts_with_cache_partial_hit() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let llm_string = serde_json::to_string(&params).unwrap();
@@ -283,10 +283,12 @@ fn test_get_prompts_with_cache_partial_hit() {
             .message(AIMessage::builder().content("cached").build().into())
             .build(),
     ];
-    cache.update("p1", &llm_string, cached_generation.clone());
+    cache
+        .update("p1", &llm_string, cached_generation.clone())
+        .await;
 
     let (existing, _, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache)).await;
 
     assert!(existing.contains_key(&0));
     assert_eq!(existing[&0][0].message.text(), "cached");
@@ -294,40 +296,44 @@ fn test_get_prompts_with_cache_partial_hit() {
     assert_eq!(missing, vec!["p2"]);
 }
 
-#[test]
-fn test_get_prompts_with_cache_all_hit() {
+#[tokio::test]
+async fn test_get_prompts_with_cache_all_hit() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let llm_string = serde_json::to_string(&params).unwrap();
-    cache.update(
-        "p1",
-        &llm_string,
-        vec![
-            ChatGeneration::builder()
-                .message(AIMessage::builder().content("c1").build().into())
-                .build(),
-        ],
-    );
-    cache.update(
-        "p2",
-        &llm_string,
-        vec![
-            ChatGeneration::builder()
-                .message(AIMessage::builder().content("c2").build().into())
-                .build(),
-        ],
-    );
+    cache
+        .update(
+            "p1",
+            &llm_string,
+            vec![
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("c1").build().into())
+                    .build(),
+            ],
+        )
+        .await;
+    cache
+        .update(
+            "p2",
+            &llm_string,
+            vec![
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("c2").build().into())
+                    .build(),
+            ],
+        )
+        .await;
 
     let (existing, _, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache)).await;
 
     assert_eq!(existing.len(), 2);
     assert!(missing_idxs.is_empty());
     assert!(missing.is_empty());
 }
 
-#[test]
-fn test_update_cache_stores_results() {
+#[tokio::test]
+async fn test_update_cache_stores_results() {
     let cache = InMemoryCache::unbounded();
     let llm_string = "test_llm";
     let new_results = LLMResult::builder()
@@ -353,17 +359,18 @@ fn test_update_cache_stores_results() {
         &[0, 1],
         &new_results,
         &["p1".to_string(), "p2".to_string()],
-    );
+    )
+    .await;
 
-    assert!(cache.lookup("p1", llm_string).is_some());
-    assert!(cache.lookup("p2", llm_string).is_some());
+    assert!(cache.lookup("p1", llm_string).await.is_some());
+    assert!(cache.lookup("p2", llm_string).await.is_some());
     assert!(existing.contains_key(&0));
     assert!(existing.contains_key(&1));
     assert_eq!(existing[&0][0].message.text(), "r1");
 }
 
-#[test]
-fn test_update_cache_with_none_does_not_store() {
+#[tokio::test]
+async fn test_update_cache_with_none_does_not_store() {
     let new_results = LLMResult::builder()
         .generations(vec![vec![GenerationType::ChatGeneration(
             ChatGeneration::builder()
@@ -380,7 +387,8 @@ fn test_update_cache_with_none_does_not_store() {
         &[0],
         &new_results,
         &["p1".to_string()],
-    );
+    )
+    .await;
 
     assert!(existing.is_empty());
 }
@@ -640,12 +648,12 @@ fn test_resolve_cache_false() {
 }
 
 #[tokio::test]
-async fn test_batch_with_exceptions() {
+async fn test_batch_succeeds() {
     let llm = FakeListLLM::builder()
         .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
         .build();
     let results = llm
-        .batch_with_exceptions(
+        .batch(
             vec![
                 vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p1").build(),
@@ -659,13 +667,13 @@ async fn test_batch_with_exceptions() {
             ],
             None,
         )
-        .await;
+        .await
+        .unwrap();
 
     assert_eq!(results.len(), 3);
-    assert!(results.iter().all(|r| r.is_ok()));
-    assert_eq!(results[0].as_ref().unwrap(), "r1");
-    assert_eq!(results[1].as_ref().unwrap(), "r2");
-    assert_eq!(results[2].as_ref().unwrap(), "r3");
+    assert_eq!(results[0], "r1");
+    assert_eq!(results[1], "r2");
+    assert_eq!(results[2], "r3");
 }
 
 #[test]

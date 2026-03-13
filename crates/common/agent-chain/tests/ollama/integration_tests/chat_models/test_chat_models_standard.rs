@@ -46,7 +46,7 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     let result = llm
-        .ainvoke(
+        .invoke(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
         )
@@ -66,7 +66,7 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
@@ -99,7 +99,7 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
@@ -230,7 +230,7 @@ async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("Write me 2 haikus. Only include the haikus.")
@@ -348,7 +348,7 @@ async fn test_standard_tool_calling_async() -> Result<(), Box<dyn std::error::Er
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(tool_schema)], None)?;
 
     let result = llm_with_tools
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("What is the value of magic_function(3)? Use the tool.")
@@ -612,7 +612,7 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
     let structured = llm.with_structured_output(joke_schema, false)?;
 
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("Tell me a joke about cats.")
@@ -656,7 +656,7 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
     let structured = llm.with_structured_output(joke_schema, false)?;
 
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("Tell me a joke about dogs.")
@@ -761,7 +761,7 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
         .map(|prompt| {
             let llm = llm.clone();
             async move {
-                llm.ainvoke(
+                llm.invoke(
                     vec![HumanMessage::builder().content(prompt).build().into()],
                     None,
                 )
@@ -992,7 +992,7 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
     let structured = llm.with_structured_output(joke_schema, false)?;
 
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("Tell me a joke about cats.")

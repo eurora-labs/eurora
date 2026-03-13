@@ -4,15 +4,15 @@ use agent_chain_core::documents::Document;
 use agent_chain_core::embeddings::DeterministicFakeEmbedding;
 use agent_chain_core::indexing::{
     CleanupMode, HashAlgorithm, InMemoryDocumentIndex, InMemoryRecordManager, IndexConfig,
-    IndexDestination, IndexingResult, KeyEncoder, RecordManager, SourceIdKey, aindex, index,
+    IndexDestination, IndexingResult, KeyEncoder, RecordManager, SourceIdKey, index,
 };
 use agent_chain_core::vectorstores::InMemoryVectorStore;
 use agent_chain_core::vectorstores::VectorStore;
 use serde_json::json;
 
-fn make_record_manager() -> InMemoryRecordManager {
+async fn make_record_manager() -> InMemoryRecordManager {
     let manager = InMemoryRecordManager::new("test");
-    manager.create_schema().unwrap();
+    manager.create_schema().await.unwrap();
     manager
 }
 
@@ -28,24 +28,25 @@ fn sha256_config() -> IndexConfig {
     }
 }
 
-#[test]
-fn test_record_manager_update_and_exists() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_record_manager_update_and_exists() {
+    let manager = make_record_manager().await;
     let keys = vec!["key1".to_string(), "key2".to_string()];
-    manager.update(&keys, None, None).unwrap();
+    manager.update(&keys, None, None).await.unwrap();
 
-    let exists = manager.exists(&keys).unwrap();
+    let exists = manager.exists(&keys).await.unwrap();
     assert_eq!(exists, vec![true, true]);
 
     let exists = manager
         .exists(&["key1".to_string(), "missing".to_string()])
+        .await
         .unwrap();
     assert_eq!(exists, vec![true, false]);
 }
 
-#[test]
-fn test_record_manager_update_with_group_ids() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_record_manager_update_with_group_ids() {
+    let manager = make_record_manager().await;
     manager.set_time_override(Some(1.0));
 
     let keys = vec!["k1".to_string(), "k2".to_string(), "k3".to_string()];
@@ -54,79 +55,97 @@ fn test_record_manager_update_with_group_ids() {
         Some("g1".to_string()),
         Some("g2".to_string()),
     ];
-    manager.update(&keys, Some(&group_ids), None).unwrap();
+    manager.update(&keys, Some(&group_ids), None).await.unwrap();
 
     let g1_keys = manager
         .list_keys(None, None, Some(&["g1".to_string()]), None)
+        .await
         .unwrap();
     assert_eq!(g1_keys.len(), 2);
 
     let g2_keys = manager
         .list_keys(None, None, Some(&["g2".to_string()]), None)
+        .await
         .unwrap();
     assert_eq!(g2_keys.len(), 1);
     assert_eq!(g2_keys[0], "k3");
 }
 
-#[test]
-fn test_record_manager_list_keys_filtering() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_record_manager_list_keys_filtering() {
+    let manager = make_record_manager().await;
 
     manager.set_time_override(Some(1.0));
-    manager.update(&["k1".to_string()], None, None).unwrap();
+    manager
+        .update(&["k1".to_string()], None, None)
+        .await
+        .unwrap();
 
     manager.set_time_override(Some(2.0));
-    manager.update(&["k2".to_string()], None, None).unwrap();
+    manager
+        .update(&["k2".to_string()], None, None)
+        .await
+        .unwrap();
 
     manager.set_time_override(Some(3.0));
-    manager.update(&["k3".to_string()], None, None).unwrap();
+    manager
+        .update(&["k3".to_string()], None, None)
+        .await
+        .unwrap();
 
-    let before = manager.list_keys(Some(2.0), None, None, None).unwrap();
+    let before = manager
+        .list_keys(Some(2.0), None, None, None)
+        .await
+        .unwrap();
     assert_eq!(before, vec!["k1".to_string()]);
 
-    let after = manager.list_keys(None, Some(1.0), None, None).unwrap();
+    let after = manager
+        .list_keys(None, Some(1.0), None, None)
+        .await
+        .unwrap();
     assert_eq!(after, vec!["k2".to_string(), "k3".to_string()]);
 
-    let limited = manager.list_keys(None, None, None, Some(2)).unwrap();
+    let limited = manager.list_keys(None, None, None, Some(2)).await.unwrap();
     assert_eq!(limited.len(), 2);
 }
 
-#[test]
-fn test_record_manager_delete_keys() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_record_manager_delete_keys() {
+    let manager = make_record_manager().await;
     let keys = vec!["k1".to_string(), "k2".to_string(), "k3".to_string()];
-    manager.update(&keys, None, None).unwrap();
+    manager.update(&keys, None, None).await.unwrap();
 
     manager
         .delete_keys(&["k1".to_string(), "k2".to_string()])
+        .await
         .unwrap();
 
-    let exists = manager.exists(&keys).unwrap();
+    let exists = manager.exists(&keys).await.unwrap();
     assert_eq!(exists, vec![false, false, true]);
 }
 
 #[tokio::test]
 async fn test_record_manager_async_update_and_exists() {
-    let manager = make_record_manager();
+    let manager = make_record_manager().await;
     let keys = vec!["key1".to_string(), "key2".to_string()];
-    manager.aupdate(&keys, None, None).await.unwrap();
+    manager.update(&keys, None, None).await.unwrap();
 
-    let exists = manager.aexists(&keys).await.unwrap();
+    let exists = manager.exists(&keys).await.unwrap();
     assert_eq!(exists, vec![true, true]);
 }
 
 #[tokio::test]
 async fn test_record_manager_async_list_and_delete() {
-    let manager = make_record_manager();
+    let manager = make_record_manager().await;
     manager.set_time_override(Some(1.0));
     let keys = vec!["k1".to_string(), "k2".to_string()];
-    manager.aupdate(&keys, None, None).await.unwrap();
+    manager.update(&keys, None, None).await.unwrap();
 
-    let listed = manager.alist_keys(None, None, None, None).await.unwrap();
+    let listed = manager.list_keys(None, None, None, None).await.unwrap();
     assert_eq!(listed.len(), 2);
 
-    manager.adelete_keys(&["k1".to_string()]).await.unwrap();
-    let listed = manager.alist_keys(None, None, None, None).await.unwrap();
+    manager.delete_keys(&["k1".to_string()]).await.unwrap();
+    let listed = manager.list_keys(None, None, None, None).await.unwrap();
     assert_eq!(listed, vec!["k2".to_string()]);
 }
 
@@ -195,9 +214,9 @@ fn test_custom_key_encoder() {
     assert_eq!(hashed.id(), Some("custom-11"));
 }
 
-#[test]
-fn test_indexing_same_content() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_indexing_same_content() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
     let config = sha256_config();
@@ -211,7 +230,7 @@ fn test_indexing_same_content() {
             .build(),
     ];
 
-    let result = index(docs.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(
         result,
         IndexingResult {
@@ -224,7 +243,7 @@ fn test_indexing_same_content() {
     assert_eq!(store.len().unwrap(), 2);
 
     for _ in 0..2 {
-        let result = index(docs.clone(), &manager, &dest, &config).unwrap();
+        let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
         assert_eq!(
             result,
             IndexingResult {
@@ -239,7 +258,7 @@ fn test_indexing_same_content() {
 
 #[tokio::test]
 async fn test_aindexing_same_content() {
-    let manager = make_record_manager();
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
     let config = sha256_config();
@@ -253,22 +272,18 @@ async fn test_aindexing_same_content() {
             .build(),
     ];
 
-    let result = aindex(docs.clone(), &manager, &dest, &config)
-        .await
-        .unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 2);
     assert_eq!(store.len().unwrap(), 2);
 
-    let result = aindex(docs.clone(), &manager, &dest, &config)
-        .await
-        .unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_skipped, 2);
 }
 
-#[test]
-fn test_index_simple_delete_full() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_index_simple_delete_full() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
 
@@ -287,10 +302,10 @@ fn test_index_simple_delete_full() {
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
         ..Default::default()
     };
-    let result = index(docs.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 2);
 
-    let result = index(docs, &manager, &dest, &config).unwrap();
+    let result = index(docs, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_skipped, 2);
     assert_eq!(result.num_deleted, 0);
 
@@ -304,7 +319,9 @@ fn test_index_simple_delete_full() {
     ];
 
     manager.set_time_override(Some(1609545600.0)); // 2021-01-02
-    let result = index(docs2.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs2.clone(), &manager, &dest, &config)
+        .await
+        .unwrap();
     assert_eq!(result.num_added, 1);
     assert_eq!(result.num_skipped, 1);
     assert_eq!(result.num_deleted, 1);
@@ -312,7 +329,7 @@ fn test_index_simple_delete_full() {
     let store_keys = store.store_keys().unwrap();
     assert_eq!(store_keys.len(), 2);
 
-    let all_docs = store.get_by_ids(&store_keys).unwrap();
+    let all_docs = store.get_by_ids(&store_keys).await.unwrap();
     let texts: std::collections::HashSet<String> = all_docs
         .into_iter()
         .map(|d| d.page_content().to_string())
@@ -320,15 +337,15 @@ fn test_index_simple_delete_full() {
     assert!(texts.contains("mutated document 1"));
     assert!(texts.contains("This is another document."));
 
-    let result = index(docs2, &manager, &dest, &config).unwrap();
+    let result = index(docs2, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_deleted, 0);
     assert_eq!(result.num_skipped, 2);
 }
 
-#[test]
-fn test_incremental_fails_with_bad_source_ids() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_incremental_fails_with_bad_source_ids() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
 
@@ -342,7 +359,8 @@ fn test_incremental_fails_with_bad_source_ids() {
         &manager,
         &dest,
         &config,
-    );
+    )
+    .await;
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(err.contains("Source id key is required"));
@@ -363,15 +381,15 @@ fn test_incremental_fails_with_bad_source_ids() {
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
         ..Default::default()
     };
-    let result = index(docs, &manager, &dest, &config);
+    let result = index(docs, &manager, &dest, &config).await;
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(err.contains("Source IDs are required"));
 }
 
-#[test]
-fn test_index_simple_delete_scoped_full() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_index_simple_delete_scoped_full() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
 
@@ -401,11 +419,11 @@ fn test_index_simple_delete_scoped_full() {
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
         ..Default::default()
     };
-    let result = index(docs.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 4);
 
     manager.set_time_override(Some(2.0));
-    let result = index(docs, &manager, &dest, &config).unwrap();
+    let result = index(docs, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_skipped, 4);
 
     let docs2 = vec![
@@ -419,7 +437,9 @@ fn test_index_simple_delete_scoped_full() {
             .build(),
     ];
     manager.set_time_override(Some(3.0));
-    let result = index(docs2.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs2.clone(), &manager, &dest, &config)
+        .await
+        .unwrap();
     assert_eq!(result.num_added, 1);
     assert_eq!(result.num_skipped, 1);
     assert_eq!(result.num_deleted, 2); // doc1 and doc3 from source=1 deleted
@@ -427,20 +447,22 @@ fn test_index_simple_delete_scoped_full() {
     assert_eq!(store.len().unwrap(), 3); // mutated_doc + doc2 + doc_other
 
     manager.set_time_override(Some(4.0));
-    let result = index(docs2, &manager, &dest, &config).unwrap();
+    let result = index(docs2, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_skipped, 2);
     assert_eq!(result.num_deleted, 0);
 }
 
-#[test]
-fn test_indexing_with_no_docs() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_indexing_with_no_docs() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
     let config = sha256_config();
 
-    let result = index(Vec::<Document>::new(), &manager, &dest, &config).unwrap();
+    let result = index(Vec::<Document>::new(), &manager, &dest, &config)
+        .await
+        .unwrap();
     assert_eq!(
         result,
         IndexingResult {
@@ -452,9 +474,9 @@ fn test_indexing_with_no_docs() {
     );
 }
 
-#[test]
-fn test_deduplication() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_deduplication() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
     let config = sha256_config();
@@ -469,25 +491,25 @@ fn test_deduplication() {
         Document::builder().page_content("unique content").build(),
     ];
 
-    let result = index(docs, &manager, &dest, &config).unwrap();
+    let result = index(docs, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 2);
     assert_eq!(result.num_skipped, 1); // one duplicate skipped
     assert_eq!(store.len().unwrap(), 2);
 }
 
-#[test]
-fn test_indexing_force_update() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_indexing_force_update() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
 
     let docs = vec![Document::builder().page_content("some content").build()];
 
     let config = sha256_config();
-    let result = index(docs.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 1);
 
-    let result = index(docs.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_skipped, 1);
 
     let config = IndexConfig {
@@ -495,14 +517,14 @@ fn test_indexing_force_update() {
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
         ..Default::default()
     };
-    let result = index(docs, &manager, &dest, &config).unwrap();
+    let result = index(docs, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_updated, 1);
     assert_eq!(result.num_added, 0);
 }
 
-#[test]
-fn test_index_into_document_index() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_index_into_document_index() {
+    let manager = make_record_manager().await;
     let doc_index = InMemoryDocumentIndex::default();
     let dest = IndexDestination::DocumentIndex(&doc_index);
     let config = sha256_config();
@@ -512,17 +534,17 @@ fn test_index_into_document_index() {
         Document::builder().page_content("doc two").build(),
     ];
 
-    let result = index(docs.clone(), &manager, &dest, &config).unwrap();
+    let result = index(docs.clone(), &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 2);
     assert_eq!(doc_index.len().unwrap(), 2);
 
-    let result = index(docs, &manager, &dest, &config).unwrap();
+    let result = index(docs, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_skipped, 2);
 }
 
-#[test]
-fn test_document_index_upsert_and_get() {
+#[tokio::test]
+async fn test_document_index_upsert_and_get() {
     use agent_chain_core::indexing::DocumentIndex;
 
     let index = InMemoryDocumentIndex::default();
@@ -534,22 +556,22 @@ fn test_document_index_upsert_and_get() {
         Document::builder().page_content("foo bar").build(),
     ];
 
-    let response = index.upsert(&docs).unwrap();
+    let response = index.upsert(&docs).await.unwrap();
     assert_eq!(response.succeeded.len(), 2);
     assert_eq!(response.succeeded[0], "id1");
     assert!(response.failed.is_empty());
 
-    let retrieved = index.get(&["id1".to_string()]).unwrap();
+    let retrieved = index.get(&["id1".to_string()]).await.unwrap();
     assert_eq!(retrieved.len(), 1);
     assert_eq!(retrieved[0].page_content(), "hello world");
 
-    let retrieved = index.get(&[response.succeeded[1].clone()]).unwrap();
+    let retrieved = index.get(&[response.succeeded[1].clone()]).await.unwrap();
     assert_eq!(retrieved.len(), 1);
     assert_eq!(retrieved[0].page_content(), "foo bar");
 }
 
-#[test]
-fn test_document_index_delete() {
+#[tokio::test]
+async fn test_document_index_delete() {
     use agent_chain_core::indexing::DocumentIndex;
 
     let index = InMemoryDocumentIndex::default();
@@ -558,20 +580,21 @@ fn test_document_index_delete() {
         Document::builder().page_content("b").id("2").build(),
         Document::builder().page_content("c").id("3").build(),
     ];
-    index.upsert(&docs).unwrap();
+    index.upsert(&docs).await.unwrap();
 
     let response = index
         .delete(Some(&["1".to_string(), "2".to_string()]))
+        .await
         .unwrap();
     assert_eq!(response.num_deleted, Some(2));
     assert_eq!(index.len().unwrap(), 1);
 
-    let remaining = index.get(&["3".to_string()]).unwrap();
+    let remaining = index.get(&["3".to_string()]).await.unwrap();
     assert_eq!(remaining.len(), 1);
 }
 
-#[test]
-fn test_document_index_retriever_ordering() {
+#[tokio::test]
+async fn test_document_index_retriever_ordering() {
     use agent_chain_core::indexing::DocumentIndex;
     use agent_chain_core::retrievers::BaseRetriever;
 
@@ -590,17 +613,17 @@ fn test_document_index_retriever_ordering() {
             .id("3")
             .build(),
     ];
-    idx.upsert(&docs).unwrap();
+    idx.upsert(&docs).await.unwrap();
 
-    let results = idx.invoke("the", None).unwrap();
+    let results = idx.invoke("the", None).await.unwrap();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].page_content(), "the the the the the");
     assert_eq!(results[1].page_content(), "the cat sat on the mat");
 }
 
-#[test]
-fn test_scoped_full_empty_loader() {
-    let manager = make_record_manager();
+#[tokio::test]
+async fn test_scoped_full_empty_loader() {
+    let manager = make_record_manager().await;
     let store = make_vector_store();
     let dest = IndexDestination::VectorStore(&store);
 
@@ -622,11 +645,13 @@ fn test_scoped_full_empty_loader() {
         key_encoder: KeyEncoder::Algorithm(HashAlgorithm::Sha256),
         ..Default::default()
     };
-    let result = index(docs, &manager, &dest, &config).unwrap();
+    let result = index(docs, &manager, &dest, &config).await.unwrap();
     assert_eq!(result.num_added, 2);
 
     manager.set_time_override(Some(2.0));
-    let result = index(Vec::<Document>::new(), &manager, &dest, &config).unwrap();
+    let result = index(Vec::<Document>::new(), &manager, &dest, &config)
+        .await
+        .unwrap();
     assert_eq!(result.num_added, 0);
     assert_eq!(result.num_deleted, 0);
     assert_eq!(store.len().unwrap(), 2);

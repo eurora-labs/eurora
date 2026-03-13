@@ -33,7 +33,7 @@ async fn test_llm_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
-    let result = llm.ainvoke(vec!["I'm Pickle Rick".into()], None).await?;
+    let result = llm.invoke(vec!["I'm Pickle Rick".into()], None).await?;
     assert!(!result.is_empty());
 
     Ok(())
@@ -63,7 +63,7 @@ async fn test_llm_astream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
-    let mut stream = llm.astream(vec!["Hi.".into()], None, None).await?;
+    let mut stream = llm.stream(vec!["Hi.".into()], None, None).await?;
 
     let mut got_chunk = false;
     while let Some(chunk) = stream.next().await {
@@ -106,7 +106,7 @@ async fn test_llm_abatch() -> Result<(), Box<dyn std::error::Error>> {
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
     let result = llm
-        .abatch(
+        .batch(
             vec![
                 vec!["I'm Pickle Rick".into()],
                 vec!["I'm not Pickle Rick".into()],
@@ -154,7 +154,7 @@ async fn test_llm_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
     let result = llm
-        .abatch(
+        .batch(
             vec![
                 vec!["I'm Pickle Rick".into()],
                 vec!["I'm not Pickle Rick".into()],
@@ -206,7 +206,7 @@ async fn test_llm_astream_no_reasoning() -> Result<(), Box<dyn std::error::Error
     load_env();
     let llm = OllamaLLM::new(REASONING_MODEL).num_ctx(4096);
 
-    let mut stream = llm.astream(vec![SAMPLE_PROMPT.into()], None, None).await?;
+    let mut stream = llm.stream(vec![SAMPLE_PROMPT.into()], None, None).await?;
 
     let mut result_chunk: Option<ChatGenerationChunk> = None;
     while let Some(chunk) = stream.next().await {
@@ -273,7 +273,7 @@ async fn test_llm_astream_with_reasoning() -> Result<(), Box<dyn std::error::Err
         .num_ctx(4096)
         .reasoning(true);
 
-    let mut stream = llm.astream(vec![SAMPLE_PROMPT.into()], None, None).await?;
+    let mut stream = llm.stream(vec![SAMPLE_PROMPT.into()], None, None).await?;
 
     let mut result_chunk: Option<ChatGenerationChunk> = None;
     while let Some(chunk) = stream.next().await {
