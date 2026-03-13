@@ -190,9 +190,9 @@ impl ThreadManager {
             .await?
             .into_inner();
 
-        let mapped_stream = stream.filter_map(|result| match result {
-            Ok(response) => response.chunk.map(|c| Ok(AIMessageChunk::from(c))),
-            Err(e) => Some(Err(Error::from(e))),
+        let mapped_stream = stream.map(|result| match result {
+            Ok(chunk) => Ok(AIMessageChunk::from(chunk)),
+            Err(e) => Err(Error::from(e)),
         });
 
         Ok(Box::pin(mapped_stream))

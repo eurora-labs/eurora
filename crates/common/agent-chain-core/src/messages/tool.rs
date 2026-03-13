@@ -34,12 +34,17 @@ pub struct ToolCall {
 #[bon]
 impl ToolCall {
     #[builder]
-    pub fn new(name: impl Into<String>, args: serde_json::Value, id: Option<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        args: serde_json::Value,
+        id: Option<String>,
+        call_type: Option<String>,
+    ) -> Self {
         Self {
             id,
             name: name.into(),
             args,
-            call_type: Some("tool_call".to_string()),
+            call_type: call_type.or(Some("tool_call".to_string())),
         }
     }
 }
