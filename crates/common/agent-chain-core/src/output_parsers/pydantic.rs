@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
-use crate::outputs::Generation;
+use crate::outputs::ChatGeneration;
 
 use crate::messages::AnyMessage;
 
@@ -62,11 +62,11 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq> BaseOutputPa
         self.parse_obj(&json_object)
     }
 
-    fn parse_result(&self, result: &[Generation], partial: bool) -> Result<T> {
+    fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<T> {
         let first = result
             .first()
             .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
-        let json_object = parse_json_result(first.text.trim(), partial)?;
+        let json_object = parse_json_result(first.message.text().trim(), partial)?;
         if partial {
             self.parse_obj(&json_object)
                 .map_err(|_| Error::output_parser_simple("Partial parse: validation failed"))
@@ -107,11 +107,11 @@ impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
 impl<T: DeserializeOwned + Send + Sync + Clone + Debug + PartialEq + 'static>
     BaseCumulativeTransformOutputParser for PydanticOutputParser<T>
 {
-    fn parse_result_partial(&self, result: &[Generation]) -> Result<Option<T>> {
+    fn parse_result_partial(&self, result: &[ChatGeneration]) -> Result<Option<T>> {
         let first = result
             .first()
             .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
-        let Some(json_object) = parse_json_result_partial(first.text.trim())? else {
+        let Some(json_object) = parse_json_result_partial(first.message.text().trim())? else {
             return Ok(None);
         };
         match self.parse_obj(&json_object) {
@@ -189,7 +189,10 @@ mod tests {
     #[test]
     fn test_pydantic_parse_result_partial_incomplete() {
         let parser = person_parser();
-        let generations = vec![Generation::builder().text(r#"{"name": "Alice"#).build()];
+        let msg = crate::messages::AIMessage::builder()
+            .content(r#"{"name": "Alice"#)
+            .build();
+        let generations = vec![ChatGeneration::builder().message(msg.into()).build()];
         let result = parser.parse_result_partial(&generations).unwrap();
         assert!(result.is_none());
     }
@@ -197,11 +200,10 @@ mod tests {
     #[test]
     fn test_pydantic_parse_result_partial_complete() {
         let parser = person_parser();
-        let generations = vec![
-            Generation::builder()
-                .text(r#"{"name": "Alice", "age": 30}"#)
-                .build(),
-        ];
+        let msg = crate::messages::AIMessage::builder()
+            .content(r#"{"name": "Alice", "age": 30}"#)
+            .build();
+        let generations = vec![ChatGeneration::builder().message(msg.into()).build()];
         let result = parser.parse_result(&generations, true).unwrap();
         assert_eq!(result.name, "Alice");
         assert_eq!(result.age, 30);

@@ -7,14 +7,11 @@ use std::collections::HashMap;
 use super::chat_generation::{
     CHAT_GENERATION_CHUNK_TYPE, CHAT_GENERATION_TYPE, ChatGeneration, ChatGenerationChunk,
 };
-use super::generation::{GENERATION_TYPE, Generation, GenerationChunk};
 use super::run_info::RunInfo;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(untagged)]
 pub enum GenerationType {
-    Generation(Generation),
-    GenerationChunk(GenerationChunk),
     ChatGeneration(ChatGeneration),
     ChatGenerationChunk(ChatGenerationChunk),
 }
@@ -29,33 +26,16 @@ impl<'de> Deserialize<'de> for GenerationType {
         let type_str = value
             .get("type")
             .and_then(|v| v.as_str())
-            .unwrap_or(GENERATION_TYPE);
+            .unwrap_or(CHAT_GENERATION_TYPE);
 
-        let has_message = value.get("message").is_some();
-
-        match (type_str, has_message) {
-            (CHAT_GENERATION_CHUNK_TYPE, true) => serde_json::from_value(value.clone())
+        match type_str {
+            CHAT_GENERATION_CHUNK_TYPE => serde_json::from_value(value.clone())
                 .map(GenerationType::ChatGenerationChunk)
                 .map_err(de::Error::custom),
-            (CHAT_GENERATION_TYPE, true) | (_, true) => serde_json::from_value(value.clone())
+            _ => serde_json::from_value(value.clone())
                 .map(GenerationType::ChatGeneration)
                 .map_err(de::Error::custom),
-            _ => serde_json::from_value(value.clone())
-                .map(GenerationType::Generation)
-                .map_err(de::Error::custom),
         }
-    }
-}
-
-impl From<Generation> for GenerationType {
-    fn from(generation: Generation) -> Self {
-        GenerationType::Generation(generation)
-    }
-}
-
-impl From<GenerationChunk> for GenerationType {
-    fn from(generation: GenerationChunk) -> Self {
-        GenerationType::GenerationChunk(generation)
     }
 }
 
@@ -167,7 +147,8 @@ mod tests {
 
     #[test]
     fn test_llm_result_new() {
-        let generation = Generation::builder().text("Hello").build();
+        let msg = AIMessage::builder().content("Hello").build();
+        let generation = ChatGeneration::builder().message(msg.into()).build();
         let result = LLMResult::builder()
             .generations(vec![vec![generation.into()]])
             .build();
@@ -188,8 +169,10 @@ mod tests {
 
     #[test]
     fn test_llm_result_flatten() {
-        let generation1 = Generation::builder().text("First").build();
-        let generation2 = Generation::builder().text("Second").build();
+        let msg1 = AIMessage::builder().content("First").build();
+        let msg2 = AIMessage::builder().content("Second").build();
+        let generation1 = ChatGeneration::builder().message(msg1.into()).build();
+        let generation2 = ChatGeneration::builder().message(msg2.into()).build();
         let mut output = HashMap::new();
         output.insert("token_usage".to_string(), json!({"total": 100}));
         let result = LLMResult::builder()
@@ -214,8 +197,10 @@ mod tests {
 
     #[test]
     fn test_llm_result_equality() {
-        let generation1 = Generation::builder().text("Hello").build();
-        let generation2 = Generation::builder().text("Hello").build();
+        let msg1 = AIMessage::builder().content("Hello").build();
+        let msg2 = AIMessage::builder().content("Hello").build();
+        let generation1 = ChatGeneration::builder().message(msg1.into()).build();
+        let generation2 = ChatGeneration::builder().message(msg2.into()).build();
         let result1 = LLMResult::builder()
             .generations(vec![vec![generation1.into()]])
             .build();
@@ -227,7 +212,8 @@ mod tests {
 
     #[test]
     fn test_llm_result_serialization() {
-        let generation = Generation::builder().text("test").build();
+        let msg = AIMessage::builder().content("test").build();
+        let generation = ChatGeneration::builder().message(msg.into()).build();
         let result = LLMResult::builder()
             .generations(vec![vec![generation.into()]])
             .build();
@@ -256,14 +242,5 @@ mod tests {
             deserialized,
             GenerationType::ChatGenerationChunk(_)
         ));
-    }
-
-    #[test]
-    fn test_generation_type_deserialize_generation() {
-        let generation = Generation::builder().text("Hello").build();
-        let gen_type = GenerationType::Generation(generation);
-        let json = serde_json::to_value(&gen_type).unwrap();
-        let deserialized: GenerationType = serde_json::from_value(json).unwrap();
-        assert!(matches!(deserialized, GenerationType::Generation(_)));
     }
 }

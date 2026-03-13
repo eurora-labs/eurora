@@ -1,7 +1,7 @@
 use agent_chain_core::Serializable;
 use agent_chain_core::messages::{AIMessage, HumanMessage};
 use agent_chain_core::outputs::{
-    ChatGeneration, ChatGenerationChunk, Generation, merge_chat_generation_chunks,
+    ChatGeneration, ChatGenerationChunk, merge_chat_generation_chunks,
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -327,9 +327,8 @@ mod test_chat_generation_inheritance {
         let chat_gen = ChatGeneration::builder()
             .message(AIMessage::builder().content("test").build().into())
             .build();
-        let generation = Generation::builder().text("test").build();
-        assert_eq!(chat_gen.message.text(), generation.text);
-        assert_eq!(chat_gen.generation_info, generation.generation_info);
+        assert_eq!(chat_gen.message.text(), "test");
+        assert!(chat_gen.generation_info.is_none());
     }
 
     #[test]

@@ -50,66 +50,44 @@ fn test_branch_requires_minimum_branches_new() {
     );
 }
 
-#[test]
-fn test_branch_invoke_first_condition_true() {
+#[tokio::test]
+async fn test_branch_invoke_first_condition_true() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .branch(|x: i32| Ok(x < 0), |x: i32| Ok(x - 1))
         .default(|x: i32| Ok(x * 10))
         .unwrap();
 
-    let result = branch.invoke(5, None).unwrap();
+    let result = branch.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_branch_invoke_second_condition_true() {
+#[tokio::test]
+async fn test_branch_invoke_second_condition_true() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 10), |x: i32| Ok(x + 1))
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x * 2))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
 
-    let result = branch.invoke(5, None).unwrap();
+    let result = branch.invoke(5, None).await.unwrap();
     assert_eq!(result, 10);
 }
 
-#[test]
-fn test_branch_invoke_default() {
+#[tokio::test]
+async fn test_branch_invoke_default() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 10), |x: i32| Ok(x + 1))
         .branch(|x: i32| Ok(x < 0), |x: i32| Ok(x - 1))
         .default(|x: i32| Ok(x * 100))
         .unwrap();
 
-    let result = branch.invoke(5, None).unwrap();
+    let result = branch.invoke(5, None).await.unwrap();
     assert_eq!(result, 500);
 }
 
 #[tokio::test]
-async fn test_branch_ainvoke_first_condition() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
-        .default(|x: i32| Ok(x * 10))
-        .unwrap();
-
-    let result = branch.ainvoke(5, None).await.unwrap();
-    assert_eq!(result, 6);
-}
-
-#[tokio::test]
-async fn test_branch_ainvoke_default() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(|x: i32| Ok(x > 100), |x: i32| Ok(x + 1))
-        .default(|x: i32| Ok(x * 10))
-        .unwrap();
-
-    let result = branch.ainvoke(5, None).await.unwrap();
-    assert_eq!(result, 50);
-}
-
-#[test]
-fn test_branch_batch() {
+async fn test_branch_batch() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 5), |x: i32| Ok(x * 2))
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 10))
@@ -118,22 +96,6 @@ fn test_branch_batch() {
 
     let results: Vec<i32> = branch
         .batch(vec![1, 3, 7, 10, -5], None, false)
-        .into_iter()
-        .map(|r| r.unwrap())
-        .collect();
-    assert_eq!(results, vec![11, 13, 14, 20, -15]);
-}
-
-#[tokio::test]
-async fn test_branch_abatch() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(|x: i32| Ok(x > 5), |x: i32| Ok(x * 2))
-        .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 10))
-        .default(|x: i32| Ok(x - 10))
-        .unwrap();
-
-    let results: Vec<i32> = branch
-        .abatch(vec![1, 3, 7, 10, -5], None, false)
         .await
         .into_iter()
         .map(|r| r.unwrap())
@@ -141,19 +103,19 @@ async fn test_branch_abatch() {
     assert_eq!(results, vec![11, 13, 14, 20, -15]);
 }
 
-#[test]
-fn test_branch_empty_batch() {
+#[tokio::test]
+async fn test_branch_empty_batch() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x))
         .unwrap();
 
-    let results = branch.batch(vec![], None, false);
+    let results = branch.batch(vec![], None, false).await;
     assert!(results.is_empty());
 }
 
-#[test]
-fn test_branch_batch_different_routes() {
+#[tokio::test]
+async fn test_branch_batch_different_routes() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 10), |_: i32| Ok("large".to_string()))
         .branch(|x: i32| Ok(x > 0), |_: i32| Ok("small".to_string()))
@@ -162,6 +124,7 @@ fn test_branch_batch_different_routes() {
 
     let results: Vec<String> = branch
         .batch(vec![15, 5, -3, 0, 20], None, false)
+        .await
         .into_iter()
         .map(|r| r.unwrap())
         .collect();
@@ -180,7 +143,7 @@ async fn test_branch_batch_preserves_order() {
 
     let inputs = vec![1, 10, 3, 8, 2];
     let results: Vec<i32> = branch
-        .abatch(inputs, None, false)
+        .batch(inputs, None, false)
         .await
         .into_iter()
         .map(|r| r.unwrap())
@@ -201,18 +164,7 @@ async fn test_branch_stream() {
 }
 
 #[tokio::test]
-async fn test_branch_astream() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
-        .default(|x: i32| Ok(x - 1))
-        .unwrap();
-
-    let results: Vec<i32> = branch.astream(5, None).map(|r| r.unwrap()).collect().await;
-    assert_eq!(results, vec![6]);
-}
-
-#[test]
-fn test_branch_with_runnable_objects() {
+async fn test_branch_with_runnable_objects() {
     let condition: DynRunnable<i32, bool> =
         Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
     let action_true: DynRunnable<i32, i32> =
@@ -226,12 +178,12 @@ fn test_branch_with_runnable_objects() {
         .build()
         .unwrap();
 
-    assert_eq!(branch.invoke(5, None).unwrap(), 6);
-    assert_eq!(branch.invoke(-5, None).unwrap(), -6);
+    assert_eq!(branch.invoke(5, None).await.unwrap(), 6);
+    assert_eq!(branch.invoke(-5, None).await.unwrap(), -6);
 }
 
-#[test]
-fn test_branch_multiple_conditions() {
+#[tokio::test]
+async fn test_branch_multiple_conditions() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |_: i32| Ok("very large".to_string()))
         .branch(|x: i32| Ok(x > 50), |_: i32| Ok("large".to_string()))
@@ -240,16 +192,16 @@ fn test_branch_multiple_conditions() {
         .default(|_: i32| Ok("negative or zero".to_string()))
         .unwrap();
 
-    assert_eq!(branch.invoke(150, None).unwrap(), "very large");
-    assert_eq!(branch.invoke(75, None).unwrap(), "large");
-    assert_eq!(branch.invoke(25, None).unwrap(), "medium");
-    assert_eq!(branch.invoke(5, None).unwrap(), "small");
-    assert_eq!(branch.invoke(-5, None).unwrap(), "negative or zero");
-    assert_eq!(branch.invoke(0, None).unwrap(), "negative or zero");
+    assert_eq!(branch.invoke(150, None).await.unwrap(), "very large");
+    assert_eq!(branch.invoke(75, None).await.unwrap(), "large");
+    assert_eq!(branch.invoke(25, None).await.unwrap(), "medium");
+    assert_eq!(branch.invoke(5, None).await.unwrap(), "small");
+    assert_eq!(branch.invoke(-5, None).await.unwrap(), "negative or zero");
+    assert_eq!(branch.invoke(0, None).await.unwrap(), "negative or zero");
 }
 
-#[test]
-fn test_branch_with_hashmap_input() {
+#[tokio::test]
+async fn test_branch_with_hashmap_input() {
     use std::collections::HashMap;
 
     type Input = HashMap<String, String>;
@@ -278,23 +230,23 @@ fn test_branch_with_hashmap_input() {
     add_input.insert("type".to_string(), "add".to_string());
     add_input.insert("a".to_string(), "5".to_string());
     add_input.insert("b".to_string(), "3".to_string());
-    assert_eq!(branch.invoke(add_input, None).unwrap(), "8");
+    assert_eq!(branch.invoke(add_input, None).await.unwrap(), "8");
 
     let mut mul_input = HashMap::new();
     mul_input.insert("type".to_string(), "multiply".to_string());
     mul_input.insert("a".to_string(), "5".to_string());
     mul_input.insert("b".to_string(), "3".to_string());
-    assert_eq!(branch.invoke(mul_input, None).unwrap(), "15");
+    assert_eq!(branch.invoke(mul_input, None).await.unwrap(), "15");
 
     let mut unknown_input = HashMap::new();
     unknown_input.insert("type".to_string(), "unknown".to_string());
     unknown_input.insert("a".to_string(), "5".to_string());
     unknown_input.insert("b".to_string(), "3".to_string());
-    assert_eq!(branch.invoke(unknown_input, None).unwrap(), "0");
+    assert_eq!(branch.invoke(unknown_input, None).await.unwrap(), "0");
 }
 
-#[test]
-fn test_branch_exception_in_condition() {
+#[tokio::test]
+async fn test_branch_exception_in_condition() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |_: i32| Err(Error::Other("Condition failed".to_string())),
@@ -303,13 +255,13 @@ fn test_branch_exception_in_condition() {
         .default(|x: i32| Ok(x))
         .unwrap();
 
-    let result = branch.invoke(5, None);
+    let result = branch.invoke(5, None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Condition failed"));
 }
 
-#[test]
-fn test_branch_exception_in_action() {
+#[tokio::test]
+async fn test_branch_exception_in_action() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: i32| Ok(x > 0),
@@ -318,28 +270,13 @@ fn test_branch_exception_in_action() {
         .default(|x: i32| Ok(x))
         .unwrap();
 
-    let result = branch.invoke(5, None);
+    let result = branch.invoke(5, None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("Action failed"));
 }
 
 #[tokio::test]
-async fn test_branch_exception_in_async_action() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(
-            |x: i32| Ok(x > 0),
-            |_: i32| Err(Error::Other("Action failed".to_string())),
-        )
-        .default(|x: i32| Ok(x))
-        .unwrap();
-
-    let result = branch.ainvoke(5, None).await;
-    assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Action failed"));
-}
-
-#[test]
-fn test_branch_conditions_evaluated_in_order() {
+async fn test_branch_conditions_evaluated_in_order() {
     let evaluations = Arc::new(Mutex::new(Vec::<usize>::new()));
 
     let eval1 = evaluations.clone();
@@ -405,28 +342,28 @@ fn test_branch_conditions_evaluated_in_order() {
         .unwrap();
 
     evaluations.lock().unwrap().clear();
-    let result = branch.invoke(15, None).unwrap();
+    let result = branch.invoke(15, None).await.unwrap();
     assert_eq!(result, "first");
     assert_eq!(*evaluations.lock().unwrap(), vec![1]);
 
     evaluations.lock().unwrap().clear();
-    let result = branch.invoke(7, None).unwrap();
+    let result = branch.invoke(7, None).await.unwrap();
     assert_eq!(result, "second");
     assert_eq!(*evaluations.lock().unwrap(), vec![1, 2]);
 
     evaluations.lock().unwrap().clear();
-    let result = branch.invoke(3, None).unwrap();
+    let result = branch.invoke(3, None).await.unwrap();
     assert_eq!(result, "third");
     assert_eq!(*evaluations.lock().unwrap(), vec![1, 2, 3]);
 
     evaluations.lock().unwrap().clear();
-    let result = branch.invoke(-5, None).unwrap();
+    let result = branch.invoke(-5, None).await.unwrap();
     assert_eq!(result, "default");
     assert_eq!(*evaluations.lock().unwrap(), vec![1, 2, 3]);
 }
 
-#[test]
-fn test_branch_short_circuit_evaluation() {
+#[tokio::test]
+async fn test_branch_short_circuit_evaluation() {
     let condition_calls = Arc::new(Mutex::new(Vec::<String>::new()));
 
     let calls1 = condition_calls.clone();
@@ -480,13 +417,13 @@ fn test_branch_short_circuit_evaluation() {
         .unwrap();
 
     condition_calls.lock().unwrap().clear();
-    let result = branch.invoke(5, None).unwrap();
+    let result = branch.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
     assert_eq!(*condition_calls.lock().unwrap(), vec!["first"]);
 }
 
-#[test]
-fn test_branch_with_complex_conditions() {
+#[tokio::test]
+async fn test_branch_with_complex_conditions() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: i32| Ok(x > 0 && x % 2 == 0),
@@ -499,14 +436,14 @@ fn test_branch_with_complex_conditions() {
         .default(|x: i32| Ok(format!("non-positive: {x}")))
         .unwrap();
 
-    assert_eq!(branch.invoke(4, None).unwrap(), "even: 4");
-    assert_eq!(branch.invoke(5, None).unwrap(), "odd: 5");
-    assert_eq!(branch.invoke(0, None).unwrap(), "non-positive: 0");
-    assert_eq!(branch.invoke(-3, None).unwrap(), "non-positive: -3");
+    assert_eq!(branch.invoke(4, None).await.unwrap(), "even: 4");
+    assert_eq!(branch.invoke(5, None).await.unwrap(), "odd: 5");
+    assert_eq!(branch.invoke(0, None).await.unwrap(), "non-positive: 0");
+    assert_eq!(branch.invoke(-3, None).await.unwrap(), "non-positive: -3");
 }
 
-#[test]
-fn test_branch_config_propagation() {
+#[tokio::test]
+async fn test_branch_config_propagation() {
     let condition: DynRunnable<i32, bool> =
         Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 0)).build());
     let action: DynRunnable<i32, i32> =
@@ -523,7 +460,7 @@ fn test_branch_config_propagation() {
     let config = RunnableConfig::builder()
         .tags(vec!["my-tag".to_string()])
         .build();
-    let result = branch.invoke(5, Some(config)).unwrap();
+    let result = branch.invoke(5, Some(config)).await.unwrap();
     assert_eq!(result, 6);
 }
 
@@ -538,8 +475,8 @@ fn test_branch_serialization() {
     );
 }
 
-#[test]
-fn test_branch_all_conditions_false_uses_default() {
+#[tokio::test]
+async fn test_branch_all_conditions_false_uses_default() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |_: i32| Ok("a".to_string()))
         .branch(|x: i32| Ok(x > 50), |_: i32| Ok("b".to_string()))
@@ -547,12 +484,12 @@ fn test_branch_all_conditions_false_uses_default() {
         .default(|_: i32| Ok("default".to_string()))
         .unwrap();
 
-    let result = branch.invoke(10, None).unwrap();
+    let result = branch.invoke(10, None).await.unwrap();
     assert_eq!(result, "default");
 }
 
-#[test]
-fn test_branch_preserves_intermediate_types() {
+#[tokio::test]
+async fn test_branch_preserves_intermediate_types() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: String| Ok(x.len() > 5),
@@ -562,14 +499,17 @@ fn test_branch_preserves_intermediate_types() {
         .unwrap();
 
     assert_eq!(
-        branch.invoke("hello world".to_string(), None).unwrap(),
+        branch
+            .invoke("hello world".to_string(), None)
+            .await
+            .unwrap(),
         "HELLO WORLD"
     );
-    assert_eq!(branch.invoke("hi".to_string(), None).unwrap(), "hi");
+    assert_eq!(branch.invoke("hi".to_string(), None).await.unwrap(), "hi");
 }
 
-#[test]
-fn test_branch_with_complex_return_types() {
+#[tokio::test]
+async fn test_branch_with_complex_return_types() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: (String, i32)| Ok(x.0 == "list"),
@@ -579,17 +519,17 @@ fn test_branch_with_complex_return_types() {
         .unwrap();
 
     assert_eq!(
-        branch.invoke(("list".to_string(), 5), None).unwrap(),
+        branch.invoke(("list".to_string(), 5), None).await.unwrap(),
         vec![5, 10]
     );
     assert_eq!(
-        branch.invoke(("other".to_string(), 5), None).unwrap(),
+        branch.invoke(("other".to_string(), 5), None).await.unwrap(),
         vec![5]
     );
 }
 
-#[test]
-fn test_branch_with_type_annotations() {
+#[tokio::test]
+async fn test_branch_with_type_annotations() {
     fn condition_typed(x: i32) -> agent_chain_core::error::Result<bool> {
         Ok(x > 0)
     }
@@ -607,12 +547,12 @@ fn test_branch_with_type_annotations() {
         .default(default_typed)
         .unwrap();
 
-    assert_eq!(branch.invoke(5, None).unwrap(), "positive: 5");
-    assert_eq!(branch.invoke(-5, None).unwrap(), "non-positive: -5");
+    assert_eq!(branch.invoke(5, None).await.unwrap(), "positive: 5");
+    assert_eq!(branch.invoke(-5, None).await.unwrap(), "non-positive: -5");
 }
 
-#[test]
-fn test_branch_with_runnables_in_chain() {
+#[tokio::test]
+async fn test_branch_with_runnables_in_chain() {
     let preprocess = RunnableLambda::builder().func(|x: (i32,)| Ok(x.0)).build();
 
     let branch = RunnableBranchFluentBuilder::new()
@@ -627,13 +567,13 @@ fn test_branch_with_runnables_in_chain() {
 
     let chain = pipe(pipe(preprocess, branch), postprocess);
 
-    assert_eq!(chain.invoke((15,), None).unwrap(), "Result: 30");
-    assert_eq!(chain.invoke((5,), None).unwrap(), "Result: 15");
-    assert_eq!(chain.invoke((-5,), None).unwrap(), "Result: -15");
+    assert_eq!(chain.invoke((15,), None).await.unwrap(), "Result: 30");
+    assert_eq!(chain.invoke((5,), None).await.unwrap(), "Result: 15");
+    assert_eq!(chain.invoke((-5,), None).await.unwrap(), "Result: -15");
 }
 
-#[test]
-fn test_branch_with_none_output() {
+#[tokio::test]
+async fn test_branch_with_none_output() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(
             |x: String| Ok(x == "return_none"),
@@ -642,10 +582,13 @@ fn test_branch_with_none_output() {
         .default(|x: String| Ok(Some(x)))
         .unwrap();
 
-    let result = branch.invoke("return_none".to_string(), None).unwrap();
+    let result = branch
+        .invoke("return_none".to_string(), None)
+        .await
+        .unwrap();
     assert!(result.is_none());
 
-    let result = branch.invoke("other".to_string(), None).unwrap();
+    let result = branch.invoke("other".to_string(), None).await.unwrap();
     assert_eq!(result, Some("other".to_string()));
 }
 
@@ -708,30 +651,6 @@ async fn test_branch_stream_condition_error() {
 }
 
 #[tokio::test]
-async fn test_branch_astream_condition_error() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(
-            |_: i32| Err(Error::Other("astream condition failed".to_string())),
-            |x: i32| Ok(x + 1),
-        )
-        .default(|x: i32| Ok(x))
-        .unwrap();
-
-    let results: Vec<agent_chain_core::error::Result<i32>> =
-        branch.astream(5, None).collect().await;
-
-    assert_eq!(results.len(), 1);
-    assert!(results[0].is_err());
-    assert!(
-        results[0]
-            .as_ref()
-            .unwrap_err()
-            .to_string()
-            .contains("astream condition failed")
-    );
-}
-
-#[tokio::test]
 async fn test_branch_stream_default_path() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 100), |x: i32| Ok(x + 1))
@@ -743,29 +662,18 @@ async fn test_branch_stream_default_path() {
 }
 
 #[tokio::test]
-async fn test_branch_astream_default_path() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(|x: i32| Ok(x > 100), |x: i32| Ok(x + 1))
-        .default(|x: i32| Ok(x * 10))
-        .unwrap();
-
-    let results: Vec<i32> = branch.astream(5, None).map(|r| r.unwrap()).collect().await;
-    assert_eq!(results, vec![50]);
-}
-
-#[test]
-fn test_branch_coerces_conditions_and_actions() {
+async fn test_branch_coerces_conditions_and_actions() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
         .unwrap();
 
-    assert_eq!(branch.invoke(5, None).unwrap(), 6);
-    assert_eq!(branch.invoke(-5, None).unwrap(), -6);
+    assert_eq!(branch.invoke(5, None).await.unwrap(), 6);
+    assert_eq!(branch.invoke(-5, None).await.unwrap(), -6);
 }
 
 #[tokio::test]
-async fn test_branch_ainvoke_multiple_sequential() {
+async fn test_branch_invoke_multiple_sequential() {
     let call_count = Arc::new(AtomicUsize::new(0));
 
     let count = call_count.clone();
@@ -789,16 +697,16 @@ async fn test_branch_ainvoke_multiple_sequential() {
         .build()
         .unwrap();
 
-    let result1 = branch.ainvoke(5, None).await.unwrap();
-    let result2 = branch.ainvoke(-5, None).await.unwrap();
+    let result1 = branch.invoke(5, None).await.unwrap();
+    let result2 = branch.invoke(-5, None).await.unwrap();
 
     assert_eq!(result1, 6);
     assert_eq!(result2, -6);
     assert_eq!(call_count.load(Ordering::SeqCst), 2);
 }
 
-#[test]
-fn test_branch_builder_branch_arc() {
+#[tokio::test]
+async fn test_branch_builder_branch_arc() {
     let condition: DynRunnable<i32, bool> =
         Arc::new(RunnableLambda::builder().func(|x: i32| Ok(x > 10)).build());
     let action: DynRunnable<i32, String> = Arc::new(
@@ -817,24 +725,24 @@ fn test_branch_builder_branch_arc() {
         .default_arc(default)
         .unwrap();
 
-    assert_eq!(branch.invoke(15, None).unwrap(), "big: 15");
-    assert_eq!(branch.invoke(5, None).unwrap(), "small: 5");
+    assert_eq!(branch.invoke(15, None).await.unwrap(), "big: 15");
+    assert_eq!(branch.invoke(5, None).await.unwrap(), "small: 5");
 }
 
-#[test]
-fn test_branch_condition_edge_values() {
+#[tokio::test]
+async fn test_branch_condition_edge_values() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x != 0), |_: i32| Ok("truthy".to_string()))
         .default(|_: i32| Ok("falsy".to_string()))
         .unwrap();
 
-    assert_eq!(branch.invoke(1, None).unwrap(), "truthy");
-    assert_eq!(branch.invoke(5, None).unwrap(), "truthy");
-    assert_eq!(branch.invoke(0, None).unwrap(), "falsy");
+    assert_eq!(branch.invoke(1, None).await.unwrap(), "truthy");
+    assert_eq!(branch.invoke(5, None).await.unwrap(), "truthy");
+    assert_eq!(branch.invoke(0, None).await.unwrap(), "falsy");
 }
 
-#[test]
-fn test_branch_with_callbacks() {
+#[tokio::test]
+async fn test_branch_with_callbacks() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x > 0), |x: i32| Ok(x + 1))
         .default(|x: i32| Ok(x - 1))
@@ -843,7 +751,7 @@ fn test_branch_with_callbacks() {
     let config = RunnableConfig::builder()
         .tags(vec!["test-tag".to_string()])
         .build();
-    let result = branch.invoke(5, Some(config)).unwrap();
+    let result = branch.invoke(5, Some(config)).await.unwrap();
     assert_eq!(result, 6);
 }
 
@@ -854,15 +762,15 @@ async fn test_branch_mixed_sync_async() {
         .default(|x: i32| Ok(x - 1))
         .unwrap();
 
-    let result = branch.ainvoke(5, None).await.unwrap();
+    let result = branch.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 
-    let result2 = branch.ainvoke(-5, None).await.unwrap();
+    let result2 = branch.invoke(-5, None).await.unwrap();
     assert_eq!(result2, -6);
 }
 
-#[test]
-fn test_branch_many_branches() {
+#[tokio::test]
+async fn test_branch_many_branches() {
     let branch = RunnableBranchFluentBuilder::new()
         .branch(|x: i32| Ok(x == 1), |_: i32| Ok("one".to_string()))
         .branch(|x: i32| Ok(x == 2), |_: i32| Ok("two".to_string()))
@@ -877,11 +785,11 @@ fn test_branch_many_branches() {
         .default(|_: i32| Ok("other".to_string()))
         .unwrap();
 
-    assert_eq!(branch.invoke(1, None).unwrap(), "one");
-    assert_eq!(branch.invoke(5, None).unwrap(), "five");
-    assert_eq!(branch.invoke(10, None).unwrap(), "ten");
-    assert_eq!(branch.invoke(11, None).unwrap(), "other");
-    assert_eq!(branch.invoke(0, None).unwrap(), "other");
+    assert_eq!(branch.invoke(1, None).await.unwrap(), "one");
+    assert_eq!(branch.invoke(5, None).await.unwrap(), "five");
+    assert_eq!(branch.invoke(10, None).await.unwrap(), "ten");
+    assert_eq!(branch.invoke(11, None).await.unwrap(), "other");
+    assert_eq!(branch.invoke(0, None).await.unwrap(), "other");
 }
 
 #[tokio::test]
@@ -903,31 +811,6 @@ async fn test_branch_stream_routes_to_correct_branch() {
 
     let result2: Vec<String> = branch
         .stream("b".to_string(), None)
-        .map(|r| r.unwrap())
-        .collect()
-        .await;
-    assert_eq!(result2.join(""), "response two");
-}
-
-#[tokio::test]
-async fn test_branch_astream_routes_to_correct_branch() {
-    let branch = RunnableBranchFluentBuilder::new()
-        .branch(
-            |x: String| Ok(x == "a"),
-            |_: String| Ok("response one".to_string()),
-        )
-        .default(|_: String| Ok("response two".to_string()))
-        .unwrap();
-
-    let result1: Vec<String> = branch
-        .astream("a".to_string(), None)
-        .map(|r| r.unwrap())
-        .collect()
-        .await;
-    assert_eq!(result1.join(""), "response one");
-
-    let result2: Vec<String> = branch
-        .astream("b".to_string(), None)
         .map(|r| r.unwrap())
         .collect()
         .await;

@@ -4,7 +4,7 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
-use crate::outputs::Generation;
+use crate::outputs::ChatGeneration;
 use crate::runnables::AddableDict;
 
 use crate::messages::AnyMessage;
@@ -315,11 +315,11 @@ impl BaseOutputParser for XMLOutputParser {
         self.parse_xml(text)
     }
 
-    fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<Value> {
+    fn parse_result(&self, result: &[ChatGeneration], _partial: bool) -> Result<Value> {
         if result.is_empty() {
             return Err(Error::output_parser_simple("No generations to parse"));
         }
-        self.parse(&result[0].text)
+        self.parse(&result[0].message.text())
     }
 
     fn get_format_instructions(&self) -> Result<String> {

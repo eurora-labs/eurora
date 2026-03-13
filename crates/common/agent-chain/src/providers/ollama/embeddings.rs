@@ -369,23 +369,11 @@ impl OllamaEmbeddings {
 
 #[async_trait]
 impl crate::embeddings::Embeddings for OllamaEmbeddings {
-    fn embed_documents(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(self.aembed_documents(texts))
-        })
-    }
-
-    fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(self.aembed_query(text))
-        })
-    }
-
-    async fn aembed_documents(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
+    async fn embed_documents(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
         self.embed_internal(texts).await
     }
 
-    async fn aembed_query(&self, text: &str) -> Result<Vec<f32>> {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
         let results = self.embed_internal(vec![text.to_string()]).await?;
 
         results

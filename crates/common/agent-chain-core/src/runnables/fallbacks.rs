@@ -2,8 +2,6 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::StreamExt;
-use futures::stream::BoxStream;
 
 use bon::bon;
 
@@ -11,8 +9,7 @@ use crate::error::{Error, Result};
 
 use super::base::{DynRunnable, Runnable};
 use super::config::{
-    ConfigOrList, RunnableConfig, child_config, ensure_config, finish_chain_run, get_config_list,
-    start_chain_run,
+    ConfigOrList, RunnableConfig, child_config, finish_chain_run, get_config_list, start_chain_run,
 };
 
 pub type FallbackErrorPredicate = Arc<dyn Fn(&Error) -> bool + Send + Sync>;
@@ -107,40 +104,6 @@ where
         }
     }
 
-    fn try_invoke_with_fallbacks(&self, input: I, config: &RunnableConfig) -> Result<O> {
-        let (run_manager, config) = start_chain_run(Some(config.clone()));
-
-        let mut first_error: Option<Error> = None;
-        let mut last_error: Option<Error> = None;
-        let mut current_input = input;
-
-        for runnable in self.runnables() {
-            if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref())
-            {
-                current_input = modified;
-            }
-
-            let invoke_config = child_config(&config, &run_manager, None);
-            match runnable.invoke(current_input.clone(), Some(invoke_config)) {
-                Ok(output) => return finish_chain_run(&run_manager, Ok(output)),
-                Err(e) => {
-                    if self.should_fallback(&e) {
-                        if first_error.is_none() {
-                            first_error = Some(Error::other(e.to_string()));
-                        }
-                        last_error = Some(e);
-                    } else {
-                        return finish_chain_run(&run_manager, Err(e));
-                    }
-                }
-            }
-        }
-
-        let error =
-            first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."));
-        finish_chain_run(&run_manager, Err(error))
-    }
-
     fn process_batch_outputs(
         &self,
         outputs: Vec<Result<O>>,
@@ -221,13 +184,7 @@ where
     fn get_output_schema(&self, config: Option<&RunnableConfig>) -> serde_json::Value {
         self.runnable.get_output_schema(config)
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-        self.try_invoke_with_fallbacks(input, &config)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -248,7 +205,7 @@ where
             }
 
             match runnable
-                .ainvoke(
+                .invoke(
                     current_input.clone(),
                     Some(child_config(&config, &run_manager, None)),
                 )
@@ -273,67 +230,7 @@ where
             Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks."))),
         )
     }
-
-    fn batch(
-        &self,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        return_exceptions: bool,
-    ) -> Vec<Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![Err(e)],
-        };
-        let n = inputs.len();
-
-        let mut to_return: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
-        let mut run_again: Vec<(usize, Self::Input)> = inputs.into_iter().enumerate().collect();
-        let mut handled_exception_indices: Vec<usize> = Vec::new();
-        let mut first_to_raise: Option<Error> = None;
-
-        for runnable in self.runnables() {
-            if run_again.is_empty() {
-                break;
-            }
-
-            let batch_inputs: Vec<Self::Input> =
-                run_again.iter().map(|(_, inp)| inp.clone()).collect();
-            let batch_configs: Vec<RunnableConfig> =
-                run_again.iter().map(|(i, _)| configs[*i].clone()).collect();
-
-            let outputs =
-                runnable.batch(batch_inputs, Some(ConfigOrList::List(batch_configs)), true);
-
-            let mut next_run_again = Vec::new();
-            if let Some(results) = self.process_batch_outputs(
-                outputs,
-                &run_again,
-                &mut to_return,
-                &mut handled_exception_indices,
-                &mut first_to_raise,
-                &mut next_run_again,
-                return_exceptions,
-            ) {
-                return results;
-            }
-
-            run_again = next_run_again;
-        }
-
-        to_return
-            .into_iter()
-            .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result for index"))))
-            .collect()
-    }
-
-    async fn abatch(
+    async fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
@@ -368,7 +265,7 @@ where
                 run_again.iter().map(|(i, _)| configs[*i].clone()).collect();
 
             let outputs = runnable
-                .abatch(batch_inputs, Some(ConfigOrList::List(batch_configs)), true)
+                .batch(batch_inputs, Some(ConfigOrList::List(batch_configs)), true)
                 .await;
 
             let mut next_run_again = Vec::new();
@@ -392,77 +289,15 @@ where
             .map(|opt| opt.unwrap_or_else(|| Err(Error::other("No result for index"))))
             .collect()
     }
-
-    fn stream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        self.astream(input, config)
-    }
-
-    fn astream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        let config = ensure_config(config);
-
-        Box::pin(async_stream::stream! {
-            let mut first_error: Option<Error> = None;
-            let mut last_error: Option<Error> = None;
-            let mut current_input = input;
-
-            for runnable in self.runnables() {
-                if let Some(modified) = self.maybe_insert_exception(&current_input, last_error.as_ref()) {
-                    current_input = modified;
-                }
-
-                let mut stream = runnable.astream(current_input.clone(), Some(config.clone()));
-
-                match stream.next().await {
-                    Some(Ok(chunk)) => {
-                        yield Ok(chunk);
-
-                        while let Some(result) = stream.next().await {
-                            yield result;
-                        }
-                        return;
-                    }
-                    Some(Err(e)) => {
-                        if self.should_fallback(&e) {
-                            if first_error.is_none() {
-                                first_error = Some(Error::other(e.to_string()));
-                            }
-                            last_error = Some(e);
-                        } else {
-                            yield Err(e);
-                            return;
-                        }
-                    }
-                    None => {
-                        if first_error.is_none() {
-                            first_error = Some(Error::other("Empty stream from runnable"));
-                        }
-                    }
-                }
-            }
-
-            yield Err(first_error.unwrap_or_else(|| Error::other("No error stored at end of fallbacks.")));
-        })
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runnables::base::{RunnableExt, RunnableLambda};
+    use crate::runnables::base::RunnableLambda;
 
-    #[test]
-    fn test_fallback_on_error() {
+    #[tokio::test]
+    async fn test_fallback_on_error() {
         let primary = RunnableLambda::builder()
             .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
             .build();
@@ -473,97 +308,12 @@ mod tests {
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
-        let result = with_fallbacks.invoke(5, None).unwrap();
-        assert_eq!(result, 10);
-    }
-
-    #[test]
-    fn test_primary_succeeds() {
-        let primary = RunnableLambda::builder()
-            .func(|x: i32| -> Result<i32> { Ok(x + 1) })
-            .build();
-
-        let fallback = RunnableLambda::builder()
-            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
-            .build();
-
-        let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
-
-        let result = with_fallbacks.invoke(5, None).unwrap();
-        assert_eq!(result, 6);
-    }
-
-    #[test]
-    fn test_all_fail() {
-        let primary = RunnableLambda::builder()
-            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
-            .build();
-
-        let fallback = RunnableLambda::builder()
-            .func(|_x: i32| -> Result<i32> { Err(Error::other("fallback failed")) })
-            .build();
-
-        let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
-
-        let result = with_fallbacks.invoke(5, None);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_multiple_fallbacks() {
-        let primary = RunnableLambda::builder()
-            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
-            .build();
-
-        let fallback1 = RunnableLambda::builder()
-            .func(|_x: i32| -> Result<i32> { Err(Error::other("fallback1 failed")) })
-            .build();
-
-        let fallback2 = RunnableLambda::builder()
-            .func(|x: i32| -> Result<i32> { Ok(x * 3) })
-            .build();
-
-        let with_fallbacks =
-            RunnableWithFallbacks::new(primary, vec![Arc::new(fallback1), Arc::new(fallback2)]);
-
-        let result = with_fallbacks.invoke(5, None).unwrap();
-        assert_eq!(result, 15);
-    }
-
-    #[test]
-    fn test_with_fallbacks_ext() {
-        let primary = RunnableLambda::builder()
-            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
-            .build();
-
-        let fallback = RunnableLambda::builder()
-            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
-            .build();
-
-        let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
-
-        let result = with_fallbacks.invoke(5, None).unwrap();
+        let result = with_fallbacks.invoke(5, None).await.unwrap();
         assert_eq!(result, 10);
     }
 
     #[tokio::test]
-    async fn test_fallback_async() {
-        let primary = RunnableLambda::builder()
-            .func(|_x: i32| -> Result<i32> { Err(Error::other("primary failed")) })
-            .build();
-
-        let fallback = RunnableLambda::builder()
-            .func(|x: i32| -> Result<i32> { Ok(x * 2) })
-            .build();
-
-        let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
-
-        let result = with_fallbacks.ainvoke(5, None).await.unwrap();
-        assert_eq!(result, 10);
-    }
-
-    #[test]
-    fn test_batch_fallback() {
+    async fn test_batch_fallback() {
         let primary = RunnableLambda::builder()
             .func(|x: i32| -> Result<i32> {
                 if x > 5 {
@@ -580,7 +330,7 @@ mod tests {
 
         let with_fallbacks = RunnableWithFallbacks::new(primary, vec![Arc::new(fallback)]);
 
-        let results = with_fallbacks.batch(vec![3, 10, 5], None, false);
+        let results = with_fallbacks.batch(vec![3, 10, 5], None, false).await;
 
         assert_eq!(results[0].as_ref().unwrap(), &4);
         assert_eq!(results[1].as_ref().unwrap(), &20);

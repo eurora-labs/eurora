@@ -1,6 +1,6 @@
 use agent_chain::providers::ollama::OllamaLLM;
 use agent_chain_core::language_models::BaseLLM;
-use agent_chain_core::outputs::GenerationChunk;
+use agent_chain_core::outputs::ChatGenerationChunk;
 use futures::StreamExt;
 
 const DEFAULT_MODEL: &str = "llama3.1";
@@ -33,7 +33,7 @@ async fn test_llm_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
-    let result = llm.ainvoke(vec!["I'm Pickle Rick".into()], None).await?;
+    let result = llm.invoke(vec!["I'm Pickle Rick".into()], None).await?;
     assert!(!result.is_empty());
 
     Ok(())
@@ -63,7 +63,7 @@ async fn test_llm_astream() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
-    let mut stream = llm.astream(vec!["Hi.".into()], None, None).await?;
+    let mut stream = llm.stream(vec!["Hi.".into()], None, None).await?;
 
     let mut got_chunk = false;
     while let Some(chunk) = stream.next().await {
@@ -106,7 +106,7 @@ async fn test_llm_abatch() -> Result<(), Box<dyn std::error::Error>> {
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
     let result = llm
-        .abatch(
+        .batch(
             vec![
                 vec!["I'm Pickle Rick".into()],
                 vec!["I'm not Pickle Rick".into()],
@@ -154,7 +154,7 @@ async fn test_llm_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
     let llm = OllamaLLM::new(DEFAULT_MODEL);
 
     let result = llm
-        .abatch(
+        .batch(
             vec![
                 vec!["I'm Pickle Rick".into()],
                 vec!["I'm not Pickle Rick".into()],
@@ -179,7 +179,7 @@ async fn test_llm_stream_no_reasoning() -> Result<(), Box<dyn std::error::Error>
 
     let mut stream = llm.stream(vec![SAMPLE_PROMPT.into()], None, None).await?;
 
-    let mut result_chunk: Option<GenerationChunk> = None;
+    let mut result_chunk: Option<ChatGenerationChunk> = None;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         result_chunk = Some(match result_chunk {
@@ -189,7 +189,7 @@ async fn test_llm_stream_no_reasoning() -> Result<(), Box<dyn std::error::Error>
     }
 
     let result_chunk = result_chunk.expect("Should have received at least one chunk");
-    assert!(!result_chunk.text.is_empty());
+    assert!(!result_chunk.message.text().is_empty());
     assert!(result_chunk.generation_info.is_some());
     let info = result_chunk.generation_info.as_ref().unwrap();
     assert!(
@@ -206,9 +206,9 @@ async fn test_llm_astream_no_reasoning() -> Result<(), Box<dyn std::error::Error
     load_env();
     let llm = OllamaLLM::new(REASONING_MODEL).num_ctx(4096);
 
-    let mut stream = llm.astream(vec![SAMPLE_PROMPT.into()], None, None).await?;
+    let mut stream = llm.stream(vec![SAMPLE_PROMPT.into()], None, None).await?;
 
-    let mut result_chunk: Option<GenerationChunk> = None;
+    let mut result_chunk: Option<ChatGenerationChunk> = None;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         result_chunk = Some(match result_chunk {
@@ -218,7 +218,7 @@ async fn test_llm_astream_no_reasoning() -> Result<(), Box<dyn std::error::Error
     }
 
     let result_chunk = result_chunk.expect("Should have received at least one chunk");
-    assert!(!result_chunk.text.is_empty());
+    assert!(!result_chunk.message.text().is_empty());
     assert!(result_chunk.generation_info.is_some());
     let info = result_chunk.generation_info.as_ref().unwrap();
     assert!(
@@ -239,7 +239,7 @@ async fn test_llm_stream_with_reasoning() -> Result<(), Box<dyn std::error::Erro
 
     let mut stream = llm.stream(vec![SAMPLE_PROMPT.into()], None, None).await?;
 
-    let mut result_chunk: Option<GenerationChunk> = None;
+    let mut result_chunk: Option<ChatGenerationChunk> = None;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         result_chunk = Some(match result_chunk {
@@ -249,7 +249,7 @@ async fn test_llm_stream_with_reasoning() -> Result<(), Box<dyn std::error::Erro
     }
 
     let result_chunk = result_chunk.expect("Should have received at least one chunk");
-    assert!(!result_chunk.text.is_empty());
+    assert!(!result_chunk.message.text().is_empty());
     assert!(result_chunk.generation_info.is_some());
     let info = result_chunk.generation_info.as_ref().unwrap();
     let reasoning_content = info
@@ -257,8 +257,8 @@ async fn test_llm_stream_with_reasoning() -> Result<(), Box<dyn std::error::Erro
         .and_then(|v| v.as_str())
         .expect("Should have reasoning_content");
     assert!(!reasoning_content.is_empty());
-    assert!(!result_chunk.text.contains("<think>"));
-    assert!(!result_chunk.text.contains("</think>"));
+    assert!(!result_chunk.message.text().contains("<think>"));
+    assert!(!result_chunk.message.text().contains("</think>"));
     assert!(!reasoning_content.contains("<think>"));
     assert!(!reasoning_content.contains("</think>"));
 
@@ -273,9 +273,9 @@ async fn test_llm_astream_with_reasoning() -> Result<(), Box<dyn std::error::Err
         .num_ctx(4096)
         .reasoning(true);
 
-    let mut stream = llm.astream(vec![SAMPLE_PROMPT.into()], None, None).await?;
+    let mut stream = llm.stream(vec![SAMPLE_PROMPT.into()], None, None).await?;
 
-    let mut result_chunk: Option<GenerationChunk> = None;
+    let mut result_chunk: Option<ChatGenerationChunk> = None;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         result_chunk = Some(match result_chunk {
@@ -285,7 +285,7 @@ async fn test_llm_astream_with_reasoning() -> Result<(), Box<dyn std::error::Err
     }
 
     let result_chunk = result_chunk.expect("Should have received at least one chunk");
-    assert!(!result_chunk.text.is_empty());
+    assert!(!result_chunk.message.text().is_empty());
     assert!(result_chunk.generation_info.is_some());
     let info = result_chunk.generation_info.as_ref().unwrap();
     let reasoning_content = info
@@ -293,8 +293,8 @@ async fn test_llm_astream_with_reasoning() -> Result<(), Box<dyn std::error::Err
         .and_then(|v| v.as_str())
         .expect("Should have reasoning_content");
     assert!(!reasoning_content.is_empty());
-    assert!(!result_chunk.text.contains("<think>"));
-    assert!(!result_chunk.text.contains("</think>"));
+    assert!(!result_chunk.message.text().contains("<think>"));
+    assert!(!result_chunk.message.text().contains("</think>"));
     assert!(!reasoning_content.contains("<think>"));
     assert!(!reasoning_content.contains("</think>"));
 

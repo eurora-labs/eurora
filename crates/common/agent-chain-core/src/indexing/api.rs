@@ -223,14 +223,14 @@ fn batch_iter<T>(size: usize, items: impl IntoIterator<Item = T>) -> Vec<Vec<T>>
     result
 }
 
-fn delete_from_destination(destination: &IndexDestination<'_>, ids: &[String]) -> Result<()> {
+async fn delete_from_destination(destination: &IndexDestination<'_>, ids: &[String]) -> Result<()> {
     match destination {
         IndexDestination::VectorStore(vs) => {
-            vs.delete(Some(ids.to_vec()))?;
+            vs.delete(Some(ids.to_vec())).await?;
             Ok(())
         }
         IndexDestination::DocumentIndex(di) => {
-            let response = di.delete(Some(ids))?;
+            let response = di.delete(Some(ids)).await?;
             if let Some(num_failed) = response.num_failed
                 && num_failed > 0
             {
@@ -243,235 +243,24 @@ fn delete_from_destination(destination: &IndexDestination<'_>, ids: &[String]) -
     }
 }
 
-async fn adelete_from_destination(
-    destination: &IndexDestination<'_>,
-    ids: &[String],
-) -> Result<()> {
-    match destination {
-        IndexDestination::VectorStore(vs) => {
-            vs.adelete(Some(ids.to_vec())).await?;
-            Ok(())
-        }
-        IndexDestination::DocumentIndex(di) => {
-            let response = di.adelete(Some(ids)).await?;
-            if let Some(num_failed) = response.num_failed
-                && num_failed > 0
-            {
-                return Err(Error::Indexing(
-                    "The delete operation to DocumentIndex failed.".to_string(),
-                ));
-            }
-            Ok(())
-        }
-    }
-}
-
-fn add_to_destination(
+async fn add_to_destination(
     destination: &IndexDestination<'_>,
     documents: Vec<Document>,
     ids: Vec<String>,
 ) -> Result<()> {
     match destination {
         IndexDestination::VectorStore(vs) => {
-            vs.add_documents(documents, Some(ids))?;
+            vs.add_documents(documents, Some(ids)).await?;
             Ok(())
         }
         IndexDestination::DocumentIndex(di) => {
-            di.upsert(&documents)?;
+            di.upsert(&documents).await?;
             Ok(())
         }
     }
 }
 
-async fn aadd_to_destination(
-    destination: &IndexDestination<'_>,
-    documents: Vec<Document>,
-    ids: Vec<String>,
-) -> Result<()> {
-    match destination {
-        IndexDestination::VectorStore(vs) => {
-            vs.aadd_documents(documents, Some(ids)).await?;
-            Ok(())
-        }
-        IndexDestination::DocumentIndex(di) => {
-            di.aupsert(&documents).await?;
-            Ok(())
-        }
-    }
-}
-
-pub fn index(
-    docs_source: impl IntoIterator<Item = Document>,
-    record_manager: &dyn RecordManager,
-    destination: &IndexDestination<'_>,
-    config: &IndexConfig,
-) -> Result<IndexingResult> {
-    if matches!(
-        &config.key_encoder,
-        KeyEncoder::Algorithm(HashAlgorithm::Sha1)
-    ) {
-        warn_about_sha1();
-    }
-
-    if matches!(
-        config.cleanup,
-        Some(CleanupMode::Incremental) | Some(CleanupMode::ScopedFull)
-    ) && config.source_id_key.is_none()
-    {
-        return Err(Error::InvalidConfig(
-            "Source id key is required when cleanup mode is incremental or scoped_full."
-                .to_string(),
-        ));
-    }
-
-    let source_id_assigner = get_source_id_assigner(&config.source_id_key);
-    let index_start_dt = record_manager.get_time()?;
-
-    let mut num_added: usize = 0;
-    let mut num_skipped: usize = 0;
-    let mut num_updated: usize = 0;
-    let mut num_deleted: usize = 0;
-    let mut scoped_full_cleanup_source_ids: HashSet<String> = HashSet::new();
-
-    let doc_batches = batch_iter(config.batch_size, docs_source);
-
-    for doc_batch in doc_batches {
-        let original_batch_size = doc_batch.len();
-
-        let hashed_docs: Vec<Document> = doc_batch
-            .iter()
-            .map(|doc| get_document_with_hash(doc, &config.key_encoder))
-            .collect::<Result<Vec<_>>>()?;
-        let hashed_docs = deduplicate_in_order(hashed_docs);
-
-        num_skipped += original_batch_size - hashed_docs.len();
-
-        let source_ids: Vec<Option<String>> = hashed_docs.iter().map(&source_id_assigner).collect();
-
-        if matches!(
-            config.cleanup,
-            Some(CleanupMode::Incremental) | Some(CleanupMode::ScopedFull)
-        ) {
-            for (source_id, hashed_doc) in source_ids.iter().zip(&hashed_docs) {
-                if source_id.is_none() {
-                    return Err(Error::InvalidConfig(format!(
-                        "Source IDs are required when cleanup mode is incremental or scoped_full. \
-                         Document that starts with content: {} was not assigned as source id.",
-                        &hashed_doc.page_content()[..hashed_doc.page_content().len().min(100)]
-                    )));
-                }
-                if config.cleanup == Some(CleanupMode::ScopedFull) {
-                    scoped_full_cleanup_source_ids.insert(source_id.clone().unwrap_or_default());
-                }
-            }
-        }
-
-        let doc_ids: Vec<String> = hashed_docs
-            .iter()
-            .map(|doc| {
-                doc.id()
-                    .map(String::from)
-                    .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))
-            })
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-
-        let exists_batch = record_manager.exists(&doc_ids)?;
-
-        let mut uids = Vec::new();
-        let mut docs_to_index = Vec::new();
-        let mut uids_to_refresh = Vec::new();
-        let mut seen_docs: HashSet<String> = HashSet::new();
-
-        for (hashed_doc, doc_exists) in hashed_docs.into_iter().zip(exists_batch) {
-            let hashed_id = hashed_doc
-                .id()
-                .map(String::from)
-                .ok_or_else(|| Error::Indexing("hash should have set document id".to_string()))?;
-            if doc_exists {
-                if config.force_update {
-                    seen_docs.insert(hashed_id.clone());
-                } else {
-                    uids_to_refresh.push(hashed_id);
-                    continue;
-                }
-            }
-            uids.push(hashed_id);
-            docs_to_index.push(hashed_doc);
-        }
-
-        if !uids_to_refresh.is_empty() {
-            record_manager.update(&uids_to_refresh, None, Some(index_start_dt))?;
-            num_skipped += uids_to_refresh.len();
-        }
-
-        if !docs_to_index.is_empty() {
-            add_to_destination(destination, docs_to_index.clone(), uids.clone())?;
-            num_added += docs_to_index.len() - seen_docs.len();
-            num_updated += seen_docs.len();
-        }
-
-        let group_ids_for_update: Vec<Option<String>> = source_ids;
-        record_manager.update(&doc_ids, Some(&group_ids_for_update), Some(index_start_dt))?;
-
-        if config.cleanup == Some(CleanupMode::Incremental) {
-            let source_ids_for_cleanup: Vec<String> = group_ids_for_update
-                .iter()
-                .filter_map(|s| s.clone())
-                .collect();
-
-            loop {
-                let uids_to_delete = record_manager.list_keys(
-                    Some(index_start_dt),
-                    None,
-                    Some(&source_ids_for_cleanup),
-                    Some(config.cleanup_batch_size),
-                )?;
-                if uids_to_delete.is_empty() {
-                    break;
-                }
-                delete_from_destination(destination, &uids_to_delete)?;
-                record_manager.delete_keys(&uids_to_delete)?;
-                num_deleted += uids_to_delete.len();
-            }
-        }
-    }
-
-    if config.cleanup == Some(CleanupMode::Full)
-        || (config.cleanup == Some(CleanupMode::ScopedFull)
-            && !scoped_full_cleanup_source_ids.is_empty())
-    {
-        let delete_group_ids: Option<Vec<String>> =
-            if config.cleanup == Some(CleanupMode::ScopedFull) {
-                Some(scoped_full_cleanup_source_ids.into_iter().collect())
-            } else {
-                None
-            };
-
-        loop {
-            let uids_to_delete = record_manager.list_keys(
-                Some(index_start_dt),
-                None,
-                delete_group_ids.as_deref(),
-                Some(config.cleanup_batch_size),
-            )?;
-            if uids_to_delete.is_empty() {
-                break;
-            }
-            delete_from_destination(destination, &uids_to_delete)?;
-            record_manager.delete_keys(&uids_to_delete)?;
-            num_deleted += uids_to_delete.len();
-        }
-    }
-
-    Ok(IndexingResult {
-        num_added,
-        num_updated,
-        num_skipped,
-        num_deleted,
-    })
-}
-
-pub async fn aindex(
+pub async fn index(
     docs_source: impl IntoIterator<Item = Document> + Send,
     record_manager: &dyn RecordManager,
     destination: &IndexDestination<'_>,
@@ -496,7 +285,7 @@ pub async fn aindex(
     }
 
     let source_id_assigner = get_source_id_assigner(&config.source_id_key);
-    let index_start_dt = record_manager.aget_time().await?;
+    let index_start_dt = record_manager.get_time().await?;
 
     let mut num_added: usize = 0;
     let mut num_skipped: usize = 0;
@@ -546,7 +335,7 @@ pub async fn aindex(
             })
             .collect::<std::result::Result<Vec<_>, _>>()?;
 
-        let exists_batch = record_manager.aexists(&doc_ids).await?;
+        let exists_batch = record_manager.exists(&doc_ids).await?;
 
         let mut uids = Vec::new();
         let mut docs_to_index = Vec::new();
@@ -572,20 +361,20 @@ pub async fn aindex(
 
         if !uids_to_refresh.is_empty() {
             record_manager
-                .aupdate(&uids_to_refresh, None, Some(index_start_dt))
+                .update(&uids_to_refresh, None, Some(index_start_dt))
                 .await?;
             num_skipped += uids_to_refresh.len();
         }
 
         if !docs_to_index.is_empty() {
-            aadd_to_destination(destination, docs_to_index.clone(), uids.clone()).await?;
+            add_to_destination(destination, docs_to_index.clone(), uids.clone()).await?;
             num_added += docs_to_index.len() - seen_docs.len();
             num_updated += seen_docs.len();
         }
 
         let group_ids_for_update: Vec<Option<String>> = source_ids;
         record_manager
-            .aupdate(&doc_ids, Some(&group_ids_for_update), Some(index_start_dt))
+            .update(&doc_ids, Some(&group_ids_for_update), Some(index_start_dt))
             .await?;
 
         if config.cleanup == Some(CleanupMode::Incremental) {
@@ -596,7 +385,7 @@ pub async fn aindex(
 
             loop {
                 let uids_to_delete = record_manager
-                    .alist_keys(
+                    .list_keys(
                         Some(index_start_dt),
                         None,
                         Some(&source_ids_for_cleanup),
@@ -606,8 +395,8 @@ pub async fn aindex(
                 if uids_to_delete.is_empty() {
                     break;
                 }
-                adelete_from_destination(destination, &uids_to_delete).await?;
-                record_manager.adelete_keys(&uids_to_delete).await?;
+                delete_from_destination(destination, &uids_to_delete).await?;
+                record_manager.delete_keys(&uids_to_delete).await?;
                 num_deleted += uids_to_delete.len();
             }
         }
@@ -626,7 +415,7 @@ pub async fn aindex(
 
         loop {
             let uids_to_delete = record_manager
-                .alist_keys(
+                .list_keys(
                     Some(index_start_dt),
                     None,
                     delete_group_ids.as_deref(),
@@ -636,8 +425,8 @@ pub async fn aindex(
             if uids_to_delete.is_empty() {
                 break;
             }
-            adelete_from_destination(destination, &uids_to_delete).await?;
-            record_manager.adelete_keys(&uids_to_delete).await?;
+            delete_from_destination(destination, &uids_to_delete).await?;
+            record_manager.delete_keys(&uids_to_delete).await?;
             num_deleted += uids_to_delete.len();
         }
     }

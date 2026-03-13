@@ -12,7 +12,6 @@ use crate::error::{Error, Result};
 use crate::indexing::base::{DeleteResponse, DocumentIndex, UpsertResponse};
 use crate::retrievers::BaseRetriever;
 use crate::retrievers::LangSmithRetrieverParams;
-use crate::runnables::config::RunnableConfig;
 
 pub struct InMemoryDocumentIndex {
     store: RwLock<HashMap<String, Document>>,
@@ -58,7 +57,7 @@ impl Default for InMemoryDocumentIndex {
 
 #[async_trait]
 impl DocumentIndex for InMemoryDocumentIndex {
-    fn upsert(&self, items: &[Document]) -> Result<UpsertResponse> {
+    async fn upsert(&self, items: &[Document]) -> Result<UpsertResponse> {
         let mut store = self
             .store
             .write()
@@ -89,7 +88,7 @@ impl DocumentIndex for InMemoryDocumentIndex {
         })
     }
 
-    fn delete(&self, ids: Option<&[String]>) -> Result<DeleteResponse> {
+    async fn delete(&self, ids: Option<&[String]>) -> Result<DeleteResponse> {
         let ids = ids
             .ok_or_else(|| Error::InvalidConfig("IDs must be provided for deletion".to_string()))?;
 
@@ -114,7 +113,7 @@ impl DocumentIndex for InMemoryDocumentIndex {
         })
     }
 
-    fn get(&self, ids: &[String]) -> Result<Vec<Document>> {
+    async fn get(&self, ids: &[String]) -> Result<Vec<Document>> {
         let store = self
             .store
             .read()
@@ -142,7 +141,7 @@ impl BaseRetriever for InMemoryDocumentIndex {
         LangSmithRetrieverParams::default()
     }
 
-    fn get_relevant_documents(
+    async fn get_relevant_documents(
         &self,
         query: &str,
         _run_manager: Option<&CallbackManagerForRetrieverRun>,
@@ -167,21 +166,5 @@ impl BaseRetriever for InMemoryDocumentIndex {
             .take(self.top_k)
             .map(|(doc, _)| doc)
             .collect())
-    }
-
-    async fn aget_relevant_documents(
-        &self,
-        query: &str,
-        _run_manager: Option<&CallbackManagerForRetrieverRun>,
-    ) -> Result<Vec<Document>> {
-        self.get_relevant_documents(query, None)
-    }
-
-    fn invoke(&self, input: &str, _config: Option<RunnableConfig>) -> Result<Vec<Document>> {
-        self.get_relevant_documents(input, None)
-    }
-
-    async fn ainvoke(&self, input: &str, config: Option<RunnableConfig>) -> Result<Vec<Document>> {
-        self.invoke(input, config)
     }
 }

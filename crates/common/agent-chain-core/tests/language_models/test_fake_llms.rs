@@ -170,10 +170,10 @@ async fn test_fake_list_llm_generate_returns_llm_result() {
     assert_eq!(result.generations.len(), 1);
     assert_eq!(result.generations[0].len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => {
-            assert_eq!(generation.text, "response");
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "response");
         }
-        _ => panic!("Expected Generation variant"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -224,7 +224,7 @@ async fn test_fake_streaming_stream_yields_characters() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["h", "e", "l", "l", "o"]);
 }
@@ -241,7 +241,7 @@ async fn test_fake_streaming_stream_cycles_through_responses() {
         .unwrap();
     let mut chunks1 = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks1.push(chunk.unwrap().text);
+        chunks1.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks1, vec!["a", "b"]);
 
@@ -251,7 +251,7 @@ async fn test_fake_streaming_stream_cycles_through_responses() {
         .unwrap();
     let mut chunks2 = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks2.push(chunk.unwrap().text);
+        chunks2.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks2, vec!["c", "d"]);
 
@@ -261,7 +261,7 @@ async fn test_fake_streaming_stream_cycles_through_responses() {
         .unwrap();
     let mut chunks3 = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks3.push(chunk.unwrap().text);
+        chunks3.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks3, vec!["a", "b"]);
 }
@@ -279,9 +279,9 @@ async fn test_fake_streaming_stream_error_on_chunk() {
         .unwrap();
 
     let chunk0 = stream.next().await.unwrap().unwrap();
-    assert_eq!(chunk0.text, "h");
+    assert_eq!(chunk0.message.text(), "h");
     let chunk1 = stream.next().await.unwrap().unwrap();
-    assert_eq!(chunk1.text, "e");
+    assert_eq!(chunk1.message.text(), "e");
     let chunk2 = stream.next().await.unwrap();
     assert!(chunk2.is_err());
 }
@@ -331,7 +331,7 @@ async fn test_fake_streaming_stream_empty_response() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert!(chunks.is_empty());
 }
@@ -348,7 +348,7 @@ async fn test_fake_streaming_stream_unicode_characters() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["你", "好"]);
 }
@@ -365,7 +365,7 @@ async fn test_fake_streaming_stream_with_spaces() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["a", " ", "b"]);
 }
@@ -382,7 +382,7 @@ async fn test_fake_streaming_stream_with_newlines() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["a", "\n", "b"]);
 }
@@ -407,16 +407,16 @@ async fn test_generate_with_multiple_prompts() {
 
     assert_eq!(result.generations.len(), 3);
     match &result.generations[0][0] {
-        GenerationType::Generation(g) => assert_eq!(g.text, "alpha"),
-        _ => panic!("Expected Generation"),
+        GenerationType::ChatGeneration(g) => assert_eq!(g.message.text(), "alpha"),
+        _ => panic!("Expected ChatGeneration"),
     }
     match &result.generations[1][0] {
-        GenerationType::Generation(g) => assert_eq!(g.text, "beta"),
-        _ => panic!("Expected Generation"),
+        GenerationType::ChatGeneration(g) => assert_eq!(g.message.text(), "beta"),
+        _ => panic!("Expected ChatGeneration"),
     }
     match &result.generations[2][0] {
-        GenerationType::Generation(g) => assert_eq!(g.text, "gamma"),
-        _ => panic!("Expected Generation"),
+        GenerationType::ChatGeneration(g) => assert_eq!(g.message.text(), "gamma"),
+        _ => panic!("Expected ChatGeneration"),
     }
 }
 
@@ -436,16 +436,16 @@ async fn test_generate_with_more_prompts_than_responses() {
 
     assert_eq!(result.generations.len(), 3);
     match &result.generations[0][0] {
-        GenerationType::Generation(g) => assert_eq!(g.text, "first"),
-        _ => panic!("Expected Generation"),
+        GenerationType::ChatGeneration(g) => assert_eq!(g.message.text(), "first"),
+        _ => panic!("Expected ChatGeneration"),
     }
     match &result.generations[1][0] {
-        GenerationType::Generation(g) => assert_eq!(g.text, "second"),
-        _ => panic!("Expected Generation"),
+        GenerationType::ChatGeneration(g) => assert_eq!(g.message.text(), "second"),
+        _ => panic!("Expected ChatGeneration"),
     }
     match &result.generations[2][0] {
-        GenerationType::Generation(g) => assert_eq!(g.text, "first"),
-        _ => panic!("Expected Generation"),
+        GenerationType::ChatGeneration(g) => assert_eq!(g.message.text(), "first"),
+        _ => panic!("Expected ChatGeneration"),
     }
 }
 
@@ -504,12 +504,16 @@ async fn test_generate_returns_proper_llm_result_structure() {
     assert_eq!(result.generations[1].len(), 1);
 
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "hello"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "hello")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
     match &result.generations[1][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "world"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "world")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -526,8 +530,10 @@ async fn test_generate_single_prompt_structure() {
     assert_eq!(result.generations.len(), 1);
     assert_eq!(result.generations[0].len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "single response"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "single response")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -543,7 +549,7 @@ async fn test_stream_single_character() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["x"]);
     assert_eq!(chunks.len(), 1);
@@ -563,7 +569,7 @@ async fn test_stream_error_on_exact_last_chunk() {
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
         match chunk {
-            Ok(c) => chunks.push(c.text),
+            Ok(c) => chunks.push(c.message.text()),
             Err(_) => break,
         }
     }
@@ -584,7 +590,7 @@ async fn test_stream_error_on_last_chunk_single_char() {
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
         match chunk {
-            Ok(c) => chunks.push(c.text),
+            Ok(c) => chunks.push(c.message.text()),
             Err(_) => break,
         }
     }
@@ -603,7 +609,7 @@ async fn test_stream_advances_counter() {
         .unwrap();
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["a", "b"]);
     assert_eq!(llm.current_index(), 1);
@@ -614,7 +620,7 @@ async fn test_stream_advances_counter() {
         .unwrap();
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["c", "d"]);
     assert_eq!(llm.current_index(), 2);
@@ -625,7 +631,7 @@ async fn test_stream_advances_counter() {
         .unwrap();
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["e", "f"]);
     assert_eq!(llm.current_index(), 0);
@@ -667,7 +673,7 @@ async fn test_stream_with_tabs() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["a", "\t", "b"]);
 }
@@ -684,7 +690,7 @@ async fn test_stream_with_carriage_return() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["a", "\r", "\n", "b"]);
 }
@@ -701,7 +707,7 @@ async fn test_stream_with_null_byte() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["a", "\x00", "b"]);
 }
@@ -718,7 +724,7 @@ async fn test_stream_with_emoji() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["h", "i", "\u{1f600}"]);
 }
@@ -752,7 +758,7 @@ async fn test_stream_with_sleep() {
         .unwrap();
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     let elapsed = start.elapsed();
 
@@ -898,7 +904,7 @@ async fn test_multiple_sequential_streams_cycle() {
             .unwrap();
         let mut chunks = Vec::new();
         while let Some(chunk) = stream.next().await {
-            chunks.push(chunk.unwrap().text);
+            chunks.push(chunk.unwrap().message.text());
         }
         chunks
     }
@@ -960,7 +966,7 @@ async fn test_stream_with_mixed_special_characters() {
         .unwrap();
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     assert_eq!(chunks, vec!["\u{1f44d}", "\n", "\t"]);
 }
@@ -979,7 +985,7 @@ async fn test_astream_sleep_delays_proportional_to_chunks() {
         .unwrap();
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     let elapsed = start.elapsed();
 
@@ -1000,7 +1006,7 @@ async fn test_astream_no_sleep_is_fast() {
         .unwrap();
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text());
     }
     let elapsed = start.elapsed();
 

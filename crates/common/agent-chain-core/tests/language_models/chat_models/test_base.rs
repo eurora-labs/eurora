@@ -191,7 +191,7 @@ impl BaseChatModel for ModelWithSyncStream {
         Err(Error::NotImplemented("Use streaming".into()))
     }
 
-    fn _stream(
+    async fn _stream(
         &self,
         _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
@@ -215,6 +215,7 @@ async fn test_astream_implementation_fallback_to_stream() {
 
     let mut stream = model
         ._stream(vec![], None, None)
+        .await
         .expect("stream should work");
     let mut chunks = Vec::new();
     while let Some(chunk_result) = stream.next().await {
@@ -226,104 +227,6 @@ async fn test_astream_implementation_fallback_to_stream() {
     assert_eq!(chunks[1].message.content(), "b");
 
     assert!(model.has_stream_impl());
-    assert!(!model.has_astream_impl());
-}
-
-struct ModelWithAsyncStream {
-    config: ChatModelConfig,
-}
-
-impl ModelWithAsyncStream {
-    fn new() -> Self {
-        Self {
-            config: ChatModelConfig::default(),
-        }
-    }
-}
-
-#[async_trait]
-impl BaseLanguageModel for ModelWithAsyncStream {
-    fn llm_type(&self) -> &str {
-        "fake-chat-model"
-    }
-
-    fn model_name(&self) -> &str {
-        "fake-chat"
-    }
-
-    fn config(&self) -> &LanguageModelConfig {
-        &self.config.base
-    }
-
-    fn cache(&self) -> Option<&dyn agent_chain_core::caches::BaseCache> {
-        None
-    }
-
-    fn callbacks(&self) -> Option<&agent_chain_core::callbacks::Callbacks> {
-        None
-    }
-
-    async fn generate_prompt(
-        &self,
-        _prompts: Vec<Vec<AnyMessage>>,
-        _stop: Option<Vec<String>>,
-        _callbacks: Option<agent_chain_core::callbacks::Callbacks>,
-    ) -> Result<agent_chain_core::outputs::LLMResult> {
-        Err(Error::NotImplemented("not implemented".into()))
-    }
-}
-
-#[async_trait]
-impl BaseChatModel for ModelWithAsyncStream {
-    fn chat_config(&self) -> &ChatModelConfig {
-        &self.config
-    }
-
-    async fn _generate(
-        &self,
-        _messages: Vec<AnyMessage>,
-        _stop: Option<Vec<String>>,
-        _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
-    ) -> Result<ChatResult> {
-        Err(Error::NotImplemented("Use streaming".into()))
-    }
-
-    async fn _astream(
-        &self,
-        _messages: Vec<AnyMessage>,
-        _stop: Option<Vec<String>>,
-        _run_manager: Option<&agent_chain_core::callbacks::CallbackManagerForLLMRun>,
-    ) -> Result<ChatGenerationStream> {
-        let stream = async_stream::stream! {
-            yield Ok(ChatGenerationChunk::builder().message(AIMessage::builder().content("a").build().into()).build());
-            yield Ok(ChatGenerationChunk::builder().message(AIMessage::builder().content("b").build().into()).build());
-        };
-        Ok(Box::pin(stream))
-    }
-
-    fn has_astream_impl(&self) -> bool {
-        true
-    }
-}
-
-#[tokio::test]
-async fn test_astream_implementation_uses_astream() {
-    let model = ModelWithAsyncStream::new();
-
-    let mut stream = model
-        ._astream(vec![], None, None)
-        .await
-        .expect("astream should work");
-    let mut chunks = Vec::new();
-    while let Some(chunk_result) = stream.next().await {
-        chunks.push(chunk_result.expect("chunk should succeed"));
-    }
-
-    assert_eq!(chunks.len(), 2);
-    assert_eq!(chunks[0].message.content(), "a");
-    assert_eq!(chunks[1].message.content(), "b");
-
-    assert!(model.has_astream_impl());
 }
 
 struct NoStreamingModel {
@@ -493,7 +396,7 @@ impl BaseChatModel for StreamingModel {
         Ok(ChatResult::builder().generations(vec![generation]).build())
     }
 
-    fn _stream(
+    async fn _stream(
         &self,
         _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
@@ -522,8 +425,8 @@ impl BaseChatModel for StreamingModel {
 fn test_disable_streaming_bool_true() {
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(true));
 
-    assert!(!model._should_stream(false, false, None, None));
-    assert!(!model._should_stream(false, true, None, None)); // with tools
+    assert!(!model._should_stream(false, None, None));
+    assert!(!model._should_stream(true, None, None)); // with tools
 }
 
 #[test]
@@ -534,8 +437,8 @@ fn test_disable_streaming_bool_false() {
         vec![std::sync::Arc::new(
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
         )];
-    assert!(model._should_stream(false, false, None, Some(&handlers)));
-    assert!(model._should_stream(false, true, None, Some(&handlers))); // with tools
+    assert!(model._should_stream(false, None, Some(&handlers)));
+    assert!(model._should_stream(true, None, Some(&handlers))); // with tools
 }
 
 #[test]
@@ -547,9 +450,9 @@ fn test_disable_streaming_tool_calling() {
             agent_chain_core::callbacks::StdOutCallbackHandler::new(),
         )];
 
-    assert!(model._should_stream(false, false, None, Some(&handlers)));
+    assert!(model._should_stream(false, None, Some(&handlers)));
 
-    assert!(!model._should_stream(false, true, None, Some(&handlers)));
+    assert!(!model._should_stream(true, None, Some(&handlers)));
 }
 
 #[tokio::test]
@@ -565,11 +468,11 @@ async fn test_disable_streaming_async() {
     assert_eq!(result.unwrap().content, "invoke");
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
-    assert!(model._should_stream(true, false, None, Some(&handlers)));
+    assert!(model._should_stream(false, None, Some(&handlers)));
 
     let model = StreamingModel::new().with_disable_streaming(DisableStreaming::ToolCalling);
-    assert!(model._should_stream(true, false, None, Some(&handlers))); // no tools
-    assert!(!model._should_stream(true, true, None, Some(&handlers))); // with tools
+    assert!(model._should_stream(false, None, Some(&handlers))); // no tools
+    assert!(!model._should_stream(true, None, Some(&handlers))); // with tools
 }
 
 #[tokio::test]
@@ -580,7 +483,7 @@ async fn test_disable_streaming_no_streaming_model() {
     assert_eq!(result.unwrap().content, "invoke");
 
     let model = NoStreamingModel::new().with_disable_streaming(DisableStreaming::Bool(false));
-    assert!(!model._should_stream(false, false, None, None));
+    assert!(!model._should_stream(false, None, None));
 }
 
 #[tokio::test]
@@ -591,7 +494,7 @@ async fn test_disable_streaming_no_streaming_model_async() {
         DisableStreaming::ToolCalling,
     ] {
         let model = NoStreamingModel::new().with_disable_streaming(disable);
-        let result = model.ainvoke(vec![], None).await;
+        let result = model.invoke(vec![], None).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap().content, "invoke");
     }
@@ -865,7 +768,7 @@ async fn test_ainvoke_basic() {
         .responses(vec!["async hello".to_string()])
         .build();
     let result = model
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("test").build(),
             )],
@@ -884,6 +787,7 @@ async fn test_stream_basic() {
         .build();
     let mut stream = model
         ._stream(vec![], None, None)
+        .await
         .expect("stream should work");
 
     let mut chunks = Vec::new();
@@ -1013,10 +917,14 @@ fn test_combine_llm_outputs_returns_empty_dict_with_empty_list() {
 
 #[test]
 fn test_convert_cached_generations_chat_generation() {
-    use agent_chain_core::outputs::Generation;
+    use agent_chain_core::outputs::ChatGeneration;
 
     let model = agent_chain_core::FakeChatModel::builder().build();
-    let generations = vec![Generation::builder().text("hello".to_string()).build()];
+    let generations = vec![
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("hello").build().into())
+            .build(),
+    ];
     let result = model._convert_cached_generations(generations);
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].message.content(), "hello");
@@ -1024,12 +932,16 @@ fn test_convert_cached_generations_chat_generation() {
 
 #[test]
 fn test_convert_cached_generations_legacy() {
-    use agent_chain_core::outputs::Generation;
+    use agent_chain_core::outputs::ChatGeneration;
 
     let model = agent_chain_core::FakeChatModel::builder().build();
     let generations = vec![
-        Generation::builder().text("first".to_string()).build(),
-        Generation::builder().text("second".to_string()).build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("first").build().into())
+            .build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("second").build().into())
+            .build(),
     ];
     let result = model._convert_cached_generations(generations);
     assert_eq!(result.len(), 2);
@@ -1039,13 +951,19 @@ fn test_convert_cached_generations_legacy() {
 
 #[test]
 fn test_convert_cached_generations_mixed() {
-    use agent_chain_core::outputs::Generation;
+    use agent_chain_core::outputs::ChatGeneration;
 
     let model = agent_chain_core::FakeChatModel::builder().build();
     let generations = vec![
-        Generation::builder().text("a".to_string()).build(),
-        Generation::builder().text("b".to_string()).build(),
-        Generation::builder().text("c".to_string()).build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("a").build().into())
+            .build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("b").build().into())
+            .build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("c").build().into())
+            .build(),
     ];
     let result = model._convert_cached_generations(generations);
     assert_eq!(result.len(), 3);
@@ -1057,13 +975,7 @@ fn test_convert_cached_generations_mixed() {
 #[test]
 fn test_should_stream_no_stream_returns_false() {
     let model = agent_chain_core::FakeChatModel::builder().build();
-    assert!(!model._should_stream(false, false, None, None));
-}
-
-#[test]
-fn test_should_stream_no_astream_returns_false() {
-    let model = agent_chain_core::FakeChatModel::builder().build();
-    assert!(!model._should_stream(true, false, None, None));
+    assert!(!model._should_stream(false, None, None));
 }
 
 #[test]
@@ -1075,7 +987,7 @@ fn test_should_stream_disabled_returns_false() {
         .responses(vec!["test".to_string()])
         .config(config)
         .build();
-    assert!(!model._should_stream(false, false, None, None));
+    assert!(!model._should_stream(false, None, None));
 }
 
 #[test]
@@ -1083,7 +995,7 @@ fn test_should_stream_kwarg_true() {
     let model = FakeListChatModel::builder()
         .responses(vec!["test".to_string()])
         .build();
-    assert!(model._should_stream(false, false, Some(true), None));
+    assert!(model._should_stream(false, Some(true), None));
 }
 
 #[test]
@@ -1091,7 +1003,7 @@ fn test_should_stream_kwarg_false() {
     let model = FakeListChatModel::builder()
         .responses(vec!["test".to_string()])
         .build();
-    assert!(!model._should_stream(false, false, Some(false), None));
+    assert!(!model._should_stream(false, Some(false), None));
 }
 
 #[test]
@@ -1101,7 +1013,7 @@ fn test_should_stream_no_handlers() {
         .build();
     let handlers: Vec<std::sync::Arc<dyn agent_chain_core::callbacks::BaseCallbackHandler>> =
         vec![];
-    assert!(!model._should_stream(false, false, None, Some(&handlers)));
+    assert!(!model._should_stream(false, None, Some(&handlers)));
 }
 
 #[tokio::test]
@@ -1175,7 +1087,7 @@ async fn test_agenerate_single_message_list() {
         .responses(vec!["response".to_string()])
         .build();
     let result = model
-        .agenerate(
+        .generate(
             vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hello").build(),
             )]],
@@ -1192,7 +1104,7 @@ async fn test_agenerate_multiple_message_lists() {
         .responses(vec!["r1".to_string(), "r2".to_string()])
         .build();
     let result = model
-        .agenerate(
+        .generate(
             vec![
                 vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p1").build(),
@@ -1214,7 +1126,7 @@ async fn test_agenerate_returns_chat_result() {
         .responses(vec!["hello".to_string()])
         .build();
     let result = model
-        .agenerate(
+        .generate(
             vec![vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("hi").build(),
             )]],
@@ -1504,7 +1416,7 @@ async fn test_structured_output_with_raw_success() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("test").build(),
             )],
@@ -1538,7 +1450,7 @@ async fn test_structured_output_with_raw_no_matching_tool() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("test").build(),
             )],
@@ -1578,7 +1490,7 @@ async fn test_structured_output_with_raw_parse_error() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("test").build(),
             )],
@@ -1621,7 +1533,7 @@ async fn test_structured_output_with_raw_serializes_message() {
 
     let runnable = StructuredOutputWithRaw::new(model_runnable, parser);
     let result = runnable
-        .ainvoke(
+        .invoke(
             vec![AnyMessage::HumanMessage(
                 HumanMessage::builder().content("test").build(),
             )],

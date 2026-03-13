@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::load::{Serializable, Serialized, SerializedConstructor};
-use crate::outputs::Generation;
+use crate::outputs::ChatGeneration;
 
 use super::base::BaseOutputParser;
 use super::transform::BaseTransformOutputParser;
@@ -28,8 +28,8 @@ impl BaseOutputParser for StrOutputParser {
 }
 
 impl BaseTransformOutputParser for StrOutputParser {
-    fn parse_generation(&self, generation: &Generation) -> Result<Self::Output> {
-        Ok(generation.text.clone())
+    fn parse_generation(&self, generation: &ChatGeneration) -> Result<Self::Output> {
+        Ok(generation.message.text())
     }
 }
 

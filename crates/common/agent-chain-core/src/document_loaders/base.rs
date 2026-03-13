@@ -6,40 +6,31 @@ use crate::documents::BaseDocumentTransformer;
 use crate::documents::base::Document;
 
 pub trait BaseLoader: Send + Sync {
-    fn lazy_load(&self) -> Box<dyn Iterator<Item = Document> + '_>;
+    fn lazy_load(
+        &self,
+    ) -> impl std::future::Future<Output = Pin<Box<dyn Stream<Item = Document> + Send + '_>>> + Send;
 
-    fn load(&self) -> Vec<Document> {
-        self.lazy_load().collect()
+    fn load(&self) -> impl std::future::Future<Output = Vec<Document>> + Send {
+        async {
+            use futures::StreamExt;
+            self.lazy_load().await.collect().await
+        }
     }
 
     fn load_and_split(
         &self,
         text_splitter: &dyn BaseDocumentTransformer,
-    ) -> Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>> {
-        let docs = self.load();
-        text_splitter
-            .transform_documents(&docs)
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-    }
-
-    /// Returns an async stream of documents.
-    ///
-    /// The default implementation eagerly collects from `lazy_load` then wraps
-    /// the result in a stream. Override this for truly lazy async iteration.
-    fn alazy_load(
-        &self,
-    ) -> impl std::future::Future<Output = Pin<Box<dyn Stream<Item = Document> + Send + '_>>> + Send
+    ) -> impl std::future::Future<
+        Output = Result<Vec<Document>, Box<dyn std::error::Error + Send + Sync>>,
+    > + Send
+    where
+        Self: Sync,
     {
-        async {
-            Box::pin(futures::stream::iter(self.load()))
-                as Pin<Box<dyn Stream<Item = Document> + Send + '_>>
-        }
-    }
-
-    fn aload(&self) -> impl std::future::Future<Output = Vec<Document>> + Send {
-        async {
-            use futures::StreamExt;
-            self.alazy_load().await.collect().await
+        async move {
+            let docs = self.load().await;
+            text_splitter
+                .transform_documents(&docs)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
         }
     }
 }
@@ -64,8 +55,10 @@ mod tests {
     }
 
     impl BaseLoader for TestLoader {
-        fn lazy_load(&self) -> Box<dyn Iterator<Item = Document> + '_> {
-            Box::new(self.docs.iter().cloned())
+        async fn lazy_load(
+            &self,
+        ) -> std::pin::Pin<Box<dyn futures::Stream<Item = Document> + Send + '_>> {
+            Box::pin(futures::stream::iter(self.docs.clone()))
         }
     }
 
@@ -98,22 +91,22 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_load() {
+    #[tokio::test]
+    async fn test_load() {
         let loader = TestLoader {
             docs: vec![
                 Document::builder().page_content("hello").build(),
                 Document::builder().page_content("world").build(),
             ],
         };
-        let docs = loader.load();
+        let docs = loader.load().await;
         assert_eq!(docs.len(), 2);
         assert_eq!(docs[0].page_content(), "hello");
         assert_eq!(docs[1].page_content(), "world");
     }
 
-    #[test]
-    fn test_load_and_split() {
+    #[tokio::test]
+    async fn test_load_and_split() {
         let loader = TestLoader {
             docs: vec![
                 Document::builder().page_content("abcdef").build(),
@@ -121,7 +114,7 @@ mod tests {
             ],
         };
         let splitter = HalfSplitter::new();
-        let docs = loader.load_and_split(&splitter).unwrap();
+        let docs = loader.load_and_split(&splitter).await.unwrap();
         assert_eq!(docs.len(), 4);
         assert_eq!(docs[0].page_content(), "abc");
         assert_eq!(docs[1].page_content(), "def");
@@ -130,17 +123,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aload() {
-        let loader = TestLoader {
-            docs: vec![Document::builder().page_content("async doc").build()],
-        };
-        let docs = loader.aload().await;
-        assert_eq!(docs.len(), 1);
-        assert_eq!(docs[0].page_content(), "async doc");
-    }
-
-    #[tokio::test]
-    async fn test_alazy_load_stream() {
+    async fn test_lazy_load_stream() {
         use futures::StreamExt;
 
         let loader = TestLoader {
@@ -150,7 +133,7 @@ mod tests {
                 Document::builder().page_content("c").build(),
             ],
         };
-        let mut stream = loader.alazy_load().await;
+        let mut stream = loader.lazy_load().await;
         let first = stream.next().await;
         assert_eq!(first.unwrap().page_content(), "a");
         let rest: Vec<Document> = stream.collect().await;

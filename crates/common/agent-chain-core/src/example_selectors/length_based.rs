@@ -59,7 +59,7 @@ impl LengthBasedExampleSelector {
 
 #[async_trait::async_trait]
 impl BaseExampleSelector for LengthBasedExampleSelector {
-    fn add_example(&mut self, example: HashMap<String, String>) -> Result<Option<String>> {
+    async fn add_example(&mut self, example: HashMap<String, String>) -> Result<Option<String>> {
         let formatted = self.example_prompt.format(&example)?;
         self.example_text_lengths
             .push((self.get_text_length)(&formatted));
@@ -67,7 +67,7 @@ impl BaseExampleSelector for LengthBasedExampleSelector {
         Ok(None)
     }
 
-    fn select_examples(
+    async fn select_examples(
         &self,
         input_variables: HashMap<String, String>,
     ) -> Result<Vec<HashMap<String, Value>>> {

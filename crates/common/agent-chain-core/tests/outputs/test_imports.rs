@@ -4,8 +4,6 @@ const EXPECTED_ALL: &[&str] = &[
     "ChatGeneration",
     "ChatGenerationChunk",
     "ChatResult",
-    "Generation",
-    "GenerationChunk",
     "LLMResult",
     "RunInfo",
 ];
@@ -28,23 +26,19 @@ fn test_all_imports() {
         .build();
     let _: outputs::ChatResult = outputs::ChatResult::builder().generations(vec![cg]).build();
 
-    let _: outputs::Generation = outputs::Generation::builder().text("test").build();
-
-    let _: outputs::GenerationChunk = outputs::GenerationChunk::builder().text("test").build();
-
-    let generation = outputs::Generation::builder().text("test").build();
+    let generation = outputs::ChatGeneration::builder()
+        .message(AIMessage::builder().content("test").build().into())
+        .build();
     let _: outputs::LLMResult = outputs::LLMResult::builder()
         .generations(vec![vec![generation.into()]])
         .build();
 
     let _: outputs::RunInfo = outputs::RunInfo::new(Uuid::new_v4());
 
-    assert_eq!(EXPECTED_ALL.len(), 7);
+    assert_eq!(EXPECTED_ALL.len(), 5);
     assert!(EXPECTED_ALL.contains(&"ChatGeneration"));
     assert!(EXPECTED_ALL.contains(&"ChatGenerationChunk"));
     assert!(EXPECTED_ALL.contains(&"ChatResult"));
-    assert!(EXPECTED_ALL.contains(&"Generation"));
-    assert!(EXPECTED_ALL.contains(&"GenerationChunk"));
     assert!(EXPECTED_ALL.contains(&"LLMResult"));
     assert!(EXPECTED_ALL.contains(&"RunInfo"));
 }
@@ -52,21 +46,18 @@ fn test_all_imports() {
 #[test]
 fn test_imports_from_crate_root() {
     use agent_chain_core::messages::AIMessage;
-    use agent_chain_core::{
-        ChatGeneration, ChatGenerationChunk, ChatResult, Generation, GenerationChunk, LLMResult,
-        RunInfo,
-    };
+    use agent_chain_core::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult, RunInfo};
     use uuid::Uuid;
 
-    let _ = Generation::builder().text("test").build();
-    let _ = GenerationChunk::builder().text("test").build();
     let _ = ChatGeneration::builder()
         .message(AIMessage::builder().content("test").build().into())
         .build();
     let _ = ChatGenerationChunk::builder()
         .message(AIMessage::builder().content("test").build().into())
         .build();
-    let generation = Generation::builder().text("test").build();
+    let generation = ChatGeneration::builder()
+        .message(AIMessage::builder().content("test").build().into())
+        .build();
     let _ = LLMResult::builder()
         .generations(vec![vec![generation.into()]])
         .build();
@@ -97,15 +88,16 @@ fn test_merge_function_export() {
 
 #[test]
 fn test_generation_type_export() {
+    use agent_chain_core::messages::AIMessage;
     use agent_chain_core::outputs::GenerationType;
 
-    let generation = agent_chain_core::outputs::Generation::builder()
-        .text("test")
+    let generation = agent_chain_core::outputs::ChatGeneration::builder()
+        .message(AIMessage::builder().content("test").build().into())
         .build();
     let generation_type: GenerationType = generation.into();
 
     match generation_type {
-        GenerationType::Generation(g) => assert_eq!(g.text, "test"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(g) => assert_eq!(g.message.text(), "test"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }

@@ -17,8 +17,8 @@ use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::{Error, Result};
 use crate::language_models::{BaseLLM, LLMConfig, LLMStream};
 use crate::language_models::{BaseLanguageModel, LangSmithParams, LanguageModelConfig};
-use crate::messages::AnyMessage;
-use crate::outputs::{GenerationChunk, GenerationType, LLMResult};
+use crate::messages::{AIMessage, AnyMessage};
+use crate::outputs::{ChatGenerationChunk, GenerationType, LLMResult};
 
 const DEFAULT_API_BASE: &str = "http://localhost:11434";
 
@@ -481,14 +481,14 @@ impl OllamaLLM {
     }
 
     /// Stream with aggregation — matches Python's `_stream_with_aggregation`.
-    /// Aggregates all streaming chunks into a single `GenerationChunk`,
+    /// Aggregates all streaming chunks into a single `ChatGenerationChunk`,
     /// accumulating thinking content separately.
     async fn stream_with_aggregation(
         &self,
         prompt: &str,
         stop: Option<Vec<String>>,
         run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<GenerationChunk> {
+    ) -> Result<ChatGenerationChunk> {
         self.ensure_model_validated().await?;
 
         let client = self.build_client();
@@ -518,7 +518,7 @@ impl OllamaLLM {
         let reader = tokio::io::BufReader::new(StreamReader::new(byte_stream));
         let mut lines = reader.lines();
 
-        let mut final_chunk: Option<GenerationChunk> = None;
+        let mut final_chunk: Option<ChatGenerationChunk> = None;
         let mut thinking_content = String::new();
 
         while let Some(line) = lines
@@ -547,17 +547,18 @@ impl OllamaLLM {
                 None
             };
 
+            let msg = AnyMessage::AIMessage(AIMessage::builder().content(text).build());
             let chunk = if let Some(info) = generation_info {
-                GenerationChunk::builder()
-                    .text(text)
+                ChatGenerationChunk::builder()
+                    .message(msg)
                     .generation_info(info)
                     .build()
             } else {
-                GenerationChunk::builder().text(text).build()
+                ChatGenerationChunk::builder().message(msg).build()
             };
 
             if let Some(rm) = run_manager {
-                rm.on_llm_new_token(&chunk.text, None);
+                rm.on_llm_new_token(&chunk.message.text(), None);
             }
 
             final_chunk = Some(match final_chunk {
@@ -694,7 +695,7 @@ impl BaseLLM for OllamaLLM {
             let chunk = self
                 .stream_with_aggregation(&prompt, stop.clone(), run_manager)
                 .await?;
-            generations.push(vec![GenerationType::GenerationChunk(chunk)]);
+            generations.push(vec![GenerationType::ChatGenerationChunk(chunk)]);
         }
         Ok(LLMResult::builder().generations(generations).build())
     }
@@ -737,7 +738,8 @@ impl BaseLLM for OllamaLLM {
                     generation_info.extend(done_info);
                 }
 
-                let chunk = GenerationChunk::builder().text(text).generation_info(generation_info).build();
+                let msg = AnyMessage::AIMessage(AIMessage::builder().content(text).build());
+                let chunk = ChatGenerationChunk::builder().message(msg).generation_info(generation_info).build();
 
                 yield chunk;
             }

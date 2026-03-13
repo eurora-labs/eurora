@@ -6,7 +6,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::messages::AnyMessage;
-use crate::outputs::{ChatGenerationChunk, GenerationChunk, LLMResult};
+use crate::outputs::{ChatGenerationChunk, LLMResult};
 use crate::tracers::schemas::{Run, RunEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -272,18 +272,13 @@ pub trait TracerCore: Send + Sync + Debug {
         let mut event_kwargs: HashMap<String, Value> = HashMap::new();
         event_kwargs.insert("token".to_string(), Value::String(token.to_string()));
 
-        if let Some(chunk_any) = chunk {
-            if let Some(gen_chunk) = chunk_any.downcast_ref::<GenerationChunk>() {
-                event_kwargs.insert(
-                    "chunk".to_string(),
-                    serde_json::to_value(gen_chunk).unwrap_or_default(),
-                );
-            } else if let Some(chat_chunk) = chunk_any.downcast_ref::<ChatGenerationChunk>() {
-                event_kwargs.insert(
-                    "chunk".to_string(),
-                    serde_json::to_value(chat_chunk).unwrap_or_default(),
-                );
-            }
+        if let Some(chunk_any) = chunk
+            && let Some(chat_chunk) = chunk_any.downcast_ref::<ChatGenerationChunk>()
+        {
+            event_kwargs.insert(
+                "chunk".to_string(),
+                serde_json::to_value(chat_chunk).unwrap_or_default(),
+            );
         }
 
         run.events

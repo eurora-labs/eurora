@@ -11,7 +11,7 @@ use crate::caches::BaseCache;
 use crate::callbacks::{CallbackManagerForLLMRun, Callbacks};
 use crate::error::Result;
 use crate::messages::{AnyMessage, BaseMessage};
-use crate::outputs::{Generation, GenerationChunk, GenerationType, LLMResult};
+use crate::outputs::{ChatGeneration, ChatGenerationChunk, GenerationType, LLMResult};
 
 #[derive(Debug)]
 pub struct FakeListLLM {
@@ -139,8 +139,11 @@ impl BaseLLM for FakeListLLM {
 
         for _ in prompts {
             let response = self.get_next_response();
-            let generation = Generation::builder().text(response).build();
-            generations.push(vec![GenerationType::Generation(generation)]);
+            let msg = crate::messages::AIMessage::builder()
+                .content(&response)
+                .build();
+            let generation = ChatGeneration::builder().message(msg.into()).build();
+            generations.push(vec![GenerationType::ChatGeneration(generation)]);
         }
 
         Ok(LLMResult::builder().generations(generations).build())
@@ -280,7 +283,8 @@ impl BaseLLM for FakeStreamingListLLM {
                     return;
                 }
 
-                yield Ok(GenerationChunk::builder().text(c.to_string()).build());
+                let msg = crate::messages::AIMessage::builder().content(c.to_string()).build();
+                yield Ok(ChatGenerationChunk::builder().message(msg.into()).build());
             }
         };
 
@@ -376,7 +380,7 @@ mod tests {
 
         let mut result = String::new();
         while let Some(chunk) = stream.next().await {
-            result.push_str(&chunk.unwrap().text);
+            result.push_str(&chunk.unwrap().message.text());
         }
 
         assert_eq!(result, "Hello");

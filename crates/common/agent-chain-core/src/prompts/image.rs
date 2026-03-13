@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 
 use crate::error::{Error, Result};
-use crate::prompt_values::StringPromptValue;
+use crate::messages::AnyMessage;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
+use super::base::BasePromptTemplate;
 use super::string::{PromptTemplateFormat, format_template, get_template_variables};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -41,8 +41,8 @@ pub struct ImagePromptTemplate {
     #[serde(default)]
     pub template_format: PromptTemplateFormat,
 
-    #[serde(skip, default)]
-    pub partial_variables: HashMap<String, PartialValue>,
+    #[serde(default)]
+    pub partial_variables: HashMap<String, String>,
 }
 
 #[bon]
@@ -67,7 +67,7 @@ impl ImagePromptTemplate {
             template,
             input_variables,
             template_format: PromptTemplateFormat::FString,
-            partial_variables: HashMap::<String, PartialValue>::new(),
+            partial_variables: HashMap::new(),
         })
     }
 
@@ -85,7 +85,7 @@ impl ImagePromptTemplate {
     }
 
     pub fn format_image(&self, kwargs: &HashMap<String, String>) -> Result<ImageURL> {
-        let mut merged_kwargs = resolve_partials(&self.partial_variables);
+        let mut merged_kwargs = self.partial_variables.clone();
         merged_kwargs.extend(kwargs.iter().map(|(k, v)| (k.clone(), v.clone())));
 
         let mut formatted = HashMap::new();
@@ -128,10 +128,7 @@ impl BasePromptTemplate for ImagePromptTemplate {
         serde_json::to_string(&image_url).map_err(|e| Error::Other(e.to_string()))
     }
 
-    fn partial(
-        &self,
-        kwargs: HashMap<String, PartialValue>,
-    ) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
         let new_vars: Vec<_> = self
             .input_variables
             .iter()
@@ -167,31 +164,17 @@ impl BasePromptTemplate for ImagePromptTemplate {
 #[async_trait]
 impl Runnable for ImagePromptTemplate {
     type Input = HashMap<String, String>;
-    type Output = StringPromptValue;
+    type Output = Vec<AnyMessage>;
 
     fn name(&self) -> Option<String> {
         Some("ImagePromptTemplate".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = merge_prompt_config(config, self.metadata(), self.tags());
-        self.call_with_config(
-            &|input, _config| {
-                BasePromptTemplate::validate_input(self, &input)?;
-                let text = BasePromptTemplate::format(self, &input)?;
-                Ok(StringPromptValue::new(text))
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.invoke(input, config)
+        self.format_messages(&input)
     }
 }
 
@@ -255,7 +238,7 @@ mod tests {
             template,
             input_variables: Vec::new(),
             template_format: PromptTemplateFormat::FString,
-            partial_variables: HashMap::<String, PartialValue>::new(),
+            partial_variables: HashMap::new(),
         };
 
         let result = prompt.format_image(&HashMap::new());

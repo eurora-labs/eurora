@@ -78,39 +78,6 @@ async fn test_callable_api_key() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Ported from `test_callable_api_key_async`.
-#[tokio::test]
-
-async fn test_callable_api_key_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    let original_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
-    let call_count = Arc::new(AtomicUsize::new(0));
-    let call_count_clone = call_count.clone();
-
-    let model = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .max_tokens(MAX_TOKEN_COUNT)
-        .build()
-        .api_key_fn(move || {
-            call_count_clone.fetch_add(1, Ordering::SeqCst);
-            original_key.clone()
-        });
-
-    let response = model
-        .ainvoke(
-            vec![HumanMessage::builder().content("hello").build().into()],
-            None,
-        )
-        .await?;
-    assert!(!response.text().is_empty());
-    assert!(call_count.load(Ordering::SeqCst) >= 1);
-
-    Ok(())
-}
-
 /// Ported from `test_chat_openai_system_message`.
 #[tokio::test]
 
@@ -470,7 +437,7 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("I'm Pickle Rick")
@@ -497,43 +464,6 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .any(|c| c.usage_metadata.is_some() || !c.response_metadata.is_empty());
     assert!(has_metadata, "Expected at least one chunk with metadata");
-
-    Ok(())
-}
-
-/// Ported from `test_astream`.
-#[tokio::test]
-
-async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let llm = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .temperature(0.0)
-        .max_tokens(MAX_TOKEN_COUNT)
-        .build();
-
-    // Test with default stream_usage (true for openai api base)
-    let mut stream = llm
-        .astream(
-            vec![HumanMessage::builder().content("Hello").build().into()],
-            None,
-            None,
-        )
-        .await?;
-
-    let mut chunks_with_usage = 0;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        if chunk.usage_metadata.is_some() {
-            chunks_with_usage += 1;
-        }
-    }
-
-    // stream_usage defaults to true, so we should get usage metadata
-    assert!(
-        chunks_with_usage >= 1,
-        "Expected at least one chunk with usage metadata"
-    );
 
     Ok(())
 }
@@ -583,32 +513,6 @@ async fn test_flex_usage_responses_streaming() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-/// Ported from `test_abatch_tags`.
-#[tokio::test]
-
-async fn test_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let llm = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .max_tokens(MAX_TOKEN_COUNT)
-        .build();
-
-    let result = llm
-        .invoke(
-            vec![
-                HumanMessage::builder()
-                    .content("I'm Pickle Rick")
-                    .build()
-                    .into(),
-            ],
-            None,
-        )
-        .await?;
-
-    assert!(!result.text().is_empty());
-    Ok(())
-}
-
 /// Ported from `test_response_metadata`.
 #[tokio::test]
 
@@ -636,33 +540,6 @@ async fn test_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Ported from `test_async_response_metadata`.
-#[tokio::test]
-
-async fn test_async_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let llm = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .logprobs(true)
-        .build();
-
-    let result = llm
-        .ainvoke(
-            vec![
-                HumanMessage::builder()
-                    .content("I'm PickleRick")
-                    .build()
-                    .into(),
-            ],
-            None,
-        )
-        .await?;
-
-    assert!(!result.response_metadata.is_empty());
-    assert!(result.response_metadata.contains_key("model_name"));
-    Ok(())
-}
-
 /// Ported from `test_response_metadata_streaming`.
 #[tokio::test]
 
@@ -674,45 +551,7 @@ async fn test_response_metadata_streaming() -> Result<(), Box<dyn std::error::Er
         .build();
 
     let mut stream = llm
-        .astream(
-            vec![
-                HumanMessage::builder()
-                    .content("I'm Pickle Rick")
-                    .build()
-                    .into(),
-            ],
-            None,
-            None,
-        )
-        .await?;
-
-    let mut has_response_metadata = false;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        if !chunk.response_metadata.is_empty() {
-            has_response_metadata = true;
-        }
-    }
-
-    assert!(
-        has_response_metadata,
-        "Expected response metadata in stream"
-    );
-    Ok(())
-}
-
-/// Ported from `test_async_response_metadata_streaming`.
-#[tokio::test]
-
-async fn test_async_response_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let llm = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .logprobs(true)
-        .build();
-
-    let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("I'm Pickle Rick")
@@ -1102,15 +941,17 @@ async fn test_openai_structured_output() -> Result<(), Box<dyn std::error::Error
 
     let llm = ChatOpenAI::new("gpt-4o-mini");
     let structured = llm.with_structured_output(schema, false)?;
-    let result = structured.invoke(
-        vec![
-            HumanMessage::builder()
-                .content("I'm a 27 year old named Erick")
-                .build()
-                .into(),
-        ],
-        None,
-    )?;
+    let result = structured
+        .invoke(
+            vec![
+                HumanMessage::builder()
+                    .content("I'm a 27 year old named Erick")
+                    .build()
+                    .into(),
+            ],
+            None,
+        )
+        .await?;
 
     assert_eq!(result.get("name").and_then(|n| n.as_str()), Some("Erick"));
     assert_eq!(result.get("age").and_then(|a| a.as_i64()), Some(27));
@@ -1177,72 +1018,6 @@ async fn test_openai_response_headers_responses_api() -> Result<(), Box<dyn std:
 
     let result = chat_openai
         .invoke(
-            vec![
-                HumanMessage::builder()
-                    .content("I'm Pickle Rick")
-                    .build()
-                    .into(),
-            ],
-            None,
-        )
-        .await?;
-
-    let headers = result
-        .response_metadata
-        .get("headers")
-        .expect("headers should be present in response_metadata");
-    assert!(headers.is_object());
-    assert!(headers.get("content-type").is_some());
-
-    Ok(())
-}
-
-/// Ported from `test_openai_response_headers_async`.
-#[tokio::test]
-
-async fn test_openai_response_headers_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let chat_openai = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .include_response_headers(true)
-        .build();
-
-    let result = chat_openai
-        .ainvoke(
-            vec![
-                HumanMessage::builder()
-                    .content("I'm Pickle Rick")
-                    .build()
-                    .into(),
-            ],
-            None,
-        )
-        .await?;
-
-    let headers = result
-        .response_metadata
-        .get("headers")
-        .expect("headers should be present in response_metadata");
-    assert!(headers.is_object());
-    assert!(headers.get("content-type").is_some());
-
-    Ok(())
-}
-
-/// Ported from `test_openai_response_headers_async` with responses API.
-#[tokio::test]
-
-async fn test_openai_response_headers_async_responses_api() -> Result<(), Box<dyn std::error::Error>>
-{
-    load_env();
-    let chat_openai = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .include_response_headers(true)
-        .use_responses_api(true)
-        .build();
-
-    let result = chat_openai
-        .ainvoke(
             vec![
                 HumanMessage::builder()
                     .content("I'm Pickle Rick")
@@ -1437,15 +1212,17 @@ async fn test_structured_output_strict_function_calling() -> Result<(), Box<dyn 
         None,
     )?;
 
-    let result = chat.invoke(
-        vec![
-            HumanMessage::builder()
-                .content("Tell me a joke about cats.")
-                .build()
-                .into(),
-        ],
-        None,
-    )?;
+    let result = chat
+        .invoke(
+            vec![
+                HumanMessage::builder()
+                    .content("Tell me a joke about cats.")
+                    .build()
+                    .into(),
+            ],
+            None,
+        )
+        .await?;
 
     assert!(result.get("setup").is_some());
     assert!(result.get("punchline").is_some());
@@ -1477,15 +1254,17 @@ async fn test_structured_output_strict_json_schema() -> Result<(), Box<dyn std::
         None,
     )?;
 
-    let result = chat.invoke(
-        vec![
-            HumanMessage::builder()
-                .content("Tell me a joke about cats.")
-                .build()
-                .into(),
-        ],
-        None,
-    )?;
+    let result = chat
+        .invoke(
+            vec![
+                HumanMessage::builder()
+                    .content("Tell me a joke about cats.")
+                    .build()
+                    .into(),
+            ],
+            None,
+        )
+        .await?;
 
     assert!(result.get("setup").is_some());
     assert!(result.get("punchline").is_some());
@@ -1529,15 +1308,17 @@ async fn test_nested_structured_output_strict() -> Result<(), Box<dyn std::error
         None,
     )?;
 
-    let result = chat.invoke(
-        vec![
-            HumanMessage::builder()
-                .content("Tell me a joke about cats.")
-                .build()
-                .into(),
-        ],
-        None,
-    )?;
+    let result = chat
+        .invoke(
+            vec![
+                HumanMessage::builder()
+                    .content("Tell me a joke about cats.")
+                    .build()
+                    .into(),
+            ],
+            None,
+        )
+        .await?;
 
     assert!(result.get("setup").is_some());
     assert!(result.get("punchline").is_some());
@@ -1581,15 +1362,17 @@ async fn test_json_schema_openai_format() -> Result<(), Box<dyn std::error::Erro
         None,
     )?;
 
-    let result = chat.invoke(
-        vec![
-            HumanMessage::builder()
-                .content("What is the weather in New York?")
-                .build()
-                .into(),
-        ],
-        None,
-    )?;
+    let result = chat
+        .invoke(
+            vec![
+                HumanMessage::builder()
+                    .content("What is the weather in New York?")
+                    .build()
+                    .into(),
+            ],
+            None,
+        )
+        .await?;
 
     assert!(result.is_object());
     Ok(())
@@ -1726,7 +1509,7 @@ public class User
 async fn test_stream_o_series() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let mut stream = ChatOpenAI::new("o3-mini")
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("how are you")
@@ -1756,64 +1539,7 @@ async fn test_stream_o_series_responses_api() -> Result<(), Box<dyn std::error::
         .model("o3-mini")
         .use_responses_api(true)
         .build()
-        .astream(
-            vec![
-                HumanMessage::builder()
-                    .content("how are you")
-                    .build()
-                    .into(),
-            ],
-            None,
-            None,
-        )
-        .await?;
-
-    let mut count = 0;
-    while let Some(chunk) = stream.next().await {
-        let _chunk = chunk?;
-        count += 1;
-    }
-    assert!(count > 0);
-    Ok(())
-}
-
-/// Ported from `test_astream_o_series`.
-#[tokio::test]
-
-async fn test_astream_o_series() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let mut stream = ChatOpenAI::new("o3-mini")
-        .astream(
-            vec![
-                HumanMessage::builder()
-                    .content("how are you")
-                    .build()
-                    .into(),
-            ],
-            None,
-            None,
-        )
-        .await?;
-
-    let mut count = 0;
-    while let Some(chunk) = stream.next().await {
-        let _chunk = chunk?;
-        count += 1;
-    }
-    assert!(count > 0);
-    Ok(())
-}
-
-/// Ported from `test_astream_o_series` with responses API.
-#[tokio::test]
-
-async fn test_astream_o_series_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let mut stream = ChatOpenAI::builder()
-        .model("o3-mini")
-        .use_responses_api(true)
-        .build()
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("how are you")
@@ -1856,7 +1582,7 @@ async fn test_stream_response_format() -> Result<(), Box<dyn std::error::Error>>
     }));
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
             None,
@@ -1873,49 +1599,6 @@ async fn test_stream_response_format() -> Result<(), Box<dyn std::error::Error>>
 
     assert!(chunk_count > 1);
     // Content should be valid JSON
-    let parsed: serde_json::Value = serde_json::from_str(&full_content)?;
-    assert!(parsed.get("response").is_some());
-    Ok(())
-}
-
-/// Ported from `test_astream_response_format`.
-#[tokio::test]
-
-async fn test_astream_response_format() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").response_format(serde_json::json!({
-        "type": "json_schema",
-        "json_schema": {
-            "name": "Foo",
-            "strict": true,
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "response": {"type": "string"}
-                },
-                "required": ["response"],
-                "additionalProperties": false
-            }
-        }
-    }));
-
-    let mut stream = llm
-        .astream(
-            vec![HumanMessage::builder().content("how are ya").build().into()],
-            None,
-            None,
-        )
-        .await?;
-
-    let mut full_content = String::new();
-    let mut chunk_count = 0;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        full_content.push_str(chunk.content.as_text_ref());
-        chunk_count += 1;
-    }
-
-    assert!(chunk_count > 1);
     let parsed: serde_json::Value = serde_json::from_str(&full_content)?;
     assert!(parsed.get("response").is_some());
     Ok(())
@@ -1978,7 +1661,7 @@ async fn test_o1_responses_api() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_o1_stream_default_works() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
     let mut stream = ChatOpenAI::new("o1")
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("say 'hi'").build().into()],
             None,
             None,
@@ -2112,10 +1795,12 @@ async fn test_tools_and_structured_output() -> Result<(), Box<dyn std::error::Er
         Some(&[ToolLike::Schema(generate_username)]),
     )?;
 
-    let result = structured.invoke(
-        vec![HumanMessage::builder().content("Hello").build().into()],
-        None,
-    )?;
+    let result = structured
+        .invoke(
+            vec![HumanMessage::builder().content("Hello").build().into()],
+            None,
+        )
+        .await?;
 
     // include_raw=true returns raw + parsed
     assert!(result.is_object());
@@ -2246,87 +1931,6 @@ async fn test_schema_parsing_failures_responses_api() -> Result<(), Box<dyn std:
 
     let result = llm
         .invoke(
-            vec![
-                HumanMessage::builder()
-                    .content("respond with good")
-                    .build()
-                    .into(),
-            ],
-            None,
-        )
-        .await?;
-
-    let parsed: serde_json::Value = serde_json::from_str(&result.text())?;
-    assert!(parsed.get("response").is_some());
-    Ok(())
-}
-
-/// Ported from `test_schema_parsing_failures_async`.
-#[tokio::test]
-
-async fn test_schema_parsing_failures_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-    let llm = ChatOpenAI::new("gpt-4o-mini").response_format(serde_json::json!({
-        "type": "json_schema",
-        "json_schema": {
-            "name": "BadModel",
-            "strict": true,
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "response": {"type": "string"}
-                },
-                "required": ["response"],
-                "additionalProperties": false
-            }
-        }
-    }));
-
-    let result = llm
-        .ainvoke(
-            vec![
-                HumanMessage::builder()
-                    .content("respond with good")
-                    .build()
-                    .into(),
-            ],
-            None,
-        )
-        .await?;
-
-    let parsed: serde_json::Value = serde_json::from_str(&result.text())?;
-    assert!(parsed.get("response").is_some());
-    Ok(())
-}
-
-/// Ported from `test_schema_parsing_failures_responses_api_async`.
-#[tokio::test]
-
-async fn test_schema_parsing_failures_responses_api_async() -> Result<(), Box<dyn std::error::Error>>
-{
-    load_env();
-    let llm = ChatOpenAI::builder()
-        .model("gpt-4o-mini")
-        .use_responses_api(true)
-        .build()
-        .response_format(serde_json::json!({
-            "type": "json_schema",
-            "json_schema": {
-                "name": "BadModel",
-                "strict": true,
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "response": {"type": "string"}
-                    },
-                    "required": ["response"],
-                    "additionalProperties": false
-                }
-            }
-        }));
-
-    let result = llm
-        .ainvoke(
             vec![
                 HumanMessage::builder()
                     .content("respond with good")

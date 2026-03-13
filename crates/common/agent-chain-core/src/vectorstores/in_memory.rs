@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::Result;
 use crate::documents::Document;
 use crate::embeddings::Embeddings;
-use crate::vectorstores::base::{VectorStore, VectorStoreFactory};
+use crate::vectorstores::base::{DocumentFilter, VectorStore, VectorStoreFactory};
 use crate::vectorstores::utils::{cosine_similarity, maximal_marginal_relevance};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +23,53 @@ struct StoreEntry {
 pub struct InMemoryVectorStore {
     store: RwLock<HashMap<String, StoreEntry>>,
     embedding: Box<dyn Embeddings>,
+}
+
+fn search_store_by_vector(
+    store: &HashMap<String, StoreEntry>,
+    embedding: &[f32],
+    k: usize,
+    filter: &Option<Box<dyn DocumentFilter>>,
+) -> crate::Result<Vec<(Document, f32, Vec<f32>)>> {
+    let mut docs: Vec<&StoreEntry> = store.values().collect();
+
+    if let Some(filter_fn) = filter {
+        docs.retain(|entry| {
+            let doc = Document::builder()
+                .page_content(entry.text.clone())
+                .id(entry.id.clone())
+                .metadata(entry.metadata.clone())
+                .build();
+            filter_fn.matches(&doc)
+        });
+    }
+
+    if docs.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let doc_vectors: Vec<Vec<f32>> = docs.iter().map(|d| d.vector.clone()).collect();
+    let similarity = cosine_similarity(&[embedding.to_vec()], &doc_vectors)?;
+    let scores = &similarity[0];
+
+    let mut indexed_scores: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
+    indexed_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed_scores.truncate(k);
+
+    let results = indexed_scores
+        .into_iter()
+        .map(|(idx, score)| {
+            let entry = docs[idx];
+            let doc = Document::builder()
+                .page_content(entry.text.clone())
+                .id(entry.id.clone())
+                .metadata(entry.metadata.clone())
+                .build();
+            (doc, score, entry.vector.clone())
+        })
+        .collect();
+
+    Ok(results)
 }
 
 impl InMemoryVectorStore {
@@ -83,55 +130,6 @@ impl InMemoryVectorStore {
             .map_err(|e| crate::Error::Other(format!("Failed to acquire write lock: {}", e)))
     }
 
-    fn similarity_search_with_score_by_vector_internal(
-        &self,
-        embedding: &[f32],
-        k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
-    ) -> Result<Vec<(Document, f32, Vec<f32>)>> {
-        let store = self.lock_read()?;
-
-        let mut docs: Vec<&StoreEntry> = store.values().collect();
-
-        if let Some(filter_fn) = filter {
-            docs.retain(|entry| {
-                let doc = Document::builder()
-                    .page_content(entry.text.clone())
-                    .id(entry.id.clone())
-                    .metadata(entry.metadata.clone())
-                    .build();
-                filter_fn(&doc)
-            });
-        }
-
-        if docs.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let doc_vectors: Vec<Vec<f32>> = docs.iter().map(|d| d.vector.clone()).collect();
-        let similarity = cosine_similarity(&[embedding.to_vec()], &doc_vectors)?;
-        let scores = &similarity[0];
-
-        let mut indexed_scores: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-        indexed_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        indexed_scores.truncate(k);
-
-        let results = indexed_scores
-            .into_iter()
-            .map(|(idx, score)| {
-                let entry = docs[idx];
-                let doc = Document::builder()
-                    .page_content(entry.text.clone())
-                    .id(entry.id.clone())
-                    .metadata(entry.metadata.clone())
-                    .build();
-                (doc, score, entry.vector.clone())
-            })
-            .collect();
-
-        Ok(results)
-    }
-
     fn add_documents_with_vectors(
         &self,
         documents: &[Document],
@@ -180,7 +178,7 @@ impl InMemoryVectorStore {
 
 #[async_trait::async_trait]
 impl VectorStore for InMemoryVectorStore {
-    fn add_documents(
+    async fn add_documents(
         &self,
         documents: Vec<Document>,
         ids: Option<Vec<String>>,
@@ -189,20 +187,7 @@ impl VectorStore for InMemoryVectorStore {
             .iter()
             .map(|d| d.page_content().to_string())
             .collect();
-        let vectors = self.embedding.embed_documents(texts)?;
-        self.add_documents_with_vectors(&documents, vectors, ids)
-    }
-
-    async fn aadd_documents(
-        &self,
-        documents: Vec<Document>,
-        ids: Option<Vec<String>>,
-    ) -> Result<Vec<String>> {
-        let texts: Vec<String> = documents
-            .iter()
-            .map(|d| d.page_content().to_string())
-            .collect();
-        let vectors = self.embedding.aembed_documents(texts).await?;
+        let vectors = self.embedding.embed_documents(texts).await?;
         self.add_documents_with_vectors(&documents, vectors, ids)
     }
 
@@ -210,7 +195,7 @@ impl VectorStore for InMemoryVectorStore {
         Some(self.embedding.as_ref())
     }
 
-    fn delete(&self, ids: Option<Vec<String>>) -> Result<()> {
+    async fn delete(&self, ids: Option<Vec<String>>) -> Result<()> {
         if let Some(ids) = ids {
             let mut store = self.lock_write()?;
             for id in ids {
@@ -220,7 +205,7 @@ impl VectorStore for InMemoryVectorStore {
         Ok(())
     }
 
-    fn get_by_ids(&self, ids: &[String]) -> Result<Vec<Document>> {
+    async fn get_by_ids(&self, ids: &[String]) -> Result<Vec<Document>> {
         let store = self.lock_read()?;
         let mut documents = Vec::new();
         for id in ids {
@@ -237,50 +222,51 @@ impl VectorStore for InMemoryVectorStore {
         Ok(documents)
     }
 
-    fn similarity_search(
+    async fn similarity_search(
         &self,
         query: &str,
         k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>> {
-        let docs_and_scores = self.similarity_search_with_score(query, k, filter)?;
+        let docs_and_scores = self.similarity_search_with_score(query, k, filter).await?;
         Ok(docs_and_scores.into_iter().map(|(doc, _)| doc).collect())
     }
 
-    fn similarity_search_by_vector(
+    async fn similarity_search_by_vector(
         &self,
         embedding: &[f32],
         k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>> {
-        let results = self.similarity_search_with_score_by_vector_internal(embedding, k, filter)?;
+        let store = self.lock_read()?;
+        let results = search_store_by_vector(&store, embedding, k, &filter)?;
         Ok(results.into_iter().map(|(doc, _, _)| doc).collect())
     }
 
-    fn similarity_search_with_score(
+    async fn similarity_search_with_score(
         &self,
         query: &str,
         k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<(Document, f32)>> {
-        let embedding = self.embedding.embed_query(query)?;
-        let results =
-            self.similarity_search_with_score_by_vector_internal(&embedding, k, filter)?;
+        let embedding = self.embedding.embed_query(query).await?;
+        let store = self.lock_read()?;
+        let results = search_store_by_vector(&store, &embedding, k, &filter)?;
         Ok(results
             .into_iter()
             .map(|(doc, score, _)| (doc, score))
             .collect())
     }
 
-    fn max_marginal_relevance_search(
+    async fn max_marginal_relevance_search(
         &self,
         query: &str,
         k: usize,
         fetch_k: usize,
         lambda_mult: f32,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>> {
-        let embedding_vector = self.embedding.embed_query(query)?;
+        let embedding_vector = self.embedding.embed_query(query).await?;
         self.max_marginal_relevance_search_by_vector(
             &embedding_vector,
             k,
@@ -288,18 +274,19 @@ impl VectorStore for InMemoryVectorStore {
             lambda_mult,
             filter,
         )
+        .await
     }
 
-    fn max_marginal_relevance_search_by_vector(
+    async fn max_marginal_relevance_search_by_vector(
         &self,
         embedding: &[f32],
         k: usize,
         fetch_k: usize,
         lambda_mult: f32,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>> {
-        let prefetch_hits =
-            self.similarity_search_with_score_by_vector_internal(embedding, fetch_k, filter)?;
+        let store = self.lock_read()?;
+        let prefetch_hits = search_store_by_vector(&store, embedding, fetch_k, &filter)?;
 
         if prefetch_hits.is_empty() {
             return Ok(vec![]);
@@ -315,8 +302,9 @@ impl VectorStore for InMemoryVectorStore {
     }
 }
 
+#[async_trait::async_trait]
 impl VectorStoreFactory for InMemoryVectorStore {
-    fn from_texts(
+    async fn from_texts(
         texts: &[&str],
         embedding: Box<dyn Embeddings>,
         metadatas: Option<Vec<HashMap<String, Value>>>,
@@ -324,7 +312,7 @@ impl VectorStoreFactory for InMemoryVectorStore {
     ) -> Result<Self> {
         let store = Self::new(embedding);
         let text_strings: Vec<String> = texts.iter().map(|t| t.to_string()).collect();
-        store.add_texts(text_strings, metadatas, ids)?;
+        store.add_texts(text_strings, metadatas, ids).await?;
         Ok(store)
     }
 }
@@ -338,56 +326,57 @@ mod tests {
         InMemoryVectorStore::new(Box::new(DeterministicFakeEmbedding::new(10)))
     }
 
-    #[test]
-    fn test_add_and_search() {
+    #[tokio::test]
+    async fn test_add_and_search() {
         let store = make_store();
         let docs = vec![
             Document::builder().page_content("foo").id("1").build(),
             Document::builder().page_content("bar").id("2").build(),
             Document::builder().page_content("baz").id("3").build(),
         ];
-        let ids = store.add_documents(docs, None).unwrap();
+        let ids = store.add_documents(docs, None).await.unwrap();
         assert_eq!(ids.len(), 3);
 
-        let results = store.similarity_search("foo", 1, None).unwrap();
+        let results = store.similarity_search("foo", 1, None).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].page_content(), "foo");
     }
 
-    #[test]
-    fn test_delete() {
+    #[tokio::test]
+    async fn test_delete() {
         let store = make_store();
         let docs = vec![
             Document::builder().page_content("foo").id("1").build(),
             Document::builder().page_content("bar").id("2").build(),
         ];
-        store.add_documents(docs, None).unwrap();
-        store.delete(Some(vec!["1".into()])).unwrap();
+        store.add_documents(docs, None).await.unwrap();
+        store.delete(Some(vec!["1".into()])).await.unwrap();
 
-        let results = store.get_by_ids(&["1".into()]).unwrap();
+        let results = store.get_by_ids(&["1".into()]).await.unwrap();
         assert!(results.is_empty());
 
-        let results = store.get_by_ids(&["2".into()]).unwrap();
+        let results = store.get_by_ids(&["2".into()]).await.unwrap();
         assert_eq!(results.len(), 1);
     }
 
-    #[test]
-    fn test_get_by_ids() {
+    #[tokio::test]
+    async fn test_get_by_ids() {
         let store = make_store();
         let docs = vec![
             Document::builder().page_content("foo").id("1").build(),
             Document::builder().page_content("bar").id("2").build(),
         ];
-        store.add_documents(docs, None).unwrap();
+        store.add_documents(docs, None).await.unwrap();
 
         let results = store
             .get_by_ids(&["1".into(), "2".into(), "nonexistent".into()])
+            .await
             .unwrap();
         assert_eq!(results.len(), 2);
     }
 
-    #[test]
-    fn test_similarity_search_with_score() {
+    #[tokio::test]
+    async fn test_similarity_search_with_score() {
         let store = make_store();
         let docs = vec![
             Document::builder()
@@ -399,17 +388,18 @@ mod tests {
                 .id("2")
                 .build(),
         ];
-        store.add_documents(docs, None).unwrap();
+        store.add_documents(docs, None).await.unwrap();
 
         let results = store
             .similarity_search_with_score("hello world", 2, None)
+            .await
             .unwrap();
         assert_eq!(results.len(), 2);
         assert!(results[0].1 >= results[1].1);
     }
 
-    #[test]
-    fn test_similarity_search_with_filter() {
+    #[tokio::test]
+    async fn test_similarity_search_with_filter() {
         let store = make_store();
         let mut doc1 = Document::builder().page_content("foo").id("1").build();
         doc1.metadata_mut()
@@ -417,34 +407,38 @@ mod tests {
         let mut doc2 = Document::builder().page_content("bar").id("2").build();
         doc2.metadata_mut()
             .insert("category".into(), Value::String("b".into()));
-        store.add_documents(vec![doc1, doc2], None).unwrap();
+        store.add_documents(vec![doc1, doc2], None).await.unwrap();
 
-        let filter = |doc: &Document| -> bool {
+        let filter: Box<dyn DocumentFilter> = Box::new(|doc: &Document| {
             doc.metadata().get("category").and_then(|v| v.as_str()) == Some("b")
-        };
-        let results = store.similarity_search("bar", 2, Some(&filter)).unwrap();
+        });
+        let results = store
+            .similarity_search("bar", 2, Some(filter))
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].page_content(), "bar");
     }
 
-    #[test]
-    fn test_mmr_search() {
+    #[tokio::test]
+    async fn test_mmr_search() {
         let store = make_store();
         let docs = vec![
             Document::builder().page_content("apple").id("1").build(),
             Document::builder().page_content("banana").id("2").build(),
             Document::builder().page_content("cherry").id("3").build(),
         ];
-        store.add_documents(docs, None).unwrap();
+        store.add_documents(docs, None).await.unwrap();
 
         let results = store
             .max_marginal_relevance_search("apple", 2, 3, 0.5, None)
+            .await
             .unwrap();
         assert_eq!(results.len(), 2);
     }
 
-    #[test]
-    fn test_dump_and_load() {
+    #[tokio::test]
+    async fn test_dump_and_load() {
         let store = make_store();
         let docs = vec![
             Document::builder()
@@ -456,7 +450,7 @@ mod tests {
                 .id("2")
                 .build(),
         ];
-        store.add_documents(docs, None).unwrap();
+        store.add_documents(docs, None).await.unwrap();
 
         let temp_dir = std::env::temp_dir().join("agent_chain_test_vectorstore");
         let path = temp_dir.join("test_store.json");
@@ -469,6 +463,7 @@ mod tests {
                 .unwrap();
         let loaded_docs = loaded_store
             .get_by_ids(&["1".to_string(), "2".to_string()])
+            .await
             .unwrap();
         assert_eq!(loaded_docs.len(), 2);
 
@@ -481,8 +476,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
-    #[test]
-    fn test_add_with_explicit_ids() {
+    #[tokio::test]
+    async fn test_add_with_explicit_ids() {
         let store = make_store();
         let docs = vec![
             Document::builder().page_content("foo").build(),
@@ -490,10 +485,11 @@ mod tests {
         ];
         let ids = store
             .add_documents(docs, Some(vec!["custom1".into(), "custom2".into()]))
+            .await
             .unwrap();
         assert_eq!(ids, vec!["custom1", "custom2"]);
 
-        let results = store.get_by_ids(&["custom1".into()]).unwrap();
+        let results = store.get_by_ids(&["custom1".into()]).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].page_content(), "foo");
     }

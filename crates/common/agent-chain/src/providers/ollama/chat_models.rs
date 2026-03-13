@@ -657,7 +657,7 @@ impl BaseChatModel for ChatOllama {
         &self.chat_model_config
     }
 
-    fn has_astream_impl(&self) -> bool {
+    fn has_stream_impl(&self) -> bool {
         true
     }
 
@@ -682,7 +682,7 @@ impl BaseChatModel for ChatOllama {
         self._generate_internal(messages, stop, None).await
     }
 
-    async fn _astream(
+    async fn _stream(
         &self,
         messages: Vec<AnyMessage>,
         stop: Option<Vec<String>>,

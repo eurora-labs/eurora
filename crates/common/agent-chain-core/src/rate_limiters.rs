@@ -6,14 +6,12 @@ use std::time::Duration;
 
 #[async_trait]
 pub trait BaseRateLimiter: Send + Sync {
-    fn acquire(&self, blocking: bool) -> bool;
-
-    async fn aacquire(&self, blocking: bool) -> bool;
+    async fn acquire(&self, blocking: bool) -> bool;
 }
 
 pub struct InMemoryRateLimiter {
     limiter: Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
-    check_interval: Duration,
+    _check_interval: Duration,
 }
 
 #[bon::bon]
@@ -34,25 +32,14 @@ impl InMemoryRateLimiter {
 
         Self {
             limiter: Arc::new(RateLimiter::direct(quota)),
-            check_interval: Duration::from_secs_f64(check_every_n_seconds),
+            _check_interval: Duration::from_secs_f64(check_every_n_seconds),
         }
     }
 }
 
 #[async_trait]
 impl BaseRateLimiter for InMemoryRateLimiter {
-    fn acquire(&self, blocking: bool) -> bool {
-        if !blocking {
-            return self.limiter.check().is_ok();
-        }
-
-        while self.limiter.check().is_err() {
-            std::thread::sleep(self.check_interval);
-        }
-        true
-    }
-
-    async fn aacquire(&self, blocking: bool) -> bool {
+    async fn acquire(&self, blocking: bool) -> bool {
         if !blocking {
             return self.limiter.check().is_ok();
         }
@@ -67,62 +54,35 @@ mod tests {
     use super::*;
     use std::time::Instant;
 
-    #[test]
-    fn test_rate_limiter_non_blocking() {
+    #[tokio::test]
+    async fn test_rate_limiter_non_blocking() {
         let rate_limiter = InMemoryRateLimiter::builder()
             .requests_per_second(10.0)
             .check_every_n_seconds(0.01)
             .build();
 
-        assert!(rate_limiter.acquire(false));
-        assert!(!rate_limiter.acquire(false));
+        assert!(rate_limiter.acquire(false).await);
+        assert!(!rate_limiter.acquire(false).await);
     }
 
-    #[test]
-    fn test_rate_limiter_blocking() {
+    #[tokio::test]
+    async fn test_rate_limiter_blocking() {
         let rate_limiter = InMemoryRateLimiter::builder()
             .requests_per_second(100.0)
             .check_every_n_seconds(0.001)
             .build();
 
         let start = Instant::now();
-        assert!(rate_limiter.acquire(true));
+        assert!(rate_limiter.acquire(true).await);
         assert!(start.elapsed().as_millis() < 50);
 
         let start = Instant::now();
-        assert!(rate_limiter.acquire(true));
+        assert!(rate_limiter.acquire(true).await);
         assert!(start.elapsed().as_millis() >= 5);
     }
 
     #[tokio::test]
-    async fn test_rate_limiter_async_non_blocking() {
-        let rate_limiter = InMemoryRateLimiter::builder()
-            .requests_per_second(10.0)
-            .check_every_n_seconds(0.01)
-            .build();
-
-        assert!(rate_limiter.aacquire(false).await);
-        assert!(!rate_limiter.aacquire(false).await);
-    }
-
-    #[tokio::test]
-    async fn test_rate_limiter_async_blocking() {
-        let rate_limiter = InMemoryRateLimiter::builder()
-            .requests_per_second(100.0)
-            .check_every_n_seconds(0.001)
-            .build();
-
-        let start = Instant::now();
-        assert!(rate_limiter.aacquire(true).await);
-        assert!(start.elapsed().as_millis() < 50);
-
-        let start = Instant::now();
-        assert!(rate_limiter.aacquire(true).await);
-        assert!(start.elapsed().as_millis() >= 5);
-    }
-
-    #[test]
-    fn test_rate_limiter_burst() {
+    async fn test_rate_limiter_burst() {
         let rate_limiter = InMemoryRateLimiter::builder()
             .requests_per_second(10.0)
             .check_every_n_seconds(0.001)
@@ -131,7 +91,7 @@ mod tests {
 
         let mut successes = 0;
         for _ in 0..10 {
-            if rate_limiter.acquire(false) {
+            if rate_limiter.acquire(false).await {
                 successes += 1;
             }
         }
@@ -139,10 +99,10 @@ mod tests {
         assert_eq!(successes, 5);
     }
 
-    #[test]
-    fn test_default_config() {
+    #[tokio::test]
+    async fn test_default_config() {
         let rate_limiter = InMemoryRateLimiter::builder().build();
-        assert!(rate_limiter.acquire(false));
-        assert!(!rate_limiter.acquire(false));
+        assert!(rate_limiter.acquire(false).await);
+        assert!(!rate_limiter.acquire(false).await);
     }
 }

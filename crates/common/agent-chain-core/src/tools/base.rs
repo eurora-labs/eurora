@@ -320,35 +320,14 @@ pub trait BaseTool: Send + Sync + Debug {
         self.definition().parameters
     }
 
-    fn tool_run(
+    async fn tool_run(
         &self,
         input: ToolInput,
         run_manager: Option<&CallbackManagerForToolRun>,
         config: &RunnableConfig,
     ) -> Result<ToolOutput>;
 
-    async fn tool_arun(
-        &self,
-        input: ToolInput,
-        run_manager: Option<&CallbackManagerForToolRun>,
-        config: &RunnableConfig,
-    ) -> Result<ToolOutput> {
-        self.tool_run(input, run_manager, config)
-    }
-
-    fn run(
-        &self,
-        input: ToolInput,
-        config: Option<RunnableConfig>,
-        tool_call_id: Option<String>,
-    ) -> Result<ToolOutput> {
-        let (run_manager, child_config, _) = self.setup_run(&input, config);
-
-        let result = self.tool_run(input, Some(&run_manager), &child_config);
-        self.finalize_run(result, &run_manager, tool_call_id.as_deref())
-    }
-
-    async fn arun(
+    async fn run(
         &self,
         input: ToolInput,
         config: Option<RunnableConfig>,
@@ -357,14 +336,14 @@ pub trait BaseTool: Send + Sync + Debug {
         let (run_manager, child_config, _) = self.setup_run(&input, config);
 
         let result = self
-            .tool_arun(input, Some(&run_manager), &child_config)
+            .tool_run(input, Some(&run_manager), &child_config)
             .await;
         self.finalize_run(result, &run_manager, tool_call_id.as_deref())
     }
 
     async fn invoke(&self, input: ToolInput, config: Option<RunnableConfig>) -> Result<ToolOutput> {
         let (tool_input, tool_call_id, config) = prep_run_args(input, config);
-        self.arun(tool_input, Some(config), tool_call_id).await
+        self.run(tool_input, Some(config), tool_call_id).await
     }
 
     async fn invoke_tool_call(&self, tool_call: ToolCall) -> AnyMessage {
@@ -567,19 +546,13 @@ impl crate::runnables::base::Runnable for ToolRunnable {
     fn name(&self) -> Option<String> {
         Some(self.tool.name().to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (tool_input, tool_call_id, config) = prep_run_args(input, config);
-        self.tool.run(tool_input, Some(config), tool_call_id)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
         let (tool_input, tool_call_id, config) = prep_run_args(input, config);
-        self.tool.arun(tool_input, Some(config), tool_call_id).await
+        self.tool.run(tool_input, Some(config), tool_call_id).await
     }
 }
 

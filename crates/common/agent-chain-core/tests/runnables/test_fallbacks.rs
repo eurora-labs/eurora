@@ -6,6 +6,7 @@ use agent_chain_core::error::{Error, Result};
 use agent_chain_core::runnables::base::{Runnable, RunnableExt, RunnableLambda};
 
 use agent_chain_core::runnables::fallbacks::{ExceptionInserter, RunnableWithFallbacks};
+use futures::StreamExt;
 use serde_json::Value;
 
 fn hashmap_exception_inserter() -> ExceptionInserter<HashMap<String, Value>> {
@@ -30,69 +31,21 @@ fn bar_runnable() -> RunnableLambda<impl Fn(String) -> Result<String> + Send + S
         .build()
 }
 
-#[test]
-fn test_fallbacks_invoke() {
+#[tokio::test]
+async fn test_fallbacks_invoke() {
     let primary = failing_runnable();
     let fallback = bar_runnable();
     let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
-    assert_eq!(rwf.invoke("hello".to_string(), None).unwrap(), "bar");
-}
-
-#[test]
-fn test_fallbacks_batch() {
-    let primary = failing_runnable();
-    let fallback = bar_runnable();
-    let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
-    let results = rwf.batch(
-        vec!["hi".to_string(), "hey".to_string(), "bye".to_string()],
-        None,
-        false,
-    );
-    assert_eq!(results.len(), 3);
-    for result in &results {
-        assert_eq!(result.as_ref().unwrap(), "bar");
-    }
-}
-
-#[test]
-fn test_fallbacks_stream() {
-    let primary = failing_runnable();
-    let fallback = bar_runnable();
-    let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
-
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let chunks: Vec<Result<String>> = rt.block_on(async {
-        use futures::StreamExt;
-        rwf.stream("hello".to_string(), None).collect().await
-    });
-    assert_eq!(chunks.len(), 1);
-    assert_eq!(chunks[0].as_ref().unwrap(), "bar");
-}
-
-#[test]
-fn test_fallbacks_multi_invoke() {
-    let primary = failing_runnable();
-    let fallback1 = failing_runnable();
-    let fallback2 = bar_runnable();
-    let rwf = primary.with_fallbacks(vec![Arc::new(fallback1), Arc::new(fallback2)]);
-    assert_eq!(rwf.invoke("hello".to_string(), None).unwrap(), "bar");
+    assert_eq!(rwf.invoke("hello".to_string(), None).await.unwrap(), "bar");
 }
 
 #[tokio::test]
-async fn test_fallbacks_ainvoke() {
-    let primary = failing_runnable();
-    let fallback = bar_runnable();
-    let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
-    assert_eq!(rwf.ainvoke("hello".to_string(), None).await.unwrap(), "bar");
-}
-
-#[tokio::test]
-async fn test_fallbacks_abatch() {
+async fn test_fallbacks_batch() {
     let primary = failing_runnable();
     let fallback = bar_runnable();
     let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
     let results = rwf
-        .abatch(
+        .batch(
             vec!["hi".to_string(), "hey".to_string(), "bye".to_string()],
             None,
             false,
@@ -102,6 +55,26 @@ async fn test_fallbacks_abatch() {
     for result in &results {
         assert_eq!(result.as_ref().unwrap(), "bar");
     }
+}
+
+#[tokio::test]
+async fn test_fallbacks_stream() {
+    let primary = failing_runnable();
+    let fallback = bar_runnable();
+    let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
+
+    let chunks: Vec<Result<String>> = rwf.stream("hello".to_string(), None).collect().await;
+    assert_eq!(chunks.len(), 1);
+    assert_eq!(chunks[0].as_ref().unwrap(), "bar");
+}
+
+#[tokio::test]
+async fn test_fallbacks_multi_invoke() {
+    let primary = failing_runnable();
+    let fallback1 = failing_runnable();
+    let fallback2 = bar_runnable();
+    let rwf = primary.with_fallbacks(vec![Arc::new(fallback1), Arc::new(fallback2)]);
+    assert_eq!(rwf.invoke("hello".to_string(), None).await.unwrap(), "bar");
 }
 
 #[allow(clippy::type_complexity)]
@@ -134,8 +107,8 @@ fn make_input(text: &str) -> HashMap<String, Value> {
     m
 }
 
-#[test]
-fn test_invoke_with_exception_key_single_fallback() {
+#[tokio::test]
+async fn test_invoke_with_exception_key_single_fallback() {
     let runnable = dict_runnable();
     let fallback = dict_runnable();
 
@@ -146,12 +119,12 @@ fn test_invoke_with_exception_key_single_fallback() {
         .exception_inserter(hashmap_exception_inserter())
         .call();
 
-    let result = rwf.invoke(make_input("bar"), None).unwrap();
+    let result = rwf.invoke(make_input("bar"), None).await.unwrap();
     assert_eq!(result, "second");
 }
 
-#[test]
-fn test_invoke_with_exception_key_double_fallback() {
+#[tokio::test]
+async fn test_invoke_with_exception_key_double_fallback() {
     let runnable = dict_runnable();
     let fallback1 = dict_runnable();
     let fallback2 = dict_runnable();
@@ -163,12 +136,12 @@ fn test_invoke_with_exception_key_double_fallback() {
         .exception_inserter(hashmap_exception_inserter())
         .call();
 
-    let result = rwf.invoke(make_input("baz"), None).unwrap();
+    let result = rwf.invoke(make_input("baz"), None).await.unwrap();
     assert_eq!(result, "third");
 }
 
-#[test]
-fn test_invoke_with_exception_key_foo_succeeds() {
+#[tokio::test]
+async fn test_invoke_with_exception_key_foo_succeeds() {
     let runnable = dict_runnable();
     let fallback = dict_runnable();
 
@@ -179,77 +152,12 @@ fn test_invoke_with_exception_key_foo_succeeds() {
         .exception_inserter(hashmap_exception_inserter())
         .call();
 
-    let result = rwf.invoke(make_input("foo"), None).unwrap();
+    let result = rwf.invoke(make_input("foo"), None).await.unwrap();
     assert_eq!(result, "first");
 }
 
 #[tokio::test]
-async fn test_ainvoke_with_exception_key() {
-    let runnable = dict_runnable();
-    let fallback = dict_runnable();
-
-    let rwf = RunnableWithFallbacks::from_dyn()
-        .runnable(Arc::new(runnable))
-        .fallbacks(vec![Arc::new(fallback)])
-        .exception_key("exception".to_string())
-        .exception_inserter(hashmap_exception_inserter())
-        .call();
-
-    let result = rwf.ainvoke(make_input("bar"), None).await.unwrap();
-    assert_eq!(result, "second");
-}
-
-#[test]
-fn test_batch_with_exception_key() {
-    let runnable = dict_runnable();
-    let fallback = dict_runnable();
-
-    let rwf = RunnableWithFallbacks::from_dyn()
-        .runnable(Arc::new(runnable))
-        .fallbacks(vec![Arc::new(fallback)])
-        .exception_key("exception".to_string())
-        .exception_inserter(hashmap_exception_inserter())
-        .call();
-
-    let results = rwf.batch(
-        vec![make_input("foo"), make_input("bar"), make_input("baz")],
-        None,
-        true,
-    );
-
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[0].as_ref().unwrap(), "first");
-    assert_eq!(results[1].as_ref().unwrap(), "second");
-    assert_eq!(results[2].as_ref().unwrap(), "third");
-}
-
-#[test]
-fn test_batch_with_double_fallback_exception_key() {
-    let runnable = dict_runnable();
-    let fallback1 = dict_runnable();
-    let fallback2 = dict_runnable();
-
-    let rwf = RunnableWithFallbacks::from_dyn()
-        .runnable(Arc::new(runnable))
-        .fallbacks(vec![Arc::new(fallback1), Arc::new(fallback2)])
-        .exception_key("exception".to_string())
-        .exception_inserter(hashmap_exception_inserter())
-        .call();
-
-    let results = rwf.batch(
-        vec![make_input("foo"), make_input("bar"), make_input("baz")],
-        None,
-        true,
-    );
-
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[0].as_ref().unwrap(), "first");
-    assert_eq!(results[1].as_ref().unwrap(), "second");
-    assert_eq!(results[2].as_ref().unwrap(), "third");
-}
-
-#[tokio::test]
-async fn test_abatch_with_exception_key() {
+async fn test_batch_with_exception_key() {
     let runnable = dict_runnable();
     let fallback = dict_runnable();
 
@@ -261,7 +169,34 @@ async fn test_abatch_with_exception_key() {
         .call();
 
     let results = rwf
-        .abatch(
+        .batch(
+            vec![make_input("foo"), make_input("bar"), make_input("baz")],
+            None,
+            true,
+        )
+        .await;
+
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].as_ref().unwrap(), "first");
+    assert_eq!(results[1].as_ref().unwrap(), "second");
+    assert_eq!(results[2].as_ref().unwrap(), "third");
+}
+
+#[tokio::test]
+async fn test_batch_with_double_fallback_exception_key() {
+    let runnable = dict_runnable();
+    let fallback1 = dict_runnable();
+    let fallback2 = dict_runnable();
+
+    let rwf = RunnableWithFallbacks::from_dyn()
+        .runnable(Arc::new(runnable))
+        .fallbacks(vec![Arc::new(fallback1), Arc::new(fallback2)])
+        .exception_key("exception".to_string())
+        .exception_inserter(hashmap_exception_inserter())
+        .call();
+
+    let results = rwf
+        .batch(
             vec![make_input("foo"), make_input("bar"), make_input("baz")],
             None,
             true,
@@ -304,8 +239,8 @@ fn test_config_specs_merged() {
     assert!(specs.is_empty()); // No configurable fields on lambdas
 }
 
-#[test]
-fn test_custom_error_predicate() {
+#[tokio::test]
+async fn test_custom_error_predicate() {
     let call_count = Arc::new(AtomicUsize::new(0));
 
     let count_clone = call_count.clone();
@@ -327,13 +262,13 @@ fn test_custom_error_predicate() {
         .call();
 
     assert_eq!(
-        rwf.invoke("test".to_string(), None).unwrap(),
+        rwf.invoke("test".to_string(), None).await.unwrap(),
         "fallback_result"
     );
 }
 
-#[test]
-fn test_custom_error_predicate_non_matching_error_propagates() {
+#[tokio::test]
+async fn test_custom_error_predicate_non_matching_error_propagates() {
     let main_r = RunnableLambda::builder()
         .func(|_x: String| -> Result<String> { Err(Error::other("type error")) })
         .build();
@@ -348,13 +283,13 @@ fn test_custom_error_predicate_non_matching_error_propagates() {
         .error_predicate(Arc::new(|e: &Error| e.to_string().contains("value")))
         .call();
 
-    let result = rwf.invoke("test".to_string(), None);
+    let result = rwf.invoke("test".to_string(), None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("type error"));
 }
 
-#[test]
-fn test_fallbacks_empty_batch() {
+#[tokio::test]
+async fn test_fallbacks_empty_batch() {
     let main_r = RunnableLambda::builder()
         .func(|x: String| -> Result<String> { Ok(x) })
         .build();
@@ -362,23 +297,11 @@ fn test_fallbacks_empty_batch() {
         .func(|x: String| -> Result<String> { Ok(x) })
         .build();
     let rwf = main_r.with_fallbacks(vec![Arc::new(fb)]);
-    assert!(rwf.batch(vec![], None, false).is_empty());
+    assert!(rwf.batch(vec![], None, false).await.is_empty());
 }
 
 #[tokio::test]
-async fn test_fallbacks_empty_abatch() {
-    let main_r = RunnableLambda::builder()
-        .func(|x: String| -> Result<String> { Ok(x) })
-        .build();
-    let fb = RunnableLambda::builder()
-        .func(|x: String| -> Result<String> { Ok(x) })
-        .build();
-    let rwf = main_r.with_fallbacks(vec![Arc::new(fb)]);
-    assert!(rwf.abatch(vec![], None, false).await.is_empty());
-}
-
-#[test]
-fn test_fallbacks_all_succeed_uses_first() {
+async fn test_fallbacks_all_succeed_uses_first() {
     let call_log = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
 
     let log_main = call_log.clone();
@@ -398,13 +321,13 @@ fn test_fallbacks_all_succeed_uses_first() {
         .build();
 
     let rwf = main_r.with_fallbacks(vec![Arc::new(fb)]);
-    let result = rwf.invoke("test".to_string(), None).unwrap();
+    let result = rwf.invoke("test".to_string(), None).await.unwrap();
     assert_eq!(result, "main_result");
     assert_eq!(*call_log.lock().unwrap(), vec!["main"]);
 }
 
-#[test]
-fn test_fallbacks_chain_of_failures() {
+#[tokio::test]
+async fn test_fallbacks_chain_of_failures() {
     let main_r = RunnableLambda::builder()
         .func(|_x: String| -> Result<String> { Err(Error::other("error1")) })
         .build();
@@ -414,7 +337,7 @@ fn test_fallbacks_chain_of_failures() {
         .build();
 
     let rwf = main_r.with_fallbacks(vec![Arc::new(fb)]);
-    let result = rwf.invoke("test".to_string(), None);
+    let result = rwf.invoke("test".to_string(), None).await;
     assert!(result.is_err());
     assert!(
         result.unwrap_err().to_string().contains("error1"),
@@ -422,8 +345,8 @@ fn test_fallbacks_chain_of_failures() {
     );
 }
 
-#[test]
-fn test_fallbacks_stream_immediate_error_triggers_fallback() {
+#[tokio::test]
+async fn test_fallbacks_stream_immediate_error_triggers_fallback() {
     let primary = RunnableLambda::builder()
         .func(|_x: String| -> Result<String> { Err(Error::other("immediate error")) })
         .build();
@@ -433,59 +356,13 @@ fn test_fallbacks_stream_immediate_error_triggers_fallback() {
 
     let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let chunks: Vec<Result<String>> = rt.block_on(async {
-        use futures::StreamExt;
-        rwf.stream("test".to_string(), None).collect().await
-    });
+    let chunks: Vec<Result<String>> = rwf.stream("test".to_string(), None).collect().await;
     assert_eq!(chunks.len(), 1);
     assert_eq!(chunks[0].as_ref().unwrap(), "recovered");
 }
 
 #[tokio::test]
-async fn test_fallbacks_astream_immediate_error_triggers_fallback() {
-    let primary = RunnableLambda::builder()
-        .func(|_x: String| -> Result<String> { Err(Error::other("immediate error")) })
-        .build();
-    let fallback = RunnableLambda::builder()
-        .func(|_x: String| -> Result<String> { Ok("recovered".to_string()) })
-        .build();
-
-    let rwf = primary.with_fallbacks(vec![Arc::new(fallback)]);
-
-    use futures::StreamExt;
-    let chunks: Vec<Result<String>> = rwf.astream("test".to_string(), None).collect().await;
-    assert_eq!(chunks.len(), 1);
-    assert_eq!(chunks[0].as_ref().unwrap(), "recovered");
-}
-
-#[test]
-fn test_batch_return_exceptions() {
-    let runnable = RunnableLambda::builder()
-        .func(|inputs: HashMap<String, Value>| -> Result<String> {
-            let text = inputs.get("text").and_then(|v| v.as_str()).unwrap_or("");
-            if text == "foo" {
-                Ok("first".to_string())
-            } else {
-                Err(Error::other("missing exception"))
-            }
-        })
-        .build();
-
-    let results = runnable.batch(
-        vec![make_input("foo"), make_input("bar"), make_input("baz")],
-        None,
-        true,
-    );
-
-    assert_eq!(results.len(), 3);
-    assert_eq!(results[0].as_ref().unwrap(), "first");
-    assert!(results[1].is_err());
-    assert!(results[2].is_err());
-}
-
-#[tokio::test]
-async fn test_abatch_return_exceptions() {
+async fn test_batch_return_exceptions() {
     let runnable = RunnableLambda::builder()
         .func(|inputs: HashMap<String, Value>| -> Result<String> {
             let text = inputs.get("text").and_then(|v| v.as_str()).unwrap_or("");
@@ -498,7 +375,7 @@ async fn test_abatch_return_exceptions() {
         .build();
 
     let results = runnable
-        .abatch(
+        .batch(
             vec![make_input("foo"), make_input("bar"), make_input("baz")],
             None,
             true,
@@ -511,8 +388,8 @@ async fn test_abatch_return_exceptions() {
     assert!(results[2].is_err());
 }
 
-#[test]
-fn test_batch_with_error_predicate() {
+#[tokio::test]
+async fn test_batch_with_error_predicate() {
     let runnable = RunnableLambda::builder()
         .func(|inputs: HashMap<String, Value>| -> Result<String> {
             let text = inputs.get("text").and_then(|v| v.as_str()).unwrap_or("");
@@ -540,11 +417,13 @@ fn test_batch_with_error_predicate() {
         .error_predicate(Arc::new(|e: &Error| e.to_string().contains("value_error")))
         .call();
 
-    let results = rwf.batch(
-        vec![make_input("foo"), make_input("bar"), make_input("baz")],
-        None,
-        true,
-    );
+    let results = rwf
+        .batch(
+            vec![make_input("foo"), make_input("bar"), make_input("baz")],
+            None,
+            true,
+        )
+        .await;
 
     assert_eq!(results.len(), 3);
     assert_eq!(results[0].as_ref().unwrap(), "first");
@@ -552,8 +431,8 @@ fn test_batch_with_error_predicate() {
     assert!(results[2].is_err());
 }
 
-#[test]
-fn test_stream_with_exception_key() {
+#[tokio::test]
+async fn test_stream_with_exception_key() {
     let failing = RunnableLambda::builder()
         .func(|_inputs: HashMap<String, Value>| -> Result<String> {
             Err(Error::other("stream error"))
@@ -577,12 +456,8 @@ fn test_stream_with_exception_key() {
         .exception_inserter(hashmap_exception_inserter())
         .call();
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let chunks: Vec<Result<String>> = rt.block_on(async {
-        use futures::StreamExt;
-        let input = make_input("test");
-        rwf.stream(input, None).collect().await
-    });
+    let input = make_input("test");
+    let chunks: Vec<Result<String>> = rwf.stream(input, None).collect().await;
     assert_eq!(chunks.len(), 1);
     assert_eq!(chunks[0].as_ref().unwrap(), "recovered");
 }

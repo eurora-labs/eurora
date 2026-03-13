@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use backon::{BackoffBuilder, BlockingRetryable, Retryable};
+use backon::{BackoffBuilder, Retryable};
 use bon::bon;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -313,30 +313,11 @@ where
         self.bound.get_output_schema(config)
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (run_manager, config) = start_chain_run(config);
-
-        let attempt = AtomicUsize::new(0);
-        let result = (|| {
-            let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
-            let patched = Self::patch_config_for_retry(&config, &run_manager, n);
-            self.bound.invoke(input.clone(), Some(patched))
-        })
-        .retry(self.backoff_builder())
-        .when(|e: &Error| self.should_retry(e))
-        .call();
-
-        finish_chain_run(&run_manager, result)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         let (run_manager, config) = start_chain_run(config);
 
         let attempt = AtomicUsize::new(0);
@@ -344,7 +325,7 @@ where
             let n = attempt.fetch_add(1, Ordering::SeqCst) + 1;
             let patched = Self::patch_config_for_retry(&config, &run_manager, n);
             let input = input.clone();
-            async move { self.bound.ainvoke(input, Some(patched)).await }
+            async move { self.bound.invoke(input, Some(patched)).await }
         })
         .retry(self.backoff_builder())
         .when(|e: &Error| self.should_retry(e))
@@ -353,85 +334,7 @@ where
         finish_chain_run(&run_manager, result)
     }
 
-    fn batch(
-        &self,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        return_exceptions: bool,
-    ) -> Vec<Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![Err(e)],
-        };
-        let n = inputs.len();
-
-        let (run_managers, configs): (Vec<_>, Vec<_>) = configs
-            .into_iter()
-            .map(|config| start_chain_run(Some(config)))
-            .unzip();
-
-        let mut results: Vec<Option<Result<Self::Output>>> = (0..n).map(|_| None).collect();
-        let mut remaining: Vec<usize> = (0..n).collect();
-
-        for attempt in 1..=self.config.max_attempt_number {
-            if remaining.is_empty() {
-                break;
-            }
-
-            let pending_inputs: Vec<Self::Input> =
-                remaining.iter().map(|&i| inputs[i].clone()).collect();
-            let patched_configs: Vec<RunnableConfig> = remaining
-                .iter()
-                .map(|&i| Self::patch_config_for_retry(&configs[i], &run_managers[i], attempt))
-                .collect();
-
-            let batch_results = self.bound.batch(
-                pending_inputs,
-                Some(ConfigOrList::List(patched_configs)),
-                true,
-            );
-
-            let (next_remaining, non_retryable_err) = self.process_batch_results(
-                batch_results,
-                &remaining,
-                &mut results,
-                attempt,
-                return_exceptions,
-            );
-
-            if non_retryable_err.is_some() && !return_exceptions {
-                Self::fill_aborted(&mut results, n);
-                break;
-            }
-
-            remaining = next_remaining;
-
-            if !remaining.is_empty()
-                && self.config.wait_exponential_jitter
-                && attempt < self.config.max_attempt_number
-            {
-                std::thread::sleep(self.get_jitter_params().calculate_wait(attempt));
-            }
-        }
-
-        let results = Self::collect_results(results);
-        for (run_manager, result) in run_managers.iter().zip(results.iter()) {
-            match result {
-                Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
-                Err(e) => run_manager.on_chain_error(e),
-            }
-        }
-        results
-    }
-
-    async fn abatch(
+    async fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
@@ -472,7 +375,7 @@ where
 
             let batch_results = self
                 .bound
-                .abatch(
+                .batch(
                     pending_inputs,
                     Some(ConfigOrList::List(patched_configs)),
                     true,
@@ -531,8 +434,8 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
-    #[test]
-    fn test_retry_succeeds_first_attempt() {
+    #[tokio::test]
+    async fn test_retry_succeeds_first_attempt() {
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let config = RunnableRetryConfig::builder()
             .max_attempt_number(3)
@@ -540,12 +443,12 @@ mod tests {
             .build();
         let retry = RunnableRetry::new(runnable, config);
 
-        let result = retry.invoke(1, None).unwrap();
+        let result = retry.invoke(1, None).await.unwrap();
         assert_eq!(result, 2);
     }
 
-    #[test]
-    fn test_retry_succeeds_after_failures() {
+    #[tokio::test]
+    async fn test_retry_succeeds_after_failures() {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
@@ -566,13 +469,13 @@ mod tests {
             .build();
         let retry = RunnableRetry::new(runnable, config);
 
-        let result = retry.invoke(5, None).unwrap();
+        let result = retry.invoke(5, None).await.unwrap();
         assert_eq!(result, 10);
         assert_eq!(counter.load(Ordering::SeqCst), 3);
     }
 
-    #[test]
-    fn test_retry_exhausted() {
+    #[tokio::test]
+    async fn test_retry_exhausted() {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
@@ -589,13 +492,13 @@ mod tests {
             .build();
         let retry = RunnableRetry::new(runnable, config);
 
-        let result = retry.invoke(1, None);
+        let result = retry.invoke(1, None).await;
         assert!(result.is_err());
         assert_eq!(counter.load(Ordering::SeqCst), 3);
     }
 
-    #[test]
-    fn test_retry_predicate_http_errors() {
+    #[tokio::test]
+    async fn test_retry_predicate_http_errors() {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
@@ -613,7 +516,7 @@ mod tests {
             .build();
         let retry = RunnableRetry::new(runnable, config);
 
-        let result = retry.invoke(1, None);
+        let result = retry.invoke(1, None).await;
         assert!(result.is_err());
         assert_eq!(counter.load(Ordering::SeqCst), 1);
     }
@@ -650,27 +553,27 @@ mod tests {
         assert!(wait.as_secs_f64() >= 2.0 && wait.as_secs_f64() < 2.1);
     }
 
-    #[test]
-    fn test_retry_ext_trait() {
+    #[tokio::test]
+    async fn test_retry_ext_trait() {
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let config = RunnableRetryConfig::builder().max_attempt_number(3).build();
         let retry = runnable.with_retry_config(config);
 
-        let result = retry.invoke(1, None).unwrap();
+        let result = retry.invoke(1, None).await.unwrap();
         assert_eq!(result, 2);
     }
 
-    #[test]
-    fn test_retry_with_simple() {
+    #[tokio::test]
+    async fn test_retry_with_simple() {
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let retry = runnable.with_retry(3, false);
 
-        let result = retry.invoke(1, None).unwrap();
+        let result = retry.invoke(1, None).await.unwrap();
         assert_eq!(result, 2);
     }
 
-    #[test]
-    fn test_batch_retry_partial_failures() {
+    #[tokio::test]
+    async fn test_batch_retry_partial_failures() {
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = counter.clone();
 
@@ -691,7 +594,7 @@ mod tests {
             .build();
         let retry = RunnableRetry::new(runnable, config);
 
-        let results = retry.batch(vec![1, -1, 2], None, true);
+        let results = retry.batch(vec![1, -1, 2], None, true).await;
 
         assert!(results[0].is_ok());
         assert!(results[2].is_ok());
@@ -719,7 +622,7 @@ mod tests {
             .build();
         let retry = RunnableRetry::new(runnable, config);
 
-        let result = retry.ainvoke(5, None).await.unwrap();
+        let result = retry.invoke(5, None).await.unwrap();
         assert_eq!(result, 10);
         assert_eq!(counter.load(Ordering::SeqCst), 2);
     }

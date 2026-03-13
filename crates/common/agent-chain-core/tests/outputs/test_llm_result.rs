@@ -1,18 +1,23 @@
 use agent_chain_core::messages::AIMessage;
 use agent_chain_core::outputs::{
-    ChatGeneration, ChatGenerationChunk, Generation, GenerationChunk, GenerationType, LLMResult,
-    RunInfo,
+    ChatGeneration, ChatGenerationChunk, GenerationType, LLMResult, RunInfo,
 };
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+fn chat_gen(text: &str) -> ChatGeneration {
+    ChatGeneration::builder()
+        .message(AIMessage::builder().content(text).build().into())
+        .build()
+}
 
 mod llm_result_tests {
     use super::*;
 
     #[test]
     fn test_creation_with_single_prompt_single_generation() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let result = LLMResult::builder()
             .generations(vec![vec![generation.clone().into()]])
             .build();
@@ -25,9 +30,9 @@ mod llm_result_tests {
 
     #[test]
     fn test_creation_with_multiple_prompts() {
-        let gen1 = Generation::builder().text("Response 1").build();
-        let gen2 = Generation::builder().text("Response 2").build();
-        let gen3 = Generation::builder().text("Response 3").build();
+        let gen1 = chat_gen("Response 1");
+        let gen2 = chat_gen("Response 2");
+        let gen3 = chat_gen("Response 3");
         let result = LLMResult::builder()
             .generations(vec![
                 vec![gen1.into()],
@@ -36,35 +41,35 @@ mod llm_result_tests {
             ])
             .build();
         assert_eq!(result.generations.len(), 3);
-        if let GenerationType::Generation(g) = &result.generations[0][0] {
-            assert_eq!(g.text, "Response 1");
+        if let GenerationType::ChatGeneration(g) = &result.generations[0][0] {
+            assert_eq!(g.message.text(), "Response 1");
         }
-        if let GenerationType::Generation(g) = &result.generations[1][0] {
-            assert_eq!(g.text, "Response 2");
+        if let GenerationType::ChatGeneration(g) = &result.generations[1][0] {
+            assert_eq!(g.message.text(), "Response 2");
         }
-        if let GenerationType::Generation(g) = &result.generations[2][0] {
-            assert_eq!(g.text, "Response 3");
+        if let GenerationType::ChatGeneration(g) = &result.generations[2][0] {
+            assert_eq!(g.message.text(), "Response 3");
         }
     }
 
     #[test]
     fn test_creation_with_multiple_candidates() {
-        let gen1 = Generation::builder().text("Candidate 1").build();
-        let gen2 = Generation::builder().text("Candidate 2").build();
-        let gen3 = Generation::builder().text("Candidate 3").build();
+        let gen1 = chat_gen("Candidate 1");
+        let gen2 = chat_gen("Candidate 2");
+        let gen3 = chat_gen("Candidate 3");
         let result = LLMResult::builder()
             .generations(vec![vec![gen1.into(), gen2.into(), gen3.into()]])
             .build();
         assert_eq!(result.generations.len(), 1);
         assert_eq!(result.generations[0].len(), 3);
-        if let GenerationType::Generation(g) = &result.generations[0][0] {
-            assert_eq!(g.text, "Candidate 1");
+        if let GenerationType::ChatGeneration(g) = &result.generations[0][0] {
+            assert_eq!(g.message.text(), "Candidate 1");
         }
-        if let GenerationType::Generation(g) = &result.generations[0][1] {
-            assert_eq!(g.text, "Candidate 2");
+        if let GenerationType::ChatGeneration(g) = &result.generations[0][1] {
+            assert_eq!(g.message.text(), "Candidate 2");
         }
-        if let GenerationType::Generation(g) = &result.generations[0][2] {
-            assert_eq!(g.text, "Candidate 3");
+        if let GenerationType::ChatGeneration(g) = &result.generations[0][2] {
+            assert_eq!(g.message.text(), "Candidate 3");
         }
     }
 
@@ -97,7 +102,9 @@ mod llm_result_tests {
 
     #[test]
     fn test_creation_with_generation_chunks() {
-        let chunk1 = GenerationChunk::builder().text("Chunk 1").build();
+        let chunk1 = ChatGenerationChunk::builder()
+            .message(AIMessage::builder().content("Chunk 1").build().into())
+            .build();
         let chunk2 = ChatGenerationChunk::builder()
             .message(AIMessage::builder().content("Chunk 2").build().into())
             .build();
@@ -105,8 +112,8 @@ mod llm_result_tests {
             .generations(vec![vec![chunk1.into()], vec![chunk2.into()]])
             .build();
         assert_eq!(result.generations.len(), 2);
-        if let GenerationType::GenerationChunk(gc) = &result.generations[0][0] {
-            assert_eq!(gc.text, "Chunk 1");
+        if let GenerationType::ChatGenerationChunk(gc) = &result.generations[0][0] {
+            assert_eq!(gc.message.text(), "Chunk 1");
         }
         if let GenerationType::ChatGenerationChunk(cgc) = &result.generations[1][0] {
             assert_eq!(cgc.message.text(), "Chunk 2");
@@ -115,7 +122,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_creation_with_llm_output() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let mut llm_output = HashMap::new();
         llm_output.insert(
             "token_usage".to_string(),
@@ -141,7 +148,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_creation_with_run_info() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let run_id = Uuid::new_v4();
         let run_info = RunInfo::new(run_id);
         let mut result = LLMResult::builder()
@@ -155,8 +162,8 @@ mod llm_result_tests {
 
     #[test]
     fn test_creation_with_multiple_run_infos() {
-        let gen1 = Generation::builder().text("Response 1").build();
-        let gen2 = Generation::builder().text("Response 2").build();
+        let gen1 = chat_gen("Response 1");
+        let gen2 = chat_gen("Response 2");
         let run_id1 = Uuid::new_v4();
         let run_id2 = Uuid::new_v4();
         let run_info1 = RunInfo::new(run_id1);
@@ -173,7 +180,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_flatten_single_prompt_single_generation() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let result = LLMResult::builder()
             .generations(vec![vec![generation.clone().into()]])
             .build();
@@ -184,9 +191,9 @@ mod llm_result_tests {
 
     #[test]
     fn test_flatten_multiple_prompts() {
-        let gen1 = Generation::builder().text("Response 1").build();
-        let gen2 = Generation::builder().text("Response 2").build();
-        let gen3 = Generation::builder().text("Response 3").build();
+        let gen1 = chat_gen("Response 1");
+        let gen2 = chat_gen("Response 2");
+        let gen3 = chat_gen("Response 3");
         let result = LLMResult::builder()
             .generations(vec![
                 vec![gen1.clone().into()],
@@ -203,8 +210,8 @@ mod llm_result_tests {
 
     #[test]
     fn test_flatten_preserves_llm_output_for_first() {
-        let gen1 = Generation::builder().text("Response 1").build();
-        let gen2 = Generation::builder().text("Response 2").build();
+        let gen1 = chat_gen("Response 1");
+        let gen2 = chat_gen("Response 2");
         let mut llm_output = HashMap::new();
         llm_output.insert("token_usage".to_string(), json!({"total": 100}));
         llm_output.insert("model".to_string(), json!("gpt-4"));
@@ -228,8 +235,8 @@ mod llm_result_tests {
 
     #[test]
     fn test_flatten_clears_token_usage_for_subsequent() {
-        let gen1 = Generation::builder().text("Response 1").build();
-        let gen2 = Generation::builder().text("Response 2").build();
+        let gen1 = chat_gen("Response 1");
+        let gen2 = chat_gen("Response 2");
         let mut llm_output = HashMap::new();
         llm_output.insert("token_usage".to_string(), json!({"total": 100}));
         llm_output.insert("model".to_string(), json!("gpt-4"));
@@ -251,8 +258,8 @@ mod llm_result_tests {
 
     #[test]
     fn test_flatten_handles_none_llm_output() {
-        let gen1 = Generation::builder().text("Response 1").build();
-        let gen2 = Generation::builder().text("Response 2").build();
+        let gen1 = chat_gen("Response 1");
+        let gen2 = chat_gen("Response 2");
         let result = LLMResult::builder()
             .generations(vec![vec![gen1.into()], vec![gen2.into()]])
             .build();
@@ -263,8 +270,8 @@ mod llm_result_tests {
 
     #[test]
     fn test_flatten_with_multiple_candidates() {
-        let gen1 = Generation::builder().text("Candidate 1").build();
-        let gen2 = Generation::builder().text("Candidate 2").build();
+        let gen1 = chat_gen("Candidate 1");
+        let gen2 = chat_gen("Candidate 2");
         let result = LLMResult::builder()
             .generations(vec![vec![gen1.into(), gen2.into()]])
             .build();
@@ -275,7 +282,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_equality_same_generations_and_output() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let mut llm_output = HashMap::new();
         llm_output.insert("model".to_string(), json!("gpt-4"));
         let result1 = LLMResult::builder()
@@ -291,8 +298,8 @@ mod llm_result_tests {
 
     #[test]
     fn test_equality_different_generations() {
-        let gen1 = Generation::builder().text("Response 1").build();
-        let gen2 = Generation::builder().text("Response 2").build();
+        let gen1 = chat_gen("Response 1");
+        let gen2 = chat_gen("Response 2");
         let result1 = LLMResult::builder()
             .generations(vec![vec![gen1.into()]])
             .build();
@@ -304,7 +311,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_equality_different_llm_output() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let mut llm_output1 = HashMap::new();
         llm_output1.insert("model".to_string(), json!("gpt-4"));
         let mut llm_output2 = HashMap::new();
@@ -322,7 +329,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_equality_ignores_run_info() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let run_id1 = Uuid::new_v4();
         let run_id2 = Uuid::new_v4();
         let mut result1 = LLMResult::builder()
@@ -338,7 +345,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_equality_with_none_llm_output() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let result1 = LLMResult::builder()
             .generations(vec![vec![generation.clone().into()]])
             .build();
@@ -350,7 +357,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_type_field_is_literal() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let result = LLMResult::builder()
             .generations(vec![vec![generation.into()]])
             .build();
@@ -367,17 +374,17 @@ mod llm_result_tests {
 
     #[test]
     fn test_mixed_generation_types() {
-        let generation = Generation::builder().text("Regular").build();
-        let chat_gen = ChatGeneration::builder()
+        let generation = chat_gen("Regular");
+        let chat_gen_val = ChatGeneration::builder()
             .message(AIMessage::builder().content("Chat").build().into())
             .build();
         let result = LLMResult::builder()
-            .generations(vec![vec![generation.into()], vec![chat_gen.into()]])
+            .generations(vec![vec![generation.into()], vec![chat_gen_val.into()]])
             .build();
         assert_eq!(result.generations.len(), 2);
         assert!(matches!(
             result.generations[0][0],
-            GenerationType::Generation(_)
+            GenerationType::ChatGeneration(_)
         ));
         assert!(matches!(
             result.generations[1][0],
@@ -387,7 +394,7 @@ mod llm_result_tests {
 
     #[test]
     fn test_complex_llm_output_structure() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let mut llm_output = HashMap::new();
         llm_output.insert(
             "token_usage".to_string(),
@@ -426,8 +433,8 @@ mod llm_result_flatten_tests {
 
     #[test]
     fn test_flatten_does_not_include_run_info() {
-        let gen1 = Generation::builder().text("R1").build();
-        let gen2 = Generation::builder().text("R2").build();
+        let gen1 = chat_gen("R1");
+        let gen2 = chat_gen("R2");
         let run_info = vec![RunInfo::new(Uuid::new_v4()), RunInfo::new(Uuid::new_v4())];
         let mut result = LLMResult::builder()
             .generations(vec![vec![gen1.into()], vec![gen2.into()]])
@@ -441,8 +448,8 @@ mod llm_result_flatten_tests {
 
     #[test]
     fn test_flatten_clones_llm_output_for_subsequent() {
-        let gen1 = Generation::builder().text("R1").build();
-        let gen2 = Generation::builder().text("R2").build();
+        let gen1 = chat_gen("R1");
+        let gen2 = chat_gen("R2");
         let mut llm_output = HashMap::new();
         llm_output.insert("token_usage".to_string(), json!({"total": 100}));
         llm_output.insert("model".to_string(), json!("gpt-4"));
@@ -468,24 +475,24 @@ mod llm_result_flatten_tests {
 
     #[test]
     fn test_flatten_preserves_all_candidates_in_gen_list() {
-        let gen1a = Generation::builder().text("1A").build();
-        let gen1b = Generation::builder().text("1B").build();
-        let gen2a = Generation::builder().text("2A").build();
+        let gen1a = chat_gen("1A");
+        let gen1b = chat_gen("1B");
+        let gen2a = chat_gen("2A");
         let result = LLMResult::builder()
             .generations(vec![vec![gen1a.into(), gen1b.into()], vec![gen2a.into()]])
             .build();
         let flattened = result.flatten();
         assert_eq!(flattened.len(), 2);
         assert_eq!(flattened[0].generations[0].len(), 2);
-        if let GenerationType::Generation(g) = &flattened[0].generations[0][0] {
-            assert_eq!(g.text, "1A");
+        if let GenerationType::ChatGeneration(g) = &flattened[0].generations[0][0] {
+            assert_eq!(g.message.text(), "1A");
         }
-        if let GenerationType::Generation(g) = &flattened[0].generations[0][1] {
-            assert_eq!(g.text, "1B");
+        if let GenerationType::ChatGeneration(g) = &flattened[0].generations[0][1] {
+            assert_eq!(g.message.text(), "1B");
         }
         assert_eq!(flattened[1].generations[0].len(), 1);
-        if let GenerationType::Generation(g) = &flattened[1].generations[0][0] {
-            assert_eq!(g.text, "2A");
+        if let GenerationType::ChatGeneration(g) = &flattened[1].generations[0][0] {
+            assert_eq!(g.message.text(), "2A");
         }
     }
 
@@ -530,7 +537,7 @@ mod llm_result_flatten_tests {
 
     #[test]
     fn test_flatten_single_generation_preserves_llm_output() {
-        let generation = Generation::builder().text("Only").build();
+        let generation = chat_gen("Only");
         let mut llm_output = HashMap::new();
         llm_output.insert("token_usage".to_string(), json!({"total": 10}));
         llm_output.insert("model".to_string(), json!("test"));
@@ -546,7 +553,7 @@ mod llm_result_flatten_tests {
     #[test]
     fn test_flatten_many_prompts_token_usage_cleared() {
         let generations: Vec<Vec<GenerationType>> = (0..5)
-            .map(|i| vec![Generation::builder().text(format!("R{i}")).build().into()])
+            .map(|i| vec![chat_gen(&format!("R{i}")).into()])
             .collect();
         let mut llm_output = HashMap::new();
         llm_output.insert("token_usage".to_string(), json!({"total": 200}));
@@ -588,8 +595,8 @@ mod llm_result_flatten_tests {
 
     #[test]
     fn test_flatten_with_empty_llm_output_dict() {
-        let gen1 = Generation::builder().text("R1").build();
-        let gen2 = Generation::builder().text("R2").build();
+        let gen1 = chat_gen("R1");
+        let gen2 = chat_gen("R2");
         let result = LLMResult::builder()
             .generations(vec![vec![gen1.into()], vec![gen2.into()]])
             .llm_output(HashMap::new())
@@ -616,7 +623,7 @@ mod llm_result_equality_tests {
 
     #[test]
     fn test_equality_same_generations_different_run() {
-        let generation = Generation::builder().text("test").build();
+        let generation = chat_gen("test");
         let mut result1 = LLMResult::builder()
             .generations(vec![vec![generation.clone().into()]])
             .build();
@@ -629,7 +636,7 @@ mod llm_result_equality_tests {
 
     #[test]
     fn test_inequality_none_vs_dict_llm_output() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let result1 = LLMResult::builder()
             .generations(vec![vec![generation.clone().into()]])
             .build();
@@ -646,7 +653,7 @@ mod llm_result_serialization_tests {
 
     #[test]
     fn test_serialize_basic() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let mut llm_output = HashMap::new();
         llm_output.insert("model".to_string(), json!("test"));
         let result = LLMResult::builder()
@@ -662,7 +669,7 @@ mod llm_result_serialization_tests {
 
     #[test]
     fn test_serialize_with_run_info() {
-        let generation = Generation::builder().text("Response").build();
+        let generation = chat_gen("Response");
         let run_id = Uuid::new_v4();
         let mut result = LLMResult::builder()
             .generations(vec![vec![generation.into()]])
@@ -678,8 +685,8 @@ mod llm_result_serialization_tests {
     fn test_json_roundtrip() {
         let mut generation_info = HashMap::new();
         generation_info.insert("reason".to_string(), json!("stop"));
-        let generation = Generation::builder()
-            .text("test")
+        let generation = ChatGeneration::builder()
+            .message(AIMessage::builder().content("test").build().into())
             .generation_info(generation_info)
             .build();
         let mut llm_output = HashMap::new();
@@ -691,10 +698,10 @@ mod llm_result_serialization_tests {
         let json_str = serde_json::to_string(&result).unwrap();
         let restored: LLMResult = serde_json::from_str(&json_str).unwrap();
         assert_eq!(restored.generations.len(), 1);
-        if let GenerationType::Generation(g) = &restored.generations[0][0] {
-            assert_eq!(g.text, "test");
+        if let GenerationType::ChatGeneration(g) = &restored.generations[0][0] {
+            assert_eq!(g.message.text(), "test");
         } else {
-            panic!("Expected Generation variant");
+            panic!("Expected ChatGeneration variant");
         }
         assert_eq!(restored.llm_output, Some(llm_output));
         assert_eq!(restored.result_type, "LLMResult");
@@ -702,7 +709,7 @@ mod llm_result_serialization_tests {
 
     #[test]
     fn test_deserialize_from_value() {
-        let generation = Generation::builder().text("test").build();
+        let generation = chat_gen("test");
         let mut llm_output = HashMap::new();
         llm_output.insert("key".to_string(), json!("val"));
         let result = LLMResult::builder()

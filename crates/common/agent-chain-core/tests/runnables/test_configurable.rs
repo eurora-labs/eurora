@@ -34,7 +34,11 @@ impl Runnable for MyRunnable {
     type Input = String;
     type Output = String;
 
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+    async fn invoke(
+        &self,
+        input: Self::Input,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
         Ok(format!("{}{}", input, self.my_property))
     }
 }
@@ -72,7 +76,11 @@ impl Runnable for MyOtherRunnable {
     type Input = String;
     type Output = String;
 
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
+    async fn invoke(
+        &self,
+        input: Self::Input,
+        _config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
         Ok(format!("{}{}", input, self.my_other_property))
     }
 }
@@ -206,8 +214,8 @@ fn test_make_options_spec_multi_option() {
     );
 }
 
-#[test]
-fn test_configurable_alternatives_invoke_default() {
+#[tokio::test]
+async fn test_configurable_alternatives_invoke_default() {
     let default = MyRunnable::new("default_val");
     let alt = MyOtherRunnable::new("alt_val");
 
@@ -222,12 +230,15 @@ fn test_configurable_alternatives_invoke_default() {
         .prefix_keys(false)
         .build();
 
-    let result = configurable.invoke("input_".to_string(), None).unwrap();
+    let result = configurable
+        .invoke("input_".to_string(), None)
+        .await
+        .unwrap();
     assert_eq!(result, "input_default_val");
 }
 
-#[test]
-fn test_configurable_alternatives_invoke_alternative() {
+#[tokio::test]
+async fn test_configurable_alternatives_invoke_alternative() {
     let default = MyRunnable::new("default_val");
     let alt = MyOtherRunnable::new("alt_val");
 
@@ -253,12 +264,13 @@ fn test_configurable_alternatives_invoke_alternative() {
 
     let result = configurable
         .invoke("input_".to_string(), Some(config))
+        .await
         .unwrap();
     assert_eq!(result, "input_alt_val");
 }
 
-#[test]
-fn test_configurable_alternatives_unknown_raises() {
+#[tokio::test]
+async fn test_configurable_alternatives_unknown_raises() {
     let default = MyRunnable::new("default_val");
 
     let configurable = RunnableConfigurableAlternatives::builder()
@@ -281,7 +293,9 @@ fn test_configurable_alternatives_unknown_raises() {
         ..Default::default()
     };
 
-    let result = configurable.invoke("input_".to_string(), Some(config));
+    let result = configurable
+        .invoke("input_".to_string(), Some(config))
+        .await;
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(
@@ -291,8 +305,8 @@ fn test_configurable_alternatives_unknown_raises() {
     );
 }
 
-#[test]
-fn test_configurable_alternatives_with_callable_factory() {
+#[tokio::test]
+async fn test_configurable_alternatives_with_callable_factory() {
     let default = MyRunnable::new("default_val");
 
     let mut alternatives: HashMap<String, Alternative<String, String>> = HashMap::new();
@@ -323,6 +337,7 @@ fn test_configurable_alternatives_with_callable_factory() {
 
     let result = configurable
         .invoke("input_".to_string(), Some(config))
+        .await
         .unwrap();
     assert_eq!(result, "input_factory_val");
 }
@@ -401,15 +416,15 @@ fn test_configurable_fields_config_specs() {
     assert_eq!(spec.description, Some("The property to test".to_string()));
 }
 
-#[test]
-fn test_configurable_fields_prepare_no_config() {
+#[tokio::test]
+async fn test_configurable_fields_prepare_no_config() {
     let configurable = make_configurable_my_runnable("a", "my_property");
-    let result = configurable.invoke("x".to_string(), None).unwrap();
+    let result = configurable.invoke("x".to_string(), None).await.unwrap();
     assert_eq!(result, "xa");
 }
 
-#[test]
-fn test_configurable_fields_prepare_with_override() {
+#[tokio::test]
+async fn test_configurable_fields_prepare_with_override() {
     let configurable = make_configurable_my_runnable("a", "my_property");
     let config = RunnableConfig {
         configurable: {
@@ -419,12 +434,15 @@ fn test_configurable_fields_prepare_with_override() {
         },
         ..Default::default()
     };
-    let result = configurable.invoke("x".to_string(), Some(config)).unwrap();
+    let result = configurable
+        .invoke("x".to_string(), Some(config))
+        .await
+        .unwrap();
     assert_eq!(result, "xb");
 }
 
-#[test]
-fn test_doubly_set_configurable() {
+#[tokio::test]
+async fn test_doubly_set_configurable() {
     let configurable = make_configurable_my_runnable("a", "my_property");
 
     let config = RunnableConfig {
@@ -436,12 +454,15 @@ fn test_doubly_set_configurable() {
         ..Default::default()
     };
 
-    let result = configurable.invoke("d".to_string(), Some(config)).unwrap();
+    let result = configurable
+        .invoke("d".to_string(), Some(config))
+        .await
+        .unwrap();
     assert_eq!(result, "dc");
 }
 
-#[test]
-fn test_configurable_fields_batch() {
+#[tokio::test]
+async fn test_configurable_fields_batch() {
     let configurable = make_configurable_my_runnable("a", "my_property");
 
     let configs = vec![
@@ -463,21 +484,25 @@ fn test_configurable_fields_batch() {
         },
     ];
 
-    let results = configurable.batch(
-        vec!["x".to_string(), "y".to_string()],
-        Some(agent_chain_core::runnables::config::ConfigOrList::List(
-            configs,
-        )),
-        false,
-    );
+    let results = configurable
+        .batch(
+            vec!["x".to_string(), "y".to_string()],
+            Some(agent_chain_core::runnables::config::ConfigOrList::List(
+                configs,
+            )),
+            false,
+        )
+        .await;
 
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].as_ref().unwrap(), "x1");
     assert_eq!(results[1].as_ref().unwrap(), "y2");
 }
 
-#[test]
-fn test_configurable_fields_stream() {
+#[tokio::test]
+async fn test_configurable_fields_stream() {
+    use futures::StreamExt;
+
     let configurable = make_configurable_my_runnable("a", "my_property");
 
     let config = RunnableConfig {
@@ -489,19 +514,15 @@ fn test_configurable_fields_stream() {
         ..Default::default()
     };
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let chunks: Vec<Result<String>> = rt.block_on(async {
-        use futures::StreamExt;
-        let stream = configurable.stream("x".to_string(), Some(config));
-        stream.collect().await
-    });
+    let stream = configurable.stream("x".to_string(), Some(config));
+    let chunks: Vec<Result<String>> = stream.collect().await;
 
     assert_eq!(chunks.len(), 1);
     assert_eq!(chunks[0].as_ref().unwrap(), "xb");
 }
 
-#[test]
-fn test_configurable_fields_chained_configurable_fields() {
+#[tokio::test]
+async fn test_configurable_fields_chained_configurable_fields() {
     let configurable = make_configurable_my_runnable("a", "my_property");
     let chained = configurable.configurable_fields(HashMap::new());
 
@@ -514,79 +535,6 @@ fn test_configurable_fields_chained_configurable_fields() {
         ..Default::default()
     };
 
-    let result = chained.invoke("x".to_string(), Some(config)).unwrap();
+    let result = chained.invoke("x".to_string(), Some(config)).await.unwrap();
     assert_eq!(result, "xc");
-}
-
-#[tokio::test]
-async fn test_configurable_fields_ainvoke_with_override() {
-    let configurable = make_configurable_my_runnable("a", "my_property");
-    let config = RunnableConfig {
-        configurable: {
-            let mut c = HashMap::new();
-            c.insert("my_property".to_string(), Value::String("b".to_string()));
-            c
-        },
-        ..Default::default()
-    };
-    let result = configurable
-        .ainvoke("x".to_string(), Some(config))
-        .await
-        .unwrap();
-    assert_eq!(result, "xb");
-}
-
-#[tokio::test]
-async fn test_configurable_alternatives_ainvoke_default() {
-    let default = MyRunnable::new("default_val");
-    let alt = MyOtherRunnable::new("alt_val");
-
-    let mut alternatives = HashMap::new();
-    alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
-
-    let configurable = RunnableConfigurableAlternatives::builder()
-        .which(ConfigurableField::builder().id("which").build())
-        .default(Arc::new(default))
-        .alternatives(alternatives)
-        .default_key("default")
-        .prefix_keys(false)
-        .build();
-
-    let result = configurable
-        .ainvoke("input_".to_string(), None)
-        .await
-        .unwrap();
-    assert_eq!(result, "input_default_val");
-}
-
-#[tokio::test]
-async fn test_configurable_alternatives_ainvoke_alternative() {
-    let default = MyRunnable::new("default_val");
-    let alt = MyOtherRunnable::new("alt_val");
-
-    let mut alternatives = HashMap::new();
-    alternatives.insert("other".to_string(), Alternative::Runnable(Arc::new(alt)));
-
-    let configurable = RunnableConfigurableAlternatives::builder()
-        .which(ConfigurableField::builder().id("which").build())
-        .default(Arc::new(default))
-        .alternatives(alternatives)
-        .default_key("default")
-        .prefix_keys(false)
-        .build();
-
-    let config = RunnableConfig {
-        configurable: {
-            let mut c = HashMap::new();
-            c.insert("which".to_string(), Value::String("other".to_string()));
-            c
-        },
-        ..Default::default()
-    };
-
-    let result = configurable
-        .ainvoke("input_".to_string(), Some(config))
-        .await
-        .unwrap();
-    assert_eq!(result, "input_alt_val");
 }

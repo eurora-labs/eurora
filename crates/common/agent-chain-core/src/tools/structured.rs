@@ -168,32 +168,21 @@ impl BaseTool for StructuredTool {
         Some(&self.args_schema)
     }
 
-    fn tool_run(
+    async fn tool_run(
         &self,
         input: ToolInput,
         _run_manager: Option<&CallbackManagerForToolRun>,
         _config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let args = filter_args(self.extract_args(input)?);
-
-        let func = self.func.as_ref().ok_or_else(|| {
-            Error::ToolInvocation("StructuredTool does not support sync invocation.".to_string())
-        })?;
-
-        func(args).map(value_to_tool_output)
-    }
-
-    async fn tool_arun(
-        &self,
-        input: ToolInput,
-        run_manager: Option<&CallbackManagerForToolRun>,
-        config: &RunnableConfig,
-    ) -> Result<ToolOutput> {
         if let Some(coroutine) = &self.coroutine {
             let args = filter_args(self.extract_args(input)?);
             coroutine(args).await.map(value_to_tool_output)
         } else {
-            self.tool_run(input, run_manager, config)
+            let args = filter_args(self.extract_args(input)?);
+            let func = self.func.as_ref().ok_or_else(|| {
+                Error::ToolInvocation("StructuredTool has no function or coroutine.".to_string())
+            })?;
+            func(args).map(value_to_tool_output)
         }
     }
 }
@@ -251,8 +240,8 @@ mod tests {
         assert_eq!(tool.description(), "Adds two numbers together");
     }
 
-    #[test]
-    fn test_structured_tool_run() {
+    #[tokio::test]
+    async fn test_structured_tool_run() {
         let schema = create_args_schema(
             "multiply",
             {
@@ -280,7 +269,7 @@ mod tests {
         input.insert("x".to_string(), Value::from(3.0));
         input.insert("y".to_string(), Value::from(4.0));
 
-        let result = tool.run(ToolInput::Dict(input), None, None).unwrap();
+        let result = tool.run(ToolInput::Dict(input), None, None).await.unwrap();
         match result {
             ToolOutput::Json(v) => assert_eq!(v.as_f64().unwrap(), 12.0),
             _ => panic!("Expected Json output"),
@@ -307,7 +296,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_structured_tool_arun() {
+    async fn test_structured_tool_run_async() {
         let schema = create_args_schema(
             "concat",
             {
@@ -335,7 +324,7 @@ mod tests {
         input.insert("a".to_string(), Value::String("Hello".to_string()));
         input.insert("b".to_string(), Value::String("World".to_string()));
 
-        let result = tool.arun(ToolInput::Dict(input), None, None).await.unwrap();
+        let result = tool.run(ToolInput::Dict(input), None, None).await.unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "HelloWorld"),
             _ => panic!("Expected String output"),

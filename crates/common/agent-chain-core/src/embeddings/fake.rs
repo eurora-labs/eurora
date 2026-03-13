@@ -27,11 +27,11 @@ impl FakeEmbeddings {
 
 #[async_trait::async_trait]
 impl Embeddings for FakeEmbeddings {
-    fn embed_documents(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
+    async fn embed_documents(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
         Ok(texts.iter().map(|_| self.get_embedding()).collect())
     }
 
-    fn embed_query(&self, _text: &str) -> Result<Vec<f32>> {
+    async fn embed_query(&self, _text: &str) -> Result<Vec<f32>> {
         Ok(self.get_embedding())
     }
 }
@@ -61,7 +61,7 @@ impl DeterministicFakeEmbedding {
 
 #[async_trait::async_trait]
 impl Embeddings for DeterministicFakeEmbedding {
-    fn embed_documents(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
+    async fn embed_documents(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {
         Ok(texts
             .iter()
             .map(|text| {
@@ -71,7 +71,7 @@ impl Embeddings for DeterministicFakeEmbedding {
             .collect())
     }
 
-    fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
         let seed = Self::get_seed(text);
         Ok(self.get_embedding(seed))
     }
@@ -81,45 +81,46 @@ impl Embeddings for DeterministicFakeEmbedding {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_fake_embeddings() {
+    #[tokio::test]
+    async fn test_fake_embeddings() {
         let embeddings = FakeEmbeddings::new(10);
         let result = embeddings
             .embed_documents(vec!["hello".into(), "world".into()])
+            .await
             .unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].len(), 10);
         assert_eq!(result[1].len(), 10);
     }
 
-    #[test]
-    fn test_fake_embeddings_query() {
+    #[tokio::test]
+    async fn test_fake_embeddings_query() {
         let embeddings = FakeEmbeddings::new(5);
-        let result = embeddings.embed_query("hello").unwrap();
+        let result = embeddings.embed_query("hello").await.unwrap();
         assert_eq!(result.len(), 5);
     }
 
-    #[test]
-    fn test_deterministic_fake_embeddings() {
+    #[tokio::test]
+    async fn test_deterministic_fake_embeddings() {
         let embeddings = DeterministicFakeEmbedding::new(10);
-        let result1 = embeddings.embed_query("hello").unwrap();
-        let result2 = embeddings.embed_query("hello").unwrap();
+        let result1 = embeddings.embed_query("hello").await.unwrap();
+        let result2 = embeddings.embed_query("hello").await.unwrap();
         assert_eq!(result1, result2);
     }
 
-    #[test]
-    fn test_deterministic_fake_embeddings_different_texts() {
+    #[tokio::test]
+    async fn test_deterministic_fake_embeddings_different_texts() {
         let embeddings = DeterministicFakeEmbedding::new(10);
-        let result1 = embeddings.embed_query("hello").unwrap();
-        let result2 = embeddings.embed_query("world").unwrap();
+        let result1 = embeddings.embed_query("hello").await.unwrap();
+        let result2 = embeddings.embed_query("world").await.unwrap();
         assert_ne!(result1, result2);
     }
 
-    #[test]
-    fn test_deterministic_fake_embed_documents() {
+    #[tokio::test]
+    async fn test_deterministic_fake_embed_documents() {
         let embeddings = DeterministicFakeEmbedding::new(8);
         let texts = vec!["foo".into(), "bar".into(), "foo".into()];
-        let result = embeddings.embed_documents(texts).unwrap();
+        let result = embeddings.embed_documents(texts).await.unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].len(), 8);
         assert_eq!(result[0], result[2]);
