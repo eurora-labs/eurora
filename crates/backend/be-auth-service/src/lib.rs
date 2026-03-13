@@ -955,6 +955,7 @@ impl ProtoAuthService for AuthService {
         self.db
             .consume_login_token_and_create_refresh_token()
             .login_token_hash(&login_token_hash)
+            .user_id(user.id)
             .refresh_token_hash(refresh_token_hash)
             .refresh_token_expires_at(refresh_exp)
             .call()
