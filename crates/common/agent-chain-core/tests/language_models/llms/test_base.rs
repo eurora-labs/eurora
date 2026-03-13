@@ -5,8 +5,8 @@ use agent_chain_core::language_models::{
     BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM, get_prompts_from_cache,
     update_cache,
 };
-use agent_chain_core::messages::{AnyMessage, HumanMessage};
-use agent_chain_core::outputs::{Generation, GenerationType, LLMResult};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
+use agent_chain_core::outputs::{ChatGeneration, GenerationType, LLMResult};
 use futures::StreamExt;
 use serde_json::json;
 
@@ -126,8 +126,10 @@ async fn test_generate_single_prompt() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "result"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "result")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -174,8 +176,10 @@ async fn test_agenerate_single_prompt() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "async_result"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "async_result")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -191,8 +195,8 @@ async fn test_agenerate_multiple_prompts() {
     assert_eq!(result.generations.len(), 2);
     for generation_list in &result.generations {
         match &generation_list[0] {
-            GenerationType::Generation(_) => {}
-            _ => panic!("Expected Generation variant"),
+            GenerationType::ChatGeneration(_) => {}
+            _ => panic!("Expected ChatGeneration variant"),
         }
     }
 }
@@ -209,7 +213,7 @@ async fn test_astream_fallback_to_ainvoke() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text().to_string());
     }
     assert_eq!(chunks, vec!["hello"]);
 }
@@ -226,7 +230,7 @@ async fn test_astream_implementation_uses_stream() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text().to_string());
     }
     assert_eq!(chunks, vec!["a", "b"]);
 }
@@ -274,14 +278,18 @@ fn test_get_prompts_with_cache_partial_hit() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let llm_string = serde_json::to_string(&params).unwrap();
-    let cached_generation = vec![Generation::builder().text("cached".to_string()).build()];
+    let cached_generation = vec![
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("cached").build().into())
+            .build(),
+    ];
     cache.update("p1", &llm_string, cached_generation.clone());
 
     let (existing, _, missing_idxs, missing) =
         get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
 
     assert!(existing.contains_key(&0));
-    assert_eq!(existing[&0][0].text, "cached");
+    assert_eq!(existing[&0][0].message.text(), "cached");
     assert_eq!(missing_idxs, vec![1]);
     assert_eq!(missing, vec!["p2"]);
 }
@@ -294,12 +302,20 @@ fn test_get_prompts_with_cache_all_hit() {
     cache.update(
         "p1",
         &llm_string,
-        vec![Generation::builder().text("c1".to_string()).build()],
+        vec![
+            ChatGeneration::builder()
+                .message(AIMessage::builder().content("c1").build().into())
+                .build(),
+        ],
     );
     cache.update(
         "p2",
         &llm_string,
-        vec![Generation::builder().text("c2".to_string()).build()],
+        vec![
+            ChatGeneration::builder()
+                .message(AIMessage::builder().content("c2").build().into())
+                .build(),
+        ],
     );
 
     let (existing, _, missing_idxs, missing) =
@@ -316,15 +332,19 @@ fn test_update_cache_stores_results() {
     let llm_string = "test_llm";
     let new_results = LLMResult::builder()
         .generations(vec![
-            vec![GenerationType::Generation(
-                Generation::builder().text("r1".to_string()).build(),
+            vec![GenerationType::ChatGeneration(
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("r1").build().into())
+                    .build(),
             )],
-            vec![GenerationType::Generation(
-                Generation::builder().text("r2".to_string()).build(),
+            vec![GenerationType::ChatGeneration(
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("r2").build().into())
+                    .build(),
             )],
         ])
         .build();
-    let mut existing: HashMap<usize, Vec<Generation>> = HashMap::new();
+    let mut existing: HashMap<usize, Vec<ChatGeneration>> = HashMap::new();
 
     let _ = update_cache(
         Some(&cache),
@@ -339,17 +359,19 @@ fn test_update_cache_stores_results() {
     assert!(cache.lookup("p2", llm_string).is_some());
     assert!(existing.contains_key(&0));
     assert!(existing.contains_key(&1));
-    assert_eq!(existing[&0][0].text, "r1");
+    assert_eq!(existing[&0][0].message.text(), "r1");
 }
 
 #[test]
 fn test_update_cache_with_none_does_not_store() {
     let new_results = LLMResult::builder()
-        .generations(vec![vec![GenerationType::Generation(
-            Generation::builder().text("r1".to_string()).build(),
+        .generations(vec![vec![GenerationType::ChatGeneration(
+            ChatGeneration::builder()
+                .message(AIMessage::builder().content("r1").build().into())
+                .build(),
         )]])
         .build();
-    let mut existing: HashMap<usize, Vec<Generation>> = HashMap::new();
+    let mut existing: HashMap<usize, Vec<ChatGeneration>> = HashMap::new();
 
     let _ = update_cache(
         None,
@@ -385,12 +407,16 @@ async fn test_generate_prompt_converts_prompt_values() {
         .unwrap();
     assert_eq!(result.generations.len(), 2);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "resp1"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "resp1")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
     match &result.generations[1][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "resp2"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "resp2")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -411,8 +437,10 @@ async fn test_agenerate_prompt_converts_prompt_values() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "async_resp"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "async_resp")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -430,8 +458,10 @@ async fn test_generate_prompt_with_message_input() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "chat_resp"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "chat_resp")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 

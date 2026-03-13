@@ -12,7 +12,7 @@ use crate::GenerationType;
 use crate::callbacks::BaseCallbackHandler;
 use crate::messages::{AIMessageChunk, AnyMessage};
 use crate::outputs::ChatResult;
-use crate::outputs::{GenerationChunk, LLMResult};
+use crate::outputs::LLMResult;
 use crate::runnables::schema::{CustomStreamEvent, EventData, StandardStreamEvent, StreamEvent};
 use crate::runnables::utils::RootEventFilter;
 use crate::tracers::memory_stream::{MemoryStream, ReceiveStream, SendStream};
@@ -317,11 +317,12 @@ impl AstreamEventsCallbackHandler {
             ("on_chat_model_stream", chunk_value)
         } else if run_info.run_type == "llm" {
             let chunk_value = chunk.unwrap_or_else(|| {
-                serde_json::to_value(GenerationChunk {
-                    text: token.to_string(),
-                    generation_info: None,
-                    generation_type: "GenerationChunk".to_string(),
-                })
+                let msg = crate::messages::AIMessage::builder().content(token).build();
+                serde_json::to_value(
+                    crate::outputs::ChatGenerationChunk::builder()
+                        .message(msg.into())
+                        .build(),
+                )
                 .unwrap_or_default()
             });
             ("on_llm_stream", chunk_value)
@@ -373,7 +374,6 @@ impl AstreamEventsCallbackHandler {
                     GenerationType::ChatGenerationChunk(cgc) => {
                         serde_json::to_value(&cgc.message).unwrap_or(Value::Null)
                     }
-                    _ => Value::Null,
                 })
                 .unwrap_or(Value::Null);
             ("on_chat_model_end", output)
@@ -385,16 +385,6 @@ impl AstreamEventsCallbackHandler {
                     generation_list
                         .iter()
                         .map(|generation| match generation {
-                            GenerationType::Generation(g) => serde_json::json!({
-                                "text": g.text,
-                                "generation_info": g.generation_info,
-                                "type": g.generation_type,
-                            }),
-                            GenerationType::GenerationChunk(gc) => serde_json::json!({
-                                "text": gc.text,
-                                "generation_info": gc.generation_info,
-                                "type": gc.generation_type,
-                            }),
                             GenerationType::ChatGeneration(cg) => serde_json::json!({
                                 "text": cg.message.text(),
                                 "generation_info": cg.generation_info,

@@ -11,11 +11,12 @@ use crate::error::Result;
 use crate::messages::AnyMessage;
 use crate::messages::BaseMessage;
 use crate::outputs::{
-    ChatGeneration, ChatResult, Generation, GenerationChunk, GenerationType, LLMResult, RunInfo,
+    ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult, RunInfo,
+    merge_chat_generation_chunks,
 };
 use crate::runnables::RunnableConfig;
 
-pub type LLMStream = Pin<Box<dyn Stream<Item = Result<GenerationChunk>> + Send>>;
+pub type LLMStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationChunk>> + Send>>;
 
 #[derive(Clone, Default)]
 pub struct LLMConfig {
@@ -89,10 +90,9 @@ fn llm_result_to_chat_result(result: &LLMResult) -> ChatResult {
         .generations
         .iter()
         .flatten()
-        .map(|g| {
-            let text = extract_text(g);
-            let msg = crate::messages::AIMessage::builder().content(&text).build();
-            ChatGeneration::builder().message(msg.into()).build()
+        .map(|g| match g {
+            GenerationType::ChatGeneration(cg) => cg.clone(),
+            GenerationType::ChatGenerationChunk(cgc) => cgc.clone().into(),
         })
         .collect();
     ChatResult::builder().generations(generations).build()
@@ -100,8 +100,6 @@ fn llm_result_to_chat_result(result: &LLMResult) -> ChatResult {
 
 fn extract_text(generation: &GenerationType) -> String {
     match generation {
-        GenerationType::Generation(g) => g.text.clone(),
-        GenerationType::GenerationChunk(g) => g.text.clone(),
         GenerationType::ChatGeneration(g) => g.message.text(),
         GenerationType::ChatGenerationChunk(g) => g.message.text(),
     }
@@ -132,7 +130,8 @@ pub trait BaseLLM: BaseLanguageModel {
             && let Some(generation) = generations.first()
         {
             let text = extract_text(generation);
-            let chunk = GenerationChunk::builder().text(text).build();
+            let msg = crate::messages::AIMessage::builder().content(&text).build();
+            let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -231,7 +230,7 @@ pub trait BaseLLM: BaseLanguageModel {
                             .remove(&i)
                             .unwrap_or_default()
                             .into_iter()
-                            .map(GenerationType::Generation)
+                            .map(GenerationType::ChatGeneration)
                             .collect()
                     })
                     .collect();
@@ -259,7 +258,7 @@ pub trait BaseLLM: BaseLanguageModel {
                         .remove(&i)
                         .unwrap_or_default()
                         .into_iter()
-                        .map(GenerationType::Generation)
+                        .map(GenerationType::ChatGeneration)
                         .collect()
                 })
                 .collect();
@@ -419,13 +418,13 @@ pub trait BaseLLM: BaseLanguageModel {
             use futures::StreamExt;
 
             let mut pinned_stream = generation_stream;
-            let mut chunks: Vec<GenerationChunk> = Vec::new();
+            let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
 
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chunk) => {
                         if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(&chunk.text, None);
+                            rm.on_llm_new_token(&chunk.message.text(), None);
                         }
                         chunks.push(chunk.clone());
                         yield Ok(chunk);
@@ -441,9 +440,9 @@ pub trait BaseLLM: BaseLanguageModel {
             }
 
             if let Some(ref rm) = run_manager
-                && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
-                    let generation: Generation = merged.into();
-                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
+                && let Some(merged) = merge_chat_generation_chunks(chunks) {
+                    let generation: ChatGeneration = merged.into();
+                    let result = LLMResult::builder().generations(vec![vec![GenerationType::ChatGeneration(generation)]]).build();
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result);
                 }
@@ -508,13 +507,13 @@ pub trait BaseLLM: BaseLanguageModel {
             use futures::StreamExt;
 
             let mut pinned_stream = generation_stream;
-            let mut chunks: Vec<GenerationChunk> = Vec::new();
+            let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
 
             while let Some(result) = pinned_stream.next().await {
                 match result {
                     Ok(chunk) => {
                         if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(&chunk.text, None);
+                            rm.on_llm_new_token(&chunk.message.text(), None);
                         }
                         chunks.push(chunk.clone());
                         yield Ok(chunk);
@@ -530,9 +529,9 @@ pub trait BaseLLM: BaseLanguageModel {
             }
 
             if let Some(ref rm) = run_manager
-                && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
-                    let generation: Generation = merged.into();
-                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
+                && let Some(merged) = merge_chat_generation_chunks(chunks) {
+                    let generation: ChatGeneration = merged.into();
+                    let result = LLMResult::builder().generations(vec![vec![GenerationType::ChatGeneration(generation)]]).build();
                     let chat_result = llm_result_to_chat_result(&result);
                     rm.on_llm_end(&chat_result);
                 }
@@ -629,7 +628,7 @@ pub trait BaseLLM: BaseLanguageModel {
                             .remove(&i)
                             .unwrap_or_default()
                             .into_iter()
-                            .map(GenerationType::Generation)
+                            .map(GenerationType::ChatGeneration)
                             .collect()
                     })
                     .collect();
@@ -658,7 +657,7 @@ pub trait BaseLLM: BaseLanguageModel {
                         .remove(&i)
                         .unwrap_or_default()
                         .into_iter()
-                        .map(GenerationType::Generation)
+                        .map(GenerationType::ChatGeneration)
                         .collect()
                 })
                 .collect();
@@ -776,7 +775,7 @@ pub fn get_prompts_from_cache(
     prompts: &[String],
     cache: Option<&dyn crate::caches::BaseCache>,
 ) -> (
-    HashMap<usize, Vec<Generation>>,
+    HashMap<usize, Vec<ChatGeneration>>,
     String,
     Vec<usize>,
     Vec<String>,
@@ -813,7 +812,7 @@ pub fn get_prompts_from_cache(
 
 pub fn update_cache(
     cache: Option<&dyn crate::caches::BaseCache>,
-    existing_prompts: &mut HashMap<usize, Vec<Generation>>,
+    existing_prompts: &mut HashMap<usize, Vec<ChatGeneration>>,
     llm_string: &str,
     missing_prompt_idxs: &[usize],
     new_results: &LLMResult,
@@ -822,12 +821,11 @@ pub fn update_cache(
     if let Some(cache) = cache {
         for (i, result) in new_results.generations.iter().enumerate() {
             if let Some(&idx) = missing_prompt_idxs.get(i) {
-                let generations: Vec<Generation> = result
+                let generations: Vec<ChatGeneration> = result
                     .iter()
-                    .filter_map(|g| match g {
-                        GenerationType::Generation(generation) => Some(generation.clone()),
-                        GenerationType::GenerationChunk(chunk) => Some(chunk.clone().into()),
-                        _ => None,
+                    .map(|g| match g {
+                        GenerationType::ChatGeneration(generation) => generation.clone(),
+                        GenerationType::ChatGenerationChunk(chunk) => chunk.clone().into(),
                     })
                     .collect();
 
@@ -848,7 +846,7 @@ pub async fn aget_prompts_from_cache(
     prompts: &[String],
     cache: Option<&dyn crate::caches::BaseCache>,
 ) -> (
-    HashMap<usize, Vec<Generation>>,
+    HashMap<usize, Vec<ChatGeneration>>,
     String,
     Vec<usize>,
     Vec<String>,
@@ -885,7 +883,7 @@ pub async fn aget_prompts_from_cache(
 
 pub async fn aupdate_cache(
     cache: Option<&dyn crate::caches::BaseCache>,
-    existing_prompts: &mut HashMap<usize, Vec<Generation>>,
+    existing_prompts: &mut HashMap<usize, Vec<ChatGeneration>>,
     llm_string: &str,
     missing_prompt_idxs: &[usize],
     new_results: &LLMResult,
@@ -894,12 +892,11 @@ pub async fn aupdate_cache(
     if let Some(cache) = cache {
         for (i, result) in new_results.generations.iter().enumerate() {
             if let Some(&idx) = missing_prompt_idxs.get(i) {
-                let generations: Vec<Generation> = result
+                let generations: Vec<ChatGeneration> = result
                     .iter()
-                    .filter_map(|g| match g {
-                        GenerationType::Generation(generation) => Some(generation.clone()),
-                        GenerationType::GenerationChunk(chunk) => Some(chunk.clone().into()),
-                        _ => None,
+                    .map(|g| match g {
+                        GenerationType::ChatGeneration(generation) => generation.clone(),
+                        GenerationType::ChatGenerationChunk(chunk) => chunk.clone().into(),
                     })
                     .collect();
 

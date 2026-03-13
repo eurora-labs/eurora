@@ -5,7 +5,7 @@ use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::output_parsers::{
     BaseGenerationOutputParser, BaseLLMOutputParser, BaseOutputParser, BaseTransformOutputParser,
 };
-use agent_chain_core::outputs::Generation;
+use agent_chain_core::outputs::ChatGeneration;
 use futures::StreamExt;
 
 fn swap_case(s: &str) -> String {
@@ -28,13 +28,13 @@ struct GenerationStrInvertCase;
 impl BaseLLMOutputParser for GenerationStrInvertCase {
     type Output = String;
 
-    fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<String> {
+    fn parse_result(&self, result: &[ChatGeneration], _partial: bool) -> Result<String> {
         if result.len() != 1 {
             return Err(agent_chain_core::error::Error::NotImplemented(
                 "This output parser can only be used with a single generation.".to_string(),
             ));
         }
-        Ok(swap_case(&result[0].text))
+        Ok(swap_case(&result[0].message.text()))
     }
 }
 
@@ -75,13 +75,13 @@ impl BaseOutputParser for TransformStrInvertCase {
         ))
     }
 
-    fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<String> {
+    fn parse_result(&self, result: &[ChatGeneration], _partial: bool) -> Result<String> {
         if result.len() != 1 {
             return Err(agent_chain_core::error::Error::NotImplemented(
                 "This output parser can only be used with a single generation.".to_string(),
             ));
         }
-        Ok(swap_case(&result[0].text))
+        Ok(swap_case(&result[0].message.text()))
     }
 
     fn parser_type(&self) -> &str {

@@ -1,7 +1,8 @@
+use agent_chain_core::messages::AIMessage;
 use agent_chain_core::output_parsers::{
     BaseCumulativeTransformOutputParser, BaseOutputParser, JsonOutputParser, SimpleJsonOutputParser,
 };
-use agent_chain_core::outputs::Generation;
+use agent_chain_core::outputs::ChatGeneration;
 use serde_json::json;
 
 #[test]
@@ -109,7 +110,14 @@ fn test_parse_json_numeric_values() {
 #[test]
 fn test_parse_result_full() {
     let parser = JsonOutputParser::builder().build();
-    let generation = Generation::builder().text(r#"{"key": "value"}"#).build();
+    let generation = ChatGeneration::builder()
+        .message(
+            AIMessage::builder()
+                .content(r#"{"key": "value"}"#)
+                .build()
+                .into(),
+        )
+        .build();
     let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, json!({"key": "value"}));
 }
@@ -117,7 +125,14 @@ fn test_parse_result_full() {
 #[test]
 fn test_parse_result_partial_valid() {
     let parser = JsonOutputParser::builder().build();
-    let generation = Generation::builder().text(r#"{"key": "val"#).build();
+    let generation = ChatGeneration::builder()
+        .message(
+            AIMessage::builder()
+                .content(r#"{"key": "val"#)
+                .build()
+                .into(),
+        )
+        .build();
     let result = parser.parse_result(&[generation], true).unwrap();
     assert_eq!(result, json!({"key": "val"}));
 }
@@ -125,7 +140,9 @@ fn test_parse_result_partial_valid() {
 #[test]
 fn test_parse_result_partial_returns_err_for_unparseable() {
     let parser = JsonOutputParser::builder().build();
-    let generation = Generation::builder().text("not json").build();
+    let generation = ChatGeneration::builder()
+        .message(AIMessage::builder().content("not json").build().into())
+        .build();
     let result = parser.parse_result(&[generation], true);
     assert!(result.is_err());
 }
@@ -133,7 +150,9 @@ fn test_parse_result_partial_returns_err_for_unparseable() {
 #[test]
 fn test_parse_result_non_partial_raises_on_invalid() {
     let parser = JsonOutputParser::builder().build();
-    let generation = Generation::builder().text("not json").build();
+    let generation = ChatGeneration::builder()
+        .message(AIMessage::builder().content("not json").build().into())
+        .build();
     let result = parser.parse_result(&[generation], false);
     assert!(result.is_err());
 }

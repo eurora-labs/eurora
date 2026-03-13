@@ -28,8 +28,8 @@ async fn test_local_cache_generate_async() {
         .unwrap();
     assert_eq!(output.generations.len(), 1);
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "foo"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     let output = llm
@@ -41,8 +41,8 @@ async fn test_local_cache_generate_async() {
         .unwrap();
     assert_eq!(output.generations.len(), 1);
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "foo"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     assert!(global_cache.lookup("foo", "").is_none() || { true });
@@ -71,8 +71,8 @@ async fn test_local_cache_generate_sync() {
         .await
         .unwrap();
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "foo"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     let output = llm
@@ -83,8 +83,8 @@ async fn test_local_cache_generate_sync() {
         .await
         .unwrap();
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "foo"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     set_llm_cache(None);
@@ -110,8 +110,8 @@ async fn test_no_cache_generate_sync() {
         .await
         .unwrap();
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "foo"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     let output = llm
@@ -122,8 +122,8 @@ async fn test_no_cache_generate_sync() {
         .await
         .unwrap();
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "bar"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "bar"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     set_llm_cache(None);
@@ -149,8 +149,8 @@ async fn test_no_cache_generate_async() {
         .await
         .unwrap();
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "foo"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "foo"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     let output = llm
@@ -161,8 +161,8 @@ async fn test_no_cache_generate_async() {
         .await
         .unwrap();
     match &output.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "bar"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => assert_eq!(generation.message.text(), "bar"),
+        _ => panic!("Expected ChatGeneration variant"),
     }
 
     set_llm_cache(None);

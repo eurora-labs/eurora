@@ -382,7 +382,8 @@ async fn test_cache_preserves_message_through_round_trip() {
 #[tokio::test]
 async fn test_convert_cached_generations_legacy_format() {
     use agent_chain_core::caches::BaseCache;
-    use agent_chain_core::outputs::Generation;
+    use agent_chain_core::messages::AIMessage;
+    use agent_chain_core::outputs::ChatGeneration;
 
     let cache = Arc::new(InMemoryCache::unbounded());
 
@@ -408,7 +409,11 @@ async fn test_convert_cached_generations_legacy_format() {
     let prompt_key = serde_json::to_string(&messages).unwrap();
     let llm_string = model._get_llm_string(None, None);
 
-    let legacy_generations = vec![Generation::builder().text("legacy text").build()];
+    let legacy_generations = vec![
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("legacy text").build().into())
+            .build(),
+    ];
     cache.update(&prompt_key, &llm_string, legacy_generations);
 
     let result = model

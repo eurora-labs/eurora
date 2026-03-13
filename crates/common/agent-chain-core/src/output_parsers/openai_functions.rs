@@ -8,7 +8,6 @@ use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputP
 use crate::error::{Error, Result};
 use crate::messages::{AnyMessage, BaseMessage};
 use crate::outputs::ChatGeneration;
-use crate::outputs::Generation;
 use crate::runnables::RunnableConfig;
 use crate::utils::json::parse_partial_json;
 
@@ -408,7 +407,7 @@ fn parse_json_lenient(input: &str) -> std::result::Result<Value, String> {
 impl BaseLLMOutputParser for OutputFunctionsParser {
     type Output = Value;
 
-    fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
+    fn parse_result(&self, _result: &[ChatGeneration], _partial: bool) -> Result<Self::Output> {
         Err(Error::output_parser_simple(
             "This output parser can only be used with a chat generation.",
         ))
@@ -436,7 +435,7 @@ impl BaseOutputParser for JsonOutputFunctionsParser {
         ))
     }
 
-    fn parse_result(&self, _result: &[Generation], _partial: bool) -> Result<Self::Output> {
+    fn parse_result(&self, _result: &[ChatGeneration], _partial: bool) -> Result<Self::Output> {
         Err(Error::output_parser_simple(
             "This output parser can only be used with a chat generation.",
         ))
