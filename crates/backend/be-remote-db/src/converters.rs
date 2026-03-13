@@ -83,6 +83,7 @@ impl From<Message> for ProtoBaseMessage {
                         id,
                         name: None,
                         additional_kwargs,
+                        response_metadata: None,
                     })),
                 }
             }
@@ -94,6 +95,7 @@ impl From<Message> for ProtoBaseMessage {
                         id,
                         name: None,
                         additional_kwargs,
+                        response_metadata: None,
                     })),
                 }
             }
@@ -186,7 +188,7 @@ fn json_to_proto_tool_calls(tool_calls: &serde_json::Value) -> Vec<ProtoToolCall
 
     arr.iter()
         .filter_map(|tc| {
-            let id = tc.get("id").and_then(|v| v.as_str())?.to_string();
+            let id = tc.get("id").and_then(|v| v.as_str()).map(|s| s.to_string());
             let name = tc.get("name").and_then(|v| v.as_str())?.to_string();
             let args = tc
                 .get("args")
@@ -198,8 +200,17 @@ fn json_to_proto_tool_calls(tool_calls: &serde_json::Value) -> Vec<ProtoToolCall
                     }
                 })
                 .unwrap_or_else(|| "{}".to_string());
+            let call_type = tc
+                .get("type")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
 
-            Some(ProtoToolCall { id, name, args })
+            Some(ProtoToolCall {
+                id,
+                name,
+                args,
+                call_type,
+            })
         })
         .collect()
 }
