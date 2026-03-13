@@ -95,8 +95,8 @@ pub use output_parsers::{
 };
 
 pub use outputs::{
-    ChatGeneration, ChatGenerationChunk, ChatResult, Generation, GenerationChunk, GenerationType,
-    LLMResult, RunInfo, merge_chat_generation_chunks,
+    ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult, RunInfo,
+    merge_chat_generation_chunks,
 };
 
 pub use callbacks::{

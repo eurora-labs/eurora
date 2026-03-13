@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 
-use crate::outputs::Generation;
+use crate::outputs::ChatGeneration;
 pub use crate::runnables::run_in_executor;
 
-pub type CacheReturnValue = Vec<Generation>;
+pub type CacheReturnValue = Vec<ChatGeneration>;
 
 #[async_trait]
 pub trait BaseCache: Send + Sync {
@@ -92,7 +92,13 @@ impl BaseCache for InMemoryCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::outputs::Generation;
+    use crate::messages::AIMessage;
+    use crate::outputs::ChatGeneration;
+
+    fn chat_gen(text: &str) -> ChatGeneration {
+        let msg = AIMessage::builder().content(text).build();
+        ChatGeneration::builder().message(msg.into()).build()
+    }
 
     #[test]
     fn test_in_memory_cache_new() {
@@ -130,7 +136,7 @@ mod tests {
     #[test]
     fn test_in_memory_cache_update_and_lookup() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::builder().text("Hello, world!").build()];
+        let generations = vec![chat_gen("Hello, world!")];
 
         cache.update("prompt", "llm_string", generations.clone());
 
@@ -138,13 +144,13 @@ mod tests {
         assert!(result.is_some());
         let cached = result.unwrap();
         assert_eq!(cached.len(), 1);
-        assert_eq!(cached[0].text, "Hello, world!");
+        assert_eq!(cached[0].message.text(), "Hello, world!");
     }
 
     #[test]
     fn test_in_memory_cache_clear() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::builder().text("Hello").build()];
+        let generations = vec![chat_gen("Hello")];
 
         cache.update("prompt1", "llm", generations.clone());
         cache.update("prompt2", "llm", generations.clone());
@@ -166,11 +172,10 @@ mod tests {
             cache.update(
                 &format!("prompt{}", i),
                 "llm",
-                vec![Generation::builder().text(format!("{}", i)).build()],
+                vec![chat_gen(&format!("{}", i))],
             );
         }
 
-        // moka eviction is async internally; run_pending forces it
         cache.cache.run_pending_tasks();
 
         let present = (0..5)
@@ -183,78 +188,58 @@ mod tests {
     fn test_in_memory_cache_update_existing_key() {
         let cache = InMemoryCache::new(None).unwrap();
 
-        cache.update(
-            "prompt",
-            "llm",
-            vec![Generation::builder().text("first").build()],
-        );
+        cache.update("prompt", "llm", vec![chat_gen("first")]);
         let result = cache.lookup("prompt", "llm").unwrap();
-        assert_eq!(result[0].text, "first");
+        assert_eq!(result[0].message.text(), "first");
 
-        cache.update(
-            "prompt",
-            "llm",
-            vec![Generation::builder().text("second").build()],
-        );
+        cache.update("prompt", "llm", vec![chat_gen("second")]);
         let result = cache.lookup("prompt", "llm").unwrap();
-        assert_eq!(result[0].text, "second");
+        assert_eq!(result[0].message.text(), "second");
     }
 
     #[test]
     fn test_in_memory_cache_different_llm_strings() {
         let cache = InMemoryCache::new(None).unwrap();
 
-        cache.update(
-            "prompt",
-            "llm1",
-            vec![Generation::builder().text("from llm1").build()],
-        );
-        cache.update(
-            "prompt",
-            "llm2",
-            vec![Generation::builder().text("from llm2").build()],
-        );
+        cache.update("prompt", "llm1", vec![chat_gen("from llm1")]);
+        cache.update("prompt", "llm2", vec![chat_gen("from llm2")]);
 
         let result1 = cache.lookup("prompt", "llm1").unwrap();
-        assert_eq!(result1[0].text, "from llm1");
+        assert_eq!(result1[0].message.text(), "from llm1");
 
         let result2 = cache.lookup("prompt", "llm2").unwrap();
-        assert_eq!(result2[0].text, "from llm2");
+        assert_eq!(result2[0].message.text(), "from llm2");
     }
 
     #[tokio::test]
     async fn test_in_memory_cache_alookup() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::builder().text("async test").build()];
+        let generations = vec![chat_gen("async test")];
 
         cache.update("prompt", "llm", generations);
 
         let result = cache.alookup("prompt", "llm").await;
         assert!(result.is_some());
-        assert_eq!(result.unwrap()[0].text, "async test");
+        assert_eq!(result.unwrap()[0].message.text(), "async test");
     }
 
     #[tokio::test]
     async fn test_in_memory_cache_aupdate() {
         let cache = InMemoryCache::new(None).unwrap();
-        let generations = vec![Generation::builder().text("async update").build()];
+        let generations = vec![chat_gen("async update")];
 
         cache.aupdate("prompt", "llm", generations).await;
 
         let result = cache.lookup("prompt", "llm");
         assert!(result.is_some());
-        assert_eq!(result.unwrap()[0].text, "async update");
+        assert_eq!(result.unwrap()[0].message.text(), "async update");
     }
 
     #[tokio::test]
     async fn test_in_memory_cache_aclear() {
         let cache = InMemoryCache::new(None).unwrap();
 
-        cache.update(
-            "prompt",
-            "llm",
-            vec![Generation::builder().text("test").build()],
-        );
+        cache.update("prompt", "llm", vec![chat_gen("test")]);
         assert!(cache.lookup("prompt", "llm").is_some());
 
         cache.aclear().await;
@@ -265,17 +250,17 @@ mod tests {
     fn test_in_memory_cache_multiple_generations() {
         let cache = InMemoryCache::new(None).unwrap();
         let generations = vec![
-            Generation::builder().text("First generation").build(),
-            Generation::builder().text("Second generation").build(),
-            Generation::builder().text("Third generation").build(),
+            chat_gen("First generation"),
+            chat_gen("Second generation"),
+            chat_gen("Third generation"),
         ];
 
         cache.update("prompt", "llm", generations);
 
         let result = cache.lookup("prompt", "llm").unwrap();
         assert_eq!(result.len(), 3);
-        assert_eq!(result[0].text, "First generation");
-        assert_eq!(result[1].text, "Second generation");
-        assert_eq!(result[2].text, "Third generation");
+        assert_eq!(result[0].message.text(), "First generation");
+        assert_eq!(result[1].message.text(), "Second generation");
+        assert_eq!(result[2].message.text(), "Third generation");
     }
 }

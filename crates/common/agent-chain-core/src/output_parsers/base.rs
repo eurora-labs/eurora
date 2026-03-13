@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::error::{Error, Result};
 use crate::messages::AnyMessage;
-use crate::outputs::Generation;
+use crate::outputs::ChatGeneration;
 use crate::runnables::RunnableConfig;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::run_in_executor;
@@ -10,7 +10,7 @@ use crate::runnables::config::run_in_executor;
 pub trait BaseLLMOutputParser: Send + Sync + Debug {
     type Output: Send + Sync + Clone + Debug;
 
-    fn parse_result(&self, result: &[Generation], partial: bool) -> Result<Self::Output>;
+    fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Self::Output>;
 }
 
 pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
@@ -20,7 +20,7 @@ pub trait BaseGenerationOutputParser: BaseLLMOutputParser {
         _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
         let msg: AnyMessage = input.into();
-        let generation = Generation::builder().text(msg.text()).build();
+        let generation = ChatGeneration::builder().message(msg).build();
         self.parse_result(&[generation], false)
     }
 }
@@ -30,11 +30,11 @@ pub trait BaseOutputParser: Send + Sync + Debug {
 
     fn parse(&self, text: &str) -> Result<Self::Output>;
 
-    fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<Self::Output> {
+    fn parse_result(&self, result: &[ChatGeneration], _partial: bool) -> Result<Self::Output> {
         let first = result
             .first()
             .ok_or_else(|| Error::output_parser_simple("parse_result called with empty list"))?;
-        self.parse(&first.text)
+        self.parse(&first.message.text())
     }
 
     fn parse_with_prompt(&self, completion: &str, _prompt: &[AnyMessage]) -> Result<Self::Output> {
@@ -55,7 +55,7 @@ pub trait BaseOutputParser: Send + Sync + Debug {
         _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
         let msg: AnyMessage = input.into();
-        let generation = Generation::builder().text(msg.text()).build();
+        let generation = ChatGeneration::builder().message(msg).build();
         self.parse_result(&[generation], false)
     }
 
@@ -147,8 +147,10 @@ mod tests {
 
     #[test]
     fn test_parse_result() {
+        use crate::messages::AIMessage;
         let parser = TestParser;
-        let generations = vec![Generation::builder().text("hello").build()];
+        let msg = AIMessage::builder().content("hello").build();
+        let generations = vec![ChatGeneration::builder().message(msg.into()).build()];
         let result = parser.parse_result(&generations, false).unwrap();
         assert_eq!(result, "HELLO");
     }

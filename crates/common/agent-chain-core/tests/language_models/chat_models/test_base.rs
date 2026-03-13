@@ -1013,10 +1013,14 @@ fn test_combine_llm_outputs_returns_empty_dict_with_empty_list() {
 
 #[test]
 fn test_convert_cached_generations_chat_generation() {
-    use agent_chain_core::outputs::Generation;
+    use agent_chain_core::outputs::ChatGeneration;
 
     let model = agent_chain_core::FakeChatModel::builder().build();
-    let generations = vec![Generation::builder().text("hello".to_string()).build()];
+    let generations = vec![
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("hello").build().into())
+            .build(),
+    ];
     let result = model._convert_cached_generations(generations);
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].message.content(), "hello");
@@ -1024,12 +1028,16 @@ fn test_convert_cached_generations_chat_generation() {
 
 #[test]
 fn test_convert_cached_generations_legacy() {
-    use agent_chain_core::outputs::Generation;
+    use agent_chain_core::outputs::ChatGeneration;
 
     let model = agent_chain_core::FakeChatModel::builder().build();
     let generations = vec![
-        Generation::builder().text("first".to_string()).build(),
-        Generation::builder().text("second".to_string()).build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("first").build().into())
+            .build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("second").build().into())
+            .build(),
     ];
     let result = model._convert_cached_generations(generations);
     assert_eq!(result.len(), 2);
@@ -1039,13 +1047,19 @@ fn test_convert_cached_generations_legacy() {
 
 #[test]
 fn test_convert_cached_generations_mixed() {
-    use agent_chain_core::outputs::Generation;
+    use agent_chain_core::outputs::ChatGeneration;
 
     let model = agent_chain_core::FakeChatModel::builder().build();
     let generations = vec![
-        Generation::builder().text("a".to_string()).build(),
-        Generation::builder().text("b".to_string()).build(),
-        Generation::builder().text("c".to_string()).build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("a").build().into())
+            .build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("b").build().into())
+            .build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("c").build().into())
+            .build(),
     ];
     let result = model._convert_cached_generations(generations);
     assert_eq!(result.len(), 3);

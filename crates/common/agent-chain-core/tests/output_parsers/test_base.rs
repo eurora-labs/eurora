@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use agent_chain_core::error::{Error, Result};
 use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::output_parsers::{BaseLLMOutputParser, BaseOutputParser};
-use agent_chain_core::outputs::{ChatGeneration, Generation};
+use agent_chain_core::outputs::ChatGeneration;
 
 #[derive(Debug)]
 struct IntParser;
@@ -105,8 +105,12 @@ fn test_parse_with_whitespace() {
 fn test_parse_result_uses_first_generation() {
     let parser = IntParser;
     let generations = vec![
-        Generation::builder().text("10").build(),
-        Generation::builder().text("20").build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("10").build().into())
+            .build(),
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("20").build().into())
+            .build(),
     ];
     let result = parser.parse_result(&generations, false).unwrap();
     assert_eq!(result, 10);
@@ -116,7 +120,12 @@ fn test_parse_result_uses_first_generation() {
 fn test_parse_result_single_generation() {
     let parser = IntParser;
     let result = parser
-        .parse_result(&[Generation::builder().text("99").build()], false)
+        .parse_result(
+            &[ChatGeneration::builder()
+                .message(AIMessage::builder().content("99").build().into())
+                .build()],
+            false,
+        )
         .unwrap();
     assert_eq!(result, 99);
 }
@@ -126,8 +135,7 @@ fn test_parse_result_with_chat_generation() {
     let parser = IntParser;
     let message: AnyMessage = AIMessage::builder().content("55").build().into();
     let chat_gen = ChatGeneration::builder().message(message).build();
-    let generation = Generation::builder().text(&chat_gen.message.text()).build();
-    let result = parser.parse_result(&[generation], false).unwrap();
+    let result = parser.parse_result(&[chat_gen], false).unwrap();
     assert_eq!(result, 55);
 }
 
@@ -185,7 +193,12 @@ fn test_invoke_with_ai_message_content() {
 fn test_parse_result_partial_flag() {
     let parser = IntParser;
     let result = parser
-        .parse_result(&[Generation::builder().text("42").build()], true)
+        .parse_result(
+            &[ChatGeneration::builder()
+                .message(AIMessage::builder().content("42").build().into())
+                .build()],
+            true,
+        )
         .unwrap();
     assert_eq!(result, 42);
 }
@@ -240,8 +253,8 @@ struct SimpleParser;
 impl BaseLLMOutputParser for SimpleParser {
     type Output = String;
 
-    fn parse_result(&self, result: &[Generation], _partial: bool) -> Result<String> {
-        Ok(result[0].text.to_uppercase())
+    fn parse_result(&self, result: &[ChatGeneration], _partial: bool) -> Result<String> {
+        Ok(result[0].message.text().to_uppercase())
     }
 }
 
@@ -249,7 +262,12 @@ impl BaseLLMOutputParser for SimpleParser {
 fn test_base_llm_parse_result_delegates() {
     let parser = SimpleParser;
     let result = parser
-        .parse_result(&[Generation::builder().text("hello").build()], false)
+        .parse_result(
+            &[ChatGeneration::builder()
+                .message(AIMessage::builder().content("hello").build().into())
+                .build()],
+            false,
+        )
         .unwrap();
     assert_eq!(result, "HELLO");
 }
@@ -270,9 +288,9 @@ impl PartialTracker {
 impl BaseLLMOutputParser for PartialTracker {
     type Output = String;
 
-    fn parse_result(&self, result: &[Generation], partial: bool) -> Result<String> {
+    fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<String> {
         self.received_partial.store(partial, Ordering::SeqCst);
-        Ok(result[0].text.clone())
+        Ok(result[0].message.text())
     }
 }
 
@@ -280,7 +298,12 @@ impl BaseLLMOutputParser for PartialTracker {
 fn test_base_llm_parse_result_partial_flag() {
     let parser = PartialTracker::new();
     parser
-        .parse_result(&[Generation::builder().text("test").build()], true)
+        .parse_result(
+            &[ChatGeneration::builder()
+                .message(AIMessage::builder().content("test").build().into())
+                .build()],
+            true,
+        )
         .unwrap();
     assert!(parser.received_partial.load(Ordering::SeqCst));
 }

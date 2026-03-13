@@ -14,7 +14,7 @@ use crate::callbacks::{BaseCallbackHandler, CallbackManagerForLLMRun, Callbacks}
 use crate::error::{Error, Result};
 use crate::messages::{AIMessage, AIMessageChunk, AnyMessage, ChunkPosition, UsageMetadata};
 use crate::output_parsers::JsonOutputKeyToolsParser;
-use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, Generation, LLMResult};
+use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
 use crate::rate_limiters::BaseRateLimiter;
 use crate::runnables::base::{Runnable, pipe};
 use crate::runnables::config::RunnableConfig;
@@ -350,39 +350,8 @@ pub trait BaseChatModel: BaseLanguageModel {
         HashMap::new()
     }
 
-    fn _convert_cached_generations(&self, cache_val: Vec<Generation>) -> Vec<ChatGeneration> {
+    fn _convert_cached_generations(&self, cache_val: Vec<ChatGeneration>) -> Vec<ChatGeneration> {
         cache_val
-            .into_iter()
-            .map(|cached_gen| {
-                let message = cached_gen
-                    .generation_info
-                    .as_ref()
-                    .and_then(|info| info.get("message"))
-                    .and_then(|msg_val| serde_json::from_value::<AnyMessage>(msg_val.clone()).ok())
-                    .unwrap_or_else(|| {
-                        AIMessage::builder()
-                            .content(&cached_gen.text)
-                            .build()
-                            .into()
-                    });
-
-                let generation_info = cached_gen
-                    .generation_info
-                    .map(|mut info| {
-                        info.remove("message");
-                        info
-                    })
-                    .filter(|info| !info.is_empty());
-
-                match generation_info {
-                    Some(info) => ChatGeneration::builder()
-                        .message(message)
-                        .generation_info(info)
-                        .build(),
-                    None => ChatGeneration::builder().message(message).build(),
-                }
-            })
-            .collect()
     }
 
     fn _get_invocation_params(
@@ -833,8 +802,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            let generations: Vec<crate::outputs::Generation> =
-                _chat_generations_to_cache(&result.generations);
+            let generations: Vec<ChatGeneration> = _chat_generations_to_cache(&result.generations);
             cache.update(&prompt_key, &llm_string, generations);
         }
 
@@ -929,8 +897,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            let generations: Vec<crate::outputs::Generation> =
-                _chat_generations_to_cache(&result.generations);
+            let generations: Vec<ChatGeneration> = _chat_generations_to_cache(&result.generations);
             cache.aupdate(&prompt_key, &llm_string, generations).await;
         }
 
@@ -1499,20 +1466,8 @@ pub trait BaseChatModel: BaseLanguageModel {
     }
 }
 
-fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<Generation> {
-    generations
-        .iter()
-        .map(|chat_gen| {
-            let mut info = chat_gen.generation_info.clone().unwrap_or_default();
-            if let Ok(msg_val) = serde_json::to_value(&chat_gen.message) {
-                info.insert("message".to_string(), msg_val);
-            }
-            Generation::builder()
-                .text(chat_gen.message.text())
-                .generation_info(info)
-                .build()
-        })
-        .collect()
+fn _chat_generations_to_cache(generations: &[ChatGeneration]) -> Vec<ChatGeneration> {
+    generations.to_vec()
 }
 
 pub fn generate_response_from_error(error: &crate::error::Error) -> Vec<ChatGeneration> {
