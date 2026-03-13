@@ -157,32 +157,21 @@ impl BaseTool for Tool {
         )])
     }
 
-    fn tool_run(
+    async fn tool_run(
         &self,
         input: ToolInput,
         _run_manager: Option<&CallbackManagerForToolRun>,
         _config: &RunnableConfig,
     ) -> Result<ToolOutput> {
-        let string_input = self.extract_single_input(input)?;
-
-        let func = self.func.as_ref().ok_or_else(|| {
-            Error::ToolInvocation("Tool does not support sync invocation.".to_string())
-        })?;
-
-        func(string_input).map(ToolOutput::String)
-    }
-
-    async fn tool_arun(
-        &self,
-        input: ToolInput,
-        run_manager: Option<&CallbackManagerForToolRun>,
-        config: &RunnableConfig,
-    ) -> Result<ToolOutput> {
         if let Some(coroutine) = &self.coroutine {
             let string_input = self.extract_single_input(input)?;
             coroutine(string_input).await.map(ToolOutput::String)
         } else {
-            self.tool_run(input, run_manager, config)
+            let string_input = self.extract_single_input(input)?;
+            let func = self.func.as_ref().ok_or_else(|| {
+                Error::ToolInvocation("Tool has no function or coroutine.".to_string())
+            })?;
+            func(string_input).map(ToolOutput::String)
         }
     }
 }
@@ -203,8 +192,8 @@ mod tests {
         assert_eq!(tool.description(), "Echoes the input");
     }
 
-    #[test]
-    fn test_tool_run() {
+    #[tokio::test]
+    async fn test_tool_run() {
         let tool = Tool::from_function(
             |input| Ok(format!("Hello, {}!", input)),
             "greet",
@@ -213,6 +202,7 @@ mod tests {
 
         let result = tool
             .run(ToolInput::String("World".to_string()), None, None)
+            .await
             .unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "Hello, World!"),
@@ -220,8 +210,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_tool_run_with_dict() {
+    #[tokio::test]
+    async fn test_tool_run_with_dict() {
         let tool = Tool::from_function(
             |input| Ok(format!("Got: {}", input)),
             "process",
@@ -231,7 +221,7 @@ mod tests {
         let mut dict = HashMap::new();
         dict.insert("query".to_string(), Value::String("test".to_string()));
 
-        let result = tool.run(ToolInput::Dict(dict), None, None).unwrap();
+        let result = tool.run(ToolInput::Dict(dict), None, None).await.unwrap();
         match result {
             ToolOutput::String(s) => assert_eq!(s, "Got: test"),
             _ => panic!("Expected String output"),
@@ -247,7 +237,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_tool_arun() {
+    async fn test_tool_run_async() {
         let tool = Tool::from_function(
             |input| Ok(format!("Sync: {}", input)),
             "sync_tool",
@@ -255,7 +245,7 @@ mod tests {
         );
 
         let result = tool
-            .arun(ToolInput::String("test".to_string()), None, None)
+            .run(ToolInput::String("test".to_string()), None, None)
             .await
             .unwrap();
         match result {

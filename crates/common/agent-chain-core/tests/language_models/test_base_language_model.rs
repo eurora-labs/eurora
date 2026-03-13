@@ -560,10 +560,10 @@ mod test_generate_prompt {
         assert_eq!(result.generations.len(), 1);
         assert_eq!(result.generations[0].len(), 1);
         match &result.generations[0][0] {
-            agent_chain_core::outputs::GenerationType::Generation(generation) => {
-                assert_eq!(generation.text, "test response");
+            agent_chain_core::outputs::GenerationType::ChatGeneration(generation) => {
+                assert_eq!(generation.message.text(), "test response");
             }
-            _ => panic!("Expected Generation variant"),
+            _ => panic!("Expected ChatGeneration variant"),
         }
     }
 

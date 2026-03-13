@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -8,7 +7,7 @@ use serde_json::Value;
 use crate::caches::BaseCache;
 use crate::callbacks::Callbacks;
 use crate::error::Result;
-use crate::messages::{AIMessage, AnyMessage};
+use crate::messages::AnyMessage;
 use crate::outputs::LLMResult;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -189,12 +188,10 @@ pub trait BaseLanguageModel: Send + Sync {
     }
 }
 
-pub type LanguageModelLike =
-    Arc<dyn crate::runnables::base::Runnable<Input = Vec<AnyMessage>, Output = AIMessage>>;
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::AIMessage;
 
     #[test]
     fn test_langsmith_params_builder() {

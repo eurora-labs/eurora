@@ -71,7 +71,7 @@ impl SemanticSimilarityExampleSelector {
 
 #[async_trait::async_trait]
 impl BaseExampleSelector for SemanticSimilarityExampleSelector {
-    fn add_example(&mut self, example: HashMap<String, String>) -> Result<Option<String>> {
+    async fn add_example(&mut self, example: HashMap<String, String>) -> Result<Option<String>> {
         let text = example_to_text(&example, &self.input_keys);
         let metadata: HashMap<String, Value> = example
             .into_iter()
@@ -79,25 +79,20 @@ impl BaseExampleSelector for SemanticSimilarityExampleSelector {
             .collect();
         let ids = self
             .vectorstore
-            .add_texts(vec![text], Some(vec![metadata]), None)?;
+            .add_texts(vec![text], Some(vec![metadata]), None)
+            .await?;
         Ok(ids.into_iter().next())
     }
 
-    fn select_examples(
+    async fn select_examples(
         &self,
         input_variables: HashMap<String, String>,
     ) -> Result<Vec<HashMap<String, Value>>> {
         let text = example_to_text(&input_variables, &self.input_keys);
-        let example_docs = self.vectorstore.similarity_search(&text, self.k, None)?;
-        Ok(documents_to_examples(&example_docs, &self.example_keys))
-    }
-
-    async fn aselect_examples(
-        &self,
-        input_variables: HashMap<String, String>,
-    ) -> Result<Vec<HashMap<String, Value>>> {
-        let text = example_to_text(&input_variables, &self.input_keys);
-        let example_docs = self.vectorstore.similarity_search(&text, self.k, None)?;
+        let example_docs = self
+            .vectorstore
+            .similarity_search(&text, self.k, None)
+            .await?;
         Ok(documents_to_examples(&example_docs, &self.example_keys))
     }
 }
@@ -130,7 +125,7 @@ impl MaxMarginalRelevanceExampleSelector {
 
 #[async_trait::async_trait]
 impl BaseExampleSelector for MaxMarginalRelevanceExampleSelector {
-    fn add_example(&mut self, example: HashMap<String, String>) -> Result<Option<String>> {
+    async fn add_example(&mut self, example: HashMap<String, String>) -> Result<Option<String>> {
         let text = example_to_text(&example, &self.input_keys);
         let metadata: HashMap<String, Value> = example
             .into_iter()
@@ -138,37 +133,20 @@ impl BaseExampleSelector for MaxMarginalRelevanceExampleSelector {
             .collect();
         let ids = self
             .vectorstore
-            .add_texts(vec![text], Some(vec![metadata]), None)?;
+            .add_texts(vec![text], Some(vec![metadata]), None)
+            .await?;
         Ok(ids.into_iter().next())
     }
 
-    fn select_examples(
+    async fn select_examples(
         &self,
         input_variables: HashMap<String, String>,
     ) -> Result<Vec<HashMap<String, Value>>> {
         let text = example_to_text(&input_variables, &self.input_keys);
-        let example_docs = self.vectorstore.max_marginal_relevance_search(
-            &text,
-            self.k,
-            self.fetch_k,
-            0.5,
-            None,
-        )?;
-        Ok(documents_to_examples(&example_docs, &self.example_keys))
-    }
-
-    async fn aselect_examples(
-        &self,
-        input_variables: HashMap<String, String>,
-    ) -> Result<Vec<HashMap<String, Value>>> {
-        let text = example_to_text(&input_variables, &self.input_keys);
-        let example_docs = self.vectorstore.max_marginal_relevance_search(
-            &text,
-            self.k,
-            self.fetch_k,
-            0.5,
-            None,
-        )?;
+        let example_docs = self
+            .vectorstore
+            .max_marginal_relevance_search(&text, self.k, self.fetch_k, 0.5, None)
+            .await?;
         Ok(documents_to_examples(&example_docs, &self.example_keys))
     }
 }

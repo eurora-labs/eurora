@@ -135,24 +135,11 @@ where
         })
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = ensure_config(config);
-
-        if let Some(ref func) = self.func {
-            func(&input, &config);
-        }
-
-        Ok(input)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         let config = ensure_config(config);
 
         if let Some(ref afunc) = self.afunc {
@@ -180,33 +167,6 @@ where
     }
 
     fn transform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>> {
-        let config = ensure_config(config);
-
-        if self.func.is_none() {
-            return Box::pin(input.map(Ok));
-        }
-
-        let func = self.func.clone();
-        Box::pin(async_stream::stream! {
-            let mut last_input: Option<Self::Input> = None;
-            let mut input = input;
-
-            while let Some(chunk) = input.next().await {
-                yield Ok(chunk.clone());
-                last_input = Some(chunk);
-            }
-
-            if let (Some(func), Some(val)) = (func, last_input) {
-                func(&val, &config);
-            }
-        })
-    }
-
-    fn atransform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
         config: Option<RunnableConfig>,
@@ -340,31 +300,15 @@ impl Runnable for RunnableAssign {
         Ok(graph)
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        self.call_with_config(
-            &|input: HashMap<String, Value>, config: &RunnableConfig| {
-                let mapper_output = self.mapper.invoke(input.clone(), Some(config.clone()))?;
-                let mut result = input;
-                result.extend(mapper_output);
-                Ok(result)
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         let (run_manager, config) = start_chain_run(config);
         let cfg = child_config(&config, &run_manager, None);
 
-        let mapper_output = match self.mapper.ainvoke(input.clone(), Some(cfg)).await {
+        let mapper_output = match self.mapper.invoke(input.clone(), Some(cfg)).await {
             Ok(output) => output,
             Err(e) => return finish_chain_run(&run_manager, Err(e)),
         };
@@ -384,7 +328,7 @@ impl Runnable for RunnableAssign {
 
             yield Ok(input.clone());
 
-            match self.mapper.invoke(input, Some(config)) {
+            match self.mapper.invoke(input, Some(config)).await {
                 Ok(mapper_output) => {
                     yield Ok(mapper_output);
                 }
@@ -399,7 +343,10 @@ impl Runnable for RunnableAssign {
         &'a self,
         input: BoxStream<'a, Self::Input>,
         config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>> {
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
         let config = ensure_config(config);
 
         Box::pin(async_stream::stream! {
@@ -417,23 +364,12 @@ impl Runnable for RunnableAssign {
             }
 
             if let Some(final_input) = collected_input {
-                match self.invoke(final_input, Some(config)) {
+                match self.invoke(final_input, Some(config)).await {
                     Ok(result) => yield Ok(result),
                     Err(e) => yield Err(e),
                 }
             }
         })
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        self.transform(input, config)
     }
 }
 
@@ -557,19 +493,12 @@ impl Runnable for RunnablePick {
             }
         }
     }
-    fn invoke(&self, input: Self::Input, _config: Option<RunnableConfig>) -> Result<Self::Output> {
-        self.pick(&input)
-            .ok_or_else(|| Error::other("No matching keys found in input"))
-    }
 
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         _config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         self.pick(&input)
             .ok_or_else(|| Error::other("No matching keys found in input"))
     }
@@ -599,17 +528,6 @@ impl Runnable for RunnablePick {
             }
         })
     }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        self.transform(input, config)
-    }
 }
 
 pub fn graph_passthrough<I>() -> RunnablePassthrough<I>
@@ -623,10 +541,10 @@ where
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_runnable_passthrough() {
+    #[tokio::test]
+    async fn test_runnable_passthrough() {
         let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-        let result = passthrough.invoke(42, None).unwrap();
+        let result = passthrough.invoke(42, None).await.unwrap();
         assert_eq!(result, 42);
     }
 
@@ -638,8 +556,8 @@ mod tests {
         assert_eq!(passthrough.name(), Some("test_passthrough".to_string()));
     }
 
-    #[test]
-    fn test_runnable_passthrough_with_func() {
+    #[tokio::test]
+    async fn test_runnable_passthrough_with_func() {
         use std::sync::Arc;
         use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -651,25 +569,25 @@ mod tests {
                 called_clone.store(true, Ordering::SeqCst);
             });
 
-        let result = passthrough.invoke(42, None).unwrap();
+        let result = passthrough.invoke(42, None).await.unwrap();
         assert_eq!(result, 42);
         assert!(called.load(Ordering::SeqCst));
     }
 
-    #[test]
-    fn test_runnable_pick_single() {
+    #[tokio::test]
+    async fn test_runnable_pick_single() {
         let pick = RunnablePick::new_single().key("name").call();
 
         let mut input = HashMap::new();
         input.insert("name".to_string(), serde_json::json!("John"));
         input.insert("age".to_string(), serde_json::json!(30));
 
-        let result = pick.invoke(input, None).unwrap();
+        let result = pick.invoke(input, None).await.unwrap();
         assert_eq!(result, serde_json::json!("John"));
     }
 
-    #[test]
-    fn test_runnable_pick_multiple() {
+    #[tokio::test]
+    async fn test_runnable_pick_multiple() {
         let pick = RunnablePick::new_multi(vec!["name", "age"], None);
 
         let mut input = HashMap::new();
@@ -677,7 +595,7 @@ mod tests {
         input.insert("age".to_string(), serde_json::json!(30));
         input.insert("city".to_string(), serde_json::json!("NYC"));
 
-        let result = pick.invoke(input, None).unwrap();
+        let result = pick.invoke(input, None).await.unwrap();
         let result_map: HashMap<String, Value> = serde_json::from_value(result).unwrap();
         assert_eq!(result_map.len(), 2);
         assert_eq!(result_map.get("name"), Some(&serde_json::json!("John")));
@@ -699,7 +617,7 @@ mod tests {
     #[tokio::test]
     async fn test_runnable_passthrough_async() {
         let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-        let result = passthrough.ainvoke(42, None).await.unwrap();
+        let result = passthrough.invoke(42, None).await.unwrap();
         assert_eq!(result, 42);
     }
 
@@ -710,7 +628,7 @@ mod tests {
         let mut input = HashMap::new();
         input.insert("name".to_string(), serde_json::json!("John"));
 
-        let result = pick.ainvoke(input, None).await.unwrap();
+        let result = pick.invoke(input, None).await.unwrap();
         assert_eq!(result, serde_json::json!("John"));
     }
 }

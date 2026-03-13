@@ -25,8 +25,8 @@ fn test_router_initialization() {
     assert!(debug_str.contains("multiply"));
 }
 
-#[test]
-fn test_router_initialization_with_runnables() {
+#[tokio::test]
+async fn test_router_initialization_with_runnables() {
     let add_runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let multiply_runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
 
@@ -35,17 +35,24 @@ fn test_router_initialization_with_runnables() {
         .add("add", add_runnable)
         .add("multiply", multiply_runnable);
 
-    assert_eq!(router.invoke(RouterInput::new("add", 5), None).unwrap(), 6);
+    assert_eq!(
+        router
+            .invoke(RouterInput::new("add", 5), None)
+            .await
+            .unwrap(),
+        6
+    );
     assert_eq!(
         router
             .invoke(RouterInput::new("multiply", 5), None)
+            .await
             .unwrap(),
         10
     );
 }
 
-#[test]
-fn test_router_invoke() {
+#[tokio::test]
+async fn test_router_invoke() {
     let router = RouterRunnable::builder()
         .build()
         .add(
@@ -57,23 +64,30 @@ fn test_router_invoke() {
             RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build(),
         );
 
-    assert_eq!(router.invoke(RouterInput::new("add", 5), None).unwrap(), 6);
+    assert_eq!(
+        router
+            .invoke(RouterInput::new("add", 5), None)
+            .await
+            .unwrap(),
+        6
+    );
     assert_eq!(
         router
             .invoke(RouterInput::new("multiply", 5), None)
+            .await
             .unwrap(),
         10
     );
 }
 
-#[test]
-fn test_router_invoke_invalid_key() {
+#[tokio::test]
+async fn test_router_invoke_invalid_key() {
     let router = RouterRunnable::builder().build().add(
         "add",
         RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
     );
 
-    let result = router.invoke(RouterInput::new("invalid", 5), None);
+    let result = router.invoke(RouterInput::new("invalid", 5), None).await;
     assert!(result.is_err());
     assert!(
         result
@@ -83,8 +97,8 @@ fn test_router_invoke_invalid_key() {
     );
 }
 
-#[test]
-fn test_router_invoke_with_spy() {
+#[tokio::test]
+async fn test_router_invoke_with_spy() {
     let router = RouterRunnable::builder()
         .build()
         .add(
@@ -96,58 +110,18 @@ fn test_router_invoke_with_spy() {
             RunnableLambda::builder().func(|x: i32| Ok(x + 20)).build(),
         );
 
-    assert_eq!(router.invoke(RouterInput::new("a", 5), None).unwrap(), 15);
-    assert_eq!(router.invoke(RouterInput::new("b", 5), None).unwrap(), 25);
-}
-
-#[tokio::test]
-async fn test_router_ainvoke() {
-    let router = RouterRunnable::builder()
-        .build()
-        .add(
-            "add",
-            RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-        )
-        .add(
-            "multiply",
-            RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build(),
-        );
-
     assert_eq!(
-        router
-            .ainvoke(RouterInput::new("add", 5), None)
-            .await
-            .unwrap(),
-        6
+        router.invoke(RouterInput::new("a", 5), None).await.unwrap(),
+        15
     );
     assert_eq!(
-        router
-            .ainvoke(RouterInput::new("multiply", 5), None)
-            .await
-            .unwrap(),
-        10
+        router.invoke(RouterInput::new("b", 5), None).await.unwrap(),
+        25
     );
 }
 
 #[tokio::test]
-async fn test_router_ainvoke_invalid_key() {
-    let router = RouterRunnable::builder().build().add(
-        "add",
-        RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-    );
-
-    let result = router.ainvoke(RouterInput::new("invalid", 5), None).await;
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("No runnable associated with key 'invalid'")
-    );
-}
-
-#[test]
-fn test_router_batch() {
+async fn test_router_batch() {
     let router = RouterRunnable::builder()
         .build()
         .add(
@@ -165,14 +139,14 @@ fn test_router_batch() {
         RouterInput::new("add", 3),
     ];
 
-    let results = router.batch(inputs, None, false);
+    let results = router.batch(inputs, None, false).await;
     assert_eq!(*results[0].as_ref().unwrap(), 2);
     assert_eq!(*results[1].as_ref().unwrap(), 4);
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-#[test]
-fn test_router_batch_invalid_key() {
+#[tokio::test]
+async fn test_router_batch_invalid_key() {
     let router = RouterRunnable::builder().build().add(
         "add",
         RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
@@ -180,7 +154,7 @@ fn test_router_batch_invalid_key() {
 
     let inputs = vec![RouterInput::new("add", 1), RouterInput::new("invalid", 2)];
 
-    let results = router.batch(inputs, None, false);
+    let results = router.batch(inputs, None, false).await;
     assert!(results.iter().any(|r| r.is_err()));
     let err = results.iter().find(|r| r.is_err()).unwrap();
     assert!(
@@ -191,8 +165,8 @@ fn test_router_batch_invalid_key() {
     );
 }
 
-#[test]
-fn test_router_batch_all_same_key() {
+#[tokio::test]
+async fn test_router_batch_all_same_key() {
     let router = RouterRunnable::builder().build().add(
         "add",
         RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
@@ -204,14 +178,14 @@ fn test_router_batch_all_same_key() {
         RouterInput::new("add", 3),
     ];
 
-    let results = router.batch(inputs, None, false);
+    let results = router.batch(inputs, None, false).await;
     assert_eq!(*results[0].as_ref().unwrap(), 2);
     assert_eq!(*results[1].as_ref().unwrap(), 3);
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-#[test]
-fn test_router_batch_different_keys() {
+#[tokio::test]
+async fn test_router_batch_different_keys() {
     let router = RouterRunnable::builder()
         .build()
         .add(
@@ -234,15 +208,15 @@ fn test_router_batch_different_keys() {
         RouterInput::new("add", 4),
     ];
 
-    let results = router.batch(inputs, None, false);
+    let results = router.batch(inputs, None, false).await;
     assert_eq!(*results[0].as_ref().unwrap(), 2);
     assert_eq!(*results[1].as_ref().unwrap(), 4);
     assert_eq!(*results[2].as_ref().unwrap(), 9);
     assert_eq!(*results[3].as_ref().unwrap(), 5);
 }
 
-#[test]
-fn test_router_batch_return_exceptions() {
+#[tokio::test]
+async fn test_router_batch_return_exceptions() {
     let router = RouterRunnable::builder()
         .build()
         .add(
@@ -262,7 +236,7 @@ fn test_router_batch_return_exceptions() {
         RouterInput::new("add", 3),
     ];
 
-    let results = router.batch(inputs, None, true);
+    let results = router.batch(inputs, None, true).await;
     assert_eq!(*results[0].as_ref().unwrap(), 2);
     assert!(results[1].is_err());
     assert!(
@@ -275,19 +249,19 @@ fn test_router_batch_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
-#[test]
-fn test_router_empty_batch() {
+#[tokio::test]
+async fn test_router_empty_batch() {
     let router = RouterRunnable::builder().build().add(
         "add",
         RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
     );
 
-    let results = router.batch(vec![], None, false);
+    let results = router.batch(vec![], None, false).await;
     assert!(results.is_empty());
 }
 
-#[test]
-fn test_router_batch_with_configs() {
+#[tokio::test]
+async fn test_router_batch_with_configs() {
     let router = RouterRunnable::builder().build().add(
         "add",
         RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
@@ -299,110 +273,9 @@ fn test_router_batch_with_configs() {
         RouterInput::new("add", 3),
     ];
 
-    let results = router.batch(inputs, None, false);
+    let results = router.batch(inputs, None, false).await;
     assert_eq!(*results[0].as_ref().unwrap(), 2);
     assert_eq!(*results[1].as_ref().unwrap(), 3);
-    assert_eq!(*results[2].as_ref().unwrap(), 4);
-}
-
-#[tokio::test]
-async fn test_router_abatch() {
-    let router = RouterRunnable::builder()
-        .build()
-        .add(
-            "add",
-            RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-        )
-        .add(
-            "multiply",
-            RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build(),
-        );
-
-    let inputs = vec![
-        RouterInput::new("add", 1),
-        RouterInput::new("multiply", 2),
-        RouterInput::new("add", 3),
-    ];
-
-    let results = router.abatch(inputs, None, false).await;
-    assert_eq!(*results[0].as_ref().unwrap(), 2);
-    assert_eq!(*results[1].as_ref().unwrap(), 4);
-    assert_eq!(*results[2].as_ref().unwrap(), 4);
-}
-
-#[tokio::test]
-async fn test_router_abatch_invalid_key() {
-    let router = RouterRunnable::builder().build().add(
-        "add",
-        RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-    );
-
-    let inputs = vec![RouterInput::new("add", 1), RouterInput::new("invalid", 2)];
-
-    let results = router.abatch(inputs, None, false).await;
-    assert!(results.iter().any(|r| r.is_err()));
-}
-
-#[tokio::test]
-async fn test_router_abatch_return_exceptions() {
-    let router = RouterRunnable::builder()
-        .build()
-        .add(
-            "add",
-            RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-        )
-        .add(
-            "fail",
-            RunnableLambda::builder()
-                .func(|_x: i32| Err::<i32, _>(Error::other("Always fails")))
-                .build(),
-        );
-
-    let inputs = vec![
-        RouterInput::new("add", 1),
-        RouterInput::new("fail", 2),
-        RouterInput::new("add", 3),
-    ];
-
-    let results = router.abatch(inputs, None, true).await;
-    assert_eq!(*results[0].as_ref().unwrap(), 2);
-    assert!(results[1].is_err());
-    assert_eq!(*results[2].as_ref().unwrap(), 4);
-}
-
-#[tokio::test]
-async fn test_router_empty_abatch() {
-    let router = RouterRunnable::builder().build().add(
-        "add",
-        RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-    );
-
-    let results = router.abatch(vec![], None, false).await;
-    assert!(results.is_empty());
-}
-
-#[tokio::test]
-async fn test_router_abatch_different_keys() {
-    let router = RouterRunnable::builder()
-        .build()
-        .add(
-            "add",
-            RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-        )
-        .add(
-            "multiply",
-            RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build(),
-        );
-
-    let inputs = vec![
-        RouterInput::new("add", 1),
-        RouterInput::new("multiply", 2),
-        RouterInput::new("add", 3),
-    ];
-
-    let results = router.abatch(inputs, None, false).await;
-    assert_eq!(*results[0].as_ref().unwrap(), 2);
-    assert_eq!(*results[1].as_ref().unwrap(), 4);
     assert_eq!(*results[2].as_ref().unwrap(), 4);
 }
 
@@ -446,38 +319,6 @@ async fn test_router_stream_invalid_key() {
 }
 
 #[tokio::test]
-async fn test_router_astream() {
-    let router = RouterRunnable::builder().build().add(
-        "gen",
-        RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-    );
-
-    let result: Vec<i32> = router
-        .astream(RouterInput::new("gen", 5), None)
-        .filter_map(|r| async { r.ok() })
-        .collect()
-        .await;
-
-    assert_eq!(result, vec![6]);
-}
-
-#[tokio::test]
-async fn test_router_astream_invalid_key() {
-    let router = RouterRunnable::builder().build().add(
-        "gen",
-        RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
-    );
-
-    let results: Vec<Result<i32>> = router
-        .astream(RouterInput::new("invalid", 5), None)
-        .collect()
-        .await;
-
-    assert_eq!(results.len(), 1);
-    assert!(results[0].is_err());
-}
-
-#[tokio::test]
 async fn test_router_stream_sync() {
     let router = RouterRunnable::builder().build().add(
         "id",
@@ -493,8 +334,8 @@ async fn test_router_stream_sync() {
     assert_eq!(result, vec!["test".to_string()]);
 }
 
-#[test]
-fn test_router_with_config() {
+#[tokio::test]
+async fn test_router_with_config() {
     let router = RouterRunnable::builder().build().add(
         "add",
         RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build(),
@@ -505,12 +346,13 @@ fn test_router_with_config() {
 
     let result = router
         .invoke(RouterInput::new("add", 5), Some(config))
+        .await
         .unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_router_with_different_input_types() {
+#[tokio::test]
+async fn test_router_with_different_input_types() {
     let router = RouterRunnable::<Value, Value>::builder()
         .build()
         .add(
@@ -537,17 +379,19 @@ fn test_router_with_different_input_types() {
             RouterInput::new("string", Value::String("hello".into())),
             None,
         )
+        .await
         .unwrap();
     assert_eq!(result, Value::String("HELLO".into()));
 
     let result = router
         .invoke(RouterInput::new("int", serde_json::json!(5)), None)
+        .await
         .unwrap();
     assert_eq!(result, serde_json::json!(10));
 }
 
-#[test]
-fn test_router_with_dict_input() {
+#[tokio::test]
+async fn test_router_with_dict_input() {
     let router = RouterRunnable::<Value, String>::builder().build().add(
         "process",
         RunnableLambda::builder()
@@ -564,12 +408,13 @@ fn test_router_with_dict_input() {
             RouterInput::new("process", serde_json::json!({"name": "Alice", "age": 30})),
             None,
         )
+        .await
         .unwrap();
     assert_eq!(result, "Alice is 30 years old");
 }
 
-#[test]
-fn test_router_complex_routing_logic() {
+#[tokio::test]
+async fn test_router_complex_routing_logic() {
     let router = RouterRunnable::<Value, String>::builder()
         .build()
         .add(
@@ -612,19 +457,23 @@ fn test_router_complex_routing_logic() {
                 RouterInput::new(key, serde_json::json!({"value": value})),
                 None,
             )
+            .await
             .unwrap();
         assert_eq!(result, expected);
     }
 }
 
-#[test]
-fn test_router_single_route() {
+#[tokio::test]
+async fn test_router_single_route() {
     let router = RouterRunnable::builder().build().add(
         "only",
         RunnableLambda::builder().func(|x: i32| Ok(x * 3)).build(),
     );
 
-    let result = router.invoke(RouterInput::new("only", 4), None).unwrap();
+    let result = router
+        .invoke(RouterInput::new("only", 4), None)
+        .await
+        .unwrap();
     assert_eq!(result, 12);
 }
 
@@ -692,15 +541,15 @@ fn test_router_config_specs() {
     assert!(specs.is_empty());
 }
 
-#[test]
-fn test_router_default() {
+#[tokio::test]
+async fn test_router_default() {
     let router = RouterRunnable::<i32, i32>::default();
-    let result = router.invoke(RouterInput::new("any", 5), None);
+    let result = router.invoke(RouterInput::new("any", 5), None).await;
     assert!(result.is_err()); // No routes registered
 }
 
-#[test]
-fn test_router_from_runnables() {
+#[tokio::test]
+async fn test_router_from_runnables() {
     use std::sync::Arc;
     let mut map: HashMap<String, Arc<dyn Runnable<Input = i32, Output = i32> + Send + Sync>> =
         HashMap::new();
@@ -710,5 +559,11 @@ fn test_router_from_runnables() {
     );
     let router = RouterRunnable::from_runnables(map);
 
-    assert_eq!(router.invoke(RouterInput::new("add", 5), None).unwrap(), 6);
+    assert_eq!(
+        router
+            .invoke(RouterInput::new("add", 5), None)
+            .await
+            .unwrap(),
+        6
+    );
 }

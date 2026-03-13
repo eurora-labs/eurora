@@ -11,11 +11,12 @@ use crate::error::Result;
 use crate::messages::AnyMessage;
 use crate::messages::BaseMessage;
 use crate::outputs::{
-    ChatGeneration, ChatResult, Generation, GenerationChunk, GenerationType, LLMResult, RunInfo,
+    ChatGeneration, ChatGenerationChunk, ChatResult, GenerationType, LLMResult, RunInfo,
+    merge_chat_generation_chunks,
 };
 use crate::runnables::RunnableConfig;
 
-pub type LLMStream = Pin<Box<dyn Stream<Item = Result<GenerationChunk>> + Send>>;
+pub type LLMStream = Pin<Box<dyn Stream<Item = Result<ChatGenerationChunk>> + Send>>;
 
 #[derive(Clone, Default)]
 pub struct LLMConfig {
@@ -89,10 +90,9 @@ fn llm_result_to_chat_result(result: &LLMResult) -> ChatResult {
         .generations
         .iter()
         .flatten()
-        .map(|g| {
-            let text = extract_text(g);
-            let msg = crate::messages::AIMessage::builder().content(&text).build();
-            ChatGeneration::builder().message(msg.into()).build()
+        .map(|g| match g {
+            GenerationType::ChatGeneration(cg) => cg.clone(),
+            GenerationType::ChatGenerationChunk(cgc) => cgc.clone().into(),
         })
         .collect();
     ChatResult::builder().generations(generations).build()
@@ -100,8 +100,6 @@ fn llm_result_to_chat_result(result: &LLMResult) -> ChatResult {
 
 fn extract_text(generation: &GenerationType) -> String {
     match generation {
-        GenerationType::Generation(g) => g.text.clone(),
-        GenerationType::GenerationChunk(g) => g.text.clone(),
         GenerationType::ChatGeneration(g) => g.message.text(),
         GenerationType::ChatGenerationChunk(g) => g.message.text(),
     }
@@ -132,7 +130,8 @@ pub trait BaseLLM: BaseLanguageModel {
             && let Some(generation) = generations.first()
         {
             let text = extract_text(generation);
-            let chunk = GenerationChunk::builder().text(text).build();
+            let msg = crate::messages::AIMessage::builder().content(&text).build();
+            let chunk = ChatGenerationChunk::builder().message(msg.into()).build();
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
@@ -145,6 +144,95 @@ pub trait BaseLLM: BaseLanguageModel {
             .map(|msg| format!("{}: {}", msg.message_type(), msg.text()))
             .collect();
         parts.join("\n")
+    }
+
+    async fn stream(
+        &self,
+        input: Vec<AnyMessage>,
+        config: Option<&RunnableConfig>,
+        stop: Option<Vec<String>>,
+    ) -> Result<LLMStream> {
+        let prompt = self.convert_input(input);
+
+        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
+            (
+                cfg.callbacks.clone(),
+                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
+                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
+                cfg.run_name.clone(),
+                cfg.run_id,
+            )
+        } else {
+            (None, None, None, None, None)
+        };
+
+        let params = self.identifying_params();
+
+        let mut inheritable_metadata = metadata.unwrap_or_default();
+        let ls_params = self.get_llm_ls_params(stop.as_deref());
+        if let Some(provider) = ls_params.ls_provider {
+            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
+        }
+        if let Some(model_name) = ls_params.ls_model_name {
+            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
+        }
+        if let Some(model_type) = ls_params.ls_model_type {
+            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
+        }
+
+        let callback_manager = crate::callbacks::CallbackManager::configure()
+            .maybe_inheritable_callbacks(callbacks)
+            .maybe_local_callbacks(self.callbacks().cloned())
+            .verbose(self.verbose())
+            .maybe_inheritable_tags(tags)
+            .maybe_local_tags(self.config().tags.clone())
+            .inheritable_metadata(inheritable_metadata)
+            .maybe_local_metadata(self.config().metadata.clone())
+            .call();
+
+        let run_managers =
+            callback_manager.on_llm_start(&params, std::slice::from_ref(&prompt), run_id);
+        let run_manager = run_managers.into_iter().next();
+
+        let generation_stream = self
+            .stream_prompt(prompt, stop, run_manager.as_ref())
+            .await?;
+
+        let chunk_stream = async_stream::stream! {
+            use futures::StreamExt;
+
+            let mut pinned_stream = generation_stream;
+            let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
+
+            while let Some(result) = pinned_stream.next().await {
+                match result {
+                    Ok(chunk) => {
+                        if let Some(ref rm) = run_manager {
+                            rm.on_llm_new_token(&chunk.message.text(), None);
+                        }
+                        chunks.push(chunk.clone());
+                        yield Ok(chunk);
+                    }
+                    Err(e) => {
+                        if let Some(ref rm) = run_manager {
+                            rm.on_llm_error(&e);
+                        }
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+
+            if let Some(ref rm) = run_manager
+                && let Some(merged) = merge_chat_generation_chunks(chunks) {
+                    let generation: ChatGeneration = merged.into();
+                    let result = LLMResult::builder().generations(vec![vec![GenerationType::ChatGeneration(generation)]]).build();
+                    let chat_result = llm_result_to_chat_result(&result);
+                    rm.on_llm_end(&chat_result);
+                }
+        };
+
+        Ok(Box::pin(chunk_stream))
     }
 
     async fn invoke(
@@ -222,7 +310,7 @@ pub trait BaseLLM: BaseLanguageModel {
 
         if let Some(cache) = &resolved_cache {
             let (mut existing, llm_string, missing_idxs, missing_prompts) =
-                get_prompts_from_cache(&params, &prompts, Some(cache.as_ref()));
+                get_prompts_from_cache(&params, &prompts, Some(cache.as_ref())).await;
 
             if missing_prompts.is_empty() {
                 let generations = (0..prompts.len())
@@ -231,7 +319,7 @@ pub trait BaseLLM: BaseLanguageModel {
                             .remove(&i)
                             .unwrap_or_default()
                             .into_iter()
-                            .map(GenerationType::Generation)
+                            .map(GenerationType::ChatGeneration)
                             .collect()
                     })
                     .collect();
@@ -251,7 +339,8 @@ pub trait BaseLLM: BaseLanguageModel {
                 &missing_idxs,
                 &new_results,
                 &prompts,
-            );
+            )
+            .await;
 
             let generations = (0..prompts.len())
                 .map(|i| {
@@ -259,7 +348,7 @@ pub trait BaseLLM: BaseLanguageModel {
                         .remove(&i)
                         .unwrap_or_default()
                         .into_iter()
-                        .map(GenerationType::Generation)
+                        .map(GenerationType::ChatGeneration)
                         .collect()
                 })
                 .collect();
@@ -351,405 +440,6 @@ pub trait BaseLLM: BaseLanguageModel {
         Ok(outputs)
     }
 
-    async fn batch_with_exceptions(
-        &self,
-        inputs: Vec<Vec<AnyMessage>>,
-        config: Option<&RunnableConfig>,
-    ) -> Vec<Result<String>> {
-        let mut results = Vec::new();
-        for input in inputs {
-            results.push(self.invoke(input, config).await);
-        }
-        results
-    }
-
-    async fn stream(
-        &self,
-        input: Vec<AnyMessage>,
-        config: Option<&RunnableConfig>,
-        stop: Option<Vec<String>>,
-    ) -> Result<LLMStream> {
-        let prompt = self.convert_input(input);
-
-        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
-            (
-                cfg.callbacks.clone(),
-                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
-                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
-                cfg.run_name.clone(),
-                cfg.run_id,
-            )
-        } else {
-            (None, None, None, None, None)
-        };
-
-        let params = self.identifying_params();
-
-        let mut inheritable_metadata = metadata.unwrap_or_default();
-        let ls_params = self.get_llm_ls_params(stop.as_deref());
-        if let Some(provider) = ls_params.ls_provider {
-            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
-        }
-        if let Some(model_name) = ls_params.ls_model_name {
-            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
-        }
-        if let Some(model_type) = ls_params.ls_model_type {
-            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
-        }
-
-        let callback_manager = crate::callbacks::CallbackManager::configure()
-            .maybe_inheritable_callbacks(callbacks)
-            .maybe_local_callbacks(self.callbacks().cloned())
-            .verbose(self.verbose())
-            .maybe_inheritable_tags(tags)
-            .maybe_local_tags(self.config().tags.clone())
-            .inheritable_metadata(inheritable_metadata)
-            .maybe_local_metadata(self.config().metadata.clone())
-            .call();
-
-        let run_managers =
-            callback_manager.on_llm_start(&params, std::slice::from_ref(&prompt), run_id);
-        let run_manager = run_managers.into_iter().next();
-
-        let generation_stream = self
-            .stream_prompt(prompt, stop, run_manager.as_ref())
-            .await?;
-
-        let chunk_stream = async_stream::stream! {
-            use futures::StreamExt;
-
-            let mut pinned_stream = generation_stream;
-            let mut chunks: Vec<GenerationChunk> = Vec::new();
-
-            while let Some(result) = pinned_stream.next().await {
-                match result {
-                    Ok(chunk) => {
-                        if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(&chunk.text, None);
-                        }
-                        chunks.push(chunk.clone());
-                        yield Ok(chunk);
-                    }
-                    Err(e) => {
-                        if let Some(ref rm) = run_manager {
-                            rm.on_llm_error(&e);
-                        }
-                        yield Err(e);
-                        return;
-                    }
-                }
-            }
-
-            if let Some(ref rm) = run_manager
-                && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
-                    let generation: Generation = merged.into();
-                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
-                    let chat_result = llm_result_to_chat_result(&result);
-                    rm.on_llm_end(&chat_result);
-                }
-        };
-
-        Ok(Box::pin(chunk_stream))
-    }
-
-    async fn astream(
-        &self,
-        input: Vec<AnyMessage>,
-        config: Option<&RunnableConfig>,
-        stop: Option<Vec<String>>,
-    ) -> Result<LLMStream> {
-        let prompt = self.convert_input(input);
-
-        let (callbacks, tags, metadata, _run_name, run_id) = if let Some(cfg) = config {
-            (
-                cfg.callbacks.clone(),
-                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
-                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
-                cfg.run_name.clone(),
-                cfg.run_id,
-            )
-        } else {
-            (None, None, None, None, None)
-        };
-
-        let params = self.identifying_params();
-
-        let mut inheritable_metadata = metadata.unwrap_or_default();
-        let ls_params = self.get_llm_ls_params(stop.as_deref());
-        if let Some(provider) = ls_params.ls_provider {
-            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
-        }
-        if let Some(model_name) = ls_params.ls_model_name {
-            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
-        }
-        if let Some(model_type) = ls_params.ls_model_type {
-            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
-        }
-
-        let callback_manager = crate::callbacks::CallbackManager::configure()
-            .maybe_inheritable_callbacks(callbacks)
-            .maybe_local_callbacks(self.callbacks().cloned())
-            .verbose(self.verbose())
-            .maybe_inheritable_tags(tags)
-            .maybe_local_tags(self.config().tags.clone())
-            .inheritable_metadata(inheritable_metadata)
-            .maybe_local_metadata(self.config().metadata.clone())
-            .call();
-
-        let run_managers =
-            callback_manager.on_llm_start(&params, std::slice::from_ref(&prompt), run_id);
-        let run_manager = run_managers.into_iter().next();
-
-        let generation_stream = self
-            .stream_prompt(prompt, stop, run_manager.as_ref())
-            .await?;
-
-        let chunk_stream = async_stream::stream! {
-            use futures::StreamExt;
-
-            let mut pinned_stream = generation_stream;
-            let mut chunks: Vec<GenerationChunk> = Vec::new();
-
-            while let Some(result) = pinned_stream.next().await {
-                match result {
-                    Ok(chunk) => {
-                        if let Some(ref rm) = run_manager {
-                            rm.on_llm_new_token(&chunk.text, None);
-                        }
-                        chunks.push(chunk.clone());
-                        yield Ok(chunk);
-                    }
-                    Err(e) => {
-                        if let Some(ref rm) = run_manager {
-                            rm.on_llm_error(&e);
-                        }
-                        yield Err(e);
-                        return;
-                    }
-                }
-            }
-
-            if let Some(ref rm) = run_manager
-                && let Some(merged) = crate::outputs::merge_generation_chunks(chunks) {
-                    let generation: Generation = merged.into();
-                    let result = LLMResult::builder().generations(vec![vec![GenerationType::Generation(generation)]]).build();
-                    let chat_result = llm_result_to_chat_result(&result);
-                    rm.on_llm_end(&chat_result);
-                }
-        };
-
-        Ok(Box::pin(chunk_stream))
-    }
-
-    async fn ainvoke(
-        &self,
-        input: Vec<AnyMessage>,
-        config: Option<&RunnableConfig>,
-    ) -> Result<String> {
-        let prompt = self.convert_input(input);
-
-        let generate_config = if let Some(cfg) = config {
-            LLMGenerateConfig::from_runnable_config(cfg)
-        } else {
-            LLMGenerateConfig::default()
-        };
-
-        let result = self.agenerate(vec![prompt], generate_config).await?;
-
-        if let Some(generations) = result.generations.first()
-            && let Some(generation) = generations.first()
-        {
-            return Ok(extract_text(generation));
-        }
-
-        Ok(String::new())
-    }
-
-    async fn agenerate(
-        &self,
-        prompts: Vec<String>,
-        config: LLMGenerateConfig,
-    ) -> Result<LLMResult> {
-        use crate::caches::BaseCache;
-        use crate::callbacks::CallbackManager;
-
-        let LLMGenerateConfig {
-            stop,
-            callbacks,
-            tags,
-            metadata,
-            run_name: _run_name,
-            run_id,
-        } = config;
-
-        let params = self.identifying_params();
-
-        let mut inheritable_metadata = metadata.clone().unwrap_or_default();
-        let ls_params = self.get_llm_ls_params(stop.as_deref());
-        if let Some(provider) = ls_params.ls_provider {
-            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
-        }
-        if let Some(model_name) = ls_params.ls_model_name {
-            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
-        }
-        if let Some(model_type) = ls_params.ls_model_type {
-            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
-        }
-
-        let callback_manager = CallbackManager::configure()
-            .maybe_inheritable_callbacks(callbacks)
-            .maybe_local_callbacks(self.callbacks().cloned())
-            .verbose(self.verbose())
-            .maybe_inheritable_tags(tags)
-            .maybe_local_tags(self.config().tags.clone())
-            .inheritable_metadata(inheritable_metadata)
-            .maybe_local_metadata(self.config().metadata.clone())
-            .call();
-
-        let cache_config = self.llm_config().base.cache;
-        let cache_instance = self.llm_config().cache_instance.clone();
-
-        let resolved_cache: Option<std::sync::Arc<dyn BaseCache>> =
-            if let Some(instance) = cache_instance {
-                Some(instance)
-            } else if cache_config == Some(false) {
-                None
-            } else {
-                crate::globals::get_llm_cache()
-            };
-
-        if let Some(cache) = &resolved_cache {
-            let (mut existing, llm_string, missing_idxs, missing_prompts) =
-                aget_prompts_from_cache(&params, &prompts, Some(cache.as_ref())).await;
-
-            if missing_prompts.is_empty() {
-                let generations = (0..prompts.len())
-                    .map(|i| {
-                        existing
-                            .remove(&i)
-                            .unwrap_or_default()
-                            .into_iter()
-                            .map(GenerationType::Generation)
-                            .collect()
-                    })
-                    .collect();
-                return Ok(LLMResult::builder().generations(generations).build());
-            }
-
-            let run_managers = callback_manager.on_llm_start(&params, &missing_prompts, run_id);
-
-            let new_results = self
-                ._agenerate_helper(missing_prompts, stop, &run_managers)
-                .await?;
-
-            aupdate_cache(
-                Some(cache.as_ref()),
-                &mut existing,
-                &llm_string,
-                &missing_idxs,
-                &new_results,
-                &prompts,
-            )
-            .await;
-
-            let generations = (0..prompts.len())
-                .map(|i| {
-                    existing
-                        .remove(&i)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(GenerationType::Generation)
-                        .collect()
-                })
-                .collect();
-
-            let mut output = LLMResult::builder().generations(generations).build();
-
-            if !run_managers.is_empty() {
-                output.run = Some(
-                    run_managers
-                        .iter()
-                        .map(|rm| RunInfo::new(rm.run_id()))
-                        .collect(),
-                );
-            }
-
-            Ok(output)
-        } else {
-            let run_managers = callback_manager.on_llm_start(&params, &prompts, run_id);
-
-            let mut output = self._agenerate_helper(prompts, stop, &run_managers).await?;
-
-            if !run_managers.is_empty() {
-                output.run = Some(
-                    run_managers
-                        .iter()
-                        .map(|rm| RunInfo::new(rm.run_id()))
-                        .collect(),
-                );
-            }
-
-            Ok(output)
-        }
-    }
-
-    async fn _agenerate_helper(
-        &self,
-        prompts: Vec<String>,
-        stop: Option<Vec<String>>,
-        run_managers: &[CallbackManagerForLLMRun],
-    ) -> Result<LLMResult> {
-        match self
-            .generate_prompts(prompts, stop, run_managers.first())
-            .await
-        {
-            Ok(output) => {
-                let flattened = output.flatten();
-                for (run_manager, flattened_output) in run_managers.iter().zip(flattened.iter()) {
-                    let chat_result = llm_result_to_chat_result(flattened_output);
-                    run_manager.on_llm_end(&chat_result);
-                }
-                Ok(output)
-            }
-            Err(e) => {
-                for run_manager in run_managers {
-                    run_manager.on_llm_error(&e);
-                }
-                Err(e)
-            }
-        }
-    }
-
-    async fn abatch(
-        &self,
-        inputs: Vec<Vec<AnyMessage>>,
-        config: Option<&RunnableConfig>,
-    ) -> Result<Vec<String>> {
-        if inputs.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let prompts: Vec<String> = inputs.into_iter().map(|i| self.convert_input(i)).collect();
-
-        let generate_config = if let Some(cfg) = config {
-            LLMGenerateConfig::from_runnable_config(cfg)
-        } else {
-            LLMGenerateConfig::default()
-        };
-
-        let result = self.agenerate(prompts, generate_config).await?;
-
-        let mut outputs = Vec::new();
-        for generations in &result.generations {
-            if let Some(generation) = generations.first() {
-                outputs.push(extract_text(generation));
-            } else {
-                outputs.push(String::new());
-            }
-        }
-        Ok(outputs)
-    }
-
     fn get_llm_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
         let mut params = self.get_ls_params(stop);
         params.ls_model_type = Some("llm".to_string());
@@ -771,12 +461,12 @@ pub trait LLM: BaseLLM {
     ) -> Result<String>;
 }
 
-pub fn get_prompts_from_cache(
+pub async fn get_prompts_from_cache(
     params: &HashMap<String, Value>,
     prompts: &[String],
     cache: Option<&dyn crate::caches::BaseCache>,
 ) -> (
-    HashMap<usize, Vec<Generation>>,
+    HashMap<usize, Vec<ChatGeneration>>,
     String,
     Vec<usize>,
     Vec<String>,
@@ -789,7 +479,7 @@ pub fn get_prompts_from_cache(
 
     if let Some(cache) = cache {
         for (i, prompt) in prompts.iter().enumerate() {
-            if let Some(cached) = cache.lookup(prompt, &llm_string) {
+            if let Some(cached) = cache.lookup(prompt, &llm_string).await {
                 existing_prompts.insert(i, cached);
             } else {
                 missing_prompts.push(prompt.clone());
@@ -811,9 +501,9 @@ pub fn get_prompts_from_cache(
     )
 }
 
-pub fn update_cache(
+pub async fn update_cache(
     cache: Option<&dyn crate::caches::BaseCache>,
-    existing_prompts: &mut HashMap<usize, Vec<Generation>>,
+    existing_prompts: &mut HashMap<usize, Vec<ChatGeneration>>,
     llm_string: &str,
     missing_prompt_idxs: &[usize],
     new_results: &LLMResult,
@@ -822,91 +512,18 @@ pub fn update_cache(
     if let Some(cache) = cache {
         for (i, result) in new_results.generations.iter().enumerate() {
             if let Some(&idx) = missing_prompt_idxs.get(i) {
-                let generations: Vec<Generation> = result
+                let generations: Vec<ChatGeneration> = result
                     .iter()
-                    .filter_map(|g| match g {
-                        GenerationType::Generation(generation) => Some(generation.clone()),
-                        GenerationType::GenerationChunk(chunk) => Some(chunk.clone().into()),
-                        _ => None,
+                    .map(|g| match g {
+                        GenerationType::ChatGeneration(generation) => generation.clone(),
+                        GenerationType::ChatGenerationChunk(chunk) => chunk.clone().into(),
                     })
                     .collect();
 
                 existing_prompts.insert(idx, generations.clone());
 
                 if let Some(prompt) = prompts.get(idx) {
-                    cache.update(prompt, llm_string, generations);
-                }
-            }
-        }
-    }
-
-    new_results.llm_output.clone()
-}
-
-pub async fn aget_prompts_from_cache(
-    params: &HashMap<String, Value>,
-    prompts: &[String],
-    cache: Option<&dyn crate::caches::BaseCache>,
-) -> (
-    HashMap<usize, Vec<Generation>>,
-    String,
-    Vec<usize>,
-    Vec<String>,
-) {
-    let sorted: std::collections::BTreeMap<_, _> = params.iter().collect();
-    let llm_string = serde_json::to_string(&sorted).unwrap_or_default();
-    let mut existing_prompts = HashMap::new();
-    let mut missing_prompt_idxs = Vec::new();
-    let mut missing_prompts = Vec::new();
-
-    if let Some(cache) = cache {
-        for (i, prompt) in prompts.iter().enumerate() {
-            if let Some(cached) = cache.alookup(prompt, &llm_string).await {
-                existing_prompts.insert(i, cached);
-            } else {
-                missing_prompts.push(prompt.clone());
-                missing_prompt_idxs.push(i);
-            }
-        }
-    } else {
-        for (i, prompt) in prompts.iter().enumerate() {
-            missing_prompts.push(prompt.clone());
-            missing_prompt_idxs.push(i);
-        }
-    }
-
-    (
-        existing_prompts,
-        llm_string,
-        missing_prompt_idxs,
-        missing_prompts,
-    )
-}
-
-pub async fn aupdate_cache(
-    cache: Option<&dyn crate::caches::BaseCache>,
-    existing_prompts: &mut HashMap<usize, Vec<Generation>>,
-    llm_string: &str,
-    missing_prompt_idxs: &[usize],
-    new_results: &LLMResult,
-    prompts: &[String],
-) -> Option<HashMap<String, Value>> {
-    if let Some(cache) = cache {
-        for (i, result) in new_results.generations.iter().enumerate() {
-            if let Some(&idx) = missing_prompt_idxs.get(i) {
-                let generations: Vec<Generation> = result
-                    .iter()
-                    .filter_map(|g| match g {
-                        GenerationType::Generation(generation) => Some(generation.clone()),
-                        GenerationType::GenerationChunk(chunk) => Some(chunk.clone().into()),
-                        _ => None,
-                    })
-                    .collect();
-
-                existing_prompts.insert(idx, generations.clone());
-
-                if let Some(prompt) = prompts.get(idx) {
-                    cache.aupdate(prompt, llm_string, generations).await;
+                    cache.update(prompt, llm_string, generations).await;
                 }
             }
         }
@@ -1042,13 +659,13 @@ mod tests {
         assert_eq!(config.base.tags, Some(vec!["test".to_string()]));
     }
 
-    #[test]
-    fn test_get_prompts_from_cache_no_cache() {
+    #[tokio::test]
+    async fn test_get_prompts_from_cache_no_cache() {
         let params = HashMap::new();
         let prompts = vec!["Hello".to_string(), "World".to_string()];
 
         let (existing, _llm_string, missing_idxs, missing) =
-            get_prompts_from_cache(&params, &prompts, None);
+            get_prompts_from_cache(&params, &prompts, None).await;
 
         assert!(existing.is_empty());
         assert_eq!(missing_idxs, vec![0, 1]);

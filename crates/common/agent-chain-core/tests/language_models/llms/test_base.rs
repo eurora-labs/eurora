@@ -5,8 +5,8 @@ use agent_chain_core::language_models::{
     BaseLLM, BaseLanguageModel, FakeListLLM, FakeStreamingListLLM, LLM, get_prompts_from_cache,
     update_cache,
 };
-use agent_chain_core::messages::{AnyMessage, HumanMessage};
-use agent_chain_core::outputs::{Generation, GenerationType, LLMResult};
+use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
+use agent_chain_core::outputs::{ChatGeneration, GenerationType, LLMResult};
 use futures::StreamExt;
 use serde_json::json;
 
@@ -91,13 +91,15 @@ fn test_convert_string_input() {
 
 #[test]
 fn test_convert_prompt_value_input() {
-    use agent_chain_core::prompt_values::{PromptValue, StringPromptValue};
-
     let llm = FakeListLLM::builder()
         .responses(vec!["r".to_string()])
         .build();
-    let pv = StringPromptValue::new("already a prompt value");
-    let result = llm.convert_input(pv.to_messages());
+    let messages = vec![AnyMessage::HumanMessage(
+        HumanMessage::builder()
+            .content("already a prompt value")
+            .build(),
+    )];
+    let result = llm.convert_input(messages);
     assert_eq!(result, "human: already a prompt value");
 }
 
@@ -124,8 +126,10 @@ async fn test_generate_single_prompt() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "result"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "result")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -172,8 +176,10 @@ async fn test_agenerate_single_prompt() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "async_result"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "async_result")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -189,8 +195,8 @@ async fn test_agenerate_multiple_prompts() {
     assert_eq!(result.generations.len(), 2);
     for generation_list in &result.generations {
         match &generation_list[0] {
-            GenerationType::Generation(_) => {}
-            _ => panic!("Expected Generation variant"),
+            GenerationType::ChatGeneration(_) => {}
+            _ => panic!("Expected ChatGeneration variant"),
         }
     }
 }
@@ -207,7 +213,7 @@ async fn test_astream_fallback_to_ainvoke() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text().to_string());
     }
     assert_eq!(chunks, vec!["hello"]);
 }
@@ -224,7 +230,7 @@ async fn test_astream_implementation_uses_stream() {
 
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.next().await {
-        chunks.push(chunk.unwrap().text);
+        chunks.push(chunk.unwrap().message.text().to_string());
     }
     assert_eq!(chunks, vec!["a", "b"]);
 }
@@ -244,85 +250,107 @@ fn test_get_ls_params() {
     assert_eq!(params.ls_stop, Some(vec!["stop".to_string()]));
 }
 
-#[test]
-fn test_get_prompts_no_cache_returns_all_missing() {
+#[tokio::test]
+async fn test_get_prompts_no_cache_returns_all_missing() {
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let (existing, _llm_string, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], None);
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], None).await;
 
     assert!(existing.is_empty());
     assert_eq!(missing_idxs, vec![0, 1]);
     assert_eq!(missing, vec!["p1", "p2"]);
 }
 
-#[test]
-fn test_get_prompts_with_cache_all_miss() {
+#[tokio::test]
+async fn test_get_prompts_with_cache_all_miss() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let (existing, _llm_string, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache)).await;
 
     assert!(existing.is_empty());
     assert_eq!(missing_idxs, vec![0, 1]);
     assert_eq!(missing, vec!["p1", "p2"]);
 }
 
-#[test]
-fn test_get_prompts_with_cache_partial_hit() {
+#[tokio::test]
+async fn test_get_prompts_with_cache_partial_hit() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let llm_string = serde_json::to_string(&params).unwrap();
-    let cached_generation = vec![Generation::builder().text("cached".to_string()).build()];
-    cache.update("p1", &llm_string, cached_generation.clone());
+    let cached_generation = vec![
+        ChatGeneration::builder()
+            .message(AIMessage::builder().content("cached").build().into())
+            .build(),
+    ];
+    cache
+        .update("p1", &llm_string, cached_generation.clone())
+        .await;
 
     let (existing, _, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache)).await;
 
     assert!(existing.contains_key(&0));
-    assert_eq!(existing[&0][0].text, "cached");
+    assert_eq!(existing[&0][0].message.text(), "cached");
     assert_eq!(missing_idxs, vec![1]);
     assert_eq!(missing, vec!["p2"]);
 }
 
-#[test]
-fn test_get_prompts_with_cache_all_hit() {
+#[tokio::test]
+async fn test_get_prompts_with_cache_all_hit() {
     let cache = InMemoryCache::unbounded();
     let params = HashMap::from([("model".to_string(), json!("test"))]);
     let llm_string = serde_json::to_string(&params).unwrap();
-    cache.update(
-        "p1",
-        &llm_string,
-        vec![Generation::builder().text("c1".to_string()).build()],
-    );
-    cache.update(
-        "p2",
-        &llm_string,
-        vec![Generation::builder().text("c2".to_string()).build()],
-    );
+    cache
+        .update(
+            "p1",
+            &llm_string,
+            vec![
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("c1").build().into())
+                    .build(),
+            ],
+        )
+        .await;
+    cache
+        .update(
+            "p2",
+            &llm_string,
+            vec![
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("c2").build().into())
+                    .build(),
+            ],
+        )
+        .await;
 
     let (existing, _, missing_idxs, missing) =
-        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache));
+        get_prompts_from_cache(&params, &["p1".to_string(), "p2".to_string()], Some(&cache)).await;
 
     assert_eq!(existing.len(), 2);
     assert!(missing_idxs.is_empty());
     assert!(missing.is_empty());
 }
 
-#[test]
-fn test_update_cache_stores_results() {
+#[tokio::test]
+async fn test_update_cache_stores_results() {
     let cache = InMemoryCache::unbounded();
     let llm_string = "test_llm";
     let new_results = LLMResult::builder()
         .generations(vec![
-            vec![GenerationType::Generation(
-                Generation::builder().text("r1".to_string()).build(),
+            vec![GenerationType::ChatGeneration(
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("r1").build().into())
+                    .build(),
             )],
-            vec![GenerationType::Generation(
-                Generation::builder().text("r2".to_string()).build(),
+            vec![GenerationType::ChatGeneration(
+                ChatGeneration::builder()
+                    .message(AIMessage::builder().content("r2").build().into())
+                    .build(),
             )],
         ])
         .build();
-    let mut existing: HashMap<usize, Vec<Generation>> = HashMap::new();
+    let mut existing: HashMap<usize, Vec<ChatGeneration>> = HashMap::new();
 
     let _ = update_cache(
         Some(&cache),
@@ -331,23 +359,26 @@ fn test_update_cache_stores_results() {
         &[0, 1],
         &new_results,
         &["p1".to_string(), "p2".to_string()],
-    );
+    )
+    .await;
 
-    assert!(cache.lookup("p1", llm_string).is_some());
-    assert!(cache.lookup("p2", llm_string).is_some());
+    assert!(cache.lookup("p1", llm_string).await.is_some());
+    assert!(cache.lookup("p2", llm_string).await.is_some());
     assert!(existing.contains_key(&0));
     assert!(existing.contains_key(&1));
-    assert_eq!(existing[&0][0].text, "r1");
+    assert_eq!(existing[&0][0].message.text(), "r1");
 }
 
-#[test]
-fn test_update_cache_with_none_does_not_store() {
+#[tokio::test]
+async fn test_update_cache_with_none_does_not_store() {
     let new_results = LLMResult::builder()
-        .generations(vec![vec![GenerationType::Generation(
-            Generation::builder().text("r1".to_string()).build(),
+        .generations(vec![vec![GenerationType::ChatGeneration(
+            ChatGeneration::builder()
+                .message(AIMessage::builder().content("r1").build().into())
+                .build(),
         )]])
         .build();
-    let mut existing: HashMap<usize, Vec<Generation>> = HashMap::new();
+    let mut existing: HashMap<usize, Vec<ChatGeneration>> = HashMap::new();
 
     let _ = update_cache(
         None,
@@ -356,7 +387,8 @@ fn test_update_cache_with_none_does_not_store() {
         &[0],
         &new_results,
         &["p1".to_string()],
-    );
+    )
+    .await;
 
     assert!(existing.is_empty());
 }
@@ -383,12 +415,16 @@ async fn test_generate_prompt_converts_prompt_values() {
         .unwrap();
     assert_eq!(result.generations.len(), 2);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "resp1"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "resp1")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
     match &result.generations[1][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "resp2"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "resp2")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -409,8 +445,10 @@ async fn test_agenerate_prompt_converts_prompt_values() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "async_resp"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "async_resp")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -428,8 +466,10 @@ async fn test_generate_prompt_with_message_input() {
         .unwrap();
     assert_eq!(result.generations.len(), 1);
     match &result.generations[0][0] {
-        GenerationType::Generation(generation) => assert_eq!(generation.text, "chat_resp"),
-        _ => panic!("Expected Generation variant"),
+        GenerationType::ChatGeneration(generation) => {
+            assert_eq!(generation.message.text(), "chat_resp")
+        }
+        _ => panic!("Expected ChatGeneration variant"),
     }
 }
 
@@ -608,12 +648,12 @@ fn test_resolve_cache_false() {
 }
 
 #[tokio::test]
-async fn test_batch_with_exceptions() {
+async fn test_batch_succeeds() {
     let llm = FakeListLLM::builder()
         .responses(vec!["r1".to_string(), "r2".to_string(), "r3".to_string()])
         .build();
     let results = llm
-        .batch_with_exceptions(
+        .batch(
             vec![
                 vec![AnyMessage::HumanMessage(
                     HumanMessage::builder().content("p1").build(),
@@ -627,13 +667,13 @@ async fn test_batch_with_exceptions() {
             ],
             None,
         )
-        .await;
+        .await
+        .unwrap();
 
     assert_eq!(results.len(), 3);
-    assert!(results.iter().all(|r| r.is_ok()));
-    assert_eq!(results[0].as_ref().unwrap(), "r1");
-    assert_eq!(results[1].as_ref().unwrap(), "r2");
-    assert_eq!(results[2].as_ref().unwrap(), "r3");
+    assert_eq!(results[0], "r1");
+    assert_eq!(results[1], "r2");
+    assert_eq!(results[2], "r3");
 }
 
 #[test]

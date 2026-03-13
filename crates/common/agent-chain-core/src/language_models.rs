@@ -6,9 +6,7 @@ mod llms;
 mod model_profile;
 mod utils;
 
-pub use base::{
-    BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig, LanguageModelLike,
-};
+pub use base::{BaseLanguageModel, CustomGetTokenIds, LangSmithParams, LanguageModelConfig};
 
 pub use chat_models::{
     AIMessageChunkStream, BaseChatModel, ChatChunk, ChatGenerationStream, ChatModelConfig,
@@ -23,8 +21,8 @@ pub use crate::messages::UsageMetadata;
 
 pub use llms::{
     BaseLLM, CacheValue, LLM, LLMConfig, LLMGenerateConfig, LLMStream, RunIdInput,
-    aget_prompts_from_cache, aupdate_cache, create_base_retry, get_prompts_from_cache,
-    get_run_ids_list, resolve_cache, save_llm, update_cache,
+    create_base_retry, get_prompts_from_cache, get_run_ids_list, resolve_cache, save_llm,
+    update_cache,
 };
 
 pub use fake::{FakeListLLM, FakeStreamingListLLM};

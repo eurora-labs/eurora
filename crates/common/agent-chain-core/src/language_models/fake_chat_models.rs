@@ -203,14 +203,6 @@ impl FakeListChatModel {
         }
         Ok(results)
     }
-
-    pub async fn abatch(
-        &self,
-        inputs: Vec<Vec<AnyMessage>>,
-        config: Option<&RunnableConfig>,
-    ) -> Result<Vec<AIMessage>> {
-        self.batch(inputs, config).await
-    }
 }
 
 #[async_trait]
@@ -293,7 +285,7 @@ impl BaseChatModel for FakeListChatModel {
         true
     }
 
-    fn _stream(
+    async fn _stream(
         &self,
         _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
@@ -560,7 +552,7 @@ impl BaseChatModel for GenericFakeChatModel {
         true
     }
 
-    fn _stream(
+    async fn _stream(
         &self,
         _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
@@ -854,7 +846,7 @@ mod tests {
             .responses(vec!["Hello".to_string()])
             .build();
 
-        let mut stream = llm._stream(vec![], None, None).unwrap();
+        let mut stream = llm._stream(vec![], None, None).await.unwrap();
 
         let mut result = String::new();
         while let Some(chunk) = stream.next().await {
