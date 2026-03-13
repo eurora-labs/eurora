@@ -12,67 +12,13 @@ use crate::error::{Error, Result};
 use crate::load::{Serializable, Serialized};
 
 use super::config::{
-    AsyncVariableArgsFn, ConfigOrList, EMPTY_MAP, RunnableConfig, VariableArgsFn,
-    acall_func_with_variable_args, call_func_with_variable_args, child_config, ensure_config,
+    ConfigOrList, EMPTY_MAP, RunnableConfig, SyncVariableArgsFn, VariableArgsFn,
+    call_func_with_variable_args, call_sync_func_with_variable_args, child_config, ensure_config,
     finish_chain_run, get_config_list, merge_configs, set_config_context, start_chain_run,
 };
 use super::utils::{Addable, ConfigurableFieldSpec, get_unique_config_specs};
 
 pub type ConfigFactory = Arc<dyn Fn(&RunnableConfig) -> RunnableConfig + Send + Sync>;
-
-struct ConcurrencyGate {
-    state: std::sync::Mutex<ConcurrencyGateState>,
-    cvar: std::sync::Condvar,
-    max: usize,
-}
-
-struct ConcurrencyGateState {
-    active: usize,
-    next_ticket: u64,
-    now_serving: u64,
-}
-
-struct ConcurrencyPermit<'a>(&'a ConcurrencyGate);
-
-impl Drop for ConcurrencyPermit<'_> {
-    fn drop(&mut self) {
-        let mut state = self.0.state.lock().unwrap();
-        state.active -= 1;
-        self.0.cvar.notify_all();
-    }
-}
-
-impl ConcurrencyGate {
-    fn new(max: usize) -> Arc<Self> {
-        debug_assert!(max > 0, "ConcurrencyGate max must be > 0");
-        Arc::new(Self {
-            state: std::sync::Mutex::new(ConcurrencyGateState {
-                active: 0,
-                next_ticket: 0,
-                now_serving: 0,
-            }),
-            cvar: std::sync::Condvar::new(),
-            max,
-        })
-    }
-
-    fn take_ticket(&self) -> u64 {
-        let mut state = self.state.lock().unwrap();
-        let ticket = state.next_ticket;
-        state.next_ticket += 1;
-        ticket
-    }
-
-    fn acquire(&self, ticket: u64) -> ConcurrencyPermit<'_> {
-        let mut state = self.state.lock().unwrap();
-        while state.active >= self.max || state.now_serving != ticket {
-            state = self.cvar.wait(state).unwrap();
-        }
-        state.active += 1;
-        state.now_serving += 1;
-        ConcurrencyPermit(self)
-    }
-}
 
 fn default_get_graph(
     runnable: &(impl Runnable + ?Sized),
@@ -143,19 +89,7 @@ pub trait Runnable: Send + Sync + Debug {
         std::any::type_name::<Self>()
     }
 
-    fn call_with_config(
-        &self,
-        func: &dyn Fn(Self::Input, &RunnableConfig) -> Result<Self::Output>,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
-        let (run_manager, config) = start_chain_run(config);
-        let cfg = child_config(&config, &run_manager, None);
-        let _context_guard = set_config_context(cfg.clone());
-        finish_chain_run(&run_manager, func(input, &cfg))
-    }
-
-    async fn acall_with_config(
+    async fn call_with_config(
         &self,
         func: &(
              dyn Fn(
@@ -176,67 +110,6 @@ pub trait Runnable: Send + Sync + Debug {
         let cfg = child_config(&config, &run_manager, None);
         let _context_guard = set_config_context(cfg.clone());
         finish_chain_run(&run_manager, func(input, cfg).await)
-    }
-
-    fn batch_with_config(
-        &self,
-        func: &dyn Fn(Vec<Self::Input>, Vec<RunnableConfig>) -> Vec<Result<Self::Output>>,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        return_exceptions: bool,
-    ) -> Vec<Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![Err(e)],
-        };
-
-        let run_managers: Vec<_> = configs
-            .iter()
-            .map(|config| {
-                let (run_manager, _) = start_chain_run(Some(config.clone()));
-                run_manager
-            })
-            .collect();
-
-        let child_configs: Vec<_> = configs
-            .iter()
-            .zip(run_managers.iter())
-            .map(|(config, run_manager)| child_config(config, run_manager, None))
-            .collect();
-
-        let outputs = func(inputs, child_configs);
-
-        let mut first_exception: Option<usize> = None;
-        for (i, (run_manager, output)) in run_managers.iter().zip(outputs.iter()).enumerate() {
-            match output {
-                Ok(_) => run_manager.on_chain_end(&EMPTY_MAP),
-                Err(e) => {
-                    if first_exception.is_none() {
-                        first_exception = Some(i);
-                    }
-                    run_manager.on_chain_error(e);
-                }
-            }
-        }
-
-        if return_exceptions {
-            outputs
-        } else if let Some(idx) = first_exception {
-            let error = outputs.into_iter().nth(idx).and_then(|r| r.err());
-            match error {
-                Some(e) => vec![Err(e)],
-                None => vec![],
-            }
-        } else {
-            outputs
-        }
     }
 
     fn transform_stream_with_config<'a>(
@@ -342,115 +215,13 @@ pub trait Runnable: Send + Sync + Debug {
         }))
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output>;
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
-        self.invoke(input, config)
-    }
+    ) -> Result<Self::Output>;
 
-    fn batch(
-        &self,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        return_exceptions: bool,
-    ) -> Vec<Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![Err(e)],
-        };
-
-        if inputs.len() == 1 {
-            let input = inputs.into_iter().next().expect("checked len == 1");
-            let config = configs.into_iter().next().expect("checked len == 1");
-            let result = self.invoke(input, Some(config));
-            return vec![result];
-        }
-
-        let max_concurrency = configs[0].max_concurrency;
-        let len = inputs.len();
-        let mut results: Vec<Option<Result<Self::Output>>> = (0..len).map(|_| None).collect();
-
-        std::thread::scope(|scope| {
-            let gate = max_concurrency.filter(|&n| n > 0).map(ConcurrencyGate::new);
-            let mut handles = Vec::with_capacity(len);
-
-            for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                let gate = gate.clone();
-                let ticket = gate.as_ref().map(|g| g.take_ticket());
-
-                let handle = scope.spawn(move || {
-                    let _permit = gate.as_ref().zip(ticket).map(|(g, t)| g.acquire(t));
-                    let result = if return_exceptions {
-                        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            self.invoke(input, Some(config))
-                        })) {
-                            Ok(r) => r,
-                            Err(panic_info) => {
-                                let msg = panic_info
-                                    .downcast_ref::<String>()
-                                    .cloned()
-                                    .or_else(|| {
-                                        panic_info.downcast_ref::<&str>().map(|s| s.to_string())
-                                    })
-                                    .unwrap_or_else(|| "unknown panic".to_string());
-                                Err(Error::other(format!("Panic in batch item: {msg}")))
-                            }
-                        }
-                    } else {
-                        self.invoke(input, Some(config))
-                    };
-                    (i, result)
-                });
-                handles.push(handle);
-            }
-
-            for handle in handles {
-                match handle.join() {
-                    Ok((i, result)) => {
-                        results[i] = Some(result);
-                    }
-                    Err(panic_info) => {
-                        if !return_exceptions {
-                            std::panic::resume_unwind(panic_info);
-                        }
-                    }
-                }
-            }
-        });
-
-        let collected: Vec<Result<Self::Output>> = results
-            .into_iter()
-            .map(|r| r.expect("all results populated by thread::scope"))
-            .collect();
-
-        if return_exceptions {
-            collected
-        } else if let Some(first_err_idx) = collected.iter().position(|r| r.is_err()) {
-            collected
-                .into_iter()
-                .nth(first_err_idx)
-                .into_iter()
-                .collect()
-        } else {
-            collected
-        }
-    }
-
-    async fn abatch(
+    async fn batch(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
@@ -480,7 +251,7 @@ pub trait Runnable: Send + Sync + Debug {
                         async move {
                             let _permit =
                                 sem.acquire().await.expect("semaphore should not be closed");
-                            self.ainvoke(input, Some(config)).await
+                            self.invoke(input, Some(config)).await
                         }
                     })
                     .collect();
@@ -490,7 +261,7 @@ pub trait Runnable: Send + Sync + Debug {
                 let futures: Vec<_> = inputs
                     .into_iter()
                     .zip(configs)
-                    .map(|(input, config)| self.ainvoke(input, Some(config)))
+                    .map(|(input, config)| self.invoke(input, Some(config)))
                     .collect();
                 futures::future::join_all(futures).await
             }
@@ -506,73 +277,6 @@ pub trait Runnable: Send + Sync + Debug {
     }
 
     fn batch_as_completed(
-        &self,
-        inputs: Vec<Self::Input>,
-        config: Option<ConfigOrList>,
-        return_exceptions: bool,
-    ) -> Vec<(usize, Result<Self::Output>)>
-    where
-        Self: 'static,
-    {
-        if inputs.is_empty() {
-            return Vec::new();
-        }
-
-        let configs = match get_config_list(config, inputs.len()) {
-            Ok(c) => c,
-            Err(e) => return vec![(0, Err(e))],
-        };
-
-        if inputs.len() == 1 {
-            let input = inputs.into_iter().next().expect("checked len == 1");
-            let config = configs.into_iter().next().expect("checked len == 1");
-            return vec![(0, self.invoke(input, Some(config)))];
-        }
-
-        let max_concurrency = configs[0].max_concurrency;
-        let (sender, receiver) = std::sync::mpsc::channel();
-
-        std::thread::scope(|scope| {
-            let gate = max_concurrency.filter(|&n| n > 0).map(ConcurrencyGate::new);
-
-            for (i, (input, config)) in inputs.into_iter().zip(configs).enumerate() {
-                let gate = gate.clone();
-                let ticket = gate.as_ref().map(|g| g.take_ticket());
-                let tx = sender.clone();
-
-                scope.spawn(move || {
-                    let _permit = gate.as_ref().zip(ticket).map(|(g, t)| g.acquire(t));
-                    let result = if return_exceptions {
-                        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            self.invoke(input, Some(config))
-                        })) {
-                            Ok(r) => r,
-                            Err(panic_info) => {
-                                let msg = panic_info
-                                    .downcast_ref::<String>()
-                                    .cloned()
-                                    .or_else(|| {
-                                        panic_info.downcast_ref::<&str>().map(|s| s.to_string())
-                                    })
-                                    .unwrap_or_else(|| "unknown panic".to_string());
-                                Err(Error::other(format!("Panic in batch item: {msg}")))
-                            }
-                        }
-                    } else {
-                        self.invoke(input, Some(config))
-                    };
-                    tx.send((i, result))
-                        .expect("receiver should not be dropped");
-                });
-            }
-
-            drop(sender);
-        });
-
-        receiver.into_iter().collect()
-    }
-
-    fn abatch_as_completed(
         &self,
         inputs: Vec<Self::Input>,
         config: Option<ConfigOrList>,
@@ -601,7 +305,7 @@ pub trait Runnable: Send + Sync + Debug {
                     Some(ref s) => Some(s.acquire().await.expect("semaphore should not be closed")),
                     None => None,
                 };
-                let result = self.ainvoke(input, Some(config)).await;
+                let result = self.invoke(input, Some(config)).await;
                 (i, result)
             });
         }
@@ -613,25 +317,16 @@ pub trait Runnable: Send + Sync + Debug {
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        let result = self.invoke(input, config);
-        Box::pin(futures::stream::once(async move { result }))
-    }
-
-    fn astream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
     ) -> BoxStream<'_, Result<Self::Output>>
     where
         Self: 'static,
     {
         Box::pin(futures::stream::once(async move {
-            self.ainvoke(input, config).await
+            self.invoke(input, config).await
         }))
     }
 
-    fn astream_events<'a>(
+    fn stream_events<'a>(
         &'a self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -660,7 +355,7 @@ pub trait Runnable: Send + Sync + Debug {
         )
     }
 
-    fn astream_log<'a>(
+    fn stream_log<'a>(
         &'a self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -701,7 +396,10 @@ pub trait Runnable: Send + Sync + Debug {
         &'a self,
         input: BoxStream<'a, Self::Input>,
         config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>> {
+    ) -> BoxStream<'a, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
         Box::pin(async_stream::stream! {
             let mut final_input = None;
             let mut input = input;
@@ -715,17 +413,6 @@ pub trait Runnable: Send + Sync + Debug {
                 }
             }
         })
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        self.transform(input, config)
     }
 
     fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {
@@ -1008,7 +695,7 @@ where
 #[async_trait]
 impl<F, I, O> Runnable for RunnableLambda<F, I, O>
 where
-    F: Fn(I) -> Result<O> + Send + Sync,
+    F: Fn(I) -> Result<O> + Send + Sync + 'static,
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
@@ -1019,17 +706,31 @@ where
         self.name.clone()
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        self.call_with_config(&|input, _config| (self.func)(input), input, config)
+    async fn invoke(
+        &self,
+        input: Self::Input,
+        config: Option<RunnableConfig>,
+    ) -> Result<Self::Output> {
+        self.call_with_config(
+            &|input, _config: RunnableConfig| {
+                let result = (self.func)(input);
+                Box::pin(async move { result })
+            },
+            input,
+            config,
+        )
+        .await
     }
 
     fn stream(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        let result = self.invoke(input, config);
-        Box::pin(futures::stream::once(async move { result }))
+    ) -> BoxStream<'_, Result<Self::Output>>
+    where
+        Self: 'static,
+    {
+        Box::pin(futures::stream::once(self.invoke(input, config)))
     }
 
     fn transform<'a>(
@@ -1114,8 +815,8 @@ where
     I: Send + Sync + Clone + Debug + 'static,
     O: Send + Sync + Clone + Debug + 'static,
 {
-    func: Option<VariableArgsFn<I, Result<O>>>,
-    afunc: Option<AsyncVariableArgsFn<I, Result<O>>>,
+    func: Option<SyncVariableArgsFn<I, Result<O>>>,
+    afunc: Option<VariableArgsFn<I, Result<O>>>,
     name: Option<String>,
 }
 
@@ -1140,7 +841,10 @@ where
     O: Send + Sync + Clone + Debug + 'static,
 {
     #[builder]
-    pub fn new(func: VariableArgsFn<I, Result<O>>, #[builder(into)] name: Option<String>) -> Self {
+    pub fn new(
+        func: SyncVariableArgsFn<I, Result<O>>,
+        #[builder(into)] name: Option<String>,
+    ) -> Self {
         Self {
             func: Some(func),
             afunc: None,
@@ -1150,7 +854,7 @@ where
 
     pub fn from_func(func: impl Fn(I) -> Result<O> + Send + Sync + 'static) -> Self {
         Self::builder()
-            .func(VariableArgsFn::InputOnly(Box::new(func)))
+            .func(SyncVariableArgsFn::InputOnly(Box::new(func)))
             .build()
     }
 
@@ -1159,7 +863,7 @@ where
         name: impl Into<String>,
     ) -> Self {
         Self::builder()
-            .func(VariableArgsFn::InputOnly(Box::new(func)))
+            .func(SyncVariableArgsFn::InputOnly(Box::new(func)))
             .name(name)
             .build()
     }
@@ -1168,7 +872,7 @@ where
         func: impl Fn(I, &RunnableConfig) -> Result<O> + Send + Sync + 'static,
     ) -> Self {
         Self::builder()
-            .func(VariableArgsFn::WithConfig(Box::new(func)))
+            .func(SyncVariableArgsFn::WithConfig(Box::new(func)))
             .build()
     }
 
@@ -1179,7 +883,7 @@ where
     {
         Self {
             func: None,
-            afunc: Some(AsyncVariableArgsFn::InputOnly(Box::new(move |input| {
+            afunc: Some(VariableArgsFn::InputOnly(Box::new(move |input| {
                 Box::pin(afunc(input))
             }))),
             name: None,
@@ -1193,7 +897,7 @@ where
     {
         Self {
             func: None,
-            afunc: Some(AsyncVariableArgsFn::WithConfig(Box::new(
+            afunc: Some(VariableArgsFn::WithConfig(Box::new(
                 move |input, config| Box::pin(afunc(input, config)),
             ))),
             name: None,
@@ -1205,7 +909,7 @@ where
         F: Fn(I) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<O>> + Send + 'static,
     {
-        self.afunc = Some(AsyncVariableArgsFn::InputOnly(Box::new(move |input| {
+        self.afunc = Some(VariableArgsFn::InputOnly(Box::new(move |input| {
             Box::pin(afunc(input))
         })));
         self
@@ -1216,7 +920,7 @@ where
         F: Fn(I, RunnableConfig) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<O>> + Send + 'static,
     {
-        self.afunc = Some(AsyncVariableArgsFn::WithConfig(Box::new(
+        self.afunc = Some(VariableArgsFn::WithConfig(Box::new(
             move |input, config| Box::pin(afunc(input, config)),
         )));
         self
@@ -1236,32 +940,17 @@ where
         self.name.clone()
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let func = self.func.as_ref().ok_or_else(|| {
-            Error::other("Cannot invoke a coroutine function synchronously. Use ainvoke instead.")
-        })?;
-
-        self.call_with_config(
-            &|input, config| call_func_with_variable_args(func, input, config),
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         if let Some(afunc) = &self.afunc {
-            self.acall_with_config(
+            self.call_with_config(
                 &|input, config: RunnableConfig| {
                     let result = match afunc {
-                        AsyncVariableArgsFn::InputOnly(f) => f(input),
-                        AsyncVariableArgsFn::WithConfig(f) => f(input, config),
+                        VariableArgsFn::InputOnly(f) => f(input),
+                        VariableArgsFn::WithConfig(f) => f(input, config),
                     };
                     Box::pin(result)
                 },
@@ -1270,10 +959,12 @@ where
             )
             .await
         } else if let Some(func) = &self.func {
-            self.call_with_config(
-                &|input, config| call_func_with_variable_args(func, input, config),
-                input,
-                config,
+            let (run_manager, config) = start_chain_run(config);
+            let cfg = child_config(&config, &run_manager, None);
+            let _context_guard = set_config_context(cfg.clone());
+            finish_chain_run(
+                &run_manager,
+                call_sync_func_with_variable_args(func, input, &cfg),
             )
         } else {
             Err(Error::other(
@@ -1282,46 +973,7 @@ where
         }
     }
 
-    fn stream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>> {
-        let result = self.invoke(input, config);
-        Box::pin(futures::stream::once(async move { result }))
-    }
-
     fn transform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>> {
-        self.transform_stream_with_config(
-            input,
-            Box::new(move |input_stream, config| {
-                let config = config.clone();
-                Box::pin(async_stream::stream! {
-                    let mut final_input = None;
-                    let mut stream = input_stream;
-                    while let Some(ichunk) = stream.next().await {
-                        final_input = Some(ichunk);
-                    }
-                    if let Some(input_val) = final_input {
-                        if let Some(func) = &self.func {
-                            yield call_func_with_variable_args(func, input_val, &config);
-                        } else {
-                            yield Err(Error::other(
-                                "Cannot transform synchronously without a sync function",
-                            ));
-                        }
-                    }
-                })
-            }),
-            config,
-        )
-    }
-
-    fn atransform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
         config: Option<RunnableConfig>,
@@ -1341,7 +993,7 @@ where
                             final_input = Some(ichunk);
                         }
                         if let Some(input_val) = final_input {
-                            let result = acall_func_with_variable_args(
+                            let result = call_func_with_variable_args(
                                 afunc, input_val, &config
                             ).await;
                             yield result;
@@ -1351,7 +1003,29 @@ where
                 config,
             )
         } else if self.func.is_some() {
-            self.transform(input, config)
+            self.transform_stream_with_config(
+                input,
+                Box::new(move |input_stream, config| {
+                    let config = config.clone();
+                    Box::pin(async_stream::stream! {
+                        let mut final_input = None;
+                        let mut stream = input_stream;
+                        while let Some(ichunk) = stream.next().await {
+                            final_input = Some(ichunk);
+                        }
+                        if let Some(input_val) = final_input {
+                            if let Some(func) = &self.func {
+                                yield call_sync_func_with_variable_args(func, input_val, &config);
+                            } else {
+                                yield Err(Error::other(
+                                    "Cannot transform synchronously without a sync function",
+                                ));
+                            }
+                        }
+                    })
+                }),
+                config,
+            )
         } else {
             Box::pin(futures::stream::once(async {
                 Err(Error::other(
@@ -1423,39 +1097,16 @@ where
         prompts
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (run_manager, config) = start_chain_run(config);
-
-        let intermediate = match self.first.invoke(
-            input,
-            Some(child_config(&config, &run_manager, Some("seq:step:1"))),
-        ) {
-            Ok(output) => output,
-            Err(e) => return finish_chain_run(&run_manager, Err(e)),
-        };
-
-        finish_chain_run(
-            &run_manager,
-            self.last.invoke(
-                intermediate,
-                Some(child_config(&config, &run_manager, Some("seq:step:2"))),
-            ),
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         let (run_manager, config) = start_chain_run(config);
 
         let intermediate = match self
             .first
-            .ainvoke(
+            .invoke(
                 input,
                 Some(child_config(&config, &run_manager, Some("seq:step:1"))),
             )
@@ -1468,7 +1119,7 @@ where
         finish_chain_run(
             &run_manager,
             self.last
-                .ainvoke(
+                .invoke(
                     intermediate,
                     Some(child_config(&config, &run_manager, Some("seq:step:2"))),
                 )
@@ -1527,17 +1178,6 @@ where
                 }
             }
         })
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        self.transform(input, config)
     }
 
     fn get_graph(&self, config: Option<&RunnableConfig>) -> Result<super::graph::Graph> {
@@ -1685,47 +1325,11 @@ where
         prompts
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (run_manager, config) = start_chain_run(config);
-
-        let step_entries: Vec<_> = self.steps.iter().collect();
-        let mut results = HashMap::new();
-
-        let outcome: Result<()> = std::thread::scope(|scope| {
-            let handles: Vec<_> = step_entries
-                .iter()
-                .map(|(key, step)| {
-                    let input = input.clone();
-                    let cfg =
-                        child_config(&config, &run_manager, Some(&format!("map:key:{}", key)));
-                    let key = (*key).clone();
-                    scope.spawn(move || {
-                        let _context_guard = set_config_context(cfg.clone());
-                        let result = step.invoke(input, Some(cfg));
-                        (key, result)
-                    })
-                })
-                .collect();
-
-            for handle in handles {
-                let (key, result) = handle.join().expect("thread should not panic");
-                results.insert(key, result?);
-            }
-
-            Ok(())
-        });
-
-        finish_chain_run(&run_manager, outcome.map(|()| results))
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         let (run_manager, config) = start_chain_run(config);
 
         let futures: Vec<_> = self
@@ -1735,7 +1339,7 @@ where
                 let input = input.clone();
                 let cfg = child_config(&config, &run_manager, Some(&format!("map:key:{}", key)));
                 let key = key.clone();
-                async move { (key, step.ainvoke(input, Some(cfg)).await) }
+                async move { (key, step.invoke(input, Some(cfg)).await) }
             })
             .collect();
 
@@ -1963,20 +1567,13 @@ where
         self.bound.get_prompts()
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        self.bound.invoke(input, Some(self.merge_configs(config)))
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         self.bound
-            .ainvoke(input, Some(self.merge_configs(config)))
+            .invoke(input, Some(self.merge_configs(config)))
             .await
     }
 
@@ -2032,34 +1629,17 @@ where
         self.bound.name().map(|n| format!("RunnableEach<{}>", n))
     }
 
-    fn invoke(&self, inputs: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        self.call_with_config(
-            &|inputs: Vec<R::Input>, config: &RunnableConfig| {
-                let configs = super::config::ConfigOrList::List(
-                    inputs.iter().map(|_| config.clone()).collect(),
-                );
-                let results = self.bound.batch(inputs, Some(configs), false);
-                results.into_iter().collect()
-            },
-            inputs,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         inputs: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         let (run_manager, config) = start_chain_run(config);
         let cfg = child_config(&config, &run_manager, None);
 
         let configs =
             super::config::ConfigOrList::List(inputs.iter().map(|_| cfg.clone()).collect());
-        let results = self.bound.abatch(inputs, Some(configs), false).await;
+        let results = self.bound.batch(inputs, Some(configs), false).await;
 
         finish_chain_run(&run_manager, results.into_iter().collect())
     }
@@ -2123,51 +1703,12 @@ where
         self.name.clone()
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let collect_stream = async {
-            let mut stream = self.stream(input, config);
-            let mut final_output: Option<Self::Output> = None;
-            while let Some(result) = stream.next().await {
-                let chunk = result?;
-                final_output = Some(match final_output {
-                    None => chunk,
-                    Some(prev) => prev.add(chunk),
-                });
-            }
-            final_output.ok_or_else(|| Error::other("RunnableGenerator produced no output"))
-        };
-
-        if tokio::runtime::Handle::try_current().is_ok() {
-            std::thread::scope(|scope| {
-                scope
-                    .spawn(|| {
-                        tokio::runtime::Builder::new_current_thread()
-                            .enable_all()
-                            .build()
-                            .expect("failed to create tokio runtime")
-                            .block_on(collect_stream)
-                    })
-                    .join()
-                    .expect("spawned thread panicked")
-            })
-        } else {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|e| Error::other(format!("failed to create tokio runtime: {e}")))?
-                .block_on(collect_stream)
-        }
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
-        let mut stream = self.astream(input, config);
+    ) -> Result<Self::Output> {
+        let mut stream = self.stream(input, config);
         let mut final_output: Option<Self::Output> = None;
         while let Some(result) = stream.next().await {
             let chunk = result?;
@@ -2188,17 +1729,6 @@ where
         self.transform(input_stream, config)
     }
 
-    fn astream(
-        &self,
-        input: Self::Input,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'_, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        self.stream(input, config)
-    }
-
     fn transform<'a>(
         &'a self,
         input: BoxStream<'a, Self::Input>,
@@ -2209,17 +1739,6 @@ where
             Box::new(move |stream, _config| (self.transform_fn)(stream)),
             config,
         )
-    }
-
-    fn atransform<'a>(
-        &'a self,
-        input: BoxStream<'a, Self::Input>,
-        config: Option<RunnableConfig>,
-    ) -> BoxStream<'a, Result<Self::Output>>
-    where
-        Self: 'static,
-    {
-        self.transform(input, config)
     }
 }
 
@@ -2285,32 +1804,16 @@ where
         self.name.clone()
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let (run_manager, config) = start_chain_run(config);
-        let mut current = input;
-        for (i, step) in self.steps.iter().enumerate() {
-            let cfg = child_config(&config, &run_manager, Some(&format!("seq:step:{}", i + 1)));
-            match step.invoke(current, Some(cfg)) {
-                Ok(output) => current = output,
-                Err(e) => return finish_chain_run(&run_manager, Err(e)),
-            }
-        }
-        finish_chain_run(&run_manager, Ok(current))
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
+    ) -> Result<Self::Output> {
         let (run_manager, config) = start_chain_run(config);
         let mut current = input;
         for (i, step) in self.steps.iter().enumerate() {
             let cfg = child_config(&config, &run_manager, Some(&format!("seq:step:{}", i + 1)));
-            match step.ainvoke(current, Some(cfg)).await {
+            match step.invoke(current, Some(cfg)).await {
                 Ok(output) => current = output,
                 Err(e) => return finish_chain_run(&run_manager, Err(e)),
             }
@@ -2333,7 +1836,7 @@ where
 
             let mut current = input;
             for step in &self.steps[..last_idx] {
-                match step.invoke(current, Some(config.clone())) {
+                match step.invoke(current, Some(config.clone())).await {
                     Ok(output) => current = output,
                     Err(e) => {
                         yield Err(e);
@@ -2383,20 +1886,12 @@ where
         self.inner.name()
     }
 
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let output = self.inner.invoke(input, config)?;
-        serde_json::to_value(output).map_err(|e| Error::other(format!("serialization failed: {e}")))
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
-    ) -> Result<Self::Output>
-    where
-        Self: 'static,
-    {
-        let output = self.inner.ainvoke(input, config).await?;
+    ) -> Result<Self::Output> {
+        let output = self.inner.invoke(input, config).await?;
         serde_json::to_value(output).map_err(|e| Error::other(format!("serialization failed: {e}")))
     }
 
@@ -2421,10 +1916,10 @@ mod tests {
     use crate::runnables::passthrough::RunnablePassthrough;
     use crate::runnables::utils::AddableDict;
 
-    #[test]
-    fn test_runnable_lambda() {
+    #[tokio::test]
+    async fn test_runnable_lambda() {
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-        let result = runnable.invoke(1, None).unwrap();
+        let result = runnable.invoke(1, None).await.unwrap();
         assert_eq!(result, 2);
     }
 
@@ -2437,8 +1932,8 @@ mod tests {
         assert_eq!(runnable.name(), Some("add_one".to_string()));
     }
 
-    #[test]
-    fn test_runnable_sequence() {
+    #[tokio::test]
+    async fn test_runnable_sequence() {
         let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let sequence = RunnableSequence::builder()
@@ -2446,21 +1941,21 @@ mod tests {
             .last(second)
             .build();
 
-        let result = sequence.invoke(1, None).unwrap();
+        let result = sequence.invoke(1, None).await.unwrap();
         assert_eq!(result, 4); // (1 + 1) * 2 = 4
     }
 
-    #[test]
-    fn test_runnable_each() {
+    #[tokio::test]
+    async fn test_runnable_each() {
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let each = RunnableEach::new(runnable);
 
-        let result = each.invoke(vec![1, 2, 3], None).unwrap();
+        let result = each.invoke(vec![1, 2, 3], None).await.unwrap();
         assert_eq!(result, vec![2, 4, 6]);
     }
 
-    #[test]
-    fn test_runnable_binding() {
+    #[tokio::test]
+    async fn test_runnable_binding() {
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let config = RunnableConfig::builder()
             .tags(vec!["test".to_string()])
@@ -2470,25 +1965,25 @@ mod tests {
             .config(config)
             .build();
 
-        let result = bound.invoke(1, None).unwrap();
+        let result = bound.invoke(1, None).await.unwrap();
         assert_eq!(result, 2);
     }
 
-    #[test]
-    fn test_runnable_passthrough() {
+    #[tokio::test]
+    async fn test_runnable_passthrough() {
         let runnable: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-        let result = runnable.invoke(42, None).unwrap();
+        let result = runnable.invoke(42, None).await.unwrap();
         assert_eq!(result, 42);
     }
 
-    #[test]
-    fn test_runnable_retry() {
+    #[tokio::test]
+    async fn test_runnable_retry() {
         use crate::runnables::retry::RunnableRetry;
 
         let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let retry = RunnableRetry::with_simple(runnable, 3, false);
 
-        let result = retry.invoke(1, None).unwrap();
+        let result = retry.invoke(1, None).await.unwrap();
         assert_eq!(result, 2);
     }
 
@@ -2505,33 +2000,13 @@ mod tests {
         assert_eq!(combined.0.get("b"), Some(&serde_json::json!(2)));
     }
 
-    #[test]
-    fn test_pipe() {
+    #[tokio::test]
+    async fn test_pipe() {
         let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
         let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
         let sequence = pipe(first, second);
 
-        let result = sequence.invoke(1, None).unwrap();
-        assert_eq!(result, 4);
-    }
-
-    #[tokio::test]
-    async fn test_runnable_lambda_async() {
-        let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-        let result = runnable.ainvoke(1, None).await.unwrap();
-        assert_eq!(result, 2);
-    }
-
-    #[tokio::test]
-    async fn test_runnable_sequence_async() {
-        let first = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-        let second = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-        let sequence = RunnableSequence::builder()
-            .first(first)
-            .last(second)
-            .build();
-
-        let result = sequence.ainvoke(1, None).await.unwrap();
+        let result = sequence.invoke(1, None).await.unwrap();
         assert_eq!(result, 4);
     }
 
@@ -2578,7 +2053,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_runnable_generator_ainvoke() {
+    async fn test_runnable_generator_invoke() {
         let generator = RunnableGenerator::<String, String>::new(|input_stream| {
             Box::pin(async_stream::stream! {
                 use futures::StreamExt;
@@ -2590,7 +2065,7 @@ mod tests {
             })
         });
 
-        let result = generator.ainvoke("input".to_string(), None).await.unwrap();
+        let result = generator.invoke("input".to_string(), None).await.unwrap();
         assert_eq!(result, "Have a nice day");
     }
 
@@ -2708,7 +2183,7 @@ mod tests {
                     .build(),
             );
 
-        let invoke_result = parallel.invoke(serde_json::json!(3), None).unwrap();
+        let invoke_result = parallel.invoke(serde_json::json!(3), None).await.unwrap();
 
         let stream_chunks: Vec<_> = parallel
             .stream(serde_json::json!(3), None)

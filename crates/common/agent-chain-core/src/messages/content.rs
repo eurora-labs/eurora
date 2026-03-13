@@ -313,10 +313,6 @@ impl Annotation {
     }
 }
 
-pub type Citation = Annotation;
-
-pub type NonStandardAnnotation = Annotation;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextContentBlock {
     #[serde(rename = "type")]

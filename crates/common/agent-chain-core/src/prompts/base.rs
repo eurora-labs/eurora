@@ -1,71 +1,10 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::prompt_values::{PromptValue, StringPromptValue};
-use crate::runnables::config::{RunnableConfig, ensure_config};
-
-#[derive(Clone)]
-pub struct PartialValue(Arc<dyn Fn() -> String + Send + Sync>);
-
-impl PartialValue {
-    pub fn from_fn(f: impl Fn() -> String + Send + Sync + 'static) -> Self {
-        Self(Arc::new(f))
-    }
-
-    pub fn resolve(&self) -> String {
-        (self.0)()
-    }
-}
-
-impl From<String> for PartialValue {
-    fn from(s: String) -> Self {
-        Self(Arc::new(move || s.clone()))
-    }
-}
-
-impl From<&str> for PartialValue {
-    fn from(s: &str) -> Self {
-        let s = s.to_string();
-        Self(Arc::new(move || s.clone()))
-    }
-}
-
-impl std::fmt::Debug for PartialValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PartialValue(\"{}\")", self.resolve())
-    }
-}
-
-pub fn resolve_partials(partials: &HashMap<String, PartialValue>) -> HashMap<String, String> {
-    partials
-        .iter()
-        .map(|(k, v)| (k.clone(), v.resolve()))
-        .collect()
-}
-
-pub(super) fn merge_prompt_config(
-    config: Option<RunnableConfig>,
-    metadata: Option<&HashMap<String, serde_json::Value>>,
-    tags: Option<&[String]>,
-) -> Option<RunnableConfig> {
-    if metadata.is_none() && tags.is_none() {
-        return config;
-    }
-    let mut config = ensure_config(config);
-    if let Some(m) = metadata {
-        config
-            .metadata
-            .extend(m.iter().map(|(k, v)| (k.clone(), v.clone())));
-    }
-    if let Some(t) = tags {
-        config.tags.extend(t.iter().cloned());
-    }
-    Some(config)
-}
+use crate::messages::{AnyMessage, HumanMessage};
 
 pub trait BasePromptTemplate: Send + Sync {
     fn input_variables(&self) -> &[String];
@@ -94,31 +33,14 @@ pub trait BasePromptTemplate: Send + Sync {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String>;
 
-    fn aformat(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + '_>> {
-        let result = self.format(kwargs);
-        Box::pin(async move { result })
-    }
-
-    fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let text = self.format(kwargs)?;
-        Ok(Box::new(StringPromptValue::new(text)))
+        Ok(vec![AnyMessage::HumanMessage(
+            HumanMessage::builder().content(&text).build(),
+        )])
     }
 
-    fn aformat_prompt(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Box<dyn PromptValue>>> + Send + '_>,
-    > {
-        let result = self.format_prompt(kwargs);
-        Box::pin(async move { result })
-    }
-
-    fn partial(&self, kwargs: HashMap<String, PartialValue>)
-    -> Result<Box<dyn BasePromptTemplate>>;
+    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>>;
 
     fn prompt_type(&self) -> &str;
 
@@ -299,11 +221,6 @@ pub fn format_document(doc: &Document, prompt: &dyn BasePromptTemplate) -> Resul
     prompt.format(&info)
 }
 
-pub async fn aformat_document(doc: &Document, prompt: &dyn BasePromptTemplate) -> Result<String> {
-    let info = get_document_info(doc, prompt.input_variables())?;
-    prompt.aformat(&info).await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326,20 +243,16 @@ mod tests {
             Ok(result)
         }
 
-        fn partial(
-            &self,
-            kwargs: HashMap<String, PartialValue>,
-        ) -> Result<Box<dyn BasePromptTemplate>> {
-            let resolved: HashMap<String, String> = resolve_partials(&kwargs);
+        fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
             let new_vars: Vec<_> = self
                 .input_variables
                 .iter()
-                .filter(|v| !resolved.contains_key(*v))
+                .filter(|v| !kwargs.contains_key(*v))
                 .cloned()
                 .collect();
 
             let mut new_template = self.template.clone();
-            for (key, value) in &resolved {
+            for (key, value) in &kwargs {
                 new_template = new_template.replace(&format!("{{{}}}", key), value);
             }
 

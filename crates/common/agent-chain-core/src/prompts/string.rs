@@ -278,14 +278,6 @@ pub trait StringPromptTemplate: Send + Sync {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String>;
 
-    fn aformat(
-        &self,
-        kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + '_>> {
-        let result = self.format(kwargs);
-        Box::pin(async move { result })
-    }
-
     fn pretty_repr(&self, html: bool) -> String;
 
     fn pretty_print(&self) {
