@@ -1,51 +1,11 @@
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
-use crate::prompt_values::{PromptValue, StringPromptValue};
+use crate::messages::{AnyMessage, HumanMessage};
 use crate::runnables::config::{RunnableConfig, ensure_config};
-
-#[derive(Clone)]
-pub struct PartialValue(Arc<dyn Fn() -> String + Send + Sync>);
-
-impl PartialValue {
-    pub fn from_fn(f: impl Fn() -> String + Send + Sync + 'static) -> Self {
-        Self(Arc::new(f))
-    }
-
-    pub fn resolve(&self) -> String {
-        (self.0)()
-    }
-}
-
-impl From<String> for PartialValue {
-    fn from(s: String) -> Self {
-        Self(Arc::new(move || s.clone()))
-    }
-}
-
-impl From<&str> for PartialValue {
-    fn from(s: &str) -> Self {
-        let s = s.to_string();
-        Self(Arc::new(move || s.clone()))
-    }
-}
-
-impl std::fmt::Debug for PartialValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PartialValue(\"{}\")", self.resolve())
-    }
-}
-
-pub fn resolve_partials(partials: &HashMap<String, PartialValue>) -> HashMap<String, String> {
-    partials
-        .iter()
-        .map(|(k, v)| (k.clone(), v.resolve()))
-        .collect()
-}
 
 pub(super) fn merge_prompt_config(
     config: Option<RunnableConfig>,
@@ -102,23 +62,23 @@ pub trait BasePromptTemplate: Send + Sync {
         Box::pin(async move { result })
     }
 
-    fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let text = self.format(kwargs)?;
-        Ok(Box::new(StringPromptValue::new(text)))
+        Ok(vec![AnyMessage::HumanMessage(
+            HumanMessage::builder().content(&text).build(),
+        )])
     }
 
-    fn aformat_prompt(
+    fn aformat_messages(
         &self,
         kwargs: &HashMap<String, String>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Box<dyn PromptValue>>> + Send + '_>,
-    > {
-        let result = self.format_prompt(kwargs);
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<AnyMessage>>> + Send + '_>>
+    {
+        let result = self.format_messages(kwargs);
         Box::pin(async move { result })
     }
 
-    fn partial(&self, kwargs: HashMap<String, PartialValue>)
-    -> Result<Box<dyn BasePromptTemplate>>;
+    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>>;
 
     fn prompt_type(&self) -> &str;
 
@@ -326,20 +286,16 @@ mod tests {
             Ok(result)
         }
 
-        fn partial(
-            &self,
-            kwargs: HashMap<String, PartialValue>,
-        ) -> Result<Box<dyn BasePromptTemplate>> {
-            let resolved: HashMap<String, String> = resolve_partials(&kwargs);
+        fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
             let new_vars: Vec<_> = self
                 .input_variables
                 .iter()
-                .filter(|v| !resolved.contains_key(*v))
+                .filter(|v| !kwargs.contains_key(*v))
                 .cloned()
                 .collect();
 
             let mut new_template = self.template.clone();
-            for (key, value) in &resolved {
+            for (key, value) in &kwargs {
                 new_template = new_template.replace(&format!("{{{}}}", key), value);
             }
 

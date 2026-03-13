@@ -4,7 +4,6 @@ use agent_chain_core::error::{Error, Result};
 use agent_chain_core::messages::{AIMessage, AnyMessage, HumanMessage};
 use agent_chain_core::output_parsers::{BaseLLMOutputParser, BaseOutputParser};
 use agent_chain_core::outputs::{ChatGeneration, Generation};
-use agent_chain_core::prompt_values::StringPromptValue;
 
 #[derive(Debug)]
 struct IntParser;
@@ -194,7 +193,9 @@ fn test_parse_result_partial_flag() {
 #[test]
 fn test_parse_with_prompt_ignores_prompt() {
     let parser = IntParser;
-    let prompt = StringPromptValue::new("Give me a number");
+    let prompt = vec![AnyMessage::HumanMessage(
+        HumanMessage::builder().content("Give me a number").build(),
+    )];
     let result = parser.parse_with_prompt("42", &prompt).unwrap();
     assert_eq!(result, 42);
 }

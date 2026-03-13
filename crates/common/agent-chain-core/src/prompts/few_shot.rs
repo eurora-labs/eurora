@@ -6,11 +6,10 @@ use bon::bon;
 
 use crate::error::{Error, Result};
 use crate::messages::{AnyMessage, get_buffer_string};
-use crate::prompt_values::{ChatPromptValue, StringPromptValue};
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
+use super::base::{BasePromptTemplate, merge_prompt_config};
 use super::chat::{BaseChatPromptTemplate, ChatPromptInput};
 use super::message::BaseMessagePromptTemplate;
 use super::prompt::PromptTemplate;
@@ -123,7 +122,7 @@ pub struct FewShotPromptTemplate {
 
     input_variables: Vec<String>,
 
-    partial_variables: HashMap<String, PartialValue>,
+    partial_variables: HashMap<String, String>,
 
     validate_template: bool,
 }
@@ -149,7 +148,7 @@ impl FewShotPromptTemplate {
             prefix: prefix.unwrap_or_default(),
             template_format,
             input_variables: Vec::new(),
-            partial_variables: HashMap::<String, PartialValue>::new(),
+            partial_variables: HashMap::new(),
             validate_template,
         };
         template.infer_input_variables();
@@ -171,7 +170,7 @@ impl FewShotPromptTemplate {
             prefix: prefix.unwrap_or_default(),
             template_format: PromptTemplateFormat::FString,
             input_variables: Vec::new(),
-            partial_variables: HashMap::<String, PartialValue>::new(),
+            partial_variables: HashMap::new(),
             validate_template: false,
         };
         template.infer_input_variables();
@@ -216,7 +215,7 @@ impl BasePromptTemplate for FewShotPromptTemplate {
     }
 
     fn partial_variables(&self) -> HashMap<String, String> {
-        resolve_partials(&self.partial_variables)
+        self.partial_variables.clone()
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
@@ -252,10 +251,7 @@ impl BasePromptTemplate for FewShotPromptTemplate {
         format_template(&template, self.template_format, &kwargs)
     }
 
-    fn partial(
-        &self,
-        kwargs: HashMap<String, PartialValue>,
-    ) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
         let new_vars: Vec<_> = self
             .input_variables
             .iter()
@@ -310,7 +306,7 @@ impl BasePromptTemplate for FewShotPromptTemplate {
 #[async_trait]
 impl Runnable for FewShotPromptTemplate {
     type Input = HashMap<String, String>;
-    type Output = StringPromptValue;
+    type Output = Vec<AnyMessage>;
 
     fn name(&self) -> Option<String> {
         Some("FewShotPromptTemplate".to_string())
@@ -321,8 +317,7 @@ impl Runnable for FewShotPromptTemplate {
         self.call_with_config(
             &|input, _config| {
                 BasePromptTemplate::validate_input(self, &input)?;
-                let text = BasePromptTemplate::format(self, &input)?;
-                Ok(StringPromptValue::new(text))
+                self.format_messages(&input)
             },
             input,
             config,
@@ -344,7 +339,7 @@ impl StringPromptTemplate for FewShotPromptTemplate {
     }
 
     fn partial_variables(&self) -> HashMap<String, String> {
-        resolve_partials(&self.partial_variables)
+        self.partial_variables.clone()
     }
 
     fn template_format(&self) -> PromptTemplateFormat {
@@ -398,7 +393,7 @@ impl ExamplePrompt for super::chat::ChatPromptTemplate {
     }
     fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let input = ChatPromptInput::from(kwargs.clone());
-        BaseChatPromptTemplate::format_messages(self, &input)
+        BaseChatPromptTemplate::format_chat_messages(self, &input)
     }
     fn clone_box(&self) -> Box<dyn ExamplePrompt> {
         Box::new(self.clone())
@@ -483,14 +478,11 @@ impl BasePromptTemplate for FewShotChatMessagePromptTemplate {
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
         let input = ChatPromptInput::from(kwargs.clone());
-        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
+        let messages = BaseChatPromptTemplate::format_chat_messages(self, &input)?;
         Ok(get_buffer_string(&messages, "Human", "AI"))
     }
 
-    fn partial(
-        &self,
-        _kwargs: HashMap<String, PartialValue>,
-    ) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(&self, _kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
         Err(crate::error::Error::NotImplemented(
             "partial is not supported for FewShotChatMessagePromptTemplate".into(),
         ))
@@ -509,7 +501,7 @@ impl BasePromptTemplate for FewShotChatMessagePromptTemplate {
 }
 
 impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
-    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
+    fn format_chat_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
         BaseMessagePromptTemplate::format_messages(self, &input.variables)
     }
 
@@ -521,7 +513,7 @@ impl BaseChatPromptTemplate for FewShotChatMessagePromptTemplate {
 #[async_trait]
 impl Runnable for FewShotChatMessagePromptTemplate {
     type Input = ChatPromptInput;
-    type Output = ChatPromptValue;
+    type Output = Vec<AnyMessage>;
 
     fn name(&self) -> Option<String> {
         Some("FewShotChatMessagePromptTemplate".to_string())
@@ -532,8 +524,7 @@ impl Runnable for FewShotChatMessagePromptTemplate {
         self.call_with_config(
             &|input: ChatPromptInput, _config| {
                 BasePromptTemplate::validate_input(self, &input.variables)?;
-                let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-                Ok(ChatPromptValue::new(messages))
+                BaseChatPromptTemplate::format_chat_messages(self, &input)
             },
             input,
             config,

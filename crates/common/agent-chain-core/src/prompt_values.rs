@@ -50,49 +50,6 @@ impl ImageURL {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StringPromptValue {
-    pub text: String,
-}
-
-impl StringPromptValue {
-    pub fn new(text: impl Into<String>) -> Self {
-        Self { text: text.into() }
-    }
-}
-
-impl PromptValue for StringPromptValue {
-    fn to_string(&self) -> String {
-        self.text.clone()
-    }
-
-    fn to_messages(&self) -> Vec<AnyMessage> {
-        vec![AnyMessage::HumanMessage(
-            HumanMessage::builder().content(&self.text).build(),
-        )]
-    }
-}
-
-impl Serializable for StringPromptValue {
-    fn is_lc_serializable() -> bool
-    where
-        Self: Sized,
-    {
-        true
-    }
-
-    fn get_lc_namespace() -> Vec<String>
-    where
-        Self: Sized,
-    {
-        vec![
-            "langchain".to_string(),
-            "prompts".to_string(),
-            "base".to_string(),
-        ]
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatPromptValue {
     pub messages: Vec<AnyMessage>,
 }
@@ -249,23 +206,12 @@ impl Serializable for ChatPromptValueConcrete {
     }
 }
 
-submit_constructor!(StringPromptValue);
 submit_constructor!(ChatPromptValue);
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::{AIMessage, BaseMessage, SystemMessage};
-
-    #[test]
-    fn test_string_prompt_value() {
-        let pv = StringPromptValue::new("Hello, world!");
-        assert_eq!(pv.to_string(), "Hello, world!");
-
-        let messages = pv.to_messages();
-        assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0].content(), "Hello, world!");
-    }
+    use crate::messages::{AIMessage, SystemMessage};
 
     #[test]
     fn test_chat_prompt_value() {
@@ -322,10 +268,6 @@ mod tests {
 
     #[test]
     fn test_serializable_namespaces() {
-        assert_eq!(
-            StringPromptValue::get_lc_namespace(),
-            vec!["langchain", "prompts", "base"]
-        );
         assert_eq!(
             ChatPromptValue::get_lc_namespace(),
             vec!["langchain", "prompts", "chat"]

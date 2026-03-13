@@ -5,11 +5,11 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
+use crate::messages::get_buffer_string;
 use crate::messages::{
     AIMessage, AnyMessage, ChatMessage, ContentPart, HumanMessage, ImageDetail, ImageSource,
     MessageContent, SystemMessage,
 };
-use crate::prompt_values::{ChatPromptValue, PromptValue};
 use crate::utils::input::get_colored_text;
 use crate::utils::interactive_env::is_interactive_env;
 
@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, PartialValue, merge_prompt_config, resolve_partials};
+use super::base::{BasePromptTemplate, merge_prompt_config};
 use super::dict::DictPromptTemplate;
 use super::image::ImagePromptTemplate;
 use super::message::{BaseMessagePromptTemplate, get_msg_title_repr};
@@ -512,28 +512,14 @@ impl std::fmt::Debug for MessageLikeRepresentation {
 }
 
 pub trait BaseChatPromptTemplate: BasePromptTemplate {
-    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>>;
+    fn format_chat_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>>;
 
-    fn aformat_messages(
+    fn aformat_chat_messages(
         &self,
         input: &ChatPromptInput,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<AnyMessage>>> + Send + '_>>
     {
-        let result = self.format_messages(input);
-        Box::pin(async move { result })
-    }
-
-    fn format_prompt_chat(&self, input: &ChatPromptInput) -> Result<ChatPromptValue> {
-        let messages = self.format_messages(input)?;
-        Ok(ChatPromptValue::new(messages))
-    }
-
-    fn aformat_prompt_chat(
-        &self,
-        input: &ChatPromptInput,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ChatPromptValue>> + Send + '_>>
-    {
-        let result = self.format_prompt_chat(input);
+        let result = self.format_chat_messages(input);
         Box::pin(async move { result })
     }
 
@@ -597,8 +583,8 @@ pub struct ChatPromptTemplate {
     pub messages: Vec<ChatPromptMessage>,
     input_variables: Vec<String>,
     optional_variables: Vec<String>,
-    #[serde(skip, default)]
-    partial_variables: HashMap<String, PartialValue>,
+    #[serde(default)]
+    partial_variables: HashMap<String, String>,
     validate_template: bool,
     template_format: PromptTemplateFormat,
 }
@@ -649,7 +635,7 @@ impl ChatPromptTemplate {
             messages: chat_messages,
             input_variables,
             optional_variables,
-            partial_variables: HashMap::<String, PartialValue>::new(),
+            partial_variables: HashMap::new(),
             validate_template: false,
             template_format,
         })
@@ -689,7 +675,7 @@ impl ChatPromptTemplate {
         Ok(())
     }
 
-    pub fn partial(&self, kwargs: HashMap<String, PartialValue>) -> Self {
+    pub fn partial(&self, kwargs: HashMap<String, String>) -> Self {
         let new_vars: Vec<_> = self
             .input_variables
             .iter()
@@ -724,7 +710,7 @@ impl ChatPromptTemplate {
 }
 
 impl BaseChatPromptTemplate for ChatPromptTemplate {
-    fn format_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
+    fn format_chat_messages(&self, input: &ChatPromptInput) -> Result<Vec<AnyMessage>> {
         let merged_variables = self.merge_partial_and_user_variables(&input.variables);
         let merged_input = ChatPromptInput {
             variables: merged_variables,
@@ -752,7 +738,7 @@ impl BaseChatPromptTemplate for ChatPromptTemplate {
 #[async_trait]
 impl Runnable for ChatPromptTemplate {
     type Input = ChatPromptInput;
-    type Output = ChatPromptValue;
+    type Output = Vec<AnyMessage>;
 
     fn name(&self) -> Option<String> {
         Some("ChatPromptTemplate".to_string())
@@ -763,8 +749,7 @@ impl Runnable for ChatPromptTemplate {
         self.call_with_config(
             &|input: ChatPromptInput, _config| {
                 self.validate_input(&input.variables)?;
-                let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-                Ok(ChatPromptValue::new(messages))
+                BaseChatPromptTemplate::format_chat_messages(self, &input)
             },
             input,
             config,
@@ -858,26 +843,21 @@ impl BasePromptTemplate for ChatPromptTemplate {
     }
 
     fn partial_variables(&self) -> HashMap<String, String> {
-        resolve_partials(&self.partial_variables)
+        self.partial_variables.clone()
     }
 
     fn format(&self, kwargs: &HashMap<String, String>) -> Result<String> {
         let input = ChatPromptInput::from(kwargs.clone());
-        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-        let prompt_value = ChatPromptValue::new(messages);
-        Ok(prompt_value.to_string())
+        let messages = BaseChatPromptTemplate::format_chat_messages(self, &input)?;
+        Ok(get_buffer_string(&messages, "Human", "AI"))
     }
 
-    fn format_prompt(&self, kwargs: &HashMap<String, String>) -> Result<Box<dyn PromptValue>> {
+    fn format_messages(&self, kwargs: &HashMap<String, String>) -> Result<Vec<AnyMessage>> {
         let input = ChatPromptInput::from(kwargs.clone());
-        let messages = BaseChatPromptTemplate::format_messages(self, &input)?;
-        Ok(Box::new(ChatPromptValue::new(messages)))
+        BaseChatPromptTemplate::format_chat_messages(self, &input)
     }
 
-    fn partial(
-        &self,
-        kwargs: HashMap<String, PartialValue>,
-    ) -> Result<Box<dyn BasePromptTemplate>> {
+    fn partial(&self, kwargs: HashMap<String, String>) -> Result<Box<dyn BasePromptTemplate>> {
         Ok(Box::new(ChatPromptTemplate::partial(self, kwargs)))
     }
 
@@ -910,7 +890,7 @@ impl std::ops::Add for ChatPromptTemplate {
             self.input_variables.into_iter().collect();
         input_vars.extend(other.input_variables);
 
-        let mut partial_vars: HashMap<String, PartialValue> = self.partial_variables;
+        let mut partial_vars: HashMap<String, String> = self.partial_variables;
         partial_vars.extend(other.partial_variables);
 
         let mut optional_vars: std::collections::HashSet<_> =
@@ -1094,7 +1074,7 @@ mod tests {
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
         let input = ChatPromptInput::from(kwargs);
-        let messages = template.format_messages(&input).unwrap();
+        let messages = template.format_chat_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].content(), "You are a helpful assistant.");
         assert_eq!(messages[1].content(), "Hello!");
@@ -1108,7 +1088,7 @@ mod tests {
         kwargs.insert("name".to_string(), "World".to_string());
 
         let input = ChatPromptInput::from(kwargs);
-        let messages = template.format_messages(&input).unwrap();
+        let messages = template.format_chat_messages(&input).unwrap();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].content(), "Hello, World!");
     }
@@ -1129,7 +1109,7 @@ mod tests {
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
         let input = ChatPromptInput::from(kwargs);
-        let messages = combined.format_messages(&input).unwrap();
+        let messages = combined.format_chat_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
     }
 
@@ -1142,7 +1122,7 @@ mod tests {
         .unwrap();
 
         let mut partial_vars = HashMap::new();
-        partial_vars.insert("role".to_string(), PartialValue::from("an assistant"));
+        partial_vars.insert("role".to_string(), "an assistant".to_string());
 
         let partial = template.partial(partial_vars);
         assert_eq!(partial.input_variables(), &["question"]);
@@ -1151,7 +1131,7 @@ mod tests {
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
         let input = ChatPromptInput::from(kwargs);
-        let messages = partial.format_messages(&input).unwrap();
+        let messages = partial.format_chat_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0].content(), "You are an assistant.");
     }
@@ -1170,7 +1150,7 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), "Bob".to_string());
         let input = ChatPromptInput::from(kwargs);
-        let messages = template.format_messages(&input).unwrap();
+        let messages = template.format_chat_messages(&input).unwrap();
         assert_eq!(messages[0].content(), "hello");
         assert_eq!(messages[1].content(), "Hi Bob");
     }
@@ -1187,7 +1167,7 @@ mod tests {
         let mut kwargs = HashMap::new();
         kwargs.insert("name".to_string(), "World".to_string());
         let input = ChatPromptInput::from(kwargs);
-        let messages = template.format_messages(&input).unwrap();
+        let messages = template.format_chat_messages(&input).unwrap();
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].content(), "Hello World");
     }
@@ -1235,7 +1215,7 @@ mod tests {
             )]))
             .build();
 
-        let messages = template.format_messages(&input).unwrap();
+        let messages = template.format_chat_messages(&input).unwrap();
         assert_eq!(messages.len(), 4);
         assert_eq!(messages[0].content(), "You are a helpful assistant.");
         assert_eq!(messages[1].content(), "Hi");
@@ -1244,43 +1224,7 @@ mod tests {
     }
 
     #[test]
-    fn test_callable_partial_value() {
-        use std::sync::Arc;
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
-        let counter = Arc::new(AtomicUsize::new(0));
-        let counter_clone = counter.clone();
-
-        let template = ChatPromptTemplate::from_messages(vec![
-            ("system", "Call count: {call_count}").into(),
-            ("human", "{question}").into(),
-        ])
-        .unwrap();
-
-        let mut partial_vars = HashMap::new();
-        partial_vars.insert(
-            "call_count".to_string(),
-            PartialValue::from_fn(move || {
-                let val = counter_clone.fetch_add(1, Ordering::SeqCst);
-                val.to_string()
-            }),
-        );
-
-        let partial = template.partial(partial_vars);
-
-        let input1 =
-            ChatPromptInput::from(HashMap::from([("question".to_string(), "Q1".to_string())]));
-        let messages1 = partial.format_messages(&input1).unwrap();
-        assert_eq!(messages1[0].content(), "Call count: 0");
-
-        let input2 =
-            ChatPromptInput::from(HashMap::from([("question".to_string(), "Q2".to_string())]));
-        let messages2 = partial.format_messages(&input2).unwrap();
-        assert_eq!(messages2[0].content(), "Call count: 1");
-    }
-
-    #[test]
-    fn test_format_prompt() {
+    fn test_format_messages() {
         let template = ChatPromptTemplate::from_messages(vec![
             ("system", "You are helpful.").into(),
             ("human", "{question}").into(),
@@ -1291,7 +1235,7 @@ mod tests {
         kwargs.insert("question".to_string(), "Hello!".to_string());
 
         let input = ChatPromptInput::from(kwargs);
-        let messages = template.format_messages(&input).unwrap();
+        let messages = template.format_chat_messages(&input).unwrap();
         assert_eq!(messages.len(), 2);
     }
 

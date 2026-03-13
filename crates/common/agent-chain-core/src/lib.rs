@@ -114,8 +114,8 @@ pub use prompts::{
     ChatMessagePromptTemplate, ChatPromptInput, ChatPromptTemplate, DictPromptTemplate,
     FewShotChatMessagePromptTemplate, FewShotPromptTemplate, FewShotPromptWithTemplates,
     HumanMessagePromptTemplate, ImagePromptTemplate, MessagePromptContentPart, MessagesPlaceholder,
-    PartialValue, PromptTemplate, PromptTemplateFormat, StringPromptTemplate,
-    SystemMessagePromptTemplate, load_prompt,
+    PromptTemplate, PromptTemplateFormat, StringPromptTemplate, SystemMessagePromptTemplate,
+    load_prompt,
 };
 
 pub use load::{
@@ -126,7 +126,7 @@ pub use load::{
 
 pub use prompt_values::{
     ChatPromptValue, ChatPromptValueConcrete, ImageDetailLevel, ImagePromptValue, ImageURL,
-    PromptValue, StringPromptValue,
+    PromptValue,
 };
 
 pub use tracers::{

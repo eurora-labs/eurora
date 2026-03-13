@@ -672,19 +672,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         vec![
             "langchain".into(),
             "prompts".into(),
-            "base".into(),
-            "StringPromptValue".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "StringPromptValue".into(),
-        ],
-    );
-    map.insert(
-        vec![
-            "langchain".into(),
-            "prompts".into(),
             "chat".into(),
             "ChatPromptValue".into(),
         ],
@@ -1300,18 +1287,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
             "langchain_core".into(),
             "prompt_values".into(),
             "PromptValue".into(),
-        ],
-    );
-    map.insert(
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "StringPromptValue".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "StringPromptValue".into(),
         ],
     );
     map.insert(
