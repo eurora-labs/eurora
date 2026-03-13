@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use crate::error::{Error, Result};
 use crate::messages::AnyMessage;
 use crate::outputs::Generation;
-use crate::prompt_values::PromptValue;
 use crate::runnables::RunnableConfig;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::run_in_executor;
@@ -38,11 +37,7 @@ pub trait BaseOutputParser: Send + Sync + Debug {
         self.parse(&first.text)
     }
 
-    fn parse_with_prompt(
-        &self,
-        completion: &str,
-        _prompt: &dyn PromptValue,
-    ) -> Result<Self::Output> {
+    fn parse_with_prompt(&self, completion: &str, _prompt: &[AnyMessage]) -> Result<Self::Output> {
         self.parse(completion)
     }
 

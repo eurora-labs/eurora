@@ -91,13 +91,15 @@ fn test_convert_string_input() {
 
 #[test]
 fn test_convert_prompt_value_input() {
-    use agent_chain_core::prompt_values::{PromptValue, StringPromptValue};
-
     let llm = FakeListLLM::builder()
         .responses(vec!["r".to_string()])
         .build();
-    let pv = StringPromptValue::new("already a prompt value");
-    let result = llm.convert_input(pv.to_messages());
+    let messages = vec![AnyMessage::HumanMessage(
+        HumanMessage::builder()
+            .content("already a prompt value")
+            .build(),
+    )];
+    let result = llm.convert_input(messages);
     assert_eq!(result, "human: already a prompt value");
 }
 
