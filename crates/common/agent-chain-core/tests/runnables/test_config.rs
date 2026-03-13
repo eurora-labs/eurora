@@ -6,8 +6,7 @@ use agent_chain_core::callbacks::{
     StreamingStdOutCallbackHandler,
 };
 use agent_chain_core::runnables::config::{
-    AsyncVariableArgsFn, ConfigOrList, RunnableConfig, VariableArgsFn,
-    acall_func_with_variable_args, call_func_with_variable_args, ensure_config,
+    ConfigOrList, RunnableConfig, VariableArgsFn, call_func_with_variable_args, ensure_config,
     get_callback_manager_for_config, get_config_list, merge_configs, patch_config,
 };
 
@@ -367,39 +366,22 @@ fn test_merge_config_callbacks_handlers_with_manager() {
     }
 }
 
-#[test]
-fn test_call_func_with_variable_args_simple() {
-    let func = VariableArgsFn::InputOnly(Box::new(|x: String| x.to_uppercase()));
-    let result = call_func_with_variable_args(&func, "hello".to_string(), &ensure_config(None));
-    assert_eq!(result, "HELLO");
-}
-
-#[test]
-fn test_call_func_with_variable_args_with_config() {
-    let func = VariableArgsFn::WithConfig(Box::new(|x: String, config: &RunnableConfig| {
-        format!("{}{}", x, config.recursion_limit)
-    }));
-    let result = call_func_with_variable_args(&func, "val".to_string(), &ensure_config(None));
-    assert_eq!(result, "val25");
-}
-
 #[tokio::test]
-async fn test_acall_func_with_variable_args_simple() {
-    let func = AsyncVariableArgsFn::InputOnly(Box::new(|x: String| {
+async fn test_call_func_with_variable_args_simple() {
+    let func = VariableArgsFn::InputOnly(Box::new(|x: String| {
         Box::pin(async move { x.to_uppercase() })
     }));
     let result =
-        acall_func_with_variable_args(&func, "hello".to_string(), &ensure_config(None)).await;
+        call_func_with_variable_args(&func, "hello".to_string(), &ensure_config(None)).await;
     assert_eq!(result, "HELLO");
 }
 
 #[tokio::test]
-async fn test_acall_func_with_variable_args_with_config() {
-    let func = AsyncVariableArgsFn::WithConfig(Box::new(|x: String, config: RunnableConfig| {
+async fn test_call_func_with_variable_args_with_config() {
+    let func = VariableArgsFn::WithConfig(Box::new(|x: String, config: RunnableConfig| {
         Box::pin(async move { format!("{}{}", x, config.recursion_limit) })
     }));
-    let result =
-        acall_func_with_variable_args(&func, "val".to_string(), &ensure_config(None)).await;
+    let result = call_func_with_variable_args(&func, "val".to_string(), &ensure_config(None)).await;
     assert_eq!(result, "val25");
 }
 

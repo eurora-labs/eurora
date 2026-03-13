@@ -49,8 +49,8 @@ async fn test_async_custom_event_root_dispatch() {
     assert!(result.unwrap_err().contains("parent run id"));
 }
 
-#[test]
-fn test_sync_callback_manager() {
+#[tokio::test]
+async fn test_callback_manager() {
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
 
     let runnable = RunnableLambdaWithConfig::new_with_config(|x: i32, config: &RunnableConfig| {
@@ -67,36 +67,13 @@ fn test_sync_callback_manager() {
         ..Default::default()
     };
 
-    let result = runnable.invoke(1, Some(config));
+    let result = runnable.invoke(1, Some(config)).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 1);
 }
 
 #[tokio::test]
-async fn test_async_callback_manager() {
-    let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
-
-    let runnable = RunnableLambdaWithConfig::new_with_config(|x: i32, config: &RunnableConfig| {
-        let manager = get_callback_manager_for_config(config);
-        dispatch_custom_event("event1", &serde_json::json!({"x": x}), &manager)
-            .map_err(agent_chain_core::error::Error::other)?;
-        dispatch_custom_event("event2", &serde_json::json!({"x": x}), &manager)
-            .map_err(agent_chain_core::error::Error::other)?;
-        Ok(x)
-    });
-
-    let config = RunnableConfig {
-        callbacks: Some(Callbacks::from(vec![handler])),
-        ..Default::default()
-    };
-
-    let result = runnable.ainvoke(1, Some(config)).await;
-    assert!(result.is_ok());
-    assert_eq!(result.unwrap(), 1);
-}
-
-#[test]
-fn test_runnable_lambda_callback_lifecycle() {
+async fn test_runnable_lambda_callback_lifecycle() {
     use agent_chain_core::runnables::base::RunnableLambda;
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -108,13 +85,13 @@ fn test_runnable_lambda_callback_lifecycle() {
         ..Default::default()
     };
 
-    let result = runnable.invoke(1, Some(config));
+    let result = runnable.invoke(1, Some(config)).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), 2);
 }
 
-#[test]
-fn test_runnable_lambda_callback_error_lifecycle() {
+#[tokio::test]
+async fn test_runnable_lambda_callback_error_lifecycle() {
     use agent_chain_core::runnables::base::RunnableLambda;
 
     let handler: Arc<dyn BaseCallbackHandler> = Arc::new(FakeHandler);
@@ -130,7 +107,7 @@ fn test_runnable_lambda_callback_error_lifecycle() {
         ..Default::default()
     };
 
-    let result = runnable.invoke(1, Some(config));
+    let result = runnable.invoke(1, Some(config)).await;
     assert!(result.is_err());
 }
 

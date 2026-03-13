@@ -446,25 +446,7 @@ impl RunnableWithMessageHistory {
         }
     }
 
-    pub fn invoke_with_history(
-        &self,
-        input: Value,
-        config: Option<RunnableConfig>,
-    ) -> Result<Value> {
-        let config = config.unwrap_or_default();
-        let (config, history) = self.merge_configs(config)?;
-
-        let history_messages = self.enter_history(&input, &history)?;
-        let augmented_input = self.build_augmented_input(&input, history_messages)?;
-
-        let output = (self.runnable)(augmented_input, Some(&config))?;
-
-        self.exit_history(&input, &output, &history)?;
-
-        Ok(output)
-    }
-
-    pub async fn ainvoke_with_history(
+    pub async fn invoke_with_history(
         &self,
         input: Value,
         config: Option<RunnableConfig>,
@@ -486,26 +468,14 @@ impl RunnableWithMessageHistory {
         Ok(output)
     }
 
-    pub fn invoke_messages(
+    pub async fn invoke_messages(
         &self,
         input: Vec<AnyMessage>,
         config: Option<RunnableConfig>,
     ) -> Result<Vec<AnyMessage>> {
         let input_value = serde_json::to_value(&input)
             .map_err(|e| Error::other(format!("Failed to serialize input messages: {}", e)))?;
-        let output_value = self.invoke_with_history(input_value, config)?;
-        serde_json::from_value::<Vec<AnyMessage>>(output_value)
-            .map_err(|e| Error::other(format!("Failed to deserialize output messages: {}", e)))
-    }
-
-    pub async fn ainvoke_messages(
-        &self,
-        input: Vec<AnyMessage>,
-        config: Option<RunnableConfig>,
-    ) -> Result<Vec<AnyMessage>> {
-        let input_value = serde_json::to_value(&input)
-            .map_err(|e| Error::other(format!("Failed to serialize input messages: {}", e)))?;
-        let output_value = self.ainvoke_with_history(input_value, config).await?;
+        let output_value = self.invoke_with_history(input_value, config).await?;
         serde_json::from_value::<Vec<AnyMessage>>(output_value)
             .map_err(|e| Error::other(format!("Failed to deserialize output messages: {}", e)))
     }
@@ -519,12 +489,7 @@ impl Runnable for RunnableWithMessageHistory {
     fn name(&self) -> Option<String> {
         Some("RunnableWithMessageHistory".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        self.invoke_with_history(input, config)
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
@@ -532,7 +497,7 @@ impl Runnable for RunnableWithMessageHistory {
     where
         Self: 'static,
     {
-        self.ainvoke_with_history(input, config).await
+        self.invoke_with_history(input, config).await
     }
 
     fn config_specs(&self) -> Result<Vec<ConfigurableFieldSpec>> {

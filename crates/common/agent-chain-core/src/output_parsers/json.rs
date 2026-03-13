@@ -2,7 +2,7 @@ use futures::stream::BoxStream;
 use serde_json::Value;
 
 use crate::error::{Error, Result};
-use crate::outputs::Generation;
+use crate::outputs::ChatGeneration;
 use crate::utils::json::{parse_json_markdown, parse_partial_json};
 
 use crate::messages::AnyMessage;
@@ -74,11 +74,11 @@ impl BaseOutputParser for JsonOutputParser {
         parse_json_result(text.trim(), false)
     }
 
-    fn parse_result(&self, result: &[Generation], partial: bool) -> Result<Value> {
+    fn parse_result(&self, result: &[ChatGeneration], partial: bool) -> Result<Value> {
         let first = result
             .first()
             .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
-        parse_json_result(first.text.trim(), partial)
+        parse_json_result(first.message.text().trim(), partial)
     }
 
     fn get_format_instructions(&self) -> Result<String> {
@@ -110,11 +110,11 @@ impl BaseCumulativeTransformOutputParser for JsonOutputParser {
         self.diff
     }
 
-    fn parse_result_partial(&self, result: &[Generation]) -> Result<Option<Value>> {
+    fn parse_result_partial(&self, result: &[ChatGeneration]) -> Result<Option<Value>> {
         let first = result
             .first()
             .ok_or_else(|| Error::output_parser_simple("No generations to parse"))?;
-        parse_json_result_partial(first.text.trim())
+        parse_json_result_partial(first.message.text().trim())
     }
 
     fn compute_diff(&self, prev: Option<&Value>, next: Value) -> Result<Value> {
@@ -210,7 +210,10 @@ mod tests {
     #[test]
     fn test_json_output_parser_partial() {
         let parser = JsonOutputParser::builder().build();
-        let generations = vec![Generation::builder().text(r#"{"key": "val"#).build()];
+        let msg = crate::messages::AIMessage::builder()
+            .content(r#"{"key": "val"#)
+            .build();
+        let generations = vec![ChatGeneration::builder().message(msg.into()).build()];
         let result = parser.parse_result(&generations, true).unwrap();
         assert_eq!(result["key"], "val");
     }

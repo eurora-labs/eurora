@@ -40,10 +40,6 @@ impl DictPromptTemplate {
         insert_input_variables(&self.template, kwargs, self.template_format)
     }
 
-    pub async fn aformat(&self, kwargs: &HashMap<String, String>) -> Result<serde_json::Value> {
-        self.format(kwargs)
-    }
-
     pub fn prompt_type(&self) -> &str {
         "dict-prompt"
     }

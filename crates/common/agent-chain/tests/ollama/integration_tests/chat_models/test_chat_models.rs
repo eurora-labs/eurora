@@ -112,7 +112,7 @@ async fn test_structured_output_function_calling() -> Result<(), Box<dyn std::er
         .build();
     let structured = llm.with_structured_output(joke_schema, false)?;
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content("Tell me a joke about cats.")
@@ -202,7 +202,7 @@ async fn test_structured_output_deeply_nested() -> Result<(), Box<dyn std::error
     let structured = llm.with_structured_output(data_schema, false)?;
 
     let result = structured
-        .ainvoke(
+        .invoke(
             vec![
                 HumanMessage::builder()
                     .content(
@@ -245,7 +245,7 @@ async fn test_tool_streaming() -> Result<(), Box<dyn std::error::Error>> {
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("What is the weather today in Boston?")
@@ -291,7 +291,7 @@ async fn test_tool_astreaming() -> Result<(), Box<dyn std::error::Error>> {
     let llm_with_tools = BaseChatModel::bind_tools(&llm, &[ToolLike::Schema(weather_tool)], None)?;
 
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("What is the weather today in Boston?")

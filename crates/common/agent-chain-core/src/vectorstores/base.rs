@@ -12,6 +12,19 @@ use crate::embeddings::Embeddings;
 use crate::error::Error;
 use crate::retrievers::{BaseRetriever, LangSmithRetrieverParams};
 
+pub trait DocumentFilter: Send + Sync {
+    fn matches(&self, doc: &Document) -> bool;
+}
+
+impl<F> DocumentFilter for F
+where
+    F: Fn(&Document) -> bool + Send + Sync,
+{
+    fn matches(&self, doc: &Document) -> bool {
+        self(doc)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SearchType {
     Similarity,
@@ -37,7 +50,7 @@ impl std::fmt::Display for SearchType {
 
 #[async_trait]
 pub trait VectorStore: Send + Sync {
-    fn add_texts(
+    async fn add_texts(
         &self,
         texts: Vec<String>,
         metadatas: Option<Vec<HashMap<String, Value>>>,
@@ -73,156 +86,91 @@ pub trait VectorStore: Send + Sync {
             })
             .collect();
 
-        self.add_documents(documents, None)
+        self.add_documents(documents, None).await
     }
 
-    async fn aadd_texts(
-        &self,
-        texts: Vec<String>,
-        metadatas: Option<Vec<HashMap<String, Value>>>,
-        ids: Option<Vec<String>>,
-    ) -> Result<Vec<String>> {
-        self.add_texts(texts, metadatas, ids)
-    }
-
-    fn add_documents(
+    async fn add_documents(
         &self,
         documents: Vec<Document>,
         ids: Option<Vec<String>>,
     ) -> Result<Vec<String>>;
 
-    async fn aadd_documents(
-        &self,
-        documents: Vec<Document>,
-        ids: Option<Vec<String>>,
-    ) -> Result<Vec<String>> {
-        self.add_documents(documents, ids)
-    }
-
     fn embeddings(&self) -> Option<&dyn Embeddings> {
         None
     }
 
-    fn delete(&self, ids: Option<Vec<String>>) -> Result<()>;
+    async fn delete(&self, ids: Option<Vec<String>>) -> Result<()>;
 
-    async fn adelete(&self, ids: Option<Vec<String>>) -> Result<()> {
-        self.delete(ids)
-    }
+    async fn get_by_ids(&self, ids: &[String]) -> Result<Vec<Document>>;
 
-    fn get_by_ids(&self, ids: &[String]) -> Result<Vec<Document>>;
-
-    async fn aget_by_ids(&self, ids: &[String]) -> Result<Vec<Document>> {
-        self.get_by_ids(ids)
-    }
-
-    fn similarity_search(
+    async fn similarity_search(
         &self,
         query: &str,
         k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>>;
 
-    async fn asimilarity_search(&self, query: &str, k: usize) -> Result<Vec<Document>> {
-        self.similarity_search(query, k, None)
-    }
-
-    fn similarity_search_by_vector(
+    async fn similarity_search_by_vector(
         &self,
         embedding: &[f32],
         k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>>;
 
-    async fn asimilarity_search_by_vector(
-        &self,
-        embedding: &[f32],
-        k: usize,
-    ) -> Result<Vec<Document>> {
-        self.similarity_search_by_vector(embedding, k, None)
-    }
-
-    fn similarity_search_with_score(
+    async fn similarity_search_with_score(
         &self,
         query: &str,
         k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<(Document, f32)>>;
 
-    async fn asimilarity_search_with_score(
-        &self,
-        query: &str,
-        k: usize,
-    ) -> Result<Vec<(Document, f32)>> {
-        self.similarity_search_with_score(query, k, None)
-    }
-
-    fn max_marginal_relevance_search(
+    async fn max_marginal_relevance_search(
         &self,
         query: &str,
         k: usize,
         fetch_k: usize,
         lambda_mult: f32,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>>;
 
-    async fn amax_marginal_relevance_search(
-        &self,
-        query: &str,
-        k: usize,
-        fetch_k: usize,
-        lambda_mult: f32,
-    ) -> Result<Vec<Document>> {
-        self.max_marginal_relevance_search(query, k, fetch_k, lambda_mult, None)
-    }
-
-    fn max_marginal_relevance_search_by_vector(
+    async fn max_marginal_relevance_search_by_vector(
         &self,
         embedding: &[f32],
         k: usize,
         fetch_k: usize,
         lambda_mult: f32,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<Document>>;
 
-    async fn amax_marginal_relevance_search_by_vector(
-        &self,
-        embedding: &[f32],
-        k: usize,
-        fetch_k: usize,
-        lambda_mult: f32,
-    ) -> Result<Vec<Document>> {
-        self.max_marginal_relevance_search_by_vector(embedding, k, fetch_k, lambda_mult, None)
-    }
-
-    fn search(&self, query: &str, search_type: &SearchType, k: usize) -> Result<Vec<Document>> {
-        match search_type {
-            SearchType::Similarity => self.similarity_search(query, k, None),
-            SearchType::SimilarityScoreThreshold => {
-                let docs_and_scores = self.similarity_search_with_score(query, k, None)?;
-                Ok(docs_and_scores.into_iter().map(|(doc, _)| doc).collect())
-            }
-            SearchType::Mmr => self.max_marginal_relevance_search(query, k, 20, 0.5, None),
-        }
-    }
-
-    async fn asearch(
+    async fn search(
         &self,
         query: &str,
         search_type: &SearchType,
         k: usize,
     ) -> Result<Vec<Document>> {
-        self.search(query, search_type, k)
+        match search_type {
+            SearchType::Similarity => self.similarity_search(query, k, None).await,
+            SearchType::SimilarityScoreThreshold => {
+                let docs_and_scores = self.similarity_search_with_score(query, k, None).await?;
+                Ok(docs_and_scores.into_iter().map(|(doc, _)| doc).collect())
+            }
+            SearchType::Mmr => {
+                self.max_marginal_relevance_search(query, k, 20, 0.5, None)
+                    .await
+            }
+        }
     }
 
     fn select_relevance_score_fn(&self) -> Option<fn(f32) -> f32> {
         None
     }
 
-    fn similarity_search_with_relevance_scores_internal(
+    async fn similarity_search_with_relevance_scores(
         &self,
         query: &str,
         k: usize,
-        filter: Option<&dyn Fn(&Document) -> bool>,
+        score_threshold: Option<f32>,
+        filter: Option<Box<dyn DocumentFilter>>,
     ) -> Result<Vec<(Document, f32)>> {
         let relevance_score_fn = self.select_relevance_score_fn().ok_or_else(|| {
             Error::NotImplemented(
@@ -232,22 +180,11 @@ pub trait VectorStore: Send + Sync {
                     .into(),
             )
         })?;
-        let docs_and_scores = self.similarity_search_with_score(query, k, filter)?;
-        Ok(docs_and_scores
+        let docs_and_scores = self.similarity_search_with_score(query, k, filter).await?;
+        let mut docs_and_similarities: Vec<(Document, f32)> = docs_and_scores
             .into_iter()
             .map(|(doc, score)| (doc, relevance_score_fn(score)))
-            .collect())
-    }
-
-    fn similarity_search_with_relevance_scores(
-        &self,
-        query: &str,
-        k: usize,
-        score_threshold: Option<f32>,
-        filter: Option<&dyn Fn(&Document) -> bool>,
-    ) -> Result<Vec<(Document, f32)>> {
-        let mut docs_and_similarities =
-            self.similarity_search_with_relevance_scores_internal(query, k, filter)?;
+            .collect();
 
         if docs_and_similarities
             .iter()
@@ -273,15 +210,6 @@ pub trait VectorStore: Send + Sync {
         }
 
         Ok(docs_and_similarities)
-    }
-
-    async fn asimilarity_search_with_relevance_scores(
-        &self,
-        query: &str,
-        k: usize,
-        score_threshold: Option<f32>,
-    ) -> Result<Vec<(Document, f32)>> {
-        self.similarity_search_with_relevance_scores(query, k, score_threshold, None)
     }
 
     fn euclidean_relevance_score(distance: f32) -> f32
@@ -310,15 +238,19 @@ pub trait VectorStore: Send + Sync {
     }
 }
 
+#[async_trait]
 pub trait VectorStoreFactory: VectorStore + Sized {
-    fn from_texts(
+    async fn from_texts(
         texts: &[&str],
         embedding: Box<dyn Embeddings>,
         metadatas: Option<Vec<HashMap<String, Value>>>,
         ids: Option<Vec<String>>,
     ) -> Result<Self>;
 
-    fn from_documents(documents: Vec<Document>, embedding: Box<dyn Embeddings>) -> Result<Self> {
+    async fn from_documents(
+        documents: Vec<Document>,
+        embedding: Box<dyn Embeddings>,
+    ) -> Result<Self> {
         let texts: Vec<&str> = documents.iter().map(|d| d.page_content()).collect();
         let metadatas: Vec<HashMap<String, Value>> =
             documents.iter().map(|d| d.metadata().clone()).collect();
@@ -327,7 +259,7 @@ pub trait VectorStoreFactory: VectorStore + Sized {
             .filter_map(|d| d.id().map(String::from))
             .collect();
         let ids = if ids.is_empty() { None } else { Some(ids) };
-        Self::from_texts(&texts, embedding, Some(metadatas), ids)
+        Self::from_texts(&texts, embedding, Some(metadatas), ids).await
     }
 }
 
@@ -460,20 +392,12 @@ impl VectorStoreRetriever {
             .map(|v| v as f32)
     }
 
-    pub fn add_documents(
+    pub async fn add_documents(
         &self,
         documents: Vec<Document>,
         ids: Option<Vec<String>>,
     ) -> Result<Vec<String>> {
-        self.vectorstore.add_documents(documents, ids)
-    }
-
-    pub async fn aadd_documents(
-        &self,
-        documents: Vec<Document>,
-        ids: Option<Vec<String>>,
-    ) -> Result<Vec<String>> {
-        self.vectorstore.aadd_documents(documents, ids).await
+        self.vectorstore.add_documents(documents, ids).await
     }
 }
 
@@ -500,43 +424,19 @@ impl BaseRetriever for VectorStoreRetriever {
         }
     }
 
-    fn get_relevant_documents(
+    async fn get_relevant_documents(
         &self,
         query: &str,
         _run_manager: Option<&CallbackManagerForRetrieverRun>,
     ) -> Result<Vec<Document>> {
         let k = self.k();
         match &self.search_type {
-            SearchType::Similarity => self.vectorstore.similarity_search(query, k, None),
+            SearchType::Similarity => self.vectorstore.similarity_search(query, k, None).await,
             SearchType::SimilarityScoreThreshold => {
                 let threshold = self.score_threshold();
                 let docs_and_scores = self
                     .vectorstore
-                    .similarity_search_with_relevance_scores(query, k, threshold, None)?;
-                Ok(docs_and_scores.into_iter().map(|(doc, _)| doc).collect())
-            }
-            SearchType::Mmr => {
-                let fetch_k = self.fetch_k();
-                let lambda_mult = self.lambda_mult();
-                self.vectorstore
-                    .max_marginal_relevance_search(query, k, fetch_k, lambda_mult, None)
-            }
-        }
-    }
-
-    async fn aget_relevant_documents(
-        &self,
-        query: &str,
-        _run_manager: Option<&CallbackManagerForRetrieverRun>,
-    ) -> Result<Vec<Document>> {
-        let k = self.k();
-        match &self.search_type {
-            SearchType::Similarity => self.vectorstore.asimilarity_search(query, k).await,
-            SearchType::SimilarityScoreThreshold => {
-                let threshold = self.score_threshold();
-                let docs_and_scores = self
-                    .vectorstore
-                    .asimilarity_search_with_relevance_scores(query, k, threshold)
+                    .similarity_search_with_relevance_scores(query, k, threshold, None)
                     .await?;
                 Ok(docs_and_scores.into_iter().map(|(doc, _)| doc).collect())
             }
@@ -544,7 +444,7 @@ impl BaseRetriever for VectorStoreRetriever {
                 let fetch_k = self.fetch_k();
                 let lambda_mult = self.lambda_mult();
                 self.vectorstore
-                    .amax_marginal_relevance_search(query, k, fetch_k, lambda_mult)
+                    .max_marginal_relevance_search(query, k, fetch_k, lambda_mult, None)
                     .await
             }
         }
@@ -653,56 +553,60 @@ mod tests {
     struct InMemoryTestHelper;
     #[async_trait]
     impl VectorStore for InMemoryTestHelper {
-        fn add_documents(&self, _: Vec<Document>, _: Option<Vec<String>>) -> Result<Vec<String>> {
+        async fn add_documents(
+            &self,
+            _: Vec<Document>,
+            _: Option<Vec<String>>,
+        ) -> Result<Vec<String>> {
             Ok(vec![])
         }
-        fn delete(&self, _: Option<Vec<String>>) -> Result<()> {
+        async fn delete(&self, _: Option<Vec<String>>) -> Result<()> {
             Ok(())
         }
-        fn get_by_ids(&self, _: &[String]) -> Result<Vec<Document>> {
+        async fn get_by_ids(&self, _: &[String]) -> Result<Vec<Document>> {
             Ok(vec![])
         }
-        fn similarity_search(
+        async fn similarity_search(
             &self,
             _: &str,
             _: usize,
-            _: Option<&dyn Fn(&Document) -> bool>,
+            _: Option<Box<dyn DocumentFilter>>,
         ) -> Result<Vec<Document>> {
             Ok(vec![])
         }
-        fn similarity_search_by_vector(
+        async fn similarity_search_by_vector(
             &self,
             _: &[f32],
             _: usize,
-            _: Option<&dyn Fn(&Document) -> bool>,
+            _: Option<Box<dyn DocumentFilter>>,
         ) -> Result<Vec<Document>> {
             Ok(vec![])
         }
-        fn similarity_search_with_score(
+        async fn similarity_search_with_score(
             &self,
             _: &str,
             _: usize,
-            _: Option<&dyn Fn(&Document) -> bool>,
+            _: Option<Box<dyn DocumentFilter>>,
         ) -> Result<Vec<(Document, f32)>> {
             Ok(vec![])
         }
-        fn max_marginal_relevance_search(
+        async fn max_marginal_relevance_search(
             &self,
             _: &str,
             _: usize,
             _: usize,
             _: f32,
-            _: Option<&dyn Fn(&Document) -> bool>,
+            _: Option<Box<dyn DocumentFilter>>,
         ) -> Result<Vec<Document>> {
             Ok(vec![])
         }
-        fn max_marginal_relevance_search_by_vector(
+        async fn max_marginal_relevance_search_by_vector(
             &self,
             _: &[f32],
             _: usize,
             _: usize,
             _: f32,
-            _: Option<&dyn Fn(&Document) -> bool>,
+            _: Option<Box<dyn DocumentFilter>>,
         ) -> Result<Vec<Document>> {
             Ok(vec![])
         }

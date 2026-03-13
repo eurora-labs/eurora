@@ -2,7 +2,8 @@ use futures::StreamExt;
 use futures::stream::BoxStream;
 
 use crate::error::{Error, Result};
-use crate::outputs::{Generation, GenerationChunk};
+use crate::messages::AIMessage;
+use crate::outputs::{ChatGeneration, ChatGenerationChunk};
 use crate::runnables::RunnableConfig;
 
 use crate::messages::AnyMessage;
@@ -10,8 +11,8 @@ use crate::messages::AnyMessage;
 use super::base::BaseOutputParser;
 
 pub trait BaseTransformOutputParser: BaseOutputParser {
-    fn parse_generation(&self, generation: &Generation) -> Result<Self::Output> {
-        self.parse(&generation.text)
+    fn parse_generation(&self, generation: &ChatGeneration) -> Result<Self::Output> {
+        self.parse(&generation.message.text())
     }
 
     fn transform<'a>(
@@ -24,7 +25,8 @@ pub trait BaseTransformOutputParser: BaseOutputParser {
         Box::pin(async_stream::stream! {
             let mut input = input;
             while let Some(chunk) = input.next().await {
-                let generation = Generation::builder().text(chunk.text()).build();
+                let msg = AIMessage::builder().content(chunk.text()).build();
+                let generation = ChatGeneration::builder().message(msg.into()).build();
                 yield self.parse_result(&[generation], false);
             }
         })
@@ -46,7 +48,7 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
         ))
     }
 
-    fn parse_result_partial(&self, result: &[Generation]) -> Result<Option<Self::Output>> {
+    fn parse_result_partial(&self, result: &[ChatGeneration]) -> Result<Option<Self::Output>> {
         match self.parse_result(result, true) {
             Ok(v) => Ok(Some(v)),
             Err(_) => Ok(None),
@@ -65,11 +67,12 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
 
         Box::pin(async_stream::stream! {
             let mut prev_parsed: Option<Self::Output> = None;
-            let mut acc_gen: Option<GenerationChunk> = None;
+            let mut acc_gen: Option<ChatGenerationChunk> = None;
             let mut input = input;
 
             while let Some(chunk) = input.next().await {
-                let chunk_gen = GenerationChunk::builder().text(chunk.text()).build();
+                let msg = AIMessage::builder().content(chunk.text()).build();
+                let chunk_gen = ChatGenerationChunk::builder().message(msg.into()).build();
 
                 acc_gen = Some(match acc_gen {
                     None => chunk_gen,
@@ -77,7 +80,7 @@ pub trait BaseCumulativeTransformOutputParser: BaseTransformOutputParser {
                 });
 
                 let acc = acc_gen.as_ref().expect("just assigned Some");
-                let generation = Generation::from(acc.clone());
+                let generation = ChatGeneration::from(acc.clone());
                 let parsed = self.parse_result_partial(&[generation])?;
                 let Some(parsed) = parsed else {
                     continue;
@@ -127,7 +130,8 @@ mod tests {
     #[test]
     fn test_transform_parser_parse_generation() {
         let parser = TestTransformParser;
-        let generation = Generation::builder().text("world").build();
+        let msg = AIMessage::builder().content("world").build();
+        let generation = ChatGeneration::builder().message(msg.into()).build();
         let result = parser.parse_generation(&generation).unwrap();
         assert_eq!(result, "WORLD");
     }
