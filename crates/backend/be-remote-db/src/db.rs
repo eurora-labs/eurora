@@ -577,42 +577,6 @@ impl DatabaseManager {
     }
 
     #[builder]
-    pub async fn consume_login_token_with_user(
-        &self,
-        token_hash: &[u8],
-    ) -> DbResult<(LoginToken, User)> {
-        let now = Utc::now();
-        let mut tx = self.pool.begin().await?;
-
-        let login_token = sqlx::query_as::<_, LoginToken>(
-            r#"
-            UPDATE login_tokens
-            SET consumed = true, updated_at = $2
-            WHERE token_hash = $1 AND consumed = false AND expires_at > now()
-            RETURNING id, token_hash, consumed, expires_at, user_id, created_at, updated_at
-            "#,
-        )
-        .bind(token_hash)
-        .bind(now)
-        .fetch_one(&mut *tx)
-        .await?;
-
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users WHERE id = $1::uuid
-            "#,
-        )
-        .bind(login_token.user_id.to_string())
-        .fetch_one(&mut *tx)
-        .await?;
-
-        tx.commit().await?;
-
-        Ok((login_token, user))
-    }
-
-    #[builder]
     pub async fn cleanup_expired_auth_data(&self) -> DbResult<()> {
         let deleted_states = sqlx::query_scalar::<_, i64>(
             "WITH deleted AS (DELETE FROM oauth_state WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
@@ -1645,33 +1609,23 @@ impl DatabaseManager {
     pub async fn consume_login_token_and_create_refresh_token(
         &self,
         login_token_hash: &[u8],
+        user_id: Uuid,
         refresh_token_hash: Vec<u8>,
         refresh_token_expires_at: DateTime<Utc>,
-    ) -> DbResult<(LoginToken, User)> {
+    ) -> DbResult<()> {
         let now = Utc::now();
         let mut tx = self.pool.begin().await?;
 
-        let login_token = sqlx::query_as::<_, LoginToken>(
+        sqlx::query(
             r#"
             UPDATE login_tokens
             SET consumed = true, updated_at = $2
             WHERE token_hash = $1 AND consumed = false AND expires_at > now()
-            RETURNING id, token_hash, consumed, expires_at, user_id, created_at, updated_at
             "#,
         )
         .bind(login_token_hash)
         .bind(now)
-        .fetch_one(&mut *tx)
-        .await?;
-
-        let user = sqlx::query_as::<_, User>(
-            r#"
-            SELECT id, username, email, display_name, email_verified, created_at, updated_at
-            FROM users WHERE id = $1::uuid
-            "#,
-        )
-        .bind(login_token.user_id.to_string())
-        .fetch_one(&mut *tx)
+        .execute(&mut *tx)
         .await?;
 
         sqlx::query(
@@ -1681,7 +1635,7 @@ impl DatabaseManager {
             "#,
         )
         .bind(Uuid::now_v7())
-        .bind(user.id)
+        .bind(user_id)
         .bind(&refresh_token_hash)
         .bind(refresh_token_expires_at)
         .bind(false)
@@ -1692,6 +1646,6 @@ impl DatabaseManager {
 
         tx.commit().await?;
 
-        Ok((login_token, user))
+        Ok(())
     }
 }
