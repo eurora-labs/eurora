@@ -10,7 +10,7 @@ use crate::messages::AnyMessage;
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, merge_prompt_config};
+use super::base::BasePromptTemplate;
 use super::string::{PromptTemplateFormat, format_template, get_template_variables};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -169,25 +169,12 @@ impl Runnable for ImagePromptTemplate {
     fn name(&self) -> Option<String> {
         Some("ImagePromptTemplate".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = merge_prompt_config(config, self.metadata(), self.tags());
-        self.call_with_config(
-            &|input, _config| {
-                BasePromptTemplate::validate_input(self, &input)?;
-                self.format_messages(&input)
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.invoke(input, config)
+        self.format_messages(&input)
     }
 }
 

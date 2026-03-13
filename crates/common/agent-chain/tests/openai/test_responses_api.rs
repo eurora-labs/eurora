@@ -71,7 +71,7 @@ async fn test_responses_incomplete_response() -> Result<(), Box<dyn std::error::
 
     // Stream
     let mut stream = model
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("Tell me a 100 word story about a bear.")
@@ -213,7 +213,7 @@ async fn test_responses_web_search_async() -> Result<(), Box<dyn std::error::Err
 
     // Streaming
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("What was a positive news story from today?")
@@ -523,7 +523,7 @@ async fn test_responses_parsed_schema_async() -> Result<(), Box<dyn std::error::
         .response_format(foo_schema);
 
     let response = llm
-        .ainvoke(
+        .invoke(
             vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
@@ -662,7 +662,7 @@ async fn test_responses_parsed_dict_schema_async() -> Result<(), Box<dyn std::er
         .response_format(schema);
 
     let response = llm
-        .ainvoke(
+        .invoke(
             vec![HumanMessage::builder().content("how are ya").build().into()],
             None,
         )
@@ -885,7 +885,7 @@ async fn test_responses_route_from_model_kwargs() -> Result<(), Box<dyn std::err
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![HumanMessage::builder().content("Hello").build().into()],
             None,
             None,
@@ -1035,7 +1035,7 @@ async fn test_responses_stream_reasoning_summary_v0() -> Result<(), Box<dyn std:
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("What was the third tallest building in the year 2000?")
@@ -1074,7 +1074,7 @@ async fn test_responses_stream_reasoning_summary_responses_v1()
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("What was the third tallest building in the year 2000?")
@@ -1112,7 +1112,7 @@ async fn test_responses_stream_reasoning_summary_v1() -> Result<(), Box<dyn std:
         .build();
 
     let mut stream = llm
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("What was the third tallest building in the year 2000?")
@@ -1276,7 +1276,7 @@ async fn test_responses_mcp_builtin_zdr() -> Result<(), Box<dyn std::error::Erro
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(mcp_tool)], None)?;
 
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(
@@ -1322,7 +1322,7 @@ async fn test_responses_mcp_builtin_zdr_v1() -> Result<(), Box<dyn std::error::E
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(mcp_tool)], None)?;
 
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content(
@@ -1366,7 +1366,7 @@ async fn test_responses_image_gen_streaming_v0() -> Result<(), Box<dyn std::erro
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(tool)], None)?;
 
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("Draw a random short word in green font.")
@@ -1409,7 +1409,7 @@ async fn test_responses_image_gen_streaming_responses_v1() -> Result<(), Box<dyn
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(tool)], None)?;
 
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("Draw a random short word in green font.")
@@ -1450,7 +1450,7 @@ async fn test_responses_image_gen_streaming_v1() -> Result<(), Box<dyn std::erro
     let llm_with_tools = llm.bind_tools(&[ToolLike::Builtin(tool)], None)?;
 
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("Draw a random short word in green font.")
@@ -1641,7 +1641,7 @@ async fn test_responses_custom_tool_responses_v1() -> Result<(), Box<dyn std::er
 
     // Stream
     let mut stream = llm_with_tools
-        .astream(
+        .stream(
             vec![
                 HumanMessage::builder()
                     .content("Use the tool to evaluate 3^3.")

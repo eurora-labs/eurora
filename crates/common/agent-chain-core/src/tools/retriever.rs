@@ -57,38 +57,45 @@ impl RetrieverTool {
     where
         R: BaseRetriever + Send + Sync + 'static,
     {
-        let func = move |args: HashMap<String, Value>| -> Result<Value> {
+        let coroutine = move |args: HashMap<String, Value>| -> Pin<
+            Box<dyn Future<Output = Result<Value>> + Send>,
+        > {
             let query = args
                 .get("query")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
+            let retriever = retriever.clone();
+            let document_separator = document_separator.clone();
+            let document_prompt = document_prompt.clone();
+            Box::pin(async move {
+                let docs = retriever.get_relevant_documents(&query, None).await?;
+                let content =
+                    format_documents(&docs, &document_separator, document_prompt.as_deref());
 
-            let docs = retriever.get_relevant_documents(&query, None)?;
-            let content = format_documents(&docs, &document_separator, document_prompt.as_deref());
-
-            match response_format {
-                ResponseFormat::Content => Ok(Value::String(content)),
-                ResponseFormat::ContentAndArtifact => {
-                    let docs_json: Vec<Value> = docs
-                        .iter()
-                        .map(|d| {
-                            serde_json::json!({
-                                "page_content": d.page_content(),
-                                "metadata": d.metadata()
+                match response_format {
+                    ResponseFormat::Content => Ok(Value::String(content)),
+                    ResponseFormat::ContentAndArtifact => {
+                        let docs_json: Vec<Value> = docs
+                            .iter()
+                            .map(|d| {
+                                serde_json::json!({
+                                    "page_content": d.page_content(),
+                                    "metadata": d.metadata()
+                                })
                             })
-                        })
-                        .collect();
-                    Ok(serde_json::json!([content, docs_json]))
+                            .collect();
+                        Ok(serde_json::json!([content, docs_json]))
+                    }
                 }
-            }
+            })
         };
 
         StructuredTool::builder()
             .name(name)
             .description(description)
             .args_schema(retriever_args_schema())
-            .func(Arc::new(func))
+            .coroutine(Arc::new(coroutine))
             .response_format(response_format)
             .build()
     }

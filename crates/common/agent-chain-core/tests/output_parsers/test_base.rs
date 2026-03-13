@@ -168,25 +168,19 @@ fn test_bool_parser_invalid() {
 }
 
 #[test]
-fn test_invoke_with_ai_message() {
+fn test_parse_result_with_ai_message() {
     let parser = IntParser;
     let message: AnyMessage = AIMessage::builder().content("42").build().into();
-    assert_eq!(parser.invoke(message, None).unwrap(), 42);
+    let generation = ChatGeneration::builder().message(message).build();
+    assert_eq!(parser.parse_result(&[generation], false).unwrap(), 42);
 }
 
 #[test]
-fn test_invoke_with_human_message() {
+fn test_parse_result_with_human_message() {
     let parser = IntParser;
     let message: AnyMessage = HumanMessage::builder().content("42").build().into();
-    assert_eq!(parser.invoke(message, None).unwrap(), 42);
-}
-
-#[test]
-fn test_invoke_with_ai_message_content() {
-    let parser = IntParser;
-    let message: AnyMessage = AIMessage::builder().content("42").build().into();
-    let result = parser.invoke(message, None).unwrap();
-    assert_eq!(result, 42);
+    let generation = ChatGeneration::builder().message(message).build();
+    assert_eq!(parser.parse_result(&[generation], false).unwrap(), 42);
 }
 
 #[test]

@@ -21,8 +21,8 @@ pub use crate::messages::UsageMetadata;
 
 pub use llms::{
     BaseLLM, CacheValue, LLM, LLMConfig, LLMGenerateConfig, LLMStream, RunIdInput,
-    aget_prompts_from_cache, aupdate_cache, create_base_retry, get_prompts_from_cache,
-    get_run_ids_list, resolve_cache, save_llm, update_cache,
+    create_base_retry, get_prompts_from_cache, get_run_ids_list, resolve_cache, save_llm,
+    update_cache,
 };
 
 pub use fake::{FakeListLLM, FakeStreamingListLLM};

@@ -9,7 +9,7 @@ use crate::messages::{AnyMessage, get_buffer_string};
 use crate::runnables::base::Runnable;
 use crate::runnables::config::RunnableConfig;
 
-use super::base::{BasePromptTemplate, merge_prompt_config};
+use super::base::BasePromptTemplate;
 use super::chat::{BaseChatPromptTemplate, ChatPromptInput};
 use super::message::BaseMessagePromptTemplate;
 use super::prompt::PromptTemplate;
@@ -311,25 +311,12 @@ impl Runnable for FewShotPromptTemplate {
     fn name(&self) -> Option<String> {
         Some("FewShotPromptTemplate".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = merge_prompt_config(config, self.metadata(), self.tags());
-        self.call_with_config(
-            &|input, _config| {
-                BasePromptTemplate::validate_input(self, &input)?;
-                self.format_messages(&input)
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.invoke(input, config)
+        self.format_messages(&input)
     }
 }
 
@@ -518,25 +505,12 @@ impl Runnable for FewShotChatMessagePromptTemplate {
     fn name(&self) -> Option<String> {
         Some("FewShotChatMessagePromptTemplate".to_string())
     }
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let config = merge_prompt_config(config, self.metadata(), self.tags());
-        self.call_with_config(
-            &|input: ChatPromptInput, _config| {
-                BasePromptTemplate::validate_input(self, &input.variables)?;
-                BaseChatPromptTemplate::format_chat_messages(self, &input)
-            },
-            input,
-            config,
-        )
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
-        config: Option<RunnableConfig>,
+        _config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.invoke(input, config)
+        self.format_chat_messages(&input)
     }
 }
 

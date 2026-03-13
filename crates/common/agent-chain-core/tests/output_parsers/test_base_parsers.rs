@@ -57,7 +57,7 @@ async fn test_base_generation_parser() {
 
     let parser = GenerationStrInvertCase;
     let result = parser
-        .invoke(model_output.generations[0].message.clone(), None)
+        .parse_result(&[model_output.generations[0].clone()], false)
         .unwrap();
 
     assert_eq!(result, "HeLLO");
@@ -104,6 +104,7 @@ async fn test_base_transform_output_parser() {
             None,
             None,
         )
+        .await
         .unwrap();
 
     let input_stream = stream.filter_map(|chunk| async { chunk.ok().map(|c| c.message) });

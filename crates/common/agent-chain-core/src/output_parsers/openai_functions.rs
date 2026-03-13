@@ -8,7 +8,6 @@ use super::transform::{BaseCumulativeTransformOutputParser, BaseTransformOutputP
 use crate::error::{Error, Result};
 use crate::messages::{AnyMessage, BaseMessage};
 use crate::outputs::ChatGeneration;
-use crate::runnables::RunnableConfig;
 use crate::utils::json::parse_partial_json;
 
 #[derive(Debug, Clone)]
@@ -414,12 +413,10 @@ impl BaseLLMOutputParser for OutputFunctionsParser {
     }
 }
 
-impl BaseGenerationOutputParser for OutputFunctionsParser {
-    fn invoke(
-        &self,
-        input: impl Into<AnyMessage>,
-        _config: Option<RunnableConfig>,
-    ) -> Result<Self::Output> {
+impl BaseGenerationOutputParser for OutputFunctionsParser {}
+
+impl OutputFunctionsParser {
+    pub fn invoke_parser(&self, input: impl Into<AnyMessage>) -> Result<Value> {
         let message: AnyMessage = input.into();
         let chat_gen = ChatGeneration::builder().message(message).build();
         self.parse_result(&[chat_gen])

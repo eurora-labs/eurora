@@ -305,31 +305,13 @@ pub trait BaseChatModel: BaseLanguageModel {
         run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatResult>;
 
-    async fn _agenerate(
-        &self,
-        messages: Vec<AnyMessage>,
-        stop: Option<Vec<String>>,
-        run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<ChatResult> {
-        self._generate(messages, stop, run_manager).await
-    }
-
-    fn _stream(
+    async fn _stream(
         &self,
         _messages: Vec<AnyMessage>,
         _stop: Option<Vec<String>>,
         _run_manager: Option<&CallbackManagerForLLMRun>,
     ) -> Result<ChatGenerationStream> {
         Err(Error::NotImplemented("Streaming not implemented".into()))
-    }
-
-    async fn _astream(
-        &self,
-        messages: Vec<AnyMessage>,
-        stop: Option<Vec<String>>,
-        run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<ChatGenerationStream> {
-        self._stream(messages, stop, run_manager)
     }
 
     fn get_first_message(&self, result: &ChatResult) -> Result<AIMessage> {
@@ -389,28 +371,17 @@ pub trait BaseChatModel: BaseLanguageModel {
         false
     }
 
-    fn has_astream_impl(&self) -> bool {
-        false
-    }
-
     fn has_streaming_field(&self) -> Option<bool> {
         None
     }
 
     fn _should_stream(
         &self,
-        async_api: bool,
         has_tools: bool,
         stream_kwarg: Option<bool>,
         run_manager: Option<&[Arc<dyn BaseCallbackHandler>]>,
     ) -> bool {
-        let sync_not_implemented = !self.has_stream_impl();
-        let async_not_implemented = !self.has_astream_impl();
-
-        if !async_api && sync_not_implemented {
-            return false;
-        }
-        if async_api && async_not_implemented && sync_not_implemented {
+        if !self.has_stream_impl() {
             return false;
         }
 
@@ -499,138 +470,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         let run_managers =
             callback_manager.on_chat_model_start(&params, &messages, run_id, run_name.as_deref());
 
-        let mut results = Vec::new();
-        for (i, message_list) in messages.iter().enumerate() {
-            let run_manager = run_managers.get(i);
-            let normalized = super::utils::normalize_messages(message_list.clone());
-
-            match self
-                ._generate_with_cache(normalized, stop.clone(), run_manager)
-                .await
-            {
-                Ok(result) => {
-                    results.push(result);
-                }
-                Err(e) => {
-                    if let Some(rm) = run_manager {
-                        rm.on_llm_error(&e);
-                    }
-                    return Err(e);
-                }
-            }
-        }
-
-        let flattened_outputs: Vec<LLMResult> = results
-            .iter()
-            .map(|res| LLMResult {
-                generations: vec![res.generations.iter().cloned().map(|g| g.into()).collect()],
-                llm_output: res.llm_output.clone(),
-                run: None,
-                result_type: "LLMResult".to_string(),
-            })
-            .collect();
-
-        let llm_outputs: Vec<Option<HashMap<String, Value>>> =
-            results.iter().map(|res| res.llm_output.clone()).collect();
-        let combined_llm_output = self._combine_llm_outputs(&llm_outputs);
-
-        let generations: Vec<Vec<GenerationType>> = results
-            .into_iter()
-            .map(|res| res.generations.into_iter().map(|g| g.into()).collect())
-            .collect();
-
-        let mut output = LLMResult {
-            generations,
-            llm_output: if combined_llm_output.is_empty() {
-                None
-            } else {
-                Some(combined_llm_output)
-            },
-            run: None,
-            result_type: "LLMResult".to_string(),
-        };
-
-        let mut run_infos = Vec::new();
-        for (run_manager, flattened_output) in run_managers.iter().zip(flattened_outputs.iter()) {
-            if let Some(gen_list) = flattened_output.generations.first()
-                && let Some(generation) = gen_list.first()
-                && let GenerationType::ChatGeneration(chat_gen) = generation
-            {
-                let chat_result = crate::outputs::ChatResult::builder()
-                    .generations(vec![chat_gen.clone()])
-                    .build();
-                run_manager.on_llm_end(&chat_result);
-            }
-            run_infos.push(RunInfo::new(run_manager.run_id()));
-        }
-
-        if !run_infos.is_empty() {
-            output.run = Some(run_infos);
-        }
-
-        Ok(output)
-    }
-
-    async fn agenerate(
-        &self,
-        messages: Vec<Vec<AnyMessage>>,
-        config: GenerateConfig,
-    ) -> Result<LLMResult> {
-        use crate::callbacks::CallbackManager;
-        use crate::outputs::RunInfo;
-
-        let GenerateConfig {
-            stop,
-            callbacks,
-            tags,
-            metadata,
-            run_name,
-            run_id,
-        } = config;
-
-        let params = self._get_invocation_params(stop.as_deref(), None);
-        let options = {
-            let mut opts = HashMap::new();
-            if let Some(ref s) = stop {
-                opts.insert(
-                    "stop".to_string(),
-                    Value::Array(s.iter().map(|x| Value::String(x.clone())).collect()),
-                );
-            }
-            opts
-        };
-
-        let mut inheritable_metadata = metadata.clone().unwrap_or_default();
-        let ls_params = self.get_chat_ls_params(stop.as_deref());
-        if let Some(provider) = ls_params.ls_provider {
-            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
-        }
-        if let Some(model_name) = ls_params.ls_model_name {
-            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
-        }
-        if let Some(model_type) = ls_params.ls_model_type {
-            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
-        }
-        if !options.is_empty() {
-            inheritable_metadata.insert(
-                "options".to_string(),
-                serde_json::to_value(&options).unwrap_or_default(),
-            );
-        }
-
-        let callback_manager = CallbackManager::configure()
-            .maybe_inheritable_callbacks(callbacks)
-            .maybe_local_callbacks(self.callbacks().cloned())
-            .verbose(self.verbose())
-            .maybe_inheritable_tags(tags)
-            .maybe_local_tags(self.config().tags.clone())
-            .inheritable_metadata(inheritable_metadata)
-            .maybe_local_metadata(self.config().metadata.clone())
-            .call();
-
-        let run_managers =
-            callback_manager.on_chat_model_start(&params, &messages, run_id, run_name.as_deref());
-
         let futures: Vec<_> = messages
             .iter()
             .enumerate()
@@ -640,7 +479,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                 let run_manager = run_managers.get(i);
                 async move {
                     let result = self
-                        ._agenerate_with_cache(normalized, stop, run_manager)
+                        ._generate_with_cache(normalized, stop, run_manager)
                         .await;
                     (i, result)
                 }
@@ -744,7 +583,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         if let Some(ref cache) = resolved_cache {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            if let Some(cached) = cache.lookup(&prompt_key, &llm_string) {
+            if let Some(cached) = cache.lookup(&prompt_key, &llm_string).await {
                 let generations = self._convert_cached_generations(cached);
                 return Ok(crate::outputs::ChatResult::builder()
                     .generations(generations)
@@ -753,11 +592,13 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
 
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
-            rate_limiter.acquire(true);
+            rate_limiter.acquire(true).await;
         }
 
-        if self._should_stream(false, false, None, run_manager.map(|rm| rm.handlers())) {
-            let stream_result = self._stream(messages.clone(), stop.clone(), run_manager);
+        if self._should_stream(false, None, run_manager.map(|rm| rm.handlers())) {
+            let stream_result = self
+                ._stream(messages.clone(), stop.clone(), run_manager)
+                .await;
             match stream_result {
                 Ok(stream) => {
                     let mut chat_result = agenerate_from_stream(stream).await?;
@@ -803,102 +644,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             let llm_string = self._get_llm_string(stop.as_deref(), None);
             let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
             let generations: Vec<ChatGeneration> = _chat_generations_to_cache(&result.generations);
-            cache.update(&prompt_key, &llm_string, generations);
-        }
-
-        Ok(result)
-    }
-
-    async fn _agenerate_with_cache(
-        &self,
-        messages: Vec<AnyMessage>,
-        stop: Option<Vec<String>>,
-        run_manager: Option<&CallbackManagerForLLMRun>,
-    ) -> Result<crate::outputs::ChatResult> {
-        let cache_config = self.chat_config().base.cache;
-        let cache_instance = self.chat_config().cache_instance.clone();
-
-        let resolved_cache: Option<std::sync::Arc<dyn crate::caches::BaseCache>> =
-            if let Some(instance) = cache_instance {
-                Some(instance)
-            } else if cache_config == Some(false) {
-                None
-            } else if cache_config == Some(true) {
-                let global = crate::globals::get_llm_cache();
-                if global.is_none() {
-                    return Err(Error::Other(
-                        "Asked to cache, but no cache found at global cache.".to_string(),
-                    ));
-                }
-                global
-            } else {
-                crate::globals::get_llm_cache()
-            };
-
-        if let Some(ref cache) = resolved_cache {
-            let llm_string = self._get_llm_string(stop.as_deref(), None);
-            let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            if let Some(cached) = cache.alookup(&prompt_key, &llm_string).await {
-                let generations = self._convert_cached_generations(cached);
-                return Ok(crate::outputs::ChatResult::builder()
-                    .generations(generations)
-                    .build());
-            }
-        }
-        if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
-            rate_limiter.aacquire(true).await;
-        }
-
-        if self._should_stream(true, false, None, run_manager.map(|rm| rm.handlers())) {
-            let stream_result = self
-                ._astream(messages.clone(), stop.clone(), run_manager)
-                .await;
-            match stream_result {
-                Ok(stream) => {
-                    let mut chat_result = agenerate_from_stream(stream).await?;
-                    if self.chat_config().output_version.as_deref() == Some("v1") {
-                        for generation in &mut chat_result.generations {
-                            if let AnyMessage::AIMessage(ref ai_msg) = generation.message {
-                                let updated =
-                                    super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                                generation.message = AnyMessage::AIMessage(updated);
-                            }
-                        }
-                    }
-                    return Ok(chat_result);
-                }
-                Err(Error::NotImplemented(_)) => {}
-                Err(e) => return Err(e),
-            }
-        }
-
-        let mut result = self
-            ._agenerate(messages.clone(), stop.clone(), run_manager)
-            .await?;
-
-        if self.chat_config().output_version.as_deref() == Some("v1") {
-            for generation in &mut result.generations {
-                if let AnyMessage::AIMessage(ref ai_msg) = generation.message {
-                    let updated = super::utils::update_message_content_to_blocks(ai_msg, "v1");
-                    generation.message = AnyMessage::AIMessage(updated);
-                }
-            }
-        }
-
-        for generation in &mut result.generations {
-            if let AnyMessage::AIMessage(ref mut ai_msg) = generation.message {
-                ai_msg.response_metadata = _gen_info_and_msg_metadata(
-                    generation.generation_info.as_ref(),
-                    &ai_msg.response_metadata,
-                );
-            }
-        }
-
-        if let Some(ref cache) = resolved_cache {
-            let llm_string = self._get_llm_string(stop.as_deref(), None);
-            let prompt_key = serde_json::to_string(&messages).unwrap_or_default();
-            let generations: Vec<ChatGeneration> = _chat_generations_to_cache(&result.generations);
-            cache.aupdate(&prompt_key, &llm_string, generations).await;
+            cache.update(&prompt_key, &llm_string, generations).await;
         }
 
         Ok(result)
@@ -911,7 +657,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         callbacks: Option<Callbacks>,
     ) -> Result<AnyMessage> {
         let result = self
-            .agenerate(
+            .generate(
                 vec![messages],
                 GenerateConfig::builder()
                     .maybe_stop(stop)
@@ -994,51 +740,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         }
     }
 
-    async fn ainvoke(
-        &self,
-        input: Vec<AnyMessage>,
-        config: Option<&RunnableConfig>,
-    ) -> Result<AIMessage> {
-        let messages = input;
-
-        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
-            (
-                cfg.callbacks.clone(),
-                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
-                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
-                cfg.run_name.clone(),
-                cfg.run_id,
-            )
-        } else {
-            (None, None, None, None, None)
-        };
-
-        let result = self
-            .agenerate(
-                vec![messages],
-                GenerateConfig::builder()
-                    .maybe_callbacks(callbacks)
-                    .maybe_tags(tags)
-                    .maybe_metadata(metadata)
-                    .maybe_run_name(run_name)
-                    .maybe_run_id(run_id)
-                    .build(),
-            )
-            .await?;
-
-        if result.generations.is_empty() || result.generations[0].is_empty() {
-            return Err(Error::Other("No generations returned".into()));
-        }
-
-        match &result.generations[0][0] {
-            GenerationType::ChatGeneration(chat_gen) => match &chat_gen.message {
-                AnyMessage::AIMessage(ai) => Ok(ai.clone()),
-                other => Ok(AIMessage::builder().content(other.text()).build()),
-            },
-            _ => Err(Error::Other("Unexpected generation type".into())),
-        }
-    }
-
     fn bind_tools(
         &self,
         _tools: &[ToolLike],
@@ -1065,7 +766,7 @@ pub trait BaseChatModel: BaseLanguageModel {
         let messages = input;
         let has_tools = false;
 
-        if !self._should_stream(false, has_tools, Some(true), None) {
+        if !self._should_stream(has_tools, Some(true), None) {
             let result = self._generate(messages, stop, None).await?;
             let message = self.get_first_message(&result)?;
             let chunk = AIMessageChunk::builder()
@@ -1117,169 +818,12 @@ pub trait BaseChatModel: BaseLanguageModel {
         let run_manager = run_managers.into_iter().next();
 
         if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
-            rate_limiter.acquire(true);
+            rate_limiter.acquire(true).await;
         }
 
         let messages = super::utils::normalize_messages(messages);
 
-        let generation_stream = self._stream(messages, stop, run_manager.as_ref())?;
-
-        let output_version = self.chat_config().output_version.clone();
-
-        let chunk_stream = async_stream::stream! {
-            use futures::StreamExt;
-
-            let mut pinned_stream = generation_stream;
-            let mut chunks: Vec<ChatGenerationChunk> = Vec::new();
-            let mut yielded = false;
-            let mut last_chunk_position: Option<ChunkPosition> = None;
-            let mut block_index: i64 = -1;
-            let mut block_index_type = String::new();
-
-            while let Some(result) = pinned_stream.next().await {
-                match result {
-                    Ok(generation_chunk) => {
-                        let mut ai_chunk = match &generation_chunk.message {
-                            AnyMessage::AIMessage(ai_msg) => AIMessageChunk::builder()
-                                .content(ai_msg.content.clone())
-                                .tool_calls(ai_msg.tool_calls.clone())
-                                .additional_kwargs(ai_msg.additional_kwargs.clone())
-                                .build(),
-                            other => AIMessageChunk::builder().content(other.text()).build(),
-                        };
-
-                        let ai_response_meta = match &generation_chunk.message {
-                            AnyMessage::AIMessage(ai_msg) => &ai_msg.response_metadata,
-                            _ => &ai_chunk.response_metadata,
-                        };
-                        ai_chunk.response_metadata = _gen_info_and_msg_metadata(
-                            generation_chunk.generation_info.as_ref(),
-                            ai_response_meta,
-                        );
-
-                        if output_version.as_deref() == Some("v1") {
-                            ai_chunk = super::utils::update_chunk_content_to_blocks(&ai_chunk, "v1");
-                            apply_block_indices(&mut ai_chunk, &mut block_index, &mut block_index_type);
-                        }
-
-                        if let Some(ref rm) = run_manager {
-                            let chunk_json = serde_json::to_value(&generation_chunk).ok();
-                            rm.on_llm_new_token(
-                                ai_chunk.content.as_text_ref(),
-                                chunk_json.as_ref(),
-                            );
-                        }
-
-                        last_chunk_position = generation_chunk
-                            .generation_info
-                            .as_ref()
-                            .and_then(|info| info.get("chunk_position"))
-                            .and_then(|v| serde_json::from_value::<ChunkPosition>(v.clone()).ok());
-                        chunks.push(generation_chunk);
-                        yielded = true;
-                        yield Ok(ai_chunk);
-                    }
-                    Err(e) => {
-                        if let Some(ref rm) = run_manager {
-                            rm.on_llm_error(&e);
-                        }
-                        yield Err(e);
-                        return;
-                    }
-                }
-            }
-
-            if yielded && last_chunk_position.is_none() {
-                let mut final_chunk = AIMessageChunk::builder().content("").build();
-                final_chunk.set_chunk_position(Some(ChunkPosition::Last));
-
-                if let Some(ref rm) = run_manager {
-                    let msg_chunk = ChatGenerationChunk::builder().message(AnyMessage::AIMessage(crate::messages::AIMessage::builder().content("").build())).build();
-                    let chunk_json = serde_json::to_value(&msg_chunk).ok();
-                    rm.on_llm_new_token("", chunk_json.as_ref());
-                }
-
-                yield Ok(final_chunk);
-            }
-
-            if let Some(ref rm) = run_manager
-                && let Some(merged) = crate::outputs::merge_chat_generation_chunks(chunks) {
-                    let chat_gen: ChatGeneration = merged.into();
-                    let chat_result = ChatResult::builder().generations(vec![chat_gen]).build();
-                    rm.on_llm_end(&chat_result);
-                }
-        };
-
-        Ok(Box::pin(chunk_stream))
-    }
-
-    async fn astream(
-        &self,
-        input: Vec<AnyMessage>,
-        config: Option<&RunnableConfig>,
-        stop: Option<Vec<String>>,
-    ) -> Result<AIMessageChunkStream> {
-        let messages = input;
-        let has_tools = false;
-
-        if !self._should_stream(true, has_tools, Some(true), None) {
-            let result = self._agenerate(messages, stop, None).await?;
-            let message = self.get_first_message(&result)?;
-            let chunk = AIMessageChunk::builder()
-                .content(message.content.clone())
-                .build();
-            return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
-        }
-
-        let (callbacks, tags, metadata, run_name, run_id) = if let Some(cfg) = config {
-            (
-                cfg.callbacks.clone(),
-                Some(cfg.tags.clone()).filter(|t| !t.is_empty()),
-                Some(cfg.metadata.clone()).filter(|m| !m.is_empty()),
-                cfg.run_name.clone(),
-                cfg.run_id,
-            )
-        } else {
-            (None, None, None, None, None)
-        };
-
-        let mut inheritable_metadata = metadata.unwrap_or_default();
-        let ls_params = self.get_chat_ls_params(stop.as_deref());
-        if let Some(provider) = ls_params.ls_provider {
-            inheritable_metadata.insert("ls_provider".to_string(), Value::String(provider));
-        }
-        if let Some(model_name) = ls_params.ls_model_name {
-            inheritable_metadata.insert("ls_model_name".to_string(), Value::String(model_name));
-        }
-        if let Some(model_type) = ls_params.ls_model_type {
-            inheritable_metadata.insert("ls_model_type".to_string(), Value::String(model_type));
-        }
-
-        let params = self._get_invocation_params(stop.as_deref(), None);
-        let callback_manager = crate::callbacks::CallbackManager::configure()
-            .maybe_inheritable_callbacks(callbacks)
-            .maybe_local_callbacks(self.callbacks().cloned())
-            .verbose(self.verbose())
-            .maybe_inheritable_tags(tags)
-            .maybe_local_tags(self.config().tags.clone())
-            .inheritable_metadata(inheritable_metadata)
-            .maybe_local_metadata(self.config().metadata.clone())
-            .call();
-        let run_managers = callback_manager.on_chat_model_start(
-            &params,
-            std::slice::from_ref(&messages),
-            run_id,
-            run_name.as_deref(),
-        );
-        let run_manager = run_managers.into_iter().next();
-
-        if let Some(ref rate_limiter) = self.chat_config().rate_limiter {
-            rate_limiter.aacquire(true).await;
-        }
-
-        let messages = super::utils::normalize_messages(messages);
-
-        let generation_stream = self._astream(messages, stop, run_manager.as_ref()).await?;
+        let generation_stream = self._stream(messages, stop, run_manager.as_ref()).await?;
 
         let output_version = self.chat_config().output_version.clone();
 
@@ -1379,7 +923,7 @@ pub trait BaseChatModel: BaseLanguageModel {
     ) -> Result<ChatGenerationStream> {
         let has_tools = false;
 
-        if !self._should_stream(false, has_tools, None, None) {
+        if !self._should_stream(has_tools, None, None) {
             let result = self._generate(messages, stop, run_manager).await?;
             if result.generations.is_empty() {
                 return Err(Error::Other("No generations returned".into()));
@@ -1390,7 +934,7 @@ pub trait BaseChatModel: BaseLanguageModel {
             return Ok(Box::pin(futures::stream::once(async move { Ok(chunk) })));
         }
 
-        self._stream(messages, stop, run_manager)
+        self._stream(messages, stop, run_manager).await
     }
 
     fn get_chat_ls_params(&self, stop: Option<&[String]>) -> LangSmithParams {
@@ -1442,14 +986,6 @@ pub trait BaseChatModel: BaseLanguageModel {
         config: GenerateConfig,
     ) -> Result<LLMResult> {
         self.generate(prompts, config).await
-    }
-
-    async fn agenerate_prompt(
-        &self,
-        prompts: Vec<Vec<AnyMessage>>,
-        config: GenerateConfig,
-    ) -> Result<LLMResult> {
-        self.agenerate(prompts, config).await
     }
 
     fn get_identifying_params(&self) -> HashMap<String, Value> {
@@ -1571,55 +1107,16 @@ impl std::fmt::Debug for ChatModelRunnable {
     }
 }
 
-/// Run an async future synchronously, safe to call from any context.
-///
-/// When called outside a tokio runtime, creates a temporary runtime on the
-/// current thread. When called from within an existing runtime (e.g. from a
-/// sync `invoke` inside an async test), spawns a new thread with its own
-/// runtime so the calling runtime's I/O driver is not blocked.
-fn run_blocking_async<F, T>(future: F) -> T
-where
-    F: std::future::Future<Output = T> + Send + 'static,
-    T: Send + 'static,
-{
-    if tokio::runtime::Handle::try_current().is_ok() {
-        std::thread::scope(|scope| {
-            scope
-                .spawn(|| {
-                    tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .expect("failed to create tokio runtime")
-                        .block_on(future)
-                })
-                .join()
-                .expect("spawned thread panicked")
-        })
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to create tokio runtime")
-            .block_on(future)
-    }
-}
-
 #[async_trait]
 impl Runnable for ChatModelRunnable {
     type Input = Vec<AnyMessage>;
     type Output = AIMessage;
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let model = self.model.clone();
-        run_blocking_async(async move { model.invoke(input, config.as_ref()).await })
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        self.model.ainvoke(input, config.as_ref()).await
+        self.model.invoke(input, config.as_ref()).await
     }
 }
 
@@ -1660,25 +1157,13 @@ impl std::fmt::Debug for StructuredOutputWithRaw {
 impl Runnable for StructuredOutputWithRaw {
     type Input = Vec<AnyMessage>;
     type Output = Value;
-
-    fn invoke(&self, input: Self::Input, config: Option<RunnableConfig>) -> Result<Self::Output> {
-        let raw: AIMessage = self.model.invoke(input, config.clone())?;
-        match self.parser.invoke(raw.clone(), config) {
-            Ok(parsed) => {
-                let parsed_value = serde_json::to_value(&parsed)?;
-                Self::build_output(&raw, Some(parsed_value), None)
-            }
-            Err(e) => Self::build_output(&raw, None, Some(e.to_string())),
-        }
-    }
-
-    async fn ainvoke(
+    async fn invoke(
         &self,
         input: Self::Input,
         config: Option<RunnableConfig>,
     ) -> Result<Self::Output> {
-        let raw: AIMessage = self.model.ainvoke(input, config.clone()).await?;
-        match self.parser.ainvoke(raw.clone(), config).await {
+        let raw: AIMessage = self.model.invoke(input, config.clone()).await?;
+        match self.parser.invoke(raw.clone(), config).await {
             Ok(parsed) => {
                 let parsed_value = serde_json::to_value(&parsed)?;
                 Self::build_output(&raw, Some(parsed_value), None)

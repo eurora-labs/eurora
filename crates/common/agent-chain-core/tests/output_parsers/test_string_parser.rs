@@ -5,6 +5,7 @@ use agent_chain_core::output_parsers::{
     BaseOutputParser, BaseTransformOutputParser, StrOutputParser,
 };
 use agent_chain_core::outputs::ChatGeneration;
+use agent_chain_core::runnables::base::Runnable;
 use futures::StreamExt;
 
 #[test]
@@ -41,30 +42,26 @@ fn test_str_output_parser_parse_unicode() {
     assert_eq!(parser.parse(text).unwrap(), text);
 }
 
-#[test]
-fn test_str_output_parser_invoke_with_message() {
-    let parser = StrOutputParser::new();
+#[tokio::test]
+async fn test_str_output_parser_invoke_with_message() {
+    let parser = StrOutputParser::new().into_runnable();
     let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
+    let result = parser
+        .invoke(AnyMessage::AIMessage(message), None)
+        .await
+        .unwrap();
     assert_eq!(result, "Hello from AI");
 }
 
-#[test]
-fn test_str_output_parser_invoke_with_human_message() {
-    let parser = StrOutputParser::new();
+#[tokio::test]
+async fn test_str_output_parser_invoke_with_human_message() {
+    let parser = StrOutputParser::new().into_runnable();
     let message = HumanMessage::builder().content("Hello from human").build();
     let result = parser
         .invoke(AnyMessage::HumanMessage(message), None)
+        .await
         .unwrap();
     assert_eq!(result, "Hello from human");
-}
-
-#[test]
-fn test_str_output_parser_invoke_with_ai_message() {
-    let parser = StrOutputParser::new();
-    let message = AIMessage::builder().content("Hello from AI").build();
-    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
-    assert_eq!(result, "Hello from AI");
 }
 
 #[test]
@@ -172,7 +169,7 @@ async fn test_str_output_parser_with_model_chain() {
         .await
         .unwrap();
     let result = parser
-        .invoke(model_output.generations[0].message.clone(), None)
+        .parse_result(&[model_output.generations[0].clone()], false)
         .unwrap();
 
     assert_eq!(result, "Model output");
@@ -193,13 +190,19 @@ async fn test_str_output_parser_with_model_stream() {
             None,
             None,
         )
+        .await
         .unwrap();
 
     let chunks: Vec<String> = stream
         .filter_map(|chunk| async {
-            chunk
-                .ok()
-                .map(|c| parser.invoke(c.message.clone(), None).unwrap())
+            chunk.ok().map(|c| {
+                parser
+                    .parse_result(
+                        &[ChatGeneration::builder().message(c.message.clone()).build()],
+                        false,
+                    )
+                    .unwrap()
+            })
         })
         .collect()
         .await;
@@ -211,7 +214,10 @@ async fn test_str_output_parser_with_model_stream() {
 fn test_str_output_parser_with_empty_content() {
     let parser = StrOutputParser::new();
     let message = AIMessage::builder().content("").build();
-    let result = parser.invoke(AnyMessage::AIMessage(message), None).unwrap();
+    let generation = ChatGeneration::builder()
+        .message(AnyMessage::AIMessage(message))
+        .build();
+    let result = parser.parse_result(&[generation], false).unwrap();
     assert_eq!(result, "");
 }
 
@@ -308,20 +314,6 @@ fn test_str_output_parser_with_long_text() {
 
 #[tokio::test]
 async fn test_str_output_parser_transform_empty_iterator() {
-    let parser = StrOutputParser::new();
-
-    let input_stream = futures::stream::iter(Vec::<AnyMessage>::new());
-    let result: Vec<String> = parser
-        .transform(Box::pin(input_stream))
-        .filter_map(|r| async { r.ok() })
-        .collect()
-        .await;
-
-    assert_eq!(result, Vec::<String>::new());
-}
-
-#[tokio::test]
-async fn test_str_output_parser_transform_empty_iterator_2() {
     let parser = StrOutputParser::new();
 
     let input_stream = futures::stream::iter(Vec::<AnyMessage>::new());

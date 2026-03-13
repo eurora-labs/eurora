@@ -18,10 +18,10 @@ fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
         .collect()
 }
 
-#[test]
-fn test_runnable_lambda_invoke() {
+#[tokio::test]
+async fn test_runnable_lambda_invoke() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-    assert_eq!(runnable.invoke(5, None).unwrap(), 10);
+    assert_eq!(runnable.invoke(5, None).await.unwrap(), 10);
 }
 
 #[test]
@@ -31,15 +31,14 @@ fn test_runnable_lambda_named() {
         .name("add_one")
         .build();
     assert_eq!(runnable.name(), Some("add_one".to_string()));
-    assert_eq!(runnable.invoke(5, None).unwrap(), 6);
 }
 
-#[test]
-fn test_runnable_lambda_error() {
+#[tokio::test]
+async fn test_runnable_lambda_error() {
     let runnable = RunnableLambda::builder()
         .func(|_x: i32| Err::<i32, _>(Error::other("boom")))
         .build();
-    let result = runnable.invoke(5, None);
+    let result = runnable.invoke(5, None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("boom"));
 }
@@ -56,66 +55,46 @@ async fn test_runnable_lambda_stream() {
 }
 
 #[tokio::test]
-async fn test_runnable_lambda_astream() {
-    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-    let output: Vec<i32> = runnable
-        .astream(5, None)
-        .filter_map(|r| async { r.ok() })
-        .collect()
-        .await;
-    assert_eq!(output, vec![6]);
-}
-
-#[test]
-fn test_sequence_invoke() {
+async fn test_sequence_invoke() {
     let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let seq = pipe(add_one, double);
 
-    assert_eq!(seq.invoke(5, None).unwrap(), 12);
+    assert_eq!(seq.invoke(5, None).await.unwrap(), 12);
 }
 
 #[tokio::test]
-async fn test_sequence_ainvoke() {
-    let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-    let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-    let seq = pipe(add_one, double);
-
-    assert_eq!(seq.ainvoke(5, None).await.unwrap(), 12);
-}
-
-#[test]
-fn test_sequence_three_steps() {
+async fn test_sequence_three_steps() {
     let step1 = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let step2 = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let step3 = RunnableLambda::builder().func(|x: i32| Ok(x - 3)).build();
     let seq = pipe(pipe(step1, step2), step3);
 
-    assert_eq!(seq.invoke(5, None).unwrap(), 9);
+    assert_eq!(seq.invoke(5, None).await.unwrap(), 9);
 }
 
-#[test]
-fn test_sequence_first_step_error() {
+#[tokio::test]
+async fn test_sequence_first_step_error() {
     let fail = RunnableLambda::builder()
         .func(|_x: i32| Err::<i32, _>(Error::other("first failed")))
         .build();
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let seq = pipe(fail, double);
 
-    let result = seq.invoke(5, None);
+    let result = seq.invoke(5, None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("first failed"));
 }
 
-#[test]
-fn test_sequence_second_step_error() {
+#[tokio::test]
+async fn test_sequence_second_step_error() {
     let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let fail = RunnableLambda::builder()
         .func(|_x: i32| Err::<i32, _>(Error::other("second failed")))
         .build();
     let seq = pipe(add_one, fail);
 
-    let result = seq.invoke(5, None);
+    let result = seq.invoke(5, None).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("second failed"));
 }
@@ -150,22 +129,6 @@ async fn test_runnable_sequence_transform() {
     assert_eq!(result, vec![12]);
 }
 
-#[tokio::test]
-async fn test_runnable_sequence_atransform() {
-    let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-    let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-    let seq = pipe(add_one, double);
-
-    let input_stream = futures::stream::iter(vec![5]);
-    let result: Vec<i32> = seq
-        .atransform(Box::pin(input_stream), None)
-        .filter_map(|r| async { r.ok() })
-        .collect()
-        .await;
-
-    assert_eq!(result, vec![12]);
-}
-
 #[test]
 fn test_sequence_name() {
     let add = RunnableLambda::builder()
@@ -185,8 +148,8 @@ fn test_sequence_name() {
     assert_eq!(seq.name(), Some("my_seq".to_string()));
 }
 
-#[test]
-fn test_with_config_with_config() {
+#[tokio::test]
+async fn test_with_config_with_config() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
     let mut config1 = RunnableConfig::default();
@@ -196,45 +159,45 @@ fn test_with_config_with_config() {
     config2.tags.push("a-tag".into());
 
     let bound = runnable.with_config(config1).with_config(config2);
-    let result = bound.invoke(5, None).unwrap();
+    let result = bound.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_bind_creates_binding() {
+#[tokio::test]
+async fn test_bind_creates_binding() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let kwargs: HashMap<String, Value> = HashMap::from([
         ("stop".into(), json!(["Thought:"])),
         ("one".into(), json!("two")),
     ]);
     let bound = runnable.bind(kwargs);
-    assert_eq!(bound.invoke(5, None).unwrap(), 6);
+    assert_eq!(bound.invoke(5, None).await.unwrap(), 6);
 }
 
-#[test]
-fn test_with_config_tags() {
+#[tokio::test]
+async fn test_with_config_tags() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let mut config = RunnableConfig::default();
     config.tags.push("my_key".into());
 
     let bound = runnable.with_config(config);
-    let result = bound.invoke(5, None).unwrap();
+    let result = bound.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_with_config_metadata() {
+#[tokio::test]
+async fn test_with_config_metadata() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let mut config = RunnableConfig::default();
     config.metadata.insert("my_key".into(), json!("my_value"));
 
     let bound = runnable.with_config(config);
-    let result = bound.invoke(5, None).unwrap();
+    let result = bound.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_with_config_merge_at_invoke() {
+#[tokio::test]
+async fn test_with_config_merge_at_invoke() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let mut base_config = RunnableConfig::default();
     base_config.tags.push("base-tag".into());
@@ -243,34 +206,12 @@ fn test_with_config_merge_at_invoke() {
     let mut invoke_config = RunnableConfig::default();
     invoke_config.tags.push("invoke-tag".into());
 
-    let result = bound.invoke(5, Some(invoke_config)).unwrap();
+    let result = bound.invoke(5, Some(invoke_config)).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_parallel_invoke() {
-    let parallel = RunnableParallel::<i32>::builder()
-        .build()
-        .add(
-            "doubled",
-            RunnableLambda::builder()
-                .func(|x: i32| Ok(json!(x * 2)))
-                .build(),
-        )
-        .add(
-            "tripled",
-            RunnableLambda::builder()
-                .func(|x: i32| Ok(json!(x * 3)))
-                .build(),
-        );
-
-    let result = parallel.invoke(5, None).unwrap();
-    assert_eq!(result["doubled"], json!(10));
-    assert_eq!(result["tripled"], json!(15));
-}
-
 #[tokio::test]
-async fn test_parallel_ainvoke() {
+async fn test_parallel_invoke() {
     let parallel = RunnableParallel::<i32>::builder()
         .build()
         .add(
@@ -286,7 +227,7 @@ async fn test_parallel_ainvoke() {
                 .build(),
         );
 
-    let result = parallel.ainvoke(5, None).await.unwrap();
+    let result = parallel.invoke(5, None).await.unwrap();
     assert_eq!(result["doubled"], json!(10));
     assert_eq!(result["tripled"], json!(15));
 }
@@ -314,8 +255,8 @@ fn test_parallel_name() {
     assert!(name.contains('b'));
 }
 
-#[test]
-fn test_parallel_error_in_branch() {
+#[tokio::test]
+async fn test_parallel_error_in_branch() {
     let parallel = RunnableParallel::<i32>::builder()
         .build()
         .add(
@@ -331,41 +272,41 @@ fn test_parallel_error_in_branch() {
                 .build(),
         );
 
-    let result = parallel.invoke(5, None);
+    let result = parallel.invoke(5, None).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_each_simple() {
+#[tokio::test]
+async fn test_each_simple() {
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let each = RunnableEach::new(double);
 
-    let result = each.invoke(vec![1, 2, 3], None).unwrap();
+    let result = each.invoke(vec![1, 2, 3], None).await.unwrap();
     assert_eq!(result, vec![2, 4, 6]);
 }
 
-#[test]
-fn test_map_convenience() {
+#[tokio::test]
+async fn test_map_convenience() {
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let each = double.map();
 
-    let result = each.invoke(vec![1, 2, 3, 4, 5], None).unwrap();
+    let result = each.invoke(vec![1, 2, 3, 4, 5], None).await.unwrap();
     assert_eq!(result, vec![2, 4, 6, 8, 10]);
 }
 
-#[test]
-fn test_map_nested() {
+#[tokio::test]
+async fn test_map_nested() {
     let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let inner_each = add_one.map();
     let outer_each = inner_each.map();
 
     let input = vec![vec![1, 2, 3], vec![10, 20]];
-    let result = outer_each.invoke(input, None).unwrap();
+    let result = outer_each.invoke(input, None).await.unwrap();
     assert_eq!(result, vec![vec![2, 3, 4], vec![11, 21]]);
 }
 
-#[test]
-fn test_each_error() {
+#[tokio::test]
+async fn test_each_error() {
     let fail_on_3 = RunnableLambda::builder()
         .func(|x: i32| {
             if x == 3 {
@@ -377,7 +318,7 @@ fn test_each_error() {
         .build();
     let each = RunnableEach::new(fail_on_3);
 
-    let result = each.invoke(vec![1, 2, 3, 4], None);
+    let result = each.invoke(vec![1, 2, 3, 4], None).await;
     assert!(result.is_err());
 }
 
@@ -391,8 +332,8 @@ fn test_each_name() {
     assert_eq!(each.name(), Some("RunnableEach<identity>".to_string()));
 }
 
-#[test]
-fn test_combining_sequences() {
+#[tokio::test]
+async fn test_combining_sequences() {
     let parallel = RunnableParallel::<i32>::builder()
         .build()
         .add(
@@ -415,7 +356,7 @@ fn test_combining_sequences() {
         .build();
 
     let chain = pipe(parallel, pick);
-    assert_eq!(chain.invoke(5, None).unwrap(), 10);
+    assert_eq!(chain.invoke(5, None).await.unwrap(), 10);
 }
 
 #[tokio::test]
@@ -485,27 +426,27 @@ async fn test_passthrough_transform_with_dicts() {
     assert_eq!(result[1]["foo"], json!("n"));
 }
 
-#[test]
-fn test_lambda_batch() {
+#[tokio::test]
+async fn test_lambda_batch() {
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-    let results = double.batch(vec![1, 2, 3, 4, 5], None, false);
+    let results = double.batch(vec![1, 2, 3, 4, 5], None, false).await;
     let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
     assert_eq!(values, vec![2, 4, 6, 8, 10]);
 }
 
-#[test]
-fn test_sequence_batch() {
+#[tokio::test]
+async fn test_sequence_batch() {
     let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let seq = pipe(add_one, double);
 
-    let results = seq.batch(vec![1, 2, 3], None, false);
+    let results = seq.batch(vec![1, 2, 3], None, false).await;
     let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
     assert_eq!(values, vec![4, 6, 8]); // (1+1)*2=4, (2+1)*2=6, (3+1)*2=8
 }
 
-#[test]
-fn test_seq_batch_return_exceptions() {
+#[tokio::test]
+async fn test_seq_batch_return_exceptions() {
     let maybe_fail = RunnableLambda::builder()
         .func(|x: i32| {
             if x == 2 {
@@ -518,7 +459,7 @@ fn test_seq_batch_return_exceptions() {
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
     let seq = pipe(maybe_fail, double);
 
-    let results = seq.batch(vec![1, 2, 3], None, true);
+    let results = seq.batch(vec![1, 2, 3], None, true).await;
     assert!(results[0].is_ok());
     assert_eq!(*results[0].as_ref().unwrap(), 4); // (1+1)*2=4
     assert!(results[1].is_err()); // fails on 2
@@ -526,34 +467,15 @@ fn test_seq_batch_return_exceptions() {
     assert_eq!(*results[2].as_ref().unwrap(), 8); // (3+1)*2=8
 }
 
-#[test]
-fn test_empty_batch() {
+#[tokio::test]
+async fn test_empty_batch() {
     let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-    let results = double.batch(vec![], None, false);
+    let results = double.batch(vec![], None, false).await;
     assert!(results.is_empty());
 }
 
 #[tokio::test]
-async fn test_lambda_abatch() {
-    let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-    let results = double.abatch(vec![1, 2, 3], None, false).await;
-    let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
-    assert_eq!(values, vec![2, 4, 6]);
-}
-
-#[tokio::test]
-async fn test_sequence_abatch() {
-    let add_one = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-    let double = RunnableLambda::builder().func(|x: i32| Ok(x * 2)).build();
-    let seq = pipe(add_one, double);
-
-    let results = seq.abatch(vec![1, 2, 3], None, false).await;
-    let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
-    assert_eq!(values, vec![4, 6, 8]);
-}
-
-#[test]
-fn test_runnable_assign() {
+async fn test_runnable_assign() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -568,7 +490,7 @@ fn test_runnable_assign() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("input", json!(5))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["input"], json!(5));
     assert_eq!(result["add_step"], json!({"added": 15}));
@@ -616,29 +538,18 @@ fn test_representation_of_runnables() {
     assert!(repr.contains("RunnableEach"));
 }
 
-#[test]
-fn test_default_method_implementations() {
-    let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
-
-    assert_eq!(runnable.invoke(5, None).unwrap(), 6);
-
-    let results = runnable.batch(vec![1, 2, 3], None, false);
-    let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
-    assert_eq!(values, vec![2, 3, 4]);
-}
-
 #[tokio::test]
-async fn test_default_method_implementations_async() {
+async fn test_default_method_implementations() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
 
-    assert_eq!(runnable.ainvoke(5, None).await.unwrap(), 6);
+    assert_eq!(runnable.invoke(5, None).await.unwrap(), 6);
 
-    let results = runnable.abatch(vec![1, 2, 3], None, false).await;
+    let results = runnable.batch(vec![1, 2, 3], None, false).await;
     let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
     assert_eq!(values, vec![2, 3, 4]);
 
     let output: Vec<i32> = runnable
-        .astream(5, None)
+        .stream(5, None)
         .filter_map(|r| async { r.ok() })
         .collect()
         .await;
@@ -724,8 +635,8 @@ fn test_get_name_override() {
     assert_eq!(name, "override");
 }
 
-#[test]
-fn test_each_call_count() {
+#[tokio::test]
+async fn test_each_call_count() {
     let counter = Arc::new(AtomicUsize::new(0));
     let c = counter.clone();
 
@@ -737,12 +648,12 @@ fn test_each_call_count() {
         .build();
 
     let each = RunnableEach::new(runnable);
-    let _ = each.invoke(vec![1, 2, 3, 4, 5], None).unwrap();
+    let _ = each.invoke(vec![1, 2, 3, 4, 5], None).await.unwrap();
     assert_eq!(counter.load(Ordering::SeqCst), 5);
 }
 
-#[test]
-fn test_sequence_step_count() {
+#[tokio::test]
+async fn test_sequence_step_count() {
     let counter1 = Arc::new(AtomicUsize::new(0));
     let counter2 = Arc::new(AtomicUsize::new(0));
     let c1 = counter1.clone();
@@ -762,14 +673,14 @@ fn test_sequence_step_count() {
         .build();
 
     let seq = pipe(step1, step2);
-    let _ = seq.invoke(5, None).unwrap();
+    let _ = seq.invoke(5, None).await.unwrap();
 
     assert_eq!(counter1.load(Ordering::SeqCst), 1);
     assert_eq!(counter2.load(Ordering::SeqCst), 1);
 }
 
-#[test]
-fn test_parallel_call_count() {
+#[tokio::test]
+async fn test_parallel_call_count() {
     let counter_a = Arc::new(AtomicUsize::new(0));
     let counter_b = Arc::new(AtomicUsize::new(0));
     let ca = counter_a.clone();
@@ -796,7 +707,7 @@ fn test_parallel_call_count() {
                 .build(),
         );
 
-    let _ = parallel.invoke(5, None).unwrap();
+    let _ = parallel.invoke(5, None).await.unwrap();
     assert_eq!(counter_a.load(Ordering::SeqCst), 1);
     assert_eq!(counter_b.load(Ordering::SeqCst), 1);
 }
@@ -808,10 +719,10 @@ fn test_type_name() {
     assert!(name.contains("RunnableLambda"));
 }
 
-#[test]
-fn test_parallel_default() {
+#[tokio::test]
+async fn test_parallel_default() {
     let parallel = RunnableParallel::<i32>::default();
-    let result = parallel.invoke(5, None).unwrap();
+    let result = parallel.invoke(5, None).await.unwrap();
     assert!(result.is_empty());
 }
 
@@ -824,8 +735,8 @@ fn test_binding_debug() {
     assert!(debug.contains("key"));
 }
 
-#[test]
-fn test_pick_single_key() {
+#[tokio::test]
+async fn test_pick_single_key() {
     use agent_chain_core::runnables::passthrough::PickKeys;
 
     let runnable = RunnableLambda::builder()
@@ -838,12 +749,12 @@ fn test_pick_single_key() {
         .build();
 
     let picked = runnable.pick(PickKeys::Single("name".to_string()));
-    let result = picked.invoke(1, None).unwrap();
+    let result = picked.invoke(1, None).await.unwrap();
     assert_eq!(result, json!("Alice"));
 }
 
-#[test]
-fn test_pick_multiple_keys() {
+#[tokio::test]
+async fn test_pick_multiple_keys() {
     use agent_chain_core::runnables::passthrough::PickKeys;
 
     let runnable = RunnableLambda::builder()
@@ -860,15 +771,15 @@ fn test_pick_multiple_keys() {
         "name".to_string(),
         "age".to_string(),
     ]));
-    let result = picked.invoke(1, None).unwrap();
+    let result = picked.invoke(1, None).await.unwrap();
     let result_map: HashMap<String, serde_json::Value> = serde_json::from_value(result).unwrap();
     assert_eq!(result_map.len(), 2);
     assert_eq!(result_map.get("name"), Some(&json!("Alice")));
     assert_eq!(result_map.get("age"), Some(&json!(30)));
 }
 
-#[test]
-fn test_assign_convenience() {
+#[tokio::test]
+async fn test_assign_convenience() {
     let passthrough = RunnablePassthrough::<HashMap<String, serde_json::Value>>::builder().build();
 
     let mapper = RunnablePassthrough::<HashMap<String, serde_json::Value>>::assign()
@@ -888,13 +799,13 @@ fn test_assign_convenience() {
     let mut input = HashMap::new();
     input.insert("x".to_string(), json!(5));
 
-    let result = chained.invoke(input, None).unwrap();
+    let result = chained.invoke(input, None).await.unwrap();
     assert_eq!(result.get("x"), Some(&json!(5)));
     assert_eq!(result.get("doubled"), Some(&json!(10)));
 }
 
-#[test]
-fn test_with_fallbacks_convenience() {
+#[tokio::test]
+async fn test_with_fallbacks_convenience() {
     let primary = RunnableLambda::builder()
         .func(|_x: i32| -> Result<i32, Error> { Err(Error::other("primary failed")) })
         .build();
@@ -904,12 +815,12 @@ fn test_with_fallbacks_convenience() {
         .build();
 
     let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
-    let result = with_fallbacks.invoke(5, None).unwrap();
+    let result = with_fallbacks.invoke(5, None).await.unwrap();
     assert_eq!(result, 10);
 }
 
-#[test]
-fn test_with_fallbacks_primary_succeeds() {
+#[tokio::test]
+async fn test_with_fallbacks_primary_succeeds() {
     let primary = RunnableLambda::builder()
         .func(|x: i32| -> Result<i32, Error> { Ok(x + 1) })
         .build();
@@ -919,12 +830,12 @@ fn test_with_fallbacks_primary_succeeds() {
         .build();
 
     let with_fallbacks = primary.with_fallbacks(vec![Arc::new(fallback)]);
-    let result = with_fallbacks.invoke(5, None).unwrap();
+    let result = with_fallbacks.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_with_listeners_convenience() {
+#[tokio::test]
+async fn test_with_listeners_convenience() {
     use agent_chain_core::tracers::root_listeners::Listener;
     use std::sync::atomic::AtomicBool;
 
@@ -944,12 +855,12 @@ fn test_with_listeners_convenience() {
     let runnable = RunnableLambda::builder().func(|x: i32| Ok(x + 1)).build();
     let with_listeners = runnable.with_listeners(Some(on_start), Some(on_end), None);
 
-    let result = with_listeners.invoke(5, None).unwrap();
+    let result = with_listeners.invoke(5, None).await.unwrap();
     assert_eq!(result, 6);
 }
 
-#[test]
-fn test_chaining_pick_with_fallbacks() {
+#[tokio::test]
+async fn test_chaining_pick_with_fallbacks() {
     use agent_chain_core::runnables::passthrough::PickKeys;
 
     let runnable = RunnableLambda::builder()
@@ -980,6 +891,6 @@ fn test_chaining_pick_with_fallbacks() {
 
     let with_fallbacks = picked.with_fallbacks(vec![Arc::new(fallback_picked)]);
 
-    let result = with_fallbacks.invoke(1, None).unwrap();
+    let result = with_fallbacks.invoke(1, None).await.unwrap();
     assert_eq!(result, json!("Alice"));
 }

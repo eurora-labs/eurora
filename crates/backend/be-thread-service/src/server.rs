@@ -545,7 +545,7 @@ impl ProtoThreadService for ThreadService {
 
             for round in 0..=MAX_TOOL_ROUNDS {
                 let provider_stream = chat_provider
-                    .astream(messages.clone(), None, None)
+                    .stream(messages.clone(), None, None)
                     .await
                     .map_err(|e| {
                         tracing::error!("Error in chat_stream: {}", e);

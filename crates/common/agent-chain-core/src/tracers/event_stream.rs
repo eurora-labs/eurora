@@ -1068,7 +1068,7 @@ where
     let send_stream = event_streamer.get_send_stream();
 
     Box::pin(async_stream::stream! {
-        let mut astream = std::pin::pin!(runnable.astream(input, Some(config)));
+        let mut astream = std::pin::pin!(runnable.stream(input, Some(config)));
         while let Some(_chunk) = astream.next().await {
         }
         if let Err(e) = send_stream.close() { tracing::warn!("Failed to close stream: {e}"); }

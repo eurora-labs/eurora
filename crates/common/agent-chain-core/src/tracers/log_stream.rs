@@ -1018,7 +1018,7 @@ where
     let send_stream = bridge.get_send_stream();
 
     Box::pin(async_stream::stream! {
-        let mut astream = std::pin::pin!(runnable.astream(input, Some(config)));
+        let mut astream = std::pin::pin!(runnable.stream(input, Some(config)));
         while let Some(chunk_result) = astream.next().await {
             match chunk_result {
                 Ok(chunk) => {

@@ -15,54 +15,37 @@ fn make_input(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
         .collect()
 }
 
-#[test]
-fn test_passthrough_identity() {
+#[tokio::test]
+async fn test_passthrough_identity() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-    assert_eq!(passthrough.invoke(5, None).unwrap(), 5);
+    assert_eq!(passthrough.invoke(5, None).await.unwrap(), 5);
 
     let passthrough_str: RunnablePassthrough<String> = RunnablePassthrough::builder().build();
     assert_eq!(
-        passthrough_str.invoke("hello".to_string(), None).unwrap(),
+        passthrough_str
+            .invoke("hello".to_string(), None)
+            .await
+            .unwrap(),
         "hello"
     );
 
     let passthrough_vec: RunnablePassthrough<Vec<i32>> = RunnablePassthrough::builder().build();
     assert_eq!(
-        passthrough_vec.invoke(vec![1, 2, 3], None).unwrap(),
+        passthrough_vec.invoke(vec![1, 2, 3], None).await.unwrap(),
         vec![1, 2, 3]
     );
 
     let passthrough_map: RunnablePassthrough<HashMap<String, Value>> =
         RunnablePassthrough::builder().build();
     let input = make_input(&[("key", json!("value"))]);
-    assert_eq!(passthrough_map.invoke(input.clone(), None).unwrap(), input);
-}
-
-#[tokio::test]
-async fn test_passthrough_identity_async() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-    assert_eq!(passthrough.ainvoke(5, None).await.unwrap(), 5);
-
-    let passthrough_str: RunnablePassthrough<String> = RunnablePassthrough::builder().build();
     assert_eq!(
-        passthrough_str
-            .ainvoke("hello".to_string(), None)
-            .await
-            .unwrap(),
-        "hello"
-    );
-
-    let passthrough_map: RunnablePassthrough<HashMap<String, Value>> =
-        RunnablePassthrough::builder().build();
-    let input = make_input(&[("key", json!("value"))]);
-    assert_eq!(
-        passthrough_map.ainvoke(input.clone(), None).await.unwrap(),
+        passthrough_map.invoke(input.clone(), None).await.unwrap(),
         input
     );
 }
 
-#[test]
-fn test_passthrough_with_func() {
+#[tokio::test]
+async fn test_passthrough_with_func() {
     let calls: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(Vec::new()));
     let calls_clone = calls.clone();
 
@@ -71,11 +54,11 @@ fn test_passthrough_with_func() {
             calls_clone.lock().unwrap().push(*x);
         });
 
-    let result = passthrough.invoke(5, None).unwrap();
+    let result = passthrough.invoke(5, None).await.unwrap();
     assert_eq!(result, 5);
     assert_eq!(*calls.lock().unwrap(), vec![5]);
 
-    let result = passthrough.invoke(10, None).unwrap();
+    let result = passthrough.invoke(10, None).await.unwrap();
     assert_eq!(result, 10);
     assert_eq!(*calls.lock().unwrap(), vec![5, 10]);
 }
@@ -94,7 +77,7 @@ async fn test_passthrough_with_afunc() {
             }
         });
 
-    let result = passthrough.ainvoke(5, None).await.unwrap();
+    let result = passthrough.invoke(5, None).await.unwrap();
     assert_eq!(result, 5);
     assert_eq!(*calls.lock().unwrap(), vec![5]);
 }
@@ -111,25 +94,11 @@ async fn test_passthrough_stream() {
 }
 
 #[tokio::test]
-async fn test_passthrough_astream() {
+async fn test_passthrough_batch() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-    let result: Vec<i32> = passthrough
-        .stream(42, None)
-        .filter_map(|r| async { r.ok() })
-        .collect()
-        .await;
-    assert_eq!(result, vec![42]);
-}
-
-#[test]
-fn test_passthrough_batch() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-    let inputs = vec![1, 2, 3, 4, 5];
-    let results: Vec<i32> = inputs
-        .into_iter()
-        .map(|i| passthrough.invoke(i, None).unwrap())
-        .collect();
-    assert_eq!(results, vec![1, 2, 3, 4, 5]);
+    let results = passthrough.batch(vec![1, 2, 3, 4, 5], None, false).await;
+    let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
+    assert_eq!(values, vec![1, 2, 3, 4, 5]);
 }
 
 #[tokio::test]
@@ -145,19 +114,7 @@ async fn test_passthrough_transform() {
 }
 
 #[tokio::test]
-async fn test_passthrough_atransform() {
-    let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-    let input_stream = futures::stream::iter(vec![1, 2, 3]);
-    let result: Vec<i32> = passthrough
-        .atransform(Box::pin(input_stream), None)
-        .filter_map(|r| async { r.ok() })
-        .collect()
-        .await;
-    assert_eq!(result, vec![1, 2, 3]);
-}
-
-#[test]
-fn test_passthrough_with_func_and_config() {
+async fn test_passthrough_with_func_and_config() {
     let tags_seen: Arc<Mutex<Vec<Vec<String>>>> = Arc::new(Mutex::new(Vec::new()));
     let tags_clone = tags_seen.clone();
 
@@ -169,7 +126,7 @@ fn test_passthrough_with_func_and_config() {
     let mut config = RunnableConfig::default();
     config.tags.push("test-tag".to_string());
 
-    let result = passthrough.invoke(5, Some(config)).unwrap();
+    let result = passthrough.invoke(5, Some(config)).await.unwrap();
     assert_eq!(result, 5);
 
     let seen = tags_seen.lock().unwrap();
@@ -177,8 +134,8 @@ fn test_passthrough_with_func_and_config() {
     assert!(seen[0].contains(&"test-tag".to_string()));
 }
 
-#[test]
-fn test_passthrough_with_side_effect_batch() {
+#[tokio::test]
+async fn test_passthrough_with_side_effect_batch() {
     let calls: Arc<Mutex<Vec<i32>>> = Arc::new(Mutex::new(Vec::new()));
     let calls_clone = calls.clone();
 
@@ -187,11 +144,9 @@ fn test_passthrough_with_side_effect_batch() {
             calls_clone.lock().unwrap().push(*x);
         });
 
-    let results: Vec<i32> = vec![1, 2, 3]
-        .into_iter()
-        .map(|i| passthrough.invoke(i, None).unwrap())
-        .collect();
-    assert_eq!(results, vec![1, 2, 3]);
+    let results = passthrough.batch(vec![1, 2, 3], None, false).await;
+    let values: Vec<i32> = results.into_iter().map(|r| r.unwrap()).collect();
+    assert_eq!(values, vec![1, 2, 3]);
 
     let mut recorded = calls.lock().unwrap().clone();
     recorded.sort();
@@ -205,15 +160,15 @@ fn test_passthrough_repr() {
     assert!(repr_str.contains("RunnablePassthrough"));
 }
 
-#[test]
-fn test_passthrough_with_none_func() {
+#[tokio::test]
+async fn test_passthrough_with_none_func() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
-    let result = passthrough.invoke(42, None).unwrap();
+    let result = passthrough.invoke(42, None).await.unwrap();
     assert_eq!(result, 42);
 }
 
-#[test]
-fn test_passthrough_in_parallel() {
+#[tokio::test]
+async fn test_passthrough_in_parallel() {
     let parallel = RunnableParallel::<i32>::builder()
         .build()
         .add(
@@ -229,7 +184,7 @@ fn test_passthrough_in_parallel() {
                 .build(),
         );
 
-    let result = parallel.invoke(5, None).unwrap();
+    let result = parallel.invoke(5, None).await.unwrap();
     assert_eq!(result["original"], json!(5));
     assert_eq!(result["modified"], json!(6));
 }
@@ -257,8 +212,8 @@ async fn test_passthrough_transform_with_func() {
     assert_eq!(recorded[0], 3);
 }
 
-#[test]
-fn test_assign_basic() {
+#[tokio::test]
+async fn test_assign_basic() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -273,36 +228,14 @@ fn test_assign_basic() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["new_key"], json!(10));
 }
 
 #[tokio::test]
-async fn test_assign_basic_async() {
-    let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
-        .build()
-        .add(
-            "new_key",
-            RunnableLambda::builder()
-                .func(|x: HashMap<String, Value>| {
-                    let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
-                    Ok(json!(val * 2))
-                })
-                .build(),
-        );
-    let assign = RunnableAssign::builder().mapper(mapper).build();
-
-    let input = make_input(&[("value", json!(5))]);
-    let result = assign.ainvoke(input, None).await.unwrap();
-
-    assert_eq!(result["value"], json!(5));
-    assert_eq!(result["new_key"], json!(10));
-}
-
-#[test]
-fn test_assign_multiple_keys() {
+async fn test_assign_multiple_keys() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -335,7 +268,7 @@ fn test_assign_multiple_keys() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["doubled"], json!(10));
@@ -343,8 +276,8 @@ fn test_assign_multiple_keys() {
     assert_eq!(result["quadrupled"], json!(20));
 }
 
-#[test]
-fn test_assign_overwrite_existing() {
+#[tokio::test]
+async fn test_assign_overwrite_existing() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -359,14 +292,14 @@ fn test_assign_overwrite_existing() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5)), ("other", json!("data"))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["value"], json!(10));
     assert_eq!(result["other"], json!("data"));
 }
 
-#[test]
-fn test_assign_with_runnable() {
+#[tokio::test]
+async fn test_assign_with_runnable() {
     let double = RunnableLambda::builder()
         .func(|x: HashMap<String, Value>| {
             let val = x.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -379,14 +312,14 @@ fn test_assign_with_runnable() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["new_key"], json!(10));
 }
 
-#[test]
-fn test_assign_batch() {
+#[tokio::test]
+async fn test_assign_batch() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -406,9 +339,11 @@ fn test_assign_batch() {
         make_input(&[("value", json!(3))]),
     ];
 
-    let results: Vec<HashMap<String, Value>> = inputs
+    let results: Vec<HashMap<String, Value>> = assign
+        .batch(inputs, None, false)
+        .await
         .into_iter()
-        .map(|i| assign.invoke(i, None).unwrap())
+        .map(|r| r.unwrap())
         .collect();
 
     assert_eq!(results[0]["value"], json!(1));
@@ -481,8 +416,8 @@ async fn test_assign_transform() {
     assert_eq!(final_result["doubled"], json!(10));
 }
 
-#[test]
-fn test_assign_empty_dict() {
+#[tokio::test]
+async fn test_assign_empty_dict() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -493,12 +428,12 @@ fn test_assign_empty_dict() {
         );
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
-    let result = assign.invoke(HashMap::new(), None).unwrap();
+    let result = assign.invoke(HashMap::new(), None).await.unwrap();
     assert_eq!(result["new_key"], json!(42));
 }
 
-#[test]
-fn test_assign_preserves_original_order() {
+#[tokio::test]
+async fn test_assign_preserves_original_order() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -514,7 +449,7 @@ fn test_assign_preserves_original_order() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("a", json!(1)), ("b", json!(2)), ("c", json!(3))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert!(result.contains_key("a"));
     assert!(result.contains_key("b"));
@@ -522,8 +457,8 @@ fn test_assign_preserves_original_order() {
     assert_eq!(result["z"], json!(3));
 }
 
-#[test]
-fn test_assign_with_config_propagation() {
+#[tokio::test]
+async fn test_assign_with_config_propagation() {
     let configs_seen = Arc::new(AtomicI32::new(0));
     let configs_clone = configs_seen.clone();
 
@@ -545,15 +480,15 @@ fn test_assign_with_config_propagation() {
     config.tags.push("my-tag".to_string());
 
     let input = make_input(&[("value", json!(5))]);
-    let result = assign.invoke(input, Some(config)).unwrap();
+    let result = assign.invoke(input, Some(config)).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["new_key"], json!(10));
     assert_eq!(configs_seen.load(Ordering::SeqCst), 1);
 }
 
-#[test]
-fn test_assign_with_multiple_parallel_ops() {
+#[tokio::test]
+async fn test_assign_with_multiple_parallel_ops() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -589,7 +524,7 @@ fn test_assign_with_multiple_parallel_ops() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("a", json!(10)), ("b", json!(3))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["a"], json!(10));
     assert_eq!(result["b"], json!(3));
@@ -598,8 +533,8 @@ fn test_assign_with_multiple_parallel_ops() {
     assert_eq!(result["difference"], json!(7));
 }
 
-#[test]
-fn test_assign_direct_instantiation() {
+#[tokio::test]
+async fn test_assign_direct_instantiation() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -614,14 +549,14 @@ fn test_assign_direct_instantiation() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["new_field"], json!(10));
 }
 
-#[test]
-fn test_assign_nested() {
+#[tokio::test]
+async fn test_assign_nested() {
     let mapper1 = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -649,16 +584,16 @@ fn test_assign_nested() {
     let assign2 = RunnableAssign::builder().mapper(mapper2).build();
 
     let input = make_input(&[("value", json!(5))]);
-    let intermediate = assign1.invoke(input, None).unwrap();
-    let result = assign2.invoke(intermediate, None).unwrap();
+    let intermediate = assign1.invoke(input, None).await.unwrap();
+    let result = assign2.invoke(intermediate, None).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["step1"], json!(6));
     assert_eq!(result["step2"], json!(12));
 }
 
-#[test]
-fn test_assign_with_parallel() {
+#[tokio::test]
+async fn test_assign_with_parallel() {
     let mapper = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -682,15 +617,15 @@ fn test_assign_with_parallel() {
     let assign = RunnableAssign::builder().mapper(mapper).build();
 
     let input = make_input(&[("value", json!(5))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["doubled"], json!(10));
     assert_eq!(result["tripled"], json!(15));
 }
 
-#[test]
-fn test_pick_single_key() {
+#[tokio::test]
+async fn test_pick_single_key() {
     let pick = RunnablePick::new_single().key("name").call();
 
     let input = make_input(&[
@@ -699,12 +634,12 @@ fn test_pick_single_key() {
         ("city", json!("NYC")),
     ]);
 
-    let result = pick.invoke(input, None).unwrap();
+    let result = pick.invoke(input, None).await.unwrap();
     assert_eq!(result, json!("Alice"));
 }
 
-#[test]
-fn test_pick_multiple_keys() {
+#[tokio::test]
+async fn test_pick_multiple_keys() {
     let pick = RunnablePick::new_multi(vec!["name", "age"], None);
 
     let input = make_input(&[
@@ -713,7 +648,7 @@ fn test_pick_multiple_keys() {
         ("city", json!("NYC")),
     ]);
 
-    let result = pick.invoke(input, None).unwrap();
+    let result = pick.invoke(input, None).await.unwrap();
     let result_map: HashMap<String, Value> = serde_json::from_value(result).unwrap();
     assert_eq!(result_map.len(), 2);
     assert_eq!(result_map["name"], json!("Alice"));
@@ -721,62 +656,37 @@ fn test_pick_multiple_keys() {
 }
 
 #[tokio::test]
-async fn test_pick_single_key_async() {
-    let pick = RunnablePick::new_single().key("name").call();
-
-    let input = make_input(&[("name", json!("Alice")), ("age", json!(30))]);
-    let result = pick.ainvoke(input, None).await.unwrap();
-    assert_eq!(result, json!("Alice"));
-}
-
-#[tokio::test]
-async fn test_pick_multiple_keys_async() {
-    let pick = RunnablePick::new_multi(vec!["name", "age"], None);
-
-    let input = make_input(&[
-        ("name", json!("Alice")),
-        ("age", json!(30)),
-        ("city", json!("NYC")),
-    ]);
-
-    let result = pick.ainvoke(input, None).await.unwrap();
-    let result_map: HashMap<String, Value> = serde_json::from_value(result).unwrap();
-    assert_eq!(result_map["name"], json!("Alice"));
-    assert_eq!(result_map["age"], json!(30));
-}
-
-#[test]
-fn test_pick_missing_key() {
+async fn test_pick_missing_key() {
     let pick = RunnablePick::new_single().key("missing").call();
 
     let input = make_input(&[("name", json!("Alice"))]);
-    let result = pick.invoke(input, None);
+    let result = pick.invoke(input, None).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_pick_partial_keys() {
+#[tokio::test]
+async fn test_pick_partial_keys() {
     let pick = RunnablePick::new_multi(vec!["name", "missing"], None);
 
     let input = make_input(&[("name", json!("Alice")), ("age", json!(30))]);
-    let result = pick.invoke(input, None).unwrap();
+    let result = pick.invoke(input, None).await.unwrap();
 
     let result_map: HashMap<String, Value> = serde_json::from_value(result).unwrap();
     assert_eq!(result_map.len(), 1);
     assert_eq!(result_map["name"], json!("Alice"));
 }
 
-#[test]
-fn test_pick_all_missing_keys() {
+#[tokio::test]
+async fn test_pick_all_missing_keys() {
     let pick = RunnablePick::new_multi(vec!["missing1", "missing2"], None);
 
     let input = make_input(&[("name", json!("Alice"))]);
-    let result = pick.invoke(input, None);
+    let result = pick.invoke(input, None).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_pick_batch() {
+#[tokio::test]
+async fn test_pick_batch() {
     let pick = RunnablePick::new_single().key("name").call();
 
     let inputs = vec![
@@ -785,9 +695,11 @@ fn test_pick_batch() {
         make_input(&[("name", json!("Charlie"))]),
     ];
 
-    let results: Vec<Value> = inputs
+    let results: Vec<Value> = pick
+        .batch(inputs, None, false)
+        .await
         .into_iter()
-        .map(|i| pick.invoke(i, None).unwrap())
+        .map(|r| r.unwrap())
         .collect();
 
     assert_eq!(
@@ -841,8 +753,8 @@ fn test_pick_get_name() {
     );
 }
 
-#[test]
-fn test_pick_maintains_types() {
+#[tokio::test]
+async fn test_pick_maintains_types() {
     let pick = RunnablePick::new_multi(vec!["int_val", "str_val", "list_val"], None);
 
     let input = make_input(&[
@@ -852,7 +764,7 @@ fn test_pick_maintains_types() {
         ("extra", json!("ignored")),
     ]);
 
-    let result = pick.invoke(input, None).unwrap();
+    let result = pick.invoke(input, None).await.unwrap();
     let result_map: HashMap<String, Value> = serde_json::from_value(result).unwrap();
 
     assert_eq!(result_map["int_val"], json!(42));
@@ -861,24 +773,24 @@ fn test_pick_maintains_types() {
     assert!(!result_map.contains_key("extra"));
 }
 
-#[test]
-fn test_pick_direct_instantiation() {
+#[tokio::test]
+async fn test_pick_direct_instantiation() {
     let pick = RunnablePick::new_single().key("selected").call();
 
     let input = make_input(&[("selected", json!("yes")), ("others", json!("no"))]);
-    let result = pick.invoke(input, None).unwrap();
+    let result = pick.invoke(input, None).await.unwrap();
     assert_eq!(result, json!("yes"));
 }
 
-#[test]
-fn test_pick_empty_dict() {
+#[tokio::test]
+async fn test_pick_empty_dict() {
     let pick = RunnablePick::new_multi(vec!["key1", "key2"], None);
-    let result = pick.invoke(HashMap::new(), None);
+    let result = pick.invoke(HashMap::new(), None).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_passthrough_assign_pick_combination() {
+#[tokio::test]
+async fn test_passthrough_assign_pick_combination() {
     let passthrough: RunnablePassthrough<HashMap<String, Value>> =
         RunnablePassthrough::builder().build();
 
@@ -907,9 +819,9 @@ fn test_passthrough_assign_pick_combination() {
     let pick = RunnablePick::new_multi(vec!["value", "doubled"], None);
 
     let input = make_input(&[("value", json!(5))]);
-    let step1 = passthrough.invoke(input, None).unwrap();
-    let step2 = assign.invoke(step1, None).unwrap();
-    let result = pick.invoke(step2, None).unwrap();
+    let step1 = passthrough.invoke(input, None).await.unwrap();
+    let step2 = assign.invoke(step1, None).await.unwrap();
+    let result = pick.invoke(step2, None).await.unwrap();
 
     let result_map: HashMap<String, Value> = serde_json::from_value(result).unwrap();
     assert_eq!(result_map["value"], json!(5));
@@ -917,8 +829,8 @@ fn test_passthrough_assign_pick_combination() {
     assert!(!result_map.contains_key("tripled"));
 }
 
-#[test]
-fn test_assign_with_dependencies() {
+#[tokio::test]
+async fn test_assign_with_dependencies() {
     let mapper1 = RunnableParallel::<HashMap<String, Value>>::builder()
         .build()
         .add(
@@ -946,8 +858,8 @@ fn test_assign_with_dependencies() {
     let assign2 = RunnableAssign::builder().mapper(mapper2).build();
 
     let input = make_input(&[("value", json!(5))]);
-    let intermediate = assign1.invoke(input, None).unwrap();
-    let result = assign2.invoke(intermediate, None).unwrap();
+    let intermediate = assign1.invoke(input, None).await.unwrap();
+    let result = assign2.invoke(intermediate, None).await.unwrap();
 
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["step1"], json!(6));
@@ -973,8 +885,8 @@ async fn test_pick_transform_filters_each_chunk() {
     assert_eq!(result, vec![json!(1), json!(2)]);
 }
 
-#[test]
-fn test_assign_builder() {
+#[tokio::test]
+async fn test_assign_builder() {
     let assign = RunnablePassthrough::<HashMap<String, Value>>::assign()
         .add(
             "new_key",
@@ -988,7 +900,7 @@ fn test_assign_builder() {
         .build();
 
     let input = make_input(&[("value", json!(5))]);
-    let result = assign.invoke(input, None).unwrap();
+    let result = assign.invoke(input, None).await.unwrap();
     assert_eq!(result["value"], json!(5));
     assert_eq!(result["new_key"], json!(10));
 }
@@ -1037,24 +949,24 @@ fn test_assign_mapper_accessor() {
     let _mapper_ref = assign.mapper();
 }
 
-#[test]
-fn test_passthrough_default() {
+#[tokio::test]
+async fn test_passthrough_default() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::default();
-    assert_eq!(passthrough.invoke(99, None).unwrap(), 99);
+    assert_eq!(passthrough.invoke(99, None).await.unwrap(), 99);
 }
 
-#[test]
-fn test_passthrough_clone() {
+#[tokio::test]
+async fn test_passthrough_clone() {
     let passthrough: RunnablePassthrough<i32> = RunnablePassthrough::builder().build();
     let cloned = passthrough.clone();
-    assert_eq!(cloned.invoke(42, None).unwrap(), 42);
+    assert_eq!(cloned.invoke(42, None).await.unwrap(), 42);
 }
 
-#[test]
-fn test_graph_passthrough() {
+#[tokio::test]
+async fn test_graph_passthrough() {
     use agent_chain_core::runnables::passthrough::graph_passthrough;
     let pt: RunnablePassthrough<String> = graph_passthrough();
-    assert_eq!(pt.invoke("hello".into(), None).unwrap(), "hello");
+    assert_eq!(pt.invoke("hello".into(), None).await.unwrap(), "hello");
 }
 
 #[test]
