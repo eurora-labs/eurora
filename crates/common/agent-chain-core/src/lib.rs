@@ -31,7 +31,6 @@ pub mod language_models;
 pub mod messages;
 pub mod output_parsers;
 pub mod outputs;
-pub mod prompt_values;
 pub mod prompts;
 pub mod rate_limiters;
 pub mod retrievers;
@@ -122,11 +121,6 @@ pub use load::{
     ConstructorInfo, RevivedValue, Reviver, ReviverConfig, Serializable, Serialized,
     SerializedConstructor, SerializedNotImplemented, SerializedSecret, dumpd, dumps,
     load as load_json, loads,
-};
-
-pub use prompt_values::{
-    ChatPromptValue, ChatPromptValueConcrete, ImageDetailLevel, ImagePromptValue, ImageURL,
-    PromptValue,
 };
 
 pub use tracers::{

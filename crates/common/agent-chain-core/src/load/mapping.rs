@@ -404,19 +404,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
         vec![
             "langchain".into(),
             "schema".into(),
-            "prompt".into(),
-            "PromptValue".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "PromptValue".into(),
-        ],
-    );
-    map.insert(
-        vec![
-            "langchain".into(),
-            "schema".into(),
             "runnable".into(),
             "RunnableBinding".into(),
         ],
@@ -668,33 +655,6 @@ pub static SERIALIZABLE_MAPPING: LazyLock<NamespaceMapping> = LazyLock::new(|| {
             "StringPromptTemplate".into(),
         ],
     );
-    map.insert(
-        vec![
-            "langchain".into(),
-            "prompts".into(),
-            "chat".into(),
-            "ChatPromptValue".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "ChatPromptValue".into(),
-        ],
-    );
-    map.insert(
-        vec![
-            "langchain".into(),
-            "prompts".into(),
-            "chat".into(),
-            "ChatPromptValueConcrete".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "ChatPromptValueConcrete".into(),
-        ],
-    );
-
     map.insert(
         vec![
             "langchain".into(),
@@ -1274,43 +1234,6 @@ pub static OLD_CORE_NAMESPACES_MAPPING: LazyLock<NamespaceMapping> = LazyLock::n
             "documents".into(),
             "base".into(),
             "Document".into(),
-        ],
-    );
-
-    map.insert(
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "PromptValue".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "PromptValue".into(),
-        ],
-    );
-    map.insert(
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "ChatPromptValue".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "ChatPromptValue".into(),
-        ],
-    );
-    map.insert(
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "ChatPromptValueConcrete".into(),
-        ],
-        vec![
-            "langchain_core".into(),
-            "prompt_values".into(),
-            "ChatPromptValueConcrete".into(),
         ],
     );
 
