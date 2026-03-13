@@ -110,7 +110,10 @@ export class MessageService {
 		const messageIndex = entry.messages.length - 1;
 		let agentMessage: MessageView | undefined;
 		let reasoningStartTime: number | null = null;
+		let hasReceivedContent = false;
 		entry.streaming = true;
+
+		let pendingWhitespace = '';
 
 		function onEvent(response: ResponseChunk) {
 			if (!agentMessage) {
@@ -130,11 +133,22 @@ export class MessageService {
 			}
 
 			if (agentMessage && agentMessage.role === 'ai' && response.chunk) {
-				if (entry.reasoningData[messageIndex]?.isStreaming) {
-					entry.reasoningData[messageIndex].isStreaming = false;
-					entry.reasoningData[messageIndex].duration = reasoningStartTime
-						? Math.ceil((Date.now() - reasoningStartTime) / 1000)
-						: undefined;
+				if (!hasReceivedContent) {
+					if (response.chunk.trim().length === 0) {
+						pendingWhitespace += response.chunk;
+						return;
+					}
+					hasReceivedContent = true;
+					if (pendingWhitespace) {
+						agentMessage.content += pendingWhitespace;
+						pendingWhitespace = '';
+					}
+					if (entry.reasoningData[messageIndex]?.isStreaming) {
+						entry.reasoningData[messageIndex].isStreaming = false;
+						entry.reasoningData[messageIndex].duration = reasoningStartTime
+							? Math.ceil((Date.now() - reasoningStartTime) / 1000)
+							: undefined;
+					}
 				}
 				agentMessage.content += response.chunk;
 			}
