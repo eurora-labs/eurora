@@ -1,3 +1,4 @@
+use auth_core::Claims;
 use euro_endpoint::DEFAULT_API_URL;
 use euro_secret::{ExposeSecret, SecretString, secret};
 use tauri::{AppHandle, Manager, Runtime};
@@ -15,6 +16,9 @@ pub struct LoginToken {
 
 #[taurpc::procedures(path = "auth")]
 pub trait AuthApi {
+    #[taurpc(event)]
+    async fn auth_state_changed(claims: Option<Claims>);
+
     async fn poll_for_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
     async fn get_login_token<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginToken, String>;
 
@@ -47,6 +51,10 @@ fn user_controller<R: Runtime>(
     app_handle
         .try_state::<SharedUserController>()
         .ok_or_else(|| "User controller not available".to_string())
+}
+
+fn emit_auth_state<R: Runtime>(app_handle: &AppHandle<R>, claims: Option<Claims>) {
+    let _ = TauRpcAuthApiEventTrigger::new(app_handle.clone()).auth_state_changed(claims);
 }
 
 #[derive(Clone)]
@@ -108,6 +116,9 @@ impl AuthApi for AuthApiImpl {
 
         if controller.get_or_refresh_access_token().await.is_ok() {
             let _ = secret::delete(LOGIN_CODE_VERIFIER);
+            if let Ok(claims) = controller.get_access_token_payload() {
+                emit_auth_state(&app_handle, Some(claims));
+            }
             return Ok(true);
         }
 
@@ -121,6 +132,10 @@ impl AuthApi for AuthApiImpl {
         {
             Ok(_) => {
                 secret::delete(LOGIN_CODE_VERIFIER).ctx("Failed to remove login token")?;
+
+                if let Ok(claims) = controller.get_access_token_payload() {
+                    emit_auth_state(&app_handle, Some(claims));
+                }
 
                 let state = app_handle.state::<SharedAppSettings>();
                 let settings = state.lock().await;
@@ -152,6 +167,10 @@ impl AuthApi for AuthApiImpl {
             .await
             .ctx("Registration failed")?;
 
+        if let Ok(claims) = controller.get_access_token_payload() {
+            emit_auth_state(&app_handle, Some(claims));
+        }
+
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
         settings
@@ -175,6 +194,10 @@ impl AuthApi for AuthApiImpl {
             .await
             .ctx("Login failed")?;
 
+        if let Ok(claims) = controller.get_access_token_payload() {
+            emit_auth_state(&app_handle, Some(claims));
+        }
+
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
         settings
@@ -189,6 +212,7 @@ impl AuthApi for AuthApiImpl {
         let mut controller = user_state.lock().await;
 
         controller.delete_user().ctx("Logout failed")?;
+        emit_auth_state(&app_handle, None);
 
         let state = app_handle.state::<SharedAppSettings>();
         let settings = state.lock().await;
@@ -259,6 +283,11 @@ impl AuthApi for AuthApiImpl {
             .refresh_tokens()
             .await
             .ctx("Failed to refresh session")?;
+
+        if let Ok(claims) = controller.get_access_token_payload() {
+            emit_auth_state(&app_handle, Some(claims));
+        }
+
         Ok(())
     }
 
