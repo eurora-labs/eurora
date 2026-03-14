@@ -17,33 +17,40 @@
 	let connected = $state(false);
 	let intervalId: ReturnType<typeof setInterval> | null = null;
 
+	function startPolling() {
+		if (intervalId) return;
+		intervalId = setInterval(async () => {
+			try {
+				const count = await taurpc.system.get_browser_connection_count();
+				if (count > 0) {
+					connected = true;
+					downloaded = true;
+					if (intervalId) clearInterval(intervalId);
+					taurpc.system.focus_main_window().catch(() => {});
+				}
+			} catch (err) {
+				console.error('Failed to check browser connections:', err);
+			}
+		}, 2000);
+	}
+
 	onMount(async () => {
 		try {
 			const count = await taurpc.system.get_browser_connection_count();
 			if (count > 0) {
 				goto('/');
+				return;
 			}
 		} catch (_) {
-			// Ignore errors
+			// It's fine to fail
 		}
+		startPolling();
 	});
 
 	async function downloadBrowserExtension() {
 		const url = await taurpc.onboarding.get_browser_extension_download_url();
 		await open(url);
 		downloaded = true;
-
-		intervalId = setInterval(async () => {
-			try {
-				const count = await taurpc.system.get_browser_connection_count();
-				if (count > 0) {
-					connected = true;
-					if (intervalId) clearInterval(intervalId);
-				}
-			} catch (err) {
-				console.error('Failed to check browser connections:', err);
-			}
-		}, 2000);
 	}
 
 	onDestroy(() => {
@@ -53,22 +60,20 @@
 
 {#if !downloaded}
 	<div class="relative flex h-full w-full flex-col px-8">
-		<div class="flex flex-col justify-center items-start h-full w-full gap-6">
-			<div>
-				<h1 class="text-3xl font-bold mb-2">Browser Extension</h1>
-				<p class="text-sm text-muted-foreground">
-					Eurora uses a browser extension to understand your browsing context, enabling
-					deeper integration and more relevant assistance as you work.
-				</p>
-			</div>
+		<div class="flex flex-col justify-center items-center h-full w-full gap-6">
+			<h1 class="text-3xl font-bold">Browser Extension</h1>
+			<p class="text-sm text-muted-foreground max-w-lg text-center">
+				Eurora uses a browser extension to understand your browsing context, enabling deeper
+				integration and more relevant assistance as you work.
+			</p>
 
-			<Button onclick={downloadBrowserExtension}>
+			<Button class="px-10 py-6 text-lg" onclick={downloadBrowserExtension}>
 				Download Extension
-				<ExternalLink class="size-3" />
+				<ExternalLink class="size-4" />
 			</Button>
 
 			{#if isMacos}
-				<Alert>
+				<Alert class="max-w-lg">
 					<AlertDescription>
 						<p class="font-medium text-foreground">Using Safari?</p>
 						<p class="mt-1">After downloading, enable the extension manually:</p>
@@ -84,10 +89,6 @@
 					</AlertDescription>
 				</Alert>
 			{/if}
-		</div>
-
-		<div class="mb-8">
-			<Button variant="outline" onclick={() => goto('/onboarding')}>Back</Button>
 		</div>
 	</div>
 {:else}
@@ -107,20 +108,8 @@
 				Eurora uses a browser extension to understand your browsing context, enabling deeper
 				integration and more relevant assistance as you work.
 			</p>
-		</div>
-		<div class="flex justify-between mb-8">
-			<Button
-				variant="outline"
-				onclick={() => {
-					if (intervalId) {
-						clearInterval(intervalId);
-						intervalId = null;
-					}
-					downloaded = false;
-				}}>Cancel</Button
-			>
 			{#if connected}
-				<Button onclick={() => goto('/')}>Continue</Button>
+				<Button class="px-10 py-6 text-lg" onclick={() => goto('/')}>Continue</Button>
 			{/if}
 		</div>
 	</div>
