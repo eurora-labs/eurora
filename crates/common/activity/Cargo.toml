@@ -1,0 +1,16 @@
+[package]
+name = "activity"
+version = "0.0.0"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+serde = { workspace = true, features = ["std"] }
+specta = { workspace = true, optional = true }
+enum_dispatch = { workspace = true }
+strum_macros = { workspace = true }
+agent-chain = { workspace = true }
+agent-chain-macros = { workspace = true }
+
+[features]
+specta = ["specta/derive", "specta/function"]
