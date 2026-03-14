@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Separator } from '@eurora/ui/components/separator/index';
@@ -12,6 +13,7 @@
 	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
+	const user = inject(USER_SERVICE);
 
 	let interval: ReturnType<typeof setInterval> | undefined;
 
@@ -22,7 +24,7 @@
 				if (!subscribed) return;
 
 				clearInterval(interval);
-				await taurpc.auth.refresh_session().catch(() => {});
+				await user.refreshSession().catch(() => {});
 				const win = getCurrentWindow();
 				await win.setFocus();
 				goto('/');
