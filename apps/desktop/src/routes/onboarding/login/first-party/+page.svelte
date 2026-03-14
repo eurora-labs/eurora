@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -8,6 +9,7 @@
 	import { onMount, onDestroy } from 'svelte';
 
 	const user = inject(USER_SERVICE);
+	const taurpc = inject(TAURPC_SERVICE);
 	let intervalId: ReturnType<typeof setInterval> | null = null;
 
 	async function openLogin() {
@@ -20,6 +22,7 @@
 				return;
 			}
 			clearInterval(intervalId!);
+			taurpc.system.focus_main_window().catch(() => {});
 			goto('/onboarding/login/first-party/browser-extension');
 		}, 5000);
 	}
