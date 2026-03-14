@@ -468,6 +468,8 @@ impl SystemApi for SystemApiImpl {
         let window = app_handle
             .get_webview_window("main")
             .ok_or_else(|| "Main window not found".to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+        window.unminimize().map_err(|e| e.to_string())?;
         window.set_focus().map_err(|e| e.to_string())?;
         Ok(())
     }
