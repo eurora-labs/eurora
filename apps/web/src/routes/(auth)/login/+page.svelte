@@ -156,12 +156,11 @@
 						class="w-full"
 						disabled={loading}
 						onclick={() => {
-							sessionStorage.removeItem('loginToken');
-							sessionStorage.removeItem('challengeMethod');
+							auth.logout();
 							pendingDesktopLogin = null;
 						}}
 					>
-						Cancel
+						Log out
 					</Button>
 				</div>
 			</Card.Root>
