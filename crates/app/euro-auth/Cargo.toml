@@ -10,7 +10,7 @@ ignored = ["humantime-serde", "specta", "tonic-prost"]
 
 [dependencies]
 anyhow = { workspace = true }
-auth-core = { workspace = true }
+auth-core = { workspace = true, features = ["specta"] }
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-secret = { workspace = true }

@@ -6,7 +6,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 serde = { workspace = true, features = ["std"] }
-specta = { workspace = true, optional = true }
+specta = { workspace = true, optional = true, features = ["derive", "function"] }
 
 [features]
 specta = ["specta/derive", "specta/function"]

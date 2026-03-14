@@ -3,6 +3,7 @@
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
+	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
@@ -23,11 +24,11 @@
 
 	const taurpc = inject(TAURPC_SERVICE);
 	const threadService = inject(THREAD_SERVICE);
+	const user = inject(USER_SERVICE);
 	const sidebarState = useSidebar();
 	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let quitDialogOpen = $state(false);
-	let username = $state('');
 	let visibleTimelineItems = $derived.by(() => {
 		const limit = sidebarState.open ? 3 : 1;
 		return timelineItems.slice(-limit);
@@ -37,6 +38,18 @@
 		if (!name) return '';
 		return name.charAt(0).toUpperCase();
 	}
+
+	let threadInitialized = false;
+	$effect(() => {
+		if (user.authenticated && !threadInitialized) {
+			threadInitialized = true;
+			threadService.init();
+		} else if (!user.authenticated && threadInitialized) {
+			threadInitialized = false;
+			threadService.destroy();
+			threadService.loading = false;
+		}
+	});
 
 	onMount(() => {
 		const unlistenPromises: Promise<() => void>[] = [];
@@ -50,25 +63,13 @@
 			}),
 		);
 
-		taurpc.auth
-			.is_authenticated()
-			.then((isAuthenticated) => {
-				if (!isAuthenticated) {
-					threadService.loading = false;
-					return;
-				}
-				taurpc.auth.get_username().then((name) => {
-					username = name;
-				});
-				threadService.init();
-			})
-			.catch((error) => {
-				goto('/onboarding');
-				console.error('Failed to check authentication:', error);
-			});
+		if (!user.authenticated) {
+			threadService.loading = false;
+		}
 
 		return () => {
 			threadService.destroy();
+			threadInitialized = false;
 			for (const p of unlistenPromises) {
 				p.then((unlisten) => unlisten());
 			}
@@ -189,10 +190,10 @@
 						<div
 							class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium"
 						>
-							{getFirstLetterAndCapitalize(username)}
+							{getFirstLetterAndCapitalize(user.username)}
 						</div>
 						{#if sidebarState.open}
-							<span class="truncate text-sm flex-1 text-left">{username}</span>
+							<span class="truncate text-sm flex-1 text-left">{user.username}</span>
 							<ChevronUpIcon class="size-4 shrink-0" />
 						{/if}
 					</Button>
@@ -211,7 +212,7 @@
 					<DropdownMenu.SubContent class="w-40">
 						<DropdownMenu.Item
 							onclick={() => {
-								taurpc.auth.logout().then(() => {
+								user.logout().then(() => {
 									goto('/onboarding');
 								});
 							}}
