@@ -301,16 +301,9 @@ fn setup_main_window(
     main_window.on_window_event(move |event| match event {
         tauri::WindowEvent::CloseRequested { api, .. } => {
             if let Some(w) = handle.get_webview_window("main") {
-                let _ = w.hide();
+                let _ = w.minimize();
             }
             api.prevent_close();
-        }
-        tauri::WindowEvent::Focused(false) => {
-            if let Some(w) = handle.get_webview_window("main")
-                && w.is_minimized().unwrap_or(false)
-            {
-                let _ = w.hide();
-            }
         }
         _ => {}
     });
