@@ -24,6 +24,7 @@
 				const count = await taurpc.system.get_browser_connection_count();
 				if (count > 0) {
 					connected = true;
+					downloaded = true;
 					if (intervalId) clearInterval(intervalId);
 					taurpc.system.focus_main_window().catch(() => {});
 				}
