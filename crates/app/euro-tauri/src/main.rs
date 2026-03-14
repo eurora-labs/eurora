@@ -298,21 +298,13 @@ fn setup_main_window(
     }
 
     let handle = tauri_app.handle().clone();
-    main_window.on_window_event(move |event| match event {
-        tauri::WindowEvent::CloseRequested { api, .. } => {
+    main_window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
             if let Some(w) = handle.get_webview_window("main") {
-                let _ = w.hide();
+                let _ = w.minimize();
             }
             api.prevent_close();
         }
-        tauri::WindowEvent::Focused(false) => {
-            if let Some(w) = handle.get_webview_window("main")
-                && w.is_minimized().unwrap_or(false)
-            {
-                let _ = w.hide();
-            }
-        }
-        _ => {}
     });
 
     Ok(())
