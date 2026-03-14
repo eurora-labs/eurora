@@ -70,6 +70,8 @@ pub trait SystemApi {
     ) -> Result<LocalBackendInfo, String>;
 
     async fn get_browser_connection_count() -> Result<usize, String>;
+
+    async fn focus_main_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 }
 
 fn resolve_docker_compose_path<R: Runtime>(
@@ -457,6 +459,17 @@ impl SystemApi for SystemApiImpl {
         let service = euro_browser::BrowserBridgeService::get_or_init().await;
         let count = service.connection_count().await;
         Ok(count)
+    }
+
+    async fn focus_main_window<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<(), String> {
+        let window = app_handle
+            .get_webview_window("main")
+            .ok_or_else(|| "Main window not found".to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
 
