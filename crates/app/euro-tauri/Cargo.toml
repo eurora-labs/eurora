@@ -26,6 +26,7 @@ test = false
 
 [dependencies]
 agent-chain-core = { workspace = true }
+auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 backon = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
