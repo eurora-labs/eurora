@@ -3803,6 +3803,7 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
+ "auth-core",
  "backon",
  "backtrace",
  "base64 0.22.1",

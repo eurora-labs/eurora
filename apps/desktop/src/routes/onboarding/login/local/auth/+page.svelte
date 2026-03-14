@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
@@ -9,7 +9,7 @@
 	import * as Tabs from '@eurora/ui/components/tabs/index';
 	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
+	const user = inject(USER_SERVICE);
 
 	let mode: 'login' | 'register' = $state('login');
 	let submitting = $state(false);
@@ -24,7 +24,7 @@
 	async function handleLogin() {
 		submitting = true;
 		try {
-			await taurpc.auth.login(login, password);
+			await user.login(login, password);
 			goto('/');
 		} catch (error) {
 			toast.error(`Login failed: ${error}`);
@@ -36,7 +36,7 @@
 	async function handleRegister() {
 		submitting = true;
 		try {
-			await taurpc.auth.register(regUsername, regEmail, regPassword);
+			await user.register(regUsername, regEmail, regPassword);
 			goto('/');
 		} catch (error) {
 			toast.error(`Registration failed: ${error}`);
