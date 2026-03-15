@@ -1,10 +1,11 @@
 <script module lang="ts">
 	import { defineMeta } from '@storybook/addon-svelte-csf';
+	import { Root as ConversationRoot } from '$lib/components/ai-elements/conversation/index';
 	import * as Conversation from '$lib/components/ai-elements/conversation/index';
 
 	const { Story } = defineMeta({
 		title: 'AI Elements / Chat',
-		component: Conversation.Root,
+		component: ConversationRoot,
 		parameters: {
 			layout: 'fullscreen',
 			controls: { disable: true },
