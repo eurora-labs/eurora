@@ -179,6 +179,7 @@ The beauty of hooks is that they let you reuse stateful logic without changing y
 
 	let liked = $state<Record<string, boolean>>({});
 	let disliked = $state<Record<string, boolean>>({});
+	let activeBranch = $state<Record<string, number>>({});
 
 	function handleCopy(content: string) {
 		navigator.clipboard.writeText(content);
@@ -199,10 +200,13 @@ The beauty of hooks is that they let you reuse stateful logic without changing y
 
 <Story name="Message">
 	<TooltipProvider>
-		<div class="flex w-[700px] flex-col gap-4">
+		<div class="flex w-175 flex-col gap-4">
 			{#each messages as msg (msg.key)}
 				{#if msg.versions.length > 1}
-					<Message.Branch defaultBranch={0}>
+					<Message.Branch
+						defaultBranch={0}
+						onBranchChange={(i) => (activeBranch = { ...activeBranch, [msg.key]: i })}
+					>
 						<Message.BranchContent count={msg.versions.length}>
 							{#snippet children({ index })}
 								{@const version = msg.versions[index]}
@@ -250,7 +254,11 @@ The beauty of hooks is that they let you reuse stateful logic without changing y
 									</Message.Action>
 									<Message.Action
 										label="Copy"
-										onclick={() => handleCopy(msg.versions[0]?.content || '')}
+										onclick={() =>
+											handleCopy(
+												msg.versions[activeBranch[msg.key] ?? 0]?.content ||
+													'',
+											)}
 										tooltip="Copy to clipboard"
 									>
 										<CopyIcon class="size-4" />
