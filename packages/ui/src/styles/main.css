@@ -3,7 +3,7 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 @custom-variant dark (&:is(.dark *));
-@source "../../node_modules/svelte-streamdown/dist";
+@source "../../node_modules/svelte-streamdown/dist/*.js";
 /*@plugin '@tailwindcss/typography';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/container-queries';*/
