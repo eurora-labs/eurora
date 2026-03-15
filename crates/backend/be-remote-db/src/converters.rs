@@ -32,6 +32,7 @@ impl TryFrom<proto_gen::thread::Thread> for Thread {
             id,
             user_id,
             title: Some(value.title),
+            active_leaf_id: None,
             created_at,
             updated_at,
         })
