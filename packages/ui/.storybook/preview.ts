@@ -1,6 +1,9 @@
 import type { Preview } from '@storybook/svelte';
 import '../src/styles/main.css';
 
+document.body.classList.add('dark');
+document.documentElement.classList.add('dark');
+
 const preview: Preview = {
 	parameters: {
 		controls: {

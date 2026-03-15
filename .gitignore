@@ -42,6 +42,8 @@ tsconfig.tsbuildinfo
 
 # playwright
 test-results*
+!packages/ui/src/lib/components/ai-elements/test-results/
+!packages/ui/src/lib/components/ai-elements/test-results/*
 playwright-report
 
 # storybook
