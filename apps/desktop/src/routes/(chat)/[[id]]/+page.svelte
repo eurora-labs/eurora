@@ -11,6 +11,7 @@
 	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -19,11 +20,9 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
-	import SendIcon from '@lucide/svelte/icons/send';
-	import XIcon from '@lucide/svelte/icons/x';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import type {
 		Query,
@@ -41,6 +40,7 @@
 	let copiedMessageId = $state<string | null>(null);
 	let editingIndex = $state<number | null>(null);
 	let editText = $state('');
+	let editTextarea = $state<HTMLTextAreaElement | null>(null);
 
 	async function copyMessageContent(content: string, messageIndex: number) {
 		await writeText(content);
@@ -181,9 +181,12 @@
 		sendQuery(text, assetIds).catch((error) => handleQueryError(error));
 	}
 
-	function startEdit(index: number, content: string) {
+	async function startEdit(index: number, content: string) {
 		editingIndex = index;
 		editText = content;
+		await tick();
+		editTextarea?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		editTextarea?.focus();
 	}
 
 	function cancelEdit() {
@@ -292,35 +295,46 @@
 								<Reasoning.Content children={reasoning.content} />
 							</Reasoning.Root>
 						{/if}
-						<Message.Content>
-							{#if isUser && editingIndex === i}
-								<div class="flex w-full flex-col gap-2">
-									<textarea
-										class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 text-sm focus:outline-none"
-										bind:value={editText}
-										onkeydown={handleEditKeydown}
-										rows={3}
-									></textarea>
-									<div class="flex justify-end gap-1">
-										<Message.Action tooltip="Cancel" onclick={cancelEdit}>
-											<XIcon />
-										</Message.Action>
-										<Message.Action tooltip="Send" onclick={submitEdit}>
-											<SendIcon />
-										</Message.Action>
-									</div>
+						{#if isUser && editingIndex === i}
+							<div class="flex w-full flex-col gap-2">
+								<textarea
+									bind:this={editTextarea}
+									class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 focus:outline-none"
+									bind:value={editText}
+									onkeydown={handleEditKeydown}
+									rows={3}
+								></textarea>
+								<div class="flex justify-end gap-2">
+									<Button variant="ghost" size="sm" onclick={cancelEdit}>
+										Cancel
+									</Button>
+									<Button size="sm" onclick={submitEdit}>Send</Button>
 								</div>
-							{:else if content.trim().length > 0}
-								<Message.Response {content} />
-							{:else if !reasoning}
-								<Shimmer>Thinking</Shimmer>
-							{/if}
-						</Message.Content>
+							</div>
+						{:else}
+							<Message.Content>
+								{#if content.trim().length > 0}
+									<Message.Response {content} />
+								{:else if !reasoning}
+									<Shimmer>Thinking</Shimmer>
+								{/if}
+							</Message.Content>
+						{/if}
 						{@const isStreaming =
 							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
 						{#if isUser && editingIndex !== i && chatStatus === 'ready'}
-							<Message.Actions>
+							<Message.Actions class="self-end">
 								{@render siblingNav(message)}
+								<Message.Action
+									tooltip="Copy"
+									onclick={() => copyMessageContent(content, i)}
+								>
+									{#if copiedMessageId === String(i)}
+										<CheckIcon />
+									{:else}
+										<CopyIcon />
+									{/if}
+								</Message.Action>
 								<Message.Action
 									tooltip="Edit"
 									onclick={() => startEdit(i, content)}
