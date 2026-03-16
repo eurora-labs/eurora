@@ -808,33 +808,30 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let mut messages: Vec<AnyMessage> = hidden_messages
-            .into_iter()
-            .filter_map(|msg| {
-                convert_db_message_to_base_message(msg)
-                    .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
-                    .ok()
-            })
-            .collect();
-
-        messages.push(HumanMessage::builder().content(req.content).build().into());
-
-        messages.push(
+        let mut messages: Vec<AnyMessage> = vec![
             SystemMessage::builder()
                 .content(
-                    "Generate a title for the past thread. Your task is:
+                    "Generate a title for the following conversation. Your task is:
                 - Return a concise title, max 6 words.
                 - No quotation marks.
                 - Use sentence case.
                 - Summarize the main topic, not the tone.
                 - If the topic is unclear, use a generic title.
-                Output only the title text.
-                "
-                    .to_string(),
+                - Do NOT answer or respond to the messages. Only output a title.
+                Output only the title text."
+                        .to_string(),
                 )
                 .build()
                 .into(),
-        );
+        ];
+
+        messages.extend(hidden_messages.into_iter().filter_map(|msg| {
+            convert_db_message_to_base_message(msg)
+                .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
+                .ok()
+        }));
+
+        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         let title_provider = self.get_title_provider()?;
         let mut title = match title_provider.invoke(messages, None).await {
