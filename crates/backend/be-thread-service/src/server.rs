@@ -18,7 +18,7 @@ use proto_gen::thread::{
     AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
     CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
     GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, Thread,
+    ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, SwitchBranchRequest, Thread,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -241,6 +241,7 @@ impl ThreadService {
             title: thread.title.clone().unwrap_or_default(),
             created_at: Some(datetime_to_timestamp(thread.created_at)),
             updated_at: Some(datetime_to_timestamp(thread.updated_at)),
+            active_leaf_id: thread.active_leaf_id.map(|id| id.to_string()),
         }
     }
 }
@@ -472,6 +473,31 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
+        let is_edit = req.parent_message_id.is_some();
+        let parent_id = req
+            .parent_message_id
+            .filter(|s| !s.is_empty())
+            .map(|s| Uuid::parse_str(&s))
+            .transpose()
+            .map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "parent_message_id",
+                source: e,
+            })?;
+
+        // If the user edits the root message, we still need to handle the edit.
+        // That is why we call set_active_leaf even if parent_id is not a valid UUID.
+        // parent_id would not be a valid UUID if the user is editing the root message.
+        if is_edit {
+            self.db
+                .set_active_leaf()
+                .id(thread_id)
+                .user_id(user_id)
+                .maybe_active_leaf_id(parent_id)
+                .call()
+                .await
+                .map_err(ThreadServiceError::from)?;
+        }
+
         tracing::debug!("ChatStream: thread_id = {}", thread_id);
 
         let mut hidden_messages = self
@@ -700,8 +726,25 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
+        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+        let sibling_rows = self
+            .db
+            .get_sibling_info(&message_ids)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let sibling_info = sibling_rows
+            .into_iter()
+            .map(|s| MessageSiblingInfo {
+                message_id: s.message_id.to_string(),
+                sibling_count: s.sibling_count as u32,
+                sibling_index: s.sibling_index as u32,
+            })
+            .collect();
+
         Ok(Response::new(GetMessagesResponse {
             messages: messages.into_iter().map(|m| m.into()).collect(),
+            sibling_info,
         }))
     }
 
@@ -821,6 +864,81 @@ impl ProtoThreadService for ThreadService {
 
         Ok(Response::new(GenerateThreadTitleResponse {
             thread: Some(Self::db_thread_to_proto(thread)),
+        }))
+    }
+
+    async fn switch_branch(
+        &self,
+        request: Request<SwitchBranchRequest>,
+    ) -> Result<Response<GetMessagesResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
+                source: e,
+            })?;
+
+        let message_id =
+            Uuid::parse_str(&req.message_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "message_id",
+                source: e,
+            })?;
+
+        let sibling_id = self
+            .db
+            .get_adjacent_sibling(message_id, req.direction)
+            .await
+            .map_err(ThreadServiceError::from)?
+            .ok_or_else(|| Status::not_found("No adjacent sibling found"))?;
+
+        let new_leaf = self
+            .db
+            .find_deepest_leaf(sibling_id)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        self.db
+            .set_active_leaf()
+            .id(thread_id)
+            .user_id(user_id)
+            .active_leaf_id(new_leaf)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let messages = self
+            .db
+            .list_messages()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .params(PaginationParams::new(0, 100, "ASC".to_string()))
+            .include_hidden(false)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+        let sibling_rows = self
+            .db
+            .get_sibling_info(&message_ids)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let sibling_info = sibling_rows
+            .into_iter()
+            .map(|s| MessageSiblingInfo {
+                message_id: s.message_id.to_string(),
+                sibling_count: s.sibling_count as u32,
+                sibling_index: s.sibling_index as u32,
+            })
+            .collect();
+
+        Ok(Response::new(GetMessagesResponse {
+            messages: messages.into_iter().map(|m| m.into()).collect(),
+            sibling_info,
         }))
     }
 }

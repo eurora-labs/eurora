@@ -28,11 +28,17 @@ impl TryFrom<proto_gen::thread::Thread> for Thread {
         let updated_at = DateTime::from_timestamp(updated_at.seconds, updated_at.nanos as u32)
             .ok_or_else(|| DbError::Internal("Invalid timestamp".to_string()))?;
 
+        let active_leaf_id = value
+            .active_leaf_id
+            .map(|s| Uuid::parse_str(&s))
+            .transpose()
+            .map_err(|e| DbError::Internal(e.to_string()))?;
+
         Ok(Thread {
             id,
             user_id,
             title: Some(value.title),
-            active_leaf_id: None,
+            active_leaf_id,
             created_at,
             updated_at,
         })
@@ -59,6 +65,7 @@ impl TryInto<proto_gen::thread::Thread> for Thread {
                 seconds: self.updated_at.timestamp(),
                 nanos: self.updated_at.timestamp_subsec_nanos() as i32,
             }),
+            active_leaf_id: self.active_leaf_id.map(|id| id.to_string()),
         })
     }
 }
