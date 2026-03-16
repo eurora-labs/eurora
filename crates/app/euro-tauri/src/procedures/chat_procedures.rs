@@ -91,7 +91,11 @@ impl ChatApi for ChatApiImpl {
         let stream_result = {
             let mut thread_manager = thread_state.lock().await;
             thread_manager
-                .chat_stream(thread_id.clone(), query.text.clone(), query.parent_message_id.clone())
+                .chat_stream(
+                    thread_id.clone(),
+                    query.text.clone(),
+                    query.parent_message_id.clone(),
+                )
                 .await
         };
 

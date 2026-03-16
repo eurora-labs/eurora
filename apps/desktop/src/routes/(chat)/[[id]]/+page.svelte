@@ -258,11 +258,29 @@
 					</Empty.Header>
 				</Empty.Root>
 			{/if}
-			{#each messages as message, i}
+			{#snippet siblingNav(message: import('$lib/bindings/bindings.js').MessageView)}
+			{#if message.sibling_count > 1 && message.id}
+				<Message.Action
+					tooltip="Previous"
+					onclick={() => handleSwitchBranch(message.id!, -1)}
+				>
+					<ChevronLeftIcon />
+				</Message.Action>
+				<span class="text-muted-foreground flex items-center text-xs">
+					{message.sibling_index + 1} / {message.sibling_count}
+				</span>
+				<Message.Action
+					tooltip="Next"
+					onclick={() => handleSwitchBranch(message.id!, 1)}
+				>
+					<ChevronRightIcon />
+				</Message.Action>
+			{/if}
+		{/snippet}
+		{#each messages as message, i}
 				{@const content = getMessageContent(message)}
 				{@const isUser = isUserMessage(message)}
 				{@const reasoning = reasoningData[i]}
-				{@const hasSiblings = message.sibling_count > 1}
 				{#if content.length > 0 || !isUser}
 					<Message.Root from={isUser ? 'user' : 'assistant'}>
 						{#if reasoning}
@@ -302,23 +320,7 @@
 							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
 						{#if isUser && editingIndex !== i && chatStatus === 'ready'}
 							<Message.Actions>
-								{#if hasSiblings}
-									<Message.Action
-										tooltip="Previous"
-										onclick={() => handleSwitchBranch(message.id!, -1)}
-									>
-										<ChevronLeftIcon />
-									</Message.Action>
-									<span class="text-muted-foreground flex items-center text-xs">
-										{message.sibling_index + 1} / {message.sibling_count}
-									</span>
-									<Message.Action
-										tooltip="Next"
-										onclick={() => handleSwitchBranch(message.id!, 1)}
-									>
-										<ChevronRightIcon />
-									</Message.Action>
-								{/if}
+								{@render siblingNav(message)}
 								<Message.Action
 									tooltip="Edit"
 									onclick={() => startEdit(i, content)}
@@ -329,23 +331,7 @@
 						{/if}
 						{#if !isUser && content.trim().length > 0 && !isStreaming}
 							<Message.Actions>
-								{#if hasSiblings}
-									<Message.Action
-										tooltip="Previous"
-										onclick={() => handleSwitchBranch(message.id!, -1)}
-									>
-										<ChevronLeftIcon />
-									</Message.Action>
-									<span class="text-muted-foreground flex items-center text-xs">
-										{message.sibling_index + 1} / {message.sibling_count}
-									</span>
-									<Message.Action
-										tooltip="Next"
-										onclick={() => handleSwitchBranch(message.id!, 1)}
-									>
-										<ChevronRightIcon />
-									</Message.Action>
-								{/if}
+								{@render siblingNav(message)}
 								{#if tokenLimitMessages.has(i)}
 									<Message.Action
 										tooltip="Upgrade Plan"
