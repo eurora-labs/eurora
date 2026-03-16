@@ -15,8 +15,13 @@
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import SendIcon from '@lucide/svelte/icons/send';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
@@ -29,6 +34,8 @@
 	let { data } = $props();
 
 	let copiedMessageId = $state<string | null>(null);
+	let editingIndex = $state<number | null>(null);
+	let editText = $state('');
 
 	async function copyMessageContent(content: string, messageIndex: number) {
 		await writeText(content);
@@ -71,6 +78,13 @@
 	const messages = $derived(threadData?.messages ?? []);
 	const reasoningData = $derived(threadData?.reasoningData ?? {});
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
+
+	function handleSwitchBranch(messageId: string, direction: number) {
+		if (!threadId) return;
+		messageService.switchBranch(threadId, messageId, direction).catch((error) => {
+			toast.error(`Failed to switch branch: ${error}`);
+		});
+	}
 
 	$effect(() => {
 		if (threadData?.streaming) {
@@ -162,8 +176,44 @@
 		sendQuery(text, assetIds).catch((error) => handleQueryError(error));
 	}
 
+	function startEdit(index: number, content: string) {
+		editingIndex = index;
+		editText = content;
+	}
+
+	function cancelEdit() {
+		editingIndex = null;
+		editText = '';
+	}
+
+	function submitEdit() {
+		if (editingIndex === null || !threadId) return;
+		const text = editText.trim();
+		if (!text) return;
+
+		const parentId = editingIndex > 0 ? (messages[editingIndex - 1]?.id ?? '') : '';
+
+		chatStatus = 'submitted';
+		const idx = editingIndex;
+		editingIndex = null;
+		editText = '';
+
+		messageService.editMessage(threadId, idx, text, parentId).catch((error) =>
+			handleQueryError(error),
+		);
+	}
+
+	function handleEditKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			submitEdit();
+		} else if (e.key === 'Escape') {
+			cancelEdit();
+		}
+	}
+
 	async function sendQuery(text: string, assetIds: string[] = []): Promise<void> {
-		const query: Query = { text, assets: assetIds };
+		const query: Query = { text, assets: assetIds, parent_message_id: null };
 		let targetThreadId = threadId;
 
 		if (!targetThreadId) {
@@ -212,6 +262,7 @@
 				{@const content = getMessageContent(message)}
 				{@const isUser = isUserMessage(message)}
 				{@const reasoning = reasoningData[i]}
+				{@const hasSiblings = message.sibling_count > 1}
 				{#if content.length > 0 || !isUser}
 					<Message.Root from={isUser ? 'user' : 'assistant'}>
 						{#if reasoning}
@@ -224,7 +275,24 @@
 							</Reasoning.Root>
 						{/if}
 						<Message.Content>
-							{#if content.trim().length > 0}
+							{#if isUser && editingIndex === i}
+								<div class="flex w-full flex-col gap-2">
+									<textarea
+										class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 text-sm focus:outline-none"
+										bind:value={editText}
+										onkeydown={handleEditKeydown}
+										rows={3}
+									></textarea>
+									<div class="flex justify-end gap-1">
+										<Message.Action tooltip="Cancel" onclick={cancelEdit}>
+											<XIcon />
+										</Message.Action>
+										<Message.Action tooltip="Send" onclick={submitEdit}>
+											<SendIcon />
+										</Message.Action>
+									</div>
+								</div>
+							{:else if content.trim().length > 0}
 								<Message.Response {content} />
 							{:else if !reasoning}
 								<Shimmer>Thinking</Shimmer>
@@ -232,8 +300,52 @@
 						</Message.Content>
 						{@const isStreaming =
 							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
+						{#if isUser && editingIndex !== i && chatStatus === 'ready'}
+							<Message.Actions>
+								{#if hasSiblings}
+									<Message.Action
+										tooltip="Previous"
+										onclick={() => handleSwitchBranch(message.id!, -1)}
+									>
+										<ChevronLeftIcon />
+									</Message.Action>
+									<span class="text-muted-foreground flex items-center text-xs">
+										{message.sibling_index + 1} / {message.sibling_count}
+									</span>
+									<Message.Action
+										tooltip="Next"
+										onclick={() => handleSwitchBranch(message.id!, 1)}
+									>
+										<ChevronRightIcon />
+									</Message.Action>
+								{/if}
+								<Message.Action
+									tooltip="Edit"
+									onclick={() => startEdit(i, content)}
+								>
+									<PencilIcon />
+								</Message.Action>
+							</Message.Actions>
+						{/if}
 						{#if !isUser && content.trim().length > 0 && !isStreaming}
 							<Message.Actions>
+								{#if hasSiblings}
+									<Message.Action
+										tooltip="Previous"
+										onclick={() => handleSwitchBranch(message.id!, -1)}
+									>
+										<ChevronLeftIcon />
+									</Message.Action>
+									<span class="text-muted-foreground flex items-center text-xs">
+										{message.sibling_index + 1} / {message.sibling_count}
+									</span>
+									<Message.Action
+										tooltip="Next"
+										onclick={() => handleSwitchBranch(message.id!, 1)}
+									>
+										<ChevronRightIcon />
+									</Message.Action>
+								{/if}
 								{#if tokenLimitMessages.has(i)}
 									<Message.Action
 										tooltip="Upgrade Plan"

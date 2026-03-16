@@ -269,6 +269,13 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SiblingInfo {
+    pub message_id: Uuid,
+    pub sibling_count: i64,
+    pub sibling_index: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ActivityThread {
     pub activity_id: Uuid,
     pub thread_id: Uuid,

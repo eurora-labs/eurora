@@ -922,7 +922,7 @@ impl DatabaseManager {
             r#"
             INSERT INTO threads (id, user_id, title, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, user_id, title, created_at, updated_at
+            RETURNING id, user_id, title, active_leaf_id, created_at, updated_at
             "#,
         )
         .bind(id)
@@ -940,7 +940,7 @@ impl DatabaseManager {
     pub async fn get_thread(&self, id: Uuid, user_id: Uuid) -> DbResult<Thread> {
         let thread = sqlx::query_as::<_, Thread>(
             r#"
-            SELECT id, user_id, title, created_at, updated_at
+            SELECT id, user_id, title, active_leaf_id, created_at, updated_at
             FROM threads
             WHERE id = $1 AND user_id = $2
             "#,
@@ -962,7 +962,7 @@ impl DatabaseManager {
             UPDATE threads
             SET title = $1, updated_at = $2
             WHERE id = $3 AND user_id = $4
-            RETURNING id, user_id, title, created_at, updated_at
+            RETURNING id, user_id, title, active_leaf_id, created_at, updated_at
             "#,
         )
         .bind(&title)
@@ -976,6 +976,127 @@ impl DatabaseManager {
     }
 
     #[builder]
+    pub async fn set_active_leaf(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        active_leaf_id: Option<Uuid>,
+    ) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            UPDATE threads
+            SET active_leaf_id = $1
+            WHERE id = $2 AND user_id = $3
+            "#,
+        )
+        .bind(active_leaf_id)
+        .bind(id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_sibling_info(
+        &self,
+        message_ids: &[Uuid],
+    ) -> DbResult<Vec<crate::types::SiblingInfo>> {
+        if message_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let rows = sqlx::query_as::<_, crate::types::SiblingInfo>(
+            r#"
+            WITH siblings AS (
+                SELECT
+                    m.id,
+                    m.parent_message_id,
+                    COUNT(*) OVER (PARTITION BY m.parent_message_id) AS sibling_count,
+                    ROW_NUMBER() OVER (PARTITION BY m.parent_message_id ORDER BY m.created_at, m.id) - 1 AS sibling_index
+                FROM messages m
+                WHERE m.parent_message_id IS NOT NULL
+            ),
+            root_siblings AS (
+                SELECT
+                    m.id,
+                    m.parent_message_id,
+                    COUNT(*) OVER (PARTITION BY m.thread_id) AS sibling_count,
+                    ROW_NUMBER() OVER (PARTITION BY m.thread_id ORDER BY m.created_at, m.id) - 1 AS sibling_index
+                FROM messages m
+                WHERE m.parent_message_id IS NULL
+            )
+            SELECT q.message_id, q.sibling_count, q.sibling_index FROM (
+                SELECT s.id AS message_id, s.sibling_count, s.sibling_index FROM siblings s WHERE s.id = ANY($1)
+                UNION ALL
+                SELECT r.id AS message_id, r.sibling_count, r.sibling_index FROM root_siblings r WHERE r.id = ANY($1)
+            ) q
+            "#,
+        )
+        .bind(message_ids)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
+    }
+
+    pub async fn get_adjacent_sibling(
+        &self,
+        message_id: Uuid,
+        direction: i32,
+    ) -> DbResult<Option<Uuid>> {
+        let row = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            WITH target AS (
+                SELECT id, parent_message_id, thread_id FROM messages WHERE id = $1
+            ),
+            siblings AS (
+                SELECT m.id,
+                       ROW_NUMBER() OVER (ORDER BY m.created_at, m.id) AS rn,
+                       COUNT(*) OVER () AS total
+                FROM messages m, target t
+                WHERE (t.parent_message_id IS NOT NULL AND m.parent_message_id = t.parent_message_id)
+                   OR (t.parent_message_id IS NULL AND m.parent_message_id IS NULL AND m.thread_id = t.thread_id)
+            )
+            SELECT s2.id
+            FROM siblings s1
+            JOIN siblings s2 ON s2.rn = CASE
+                WHEN s1.rn + $2 < 1 THEN s1.total
+                WHEN s1.rn + $2 > s1.total THEN 1
+                ELSE s1.rn + $2
+            END
+            WHERE s1.id = $1
+            "#,
+        )
+        .bind(message_id)
+        .bind(direction)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row)
+    }
+
+    pub async fn find_deepest_leaf(&self, message_id: Uuid) -> DbResult<Uuid> {
+        let leaf = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            WITH RECURSIVE descendants AS (
+                SELECT id, 0 AS depth FROM messages WHERE id = $1
+                UNION ALL
+                SELECT m.id, d.depth + 1
+                FROM messages m
+                JOIN descendants d ON m.parent_message_id = d.id
+            )
+            SELECT id FROM descendants ORDER BY depth DESC LIMIT 1
+            "#,
+        )
+        .bind(message_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(leaf)
+    }
+
+    #[builder]
     pub async fn list_threads(
         &self,
         user_id: Uuid,
@@ -983,7 +1104,7 @@ impl DatabaseManager {
     ) -> DbResult<Vec<Thread>> {
         let query = format!(
             r#"
-            SELECT id, user_id, title, created_at, updated_at
+            SELECT id, user_id, title, active_leaf_id, created_at, updated_at
             FROM threads
             WHERE user_id = $1
             ORDER BY id {}
@@ -1008,6 +1129,7 @@ impl DatabaseManager {
         id: Option<Uuid>,
         thread_id: Uuid,
         user_id: Uuid,
+        parent_message_id: Option<Uuid>,
         message_type: MessageType,
         content: serde_json::Value,
         tool_call_id: Option<String>,
@@ -1029,15 +1151,16 @@ impl DatabaseManager {
             ),
             updated_thread AS (
                 UPDATE threads
-                SET updated_at = $11
+                SET updated_at = $12, active_leaf_id = $1
                 WHERE id = (SELECT id FROM verified_thread)
                 RETURNING id
             ),
             inserted_message AS (
-                INSERT INTO messages (id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, reasoning_blocks, created_at, updated_at)
-                SELECT $1, vc.id, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+                INSERT INTO messages (id, thread_id, user_id, parent_message_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, reasoning_blocks, created_at, updated_at)
+                SELECT $1, vc.id, $3, COALESCE($4, t.active_leaf_id), $5, $6, $7, $8, $9, $10, $11, $12, $12
                 FROM verified_thread vc
-                RETURNING id, thread_id, user_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, reasoning_blocks, created_at, updated_at
+                JOIN threads t ON t.id = vc.id
+                RETURNING id, thread_id, user_id, parent_message_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, reasoning_blocks, created_at, updated_at
             )
             SELECT * FROM inserted_message
             "#,
@@ -1045,6 +1168,7 @@ impl DatabaseManager {
         .bind(id)
         .bind(thread_id)
         .bind(user_id)
+        .bind(parent_message_id)
         .bind(message_type)
         .bind(&content)
         .bind(&tool_call_id)
@@ -1052,7 +1176,6 @@ impl DatabaseManager {
         .bind(&additional_kwargs)
         .bind(hidden_from_ui)
         .bind(&reasoning_blocks)
-        .bind(now)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -1082,10 +1205,29 @@ impl DatabaseManager {
 
         let query = format!(
             r#"
-            SELECT m.id, m.thread_id, m.user_id, m.message_type, m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs, m.reasoning_blocks, m.created_at, m.updated_at
-            FROM messages m
-            WHERE m.thread_id = $1 AND m.user_id = $2{}
-            ORDER BY m.id {}
+            WITH RECURSIVE branch AS (
+                SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
+                       m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
+                       m.reasoning_blocks, m.hidden_from_ui, m.created_at, m.updated_at
+                FROM messages m
+                JOIN threads t ON t.active_leaf_id = m.id
+                WHERE t.id = $1 AND t.user_id = $2
+
+                UNION ALL
+
+                SELECT parent.id, parent.thread_id, parent.user_id, parent.parent_message_id,
+                       parent.message_type, parent.content, parent.tool_call_id, parent.tool_calls,
+                       parent.additional_kwargs, parent.reasoning_blocks, parent.hidden_from_ui,
+                       parent.created_at, parent.updated_at
+                FROM messages parent
+                JOIN branch child ON child.parent_message_id = parent.id
+            )
+            SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
+                   m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
+                   m.reasoning_blocks, m.created_at, m.updated_at
+            FROM branch m
+            WHERE true{}
+            ORDER BY m.created_at {}
             LIMIT $3 OFFSET $4
             "#,
             visibility_filter,
