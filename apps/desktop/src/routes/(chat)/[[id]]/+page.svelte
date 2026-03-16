@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type Query, type ContextChip, type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { MESSAGE_SERVICE } from '$lib/services/message-service.svelte.js';
 	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
@@ -12,15 +11,25 @@
 	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import type {
+		Query,
+		ContextChip,
+		TimelineAppEvent,
+		MessageView,
+	} from '$lib/bindings/bindings.js';
 	import type {
 		PromptInputMessage,
 		ChatStatus,
@@ -29,6 +38,9 @@
 	let { data } = $props();
 
 	let copiedMessageId = $state<string | null>(null);
+	let editingIndex = $state<number | null>(null);
+	let editText = $state('');
+	let editTextarea = $state<HTMLTextAreaElement | null>(null);
 
 	async function copyMessageContent(content: string, messageIndex: number) {
 		await writeText(content);
@@ -71,6 +83,13 @@
 	const messages = $derived(threadData?.messages ?? []);
 	const reasoningData = $derived(threadData?.reasoningData ?? {});
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
+
+	function handleSwitchBranch(messageId: string, direction: number) {
+		if (!threadId) return;
+		messageService.switchBranch(threadId, messageId, direction).catch((error) => {
+			toast.error(`Failed to switch branch: ${error}`);
+		});
+	}
 
 	$effect(() => {
 		if (threadData?.streaming) {
@@ -162,8 +181,47 @@
 		sendQuery(text, assetIds).catch((error) => handleQueryError(error));
 	}
 
+	async function startEdit(index: number, content: string) {
+		editingIndex = index;
+		editText = content;
+		await tick();
+		editTextarea?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		editTextarea?.focus();
+	}
+
+	function cancelEdit() {
+		editingIndex = null;
+		editText = '';
+	}
+
+	function submitEdit() {
+		if (editingIndex === null || !threadId) return;
+		const text = editText.trim();
+		if (!text) return;
+
+		const parentId = editingIndex > 0 ? (messages[editingIndex - 1]?.id ?? '') : '';
+
+		chatStatus = 'submitted';
+		const idx = editingIndex;
+		editingIndex = null;
+		editText = '';
+
+		messageService
+			.editMessage(threadId, idx, text, parentId)
+			.catch((error) => handleQueryError(error));
+	}
+
+	function handleEditKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			submitEdit();
+		} else if (e.key === 'Escape') {
+			cancelEdit();
+		}
+	}
+
 	async function sendQuery(text: string, assetIds: string[] = []): Promise<void> {
-		const query: Query = { text, assets: assetIds };
+		const query: Query = { text, assets: assetIds, parent_message_id: null };
 		let targetThreadId = threadId;
 
 		if (!targetThreadId) {
@@ -186,6 +244,20 @@
 		chatStatus = 'ready';
 	}
 </script>
+
+{#snippet siblingNav(message: MessageView)}
+	{#if message.sibling_count > 1 && message.id}
+		<Message.Action tooltip="Previous" onclick={() => handleSwitchBranch(message.id!, -1)}>
+			<ChevronLeftIcon />
+		</Message.Action>
+		<span class="text-muted-foreground flex items-center text-xs">
+			{message.sibling_index + 1} / {message.sibling_count}
+		</span>
+		<Message.Action tooltip="Next" onclick={() => handleSwitchBranch(message.id!, 1)}>
+			<ChevronRightIcon />
+		</Message.Action>
+	{/if}
+{/snippet}
 
 <div class="flex h-full flex-col overflow-hidden">
 	<Conversation.Root class="min-h-0 flex-1">
@@ -223,17 +295,57 @@
 								<Reasoning.Content children={reasoning.content} />
 							</Reasoning.Root>
 						{/if}
-						<Message.Content>
-							{#if content.trim().length > 0}
-								<Message.Response {content} />
-							{:else if !reasoning}
-								<Shimmer>Thinking</Shimmer>
-							{/if}
-						</Message.Content>
+						{#if isUser && editingIndex === i}
+							<div class="flex w-full flex-col gap-2">
+								<textarea
+									bind:this={editTextarea}
+									class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 focus:outline-none"
+									bind:value={editText}
+									onkeydown={handleEditKeydown}
+									rows={3}
+								></textarea>
+								<div class="flex justify-end gap-2">
+									<Button variant="ghost" size="sm" onclick={cancelEdit}>
+										Cancel
+									</Button>
+									<Button size="sm" onclick={submitEdit}>Send</Button>
+								</div>
+							</div>
+						{:else}
+							<Message.Content>
+								{#if content.trim().length > 0}
+									<Message.Response {content} />
+								{:else if !reasoning}
+									<Shimmer>Thinking</Shimmer>
+								{/if}
+							</Message.Content>
+						{/if}
 						{@const isStreaming =
 							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
+						{#if isUser && editingIndex !== i && chatStatus === 'ready'}
+							<Message.Actions class="self-end">
+								{@render siblingNav(message)}
+								<Message.Action
+									tooltip="Copy"
+									onclick={() => copyMessageContent(content, i)}
+								>
+									{#if copiedMessageId === String(i)}
+										<CheckIcon />
+									{:else}
+										<CopyIcon />
+									{/if}
+								</Message.Action>
+								<Message.Action
+									tooltip="Edit"
+									onclick={() => startEdit(i, content)}
+								>
+									<PencilIcon />
+								</Message.Action>
+							</Message.Actions>
+						{/if}
 						{#if !isUser && content.trim().length > 0 && !isStreaming}
 							<Message.Actions>
+								{@render siblingNav(message)}
 								{#if tokenLimitMessages.has(i)}
 									<Message.Action
 										tooltip="Upgrade Plan"

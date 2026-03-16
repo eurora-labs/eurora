@@ -18,7 +18,7 @@ use proto_gen::thread::{
     AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
     CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
     GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, Thread,
+    ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, SwitchBranchRequest, Thread,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -241,6 +241,7 @@ impl ThreadService {
             title: thread.title.clone().unwrap_or_default(),
             created_at: Some(datetime_to_timestamp(thread.created_at)),
             updated_at: Some(datetime_to_timestamp(thread.updated_at)),
+            active_leaf_id: thread.active_leaf_id.map(|id| id.to_string()),
         }
     }
 }
@@ -472,6 +473,31 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
+        let is_edit = req.parent_message_id.is_some();
+        let parent_id = req
+            .parent_message_id
+            .filter(|s| !s.is_empty())
+            .map(|s| Uuid::parse_str(&s))
+            .transpose()
+            .map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "parent_message_id",
+                source: e,
+            })?;
+
+        // If the user edits the root message, we still need to handle the edit.
+        // That is why we call set_active_leaf even if parent_id is not a valid UUID.
+        // parent_id would not be a valid UUID if the user is editing the root message.
+        if is_edit {
+            self.db
+                .set_active_leaf()
+                .id(thread_id)
+                .user_id(user_id)
+                .maybe_active_leaf_id(parent_id)
+                .call()
+                .await
+                .map_err(ThreadServiceError::from)?;
+        }
+
         tracing::debug!("ChatStream: thread_id = {}", thread_id);
 
         let mut hidden_messages = self
@@ -700,8 +726,29 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
+        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+        let sibling_rows = self
+            .db
+            .get_sibling_info()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .message_ids(&message_ids)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let sibling_info = sibling_rows
+            .into_iter()
+            .map(|s| MessageSiblingInfo {
+                message_id: s.message_id.to_string(),
+                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
+                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
+            })
+            .collect();
+
         Ok(Response::new(GetMessagesResponse {
             messages: messages.into_iter().map(|m| m.into()).collect(),
+            sibling_info,
         }))
     }
 
@@ -761,33 +808,30 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let mut messages: Vec<AnyMessage> = hidden_messages
-            .into_iter()
-            .filter_map(|msg| {
-                convert_db_message_to_base_message(msg)
-                    .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
-                    .ok()
-            })
-            .collect();
-
-        messages.push(HumanMessage::builder().content(req.content).build().into());
-
-        messages.push(
+        let mut messages: Vec<AnyMessage> = vec![
             SystemMessage::builder()
                 .content(
-                    "Generate a title for the past thread. Your task is:
+                    "Generate a title for the following conversation. Your task is:
                 - Return a concise title, max 6 words.
                 - No quotation marks.
                 - Use sentence case.
                 - Summarize the main topic, not the tone.
                 - If the topic is unclear, use a generic title.
-                Output only the title text.
-                "
-                    .to_string(),
+                - Do NOT answer or respond to the messages. Only output a title.
+                Output only the title text."
+                        .to_string(),
                 )
                 .build()
                 .into(),
-        );
+        ];
+
+        messages.extend(hidden_messages.into_iter().filter_map(|msg| {
+            convert_db_message_to_base_message(msg)
+                .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
+                .ok()
+        }));
+
+        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         let title_provider = self.get_title_provider()?;
         let mut title = match title_provider.invoke(messages, None).await {
@@ -821,6 +865,94 @@ impl ProtoThreadService for ThreadService {
 
         Ok(Response::new(GenerateThreadTitleResponse {
             thread: Some(Self::db_thread_to_proto(thread)),
+        }))
+    }
+
+    async fn switch_branch(
+        &self,
+        request: Request<SwitchBranchRequest>,
+    ) -> Result<Response<GetMessagesResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
+                source: e,
+            })?;
+
+        let message_id =
+            Uuid::parse_str(&req.message_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "message_id",
+                source: e,
+            })?;
+
+        if req.direction != -1 && req.direction != 1 {
+            return Err(Status::invalid_argument("direction must be -1 or 1"));
+        }
+
+        let sibling_id = self
+            .db
+            .get_adjacent_sibling()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .message_id(message_id)
+            .direction(req.direction)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?
+            .ok_or_else(|| Status::not_found("No adjacent sibling found"))?;
+
+        let new_leaf = self
+            .db
+            .find_deepest_leaf(thread_id, user_id, sibling_id)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        self.db
+            .set_active_leaf()
+            .id(thread_id)
+            .user_id(user_id)
+            .active_leaf_id(new_leaf)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let messages = self
+            .db
+            .list_messages()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .params(PaginationParams::new(0, 100, "ASC".to_string()))
+            .include_hidden(false)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+        let sibling_rows = self
+            .db
+            .get_sibling_info()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .message_ids(&message_ids)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let sibling_info = sibling_rows
+            .into_iter()
+            .map(|s| MessageSiblingInfo {
+                message_id: s.message_id.to_string(),
+                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
+                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
+            })
+            .collect();
+
+        Ok(Response::new(GetMessagesResponse {
+            messages: messages.into_iter().map(|m| m.into()).collect(),
+            sibling_info,
         }))
     }
 }

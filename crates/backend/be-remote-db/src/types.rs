@@ -226,6 +226,7 @@ pub struct Thread {
     pub id: Uuid,
     pub user_id: Uuid,
     pub title: Option<String>,
+    pub active_leaf_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -256,6 +257,7 @@ pub struct Message {
     pub id: Uuid,
     pub thread_id: Uuid,
     pub user_id: Uuid,
+    pub parent_message_id: Option<Uuid>,
     pub message_type: MessageType,
     pub content: serde_json::Value,
     pub tool_call_id: Option<String>,
@@ -264,6 +266,13 @@ pub struct Message {
     pub reasoning_blocks: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SiblingInfo {
+    pub message_id: Uuid,
+    pub sibling_count: i64,
+    pub sibling_index: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

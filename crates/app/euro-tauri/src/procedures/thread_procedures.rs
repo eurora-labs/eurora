@@ -2,7 +2,8 @@ use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
 use agent_chain_core::messages::prelude::*;
 use euro_thread::{ListThreadsRequest, Thread};
-use proto_gen::thread::CreateThreadRequest;
+use proto_gen::thread::{CreateThreadRequest, GetMessagesResponse};
+use std::collections::HashMap;
 use tauri::{Manager, Runtime};
 
 #[taurpc::ipc_type]
@@ -24,6 +25,8 @@ pub struct MessageView {
     pub role: String,
     pub content: String,
     pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
+    pub sibling_count: u32,
+    pub sibling_index: u32,
 }
 
 #[taurpc::procedures(path = "thread")]
@@ -52,6 +55,13 @@ pub trait ThreadApi {
         offset: u32,
     ) -> Result<Vec<MessageView>, String>;
 
+    async fn switch_branch<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        message_id: String,
+        direction: i32,
+    ) -> Result<Vec<MessageView>, String>;
+
     async fn generate_title<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
@@ -65,6 +75,40 @@ fn thread_manager<R: Runtime>(
     app_handle
         .try_state::<SharedThreadManager>()
         .ok_or_else(|| "Thread manager not available".to_string())
+}
+
+fn convert_response(response: GetMessagesResponse) -> Vec<MessageView> {
+    let sibling_map: HashMap<String, (u32, u32)> = response
+        .sibling_info
+        .into_iter()
+        .map(|s| (s.message_id, (s.sibling_count, s.sibling_index)))
+        .collect();
+
+    response
+        .messages
+        .into_iter()
+        .map(AnyMessage::from)
+        .filter_map(|message| match message {
+            AnyMessage::SystemMessage(_) => None,
+            _ => {
+                let id = message.id();
+                let (sibling_count, sibling_index) = id
+                    .as_ref()
+                    .and_then(|id| sibling_map.get(id))
+                    .copied()
+                    .unwrap_or((1, 0));
+                let reasoning_blocks = extract_reasoning_blocks(&message);
+                Some(MessageView {
+                    id,
+                    role: message.message_type().to_string(),
+                    content: message.content().to_string(),
+                    reasoning_blocks,
+                    sibling_count,
+                    sibling_index,
+                })
+            }
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -113,18 +157,29 @@ impl ThreadApi for ThreadApiImpl {
     ) -> Result<Vec<MessageView>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
-        let messages = thread_manager
+        let response = thread_manager
             .get_messages(thread_id, limit, offset)
             .await
             .ctx("Failed to get messages")?;
 
-        Ok(messages
-            .into_iter()
-            .filter_map(|message| match message {
-                AnyMessage::SystemMessage(_) => None,
-                _ => Some(MessageView::from(message)),
-            })
-            .collect())
+        Ok(convert_response(response))
+    }
+
+    async fn switch_branch<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        message_id: String,
+        direction: i32,
+    ) -> Result<Vec<MessageView>, String> {
+        let thread_state = thread_manager(&app_handle)?;
+        let thread_manager = thread_state.lock().await;
+        let response = thread_manager
+            .switch_branch(thread_id, message_id, direction)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(convert_response(response))
     }
 
     async fn generate_title<R: Runtime>(
@@ -187,28 +242,5 @@ fn extract_reasoning_blocks(message: &AnyMessage) -> Option<Vec<ReasoningBlock>>
         None
     } else {
         Some(result)
-    }
-}
-
-impl From<&AnyMessage> for MessageView {
-    fn from(message: &AnyMessage) -> Self {
-        MessageView {
-            id: message.id(),
-            role: message.message_type().to_string(),
-            content: message.content().to_string(),
-            reasoning_blocks: extract_reasoning_blocks(message),
-        }
-    }
-}
-
-impl From<AnyMessage> for MessageView {
-    fn from(message: AnyMessage) -> Self {
-        let reasoning_blocks = extract_reasoning_blocks(&message);
-        MessageView {
-            id: message.id(),
-            role: message.message_type().to_string(),
-            content: message.content().to_string(),
-            reasoning_blocks,
-        }
     }
 }

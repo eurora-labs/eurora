@@ -17,6 +17,7 @@ service ProtoThreadService {
 
   rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ProtoAIMessageChunk);
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
+  rpc SwitchBranch(SwitchBranchRequest) returns (GetMessagesResponse);
 }
 
 message CreateThreadRequest {
@@ -29,6 +30,7 @@ message Thread {
   string title = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+  optional string active_leaf_id = 6;
 }
 
 message CreateThreadResponse {
@@ -47,6 +49,7 @@ message ListThreadsResponse {
 message ChatStreamRequest {
   string thread_id = 1;
   string content = 2;
+  optional string parent_message_id = 3;
 }
 
 message AddHumanMessageRequest {
@@ -73,8 +76,21 @@ message GetMessagesRequest {
   uint32 offset = 3;
 }
 
+message MessageSiblingInfo {
+  string message_id = 1;
+  uint32 sibling_count = 2;
+  uint32 sibling_index = 3;
+}
+
 message GetMessagesResponse {
   repeated agent_chain.ProtoBaseMessage messages = 1;
+  repeated MessageSiblingInfo sibling_info = 2;
+}
+
+message SwitchBranchRequest {
+  string thread_id = 1;
+  string message_id = 2;
+  int32 direction = 3;
 }
 
 message GetThreadRequest {

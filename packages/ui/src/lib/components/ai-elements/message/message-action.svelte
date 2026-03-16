@@ -6,6 +6,7 @@
 
 	let {
 		tooltip,
+		tooltipSide = 'bottom',
 		label,
 		children,
 		class: className,
@@ -14,6 +15,7 @@
 		...restProps
 	}: {
 		tooltip?: string;
+		tooltipSide?: 'top' | 'bottom' | 'left' | 'right';
 		label?: string;
 		children?: Snippet;
 		class?: string;
@@ -45,7 +47,7 @@
 				{@render button(props)}
 			{/snippet}
 		</Tooltip.Trigger>
-		<Tooltip.Content>
+		<Tooltip.Content side={tooltipSide}>
 			<p>{tooltip}</p>
 		</Tooltip.Content>
 	</Tooltip.Root>

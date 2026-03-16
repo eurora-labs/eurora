@@ -8,7 +8,8 @@ use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
     ChatStreamRequest, CreateThreadRequest, GenerateThreadTitleRequest, GetMessagesRequest,
-    GetThreadRequest, ListThreadsRequest, proto_thread_service_client::ProtoThreadServiceClient,
+    GetMessagesResponse, GetThreadRequest, ListThreadsRequest, SwitchBranchRequest,
+    proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::watch;
@@ -89,7 +90,7 @@ impl ThreadManager {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<AnyMessage>> {
+    ) -> Result<GetMessagesResponse> {
         let mut client = self.client();
         let response = client
             .get_messages(GetMessagesRequest {
@@ -100,11 +101,26 @@ impl ThreadManager {
             .await?
             .into_inner();
 
-        Ok(response
-            .messages
-            .into_iter()
-            .map(AnyMessage::from)
-            .collect())
+        Ok(response)
+    }
+
+    pub async fn switch_branch(
+        &self,
+        thread_id: String,
+        message_id: String,
+        direction: i32,
+    ) -> Result<GetMessagesResponse> {
+        let mut client = self.client();
+        let response = client
+            .switch_branch(SwitchBranchRequest {
+                thread_id,
+                message_id,
+                direction,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response)
     }
 
     pub async fn generate_thread_title(
@@ -183,10 +199,15 @@ impl ThreadManager {
         &mut self,
         thread_id: String,
         content: String,
+        parent_message_id: Option<String>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>> {
         let mut client = self.client();
         let stream = client
-            .chat_stream(ChatStreamRequest { thread_id, content })
+            .chat_stream(ChatStreamRequest {
+                thread_id,
+                content,
+                parent_message_id,
+            })
             .await?
             .into_inner();
 

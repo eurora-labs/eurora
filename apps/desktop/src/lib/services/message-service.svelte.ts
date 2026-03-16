@@ -52,12 +52,12 @@ export class MessageService {
 
 		this.taurpc.thread
 			.get_messages(threadId, PAGE_SIZE, 0)
-			.then((response) => {
+			.then((messages) => {
 				if (entry.messages.length > 0) return;
-				entry.messages = response;
-				entry.offset = response.length;
-				entry.hasMore = response.length === PAGE_SIZE;
-				this.extractReasoning(entry, response, 0);
+				entry.messages = messages;
+				entry.offset = messages.length;
+				entry.hasMore = messages.length === PAGE_SIZE;
+				this.extractReasoning(entry, messages, 0);
 			})
 			.catch((error) => {
 				console.error(`Failed to load messages for thread ${threadId}:`, error);
@@ -73,16 +73,16 @@ export class MessageService {
 
 		entry.loading = true;
 		try {
-			const response = await this.taurpc.thread.get_messages(
+			const messages = await this.taurpc.thread.get_messages(
 				threadId,
 				PAGE_SIZE,
 				entry.offset,
 			);
 			const insertOffset = entry.messages.length;
-			entry.messages = [...entry.messages, ...response];
-			entry.offset += response.length;
-			entry.hasMore = response.length === PAGE_SIZE;
-			this.extractReasoning(entry, response, insertOffset);
+			entry.messages = [...entry.messages, ...messages];
+			entry.offset += messages.length;
+			entry.hasMore = messages.length === PAGE_SIZE;
+			this.extractReasoning(entry, messages, insertOffset);
 		} catch (error) {
 			console.error(`Failed to load more messages for thread ${threadId}:`, error);
 		} finally {
@@ -98,6 +98,8 @@ export class MessageService {
 			role: 'human',
 			content: query.text,
 			reasoning_blocks: null,
+			sibling_count: 1,
+			sibling_index: 0,
 		});
 
 		entry.messages.push({
@@ -105,6 +107,8 @@ export class MessageService {
 			role: 'ai',
 			content: '',
 			reasoning_blocks: null,
+			sibling_count: 1,
+			sibling_index: 0,
 		});
 
 		const messageIndex = entry.messages.length - 1;
@@ -165,6 +169,43 @@ export class MessageService {
 			}
 			entry.streaming = false;
 		}
+
+		const fresh = await this.taurpc.thread.get_messages(threadId, PAGE_SIZE, 0);
+		entry.messages = fresh;
+		entry.reasoningData = {};
+		this.extractReasoning(entry, fresh, 0);
+	}
+
+	async editMessage(
+		threadId: string,
+		editIndex: number,
+		newText: string,
+		parentMessageId: string | null,
+	): Promise<void> {
+		const entry = this.cache.get(threadId);
+		if (!entry) return;
+
+		entry.messages = entry.messages.slice(0, editIndex);
+		for (const key of Object.keys(entry.reasoningData)) {
+			if (Number(key) >= editIndex) delete entry.reasoningData[Number(key)];
+		}
+
+		const query: Query = {
+			text: newText,
+			assets: [],
+			parent_message_id: parentMessageId,
+		};
+		await this.sendMessage(threadId, query);
+	}
+
+	async switchBranch(threadId: string, messageId: string, direction: number): Promise<void> {
+		const entry = this.cache.get(threadId);
+		if (!entry) return;
+
+		const messages = await this.taurpc.thread.switch_branch(threadId, messageId, direction);
+		entry.messages = messages;
+		entry.reasoningData = {};
+		this.extractReasoning(entry, messages, 0);
 	}
 
 	isStreaming(threadId: string): boolean {
