@@ -998,6 +998,7 @@ impl DatabaseManager {
         Ok(())
     }
 
+    #[builder]
     pub async fn get_sibling_info(
         &self,
         thread_id: Uuid,
@@ -1048,6 +1049,7 @@ impl DatabaseManager {
         Ok(rows)
     }
 
+    #[builder]
     pub async fn get_adjacent_sibling(
         &self,
         thread_id: Uuid,
