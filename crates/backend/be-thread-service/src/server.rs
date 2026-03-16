@@ -729,7 +729,7 @@ impl ProtoThreadService for ThreadService {
         let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
         let sibling_rows = self
             .db
-            .get_sibling_info(&message_ids)
+            .get_sibling_info(thread_id, user_id, &message_ids)
             .await
             .map_err(ThreadServiceError::from)?;
 
@@ -737,8 +737,8 @@ impl ProtoThreadService for ThreadService {
             .into_iter()
             .map(|s| MessageSiblingInfo {
                 message_id: s.message_id.to_string(),
-                sibling_count: s.sibling_count as u32,
-                sibling_index: s.sibling_index as u32,
+                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
+                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
             })
             .collect();
 
@@ -887,16 +887,20 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
+        if req.direction != -1 && req.direction != 1 {
+            return Err(Status::invalid_argument("direction must be -1 or 1"));
+        }
+
         let sibling_id = self
             .db
-            .get_adjacent_sibling(message_id, req.direction)
+            .get_adjacent_sibling(thread_id, user_id, message_id, req.direction)
             .await
             .map_err(ThreadServiceError::from)?
             .ok_or_else(|| Status::not_found("No adjacent sibling found"))?;
 
         let new_leaf = self
             .db
-            .find_deepest_leaf(sibling_id)
+            .find_deepest_leaf(thread_id, user_id, sibling_id)
             .await
             .map_err(ThreadServiceError::from)?;
 
@@ -923,7 +927,7 @@ impl ProtoThreadService for ThreadService {
         let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
         let sibling_rows = self
             .db
-            .get_sibling_info(&message_ids)
+            .get_sibling_info(thread_id, user_id, &message_ids)
             .await
             .map_err(ThreadServiceError::from)?;
 
@@ -931,8 +935,8 @@ impl ProtoThreadService for ThreadService {
             .into_iter()
             .map(|s| MessageSiblingInfo {
                 message_id: s.message_id.to_string(),
-                sibling_count: s.sibling_count as u32,
-                sibling_index: s.sibling_index as u32,
+                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
+                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
             })
             .collect();
 

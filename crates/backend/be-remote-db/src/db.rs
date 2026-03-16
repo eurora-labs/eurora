@@ -1000,6 +1000,8 @@ impl DatabaseManager {
 
     pub async fn get_sibling_info(
         &self,
+        thread_id: Uuid,
+        user_id: Uuid,
         message_ids: &[Uuid],
     ) -> DbResult<Vec<crate::types::SiblingInfo>> {
         if message_ids.is_empty() {
@@ -1008,22 +1010,26 @@ impl DatabaseManager {
 
         let rows = sqlx::query_as::<_, crate::types::SiblingInfo>(
             r#"
-            WITH siblings AS (
+            WITH thread_messages AS (
+                SELECT m.id, m.parent_message_id, m.thread_id, m.created_at
+                FROM messages m
+                JOIN threads t ON t.id = m.thread_id
+                WHERE m.thread_id = $2 AND t.user_id = $3
+            ),
+            siblings AS (
                 SELECT
                     m.id,
-                    m.parent_message_id,
                     COUNT(*) OVER (PARTITION BY m.parent_message_id) AS sibling_count,
                     ROW_NUMBER() OVER (PARTITION BY m.parent_message_id ORDER BY m.created_at, m.id) - 1 AS sibling_index
-                FROM messages m
+                FROM thread_messages m
                 WHERE m.parent_message_id IS NOT NULL
             ),
             root_siblings AS (
                 SELECT
                     m.id,
-                    m.parent_message_id,
                     COUNT(*) OVER (PARTITION BY m.thread_id) AS sibling_count,
                     ROW_NUMBER() OVER (PARTITION BY m.thread_id ORDER BY m.created_at, m.id) - 1 AS sibling_index
-                FROM messages m
+                FROM thread_messages m
                 WHERE m.parent_message_id IS NULL
             )
             SELECT q.message_id, q.sibling_count, q.sibling_index FROM (
@@ -1034,6 +1040,8 @@ impl DatabaseManager {
             "#,
         )
         .bind(message_ids)
+        .bind(thread_id)
+        .bind(user_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -1042,13 +1050,18 @@ impl DatabaseManager {
 
     pub async fn get_adjacent_sibling(
         &self,
+        thread_id: Uuid,
+        user_id: Uuid,
         message_id: Uuid,
         direction: i32,
     ) -> DbResult<Option<Uuid>> {
         let row = sqlx::query_scalar::<_, Uuid>(
             r#"
             WITH target AS (
-                SELECT id, parent_message_id, thread_id FROM messages WHERE id = $1
+                SELECT m.id, m.parent_message_id, m.thread_id
+                FROM messages m
+                JOIN threads t ON t.id = m.thread_id
+                WHERE m.id = $1 AND m.thread_id = $3 AND t.user_id = $4
             ),
             siblings AS (
                 SELECT m.id,
@@ -1070,26 +1083,39 @@ impl DatabaseManager {
         )
         .bind(message_id)
         .bind(direction)
+        .bind(thread_id)
+        .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
 
         Ok(row)
     }
 
-    pub async fn find_deepest_leaf(&self, message_id: Uuid) -> DbResult<Uuid> {
+    pub async fn find_deepest_leaf(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+        message_id: Uuid,
+    ) -> DbResult<Uuid> {
         let leaf = sqlx::query_scalar::<_, Uuid>(
             r#"
             WITH RECURSIVE descendants AS (
-                SELECT id, 0 AS depth FROM messages WHERE id = $1
+                SELECT m.id, m.created_at, 0 AS depth
+                FROM messages m
+                JOIN threads t ON t.id = m.thread_id
+                WHERE m.id = $1 AND m.thread_id = $2 AND t.user_id = $3
                 UNION ALL
-                SELECT m.id, d.depth + 1
+                SELECT m.id, m.created_at, d.depth + 1
                 FROM messages m
                 JOIN descendants d ON m.parent_message_id = d.id
+                WHERE m.thread_id = $2
             )
-            SELECT id FROM descendants ORDER BY depth DESC LIMIT 1
+            SELECT id FROM descendants ORDER BY depth DESC, created_at DESC, id DESC LIMIT 1
             "#,
         )
         .bind(message_id)
+        .bind(thread_id)
+        .bind(user_id)
         .fetch_one(&self.pool)
         .await?;
 
