@@ -1,10 +1,16 @@
 -- Add tree structure for conversation branching.
 -- Each message points to its parent; threads track the active leaf.
 
-ALTER TABLE messages ADD COLUMN parent_message_id UUID REFERENCES messages(id);
+ALTER TABLE messages ADD UNIQUE (id, thread_id);
+
+ALTER TABLE messages ADD COLUMN parent_message_id UUID;
+ALTER TABLE messages ADD CONSTRAINT fk_messages_parent
+    FOREIGN KEY (parent_message_id, thread_id) REFERENCES messages(id, thread_id);
 CREATE INDEX idx_messages_parent ON messages(parent_message_id);
 
-ALTER TABLE threads ADD COLUMN active_leaf_id UUID REFERENCES messages(id);
+ALTER TABLE threads ADD COLUMN active_leaf_id UUID;
+ALTER TABLE threads ADD CONSTRAINT fk_threads_active_leaf
+    FOREIGN KEY (active_leaf_id, id) REFERENCES messages(id, thread_id);
 
 WITH ordered AS (
     SELECT id,

@@ -982,11 +982,14 @@ impl DatabaseManager {
         user_id: Uuid,
         active_leaf_id: Option<Uuid>,
     ) -> DbResult<()> {
-        sqlx::query(
+        let result = sqlx::query(
             r#"
             UPDATE threads
             SET active_leaf_id = $1
             WHERE id = $2 AND user_id = $3
+              AND ($1 IS NULL OR EXISTS(
+                  SELECT 1 FROM messages WHERE id = $1 AND thread_id = $2 AND user_id = $3
+              ))
             "#,
         )
         .bind(active_leaf_id)
@@ -994,6 +997,10 @@ impl DatabaseManager {
         .bind(user_id)
         .execute(&self.pool)
         .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(DbError::not_found_with_id("thread or active leaf", id));
+        }
 
         Ok(())
     }
@@ -1249,6 +1256,7 @@ impl DatabaseManager {
                        parent.created_at, parent.updated_at
                 FROM messages parent
                 JOIN branch child ON child.parent_message_id = parent.id
+                    AND parent.thread_id = $1 AND parent.user_id = $2
             )
             SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
                    m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
