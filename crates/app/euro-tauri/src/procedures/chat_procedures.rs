@@ -16,6 +16,7 @@ pub struct ResponseChunk {
 pub struct Query {
     text: String,
     assets: Vec<String>,
+    parent_message_id: Option<String>,
 }
 
 #[taurpc::procedures(path = "chat")]
@@ -90,7 +91,11 @@ impl ChatApi for ChatApiImpl {
         let stream_result = {
             let mut thread_manager = thread_state.lock().await;
             thread_manager
-                .chat_stream(thread_id.clone(), query.text.clone())
+                .chat_stream(
+                    thread_id.clone(),
+                    query.text.clone(),
+                    query.parent_message_id.clone(),
+                )
                 .await
         };
 
