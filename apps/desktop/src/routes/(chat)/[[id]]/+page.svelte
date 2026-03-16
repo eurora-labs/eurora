@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type Query, type ContextChip, type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { MESSAGE_SERVICE } from '$lib/services/message-service.svelte.js';
 	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
@@ -26,6 +25,12 @@
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import type {
+		Query,
+		ContextChip,
+		TimelineAppEvent,
+		MessageView,
+	} from '$lib/bindings/bindings.js';
 	import type {
 		PromptInputMessage,
 		ChatStatus,
@@ -198,9 +203,9 @@
 		editingIndex = null;
 		editText = '';
 
-		messageService.editMessage(threadId, idx, text, parentId).catch((error) =>
-			handleQueryError(error),
-		);
+		messageService
+			.editMessage(threadId, idx, text, parentId)
+			.catch((error) => handleQueryError(error));
 	}
 
 	function handleEditKeydown(e: KeyboardEvent) {
@@ -237,6 +242,20 @@
 	}
 </script>
 
+{#snippet siblingNav(message: MessageView)}
+	{#if message.sibling_count > 1 && message.id}
+		<Message.Action tooltip="Previous" onclick={() => handleSwitchBranch(message.id!, -1)}>
+			<ChevronLeftIcon />
+		</Message.Action>
+		<span class="text-muted-foreground flex items-center text-xs">
+			{message.sibling_index + 1} / {message.sibling_count}
+		</span>
+		<Message.Action tooltip="Next" onclick={() => handleSwitchBranch(message.id!, 1)}>
+			<ChevronRightIcon />
+		</Message.Action>
+	{/if}
+{/snippet}
+
 <div class="flex h-full flex-col overflow-hidden">
 	<Conversation.Root class="min-h-0 flex-1">
 		<Conversation.Content>
@@ -258,26 +277,7 @@
 					</Empty.Header>
 				</Empty.Root>
 			{/if}
-			{#snippet siblingNav(message: import('$lib/bindings/bindings.js').MessageView)}
-			{#if message.sibling_count > 1 && message.id}
-				<Message.Action
-					tooltip="Previous"
-					onclick={() => handleSwitchBranch(message.id!, -1)}
-				>
-					<ChevronLeftIcon />
-				</Message.Action>
-				<span class="text-muted-foreground flex items-center text-xs">
-					{message.sibling_index + 1} / {message.sibling_count}
-				</span>
-				<Message.Action
-					tooltip="Next"
-					onclick={() => handleSwitchBranch(message.id!, 1)}
-				>
-					<ChevronRightIcon />
-				</Message.Action>
-			{/if}
-		{/snippet}
-		{#each messages as message, i}
+			{#each messages as message, i}
 				{@const content = getMessageContent(message)}
 				{@const isUser = isUserMessage(message)}
 				{@const reasoning = reasoningData[i]}

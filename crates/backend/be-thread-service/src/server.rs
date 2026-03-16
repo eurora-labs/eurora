@@ -729,7 +729,11 @@ impl ProtoThreadService for ThreadService {
         let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
         let sibling_rows = self
             .db
-            .get_sibling_info(thread_id, user_id, &message_ids)
+            .get_sibling_info()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .message_ids(&message_ids)
+            .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
@@ -893,7 +897,12 @@ impl ProtoThreadService for ThreadService {
 
         let sibling_id = self
             .db
-            .get_adjacent_sibling(thread_id, user_id, message_id, req.direction)
+            .get_adjacent_sibling()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .message_id(message_id)
+            .direction(req.direction)
+            .call()
             .await
             .map_err(ThreadServiceError::from)?
             .ok_or_else(|| Status::not_found("No adjacent sibling found"))?;
@@ -927,7 +936,11 @@ impl ProtoThreadService for ThreadService {
         let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
         let sibling_rows = self
             .db
-            .get_sibling_info(thread_id, user_id, &message_ids)
+            .get_sibling_info()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .message_ids(&message_ids)
+            .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
