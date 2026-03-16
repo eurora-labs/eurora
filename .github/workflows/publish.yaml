@@ -925,7 +925,7 @@ jobs:
               run: |
                   TAG="release/${RELEASE_VERSION}"
 
-                  PREV_TAG=$(git tag --list 'release/*' --sort=-v:refname | grep -v "^${TAG}$" | head -n1)
+                  PREV_TAG=$(git tag --list 'release/*' --merged HEAD --sort=-v:refname | grep -Fxv "$TAG" | head -n1)
 
                   NOTES_FLAG="--generate-notes"
                   if [ -n "$PREV_TAG" ]; then
