@@ -536,13 +536,31 @@ impl ProtoThreadService for ThreadService {
             })
             .collect();
 
-        let human_message = HumanMessage::builder().content(req.content.clone()).build();
+        let mut human_additional_kwargs = HashMap::new();
+        if let Some(ref chips_json) = req.asset_chips_json
+            && let Ok(chips_value) = serde_json::from_str::<serde_json::Value>(chips_json)
+        {
+            human_additional_kwargs.insert("asset_chips".to_string(), chips_value);
+        }
+
+        let human_message = HumanMessage::builder()
+            .content(req.content.clone())
+            .additional_kwargs(human_additional_kwargs)
+            .build();
 
         messages.push(human_message.clone().into());
 
         let content = serde_json::to_value(&human_message.content).map_err(|e| {
             ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
         })?;
+
+        let additional_kwargs =
+            serde_json::to_value(&human_message.additional_kwargs).map_err(|e| {
+                ThreadServiceError::Internal(format!(
+                    "Failed to serialize additional_kwargs: {}",
+                    e
+                ))
+            })?;
 
         let _message = self
             .db
@@ -551,6 +569,7 @@ impl ProtoThreadService for ThreadService {
             .user_id(user_id)
             .message_type(MessageType::Human)
             .content(content)
+            .additional_kwargs(additional_kwargs)
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
