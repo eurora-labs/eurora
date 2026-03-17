@@ -1027,6 +1027,7 @@ impl ProtoThreadService for ThreadService {
             self.db
                 .list_messages_by_level_from_parents(
                     thread_id,
+                    user_id,
                     &parent_ids,
                     req.start_level as i32,
                     depth as i32,

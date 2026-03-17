@@ -28,7 +28,8 @@ export class ThreadMessages {
 
 	treeLoadedEndLevel = 0;
 	treeLoading = $state(false);
-	treeHasMore = $state(true);
+	treeHasMore = $state(false);
+	treeLoadId = 0;
 }
 
 export type ViewMode = 'list' | 'graph';
@@ -255,6 +256,7 @@ export class MessageService {
 		const entry = this.cache.get(threadId);
 		if (!entry) return;
 
+		const loadId = ++entry.treeLoadId;
 		entry.treeLoading = true;
 		try {
 			const response = await this.taurpc.thread.get_message_tree(
@@ -263,6 +265,7 @@ export class MessageService {
 				endLevel,
 				parentNodeIds,
 			);
+			if (entry.treeLoadId !== loadId) return;
 			if (startLevel === 0) {
 				entry.treeNodes = response.nodes;
 			} else {
@@ -273,15 +276,19 @@ export class MessageService {
 			entry.treeLoadedEndLevel = endLevel;
 			entry.treeHasMore = response.has_more;
 		} catch (error) {
+			if (entry.treeLoadId !== loadId) return;
 			console.error(`Failed to load tree nodes for thread ${threadId}:`, error);
 		} finally {
-			entry.treeLoading = false;
+			if (entry.treeLoadId === loadId) {
+				entry.treeLoading = false;
+			}
 		}
 	}
 
 	async loadMoreTreeLevels(threadId: string, count = TREE_LEVEL_PAGE_SIZE): Promise<void> {
 		const entry = this.cache.get(threadId);
 		if (!entry || entry.treeLoading || !entry.treeHasMore) return;
+		if (entry.treeNodes.length === 0) return;
 
 		const maxLevel = entry.treeLoadedEndLevel;
 		const boundaryIds = entry.treeNodes

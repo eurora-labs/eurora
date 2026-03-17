@@ -123,12 +123,8 @@
 		try {
 			await messageService.navigateToMessage(threadId, messageId);
 			await tick();
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					const el = document.querySelector(`[data-message-id="${messageId}"]`);
-					el?.scrollIntoView({ behavior: 'auto', block: 'center' });
-				});
-			});
+			const el = document.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
+			el?.scrollIntoView({ behavior: 'auto', block: 'center' });
 		} catch (error) {
 			toast.error(`Failed to navigate to message: ${error}`);
 		}
