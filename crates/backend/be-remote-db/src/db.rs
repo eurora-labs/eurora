@@ -1375,6 +1375,7 @@ impl DatabaseManager {
     pub async fn list_messages_by_level_from_parents(
         &self,
         thread_id: Uuid,
+        user_id: Uuid,
         parent_ids: &[Uuid],
         start_level: i32,
         depth_limit: i32,
@@ -1388,8 +1389,9 @@ impl DatabaseManager {
                        m.created_at,
                        0 AS depth
                 FROM messages m
-                WHERE m.thread_id = $1
-                  AND m.parent_message_id = ANY($2)
+                JOIN threads t ON t.id = m.thread_id
+                WHERE m.thread_id = $1 AND t.user_id = $2
+                  AND m.parent_message_id = ANY($3)
 
                 UNION ALL
 
@@ -1400,7 +1402,7 @@ impl DatabaseManager {
                 FROM messages m
                 JOIN tree t ON m.parent_message_id = t.id
                 WHERE m.thread_id = $1
-                  AND t.depth + 1 <= $3
+                  AND t.depth + 1 <= $4
             ),
             visible AS (
                 SELECT id, parent_message_id, message_type, content,
@@ -1415,7 +1417,7 @@ impl DatabaseManager {
             numbered AS (
                 SELECT v.id, v.parent_message_id, v.message_type, v.content,
                        v.additional_kwargs, v.reasoning_blocks, v.created_at,
-                       $4 + DENSE_RANK() OVER (ORDER BY v.depth) - 1 AS level
+                       $5 + DENSE_RANK() OVER (ORDER BY v.depth) - 1 AS level
                 FROM visible v
                 WHERE v.rn = 1
             ),
@@ -1444,6 +1446,7 @@ impl DatabaseManager {
             "#,
         )
         .bind(thread_id)
+        .bind(user_id)
         .bind(parent_ids)
         .bind(peek_depth)
         .bind(start_level)
