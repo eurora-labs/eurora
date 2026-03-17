@@ -17,8 +17,9 @@ use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
     AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
     CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
-    GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, SwitchBranchRequest, Thread,
+    GenerateThreadTitleResponse, GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest,
+    GetMessagesResponse, GetThreadResponse, ListThreadsRequest, ListThreadsResponse,
+    MessageSiblingInfo, MessageTreeNode, SwitchBranchRequest, Thread,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -985,5 +986,71 @@ impl ProtoThreadService for ThreadService {
             messages: messages.into_iter().map(|m| m.into()).collect(),
             sibling_info,
         }))
+    }
+
+    async fn get_message_tree(
+        &self,
+        request: Request<GetMessageTreeRequest>,
+    ) -> Result<Response<GetMessageTreeResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
+                source: e,
+            })?;
+
+        let nodes = self
+            .db
+            .list_messages_by_level(
+                thread_id,
+                user_id,
+                req.start_level as i32,
+                req.end_level as i32,
+            )
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let tree_nodes = nodes
+            .into_iter()
+            .map(|n| {
+                let content = if let Some(text) = n.content.as_str() {
+                    text.to_string()
+                } else {
+                    serde_json::to_string(&n.content).unwrap_or_default()
+                };
+
+                let additional_kwargs = if n.additional_kwargs.is_null()
+                    || n.additional_kwargs
+                        .as_object()
+                        .is_some_and(|o| o.is_empty())
+                {
+                    None
+                } else {
+                    Some(serde_json::to_string(&n.additional_kwargs).unwrap_or_default())
+                };
+
+                let reasoning_blocks = n
+                    .reasoning_blocks
+                    .filter(|v| !v.is_null())
+                    .map(|v| serde_json::to_string(&v).unwrap_or_default());
+
+                MessageTreeNode {
+                    id: n.id.to_string(),
+                    parent_message_id: n.parent_message_id.map(|id| id.to_string()),
+                    message_type: n.message_type.to_string(),
+                    content,
+                    level: n.level as u32,
+                    sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
+                    sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
+                    additional_kwargs,
+                    reasoning_blocks,
+                }
+            })
+            .collect();
+
+        Ok(Response::new(GetMessageTreeResponse { nodes: tree_nodes }))
     }
 }

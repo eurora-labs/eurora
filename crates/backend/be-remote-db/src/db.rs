@@ -1281,6 +1281,91 @@ impl DatabaseManager {
         Ok(messages)
     }
 
+    pub async fn list_messages_by_level(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+        start_level: i32,
+        end_level: i32,
+    ) -> DbResult<Vec<crate::types::MessageTreeNode>> {
+        let rows = sqlx::query_as::<_, crate::types::MessageTreeNode>(
+            r#"
+            WITH RECURSIVE tree AS (
+                SELECT m.id, m.parent_message_id, m.message_type, m.content,
+                       m.additional_kwargs, m.reasoning_blocks, m.hidden_from_ui,
+                       m.created_at,
+                       0 AS depth
+                FROM messages m
+                JOIN threads t ON t.id = m.thread_id
+                WHERE m.thread_id = $1 AND t.user_id = $2
+                  AND m.parent_message_id IS NULL
+
+                UNION ALL
+
+                SELECT m.id, m.parent_message_id, m.message_type, m.content,
+                       m.additional_kwargs, m.reasoning_blocks, m.hidden_from_ui,
+                       m.created_at,
+                       t.depth + 1
+                FROM messages m
+                JOIN tree t ON m.parent_message_id = t.id
+                WHERE m.thread_id = $1
+            ),
+            visible AS (
+                SELECT id, parent_message_id, message_type, content,
+                       additional_kwargs, reasoning_blocks, created_at,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY id ORDER BY depth
+                       ) AS rn,
+                       depth
+                FROM tree
+                WHERE hidden_from_ui = false
+            ),
+            numbered AS (
+                SELECT v.id, v.parent_message_id, v.message_type, v.content,
+                       v.additional_kwargs, v.reasoning_blocks, v.created_at,
+                       v.depth,
+                       DENSE_RANK() OVER (ORDER BY v.depth) - 1 AS level
+                FROM visible v
+                WHERE v.rn = 1
+            ),
+            with_siblings AS (
+                SELECT
+                    n.id,
+                    CASE WHEN p.id IS NOT NULL THEN n.parent_message_id ELSE NULL END AS parent_message_id,
+                    n.message_type,
+                    n.content,
+                    n.additional_kwargs,
+                    n.reasoning_blocks,
+                    n.level,
+                    COUNT(*) OVER (
+                        PARTITION BY CASE WHEN p.id IS NOT NULL THEN n.parent_message_id ELSE NULL END
+                    ) AS sibling_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY CASE WHEN p.id IS NOT NULL THEN n.parent_message_id ELSE NULL END
+                        ORDER BY n.created_at, n.id
+                    ) - 1 AS sibling_index
+                FROM numbered n
+                LEFT JOIN numbered p ON p.id = n.parent_message_id
+            )
+            SELECT id, parent_message_id, message_type, content,
+                   additional_kwargs, reasoning_blocks,
+                   level::int4 AS level,
+                   sibling_count, sibling_index
+            FROM with_siblings
+            WHERE level >= $3 AND level <= $4
+            ORDER BY level, sibling_index
+            "#,
+        )
+        .bind(thread_id)
+        .bind(user_id)
+        .bind(start_level)
+        .bind(end_level)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
+    }
+
     #[builder]
     pub async fn try_claim_webhook_event<'e, E>(
         &self,

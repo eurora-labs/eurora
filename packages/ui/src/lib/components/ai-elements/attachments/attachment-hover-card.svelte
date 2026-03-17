@@ -1,10 +1,11 @@
 <script lang="ts">
 	import * as HoverCard from '$lib/components/hover-card/index.js';
+	import type { Snippet } from 'svelte';
 
 	interface Props {
 		openDelay?: number;
 		closeDelay?: number;
-		children?: import('svelte').Snippet;
+		children?: Snippet;
 	}
 
 	let { openDelay = 0, closeDelay = 0, children, ...restProps }: Props = $props();

@@ -37,6 +37,19 @@ pub struct MessageView {
     pub assets: Option<Vec<MessageAssetChip>>,
 }
 
+#[taurpc::ipc_type]
+pub struct MessageTreeNodeView {
+    pub id: String,
+    pub parent_message_id: Option<String>,
+    pub message_type: String,
+    pub content: String,
+    pub level: u32,
+    pub sibling_count: u32,
+    pub sibling_index: u32,
+    pub assets: Option<Vec<MessageAssetChip>>,
+    pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
+}
+
 #[taurpc::procedures(path = "thread")]
 pub trait ThreadApi {
     #[taurpc(event)]
@@ -69,6 +82,13 @@ pub trait ThreadApi {
         message_id: String,
         direction: i32,
     ) -> Result<Vec<MessageView>, String>;
+
+    async fn get_message_tree<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        start_level: u32,
+        end_level: u32,
+    ) -> Result<Vec<MessageTreeNodeView>, String>;
 
     async fn generate_title<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -190,6 +210,94 @@ impl ThreadApi for ThreadApiImpl {
             .map_err(|e| e.to_string())?;
 
         Ok(convert_response(response))
+    }
+
+    async fn get_message_tree<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        start_level: u32,
+        end_level: u32,
+    ) -> Result<Vec<MessageTreeNodeView>, String> {
+        let thread_state = thread_manager(&app_handle)?;
+        let thread_manager = thread_state.lock().await;
+        let response = thread_manager
+            .get_message_tree(thread_id, start_level, end_level)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(response
+            .nodes
+            .into_iter()
+            .map(|n| {
+                let assets = n
+                    .additional_kwargs
+                    .as_ref()
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                    .and_then(|v| {
+                        let chips = v.get("asset_chips")?.as_array()?;
+                        let result: Vec<MessageAssetChip> = chips
+                            .iter()
+                            .filter_map(|chip| {
+                                let id = chip.get("id")?.as_str()?.to_string();
+                                let name = chip.get("name")?.as_str()?.to_string();
+                                let icon =
+                                    chip.get("icon").and_then(|v| v.as_str()).map(String::from);
+                                Some(MessageAssetChip { id, name, icon })
+                            })
+                            .collect();
+                        if result.is_empty() {
+                            None
+                        } else {
+                            Some(result)
+                        }
+                    });
+
+                let reasoning_blocks = n
+                    .reasoning_blocks
+                    .as_ref()
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                    .and_then(|v| {
+                        let blocks = v.as_array()?;
+                        let result: Vec<ReasoningBlock> = blocks
+                            .iter()
+                            .filter_map(|block| {
+                                let block_type = block.get("type")?.as_str()?.to_string();
+                                let content = block
+                                    .get("content")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from);
+                                let signature = block
+                                    .get("signature")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from);
+                                Some(ReasoningBlock {
+                                    r#type: block_type,
+                                    content,
+                                    signature,
+                                })
+                            })
+                            .collect();
+                        if result.is_empty() {
+                            None
+                        } else {
+                            Some(result)
+                        }
+                    });
+
+                MessageTreeNodeView {
+                    id: n.id,
+                    parent_message_id: n.parent_message_id,
+                    message_type: n.message_type,
+                    content: n.content,
+                    level: n.level,
+                    sibling_count: n.sibling_count,
+                    sibling_index: n.sibling_index,
+                    assets,
+                    reasoning_blocks,
+                }
+            })
+            .collect())
     }
 
     async fn generate_title<R: Runtime>(
