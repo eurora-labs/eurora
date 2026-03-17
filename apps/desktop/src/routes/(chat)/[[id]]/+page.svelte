@@ -201,6 +201,7 @@
 		if (!text) return;
 
 		const parentId = editingIndex > 0 ? (messages[editingIndex - 1]?.id ?? '') : '';
+		const assetChips = messages[editingIndex]?.assets ?? [];
 
 		chatStatus = 'submitted';
 		const idx = editingIndex;
@@ -208,7 +209,7 @@
 		editText = '';
 
 		messageService
-			.editMessage(threadId, idx, text, parentId)
+			.editMessage(threadId, idx, text, parentId, assetChips)
 			.catch((error) => handleQueryError(error));
 	}
 
