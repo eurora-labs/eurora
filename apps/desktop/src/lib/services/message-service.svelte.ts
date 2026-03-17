@@ -192,6 +192,7 @@ export class MessageService {
 		editIndex: number,
 		newText: string,
 		parentMessageId: string | null,
+		assetChips: MessageAssetChip[] = [],
 	): Promise<void> {
 		const entry = this.cache.get(threadId);
 		if (!entry) return;
@@ -203,10 +204,10 @@ export class MessageService {
 
 		const query: Query = {
 			text: newText,
-			assets: [],
+			assets: assetChips.map((a) => a.id),
 			parent_message_id: parentMessageId,
 		};
-		await this.sendMessage(threadId, query);
+		await this.sendMessage(threadId, query, assetChips);
 	}
 
 	async switchBranch(threadId: string, messageId: string, direction: number): Promise<void> {

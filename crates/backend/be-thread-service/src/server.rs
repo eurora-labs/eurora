@@ -484,15 +484,27 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        // If the user edits the root message, we still need to handle the edit.
-        // That is why we call set_active_leaf even if parent_id is not a valid UUID.
-        // parent_id would not be a valid UUID if the user is editing the root message.
         if is_edit {
+            let effective_parent = if parent_id.is_some() {
+                parent_id
+            } else {
+                let first_visible = self
+                    .db
+                    .list_messages()
+                    .thread_id(thread_id)
+                    .user_id(user_id)
+                    .include_hidden(false)
+                    .params(PaginationParams::new(0, 1, "ASC".to_string()))
+                    .call()
+                    .await
+                    .map_err(ThreadServiceError::from)?;
+                first_visible.first().and_then(|msg| msg.parent_message_id)
+            };
             self.db
                 .set_active_leaf()
                 .id(thread_id)
                 .user_id(user_id)
-                .maybe_active_leaf_id(parent_id)
+                .maybe_active_leaf_id(effective_parent)
                 .call()
                 .await
                 .map_err(ThreadServiceError::from)?;
