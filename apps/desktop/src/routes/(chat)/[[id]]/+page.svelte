@@ -83,6 +83,8 @@
 	const threadData = $derived(threadId ? messageService.getThread(threadId) : null);
 	const messages = $derived(threadData?.messages ?? []);
 	const treeNodes = $derived(threadData?.treeNodes ?? []);
+	const treeHasMore = $derived(threadData?.treeHasMore ?? false);
+	const treeLoading = $derived(threadData?.treeLoading ?? false);
 	const reasoningData = $derived(threadData?.reasoningData ?? {});
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
 
@@ -96,9 +98,14 @@
 
 	$effect(() => {
 		if (messageService.viewMode === 'graph' && threadId) {
-			messageService.loadTreeNodes(threadId, 0, 50);
+			messageService.loadTreeNodes(threadId);
 		}
 	});
+
+	function handleLoadMoreLevels() {
+		if (!threadId) return;
+		messageService.loadMoreTreeLevels(threadId);
+	}
 
 	onDestroy(() => {
 		messageService.viewModeVisible = false;
@@ -317,7 +324,10 @@
 			<MessageGraph
 				{treeNodes}
 				{activeMessageIds}
+				hasMoreLevels={treeHasMore}
+				loadingMoreLevels={treeLoading}
 				onmessagedblclick={handleGraphNodeDblClick}
+				onloadmorelevels={handleLoadMoreLevels}
 			/>
 		</div>
 	{:else}

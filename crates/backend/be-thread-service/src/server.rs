@@ -1003,18 +1003,41 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        let nodes = self
-            .db
-            .list_messages_by_level(
-                thread_id,
-                user_id,
-                req.start_level as i32,
-                req.end_level as i32,
-            )
-            .await
-            .map_err(ThreadServiceError::from)?;
+        let result = if req.parent_node_ids.is_empty() {
+            self.db
+                .list_messages_by_level(
+                    thread_id,
+                    user_id,
+                    req.start_level as i32,
+                    req.end_level as i32,
+                )
+                .await
+                .map_err(ThreadServiceError::from)?
+        } else {
+            let parent_ids: Vec<Uuid> = req
+                .parent_node_ids
+                .iter()
+                .map(|id| Uuid::parse_str(id))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| ThreadServiceError::InvalidUuid {
+                    field: "parent_node_ids",
+                    source: e,
+                })?;
+            let depth = req.end_level.saturating_sub(req.start_level) + 1;
+            self.db
+                .list_messages_by_level_from_parents(
+                    thread_id,
+                    &parent_ids,
+                    req.start_level as i32,
+                    depth as i32,
+                )
+                .await
+                .map_err(ThreadServiceError::from)?
+        };
 
-        let tree_nodes = nodes
+        let has_more = result.has_more;
+        let tree_nodes = result
+            .nodes
             .into_iter()
             .map(|n| {
                 let content = if let Some(text) = n.content.as_str() {
@@ -1052,6 +1075,9 @@ impl ProtoThreadService for ThreadService {
             })
             .collect();
 
-        Ok(Response::new(GetMessageTreeResponse { nodes: tree_nodes }))
+        Ok(Response::new(GetMessageTreeResponse {
+            nodes: tree_nodes,
+            has_more,
+        }))
     }
 }

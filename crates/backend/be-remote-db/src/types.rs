@@ -288,6 +288,11 @@ pub struct MessageTreeNode {
     pub sibling_index: i64,
 }
 
+pub struct MessageTreeResult {
+    pub nodes: Vec<MessageTreeNode>,
+    pub has_more: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ActivityThread {
     pub activity_id: Uuid,

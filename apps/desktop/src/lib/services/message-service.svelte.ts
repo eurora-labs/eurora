@@ -9,6 +9,7 @@ import type {
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 const PAGE_SIZE = 50;
+const TREE_LEVEL_PAGE_SIZE = 5;
 
 interface ReasoningData {
 	content: string;
@@ -24,6 +25,10 @@ export class ThreadMessages {
 	hasMore = $state(true);
 	offset = 0;
 	streaming = $state(false);
+
+	treeLoadedEndLevel = 0;
+	treeLoading = $state(false);
+	treeHasMore = $state(true);
 }
 
 export type ViewMode = 'list' | 'graph';
@@ -241,25 +246,58 @@ export class MessageService {
 		this.viewMode = 'list';
 	}
 
-	async loadTreeNodes(threadId: string, startLevel = 0, endLevel = 50): Promise<void> {
+	async loadTreeNodes(
+		threadId: string,
+		startLevel = 0,
+		endLevel = TREE_LEVEL_PAGE_SIZE - 1,
+		parentNodeIds: string[] = [],
+	): Promise<void> {
 		const entry = this.cache.get(threadId);
 		if (!entry) return;
 
+		entry.treeLoading = true;
 		try {
-			entry.treeNodes = await this.taurpc.thread.get_message_tree(
+			const response = await this.taurpc.thread.get_message_tree(
 				threadId,
 				startLevel,
 				endLevel,
+				parentNodeIds,
 			);
+			if (startLevel === 0) {
+				entry.treeNodes = response.nodes;
+			} else {
+				const existingIds = new Set(entry.treeNodes.map((n) => n.id));
+				const newNodes = response.nodes.filter((n) => !existingIds.has(n.id));
+				entry.treeNodes = [...entry.treeNodes, ...newNodes];
+			}
+			entry.treeLoadedEndLevel = endLevel;
+			entry.treeHasMore = response.has_more;
 		} catch (error) {
 			console.error(`Failed to load tree nodes for thread ${threadId}:`, error);
+		} finally {
+			entry.treeLoading = false;
 		}
 	}
 
+	async loadMoreTreeLevels(threadId: string, count = TREE_LEVEL_PAGE_SIZE): Promise<void> {
+		const entry = this.cache.get(threadId);
+		if (!entry || entry.treeLoading || !entry.treeHasMore) return;
+
+		const maxLevel = entry.treeLoadedEndLevel;
+		const boundaryIds = entry.treeNodes
+			.filter((n) => n.level === maxLevel)
+			.map((n) => n.id);
+
+		const startLevel = maxLevel + 1;
+		const endLevel = startLevel + count - 1;
+		await this.loadTreeNodes(threadId, startLevel, endLevel, boundaryIds);
+	}
+
 	private refreshTreeIfNeeded(threadId: string): void {
-		if (this.viewMode === 'graph') {
-			this.loadTreeNodes(threadId);
-		}
+		if (this.viewMode !== 'graph') return;
+		const entry = this.cache.get(threadId);
+		if (!entry) return;
+		this.loadTreeNodes(threadId, 0, Math.max(entry.treeLoadedEndLevel, TREE_LEVEL_PAGE_SIZE - 1));
 	}
 
 	isStreaming(threadId: string): boolean {

@@ -50,6 +50,12 @@ pub struct MessageTreeNodeView {
     pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
 }
 
+#[taurpc::ipc_type]
+pub struct MessageTreeResponse {
+    pub nodes: Vec<MessageTreeNodeView>,
+    pub has_more: bool,
+}
+
 #[taurpc::procedures(path = "thread")]
 pub trait ThreadApi {
     #[taurpc(event)]
@@ -88,7 +94,8 @@ pub trait ThreadApi {
         thread_id: String,
         start_level: u32,
         end_level: u32,
-    ) -> Result<Vec<MessageTreeNodeView>, String>;
+        parent_node_ids: Vec<String>,
+    ) -> Result<MessageTreeResponse, String>;
 
     async fn generate_title<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -218,15 +225,16 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         start_level: u32,
         end_level: u32,
-    ) -> Result<Vec<MessageTreeNodeView>, String> {
+        parent_node_ids: Vec<String>,
+    ) -> Result<MessageTreeResponse, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let response = thread_manager
-            .get_message_tree(thread_id, start_level, end_level)
+            .get_message_tree(thread_id, start_level, end_level, parent_node_ids)
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(response
+        let nodes = response
             .nodes
             .into_iter()
             .map(|n| {
@@ -297,7 +305,12 @@ impl ThreadApi for ThreadApiImpl {
                     reasoning_blocks,
                 }
             })
-            .collect())
+            .collect();
+
+        Ok(MessageTreeResponse {
+            nodes,
+            has_more: response.has_more,
+        })
     }
 
     async fn generate_title<R: Runtime>(
