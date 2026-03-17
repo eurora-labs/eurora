@@ -20,6 +20,13 @@ pub struct ReasoningBlock {
 }
 
 #[taurpc::ipc_type]
+pub struct MessageAssetChip {
+    pub id: String,
+    pub name: String,
+    pub icon: Option<String>,
+}
+
+#[taurpc::ipc_type]
 pub struct MessageView {
     pub id: Option<String>,
     pub role: String,
@@ -27,6 +34,7 @@ pub struct MessageView {
     pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
     pub sibling_count: u32,
     pub sibling_index: u32,
+    pub assets: Option<Vec<MessageAssetChip>>,
 }
 
 #[taurpc::procedures(path = "thread")]
@@ -98,6 +106,7 @@ fn convert_response(response: GetMessagesResponse) -> Vec<MessageView> {
                     .copied()
                     .unwrap_or((1, 0));
                 let reasoning_blocks = extract_reasoning_blocks(&message);
+                let assets = extract_asset_chips(&message);
                 Some(MessageView {
                     id,
                     role: message.message_type().to_string(),
@@ -105,6 +114,7 @@ fn convert_response(response: GetMessagesResponse) -> Vec<MessageView> {
                     reasoning_blocks,
                     sibling_count,
                     sibling_index,
+                    assets,
                 })
             }
         })
@@ -213,6 +223,25 @@ impl From<&Thread> for ThreadView {
             id: thread.id().map(|id| id.to_string()),
             title: thread.title().to_string(),
         }
+    }
+}
+
+fn extract_asset_chips(message: &AnyMessage) -> Option<Vec<MessageAssetChip>> {
+    let kwargs = message.additional_kwargs();
+    let chips = kwargs.get("asset_chips")?.as_array()?;
+    let result: Vec<MessageAssetChip> = chips
+        .iter()
+        .filter_map(|chip| {
+            let id = chip.get("id")?.as_str()?.to_string();
+            let name = chip.get("name")?.as_str()?.to_string();
+            let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
+            Some(MessageAssetChip { id, name, icon })
+        })
+        .collect();
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
     }
 }
 
