@@ -309,11 +309,7 @@ impl ProtoThreadService for ThreadService {
             .db
             .list_threads()
             .user_id(user_id)
-            .params(PaginationParams::new(
-                req.offset,
-                req.limit,
-                "DESC".to_string(),
-            ))
+            .params(PaginationParams::new(req.offset, req.limit, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -495,7 +491,7 @@ impl ProtoThreadService for ThreadService {
                     .thread_id(thread_id)
                     .user_id(user_id)
                     .include_hidden(false)
-                    .params(PaginationParams::new(0, 1, "ASC".to_string()))
+                    .params(PaginationParams::new(0, 1, "ASC"))
                     .call()
                     .await
                     .map_err(ThreadServiceError::from)?;
@@ -519,7 +515,7 @@ impl ProtoThreadService for ThreadService {
             .thread_id(thread_id)
             .user_id(user_id)
             .include_visible(false)
-            .params(PaginationParams::new(0, 2, "DESC".to_string()))
+            .params(PaginationParams::new(0, 2, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -532,7 +528,7 @@ impl ProtoThreadService for ThreadService {
             .thread_id(thread_id)
             .user_id(user_id)
             .include_hidden(false)
-            .params(PaginationParams::new(0, 3, "DESC".to_string()))
+            .params(PaginationParams::new(0, 3, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -748,11 +744,7 @@ impl ProtoThreadService for ThreadService {
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .params(PaginationParams::new(
-                req.offset,
-                req.limit,
-                "ASC".to_string(),
-            ))
+            .params(PaginationParams::new(req.offset, req.limit, "ASC"))
             .include_hidden(false)
             .call()
             .await
@@ -835,7 +827,7 @@ impl ProtoThreadService for ThreadService {
             .user_id(user_id)
             .include_hidden(true)
             .include_visible(false)
-            .params(PaginationParams::new(0, 2, "DESC".to_string()))
+            .params(PaginationParams::new(0, 2, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -957,7 +949,7 @@ impl ProtoThreadService for ThreadService {
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .params(PaginationParams::new(0, 100, "ASC".to_string()))
+            .params(PaginationParams::new(0, 100, "ASC"))
             .include_hidden(false)
             .call()
             .await

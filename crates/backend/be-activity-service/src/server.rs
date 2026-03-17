@@ -94,11 +94,7 @@ impl ProtoActivityService for ActivityService {
             .db
             .list_activities()
             .user_id(user_id)
-            .params(PaginationParams::new(
-                req.offset,
-                req.limit,
-                "DESC".to_string(),
-            ))
+            .params(PaginationParams::new(req.offset, req.limit, "DESC"))
             .call()
             .await
             .map_err(ActivityServiceError::from)?;

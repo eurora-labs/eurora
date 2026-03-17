@@ -2,8 +2,6 @@ mod error;
 
 pub use error::{StorageError, StorageResult};
 
-use std::sync::Arc;
-
 use bon::bon;
 use opendal::{Operator, services};
 use secrecy::{ExposeSecret, SecretString};
