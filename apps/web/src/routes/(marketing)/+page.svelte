@@ -92,7 +92,7 @@
 					>Eurora — one application — every platform</FeatureSection.Title
 				>
 				<FeatureSection.Subtitle>
-					Native MacOS, Windows, and Linux. Browser extensions include: Chrome, Firefox,
+					Native macOS, Windows, and Linux. Browser extensions include: Chrome, Firefox,
 					Edge, Safari and all other browsers. Your preferences, your history, and your AI
 					— always with you, always in sync, always accessible, always private.
 				</FeatureSection.Subtitle>
