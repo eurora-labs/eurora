@@ -1003,14 +1003,13 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
+        const MAX_TREE_DEPTH: u32 = 100;
+        let start_level = req.start_level.min(MAX_TREE_DEPTH);
+        let end_level = req.end_level.min(MAX_TREE_DEPTH);
+
         let result = if req.parent_node_ids.is_empty() {
             self.db
-                .list_messages_by_level(
-                    thread_id,
-                    user_id,
-                    req.start_level as i32,
-                    req.end_level as i32,
-                )
+                .list_messages_by_level(thread_id, user_id, start_level as i32, end_level as i32)
                 .await
                 .map_err(ThreadServiceError::from)?
         } else {
@@ -1023,13 +1022,13 @@ impl ProtoThreadService for ThreadService {
                     field: "parent_node_ids",
                     source: e,
                 })?;
-            let depth = req.end_level.saturating_sub(req.start_level) + 1;
+            let depth = end_level.saturating_sub(start_level) + 1;
             self.db
                 .list_messages_by_level_from_parents(
                     thread_id,
                     user_id,
                     &parent_ids,
-                    req.start_level as i32,
+                    start_level as i32,
                     depth as i32,
                 )
                 .await
