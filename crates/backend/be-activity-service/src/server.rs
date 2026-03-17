@@ -183,7 +183,9 @@ impl ProtoActivityService for ActivityService {
                     .await
                 {
                     Ok(icon_response) => match icon_response.asset {
-                        Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
+                        Some(asset) => Some(Uuid::parse_str(&asset.id).map_err(|e| {
+                            Status::from(ActivityServiceError::invalid_uuid("icon_asset_id", e))
+                        })?),
                         None => None,
                     },
                     Err(e) => {
