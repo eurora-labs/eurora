@@ -37,6 +37,25 @@ pub struct MessageView {
     pub assets: Option<Vec<MessageAssetChip>>,
 }
 
+#[taurpc::ipc_type]
+pub struct MessageTreeNodeView {
+    pub id: String,
+    pub parent_message_id: Option<String>,
+    pub message_type: String,
+    pub content: String,
+    pub level: u32,
+    pub sibling_count: u32,
+    pub sibling_index: u32,
+    pub assets: Option<Vec<MessageAssetChip>>,
+    pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
+}
+
+#[taurpc::ipc_type]
+pub struct MessageTreeResponse {
+    pub nodes: Vec<MessageTreeNodeView>,
+    pub has_more: bool,
+}
+
 #[taurpc::procedures(path = "thread")]
 pub trait ThreadApi {
     #[taurpc(event)]
@@ -69,6 +88,14 @@ pub trait ThreadApi {
         message_id: String,
         direction: i32,
     ) -> Result<Vec<MessageView>, String>;
+
+    async fn get_message_tree<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        start_level: u32,
+        end_level: u32,
+        parent_node_ids: Vec<String>,
+    ) -> Result<MessageTreeResponse, String>;
 
     async fn generate_title<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -192,6 +219,48 @@ impl ThreadApi for ThreadApiImpl {
         Ok(convert_response(response))
     }
 
+    async fn get_message_tree<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        start_level: u32,
+        end_level: u32,
+        parent_node_ids: Vec<String>,
+    ) -> Result<MessageTreeResponse, String> {
+        let thread_state = thread_manager(&app_handle)?;
+        let thread_manager = thread_state.lock().await;
+        let response = thread_manager
+            .get_message_tree(thread_id, start_level, end_level, parent_node_ids)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        let nodes = response
+            .nodes
+            .into_iter()
+            .map(|n| {
+                let assets = parse_asset_chips_from_json(&n.additional_kwargs);
+                let reasoning_blocks = parse_reasoning_blocks_from_json(&n.reasoning_blocks);
+
+                MessageTreeNodeView {
+                    id: n.id,
+                    parent_message_id: n.parent_message_id,
+                    message_type: n.message_type,
+                    content: n.content,
+                    level: n.level,
+                    sibling_count: n.sibling_count,
+                    sibling_index: n.sibling_index,
+                    assets,
+                    reasoning_blocks,
+                }
+            })
+            .collect();
+
+        Ok(MessageTreeResponse {
+            nodes,
+            has_more: response.has_more,
+        })
+    }
+
     async fn generate_title<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
@@ -223,6 +292,54 @@ impl From<&Thread> for ThreadView {
             id: thread.id().map(|id| id.to_string()),
             title: thread.title().to_string(),
         }
+    }
+}
+
+fn parse_asset_chips_from_json(json_str: &Option<String>) -> Option<Vec<MessageAssetChip>> {
+    let v = serde_json::from_str::<serde_json::Value>(json_str.as_ref()?).ok()?;
+    let chips = v.get("asset_chips")?.as_array()?;
+    let result: Vec<MessageAssetChip> = chips
+        .iter()
+        .filter_map(|chip| {
+            let id = chip.get("id")?.as_str()?.to_string();
+            let name = chip.get("name")?.as_str()?.to_string();
+            let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
+            Some(MessageAssetChip { id, name, icon })
+        })
+        .collect();
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
+fn parse_reasoning_blocks_from_json(json_str: &Option<String>) -> Option<Vec<ReasoningBlock>> {
+    let v = serde_json::from_str::<serde_json::Value>(json_str.as_ref()?).ok()?;
+    let blocks = v.as_array()?;
+    let result: Vec<ReasoningBlock> = blocks
+        .iter()
+        .filter_map(|block| {
+            let block_type = block.get("type")?.as_str()?.to_string();
+            let content = block
+                .get("content")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let signature = block
+                .get("signature")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            Some(ReasoningBlock {
+                r#type: block_type,
+                content,
+                signature,
+            })
+        })
+        .collect();
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
     }
 }
 

@@ -7,9 +7,9 @@ use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
-    ChatStreamRequest, CreateThreadRequest, GenerateThreadTitleRequest, GetMessagesRequest,
-    GetMessagesResponse, GetThreadRequest, ListThreadsRequest, SwitchBranchRequest,
-    proto_thread_service_client::ProtoThreadServiceClient,
+    ChatStreamRequest, CreateThreadRequest, GenerateThreadTitleRequest, GetMessageTreeRequest,
+    GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadRequest,
+    ListThreadsRequest, SwitchBranchRequest, proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::watch;
@@ -116,6 +116,27 @@ impl ThreadManager {
                 thread_id,
                 message_id,
                 direction,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response)
+    }
+
+    pub async fn get_message_tree(
+        &self,
+        thread_id: String,
+        start_level: u32,
+        end_level: u32,
+        parent_node_ids: Vec<String>,
+    ) -> Result<GetMessageTreeResponse> {
+        let mut client = self.client();
+        let response = client
+            .get_message_tree(GetMessageTreeRequest {
+                thread_id,
+                start_level,
+                end_level,
+                parent_node_ids,
             })
             .await?
             .into_inner();
