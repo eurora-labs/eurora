@@ -17,8 +17,9 @@ use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
     AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
     CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
-    GenerateThreadTitleResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, SwitchBranchRequest, Thread,
+    GenerateThreadTitleResponse, GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest,
+    GetMessagesResponse, GetThreadResponse, ListThreadsRequest, ListThreadsResponse,
+    MessageSiblingInfo, MessageTreeNode, SwitchBranchRequest, Thread,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -919,25 +920,26 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        if req.direction != -1 && req.direction != 1 {
-            return Err(Status::invalid_argument("direction must be -1 or 1"));
-        }
-
-        let sibling_id = self
-            .db
-            .get_adjacent_sibling()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_id(message_id)
-            .direction(req.direction)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?
-            .ok_or_else(|| Status::not_found("No adjacent sibling found"))?;
+        let target_id = if req.direction == 0 {
+            message_id
+        } else if req.direction == -1 || req.direction == 1 {
+            self.db
+                .get_adjacent_sibling()
+                .thread_id(thread_id)
+                .user_id(user_id)
+                .message_id(message_id)
+                .direction(req.direction)
+                .call()
+                .await
+                .map_err(ThreadServiceError::from)?
+                .ok_or_else(|| Status::not_found("No adjacent sibling found"))?
+        } else {
+            return Err(Status::invalid_argument("direction must be -1, 0, or 1"));
+        };
 
         let new_leaf = self
             .db
-            .find_deepest_leaf(thread_id, user_id, sibling_id)
+            .find_deepest_leaf(thread_id, user_id, target_id)
             .await
             .map_err(ThreadServiceError::from)?;
 
@@ -984,6 +986,98 @@ impl ProtoThreadService for ThreadService {
         Ok(Response::new(GetMessagesResponse {
             messages: messages.into_iter().map(|m| m.into()).collect(),
             sibling_info,
+        }))
+    }
+
+    async fn get_message_tree(
+        &self,
+        request: Request<GetMessageTreeRequest>,
+    ) -> Result<Response<GetMessageTreeResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
+                source: e,
+            })?;
+
+        const MAX_TREE_DEPTH: u32 = 100;
+        let start_level = req.start_level.min(MAX_TREE_DEPTH);
+        let end_level = req.end_level.min(MAX_TREE_DEPTH);
+
+        let result = if req.parent_node_ids.is_empty() {
+            self.db
+                .list_messages_by_level(thread_id, user_id, start_level as i32, end_level as i32)
+                .await
+                .map_err(ThreadServiceError::from)?
+        } else {
+            let parent_ids: Vec<Uuid> = req
+                .parent_node_ids
+                .iter()
+                .map(|id| Uuid::parse_str(id))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| ThreadServiceError::InvalidUuid {
+                    field: "parent_node_ids",
+                    source: e,
+                })?;
+            let depth = end_level.saturating_sub(start_level) + 1;
+            self.db
+                .list_messages_by_level_from_parents(
+                    thread_id,
+                    user_id,
+                    &parent_ids,
+                    start_level as i32,
+                    depth as i32,
+                )
+                .await
+                .map_err(ThreadServiceError::from)?
+        };
+
+        let has_more = result.has_more;
+        let tree_nodes = result
+            .nodes
+            .into_iter()
+            .map(|n| {
+                let content = if let Some(text) = n.content.as_str() {
+                    text.to_string()
+                } else {
+                    serde_json::to_string(&n.content).unwrap_or_default()
+                };
+
+                let additional_kwargs = if n.additional_kwargs.is_null()
+                    || n.additional_kwargs
+                        .as_object()
+                        .is_some_and(|o| o.is_empty())
+                {
+                    None
+                } else {
+                    Some(serde_json::to_string(&n.additional_kwargs).unwrap_or_default())
+                };
+
+                let reasoning_blocks = n
+                    .reasoning_blocks
+                    .filter(|v| !v.is_null())
+                    .map(|v| serde_json::to_string(&v).unwrap_or_default());
+
+                MessageTreeNode {
+                    id: n.id.to_string(),
+                    parent_message_id: n.parent_message_id.map(|id| id.to_string()),
+                    message_type: n.message_type.to_string(),
+                    content,
+                    level: n.level as u32,
+                    sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
+                    sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
+                    additional_kwargs,
+                    reasoning_blocks,
+                }
+            })
+            .collect();
+
+        Ok(Response::new(GetMessageTreeResponse {
+            nodes: tree_nodes,
+            has_more,
         }))
     }
 }

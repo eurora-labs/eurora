@@ -1,39 +1,33 @@
 <script lang="ts">
-	import { BaseEdge, getBezierPath, useSvelteFlow, type EdgeProps } from '@xyflow/svelte';
-	import { getEdgeParams } from './edge-utils.js';
+	import { BaseEdge, getBezierPath, type EdgeProps } from '@xyflow/svelte';
 
-	let { id, source, target, markerEnd, style }: EdgeProps = $props();
+	let {
+		id,
+		sourceX,
+		sourceY,
+		targetX,
+		targetY,
+		sourcePosition,
+		targetPosition,
+		markerEnd,
+		style,
+	}: EdgeProps = $props();
 
-	const { getInternalNode } = useSvelteFlow();
-
-	let edgeParams = $derived.by(() => {
-		const sourceNode = getInternalNode(source);
-		const targetNode = getInternalNode(target);
-
-		if (!(sourceNode && targetNode)) {
-			return null;
-		}
-
-		return getEdgeParams(sourceNode, targetNode);
-	});
-
-	let edgePath = $derived.by(() => {
-		if (!edgeParams) return null;
-
-		return getBezierPath({
-			sourcePosition: edgeParams.sourcePos,
-			sourceX: edgeParams.sx,
-			sourceY: edgeParams.sy,
-			targetPosition: edgeParams.targetPos,
-			targetX: edgeParams.tx,
-			targetY: edgeParams.ty,
-		});
-	});
+	let [path] = $derived(
+		getBezierPath({
+			sourceX,
+			sourceY,
+			targetX,
+			targetY,
+			sourcePosition,
+			targetPosition,
+		}),
+	);
 </script>
 
-{#if edgePath}
-	<BaseEdge data-slot="edge-animated" {id} {markerEnd} path={edgePath[0]} {style} />
+{#if path}
+	<BaseEdge data-slot="edge-animated" {id} {markerEnd} {path} {style} />
 	<circle fill="var(--primary)" r="4">
-		<animateMotion dur="2s" path={edgePath[0]} repeatCount="indefinite" />
+		<animateMotion dur="2s" {path} repeatCount="indefinite" />
 	</circle>
 {/if}

@@ -1,11 +1,12 @@
 <script lang="ts">
 	import * as HoverCard from '$lib/components/hover-card/index.js';
 	import { cn } from '$lib/utils.js';
+	import type { Snippet } from 'svelte';
 
 	interface Props {
 		class?: string;
 		align?: 'start' | 'center' | 'end';
-		children?: import('svelte').Snippet;
+		children?: Snippet;
 	}
 
 	let { class: className, align = 'start', children, ...restProps }: Props = $props();
