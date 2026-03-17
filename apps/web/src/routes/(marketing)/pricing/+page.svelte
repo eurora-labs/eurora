@@ -50,7 +50,11 @@
 				</li>
 				<li class="flex items-center gap-2.5 text-base">
 					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
-					Unlimited storage
+					All data stored in a Sovereign European Data Center
+				</li>
+				<li class="flex items-center gap-2.5 text-base">
+					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+					No identifiable logs, fully private data storage
 				</li>
 				<li class="flex items-center gap-2.5 text-base">
 					<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
@@ -76,7 +80,7 @@
 					<span class="text-2xl text-orange-500">Recommended</span>
 				</div>
 				<p class="text-sm text-muted-foreground">
-					Fully private and secure European cloud AI
+					Fully private and secure European Cloud AI
 				</p>
 				<div>
 					<span class="text-5xl font-bold">€19.99</span>
@@ -97,15 +101,11 @@
 					</li>
 					<li class="flex items-center gap-2.5 text-base">
 						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
+						Unlimited storage
+					</li>
+					<li class="flex items-center gap-2.5 text-base">
+						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
 						Priority support
-					</li>
-					<li class="flex items-center gap-2.5 text-base">
-						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
-						All data stored in a Sovereign European Data Center
-					</li>
-					<li class="flex items-center gap-2.5 text-base">
-						<CheckIcon class="h-4 w-4 shrink-0 text-primary" />
-						No identifiable logs, fully private data storage
 					</li>
 				</ul>
 			</div>

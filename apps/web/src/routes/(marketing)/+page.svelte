@@ -1,6 +1,5 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
-	import VideoSection from '$lib/components/marketing/video-section.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
@@ -30,21 +29,16 @@
 <div class="mx-auto w-full max-w-7xl px-4">
 	<div class="flex flex-col items-start py-12 max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
-			Less typing, more answers.
+			Your AI Assistant fully integrated into your browser
 		</h1>
 		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
-			A private, open-source AI assistant that reads what you read. Ask questions about any
-			YouTube video, article, or tweet — Eurora captures the transcript, content, and metadata
-			so you don't have to copy-paste a thing.
+			<span class="text-foreground font-semibold">Less typing, more answers.</span>
+			A private, open-source AI assistant that reads what you read. Ask questions about any YouTube
+			video, article, or tweet — Eurora captures the transcript, content, and metadata so you don't
+			have to copy-paste a thing.
 		</p>
 		<div class="flex flex-col items-center gap-4 w-full md:flex-row md:items-start mt-16">
 			<DownloadButton class="h-24 w-full max-w-md" />
-			<div class="hidden md:block h-24 w-32 overflow-hidden rounded-xl shrink-0">
-				<AutoplayVideo
-					src="https://d26xptavrz5c8t.cloudfront.net/video/juice_demo.mp4"
-					class="h-full w-full object-cover"
-				/>
-			</div>
 		</div>
 	</div>
 
@@ -72,21 +66,15 @@
 		{/each}
 	</div>
 
-	<VideoSection
-		title="Seamless Integration"
-		subtitle="Eurora works in every browser across MacOS, Windows and Linux."
-		videoSrc="https://d26xptavrz5c8t.cloudfront.net/video/juice_demo.mp4"
-	></VideoSection>
-
 	<div class="flex flex-col gap-24 mt-24">
 		<FeatureSection.Root>
 			<FeatureSection.Header>
 				<FeatureSection.Title>AI On Your Own Terms</FeatureSection.Title>
 				<FeatureSection.Subtitle>
-					Get answers instantly, everywhere. Eurora works on your platform, with your
-					browser. All data is stored securely in a Soveign European data center.
-					Regardless of your location. Enjoy the highest standard of Data Protection and
-					Privacy.
+					Get answers instantly. Eurora works on your platform, with your browser. All
+					data is stored securely in a Sovereign European data center. Eurora provides
+					independence and accessibility with the highest standard of data protection and
+					privacy.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
 			<FeatureSection.Content class="overflow-hidden">
@@ -98,44 +86,17 @@
 			</FeatureSection.Content>
 		</FeatureSection.Root>
 
-		<FeatureSection.Root align="right">
-			<FeatureSection.Header>
-				<FeatureSection.Title>European Open Source AI Platform</FeatureSection.Title>
-				<FeatureSection.Subtitle>
-					Use it locally for free forever, or make use of secure European Cloud. We are
-					self-funded and would appreciate your subscription for just €10 for the first
-					month.
-				</FeatureSection.Subtitle>
-			</FeatureSection.Header>
-			<FeatureSection.Content class="overflow-hidden">
-				<p
-					class="flex items-center p-6 md:h-200 text-lg leading-relaxed text-muted-foreground sm:p-10 sm:text-xl lg:p-14"
-				>
-					We are fully Open Source. Every single line of code is available for you to see.
-					You do not have to trust us. We do everything we can to provide you with the
-					highest standard of security and privacy. And if that is not enough, we will
-					support you fully in running Eurora fully locally.
-				</p>
-			</FeatureSection.Content>
-		</FeatureSection.Root>
-
 		<FeatureSection.Root>
 			<FeatureSection.Header>
-				<FeatureSection.Title></FeatureSection.Title>
+				<FeatureSection.Title
+					>Eurora — one application — every platform</FeatureSection.Title
+				>
 				<FeatureSection.Subtitle>
-					One app. Every platform. No compromises.
+					Native macOS, Windows, and Linux. Browser extensions include: Chrome, Firefox,
+					Edge, Safari and all other browsers. Your preferences, your history, and your AI
+					— always with you, always in sync, always accessible, always private.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
-			<FeatureSection.Content>
-				<p
-					class="p-6 text-lg leading-relaxed text-muted-foreground sm:p-10 sm:text-xl lg:p-14"
-				>
-					Native on MacOS, Windows, and Linux. Browser extensions for Chrome, Firefox,
-					Edge, Safari and every other browser. Your preferences, your history, and your
-					AI — always with you, always in sync, always private. One download and you're
-					set.
-				</p>
-			</FeatureSection.Content>
 		</FeatureSection.Root>
 	</div>
 
