@@ -1,5 +1,10 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { MessageView, ResponseChunk, Query } from '$lib/bindings/bindings.js';
+import type {
+	MessageAssetChip,
+	MessageView,
+	ResponseChunk,
+	Query,
+} from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 const PAGE_SIZE = 50;
@@ -90,7 +95,11 @@ export class MessageService {
 		}
 	}
 
-	async sendMessage(threadId: string, query: Query): Promise<void> {
+	async sendMessage(
+		threadId: string,
+		query: Query,
+		assetChips?: MessageAssetChip[],
+	): Promise<void> {
 		const entry = this.cache.get(threadId) ?? this.getThread(threadId);
 
 		entry.messages.push({
@@ -100,6 +109,7 @@ export class MessageService {
 			reasoning_blocks: null,
 			sibling_count: 1,
 			sibling_index: 0,
+			assets: assetChips?.length ? assetChips : null,
 		});
 
 		entry.messages.push({
@@ -109,6 +119,7 @@ export class MessageService {
 			reasoning_blocks: null,
 			sibling_count: 1,
 			sibling_index: 0,
+			assets: null,
 		});
 
 		const messageIndex = entry.messages.length - 1;

@@ -18,7 +18,9 @@ export type LocalBackendInfo = { grpc_port: number; http_port: number; postgres_
 
 export type LoginToken = { code_challenge: string; expires_in: bigint; url: string }
 
-export type MessageView = { id: string | null; role: string; content: string; reasoning_blocks: ReasoningBlock[] | null; sibling_count: number; sibling_index: number }
+export type MessageAssetChip = { id: string; name: string; icon: string | null }
+
+export type MessageView = { id: string | null; role: string; content: string; reasoning_blocks: ReasoningBlock[] | null; sibling_count: number; sibling_index: number; assets: MessageAssetChip[] | null }
 
 export type OllamaSettings = { base_url: string; model: string }
 

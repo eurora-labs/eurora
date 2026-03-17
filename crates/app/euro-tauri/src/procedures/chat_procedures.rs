@@ -48,12 +48,19 @@ impl ChatApi for ChatApiImpl {
             .try_state()
             .ok_or_else(|| "Timeline not available".to_string())?;
 
+        let mut asset_chips_json: Option<String> = None;
+
         {
             let timeline = timeline_state.lock().await;
             let mut thread_manager = thread_state.lock().await;
 
             if timeline.save_current_activity_to_service().await.is_ok() && !query.assets.is_empty()
             {
+                let chips = timeline.get_context_chips().await;
+                if !chips.is_empty() {
+                    asset_chips_json = serde_json::to_string(&chips).ok();
+                }
+
                 let mut messages = Vec::new();
                 let asset_messages = timeline.construct_messages_from_last_asset().await;
                 if let Some(last_asset_message) = asset_messages.last() {
@@ -95,6 +102,7 @@ impl ChatApi for ChatApiImpl {
                     thread_id.clone(),
                     query.text.clone(),
                     query.parent_message_id.clone(),
+                    asset_chips_json,
                 )
                 .await
         };

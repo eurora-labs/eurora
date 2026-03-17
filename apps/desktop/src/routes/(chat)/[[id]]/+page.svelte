@@ -177,8 +177,9 @@
 		if (!text) return;
 
 		chatStatus = 'submitted';
-		const assetIds = assets.map((a) => a.id);
-		sendQuery(text, assetIds).catch((error) => handleQueryError(error));
+		const currentAssets = [...assets];
+		const assetIds = currentAssets.map((a) => a.id);
+		sendQuery(text, assetIds, currentAssets).catch((error) => handleQueryError(error));
 	}
 
 	async function startEdit(index: number, content: string) {
@@ -220,7 +221,11 @@
 		}
 	}
 
-	async function sendQuery(text: string, assetIds: string[] = []): Promise<void> {
+	async function sendQuery(
+		text: string,
+		assetIds: string[] = [],
+		contextAssets: ContextChip[] = [],
+	): Promise<void> {
 		const query: Query = { text, assets: assetIds, parent_message_id: null };
 		let targetThreadId = threadId;
 
@@ -234,7 +239,17 @@
 			await goto(`/${targetThreadId}`, { replaceState: true });
 		}
 
-		const streamPromise = messageService.sendMessage(targetThreadId, query);
+		const assetChips = contextAssets.map((a) => ({
+			id: a.id,
+			name: a.name,
+			icon: a.icon,
+		}));
+
+		const streamPromise = messageService.sendMessage(
+			targetThreadId,
+			query,
+			assetChips.length ? assetChips : undefined,
+		);
 
 		taurpc.thread.generate_title(targetThreadId, text).then((updated) => {
 			threadService.updateThread(updated);
@@ -286,6 +301,22 @@
 				{@const reasoning = reasoningData[i]}
 				{#if content.length > 0 || !isUser}
 					<Message.Root from={isUser ? 'user' : 'assistant'}>
+						{#if isUser && message.assets?.length}
+							<Attachment.Root variant="inline" class="ml-auto">
+								{#each message.assets as asset (asset.id)}
+									<Attachment.Item
+										data={{
+											type: 'file',
+											id: asset.id,
+											filename: asset.name,
+										}}
+									>
+										<Attachment.Preview />
+										<Attachment.Info />
+									</Attachment.Item>
+								{/each}
+							</Attachment.Root>
+						{/if}
 						{#if reasoning}
 							<Reasoning.Root
 								isStreaming={reasoning.isStreaming}

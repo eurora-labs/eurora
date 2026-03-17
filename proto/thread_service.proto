@@ -50,6 +50,7 @@ message ChatStreamRequest {
   string thread_id = 1;
   string content = 2;
   optional string parent_message_id = 3;
+  optional string asset_chips_json = 4;
 }
 
 message AddHumanMessageRequest {

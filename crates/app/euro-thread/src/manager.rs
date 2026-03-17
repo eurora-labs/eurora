@@ -200,6 +200,7 @@ impl ThreadManager {
         thread_id: String,
         content: String,
         parent_message_id: Option<String>,
+        asset_chips_json: Option<String>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>> {
         let mut client = self.client();
         let stream = client
@@ -207,6 +208,7 @@ impl ThreadManager {
                 thread_id,
                 content,
                 parent_message_id,
+                asset_chips_json,
             })
             .await?
             .into_inner();
