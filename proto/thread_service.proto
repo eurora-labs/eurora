@@ -125,6 +125,7 @@ message GetMessageTreeRequest {
   string thread_id = 1;
   uint32 start_level = 2;
   uint32 end_level = 3;
+  repeated string parent_node_ids = 4;
 }
 
 message MessageTreeNode {
@@ -141,4 +142,5 @@ message MessageTreeNode {
 
 message GetMessageTreeResponse {
   repeated MessageTreeNode nodes = 1;
+  bool has_more = 2;
 }

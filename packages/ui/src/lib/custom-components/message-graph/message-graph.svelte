@@ -19,11 +19,22 @@
 	interface Props {
 		treeNodes: TreeNodeData[];
 		activeMessageIds?: Set<string>;
+		hasMoreLevels?: boolean;
+		loadingMoreLevels?: boolean;
 		onmessagedblclick?: (messageId: string) => void;
+		onloadmorelevels?: () => void;
 		class?: string;
 	}
 
-	let { treeNodes, activeMessageIds, onmessagedblclick, class: className }: Props = $props();
+	let {
+		treeNodes,
+		activeMessageIds,
+		hasMoreLevels = false,
+		loadingMoreLevels = false,
+		onmessagedblclick,
+		onloadmorelevels,
+		class: className,
+	}: Props = $props();
 
 	const NODE_X_GAP = 450;
 	const NODE_Y_GAP = 250;
@@ -58,6 +69,8 @@
 
 		if (treeNodes.length === 0) return { nodes, edges };
 
+		const maxLevel = Math.max(...treeNodes.map((n) => n.level));
+
 		const childrenMap = new Map<string, TreeNodeData[]>();
 		for (const node of treeNodes) {
 			const parentKey = node.parent_message_id ?? '__root__';
@@ -90,6 +103,7 @@
 		layoutChildren(null, 0);
 
 		const isActive = activeMessageIds ?? new Set<string>();
+		const leafNodesAtBoundary: TreeNodeData[] = [];
 
 		for (const node of treeNodes) {
 			const content =
@@ -98,6 +112,7 @@
 			const assets = node.assets?.map((a) => ({ id: a.id, name: a.name }));
 			const hasChildren = childrenMap.has(node.id);
 			const hasSiblings = node.sibling_count > 1;
+			const isAtBoundary = hasMoreLevels && node.level === maxLevel && !hasChildren;
 
 			nodes.push({
 				id: node.id,
@@ -115,11 +130,15 @@
 					assets,
 					handles: {
 						target: true,
-						source: hasChildren,
+						source: hasChildren || isAtBoundary,
 					},
 					ondblclick: onmessagedblclick ? () => onmessagedblclick(node.id) : undefined,
 				},
 			});
+
+			if (isAtBoundary) {
+				leafNodesAtBoundary.push(node);
+			}
 
 			const sourceId = node.parent_message_id ?? startId;
 			const active = isActive.size === 0 || isActive.has(node.id);
@@ -129,6 +148,38 @@
 				target: node.id,
 				type: active ? 'animated' : 'temporary',
 			});
+		}
+
+		if (hasMoreLevels && leafNodesAtBoundary.length > 0) {
+			const avgY =
+				leafNodesAtBoundary.reduce((sum, n) => sum + (nodeYPositions.get(n.id) ?? 0), 0) /
+				leafNodesAtBoundary.length;
+
+			const loadMoreId = '__load_more__';
+			nodes.push({
+				id: loadMoreId,
+				type: 'message',
+				position: {
+					x: (maxLevel + 2) * NODE_X_GAP,
+					y: avgY,
+				},
+				data: {
+					role: 'assistant',
+					label: loadingMoreLevels ? 'Loading...' : 'Load more',
+					content: '',
+					handles: { target: true, source: false },
+					ondblclick: onloadmorelevels,
+				},
+			});
+
+			for (const leaf of leafNodesAtBoundary) {
+				edges.push({
+					id: `e-${leaf.id}-${loadMoreId}`,
+					source: leaf.id,
+					target: loadMoreId,
+					type: 'temporary',
+				});
+			}
 		}
 
 		return { nodes, edges };

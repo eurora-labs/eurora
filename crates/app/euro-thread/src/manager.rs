@@ -128,6 +128,7 @@ impl ThreadManager {
         thread_id: String,
         start_level: u32,
         end_level: u32,
+        parent_node_ids: Vec<String>,
     ) -> Result<GetMessageTreeResponse> {
         let mut client = self.client();
         let response = client
@@ -135,6 +136,7 @@ impl ThreadManager {
                 thread_id,
                 start_level,
                 end_level,
+                parent_node_ids,
             })
             .await?
             .into_inner();
