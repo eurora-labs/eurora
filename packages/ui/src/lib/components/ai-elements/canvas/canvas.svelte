@@ -19,13 +19,12 @@
 	<SvelteFlow
 		{deleteKey}
 		fitView
-		panOnDrag={false}
-		panOnScroll
-		selectionOnDrag={true}
+		panOnDrag
 		zoomOnDoubleClick={false}
+		proOptions={{ hideAttribution: true }}
 		{...restProps}
 	>
-		<Background bgColor="var(--sidebar)" />
+		<Background size={2} bgColor="var(--sidebar)" />
 		{@render children?.()}
 	</SvelteFlow>
 </div>

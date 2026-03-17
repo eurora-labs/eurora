@@ -41,7 +41,7 @@ pub enum DbError {
     #[error("Token error: {0}")]
     Token(String),
 
-    #[error("Database error")]
+    #[error("Database error: {0}")]
     Database(#[source] sqlx::Error),
 
     #[error("Internal error: {0}")]

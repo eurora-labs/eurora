@@ -7,12 +7,13 @@
 		type AttachmentData,
 	} from './attachments-context.svelte.js';
 	import { watch } from 'runed';
+	import type { Snippet } from 'svelte';
 
 	interface Props {
 		class?: string;
 		data: AttachmentData;
 		onRemove?: () => void;
-		children?: import('svelte').Snippet;
+		children?: Snippet;
 	}
 
 	let { class: className, data, onRemove, children, ...restProps }: Props = $props();
