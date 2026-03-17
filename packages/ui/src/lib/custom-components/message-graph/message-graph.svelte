@@ -19,10 +19,11 @@
 	interface Props {
 		treeNodes: TreeNodeData[];
 		activeMessageIds?: Set<string>;
+		onmessagedblclick?: (messageId: string) => void;
 		class?: string;
 	}
 
-	let { treeNodes, activeMessageIds, class: className }: Props = $props();
+	let { treeNodes, activeMessageIds, onmessagedblclick, class: className }: Props = $props();
 
 	const NODE_X_GAP = 450;
 	const NODE_Y_GAP = 250;
@@ -116,6 +117,7 @@
 						target: true,
 						source: hasChildren,
 					},
+					ondblclick: onmessagedblclick ? () => onmessagedblclick(node.id) : undefined,
 				},
 			});
 

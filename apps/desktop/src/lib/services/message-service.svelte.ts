@@ -230,6 +230,17 @@ export class MessageService {
 		this.refreshTreeIfNeeded(threadId);
 	}
 
+	async navigateToMessage(threadId: string, messageId: string): Promise<void> {
+		const entry = this.cache.get(threadId);
+		if (!entry) return;
+
+		const messages = await this.taurpc.thread.switch_branch(threadId, messageId, 0);
+		entry.messages = messages;
+		entry.reasoningData = {};
+		this.extractReasoning(entry, messages, 0);
+		this.viewMode = 'list';
+	}
+
 	async loadTreeNodes(threadId: string, startLevel = 0, endLevel = 50): Promise<void> {
 		const entry = this.cache.get(threadId);
 		if (!entry) return;
