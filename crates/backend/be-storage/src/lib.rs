@@ -72,7 +72,7 @@ pub struct StorageService {
     operator: Operator,
     config: StorageConfig,
     #[cfg(feature = "encryption")]
-    encryption_key: Arc<std::sync::RwLock<Option<be_encrypt::MainKey>>>,
+    encryption_key: std::sync::Arc<std::sync::RwLock<Option<be_encrypt::MainKey>>>,
 }
 
 #[bon]
@@ -87,7 +87,7 @@ impl StorageService {
             operator,
             config,
             #[cfg(feature = "encryption")]
-            encryption_key: Arc::new(std::sync::RwLock::new(encryption_key)),
+            encryption_key: std::sync::Arc::new(std::sync::RwLock::new(encryption_key)),
         })
     }
 
