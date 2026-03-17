@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { SvelteFlow } from '@xyflow/svelte';
+	import { SvelteFlow, Background } from '@xyflow/svelte';
 	import '@xyflow/svelte/dist/style.css';
 	import { cn } from '$lib/utils.js';
 
@@ -15,16 +15,16 @@
 	const deleteKey = ['Backspace', 'Delete'];
 </script>
 
-<div data-slot="canvas" class={cn('h-full w-full', className)} style="background-color: var(--sidebar);">
+<div data-slot="canvas" class={cn('h-full w-full', className)}>
 	<SvelteFlow
 		{deleteKey}
 		fitView
 		panOnDrag
-		panOnScroll
 		zoomOnDoubleClick={false}
 		proOptions={{ hideAttribution: true }}
 		{...restProps}
 	>
+		<Background size={2} bgColor="var(--sidebar)" />
 		{@render children?.()}
 	</SvelteFlow>
 </div>

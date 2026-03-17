@@ -920,25 +920,26 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        if req.direction != -1 && req.direction != 1 {
-            return Err(Status::invalid_argument("direction must be -1 or 1"));
-        }
-
-        let sibling_id = self
-            .db
-            .get_adjacent_sibling()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_id(message_id)
-            .direction(req.direction)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?
-            .ok_or_else(|| Status::not_found("No adjacent sibling found"))?;
+        let target_id = if req.direction == 0 {
+            message_id
+        } else if req.direction == -1 || req.direction == 1 {
+            self.db
+                .get_adjacent_sibling()
+                .thread_id(thread_id)
+                .user_id(user_id)
+                .message_id(message_id)
+                .direction(req.direction)
+                .call()
+                .await
+                .map_err(ThreadServiceError::from)?
+                .ok_or_else(|| Status::not_found("No adjacent sibling found"))?
+        } else {
+            return Err(Status::invalid_argument("direction must be -1, 0, or 1"));
+        };
 
         let new_leaf = self
             .db
-            .find_deepest_leaf(thread_id, user_id, sibling_id)
+            .find_deepest_leaf(thread_id, user_id, target_id)
             .await
             .map_err(ThreadServiceError::from)?;
 

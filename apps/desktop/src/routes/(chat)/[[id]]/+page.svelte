@@ -111,6 +111,22 @@
 		});
 	}
 
+	async function handleGraphNodeDblClick(messageId: string) {
+		if (!threadId) return;
+		try {
+			await messageService.navigateToMessage(threadId, messageId);
+			await tick();
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					const el = document.querySelector(`[data-message-id="${messageId}"]`);
+					el?.scrollIntoView({ behavior: 'auto', block: 'center' });
+				});
+			});
+		} catch (error) {
+			toast.error(`Failed to navigate to message: ${error}`);
+		}
+	}
+
 	$effect(() => {
 		if (threadData?.streaming) {
 			chatStatus = 'streaming';
@@ -298,7 +314,11 @@
 <div class="flex h-full flex-col overflow-hidden">
 	{#if messageService.viewMode === 'graph' && messages.length > 0}
 		<div class="min-h-0 flex-1">
-			<MessageGraph {treeNodes} {activeMessageIds} />
+			<MessageGraph
+				{treeNodes}
+				{activeMessageIds}
+				onmessagedblclick={handleGraphNodeDblClick}
+			/>
 		</div>
 	{:else}
 		<Conversation.Root class="min-h-0 flex-1">
@@ -326,7 +346,10 @@
 					{@const isUser = isUserMessage(message)}
 					{@const reasoning = reasoningData[i]}
 					{#if content.length > 0 || !isUser}
-						<Message.Root from={isUser ? 'user' : 'assistant'}>
+						<Message.Root
+							from={isUser ? 'user' : 'assistant'}
+							data-message-id={message.id}
+						>
 							{#if isUser && message.assets?.length}
 								<Attachment.Root variant="inline" class="ml-auto">
 									{#each message.assets as asset (asset.id)}
