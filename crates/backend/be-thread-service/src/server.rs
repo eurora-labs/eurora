@@ -484,10 +484,6 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        // When editing, find the original message being replaced so we can:
-        // 1. Use its actual parent_message_id (may be a hidden message)
-        // 2. Carry forward its asset_chips
-        let mut edited_message_kwargs: Option<serde_json::Value> = None;
         if is_edit {
             let effective_parent = if parent_id.is_some() {
                 parent_id
@@ -502,31 +498,8 @@ impl ProtoThreadService for ThreadService {
                     .call()
                     .await
                     .map_err(ThreadServiceError::from)?;
-                if let Some(msg) = first_visible.first() {
-                    edited_message_kwargs = Some(msg.additional_kwargs.clone());
-                    msg.parent_message_id
-                } else {
-                    None
-                }
+                first_visible.first().and_then(|msg| msg.parent_message_id)
             };
-            if edited_message_kwargs.is_none()
-                && let Some(pid) = parent_id
-            {
-                // For non-root edits, find the current visible child of the parent
-                let siblings = self
-                    .db
-                    .list_messages()
-                    .thread_id(thread_id)
-                    .user_id(user_id)
-                    .include_hidden(false)
-                    .params(PaginationParams::new(0, 50, "ASC".to_string()))
-                    .call()
-                    .await
-                    .map_err(ThreadServiceError::from)?;
-                if let Some(msg) = siblings.iter().find(|m| m.parent_message_id == Some(pid)) {
-                    edited_message_kwargs = Some(msg.additional_kwargs.clone());
-                }
-            }
             self.db
                 .set_active_leaf()
                 .id(thread_id)
@@ -580,10 +553,6 @@ impl ProtoThreadService for ThreadService {
             && let Ok(chips_value) = serde_json::from_str::<serde_json::Value>(chips_json)
         {
             human_additional_kwargs.insert("asset_chips".to_string(), chips_value);
-        } else if let Some(ref kwargs) = edited_message_kwargs
-            && let Some(chips) = kwargs.get("asset_chips")
-        {
-            human_additional_kwargs.insert("asset_chips".to_string(), chips.clone());
         }
 
         let human_message = HumanMessage::builder()
