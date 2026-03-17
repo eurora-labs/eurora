@@ -37,3 +37,12 @@ body.macos-app [data-slot='sidebar-inner'] {
 [data-slot='sidebar-inset'] {
 	overflow: hidden;
 }
+
+html:has(> body.linux-app),
+body.linux-app {
+	background-color: transparent !important;
+}
+
+body.linux-app .app-shell {
+	/*box-shadow: 0 0 0 2px var(--background);*/
+}

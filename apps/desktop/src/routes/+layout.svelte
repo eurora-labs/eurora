@@ -59,7 +59,11 @@
 
 <ModeWatcher defaultMode="dark" track={false} />
 
-<div class="flex flex-col h-screen overflow-hidden">
+<div
+	class="app-shell relative flex flex-col h-screen overflow-hidden {platform() === 'linux'
+		? 'rounded-[20px]'
+		: ''}"
+>
 	<Titlebar />
 	<main class="flex-1 min-h-0 bg-inherit">
 		{@render children?.()}
