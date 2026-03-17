@@ -420,7 +420,20 @@
 				{/each}
 			</Suggestion.Root>
 		{/if}
-		<div class="w-full px-4 pb-4">
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			class="w-full cursor-text px-4 pb-4"
+			onclick={(e) => {
+				if (
+					e.target === e.currentTarget ||
+					!(e.target as HTMLElement).closest('textarea, button, a, input')
+				) {
+					const textarea = e.currentTarget.querySelector('textarea');
+					textarea?.focus();
+				}
+			}}
+		>
 			<PromptInput.Root onSubmit={handleSubmit}>
 				{#if assets.length > 0}
 					<PromptInput.Header>
