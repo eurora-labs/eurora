@@ -1,6 +1,7 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type {
 	MessageAssetChip,
+	MessageTreeNodeView,
 	MessageView,
 	ResponseChunk,
 	Query,
@@ -17,6 +18,7 @@ interface ReasoningData {
 
 export class ThreadMessages {
 	messages: MessageView[] = $state([]);
+	treeNodes: MessageTreeNodeView[] = $state([]);
 	reasoningData: Record<number, ReasoningData> = $state({});
 	loading = $state(false);
 	hasMore = $state(true);
@@ -24,7 +26,12 @@ export class ThreadMessages {
 	streaming = $state(false);
 }
 
+export type ViewMode = 'list' | 'graph';
+
 export class MessageService {
+	viewMode: ViewMode = $state('list');
+	viewModeVisible = $state(false);
+
 	private cache: Map<string, ThreadMessages> = $state(new Map());
 	private readonly taurpc: TaurpcService;
 	private readonly unlisteners: Promise<() => void>[] = [];
@@ -63,6 +70,7 @@ export class MessageService {
 				entry.offset = messages.length;
 				entry.hasMore = messages.length === PAGE_SIZE;
 				this.extractReasoning(entry, messages, 0);
+				this.refreshTreeIfNeeded(threadId);
 			})
 			.catch((error) => {
 				console.error(`Failed to load messages for thread ${threadId}:`, error);
@@ -185,6 +193,7 @@ export class MessageService {
 		entry.messages = fresh;
 		entry.reasoningData = {};
 		this.extractReasoning(entry, fresh, 0);
+		this.refreshTreeIfNeeded(threadId);
 	}
 
 	async editMessage(
@@ -218,6 +227,28 @@ export class MessageService {
 		entry.messages = messages;
 		entry.reasoningData = {};
 		this.extractReasoning(entry, messages, 0);
+		this.refreshTreeIfNeeded(threadId);
+	}
+
+	async loadTreeNodes(threadId: string, startLevel = 0, endLevel = 50): Promise<void> {
+		const entry = this.cache.get(threadId);
+		if (!entry) return;
+
+		try {
+			entry.treeNodes = await this.taurpc.thread.get_message_tree(
+				threadId,
+				startLevel,
+				endLevel,
+			);
+		} catch (error) {
+			console.error(`Failed to load tree nodes for thread ${threadId}:`, error);
+		}
+	}
+
+	private refreshTreeIfNeeded(threadId: string): void {
+		if (this.viewMode === 'graph') {
+			this.loadTreeNodes(threadId);
+		}
 	}
 
 	isStreaming(threadId: string): boolean {

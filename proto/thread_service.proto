@@ -18,6 +18,7 @@ service ProtoThreadService {
   rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ProtoAIMessageChunk);
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
   rpc SwitchBranch(SwitchBranchRequest) returns (GetMessagesResponse);
+  rpc GetMessageTree(GetMessageTreeRequest) returns (GetMessageTreeResponse);
 }
 
 message CreateThreadRequest {
@@ -118,4 +119,26 @@ message GenerateThreadTitleRequest {
 
 message GenerateThreadTitleResponse {
   Thread thread = 1;
+}
+
+message GetMessageTreeRequest {
+  string thread_id = 1;
+  uint32 start_level = 2;
+  uint32 end_level = 3;
+}
+
+message MessageTreeNode {
+  string id = 1;
+  optional string parent_message_id = 2;
+  string message_type = 3;
+  string content = 4;
+  uint32 level = 5;
+  uint32 sibling_count = 6;
+  uint32 sibling_index = 7;
+  optional string additional_kwargs = 8;
+  optional string reasoning_blocks = 9;
+}
+
+message GetMessageTreeResponse {
+  repeated MessageTreeNode nodes = 1;
 }

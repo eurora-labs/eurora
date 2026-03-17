@@ -13,6 +13,7 @@
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
+	import { MessageGraph } from '@eurora/ui/custom-components/message-graph/index';
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -22,7 +23,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onMount, tick } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import type {
 		Query,
@@ -81,8 +82,27 @@
 	const threadId = $derived(data.threadId);
 	const threadData = $derived(threadId ? messageService.getThread(threadId) : null);
 	const messages = $derived(threadData?.messages ?? []);
+	const treeNodes = $derived(threadData?.treeNodes ?? []);
 	const reasoningData = $derived(threadData?.reasoningData ?? {});
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
+
+	const activeMessageIds = $derived(
+		new Set(messages.map((m) => m.id).filter((id): id is string => id !== null)),
+	);
+
+	$effect(() => {
+		messageService.viewModeVisible = messages.length > 0;
+	});
+
+	$effect(() => {
+		if (messageService.viewMode === 'graph' && threadId) {
+			messageService.loadTreeNodes(threadId, 0, 50);
+		}
+	});
+
+	onDestroy(() => {
+		messageService.viewModeVisible = false;
+	});
 
 	function handleSwitchBranch(messageId: string, direction: number) {
 		if (!threadId) return;
@@ -276,124 +296,92 @@
 {/snippet}
 
 <div class="flex h-full flex-col overflow-hidden">
-	<Conversation.Root class="min-h-0 flex-1">
-		<Conversation.Content>
-			{#if messages.length === 0}
-				<Empty.Root>
-					<Empty.Header>
-						{#if latestTimelineItem?.icon_base64}
-							<Empty.Title>Currently on</Empty.Title>
-							<Empty.Media variant="icon" class="bg-transparent">
-								<img
-									src={latestTimelineItem.icon_base64}
-									alt=""
-									class="size-full"
-								/>
-							</Empty.Media>
-						{:else}
-							<Empty.Title>No messages yet</Empty.Title>
-						{/if}
-					</Empty.Header>
-				</Empty.Root>
-			{/if}
-			{#each messages as message, i}
-				{@const content = getMessageContent(message)}
-				{@const isUser = isUserMessage(message)}
-				{@const reasoning = reasoningData[i]}
-				{#if content.length > 0 || !isUser}
-					<Message.Root from={isUser ? 'user' : 'assistant'}>
-						{#if isUser && message.assets?.length}
-							<Attachment.Root variant="inline" class="ml-auto">
-								{#each message.assets as asset (asset.id)}
-									<Attachment.Item
-										data={{
-											type: 'file',
-											id: asset.id,
-											filename: asset.name,
-										}}
-									>
-										<Attachment.Preview />
-										<Attachment.Info />
-									</Attachment.Item>
-								{/each}
-							</Attachment.Root>
-						{/if}
-						{#if reasoning}
-							<Reasoning.Root
-								isStreaming={reasoning.isStreaming}
-								duration={reasoning.duration}
-							>
-								<Reasoning.Trigger />
-								<Reasoning.Content children={reasoning.content} />
-							</Reasoning.Root>
-						{/if}
-						{#if isUser && editingIndex === i}
-							<div class="flex w-full flex-col gap-2">
-								<textarea
-									bind:this={editTextarea}
-									class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 focus:outline-none"
-									bind:value={editText}
-									onkeydown={handleEditKeydown}
-									rows={3}
-								></textarea>
-								<div class="flex justify-end gap-2">
-									<Button variant="ghost" size="sm" onclick={cancelEdit}>
-										Cancel
-									</Button>
-									<Button size="sm" onclick={submitEdit}>Send</Button>
+	{#if messageService.viewMode === 'graph' && messages.length > 0}
+		<div class="min-h-0 flex-1">
+			<MessageGraph {treeNodes} {activeMessageIds} />
+		</div>
+	{:else}
+		<Conversation.Root class="min-h-0 flex-1">
+			<Conversation.Content>
+				{#if messages.length === 0}
+					<Empty.Root>
+						<Empty.Header>
+							{#if latestTimelineItem?.icon_base64}
+								<Empty.Title>Currently on</Empty.Title>
+								<Empty.Media variant="icon" class="bg-transparent">
+									<img
+										src={latestTimelineItem.icon_base64}
+										alt=""
+										class="size-full"
+									/>
+								</Empty.Media>
+							{:else}
+								<Empty.Title>No messages yet</Empty.Title>
+							{/if}
+						</Empty.Header>
+					</Empty.Root>
+				{/if}
+				{#each messages as message, i}
+					{@const content = getMessageContent(message)}
+					{@const isUser = isUserMessage(message)}
+					{@const reasoning = reasoningData[i]}
+					{#if content.length > 0 || !isUser}
+						<Message.Root from={isUser ? 'user' : 'assistant'}>
+							{#if isUser && message.assets?.length}
+								<Attachment.Root variant="inline" class="ml-auto">
+									{#each message.assets as asset (asset.id)}
+										<Attachment.Item
+											data={{
+												type: 'file',
+												id: asset.id,
+												filename: asset.name,
+											}}
+										>
+											<Attachment.Preview />
+											<Attachment.Info />
+										</Attachment.Item>
+									{/each}
+								</Attachment.Root>
+							{/if}
+							{#if reasoning}
+								<Reasoning.Root
+									isStreaming={reasoning.isStreaming}
+									duration={reasoning.duration}
+								>
+									<Reasoning.Trigger />
+									<Reasoning.Content children={reasoning.content} />
+								</Reasoning.Root>
+							{/if}
+							{#if isUser && editingIndex === i}
+								<div class="flex w-full flex-col gap-2">
+									<textarea
+										bind:this={editTextarea}
+										class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 focus:outline-none"
+										bind:value={editText}
+										onkeydown={handleEditKeydown}
+										rows={3}
+									></textarea>
+									<div class="flex justify-end gap-2">
+										<Button variant="ghost" size="sm" onclick={cancelEdit}>
+											Cancel
+										</Button>
+										<Button size="sm" onclick={submitEdit}>Send</Button>
+									</div>
 								</div>
-							</div>
-						{:else}
-							<Message.Content>
-								{#if content.trim().length > 0}
-									<Message.Response {content} />
-								{:else if !reasoning}
-									<Shimmer>Thinking</Shimmer>
-								{/if}
-							</Message.Content>
-						{/if}
-						{@const isStreaming =
-							!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
-						{#if isUser && editingIndex !== i && chatStatus === 'ready'}
-							<Message.Actions class="self-end">
-								{@render siblingNav(message)}
-								<Message.Action
-									tooltip="Copy"
-									onclick={() => copyMessageContent(content, i)}
-								>
-									{#if copiedMessageId === String(i)}
-										<CheckIcon />
-									{:else}
-										<CopyIcon />
+							{:else}
+								<Message.Content>
+									{#if content.trim().length > 0}
+										<Message.Response {content} />
+									{:else if !reasoning}
+										<Shimmer>Thinking</Shimmer>
 									{/if}
-								</Message.Action>
-								<Message.Action
-									tooltip="Edit"
-									onclick={() => startEdit(i, content)}
-								>
-									<PencilIcon />
-								</Message.Action>
-							</Message.Actions>
-						{/if}
-						{#if !isUser && content.trim().length > 0 && !isStreaming}
-							<Message.Actions>
-								{@render siblingNav(message)}
-								{#if tokenLimitMessages.has(i)}
-									<Message.Action
-										tooltip="Upgrade Plan"
-										onclick={handleUpgrade}
-										variant="default"
-										size="lg"
-										disabled={upgradeLoading}
-									>
-										{#if upgradeLoading}
-											<Loader2Icon class="animate-spin" />
-										{:else}
-											Upgrade Plan
-											<ArrowUpCircleIcon />
-										{/if}
-									</Message.Action>
-								{:else}
+								</Message.Content>
+							{/if}
+							{@const isStreaming =
+								!isUser && i === messages.length - 1 && chatStatus !== 'ready'}
+							{#if isUser && editingIndex !== i && chatStatus === 'ready'}
+								<Message.Actions class="self-end">
+									{@render siblingNav(message)}
 									<Message.Action
 										tooltip="Copy"
 										onclick={() => copyMessageContent(content, i)}
@@ -404,14 +392,52 @@
 											<CopyIcon />
 										{/if}
 									</Message.Action>
-								{/if}
-							</Message.Actions>
-						{/if}
-					</Message.Root>
-				{/if}
-			{/each}
-		</Conversation.Content>
-	</Conversation.Root>
+									<Message.Action
+										tooltip="Edit"
+										onclick={() => startEdit(i, content)}
+									>
+										<PencilIcon />
+									</Message.Action>
+								</Message.Actions>
+							{/if}
+							{#if !isUser && content.trim().length > 0 && !isStreaming}
+								<Message.Actions>
+									{@render siblingNav(message)}
+									{#if tokenLimitMessages.has(i)}
+										<Message.Action
+											tooltip="Upgrade Plan"
+											onclick={handleUpgrade}
+											variant="default"
+											size="lg"
+											disabled={upgradeLoading}
+										>
+											{#if upgradeLoading}
+												<Loader2Icon class="animate-spin" />
+											{:else}
+												Upgrade Plan
+												<ArrowUpCircleIcon />
+											{/if}
+										</Message.Action>
+									{:else}
+										<Message.Action
+											tooltip="Copy"
+											onclick={() => copyMessageContent(content, i)}
+										>
+											{#if copiedMessageId === String(i)}
+												<CheckIcon />
+											{:else}
+												<CopyIcon />
+											{/if}
+										</Message.Action>
+									{/if}
+								</Message.Actions>
+							{/if}
+						</Message.Root>
+					{/if}
+				{/each}
+			</Conversation.Content>
+		</Conversation.Root>
+	{/if}
 	<div class="grid shrink-0 gap-4">
 		{#if showSuggestions}
 			<Suggestion.Root class="px-4">
