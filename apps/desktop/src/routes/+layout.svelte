@@ -14,7 +14,8 @@
 
 	// Set platform class synchronously (before first render) so CSS
 	// variables like --titlebar-height are correct from the start.
-	document.body.classList.add(`${platform()}-app`);
+	const currentPlatform = platform();
+	document.body.classList.add(`${currentPlatform}-app`);
 
 	let { children } = $props();
 
@@ -59,7 +60,11 @@
 
 <ModeWatcher defaultMode="dark" track={false} />
 
-<div class="flex flex-col h-screen overflow-hidden">
+<div
+	class="app-shell relative flex flex-col h-screen overflow-hidden {currentPlatform === 'linux'
+		? 'rounded-[20px]'
+		: ''}"
+>
 	<Titlebar />
 	<main class="flex-1 min-h-0 bg-inherit">
 		{@render children?.()}
