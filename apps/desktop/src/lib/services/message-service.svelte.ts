@@ -30,6 +30,7 @@ export class ThreadMessages {
 	treeLoading = $state(false);
 	treeHasMore = $state(false);
 	treeLoadId = 0;
+	treeInitialLoaded = false;
 }
 
 export type ViewMode = 'list' | 'graph';
@@ -247,6 +248,13 @@ export class MessageService {
 		this.viewMode = 'list';
 	}
 
+	ensureTreeLoaded(threadId: string): void {
+		const entry = this.cache.get(threadId);
+		if (!entry || entry.treeInitialLoaded || entry.treeLoading) return;
+		entry.treeInitialLoaded = true;
+		this.loadTreeNodes(threadId);
+	}
+
 	async loadTreeNodes(
 		threadId: string,
 		startLevel = 0,
@@ -254,7 +262,7 @@ export class MessageService {
 		parentNodeIds: string[] = [],
 	): Promise<void> {
 		const entry = this.cache.get(threadId);
-		if (!entry) return;
+		if (!entry || entry.treeLoading) return;
 
 		const loadId = ++entry.treeLoadId;
 		entry.treeLoading = true;
@@ -291,9 +299,7 @@ export class MessageService {
 		if (entry.treeNodes.length === 0) return;
 
 		const maxLevel = entry.treeLoadedEndLevel;
-		const boundaryIds = entry.treeNodes
-			.filter((n) => n.level === maxLevel)
-			.map((n) => n.id);
+		const boundaryIds = entry.treeNodes.filter((n) => n.level === maxLevel).map((n) => n.id);
 
 		const startLevel = maxLevel + 1;
 		const endLevel = startLevel + count - 1;
@@ -304,7 +310,12 @@ export class MessageService {
 		if (this.viewMode !== 'graph') return;
 		const entry = this.cache.get(threadId);
 		if (!entry) return;
-		this.loadTreeNodes(threadId, 0, Math.max(entry.treeLoadedEndLevel, TREE_LEVEL_PAGE_SIZE - 1));
+		entry.treeInitialLoaded = false;
+		this.loadTreeNodes(
+			threadId,
+			0,
+			Math.max(entry.treeLoadedEndLevel, TREE_LEVEL_PAGE_SIZE - 1),
+		);
 	}
 
 	isStreaming(threadId: string): boolean {

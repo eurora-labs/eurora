@@ -6,8 +6,11 @@
 
 	const { fitView } = useSvelteFlow();
 
+	let prevNodeCount = 0;
+
 	$effect(() => {
-		if (nodeCount > 1) {
+		if (nodeCount > 1 && nodeCount !== prevNodeCount) {
+			prevNodeCount = nodeCount;
 			tick().then(() => fitView({ padding: 0.2 }));
 		}
 	});

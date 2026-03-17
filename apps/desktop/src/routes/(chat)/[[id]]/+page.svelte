@@ -98,7 +98,7 @@
 
 	$effect(() => {
 		if (messageService.viewMode === 'graph' && threadId) {
-			messageService.loadTreeNodes(threadId);
+			messageService.ensureTreeLoaded(threadId);
 		}
 	});
 

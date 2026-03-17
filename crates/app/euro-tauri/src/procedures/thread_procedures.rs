@@ -238,60 +238,8 @@ impl ThreadApi for ThreadApiImpl {
             .nodes
             .into_iter()
             .map(|n| {
-                let assets = n
-                    .additional_kwargs
-                    .as_ref()
-                    .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
-                    .and_then(|v| {
-                        let chips = v.get("asset_chips")?.as_array()?;
-                        let result: Vec<MessageAssetChip> = chips
-                            .iter()
-                            .filter_map(|chip| {
-                                let id = chip.get("id")?.as_str()?.to_string();
-                                let name = chip.get("name")?.as_str()?.to_string();
-                                let icon =
-                                    chip.get("icon").and_then(|v| v.as_str()).map(String::from);
-                                Some(MessageAssetChip { id, name, icon })
-                            })
-                            .collect();
-                        if result.is_empty() {
-                            None
-                        } else {
-                            Some(result)
-                        }
-                    });
-
-                let reasoning_blocks = n
-                    .reasoning_blocks
-                    .as_ref()
-                    .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
-                    .and_then(|v| {
-                        let blocks = v.as_array()?;
-                        let result: Vec<ReasoningBlock> = blocks
-                            .iter()
-                            .filter_map(|block| {
-                                let block_type = block.get("type")?.as_str()?.to_string();
-                                let content = block
-                                    .get("content")
-                                    .and_then(|v| v.as_str())
-                                    .map(String::from);
-                                let signature = block
-                                    .get("signature")
-                                    .and_then(|v| v.as_str())
-                                    .map(String::from);
-                                Some(ReasoningBlock {
-                                    r#type: block_type,
-                                    content,
-                                    signature,
-                                })
-                            })
-                            .collect();
-                        if result.is_empty() {
-                            None
-                        } else {
-                            Some(result)
-                        }
-                    });
+                let assets = parse_asset_chips_from_json(&n.additional_kwargs);
+                let reasoning_blocks = parse_reasoning_blocks_from_json(&n.reasoning_blocks);
 
                 MessageTreeNodeView {
                     id: n.id,
@@ -344,6 +292,54 @@ impl From<&Thread> for ThreadView {
             id: thread.id().map(|id| id.to_string()),
             title: thread.title().to_string(),
         }
+    }
+}
+
+fn parse_asset_chips_from_json(json_str: &Option<String>) -> Option<Vec<MessageAssetChip>> {
+    let v = serde_json::from_str::<serde_json::Value>(json_str.as_ref()?).ok()?;
+    let chips = v.get("asset_chips")?.as_array()?;
+    let result: Vec<MessageAssetChip> = chips
+        .iter()
+        .filter_map(|chip| {
+            let id = chip.get("id")?.as_str()?.to_string();
+            let name = chip.get("name")?.as_str()?.to_string();
+            let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
+            Some(MessageAssetChip { id, name, icon })
+        })
+        .collect();
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
+fn parse_reasoning_blocks_from_json(json_str: &Option<String>) -> Option<Vec<ReasoningBlock>> {
+    let v = serde_json::from_str::<serde_json::Value>(json_str.as_ref()?).ok()?;
+    let blocks = v.as_array()?;
+    let result: Vec<ReasoningBlock> = blocks
+        .iter()
+        .filter_map(|block| {
+            let block_type = block.get("type")?.as_str()?.to_string();
+            let content = block
+                .get("content")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let signature = block
+                .get("signature")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            Some(ReasoningBlock {
+                r#type: block_type,
+                content,
+                signature,
+            })
+        })
+        .collect();
+    if result.is_empty() {
+        None
+    } else {
+        Some(result)
     }
 }
 
