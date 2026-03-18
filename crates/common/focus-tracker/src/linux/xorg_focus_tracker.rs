@@ -67,6 +67,8 @@ where
         let mut current_focused_window: Option<u32> = None;
         let mut icon_cache = IconCache::new(config_clone.icon_cache_capacity);
         let mut consecutive_errors: u32 = 0;
+        let mut prev_process_id: Option<u32> = None;
+        let mut prev_window_title: Option<String> = None;
 
         if let Ok(Some(window)) = get_active_window(&conn, root, atoms.net_active_window) {
             match get_window_info(&conn, window, &atoms) {
@@ -90,6 +92,8 @@ where
                         tracing::info!("Failed to flush after initial monitoring: {e}");
                     }
 
+                    prev_process_id = Some(focused_window.process_id);
+                    prev_window_title = focused_window.window_title.clone();
                     if tx.send(focused_window).is_err() {
                         tracing::info!(
                             "Async task dropped before initial event, stopping X11 event loop"
@@ -182,9 +186,16 @@ where
                             focused_window.icon = Some(Arc::clone(cached));
                         }
 
-                        if tx.send(focused_window).is_err() {
-                            tracing::info!("Async task dropped, stopping X11 event loop");
-                            break;
+                        let dominated = prev_process_id == Some(focused_window.process_id)
+                            && prev_window_title.as_deref()
+                                == focused_window.window_title.as_deref();
+                        if !dominated {
+                            prev_process_id = Some(focused_window.process_id);
+                            prev_window_title = focused_window.window_title.clone();
+                            if tx.send(focused_window).is_err() {
+                                tracing::info!("Async task dropped, stopping X11 event loop");
+                                break;
+                            }
                         }
                     }
                     Err(e) => {
