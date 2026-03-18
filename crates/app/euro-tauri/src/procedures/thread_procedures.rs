@@ -56,6 +56,22 @@ pub struct MessageTreeResponse {
     pub has_more: bool,
 }
 
+#[taurpc::ipc_type]
+pub struct SearchThreadResultView {
+    pub id: String,
+    pub title: String,
+    pub rank: f32,
+}
+
+#[taurpc::ipc_type]
+pub struct SearchMessageResultView {
+    pub id: String,
+    pub thread_id: String,
+    pub message_type: String,
+    pub snippet: String,
+    pub rank: f32,
+}
+
 #[taurpc::procedures(path = "thread")]
 pub trait ThreadApi {
     #[taurpc(event)]
@@ -102,6 +118,20 @@ pub trait ThreadApi {
         thread_id: String,
         content: String,
     ) -> Result<ThreadView, String>;
+
+    async fn search_threads<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        query: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<SearchThreadResultView>, String>;
+
+    async fn search_messages<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        query: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<SearchMessageResultView>, String>;
 }
 
 fn thread_manager<R: Runtime>(
@@ -274,6 +304,58 @@ impl ThreadApi for ThreadApiImpl {
             .await
             .map_err(|e| e.to_string())?;
         Ok(thread.into())
+    }
+
+    async fn search_threads<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        query: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<SearchThreadResultView>, String> {
+        let thread_state = thread_manager(&app_handle)?;
+        let thread_manager = thread_state.lock().await;
+        let response = thread_manager
+            .search_threads(query, limit, offset)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(response
+            .results
+            .into_iter()
+            .map(|r| SearchThreadResultView {
+                id: r.id,
+                title: r.title,
+                rank: r.rank,
+            })
+            .collect())
+    }
+
+    async fn search_messages<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        query: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<SearchMessageResultView>, String> {
+        let thread_state = thread_manager(&app_handle)?;
+        let thread_manager = thread_state.lock().await;
+        let response = thread_manager
+            .search_messages(query, limit, offset)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(response
+            .results
+            .into_iter()
+            .map(|r| SearchMessageResultView {
+                id: r.id,
+                thread_id: r.thread_id,
+                message_type: r.message_type,
+                snippet: r.snippet,
+                rank: r.rank,
+            })
+            .collect())
     }
 }
 
