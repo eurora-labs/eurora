@@ -9,9 +9,9 @@ A cross-platform focus tracker for Linux (X11), macOS, and Windows that monitors
 ## Features
 
 -   Cross-platform support (Linux X11, macOS, Windows)
--   Real-time focus tracking
+-   Real-time focus tracking with automatic deduplication
 -   Window information (title, process name, PID)
--   Icon extraction with configurable sizes
+-   Icon extraction with configurable sizes and bounded cache
 -   Async API with tokio
 -   Configurable polling intervals
 -   Graceful shutdown with stop signals
@@ -22,7 +22,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-focus-tracker = "*"
+focus-tracker = "1.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -37,18 +37,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     let stop_signal = Arc::new(AtomicBool::new(false));
 
-    tracker.track_focus_with_stop(
-        |window| async move {
+    tracker
+        .track_focus()
+        .on_focus(|window| async move {
             println!("Focused: {}",
                 window.window_title.as_deref().unwrap_or("Unknown"));
-
             Ok(())
-        },
-        &stop_signal,
-    ).await?;
+        })
+        .stop_signal(&stop_signal)
+        .call()
+        .await?;
 
     Ok(())
 }
@@ -62,12 +63,12 @@ Customize behavior with `FocusTrackerConfig`:
 use focus_tracker::{FocusTracker, FocusTrackerConfig, IconConfig};
 
 let config = FocusTrackerConfig::builder()
-    .poll_interval(std::time::Duration::from_millis(50))  // Faster polling (default: 100ms)
-    .unwrap()
-    .icon(IconConfig::builder().size(128).unwrap().build()) // Custom icon size
+    .poll_interval(std::time::Duration::from_millis(50)).unwrap()  // Faster polling (default: 100ms)
+    .icon(IconConfig::builder().size(128).unwrap().build())        // Custom icon size (default: 128)
+    .icon_cache_capacity(32).unwrap()                              // Bounded icon cache (default: 64)
     .build();
 
-let tracker = FocusTracker::with_config(config);
+let tracker = FocusTracker::builder().config(config).build();
 ```
 
 ## Examples
