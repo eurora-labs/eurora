@@ -31,6 +31,15 @@ fn validate_poll_interval(interval: Duration) -> FocusTrackerResult<Duration> {
     Ok(interval)
 }
 
+fn validate_icon_cache_capacity(capacity: usize) -> FocusTrackerResult<usize> {
+    if capacity == 0 {
+        return Err(FocusTrackerError::InvalidConfig {
+            reason: "icon cache capacity cannot be zero".into(),
+        });
+    }
+    Ok(capacity)
+}
+
 #[derive(Debug, Clone)]
 pub struct IconConfig {
     pub size: Option<u32>,
@@ -89,6 +98,7 @@ impl IconConfig {
 pub struct FocusTrackerConfig {
     pub poll_interval: Duration,
     pub icon: IconConfig,
+    pub icon_cache_capacity: usize,
 }
 
 impl Default for FocusTrackerConfig {
@@ -96,6 +106,7 @@ impl Default for FocusTrackerConfig {
         Self {
             poll_interval: Duration::from_millis(100),
             icon: IconConfig::default(),
+            icon_cache_capacity: 64,
         }
     }
 }
@@ -126,10 +137,18 @@ impl FocusTrackerConfig {
         )]
         poll_interval: Duration,
         #[builder(default)] icon: IconConfig,
+        #[builder(
+            default = 64,
+            with = |capacity: usize| -> Result<_, FocusTrackerError> {
+                validate_icon_cache_capacity(capacity)
+            },
+        )]
+        icon_cache_capacity: usize,
     ) -> Self {
         Self {
             poll_interval,
             icon,
+            icon_cache_capacity,
         }
     }
 }
@@ -198,6 +217,7 @@ mod tests {
         let config = FocusTrackerConfig::default();
         assert_eq!(config.poll_interval, Duration::from_millis(100));
         assert_eq!(config.icon.size, None);
+        assert_eq!(config.icon_cache_capacity, 64);
     }
 
     #[test]
@@ -205,6 +225,25 @@ mod tests {
         let config = FocusTrackerConfig::builder().build();
         assert_eq!(config.poll_interval, Duration::from_millis(100));
         assert_eq!(config.icon.size, None);
+        assert_eq!(config.icon_cache_capacity, 64);
+    }
+
+    #[test]
+    fn config_builder_icon_cache_capacity() {
+        let config = FocusTrackerConfig::builder()
+            .icon_cache_capacity(128)
+            .unwrap()
+            .build();
+        assert_eq!(config.icon_cache_capacity, 128);
+    }
+
+    #[test]
+    fn config_builder_zero_cache_capacity_errors() {
+        assert!(
+            FocusTrackerConfig::builder()
+                .icon_cache_capacity(0)
+                .is_err()
+        );
     }
 
     #[test]
