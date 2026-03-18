@@ -155,12 +155,13 @@ impl CollectorService {
                         .build(),
                 )
                 .build();
-            let tracker = FocusTracker::with_config(config);
+            let tracker = FocusTracker::builder().config(config).build();
             let prev_focus = Arc::new(Mutex::new(String::new()));
 
             let strategy_inner = Arc::clone(&strategy_clone);
             let _ = tracker
-                .track_focus(move |window: FocusedWindow| {
+                .track_focus()
+                .on_focus(move |window: FocusedWindow| {
                     let prev_focus = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
                     let activity_tx_inner = activity_tx.clone();
@@ -217,6 +218,7 @@ impl CollectorService {
                         Ok(())
                     }
                 })
+                .call()
                 .await;
         }));
 

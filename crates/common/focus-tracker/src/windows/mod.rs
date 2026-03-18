@@ -1,3 +1,5 @@
-pub mod utils;
+pub(crate) mod utils;
 
-pub mod impl_focus_tracker;
+mod impl_focus_tracker;
+
+pub(crate) use impl_focus_tracker::{track_focus, track_focus_with_stop};

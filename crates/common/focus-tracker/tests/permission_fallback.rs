@@ -31,23 +31,23 @@ async fn test_macos_accessibility_permission() {
 
     tracing::info!("Testing macOS Accessibility permission handling");
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     let stop_signal = AtomicBool::new(false);
     let focus_events = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
     let focus_events_clone = Arc::clone(&focus_events);
     let result = tracker
-        .track_focus_with_stop(
-            move |window: FocusedWindow| {
-                let events = Arc::clone(&focus_events_clone);
-                async move {
-                    tracing::info!("Focus event received: {:?}", window);
-                    events.lock().await.push(window);
-                    Ok(())
-                }
-            },
-            &stop_signal,
-        )
+        .track_focus()
+        .on_focus(move |window: FocusedWindow| {
+            let events = Arc::clone(&focus_events_clone);
+            async move {
+                tracing::info!("Focus event received: {:?}", window);
+                events.lock().await.push(window);
+                Ok(())
+            }
+        })
+        .stop_signal(&stop_signal)
+        .call()
         .await;
 
     stop_signal.store(true, Ordering::Relaxed);
@@ -80,22 +80,22 @@ async fn test_macos_accessibility_no_permission_mock() {
 
     tracing::info!("Testing macOS Accessibility mock permission denial");
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     tracing::info!("FocusTracker created successfully: {:?}", tracker);
 
     let stop_signal = AtomicBool::new(false);
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker
-        .track_focus_with_stop(
-            |window: FocusedWindow| async move {
-                if window.window_title.is_none() {
-                    tracing::info!("Received window with no title - possible permission issue");
-                }
-                Ok(())
-            },
-            &stop_signal,
-        )
+        .track_focus()
+        .on_focus(|window: FocusedWindow| async move {
+            if window.window_title.is_none() {
+                tracing::info!("Received window with no title - possible permission issue");
+            }
+            Ok(())
+        })
+        .stop_signal(&stop_signal)
+        .call()
         .await;
 
     match result {
@@ -120,21 +120,21 @@ async fn test_wayland_unsupported_compositor() {
 
     tracing::info!("Testing Wayland unsupported compositor handling");
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     let stop_signal = AtomicBool::new(false);
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker
-        .track_focus_with_stop(
-            |window: FocusedWindow| async move {
-                tracing::info!(
-                    "Unexpected focus event in unsupported environment: {:?}",
-                    window
-                );
-                Ok(())
-            },
-            &stop_signal,
-        )
+        .track_focus()
+        .on_focus(|window: FocusedWindow| async move {
+            tracing::info!(
+                "Unexpected focus event in unsupported environment: {:?}",
+                window
+            );
+            Ok(())
+        })
+        .stop_signal(&stop_signal)
+        .call()
         .await;
 
     match result {
@@ -175,18 +175,18 @@ fn test_missing_x_server() {
     let result = std::panic::catch_unwind(|| {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let tracker = FocusTracker::new();
+            let tracker = FocusTracker::builder().build();
             let stop_signal = AtomicBool::new(false);
             stop_signal.store(true, Ordering::Relaxed);
 
             tracker
-                .track_focus_with_stop(
-                    |window: FocusedWindow| async move {
-                        tracing::info!("Unexpected focus event without display: {:?}", window);
-                        Ok(())
-                    },
-                    &stop_signal,
-                )
+                .track_focus()
+                .on_focus(|window: FocusedWindow| async move {
+                    tracing::info!("Unexpected focus event without display: {:?}", window);
+                    Ok(())
+                })
+                .stop_signal(&stop_signal)
+                .call()
                 .await
         })
     });
@@ -234,18 +234,18 @@ async fn test_windows_service_context_mock() {
 
     tracing::info!("Testing Windows service context handling (mock)");
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     let stop_signal = AtomicBool::new(false);
     stop_signal.store(true, Ordering::Relaxed);
 
     let result = tracker
-        .track_focus_with_stop(
-            |window: FocusedWindow| async move {
-                tracing::info!("Focus event in service context: {:?}", window);
-                Ok(())
-            },
-            &stop_signal,
-        )
+        .track_focus()
+        .on_focus(|window: FocusedWindow| async move {
+            tracing::info!("Focus event in service context: {:?}", window);
+            Ok(())
+        })
+        .stop_signal(&stop_signal)
+        .call()
         .await;
 
     match result {
@@ -272,7 +272,7 @@ fn test_error_handling_robustness() {
     tracing::info!("Testing general error handling robustness");
 
     let result = std::panic::catch_unwind(|| {
-        let tracker = FocusTracker::new();
+        let tracker = FocusTracker::builder().build();
         tracing::info!("FocusTracker created: {:?}", tracker);
         tracker
     });
@@ -326,20 +326,20 @@ async fn test_timeout_behavior() {
 
     tracing::info!("Testing timeout behavior");
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     let stop_signal = AtomicBool::new(false);
     stop_signal.store(true, Ordering::Relaxed);
 
     let start_time = std::time::Instant::now();
 
     let result = tracker
-        .track_focus_with_stop(
-            |window: FocusedWindow| async move {
-                tracing::info!("Focus event: {:?}", window);
-                Ok(())
-            },
-            &stop_signal,
-        )
+        .track_focus()
+        .on_focus(|window: FocusedWindow| async move {
+            tracing::info!("Focus event: {:?}", window);
+            Ok(())
+        })
+        .stop_signal(&stop_signal)
+        .call()
         .await;
 
     let elapsed = start_time.elapsed();

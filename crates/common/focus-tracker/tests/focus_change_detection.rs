@@ -112,7 +112,7 @@ async fn event_mode_focus_switch() {
 
     tracing::info!("Starting event mode focus switch test");
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     let stop_signal = Arc::new(AtomicBool::new(false));
     let events: Arc<tokio::sync::Mutex<Vec<focus_tracker::FocusedWindow>>> =
         Arc::new(tokio::sync::Mutex::new(Vec::new()));
@@ -122,17 +122,17 @@ async fn event_mode_focus_switch() {
 
     let track_handle = tokio::spawn(async move {
         let _ = tracker
-            .track_focus_with_stop(
-                |window| {
-                    let events = Arc::clone(&events_clone);
-                    async move {
-                        tracing::info!("Received focus event: {:?}", window.window_title);
-                        events.lock().await.push(window);
-                        Ok(())
-                    }
-                },
-                &stop_clone,
-            )
+            .track_focus()
+            .on_focus(|window| {
+                let events = Arc::clone(&events_clone);
+                async move {
+                    tracing::info!("Received focus event: {:?}", window.window_title);
+                    events.lock().await.push(window);
+                    Ok(())
+                }
+            })
+            .stop_signal(&stop_clone)
+            .call()
             .await;
     });
 

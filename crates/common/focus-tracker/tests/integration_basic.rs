@@ -79,19 +79,19 @@ async fn test_basic_focus_tracking() {
     let stop_signal_clone = Arc::clone(&stop_signal);
 
     let tracker_handle = tokio::spawn(async move {
-        let tracker = FocusTracker::new();
+        let tracker = FocusTracker::builder().build();
         let result = tracker
-            .track_focus_with_stop(
-                move |window: FocusedWindow| {
-                    let events = Arc::clone(&focus_events_clone);
-                    async move {
-                        tracing::info!("Focus event: {:?}", window);
-                        events.lock().await.push(window);
-                        Ok(())
-                    }
-                },
-                &stop_signal_clone,
-            )
+            .track_focus()
+            .on_focus(move |window: FocusedWindow| {
+                let events = Arc::clone(&focus_events_clone);
+                async move {
+                    tracing::info!("Focus event: {:?}", window);
+                    events.lock().await.push(window);
+                    Ok(())
+                }
+            })
+            .stop_signal(&stop_signal_clone)
+            .call()
             .await;
 
         match result {
@@ -133,8 +133,13 @@ fn test_wayland_detection() {
 
     #[cfg(target_os = "linux")]
     {
-        use focus_tracker::utils::wayland_detect;
-        let detected_wayland = wayland_detect();
+        let is_wayland_session = std::env::var("XDG_SESSION_TYPE")
+            .map(|v| v.eq_ignore_ascii_case("wayland"))
+            .unwrap_or(false);
+        let has_wayland_display = std::env::var("WAYLAND_DISPLAY")
+            .map(|v| !v.is_empty())
+            .unwrap_or(false);
+        let detected_wayland = is_wayland_session || has_wayland_display;
         tracing::info!("Detected Wayland: {}", detected_wayland);
     }
 }
@@ -191,11 +196,16 @@ fn test_linux_backend_selection() {
 
     use focus_tracker::FocusTracker;
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     tracing::info!("Successfully created Linux focus tracker: {:?}", tracker);
 
-    use focus_tracker::utils::wayland_detect;
-    let is_wayland = wayland_detect();
+    let is_wayland_session = std::env::var("XDG_SESSION_TYPE")
+        .map(|v| v.eq_ignore_ascii_case("wayland"))
+        .unwrap_or(false);
+    let has_wayland_display = std::env::var("WAYLAND_DISPLAY")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
+    let is_wayland = is_wayland_session || has_wayland_display;
     tracing::info!(
         "Detected backend - Wayland: {}, X11: {}",
         is_wayland,
