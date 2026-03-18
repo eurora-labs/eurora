@@ -41,9 +41,6 @@ impl FocusTracker {
         F: FnMut(FocusedWindow) -> Fut,
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
-        match stop_signal {
-            Some(signal) => platform::track_focus_with_stop(on_focus, signal, &self.config).await,
-            None => platform::track_focus(on_focus, &self.config).await,
-        }
+        platform::track_focus(on_focus, stop_signal, &self.config).await
     }
 }

@@ -17,27 +17,7 @@ use x11rb::{
     rust_connection::RustConnection,
 };
 
-pub async fn track_focus<F, Fut>(on_focus: F, config: &FocusTrackerConfig) -> FocusTrackerResult<()>
-where
-    F: FnMut(FocusedWindow) -> Fut,
-    Fut: Future<Output = FocusTrackerResult<()>>,
-{
-    run(on_focus, None, config).await
-}
-
-pub async fn track_focus_with_stop<F, Fut>(
-    on_focus: F,
-    stop_signal: &AtomicBool,
-    config: &FocusTrackerConfig,
-) -> FocusTrackerResult<()>
-where
-    F: FnMut(FocusedWindow) -> Fut,
-    Fut: Future<Output = FocusTrackerResult<()>>,
-{
-    run(on_focus, Some(stop_signal), config).await
-}
-
-async fn run<F, Fut>(
+pub async fn track_focus<F, Fut>(
     mut on_focus: F,
     stop_signal: Option<&AtomicBool>,
     config: &FocusTrackerConfig,
