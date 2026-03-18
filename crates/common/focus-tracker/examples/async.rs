@@ -5,19 +5,14 @@
 //!
 //! To run this example:
 //! ```bash
-//! cargo run --example async --features async
+//! cargo run --example async
 //! ```
 
-#[cfg(feature = "async")]
 use focus_tracker::{FocusTracker, FocusTrackerResult};
-#[cfg(feature = "async")]
 use std::sync::Arc;
-#[cfg(feature = "async")]
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(feature = "async")]
 use std::time::Duration;
 
-#[cfg(feature = "async")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
@@ -39,7 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     tracker
-        .track_focus_async_with_stop(
+        .track_focus_with_stop(
             |window| async move {
                 println!(
                     "🔍 Focus changed to: {}",
@@ -73,8 +68,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Simulate async processing that might involve network or computation
-#[cfg(feature = "async")]
 async fn simulate_async_processing(
     window: &focus_tracker::FocusedWindow,
 ) -> FocusTrackerResult<()> {
@@ -88,8 +81,6 @@ async fn simulate_async_processing(
     Ok(())
 }
 
-/// Simulate async data processing
-#[cfg(feature = "async")]
 async fn process_window_data(window: &focus_tracker::FocusedWindow) -> FocusTrackerResult<()> {
     tokio::time::sleep(Duration::from_millis(30)).await;
 
@@ -104,10 +95,4 @@ async fn process_window_data(window: &focus_tracker::FocusedWindow) -> FocusTrac
     );
 
     Ok(())
-}
-
-#[cfg(not(feature = "async"))]
-fn main() {
-    println!("This example requires the 'async' feature to be enabled.");
-    println!("Run with: cargo run --example async --features async");
 }

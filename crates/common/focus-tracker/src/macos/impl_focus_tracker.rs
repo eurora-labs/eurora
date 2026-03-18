@@ -1,10 +1,8 @@
 use crate::{FocusTrackerConfig, FocusTrackerResult, FocusedWindow};
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-#[cfg(feature = "async")]
-use std::future::Future;
 
 use super::utils;
 
@@ -44,27 +42,7 @@ fn should_stop(stop_signal: Option<&AtomicBool>) -> bool {
 }
 
 impl ImplFocusTracker {
-    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
-    {
-        self.run(on_focus, None, config)
-    }
-
-    pub fn track_focus_with_stop<F>(
-        &self,
-        on_focus: F,
-        stop_signal: &AtomicBool,
-        config: &FocusTrackerConfig,
-    ) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
-    {
-        self.run(on_focus, Some(stop_signal), config)
-    }
-
-    #[cfg(feature = "async")]
-    pub async fn track_focus_async<F, Fut>(
+    pub async fn track_focus<F, Fut>(
         &self,
         on_focus: F,
         config: &FocusTrackerConfig,
@@ -73,11 +51,10 @@ impl ImplFocusTracker {
         F: FnMut(FocusedWindow) -> Fut,
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
-        self.run_async(on_focus, None, config).await
+        self.run(on_focus, None, config).await
     }
 
-    #[cfg(feature = "async")]
-    pub async fn track_focus_async_with_stop<F, Fut>(
+    pub async fn track_focus_with_stop<F, Fut>(
         &self,
         on_focus: F,
         stop_signal: &AtomicBool,
@@ -87,11 +64,10 @@ impl ImplFocusTracker {
         F: FnMut(FocusedWindow) -> Fut,
         Fut: Future<Output = FocusTrackerResult<()>>,
     {
-        self.run_async(on_focus, Some(stop_signal), config).await
+        self.run(on_focus, Some(stop_signal), config).await
     }
 
-    #[cfg(feature = "async")]
-    async fn run_async<F, Fut>(
+    async fn run<F, Fut>(
         &self,
         mut on_focus: F,
         stop_signal: Option<&AtomicBool>,
@@ -140,60 +116,6 @@ impl ImplFocusTracker {
             }
 
             tokio::time::sleep(config.poll_interval).await;
-        }
-
-        Ok(())
-    }
-
-    #[allow(clippy::unused_self)] // &self required for cross-platform API consistency
-    fn run<F>(
-        &self,
-        mut on_focus: F,
-        stop_signal: Option<&AtomicBool>,
-        config: &FocusTrackerConfig,
-    ) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
-    {
-        let mut prev_state = FocusState::default();
-        let mut icon_cache: HashMap<String, Arc<image::RgbaImage>> = HashMap::new();
-
-        loop {
-            if should_stop(stop_signal) {
-                tracing::debug!("Stop signal received, exiting focus tracking loop");
-                break;
-            }
-
-            match utils::get_frontmost_window_basic_info() {
-                Ok(mut window) => {
-                    if prev_state.has_changed(&window) {
-                        if let Some(cached) = icon_cache.get(&window.process_name) {
-                            window.icon = Some(Arc::clone(cached));
-                        } else {
-                            match utils::fetch_icon_for_pid(
-                                window.process_id.cast_signed(),
-                                &config.icon,
-                            ) {
-                                Ok(Some(icon)) => {
-                                    let icon = Arc::new(icon);
-                                    icon_cache
-                                        .insert(window.process_name.clone(), Arc::clone(&icon));
-                                    window.icon = Some(icon);
-                                }
-                                Ok(None) => {}
-                                Err(e) => tracing::debug!("Error fetching icon: {e}"),
-                            }
-                        }
-                        prev_state.update_from(&window);
-                        on_focus(window)?;
-                    }
-                }
-                Err(e) => {
-                    tracing::debug!("Error getting window info: {e}");
-                }
-            }
-
-            std::thread::sleep(config.poll_interval);
         }
 
         Ok(())
