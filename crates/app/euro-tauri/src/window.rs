@@ -18,7 +18,7 @@ pub(crate) mod state {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
 pub fn create(
     handle: &AppHandle,
     label: &str,
@@ -33,6 +33,27 @@ pub fn create(
     .title(handle.package_info().name.clone())
     .decorations(false)
     .transparent(true)
+    .disable_drag_drop_handler()
+    .min_inner_size(800.0, 600.0)
+    .inner_size(1160.0, 720.0)
+    .build()?;
+    Ok(window)
+}
+
+#[cfg(target_os = "windows")]
+pub fn create(
+    handle: &AppHandle,
+    label: &str,
+    window_relative_url: String,
+) -> tauri::Result<tauri::WebviewWindow> {
+    let window = tauri::WebviewWindowBuilder::new(
+        handle,
+        label,
+        tauri::WebviewUrl::App(window_relative_url.into()),
+    )
+    .resizable(true)
+    .title(handle.package_info().name.clone())
+    .decorations(false)
     .disable_drag_drop_handler()
     .min_inner_size(800.0, 600.0)
     .inner_size(1160.0, 720.0)
