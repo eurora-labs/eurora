@@ -11,8 +11,6 @@
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
-	import SearchXIcon from '@lucide/svelte/icons/search-x';
-
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	const taurpc = inject(TAURPC_SERVICE);
@@ -44,14 +42,11 @@
 
 		loading = true;
 		debounceTimer = setTimeout(async () => {
-			console.log('[search] firing query:', q);
 			try {
 				const [threads, messages] = await Promise.all([
 					taurpc.thread.search_threads(q, 10, 0),
 					taurpc.thread.search_messages(q, 10, 0),
 				]);
-				console.log('[search] threads:', JSON.stringify(threads));
-				console.log('[search] messages:', JSON.stringify(messages));
 				threadResults = threads;
 				messageResults = messages;
 			} catch (e) {
@@ -60,6 +55,8 @@
 				loading = false;
 			}
 		}, 300);
+
+		return () => clearTimeout(debounceTimer);
 	});
 
 	function selectThread(id: string) {
@@ -75,7 +72,12 @@
 	}
 
 	function sanitizeSnippet(html: string): string {
-		return html.replace(/<(?!\/?mark>)/g, '&lt;').replace(/(?<!<\/?mark)>/g, '&gt;');
+		return html
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/&lt;mark&gt;/g, '<mark>')
+			.replace(/&lt;\/mark&gt;/g, '</mark>');
 	}
 </script>
 

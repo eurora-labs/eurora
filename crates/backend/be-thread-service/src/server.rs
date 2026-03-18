@@ -1066,6 +1066,10 @@ impl ProtoThreadService for ThreadService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
+        if req.query.trim().len() < 2 {
+            return Ok(Response::new(SearchThreadsResponse { results: vec![] }));
+        }
+
         let results = self
             .db
             .search_threads(user_id, &req.query, req.limit as i64, req.offset as i64)
@@ -1096,13 +1100,9 @@ impl ProtoThreadService for ThreadService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        tracing::info!(
-            "[search_messages] user_id={}, query='{}', limit={}, offset={}",
-            user_id,
-            req.query,
-            req.limit,
-            req.offset
-        );
+        if req.query.trim().len() < 2 {
+            return Ok(Response::new(SearchMessagesResponse { results: vec![] }));
+        }
 
         let results = self
             .db
@@ -1110,7 +1110,11 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::info!("[search_messages] returned {} results", results.len());
+        tracing::debug!(
+            "[search_messages] query='{}', returned {} results",
+            req.query,
+            results.len()
+        );
 
         let results = results
             .into_iter()
