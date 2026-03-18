@@ -5,22 +5,20 @@
 
 mod util;
 
-use focus_tracker::{FocusTracker, FocusTrackerError, FocusTrackerResult, FocusedWindow};
+use focus_tracker::{FocusTracker, FocusTrackerError, FocusedWindow};
 use serial_test::serial;
 #[allow(unused_imports)]
 use std::env;
-use std::sync::atomic::{AtomicBool, Ordering};
 #[allow(unused_imports)]
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use util::*;
 
-/// Test macOS Accessibility permission handling
 #[cfg(target_os = "macos")]
-#[test]
+#[tokio::test]
 #[serial]
-// Only run when AX_ALLOWED=1 is set
-fn test_macos_accessibility_permission() {
+async fn test_macos_accessibility_permission() {
     if env::var("AX_ALLOWED").unwrap_or_default() != "1" {
         tracing::info!("Skipping macOS accessibility test - AX_ALLOWED=1 not set");
         return;
@@ -35,29 +33,30 @@ fn test_macos_accessibility_permission() {
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
-    let focus_events = Arc::new(Mutex::new(Vec::new()));
+    let focus_events = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
     let focus_events_clone = Arc::clone(&focus_events);
-    let result = tracker.track_focus_with_stop(
-        move |window: FocusedWindow| -> FocusTrackerResult<()> {
-            tracing::info!("Focus event received: {:?}", window);
-            if let Ok(mut events) = focus_events_clone.lock() {
-                events.push(window);
-            }
-            Ok(())
-        },
-        &stop_signal,
-    );
+    let result = tracker
+        .track_focus_with_stop(
+            move |window: FocusedWindow| {
+                let events = Arc::clone(&focus_events_clone);
+                async move {
+                    tracing::info!("Focus event received: {:?}", window);
+                    events.lock().await.push(window);
+                    Ok(())
+                }
+            },
+            &stop_signal,
+        )
+        .await;
 
-    std::thread::sleep(Duration::from_millis(500));
     stop_signal.store(true, Ordering::Relaxed);
 
     match result {
         Ok(_) => {
             tracing::info!("Focus tracking succeeded - accessibility permission likely granted");
-            if let Ok(events) = focus_events.lock()
-                && events.iter().any(|w| w.window_title.is_none())
-            {
+            let events = focus_events.lock().await;
+            if events.iter().any(|w| w.window_title.is_none()) {
                 tracing::info!("Some windows had no title - possible permission issue");
             }
         }
@@ -70,11 +69,10 @@ fn test_macos_accessibility_permission() {
     }
 }
 
-/// Test macOS Accessibility without permission (mock test)
 #[cfg(target_os = "macos")]
-#[test]
+#[tokio::test]
 #[serial]
-fn test_macos_accessibility_no_permission_mock() {
+async fn test_macos_accessibility_no_permission_mock() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -86,18 +84,19 @@ fn test_macos_accessibility_no_permission_mock() {
     tracing::info!("FocusTracker created successfully: {:?}", tracker);
 
     let stop_signal = AtomicBool::new(false);
-
     stop_signal.store(true, Ordering::Relaxed);
 
-    let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FocusTrackerResult<()> {
-            if window.window_title.is_none() {
-                tracing::info!("Received window with no title - possible permission issue");
-            }
-            Ok(())
-        },
-        &stop_signal,
-    );
+    let result = tracker
+        .track_focus_with_stop(
+            |window: FocusedWindow| async move {
+                if window.window_title.is_none() {
+                    tracing::info!("Received window with no title - possible permission issue");
+                }
+                Ok(())
+            },
+            &stop_signal,
+        )
+        .await;
 
     match result {
         Ok(_) => tracing::info!("Focus tracking completed without error"),
@@ -105,11 +104,10 @@ fn test_macos_accessibility_no_permission_mock() {
     }
 }
 
-/// Test Wayland unsupported compositor handling
 #[cfg(target_os = "linux")]
-#[test]
+#[tokio::test]
 #[serial]
-fn test_wayland_unsupported_compositor() {
+async fn test_wayland_unsupported_compositor() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -124,29 +122,20 @@ fn test_wayland_unsupported_compositor() {
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
-
-    let timeout_handle = std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_millis(1000));
-    });
-
-    std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_millis(500));
-    });
-
     stop_signal.store(true, Ordering::Relaxed);
 
-    let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FocusTrackerResult<()> {
-            tracing::info!(
-                "Unexpected focus event in unsupported environment: {:?}",
-                window
-            );
-            Ok(())
-        },
-        &stop_signal,
-    );
-
-    let _ = timeout_handle.join();
+    let result = tracker
+        .track_focus_with_stop(
+            |window: FocusedWindow| async move {
+                tracing::info!(
+                    "Unexpected focus event in unsupported environment: {:?}",
+                    window
+                );
+                Ok(())
+            },
+            &stop_signal,
+        )
+        .await;
 
     match result {
         Ok(_) => {
@@ -161,7 +150,6 @@ fn test_wayland_unsupported_compositor() {
     }
 }
 
-/// Test missing X server handling
 #[cfg(target_os = "linux")]
 #[test]
 #[serial]
@@ -185,18 +173,22 @@ fn test_missing_x_server() {
     }
 
     let result = std::panic::catch_unwind(|| {
-        let tracker = FocusTracker::new();
-        let stop_signal = AtomicBool::new(false);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let tracker = FocusTracker::new();
+            let stop_signal = AtomicBool::new(false);
+            stop_signal.store(true, Ordering::Relaxed);
 
-        stop_signal.store(true, Ordering::Relaxed);
-
-        tracker.track_focus_with_stop(
-            |window: FocusedWindow| -> FocusTrackerResult<()> {
-                tracing::info!("Unexpected focus event without display: {:?}", window);
-                Ok(())
-            },
-            &stop_signal,
-        )
+            tracker
+                .track_focus_with_stop(
+                    |window: FocusedWindow| async move {
+                        tracing::info!("Unexpected focus event without display: {:?}", window);
+                        Ok(())
+                    },
+                    &stop_signal,
+                )
+                .await
+        })
     });
 
     if let Some(display) = original_display {
@@ -231,11 +223,10 @@ fn test_missing_x_server() {
     }
 }
 
-/// Test Windows service context handling (mock)
 #[cfg(target_os = "windows")]
-#[test]
+#[tokio::test]
 #[serial]
-fn test_windows_service_context_mock() {
+async fn test_windows_service_context_mock() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -245,16 +236,17 @@ fn test_windows_service_context_mock() {
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
-
     stop_signal.store(true, Ordering::Relaxed);
 
-    let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FocusTrackerResult<()> {
-            tracing::info!("Focus event in service context: {:?}", window);
-            Ok(())
-        },
-        &stop_signal,
-    );
+    let result = tracker
+        .track_focus_with_stop(
+            |window: FocusedWindow| async move {
+                tracing::info!("Focus event in service context: {:?}", window);
+                Ok(())
+            },
+            &stop_signal,
+        )
+        .await;
 
     match result {
         Ok(_) => {
@@ -269,7 +261,6 @@ fn test_windows_service_context_mock() {
     }
 }
 
-/// Test general error handling robustness
 #[test]
 #[serial]
 fn test_error_handling_robustness() {
@@ -296,7 +287,6 @@ fn test_error_handling_robustness() {
     }
 }
 
-/// Test that all error types can be created and displayed
 #[test]
 fn test_error_types() {
     tracing::info!("Testing all error types");
@@ -308,7 +298,6 @@ fn test_error_types() {
         },
         FocusTrackerError::NoDisplay,
         FocusTrackerError::NotInteractiveSession,
-        FocusTrackerError::ChannelClosed,
         FocusTrackerError::InvalidConfig {
             reason: "test invalid config".into(),
         },
@@ -327,10 +316,9 @@ fn test_error_types() {
     tracing::info!("All error types tested successfully");
 }
 
-/// Test timeout behavior to ensure tests don't hang
-#[test]
+#[tokio::test]
 #[serial]
-fn test_timeout_behavior() {
+async fn test_timeout_behavior() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -340,26 +328,19 @@ fn test_timeout_behavior() {
 
     let tracker = FocusTracker::new();
     let stop_signal = AtomicBool::new(false);
-
-    let _timeout_handle = std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_millis(500));
-    });
-
-    std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_millis(400));
-    });
-
     stop_signal.store(true, Ordering::Relaxed);
 
     let start_time = std::time::Instant::now();
 
-    let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FocusTrackerResult<()> {
-            tracing::info!("Focus event: {:?}", window);
-            Ok(())
-        },
-        &stop_signal,
-    );
+    let result = tracker
+        .track_focus_with_stop(
+            |window: FocusedWindow| async move {
+                tracing::info!("Focus event: {:?}", window);
+                Ok(())
+            },
+            &stop_signal,
+        )
+        .await;
 
     let elapsed = start_time.elapsed();
 
