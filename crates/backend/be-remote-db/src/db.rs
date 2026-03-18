@@ -19,16 +19,24 @@ use crate::{
 
 pub const DEFAULT_TOKEN_LIMIT: i64 = 50_000;
 
-fn build_prefix_tsquery(query: &str) -> String {
-    query
+fn build_prefix_tsquery(query: &str) -> Option<String> {
+    let terms: Vec<String> = query
         .split_whitespace()
-        .filter(|w| !w.is_empty())
-        .map(|w| {
+        .filter_map(|w| {
             let sanitized: String = w.chars().filter(|c| c.is_alphanumeric()).collect();
-            format!("{}:*", sanitized)
+            if sanitized.is_empty() {
+                None
+            } else {
+                Some(format!("{}:*", sanitized))
+            }
         })
-        .collect::<Vec<_>>()
-        .join(" & ")
+        .collect();
+
+    if terms.is_empty() {
+        None
+    } else {
+        Some(terms.join(" & "))
+    }
 }
 
 fn regex_escape(query: &str) -> String {
@@ -2040,7 +2048,10 @@ impl DatabaseManager {
         limit: i64,
         offset: i64,
     ) -> DbResult<Vec<SearchResultMessage>> {
-        let tsquery = build_prefix_tsquery(query);
+        let tsquery = match build_prefix_tsquery(query) {
+            Some(q) => q,
+            None => return Ok(vec![]),
+        };
         let ilike_pattern = format!("%{}%", query.replace('%', r"\%").replace('_', r"\_"));
         let regex_pattern = regex_escape(query);
         let results = sqlx::query_as::<_, SearchResultMessage>(
@@ -2089,7 +2100,10 @@ impl DatabaseManager {
         limit: i64,
         offset: i64,
     ) -> DbResult<Vec<SearchResultThread>> {
-        let tsquery = build_prefix_tsquery(query);
+        let tsquery = match build_prefix_tsquery(query) {
+            Some(q) => q,
+            None => return Ok(vec![]),
+        };
         let ilike_pattern = format!("%{}%", query.replace('%', r"\%").replace('_', r"\_"));
         let results = sqlx::query_as::<_, SearchResultThread>(
             r#"

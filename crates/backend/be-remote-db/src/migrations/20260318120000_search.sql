@@ -24,3 +24,14 @@ CREATE INDEX idx_threads_title_trgm ON threads USING GIN (title gin_trgm_ops);
 
 CREATE INDEX idx_threads_title_tsv ON threads
   USING GIN (to_tsvector('english', immutable_unaccent(coalesce(title, ''))));
+
+CREATE INDEX idx_messages_content_trgm ON messages USING GIN (content gin_trgm_ops);
+
+UPDATE messages
+SET content = (
+    SELECT string_agg(part->>'text', ' ')
+    FROM jsonb_array_elements(content::jsonb) AS part
+    WHERE part->>'type' = 'text'
+)
+WHERE content ~ '^\[.*"type"\s*:\s*"text".*\]$'
+  AND content::jsonb IS NOT NULL;
