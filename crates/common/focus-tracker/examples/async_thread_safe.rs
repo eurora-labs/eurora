@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let handle = tokio::spawn(async move {
         tracker
-            .track_focus_async(move |window| {
+            .track_focus(move |window| {
                 let focus_count = Arc::clone(&focus_count_clone);
                 async move {
                     let mut count = focus_count.lock().await;

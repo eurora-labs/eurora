@@ -160,7 +160,7 @@ impl CollectorService {
 
             let strategy_inner = Arc::clone(&strategy_clone);
             let _ = tracker
-                .track_focus_async(move |window: FocusedWindow| {
+                .track_focus(move |window: FocusedWindow| {
                     let prev_focus = Arc::clone(&prev_focus);
                     let strategy_for_update = Arc::clone(&strategy_inner);
                     let activity_tx_inner = activity_tx.clone();
