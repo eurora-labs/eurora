@@ -16,27 +16,14 @@ fn qualify_x11_error(err: FocusTrackerError) -> FocusTrackerError {
 
 pub(crate) async fn track_focus<F, Fut>(
     on_focus: F,
+    stop_signal: Option<&AtomicBool>,
     config: &FocusTrackerConfig,
 ) -> FocusTrackerResult<()>
 where
     F: FnMut(FocusedWindow) -> Fut,
     Fut: Future<Output = FocusTrackerResult<()>>,
 {
-    xorg_focus_tracker::track_focus(on_focus, config)
-        .await
-        .map_err(qualify_x11_error)
-}
-
-pub(crate) async fn track_focus_with_stop<F, Fut>(
-    on_focus: F,
-    stop_signal: &AtomicBool,
-    config: &FocusTrackerConfig,
-) -> FocusTrackerResult<()>
-where
-    F: FnMut(FocusedWindow) -> Fut,
-    Fut: Future<Output = FocusTrackerResult<()>>,
-{
-    xorg_focus_tracker::track_focus_with_stop(on_focus, stop_signal, config)
+    xorg_focus_tracker::track_focus(on_focus, stop_signal, config)
         .await
         .map_err(qualify_x11_error)
 }
