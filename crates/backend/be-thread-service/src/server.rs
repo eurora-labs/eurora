@@ -19,7 +19,9 @@ use proto_gen::thread::{
     CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
     GenerateThreadTitleResponse, GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest,
     GetMessagesResponse, GetThreadResponse, ListThreadsRequest, ListThreadsResponse,
-    MessageSiblingInfo, MessageTreeNode, SwitchBranchRequest, Thread,
+    MessageSiblingInfo, MessageTreeNode, SearchMessageResult, SearchMessagesRequest,
+    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
+    SwitchBranchRequest, Thread,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -342,10 +344,7 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-
-        let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
-        })?;
+        let content = human_message.content.as_text();
 
         let message = self
             .db
@@ -386,10 +385,7 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-
-        let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
-        })?;
+        let content = human_message.content.as_text();
 
         let message = self
             .db
@@ -431,10 +427,7 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let system_message: SystemMessage = proto_message.into();
-
-        let content = serde_json::to_value(&system_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
-        })?;
+        let content = system_message.content.as_text();
 
         let message = self
             .db
@@ -559,9 +552,7 @@ impl ProtoThreadService for ThreadService {
 
         messages.push(human_message.clone().into());
 
-        let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize message content: {}", e))
-        })?;
+        let content = human_message.content.as_text();
 
         let additional_kwargs =
             serde_json::to_value(&human_message.additional_kwargs).map_err(|e| {
@@ -686,7 +677,7 @@ impl ProtoThreadService for ThreadService {
                     .thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
-                    .content(serde_json::json!(full_content))
+                    .content(full_content.clone())
                     .maybe_reasoning_blocks(reasoning_blocks)
                     .call()
                     .await;
@@ -1032,12 +1023,6 @@ impl ProtoThreadService for ThreadService {
             .nodes
             .into_iter()
             .map(|n| {
-                let content = if let Some(text) = n.content.as_str() {
-                    text.to_string()
-                } else {
-                    serde_json::to_string(&n.content).unwrap_or_default()
-                };
-
                 let additional_kwargs = if n.additional_kwargs.is_null()
                     || n.additional_kwargs
                         .as_object()
@@ -1057,7 +1042,7 @@ impl ProtoThreadService for ThreadService {
                     id: n.id.to_string(),
                     parent_message_id: n.parent_message_id.map(|id| id.to_string()),
                     message_type: n.message_type.to_string(),
-                    content,
+                    content: n.content,
                     level: n.level as u32,
                     sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
                     sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
@@ -1071,5 +1056,76 @@ impl ProtoThreadService for ThreadService {
             nodes: tree_nodes,
             has_more,
         }))
+    }
+
+    async fn search_threads(
+        &self,
+        request: Request<SearchThreadsRequest>,
+    ) -> Result<Response<SearchThreadsResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        if req.query.trim().len() < 2 {
+            return Ok(Response::new(SearchThreadsResponse { results: vec![] }));
+        }
+
+        let results = self
+            .db
+            .search_threads(user_id, &req.query, req.limit as i64, req.offset as i64)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let results = results
+            .into_iter()
+            .map(|r| SearchThreadResult {
+                id: r.id.to_string(),
+                title: r.title.unwrap_or_default(),
+                rank: r.rank,
+                updated_at: Some(Timestamp {
+                    seconds: r.updated_at.timestamp(),
+                    nanos: r.updated_at.timestamp_subsec_nanos() as i32,
+                }),
+            })
+            .collect();
+
+        Ok(Response::new(SearchThreadsResponse { results }))
+    }
+
+    async fn search_messages(
+        &self,
+        request: Request<SearchMessagesRequest>,
+    ) -> Result<Response<SearchMessagesResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        if req.query.trim().len() < 2 {
+            return Ok(Response::new(SearchMessagesResponse { results: vec![] }));
+        }
+
+        let results = self
+            .db
+            .search_messages(user_id, &req.query, req.limit as i64, req.offset as i64)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let results = results
+            .into_iter()
+            .map(|r| SearchMessageResult {
+                id: r.id.to_string(),
+                thread_id: r.thread_id.to_string(),
+                message_type: r.message_type.to_string(),
+                content: String::new(),
+                rank: r.rank,
+                created_at: Some(Timestamp {
+                    seconds: r.created_at.timestamp(),
+                    nanos: r.created_at.timestamp_subsec_nanos() as i32,
+                }),
+                snippet: r.snippet,
+            })
+            .collect();
+
+        Ok(Response::new(SearchMessagesResponse { results }))
     }
 }
