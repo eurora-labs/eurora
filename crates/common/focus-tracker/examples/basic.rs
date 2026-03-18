@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Press Ctrl+C to exit.");
     println!();
 
-    let tracker = FocusTracker::new();
+    let tracker = FocusTracker::builder().build();
     let stop_signal = Arc::new(AtomicBool::new(false));
 
     let r = Arc::clone(&stop_signal);
@@ -28,30 +28,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut event_count = 0u64;
     tracker
-        .track_focus_with_stop(
-            |focused_window| {
-                event_count += 1;
-                let count = event_count;
-                async move {
-                    println!(
-                        "📱 Focus Event #{}: {}",
-                        count,
-                        focused_window.window_title.as_deref().unwrap_or("Unknown")
-                    );
-                    println!("   Process: {}", &focused_window.process_name);
+        .track_focus()
+        .on_focus(|focused_window| {
+            event_count += 1;
+            let count = event_count;
+            async move {
+                println!(
+                    "📱 Focus Event #{}: {}",
+                    count,
+                    focused_window.window_title.as_deref().unwrap_or("Unknown")
+                );
+                println!("   Process: {}", &focused_window.process_name);
 
-                    let icon_status = if focused_window.icon.is_some() {
-                        "✅ Has icon"
-                    } else {
-                        "❌ No icon"
-                    };
-                    println!("   Icon: {}", icon_status);
-                    println!();
-                    Ok(())
-                }
-            },
-            &stop_signal,
-        )
+                let icon_status = if focused_window.icon.is_some() {
+                    "✅ Has icon"
+                } else {
+                    "❌ No icon"
+                };
+                println!("   Icon: {}", icon_status);
+                println!();
+                Ok(())
+            }
+        })
+        .stop_signal(&stop_signal)
+        .call()
         .await?;
 
     println!("📊 Total focus events captured: {}", event_count);

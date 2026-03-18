@@ -1,6 +1,7 @@
 pub use focus_tracker_core::*;
 
 mod focus_tracker;
+pub(crate) mod icon_cache;
 
 pub use focus_tracker::*;
 
@@ -15,5 +16,3 @@ mod platform;
 #[cfg(target_os = "windows")]
 #[path = "windows/mod.rs"]
 mod platform;
-
-pub use platform::utils;

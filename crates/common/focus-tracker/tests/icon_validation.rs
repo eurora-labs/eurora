@@ -43,18 +43,18 @@ async fn test_icon_format_png() {
                 }
 
                 let tracker_handle = tokio::spawn(async move {
-                    let tracker = FocusTracker::new();
+                    let tracker = FocusTracker::builder().build();
                     let _ = tracker
-                        .track_focus_with_stop(
-                            move |window: FocusedWindow| {
-                                let events = Arc::clone(&focus_events_clone);
-                                async move {
-                                    events.lock().await.push(window);
-                                    Ok(())
-                                }
-                            },
-                            &stop_signal_clone,
-                        )
+                        .track_focus()
+                        .on_focus(move |window: FocusedWindow| {
+                            let events = Arc::clone(&focus_events_clone);
+                            async move {
+                                events.lock().await.push(window);
+                                Ok(())
+                            }
+                        })
+                        .stop_signal(&stop_signal_clone)
+                        .call()
                         .await;
                 });
 
@@ -107,18 +107,18 @@ async fn test_icon_format_rgba() {
                 }
 
                 let tracker_handle = tokio::spawn(async move {
-                    let tracker = FocusTracker::new();
+                    let tracker = FocusTracker::builder().build();
                     let _ = tracker
-                        .track_focus_with_stop(
-                            move |window: FocusedWindow| {
-                                let events = Arc::clone(&focus_events_clone);
-                                async move {
-                                    events.lock().await.push(window);
-                                    Ok(())
-                                }
-                            },
-                            &stop_signal_clone,
-                        )
+                        .track_focus()
+                        .on_focus(move |window: FocusedWindow| {
+                            let events = Arc::clone(&focus_events_clone);
+                            async move {
+                                events.lock().await.push(window);
+                                Ok(())
+                            }
+                        })
+                        .stop_signal(&stop_signal_clone)
+                        .call()
                         .await;
                 });
 
@@ -194,18 +194,18 @@ async fn test_icon_diff_between_apps() {
                 }
 
                 let tracker_handle = tokio::spawn(async move {
-                    let tracker = FocusTracker::new();
+                    let tracker = FocusTracker::builder().build();
                     let _ = tracker
-                        .track_focus_with_stop(
-                            move |window: FocusedWindow| {
-                                let events = Arc::clone(&focus_events_clone);
-                                async move {
-                                    events.lock().await.push(window);
-                                    Ok(())
-                                }
-                            },
-                            &stop_signal_clone,
-                        )
+                        .track_focus()
+                        .on_focus(move |window: FocusedWindow| {
+                            let events = Arc::clone(&focus_events_clone);
+                            async move {
+                                events.lock().await.push(window);
+                                Ok(())
+                            }
+                        })
+                        .stop_signal(&stop_signal_clone)
+                        .call()
                         .await;
                 });
 

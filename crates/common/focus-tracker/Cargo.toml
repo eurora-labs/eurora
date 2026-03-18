@@ -15,6 +15,7 @@ keywords = [
 ]
 
 [dependencies]
+bon = { workspace = true }
 focus-tracker-core = { workspace = true }
 image = { workspace = true }
 tokio = { workspace = true, features = [
