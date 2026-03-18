@@ -2,7 +2,7 @@
 //!
 //! This example demonstrates:
 //! - Custom FocusTrackerConfig with all available options
-//! - Using track_focus_with_stop for manual control
+//! - Using track_focus with stop_signal for manual control
 //! - Icon extraction and saving to files
 //! - Custom polling intervals and icon sizes
 //! - Proper signal handling and graceful shutdown
@@ -24,7 +24,8 @@ fn save_icon_to_file(
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();
@@ -49,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!();
 
-    let tracker = FocusTracker::with_config(config);
+    let tracker = FocusTracker::builder().config(config).build();
 
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_clone = stop_signal.clone();
@@ -59,56 +60,68 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         stop_signal_clone.store(true, Ordering::SeqCst);
     })?;
 
-    let mut event_count = 0;
-    let mut icons_saved = 0;
+    let mut event_count = 0u64;
+    let mut icons_saved = 0u64;
     let mut unique_processes = std::collections::HashSet::new();
     let start_time = std::time::Instant::now();
 
     println!("🎯 Focus tracking active! Switch between applications...");
     println!();
 
-    let result = tracker.track_focus_with_stop(
-        |window: FocusedWindow| -> FocusTrackerResult<()> {
+    let result = tracker
+        .track_focus()
+        .on_focus(|window: FocusedWindow| {
             event_count += 1;
+            let count = event_count;
 
-            let window_title = window.window_title.as_deref().unwrap_or("Unknown");
-            let process_name = window.process_name;
+            let window_title = window
+                .window_title
+                .as_deref()
+                .unwrap_or("Unknown")
+                .to_string();
+            let process_name = window.process_name.clone();
 
-            unique_processes.insert(process_name.to_string());
+            unique_processes.insert(process_name.clone());
 
-            println!("🔄 Focus Event #{}", event_count);
-            println!("   📋 Title: {}", window_title);
-            println!(
-                "   ⚙️  Process: {} (PID: {:?})",
-                process_name, window.process_id
-            );
-
-            if let Some(icon) = window.icon {
-                let (width, height) = (icon.width(), icon.height());
-                println!("   🖼️  Icon: {}x{} pixels", width, height);
-
-                icons_saved += 1;
-                let filename = format!(
-                    "examples/recorded_icons/advanced_{:03}_{}.png",
-                    icons_saved,
-                    process_name.replace("/", "_").replace(" ", "_")
+            let icon_result: FocusTrackerResult<()> = {
+                println!("🔄 Focus Event #{}", count);
+                println!("   📋 Title: {}", window_title);
+                println!(
+                    "   ⚙️  Process: {} (PID: {:?})",
+                    process_name, window.process_id
                 );
 
-                match save_icon_to_file(&icon, &filename) {
-                    Ok(_) => println!("   ✅ Icon saved successfully"),
-                    Err(e) => println!("   ❌ Failed to save icon: {}", e),
+                if let Some(icon) = &window.icon {
+                    let (width, height) = (icon.width(), icon.height());
+                    println!("   🖼️  Icon: {}x{} pixels", width, height);
+
+                    icons_saved += 1;
+                    let saved = icons_saved;
+                    let filename = format!(
+                        "examples/recorded_icons/advanced_{:03}_{}.png",
+                        saved,
+                        process_name.replace("/", "_").replace(" ", "_")
+                    );
+
+                    match save_icon_to_file(icon, &filename) {
+                        Ok(_) => println!("   ✅ Icon saved successfully"),
+                        Err(e) => println!("   ❌ Failed to save icon: {}", e),
+                    }
+                } else {
+                    println!("   🚫 No icon available");
                 }
-            } else {
-                println!("   🚫 No icon available");
-            }
 
-            println!("   ⏱️  Uptime: {:?}", start_time.elapsed());
-            println!();
+                println!("   ⏱️  Uptime: {:?}", start_time.elapsed());
+                println!();
 
-            Ok(())
-        },
-        &stop_signal,
-    );
+                Ok(())
+            };
+
+            async move { icon_result }
+        })
+        .stop_signal(&stop_signal)
+        .call()
+        .await;
 
     match result {
         Ok(_) => println!("✅ Focus tracking completed successfully"),

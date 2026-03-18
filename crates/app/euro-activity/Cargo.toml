@@ -20,7 +20,7 @@ euro-browser = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-process = { workspace = true }
-focus-tracker = { workspace = true, features = ["async"] }
+focus-tracker = { workspace = true }
 humantime-serde = { workspace = true }
 image = { workspace = true }
 prost = { workspace = true }
