@@ -17,18 +17,23 @@ export class UserService {
 		this.taurpc = taurpc;
 	}
 
-	async init() {
-		this.authenticated = await this.taurpc.auth.is_authenticated();
+	private async fetchProfile() {
+		const [u, e, r] = await Promise.all([
+			this.taurpc.auth.get_username(),
+			this.taurpc.auth.get_email(),
+			this.taurpc.auth.get_role(),
+		]);
+		this.authenticated = true;
+		this.username = u;
+		this.email = e;
+		this.role = r;
+	}
 
-		if (this.authenticated) {
-			const [u, e, r] = await Promise.all([
-				this.taurpc.auth.get_username(),
-				this.taurpc.auth.get_email(),
-				this.taurpc.auth.get_role(),
-			]);
-			this.username = u;
-			this.email = e;
-			this.role = r;
+	async init() {
+		const isAuth = await this.taurpc.auth.is_authenticated();
+
+		if (isAuth) {
+			await this.fetchProfile();
 		}
 
 		this.unlisteners.push(
@@ -50,10 +55,12 @@ export class UserService {
 
 	async login(login: string, password: string): Promise<void> {
 		await this.taurpc.auth.login(login, password);
+		await this.fetchProfile();
 	}
 
 	async register(username: string, email: string, password: string): Promise<void> {
 		await this.taurpc.auth.register(username, email, password);
+		await this.fetchProfile();
 	}
 
 	async logout(): Promise<void> {
@@ -65,7 +72,11 @@ export class UserService {
 	}
 
 	async pollForLogin(): Promise<boolean> {
-		return this.taurpc.auth.poll_for_login();
+		const success = await this.taurpc.auth.poll_for_login();
+		if (success) {
+			await this.fetchProfile();
+		}
+		return success;
 	}
 
 	async refreshSession(): Promise<void> {
