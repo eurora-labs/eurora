@@ -259,7 +259,7 @@ pub struct Message {
     pub user_id: Uuid,
     pub parent_message_id: Option<Uuid>,
     pub message_type: MessageType,
-    pub content: serde_json::Value,
+    pub content: String,
     pub tool_call_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
     pub additional_kwargs: serde_json::Value,
@@ -280,7 +280,7 @@ pub struct MessageTreeNode {
     pub id: Uuid,
     pub parent_message_id: Option<Uuid>,
     pub message_type: MessageType,
-    pub content: serde_json::Value,
+    pub content: String,
     pub additional_kwargs: serde_json::Value,
     pub reasoning_blocks: Option<serde_json::Value>,
     pub level: i32,
@@ -312,4 +312,23 @@ pub struct TokenUsage {
     pub cache_creation_tokens: i64,
     pub cache_read_tokens: i64,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SearchResultMessage {
+    pub id: Uuid,
+    pub thread_id: Uuid,
+    pub message_type: MessageType,
+    pub content: String,
+    pub snippet: String,
+    pub rank: f32,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SearchResultThread {
+    pub id: Uuid,
+    pub title: Option<String>,
+    pub rank: f32,
+    pub updated_at: DateTime<Utc>,
 }

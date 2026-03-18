@@ -3,9 +3,8 @@ use crate::types::{Message, MessageType, Thread};
 use chrono::DateTime;
 use prost_types::Timestamp;
 use proto_gen::agent_chain::{
-    ProtoAiMessage, ProtoBaseMessage, ProtoContentPart, ProtoContentParts, ProtoHumanMessage,
-    ProtoMessageContent, ProtoSystemMessage, ProtoTextPart, ProtoToolCall, ProtoToolMessage,
-    ProtoToolStatus, proto_base_message, proto_message_content,
+    ProtoAiMessage, ProtoBaseMessage, ProtoHumanMessage, ProtoMessageContent, ProtoSystemMessage,
+    ProtoToolCall, ProtoToolMessage, ProtoToolStatus, proto_base_message, proto_message_content,
 };
 use uuid::Uuid;
 
@@ -84,7 +83,7 @@ impl From<Message> for ProtoBaseMessage {
 
         match msg.message_type {
             MessageType::Human => {
-                let content = json_to_proto_message_content(&msg.content);
+                let content = text_to_proto_message_content(&msg.content);
                 ProtoBaseMessage {
                     message: Some(proto_base_message::Message::Human(ProtoHumanMessage {
                         content: Some(content),
@@ -96,7 +95,7 @@ impl From<Message> for ProtoBaseMessage {
                 }
             }
             MessageType::System => {
-                let content = json_to_proto_message_content(&msg.content);
+                let content = text_to_proto_message_content(&msg.content);
                 ProtoBaseMessage {
                     message: Some(proto_base_message::Message::System(ProtoSystemMessage {
                         content: Some(content),
@@ -108,7 +107,7 @@ impl From<Message> for ProtoBaseMessage {
                 }
             }
             MessageType::Ai => {
-                let content = json_to_proto_message_content(&msg.content);
+                let content = text_to_proto_message_content(&msg.content);
                 let tool_calls = msg
                     .tool_calls
                     .as_ref()
@@ -128,7 +127,7 @@ impl From<Message> for ProtoBaseMessage {
                 }
             }
             MessageType::Tool => {
-                let content = json_to_proto_message_content(&msg.content);
+                let content = text_to_proto_message_content(&msg.content);
                 let tool_call_id = msg.tool_call_id.unwrap_or_default();
                 ProtoBaseMessage {
                     message: Some(proto_base_message::Message::Tool(ProtoToolMessage {
@@ -147,45 +146,9 @@ impl From<Message> for ProtoBaseMessage {
     }
 }
 
-fn json_to_proto_message_content(content: &serde_json::Value) -> ProtoMessageContent {
-    if let Some(text) = content.get("Text").and_then(|v| v.as_str()) {
-        return ProtoMessageContent {
-            content: Some(proto_message_content::Content::Text(text.to_string())),
-        };
-    }
-
-    if let Some(parts) = content.get("Parts").and_then(|v| v.as_array()) {
-        let proto_parts: Vec<ProtoContentPart> = parts
-            .iter()
-            .filter_map(|part| {
-                if let Some(text_obj) = part.get("Text")
-                    && let Some(text) = text_obj.get("text").and_then(|t| t.as_str())
-                {
-                    return Some(ProtoContentPart {
-                        part: Some(proto_gen::agent_chain::proto_content_part::Part::Text(
-                            ProtoTextPart {
-                                text: text.to_string(),
-                            },
-                        )),
-                    });
-                }
-                None
-            })
-            .collect();
-
-        return ProtoMessageContent {
-            content: Some(proto_message_content::Content::Parts(ProtoContentParts {
-                parts: proto_parts,
-            })),
-        };
-    }
-
-    let text = match content {
-        serde_json::Value::String(s) => s.clone(),
-        _ => content.to_string(),
-    };
+fn text_to_proto_message_content(content: &str) -> ProtoMessageContent {
     ProtoMessageContent {
-        content: Some(proto_message_content::Content::Text(text)),
+        content: Some(proto_message_content::Content::Text(content.to_string())),
     }
 }
 
