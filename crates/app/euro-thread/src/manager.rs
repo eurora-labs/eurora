@@ -9,7 +9,9 @@ use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
     ChatStreamRequest, CreateThreadRequest, GenerateThreadTitleRequest, GetMessageTreeRequest,
     GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadRequest,
-    ListThreadsRequest, SwitchBranchRequest, proto_thread_service_client::ProtoThreadServiceClient,
+    ListThreadsRequest, SearchMessagesRequest, SearchMessagesResponse, SearchThreadsRequest,
+    SearchThreadsResponse, SwitchBranchRequest,
+    proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::watch;
@@ -161,6 +163,44 @@ impl ThreadManager {
                 "Thread title could not be generated".to_string(),
             )),
         }
+    }
+
+    pub async fn search_threads(
+        &self,
+        query: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<SearchThreadsResponse> {
+        let mut client = self.client();
+        let response = client
+            .search_threads(SearchThreadsRequest {
+                query,
+                limit,
+                offset,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response)
+    }
+
+    pub async fn search_messages(
+        &self,
+        query: String,
+        limit: u32,
+        offset: u32,
+    ) -> Result<SearchMessagesResponse> {
+        let mut client = self.client();
+        let response = client
+            .search_messages(SearchMessagesRequest {
+                query,
+                limit,
+                offset,
+            })
+            .await?
+            .into_inner();
+
+        Ok(response)
     }
 }
 

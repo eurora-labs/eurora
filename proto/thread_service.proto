@@ -19,6 +19,9 @@ service ProtoThreadService {
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
   rpc SwitchBranch(SwitchBranchRequest) returns (GetMessagesResponse);
   rpc GetMessageTree(GetMessageTreeRequest) returns (GetMessageTreeResponse);
+
+  rpc SearchThreads(SearchThreadsRequest) returns (SearchThreadsResponse);
+  rpc SearchMessages(SearchMessagesRequest) returns (SearchMessagesResponse);
 }
 
 message CreateThreadRequest {
@@ -143,4 +146,41 @@ message MessageTreeNode {
 message GetMessageTreeResponse {
   repeated MessageTreeNode nodes = 1;
   bool has_more = 2;
+}
+
+message SearchThreadsRequest {
+  string query = 1;
+  uint32 limit = 2;
+  uint32 offset = 3;
+}
+
+message SearchThreadsResponse {
+  repeated SearchThreadResult results = 1;
+}
+
+message SearchThreadResult {
+  string id = 1;
+  string title = 2;
+  float rank = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message SearchMessagesRequest {
+  string query = 1;
+  uint32 limit = 2;
+  uint32 offset = 3;
+}
+
+message SearchMessagesResponse {
+  repeated SearchMessageResult results = 1;
+}
+
+message SearchMessageResult {
+  string id = 1;
+  string thread_id = 2;
+  string message_type = 3;
+  string content = 4;
+  float rank = 5;
+  google.protobuf.Timestamp created_at = 6;
+  string snippet = 7;
 }
