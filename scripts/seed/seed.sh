@@ -19,6 +19,11 @@ fi
 
 export PGPASSWORD
 
+if [[ "$PGHOST" != "localhost" && "$PGHOST" != "127.0.0.1" ]]; then
+    echo "Error: seed script refuses to run against non-localhost database ($PGHOST)" >&2
+    exit 1
+fi
+
 PSQL="psql -h $PGHOST -p $PGPORT -U $PGUSER -d $PGDATABASE -v ON_ERROR_STOP=1"
 
 echo "Seeding database at $PGHOST:$PGPORT/$PGDATABASE ..."

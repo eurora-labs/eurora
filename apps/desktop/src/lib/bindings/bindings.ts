@@ -40,7 +40,7 @@ export type ResponseChunk = { chunk: string; reasoning: string | null }
 
 export type Role = "Free" | "Tier1"
 
-export type SearchMessageResultView = { id: string; thread_id: string; message_type: string; content: string; snippet: string; rank: number }
+export type SearchMessageResultView = { id: string; thread_id: string; message_type: string; snippet: string; rank: number }
 
 export type SearchThreadResultView = { id: string; title: string; rank: number }
 

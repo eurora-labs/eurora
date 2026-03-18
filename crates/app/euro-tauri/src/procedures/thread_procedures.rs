@@ -68,7 +68,6 @@ pub struct SearchMessageResultView {
     pub id: String,
     pub thread_id: String,
     pub message_type: String,
-    pub content: String,
     pub snippet: String,
     pub rank: f32,
 }
@@ -353,7 +352,6 @@ impl ThreadApi for ThreadApiImpl {
                 id: r.id,
                 thread_id: r.thread_id,
                 message_type: r.message_type,
-                content: r.content,
                 snippet: r.snippet,
                 rank: r.rank,
             })

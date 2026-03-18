@@ -2071,7 +2071,7 @@ impl DatabaseManager {
                 ORDER BY rank DESC, created_at DESC
                 LIMIT $3 OFFSET $4
             )
-            SELECT id, thread_id, message_type, content,
+            SELECT id, thread_id, message_type,
                    regexp_replace(
                        substring(content from GREATEST(1, position(lower($7) in lower(content)) - 80) for 200),
                        $6, '<mark>\&</mark>', 'gi'
@@ -2113,7 +2113,10 @@ impl DatabaseManager {
                             THEN ts_rank(to_tsvector('english', immutable_unaccent(coalesce(title, ''))), to_tsquery('english', $1))
                             ELSE 0.0
                        END,
-                       similarity(coalesce(title, ''), $5)
+                       CASE WHEN similarity(coalesce(title, ''), $5) > 0.1
+                            THEN similarity(coalesce(title, ''), $5)
+                            ELSE 0.0
+                       END
                    ) AS rank,
                    updated_at
             FROM threads
