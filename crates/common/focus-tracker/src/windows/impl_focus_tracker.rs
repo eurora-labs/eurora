@@ -1,11 +1,10 @@
-use crate::{FocusTrackerConfig, FocusTrackerError, FocusTrackerResult, FocusedWindow};
+use crate::{
+    FocusTrackerConfig, FocusTrackerError, FocusTrackerResult, FocusedWindow, icon_cache::IconCache,
+};
 use focus_tracker_core::IconConfig;
-use std::collections::HashMap;
+use std::future::Future;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-#[cfg(feature = "async")]
-use std::future::Future;
 
 use super::utils;
 
@@ -20,15 +19,6 @@ use windows_sys::Win32::{
         ICONINFO, SendMessageW, WM_GETICON,
     },
 };
-
-#[derive(Debug, Clone)]
-pub(crate) struct ImplFocusTracker {}
-
-impl ImplFocusTracker {
-    pub(crate) fn new() -> Self {
-        Self {}
-    }
-}
 
 #[derive(Default)]
 struct FocusState {
@@ -72,13 +62,12 @@ fn should_stop(stop_signal: Option<&AtomicBool>) -> bool {
 
 fn poll_focus_change(
     prev_state: &mut FocusState,
-    icon_cache: &mut HashMap<String, Arc<image::RgbaImage>>,
+    icon_cache: &mut IconCache,
     icon_config: &IconConfig,
 ) -> Option<FocusedWindow> {
     let Some(hwnd) = utils::get_foreground_window() else {
         if prev_state.hwnd != 0 {
             prev_state.clear();
-            icon_cache.clear();
         }
         return None;
     };
@@ -115,126 +104,42 @@ fn poll_focus_change(
     Some(focused)
 }
 
-impl ImplFocusTracker {
-    pub fn track_focus<F>(&self, on_focus: F, config: &FocusTrackerConfig) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
-    {
-        self.run(on_focus, None, config)
+pub(crate) async fn track_focus<F, Fut>(
+    mut on_focus: F,
+    stop_signal: Option<&AtomicBool>,
+    config: &FocusTrackerConfig,
+) -> FocusTrackerResult<()>
+where
+    F: FnMut(FocusedWindow) -> Fut,
+    Fut: Future<Output = FocusTrackerResult<()>>,
+{
+    if !utils::is_interactive_session()? {
+        return Err(FocusTrackerError::NotInteractiveSession);
     }
 
-    pub fn track_focus_with_stop<F>(
-        &self,
-        on_focus: F,
-        stop_signal: &AtomicBool,
-        config: &FocusTrackerConfig,
-    ) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
-    {
-        self.run(on_focus, Some(stop_signal), config)
-    }
+    let mut prev_state = FocusState::default();
+    let mut icon_cache = IconCache::new(config.icon_cache_capacity);
 
-    #[cfg(feature = "async")]
-    pub async fn track_focus_async<F, Fut>(
-        &self,
-        on_focus: F,
-        config: &FocusTrackerConfig,
-    ) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FocusTrackerResult<()>>,
-    {
-        self.run_async(on_focus, None, config).await
-    }
-
-    #[cfg(feature = "async")]
-    pub async fn track_focus_async_with_stop<F, Fut>(
-        &self,
-        on_focus: F,
-        stop_signal: &AtomicBool,
-        config: &FocusTrackerConfig,
-    ) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FocusTrackerResult<()>>,
-    {
-        self.run_async(on_focus, Some(stop_signal), config).await
-    }
-
-    #[cfg(feature = "async")]
-    async fn run_async<F, Fut>(
-        &self,
-        mut on_focus: F,
-        stop_signal: Option<&AtomicBool>,
-        config: &FocusTrackerConfig,
-    ) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> Fut,
-        Fut: Future<Output = FocusTrackerResult<()>>,
-    {
-        if !utils::is_interactive_session()? {
-            return Err(FocusTrackerError::NotInteractiveSession);
+    loop {
+        if should_stop(stop_signal) {
+            tracing::debug!("Stop signal received, exiting focus tracking loop");
+            break;
         }
 
-        let mut prev_state = FocusState::default();
-        let mut icon_cache: HashMap<String, Arc<image::RgbaImage>> = HashMap::new();
+        let pending = poll_focus_change(&mut prev_state, &mut icon_cache, &config.icon);
 
-        loop {
-            if should_stop(stop_signal) {
-                tracing::debug!("Stop signal received, exiting focus tracking loop");
-                break;
-            }
-
-            let pending = poll_focus_change(&mut prev_state, &mut icon_cache, &config.icon);
-
-            if let Some(focused) = pending {
-                on_focus(focused).await?;
-            }
-
-            tokio::time::sleep(config.poll_interval).await;
+        if let Some(focused) = pending {
+            on_focus(focused).await?;
         }
 
-        Ok(())
+        tokio::time::sleep(config.poll_interval).await;
     }
 
-    #[allow(clippy::unused_self)] // &self required for cross-platform API consistency
-    fn run<F>(
-        &self,
-        mut on_focus: F,
-        stop_signal: Option<&AtomicBool>,
-        config: &FocusTrackerConfig,
-    ) -> FocusTrackerResult<()>
-    where
-        F: FnMut(FocusedWindow) -> FocusTrackerResult<()>,
-    {
-        if !utils::is_interactive_session()? {
-            return Err(FocusTrackerError::NotInteractiveSession);
-        }
-
-        let mut prev_state = FocusState::default();
-        let mut icon_cache: HashMap<String, Arc<image::RgbaImage>> = HashMap::new();
-
-        loop {
-            if should_stop(stop_signal) {
-                tracing::debug!("Stop signal received, exiting focus tracking loop");
-                break;
-            }
-
-            if let Some(focused) = poll_focus_change(&mut prev_state, &mut icon_cache, &config.icon)
-            {
-                on_focus(focused)?;
-            }
-
-            std::thread::sleep(config.poll_interval);
-        }
-
-        Ok(())
-    }
+    Ok(())
 }
 
 fn resolve_icon(
-    cache: &mut HashMap<String, Arc<image::RgbaImage>>,
+    cache: &mut IconCache,
     hwnd: HWND,
     process_id: u32,
     process_name: &str,
