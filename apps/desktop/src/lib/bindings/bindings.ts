@@ -40,6 +40,10 @@ export type ResponseChunk = { chunk: string; reasoning: string | null }
 
 export type Role = "Free" | "Tier1"
 
+export type SearchMessageResultView = { id: string; thread_id: string; message_type: string; content: string; snippet: string; rank: number }
+
+export type SearchThreadResultView = { id: string; title: string; rank: number }
+
 export type TelemetrySettings = { considered: boolean; anonymousMetrics: boolean; anonymousErrors: boolean; nonAnonymousMetrics: boolean; distinctId: string | null }
 
 export type ThreadView = { id: string | null; title: string }
@@ -48,7 +52,7 @@ export type TimelineAppEvent = { name: string; color: string | null; icon_bg: st
 
 export type UpdateInfo = { version: string; body: string | null }
 
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_email":[],"get_login_token":[],"get_role":[],"get_username":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["username","email","password"]}', 'chat':'{"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"generate_title":["thread_id","content"],"get_message_tree":["thread_id","start_level","end_level","parent_node_ids"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_email":[],"get_login_token":[],"get_role":[],"get_username":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["username","email","password"]}', 'chat':'{"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"generate_title":["thread_id","content"],"get_message_tree":["thread_id","start_level","end_level","parent_node_ids"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: Claims | null) => Promise<void>, 
 get_email: () => Promise<string>, 
 get_login_token: () => Promise<LoginToken>, 
@@ -98,6 +102,8 @@ get_message_tree: (threadId: string, startLevel: number, endLevel: number, paren
 get_messages: (threadId: string, limit: number, offset: number) => Promise<MessageView[]>, 
 list: (limit: number, offset: number) => Promise<ThreadView[]>, 
 new_thread_added: (thread: ThreadView) => Promise<void>, 
+search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 
+search_threads: (query: string, limit: number, offset: number) => Promise<SearchThreadResultView[]>, 
 switch_branch: (threadId: string, messageId: string, direction: number) => Promise<MessageView[]>, 
 thread_title_changed: (thread: ThreadView) => Promise<void>},
 "timeline": {list: () => Promise<string[]>, 

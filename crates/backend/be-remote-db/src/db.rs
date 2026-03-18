@@ -12,11 +12,35 @@ use crate::{
     error::{DbError, DbResult},
     types::{
         Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
-        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, Thread, TokenUsage, User,
+        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, SearchResultMessage,
+        SearchResultThread, Thread, TokenUsage, User,
     },
 };
 
 pub const DEFAULT_TOKEN_LIMIT: i64 = 50_000;
+
+fn build_prefix_tsquery(query: &str) -> String {
+    query
+        .split_whitespace()
+        .filter(|w| !w.is_empty())
+        .map(|w| {
+            let sanitized: String = w.chars().filter(|c| c.is_alphanumeric()).collect();
+            format!("{}:*", sanitized)
+        })
+        .collect::<Vec<_>>()
+        .join(" & ")
+}
+
+fn regex_escape(query: &str) -> String {
+    let mut escaped = String::with_capacity(query.len() * 2);
+    for c in query.chars() {
+        if "\\.*+?()[]{}|^$".contains(c) {
+            escaped.push('\\');
+        }
+        escaped.push(c);
+    }
+    escaped
+}
 
 #[derive(Debug)]
 pub struct DatabaseManager {
@@ -1166,7 +1190,7 @@ impl DatabaseManager {
         user_id: Uuid,
         parent_message_id: Option<Uuid>,
         message_type: MessageType,
-        content: serde_json::Value,
+        content: String,
         tool_call_id: Option<String>,
         tool_calls: Option<serde_json::Value>,
         additional_kwargs: Option<serde_json::Value>,
@@ -2007,5 +2031,96 @@ impl DatabaseManager {
         tx.commit().await?;
 
         Ok(())
+    }
+
+    pub async fn search_messages(
+        &self,
+        user_id: Uuid,
+        query: &str,
+        limit: i64,
+        offset: i64,
+    ) -> DbResult<Vec<SearchResultMessage>> {
+        let tsquery = build_prefix_tsquery(query);
+        let ilike_pattern = format!("%{}%", query.replace('%', r"\%").replace('_', r"\_"));
+        let regex_pattern = regex_escape(query);
+        let results = sqlx::query_as::<_, SearchResultMessage>(
+            r#"
+            WITH matched AS (
+                SELECT id, thread_id, message_type, content,
+                       search_tsv @@ to_tsquery('english', $1) AS fts_match,
+                       CASE WHEN search_tsv @@ to_tsquery('english', $1)
+                            THEN ts_rank(search_tsv, to_tsquery('english', $1))
+                            ELSE 0.0
+                       END AS rank,
+                       created_at
+                FROM messages
+                WHERE user_id = $2
+                  AND hidden_from_ui = false
+                  AND (search_tsv @@ to_tsquery('english', $1) OR content ILIKE $5)
+                ORDER BY rank DESC, created_at DESC
+                LIMIT $3 OFFSET $4
+            )
+            SELECT id, thread_id, message_type, content,
+                   regexp_replace(
+                       substring(content from GREATEST(1, position(lower($7) in lower(content)) - 80) for 200),
+                       $6, '<mark>\&</mark>', 'gi'
+                   ) AS snippet,
+                   rank, created_at
+            FROM matched
+            "#,
+        )
+        .bind(&tsquery)       // $1
+        .bind(user_id)        // $2
+        .bind(limit)          // $3
+        .bind(offset)         // $4
+        .bind(&ilike_pattern) // $5
+        .bind(&regex_pattern) // $6
+        .bind(query)          // $7
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(results)
+    }
+
+    pub async fn search_threads(
+        &self,
+        user_id: Uuid,
+        query: &str,
+        limit: i64,
+        offset: i64,
+    ) -> DbResult<Vec<SearchResultThread>> {
+        let tsquery = build_prefix_tsquery(query);
+        let ilike_pattern = format!("%{}%", query.replace('%', r"\%").replace('_', r"\_"));
+        let results = sqlx::query_as::<_, SearchResultThread>(
+            r#"
+            SELECT id, title,
+                   GREATEST(
+                       CASE WHEN to_tsvector('english', immutable_unaccent(coalesce(title, ''))) @@ to_tsquery('english', $1)
+                            THEN ts_rank(to_tsvector('english', immutable_unaccent(coalesce(title, ''))), to_tsquery('english', $1))
+                            ELSE 0.0
+                       END,
+                       similarity(coalesce(title, ''), $5)
+                   ) AS rank,
+                   updated_at
+            FROM threads
+            WHERE user_id = $2
+              AND (
+                  to_tsvector('english', immutable_unaccent(coalesce(title, ''))) @@ to_tsquery('english', $1)
+                  OR coalesce(title, '') ILIKE $6
+              )
+            ORDER BY rank DESC, updated_at DESC
+            LIMIT $3 OFFSET $4
+            "#,
+        )
+        .bind(&tsquery)
+        .bind(user_id)
+        .bind(limit)
+        .bind(offset)
+        .bind(query)
+        .bind(&ilike_pattern)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(results)
     }
 }

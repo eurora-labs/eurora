@@ -18,9 +18,11 @@
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import SearchDialog from './SearchDialog.svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	const threadService = inject(THREAD_SERVICE);
@@ -29,6 +31,7 @@
 	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let quitDialogOpen = $state(false);
+	let searchOpen = $state(false);
 	let visibleTimelineItems = $derived.by(() => {
 		const limit = sidebarState.open ? 3 : 1;
 		return timelineItems.slice(-limit);
@@ -118,6 +121,12 @@
 						<Sidebar.MenuButton onclick={() => createChat()}>
 							<SquarePenIcon />
 							<span>New chat</span>
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton onclick={() => (searchOpen = true)}>
+							<SearchIcon />
+							<span>Search</span>
 						</Sidebar.MenuButton>
 					</Sidebar.MenuItem>
 				</Sidebar.Menu>
@@ -230,6 +239,8 @@
 		</DropdownMenu.Root>
 	</Sidebar.Footer>
 </Sidebar.Root>
+
+<SearchDialog bind:open={searchOpen} />
 
 <Dialog.Root bind:open={quitDialogOpen}>
 	<Dialog.Content class="sm:max-w-100">
