@@ -115,10 +115,10 @@ impl From<ProtoUsageMetadata> for UsageMetadata {
 impl From<ToolCall> for ProtoToolCall {
     fn from(tc: ToolCall) -> Self {
         ProtoToolCall {
-            id: tc.id.clone(),
-            name: tc.name.clone(),
+            id: tc.id,
+            name: tc.name,
             args: value_to_json_string(&tc.args),
-            call_type: tc.call_type.clone(),
+            call_type: tc.call_type,
         }
     }
 }
@@ -139,11 +139,11 @@ impl From<ProtoToolCall> for ToolCall {
 impl From<ToolCallChunk> for ProtoToolCallChunk {
     fn from(chunk: ToolCallChunk) -> Self {
         ProtoToolCallChunk {
-            name: chunk.name.clone(),
-            args: chunk.args.clone(),
-            id: chunk.id.clone(),
+            name: chunk.name,
+            args: chunk.args,
+            id: chunk.id,
             index: chunk.index,
-            chunk_type: chunk.chunk_type.clone(),
+            chunk_type: chunk.chunk_type,
         }
     }
 }
@@ -546,9 +546,9 @@ impl From<ProtoSystemMessage> for SystemMessage {
 impl From<SystemMessageChunk> for ProtoSystemMessageChunk {
     fn from(chunk: SystemMessageChunk) -> Self {
         ProtoSystemMessageChunk {
-            content: Some(chunk.content.clone().into()),
-            id: chunk.id.clone(),
-            name: chunk.name.clone(),
+            content: Some(chunk.content.into()),
+            id: chunk.id,
+            name: chunk.name,
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
             response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }
@@ -717,10 +717,10 @@ impl From<ToolMessageChunk> for ProtoToolMessageChunk {
     fn from(chunk: ToolMessageChunk) -> Self {
         ProtoToolMessageChunk {
             content: Some(chunk.content.into()),
-            tool_call_id: chunk.tool_call_id.clone(),
-            id: chunk.id.clone(),
-            name: chunk.name.clone(),
-            status: i32::from(ProtoToolStatus::from(chunk.status.clone())),
+            tool_call_id: chunk.tool_call_id,
+            id: chunk.id,
+            name: chunk.name,
+            status: i32::from(ProtoToolStatus::from(chunk.status)),
             artifact: chunk.artifact.as_ref().map(|a| value_to_json_string(a)),
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
             response_metadata: hashmap_to_json_string(&chunk.response_metadata),
@@ -783,9 +783,9 @@ impl From<ChatMessageChunk> for ProtoChatMessageChunk {
     fn from(chunk: ChatMessageChunk) -> Self {
         ProtoChatMessageChunk {
             content: Some(chunk.content.into()),
-            role: chunk.role.clone(),
-            id: chunk.id.clone(),
-            name: chunk.name.clone(),
+            role: chunk.role,
+            id: chunk.id,
+            name: chunk.name,
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
             response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }
@@ -843,8 +843,8 @@ impl From<FunctionMessageChunk> for ProtoFunctionMessageChunk {
     fn from(chunk: FunctionMessageChunk) -> Self {
         ProtoFunctionMessageChunk {
             content: Some(chunk.content.into()),
-            name: chunk.name.clone(),
-            id: chunk.id.clone(),
+            name: chunk.name,
+            id: chunk.id,
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
             response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }

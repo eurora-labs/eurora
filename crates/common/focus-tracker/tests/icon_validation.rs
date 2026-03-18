@@ -8,16 +8,15 @@ mod util;
 use focus_tracker::{FocusTracker, FocusedWindow};
 use serial_test::serial;
 use std::sync::{
-    Arc, Mutex,
+    Arc,
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
 use util::*;
 
-/// Test that PNG format icons have correct PNG header and can be decoded
-#[test]
+#[tokio::test]
 #[serial]
-fn test_icon_format_png() {
+async fn test_icon_format_png() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -30,10 +29,10 @@ fn test_icon_format_png() {
 
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
-        let focus_events = Arc::new(Mutex::new(Vec::<FocusedWindow>::new()));
-        let focus_events_clone = focus_events.clone();
+        let focus_events = Arc::new(tokio::sync::Mutex::new(Vec::<FocusedWindow>::new()));
+        let focus_events_clone = Arc::clone(&focus_events);
         let stop_signal = Arc::new(AtomicBool::new(false));
-        let stop_signal_clone = stop_signal.clone();
+        let stop_signal_clone = Arc::clone(&stop_signal);
 
         match spawn_test_window("PNG Icon Test Window") {
             Ok(mut child) => {
@@ -43,22 +42,25 @@ fn test_icon_format_png() {
                     tracing::info!("Warning: Failed to focus window: {}", e);
                 }
 
-                let tracker_handle = std::thread::spawn(move || {
-                    let tracker = FocusTracker::new();
-                    let _ = tracker.track_focus_with_stop(
-                        move |window: FocusedWindow| -> focus_tracker::FocusTrackerResult<()> {
-                            if let Ok(mut events) = focus_events_clone.lock() {
-                                events.push(window);
+                let tracker_handle = tokio::spawn(async move {
+                    let tracker = FocusTracker::builder().build();
+                    let _ = tracker
+                        .track_focus()
+                        .on_focus(move |window: FocusedWindow| {
+                            let events = Arc::clone(&focus_events_clone);
+                            async move {
+                                events.lock().await.push(window);
+                                Ok(())
                             }
-                            Ok(())
-                        },
-                        &stop_signal_clone,
-                    );
+                        })
+                        .stop_signal(&stop_signal_clone)
+                        .call()
+                        .await;
                 });
 
-                std::thread::sleep(Duration::from_millis(1000));
+                tokio::time::sleep(Duration::from_millis(1000)).await;
                 stop_signal.store(true, Ordering::Relaxed);
-                let _ = tracker_handle.join();
+                let _ = tracker_handle.await;
 
                 if let Err(e) = cleanup_child_process(child) {
                     tracing::info!("Warning: Failed to cleanup child process: {}", e);
@@ -76,10 +78,9 @@ fn test_icon_format_png() {
     }
 }
 
-/// Test that RGBA format icons have correct dimensions
-#[test]
+#[tokio::test]
 #[serial]
-fn test_icon_format_rgba() {
+async fn test_icon_format_rgba() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -92,10 +93,10 @@ fn test_icon_format_rgba() {
 
     #[cfg(target_os = "linux")]
     {
-        let focus_events = Arc::new(Mutex::new(Vec::<FocusedWindow>::new()));
-        let focus_events_clone = focus_events.clone();
+        let focus_events = Arc::new(tokio::sync::Mutex::new(Vec::<FocusedWindow>::new()));
+        let focus_events_clone = Arc::clone(&focus_events);
         let stop_signal = Arc::new(AtomicBool::new(false));
-        let stop_signal_clone = stop_signal.clone();
+        let stop_signal_clone = Arc::clone(&stop_signal);
 
         match spawn_test_window("RGBA Icon Test Window") {
             Ok(mut child) => {
@@ -105,43 +106,45 @@ fn test_icon_format_rgba() {
                     tracing::info!("Warning: Failed to focus window: {}", e);
                 }
 
-                let tracker_handle = std::thread::spawn(move || {
-                    let tracker = FocusTracker::new();
-                    let _ = tracker.track_focus_with_stop(
-                        move |window: FocusedWindow| -> focus_tracker::FocusTrackerResult<()> {
-                            if let Ok(mut events) = focus_events_clone.lock() {
-                                events.push(window);
+                let tracker_handle = tokio::spawn(async move {
+                    let tracker = FocusTracker::builder().build();
+                    let _ = tracker
+                        .track_focus()
+                        .on_focus(move |window: FocusedWindow| {
+                            let events = Arc::clone(&focus_events_clone);
+                            async move {
+                                events.lock().await.push(window);
+                                Ok(())
                             }
-                            Ok(())
-                        },
-                        &stop_signal_clone,
-                    );
+                        })
+                        .stop_signal(&stop_signal_clone)
+                        .call()
+                        .await;
                 });
 
-                std::thread::sleep(Duration::from_millis(1000));
+                tokio::time::sleep(Duration::from_millis(1000)).await;
                 stop_signal.store(true, Ordering::Relaxed);
-                let _ = tracker_handle.join();
+                let _ = tracker_handle.await;
 
-                if let Ok(events) = focus_events.lock() {
-                    for event in events.iter() {
-                        if let Some(icon) = &event.icon {
-                            let expected_size = icon.width() * icon.height() * 4;
-                            let actual_size = icon.pixels().len() as u32;
+                let events = focus_events.lock().await;
+                for event in events.iter() {
+                    if let Some(icon) = &event.icon {
+                        let expected_size = icon.width() * icon.height() * 4;
+                        let actual_size = icon.pixels().len() as u32;
 
-                            tracing::info!(
-                                "Icon dimensions: {}x{}, expected size: {}, actual size: {}",
-                                icon.width(),
-                                icon.height(),
-                                expected_size,
-                                actual_size
-                            );
+                        tracing::info!(
+                            "Icon dimensions: {}x{}, expected size: {}, actual size: {}",
+                            icon.width(),
+                            icon.height(),
+                            expected_size,
+                            actual_size
+                        );
 
-                            assert_eq!(
-                                expected_size, actual_size,
-                                "Icon data size should match width * height * 4 for RGBA format. Expected: {expected_size} bytes, Actual: {actual_size} bytes",
-                            );
-                            tracing::info!("RGBA icon format validation passed");
-                        }
+                        assert_eq!(
+                            expected_size, actual_size,
+                            "Icon data size should match width * height * 4 for RGBA format. Expected: {expected_size} bytes, Actual: {actual_size} bytes",
+                        );
+                        tracing::info!("RGBA icon format validation passed");
                     }
                 }
 
@@ -161,10 +164,9 @@ fn test_icon_format_rgba() {
     }
 }
 
-/// Test that different applications have different icon hashes
-#[test]
+#[tokio::test]
 #[serial]
-fn test_icon_diff_between_apps() {
+async fn test_icon_diff_between_apps() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -178,10 +180,10 @@ fn test_icon_diff_between_apps() {
     let test_windows = vec!["Text Editor Window", "Browser Window", "Terminal Window"];
 
     for window_title in test_windows {
-        let focus_events = Arc::new(Mutex::new(Vec::<FocusedWindow>::new()));
-        let focus_events_clone = focus_events.clone();
+        let focus_events = Arc::new(tokio::sync::Mutex::new(Vec::<FocusedWindow>::new()));
+        let focus_events_clone = Arc::clone(&focus_events);
         let stop_signal = Arc::new(AtomicBool::new(false));
-        let stop_signal_clone = stop_signal.clone();
+        let stop_signal_clone = Arc::clone(&stop_signal);
 
         match spawn_test_window(window_title) {
             Ok(mut child) => {
@@ -191,28 +193,31 @@ fn test_icon_diff_between_apps() {
                     tracing::info!("Warning: Failed to focus window: {}", e);
                 }
 
-                let tracker_handle = std::thread::spawn(move || {
-                    let tracker = FocusTracker::new();
-                    let _ = tracker.track_focus_with_stop(
-                        move |window: FocusedWindow| -> focus_tracker::FocusTrackerResult<()> {
-                            if let Ok(mut events) = focus_events_clone.lock() {
-                                events.push(window);
+                let tracker_handle = tokio::spawn(async move {
+                    let tracker = FocusTracker::builder().build();
+                    let _ = tracker
+                        .track_focus()
+                        .on_focus(move |window: FocusedWindow| {
+                            let events = Arc::clone(&focus_events_clone);
+                            async move {
+                                events.lock().await.push(window);
+                                Ok(())
                             }
-                            Ok(())
-                        },
-                        &stop_signal_clone,
-                    );
+                        })
+                        .stop_signal(&stop_signal_clone)
+                        .call()
+                        .await;
                 });
 
-                std::thread::sleep(Duration::from_millis(1000));
+                tokio::time::sleep(Duration::from_millis(1000)).await;
                 stop_signal.store(true, Ordering::Relaxed);
-                let _ = tracker_handle.join();
+                let _ = tracker_handle.await;
 
                 if let Err(e) = cleanup_child_process(child) {
                     tracing::info!("Warning: Failed to cleanup child process: {}", e);
                 }
 
-                std::thread::sleep(Duration::from_millis(500));
+                tokio::time::sleep(Duration::from_millis(500)).await;
             }
             Err(e) => {
                 tracing::info!("Could not spawn test window '{}': {}", window_title, e);

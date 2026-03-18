@@ -141,6 +141,9 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
 
         for i in 0..count {
             let dict = CFArrayGetValueAtIndex(window_list, i);
+            if dict.is_null() {
+                continue;
+            }
 
             let layer_val = CFDictionaryGetValue(dict, layer_key);
             if !layer_val.is_null() {

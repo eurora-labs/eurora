@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(sentry::integrations::tracing::layer())
         .with(global_filter)
         .try_init()
-        .unwrap();
+        .expect("failed to initialize tracing subscriber");
 
     if let Some(posthog_key) = std::env::var("POSTHOG_API_KEY")
         .ok()

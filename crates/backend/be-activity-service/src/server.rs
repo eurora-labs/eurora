@@ -94,11 +94,7 @@ impl ProtoActivityService for ActivityService {
             .db
             .list_activities()
             .user_id(user_id)
-            .params(PaginationParams::new(
-                req.offset,
-                req.limit,
-                "DESC".to_string(),
-            ))
+            .params(PaginationParams::new(req.offset, req.limit, "DESC"))
             .call()
             .await
             .map_err(ActivityServiceError::from)?;
@@ -187,7 +183,9 @@ impl ProtoActivityService for ActivityService {
                     .await
                 {
                     Ok(icon_response) => match icon_response.asset {
-                        Some(asset) => Some(Uuid::parse_str(&asset.id).unwrap()),
+                        Some(asset) => Some(Uuid::parse_str(&asset.id).map_err(|e| {
+                            Status::from(ActivityServiceError::invalid_uuid("icon_asset_id", e))
+                        })?),
                         None => None,
                     },
                     Err(e) => {

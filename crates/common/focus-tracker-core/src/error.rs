@@ -15,9 +15,6 @@ pub enum FocusTrackerError {
     #[error("not running in interactive session")]
     NotInteractiveSession,
 
-    #[error("channel closed")]
-    ChannelClosed,
-
     #[error("invalid config: {reason}")]
     InvalidConfig { reason: String },
 

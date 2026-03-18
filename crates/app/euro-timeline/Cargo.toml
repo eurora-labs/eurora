@@ -12,7 +12,7 @@ bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
 euro-browser = { workspace = true }
-focus-tracker = { workspace = true, features = ["async"] }
+focus-tracker = { workspace = true }
 image = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }

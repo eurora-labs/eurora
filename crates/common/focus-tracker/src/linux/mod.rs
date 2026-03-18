@@ -1,4 +1,29 @@
-pub mod utils;
+pub(crate) mod utils;
 mod xorg_focus_tracker;
 
-pub mod impl_focus_tracker;
+use crate::{FocusTrackerConfig, FocusTrackerError, FocusTrackerResult, FocusedWindow};
+use std::future::Future;
+use std::sync::atomic::AtomicBool;
+use utils::wayland_detect;
+
+fn qualify_x11_error(err: FocusTrackerError) -> FocusTrackerError {
+    if matches!(err, FocusTrackerError::NoDisplay) && wayland_detect() {
+        FocusTrackerError::Unsupported
+    } else {
+        err
+    }
+}
+
+pub(crate) async fn track_focus<F, Fut>(
+    on_focus: F,
+    stop_signal: Option<&AtomicBool>,
+    config: &FocusTrackerConfig,
+) -> FocusTrackerResult<()>
+where
+    F: FnMut(FocusedWindow) -> Fut,
+    Fut: Future<Output = FocusTrackerResult<()>>,
+{
+    xorg_focus_tracker::track_focus(on_focus, stop_signal, config)
+        .await
+        .map_err(qualify_x11_error)
+}

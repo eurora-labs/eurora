@@ -2,7 +2,7 @@ use crate::{FocusTrackerError, FocusTrackerResult};
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, HWND},
+    Foundation::{CloseHandle, HANDLE, HWND},
     System::{
         ProcessStatus::GetModuleBaseNameW,
         Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ},
@@ -11,6 +11,14 @@ use windows_sys::Win32::{
         GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId, IsWindow,
     },
 };
+
+pub(crate) struct HandleGuard(pub HANDLE);
+
+impl Drop for HandleGuard {
+    fn drop(&mut self) {
+        unsafe { CloseHandle(self.0) };
+    }
+}
 
 pub fn get_foreground_window() -> Option<HWND> {
     let hwnd = unsafe { GetForegroundWindow() };
@@ -90,12 +98,6 @@ pub(crate) fn get_process_name(process_id: u32) -> FocusTrackerResult<String> {
         return Err(FocusTrackerError::platform("failed to open process"));
     }
 
-    struct HandleGuard(windows_sys::Win32::Foundation::HANDLE);
-    impl Drop for HandleGuard {
-        fn drop(&mut self) {
-            unsafe { CloseHandle(self.0) };
-        }
-    }
     let _guard = HandleGuard(process_handle);
 
     let mut buffer = [0u16; 512];
@@ -128,12 +130,6 @@ pub(crate) fn get_process_exe_path(process_id: u32) -> FocusTrackerResult<Vec<u1
         return Err(FocusTrackerError::platform("failed to open process"));
     }
 
-    struct HandleGuard(windows_sys::Win32::Foundation::HANDLE);
-    impl Drop for HandleGuard {
-        fn drop(&mut self) {
-            unsafe { CloseHandle(self.0) };
-        }
-    }
     let _guard = HandleGuard(process_handle);
 
     let mut buffer = vec![0u16; 32768];

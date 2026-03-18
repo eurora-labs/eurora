@@ -27,14 +27,14 @@ pub struct PaginationParams {
 
 impl Default for PaginationParams {
     fn default() -> Self {
-        Self::new(0, 5, "DESC".to_string())
+        Self::new(0, 5, "DESC")
     }
 }
 
 impl PaginationParams {
     pub const MAX_LIMIT: u32 = 100;
 
-    pub fn new(offset: u32, limit: u32, order: String) -> Self {
+    pub fn new(offset: u32, limit: u32, order: &str) -> Self {
         let order = match order.to_lowercase().as_str() {
             "asc" => SortOrder::Asc,
             "desc" => SortOrder::Desc,

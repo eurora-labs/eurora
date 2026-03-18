@@ -179,8 +179,18 @@ fn get_current_focused_window() -> Result<focus_tracker::FocusedWindow, Box<dyn 
 
 #[cfg(target_os = "macos")]
 fn get_focused_window_macos() -> Result<focus_tracker::FocusedWindow, Box<dyn std::error::Error>> {
-    focus_tracker::utils::get_frontmost_window_basic_info()
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    let output = Command::new("osascript")
+        .args(["-e", "tell application \"System Events\" to get name of first process whose frontmost is true"])
+        .output()?;
+
+    let process_name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    Ok(focus_tracker::FocusedWindow {
+        process_id: 0,
+        process_name,
+        window_title: None,
+        icon: None,
+    })
 }
 
 #[cfg(target_os = "linux")]
