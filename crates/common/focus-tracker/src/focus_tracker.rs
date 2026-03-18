@@ -25,6 +25,9 @@ impl FocusTracker {
 
     /// Tracks focus changes, calling `on_focus` each time the focused window changes.
     ///
+    /// A focus event is only emitted when the `(process_id, window_title)` pair
+    /// differs from the previously reported one.
+    ///
     /// # Errors
     ///
     /// Returns an error if the platform API fails or the callback returns an error.
