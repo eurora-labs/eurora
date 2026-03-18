@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             unique_processes.insert(process_name.clone());
 
-            let icon_result: FocusTrackerResult<()> = (|| {
+            let icon_result: FocusTrackerResult<()> = {
                 println!("🔄 Focus Event #{}", count);
                 println!("   📋 Title: {}", window_title);
                 println!(
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!();
 
                 Ok(())
-            })();
+            };
 
             async move { icon_result }
         })
