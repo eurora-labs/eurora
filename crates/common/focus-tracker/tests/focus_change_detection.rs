@@ -5,8 +5,10 @@
 
 mod util;
 
-use focus_tracker::subscribe_focus_changes;
+use focus_tracker::FocusTracker;
 use serial_test::serial;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use util::*;
 
@@ -95,9 +97,9 @@ fn polling_focus_switch() {
     cleanup(win_a_mut, win_b_mut);
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn event_mode_focus_switch() {
+async fn event_mode_focus_switch() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -110,21 +112,38 @@ fn event_mode_focus_switch() {
 
     tracing::info!("Starting event mode focus switch test");
 
-    let subscription = match subscribe_focus_changes() {
-        Ok(sub) => sub,
-        Err(e) => {
-            tracing::info!("Failed to subscribe to focus changes: {}", e);
-            return;
-        }
-    };
-    let receiver = subscription.receiver();
+    let tracker = FocusTracker::new();
+    let stop_signal = Arc::new(AtomicBool::new(false));
+    let events: Arc<tokio::sync::Mutex<Vec<focus_tracker::FocusedWindow>>> =
+        Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
-    std::thread::sleep(Duration::from_millis(500));
+    let events_clone = Arc::clone(&events);
+    let stop_clone = Arc::clone(&stop_signal);
+
+    let track_handle = tokio::spawn(async move {
+        let _ = tracker
+            .track_focus_with_stop(
+                |window| {
+                    let events = Arc::clone(&events_clone);
+                    async move {
+                        tracing::info!("Received focus event: {:?}", window.window_title);
+                        events.lock().await.push(window);
+                        Ok(())
+                    }
+                },
+                &stop_clone,
+            )
+            .await;
+    });
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     let win_a = match spawn_window("EventWinA") {
         Ok(child) => child,
         Err(e) => {
             tracing::info!("Failed to spawn EventWinA: {}", e);
+            stop_signal.store(true, Ordering::Release);
+            let _ = track_handle.await;
             return;
         }
     };
@@ -133,16 +152,20 @@ fn event_mode_focus_switch() {
     if let Err(e) = focus_window(&mut win_a_mut) {
         tracing::info!("Failed to focus EventWinA: {}", e);
         cleanup_child_process(win_a_mut).ok();
+        stop_signal.store(true, Ordering::Release);
+        let _ = track_handle.await;
         return;
     }
 
-    std::thread::sleep(Duration::from_millis(500));
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     let win_b = match spawn_window("EventWinB") {
         Ok(child) => child,
         Err(e) => {
             tracing::info!("Failed to spawn EventWinB: {}", e);
             cleanup_child_process(win_a_mut).ok();
+            stop_signal.store(true, Ordering::Release);
+            let _ = track_handle.await;
             return;
         }
     };
@@ -152,64 +175,40 @@ fn event_mode_focus_switch() {
         tracing::info!("Failed to focus EventWinB: {}", e);
         cleanup_child_process(win_a_mut).ok();
         cleanup_child_process(win_b_mut).ok();
+        stop_signal.store(true, Ordering::Release);
+        let _ = track_handle.await;
         return;
     }
 
-    let mut events = Vec::new();
-    let timeout = Duration::from_secs(3);
-    let start = std::time::Instant::now();
+    tokio::time::sleep(Duration::from_secs(3)).await;
 
-    while start.elapsed() < timeout && events.len() < 10 {
-        match receiver.recv_timeout(Duration::from_millis(100)) {
-            Ok(event) => {
-                tracing::info!("Received focus event: {:?}", event.window_title);
-                events.push(event);
-            }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                tracing::info!("Focus event channel disconnected");
-                break;
-            }
-        }
-    }
+    stop_signal.store(true, Ordering::Release);
+    let _ = track_handle.await;
 
-    tracing::info!("Collected {} focus events", events.len());
+    let collected_events = events.lock().await;
+    tracing::info!("Collected {} focus events", collected_events.len());
 
-    let has_win_a = events.iter().any(|e| {
+    let has_win_a = collected_events.iter().any(|e| {
         e.window_title
             .as_deref()
             .map(|title| title.contains("EventWinA"))
             .unwrap_or(false)
     });
 
-    let has_win_b = events.iter().any(|e| {
+    let has_win_b = collected_events.iter().any(|e| {
         e.window_title
             .as_deref()
             .map(|title| title.contains("EventWinB"))
             .unwrap_or(false)
     });
 
-    let final_event_is_win_b = events
-        .iter()
-        .rev()
-        .find(|e| {
-            e.window_title
-                .as_deref()
-                .map(|title| title.contains("EventWin"))
-                .unwrap_or(false)
-        })
-        .and_then(|e| e.window_title.as_deref())
-        .map(|title| title.contains("EventWinB"))
-        .unwrap_or(false);
-
     tracing::info!(
-        "Event analysis - Has WinA: {}, Has WinB: {}, Final is WinB: {}",
+        "Event analysis - Has WinA: {}, Has WinB: {}",
         has_win_a,
         has_win_b,
-        final_event_is_win_b
     );
 
-    if events.len() >= 2 && (has_win_a || has_win_b) {
+    if collected_events.len() >= 2 && (has_win_a || has_win_b) {
         tracing::info!("✓ Event mode focus switch test passed");
     } else {
         tracing::info!(

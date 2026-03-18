@@ -5,10 +5,10 @@
 
 mod util;
 
-use focus_tracker::{FocusTracker, FocusTrackerResult, FocusedWindow};
+use focus_tracker::{FocusTracker, FocusedWindow};
 use serial_test::serial;
 use std::sync::{
-    Arc, Mutex,
+    Arc,
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
@@ -59,9 +59,9 @@ fn test_spawn_window_helper() {
     }
 }
 
-#[test]
+#[tokio::test]
 #[serial]
-fn test_basic_focus_tracking() {
+async fn test_basic_focus_tracking() {
     if !should_run_integration_tests() {
         tracing::info!("Skipping integration test - INTEGRATION_TEST=1 not set");
         return;
@@ -72,24 +72,27 @@ fn test_basic_focus_tracking() {
         return;
     }
 
-    let focus_events = Arc::new(Mutex::new(Vec::<FocusedWindow>::new()));
-    let focus_events_clone = focus_events.clone();
+    let focus_events = Arc::new(tokio::sync::Mutex::new(Vec::<FocusedWindow>::new()));
+    let focus_events_clone = Arc::clone(&focus_events);
 
     let stop_signal = Arc::new(AtomicBool::new(false));
-    let stop_signal_clone = stop_signal.clone();
+    let stop_signal_clone = Arc::clone(&stop_signal);
 
-    let tracker_handle = std::thread::spawn(move || {
+    let tracker_handle = tokio::spawn(async move {
         let tracker = FocusTracker::new();
-        let result = tracker.track_focus_with_stop(
-            move |window: FocusedWindow| -> FocusTrackerResult<()> {
-                tracing::info!("Focus event: {:?}", window);
-                if let Ok(mut events) = focus_events_clone.lock() {
-                    events.push(window);
-                }
-                Ok(())
-            },
-            &stop_signal_clone,
-        );
+        let result = tracker
+            .track_focus_with_stop(
+                move |window: FocusedWindow| {
+                    let events = Arc::clone(&focus_events_clone);
+                    async move {
+                        tracing::info!("Focus event: {:?}", window);
+                        events.lock().await.push(window);
+                        Ok(())
+                    }
+                },
+                &stop_signal_clone,
+            )
+            .await;
 
         match result {
             Ok(_) => tracing::info!("Focus tracking completed"),
@@ -97,21 +100,20 @@ fn test_basic_focus_tracking() {
         }
     });
 
-    std::thread::sleep(Duration::from_millis(500));
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     stop_signal.store(true, Ordering::Relaxed);
 
-    if let Err(e) = tracker_handle.join() {
-        tracing::info!("Failed to join tracker thread: {:?}", e);
+    if let Err(e) = tracker_handle.await {
+        tracing::info!("Failed to join tracker task: {:?}", e);
     }
 
     tracing::info!("Focus tracking test completed successfully");
 
-    if let Ok(events) = focus_events.lock() {
-        tracing::info!("Captured {} focus events", events.len());
-        for (i, event) in events.iter().enumerate() {
-            tracing::info!("Event {}: {:?}", i + 1, event);
-        }
+    let events = focus_events.lock().await;
+    tracing::info!("Captured {} focus events", events.len());
+    for (i, event) in events.iter().enumerate() {
+        tracing::info!("Event {}: {:?}", i + 1, event);
     }
 }
 

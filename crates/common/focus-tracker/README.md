@@ -12,7 +12,7 @@ A cross-platform focus tracker for Linux (X11), macOS, and Windows that monitors
 -   Real-time focus tracking
 -   Window information (title, process name, PID)
 -   Icon extraction with configurable sizes
--   Sync and async APIs
+-   Async API with tokio
 -   Configurable polling intervals
 -   Graceful shutdown with stop signals
 
@@ -23,42 +23,12 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 focus-tracker = "*"
-```
-
-For async support:
-
-```toml
-[dependencies]
-focus-tracker = { version = "*", features = ["async"] }
 tokio = { version = "1", features = ["full"] }
 ```
 
-## Quick Start - Channel-Based
+## Quick Start
 
-Subscribe to focus changes and receive them via a channel:
-
-```rust
-use focus_tracker::subscribe_focus_changes;
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let receiver = subscribe_focus_changes()?;
-
-    while let Ok(window) = receiver.recv() {
-        println!("Focused: {}",
-            window.window_title.as_deref().unwrap_or("Unknown"));
-
-        if let Some(process) = &window.process_name {
-            println!("Process: {}", process);
-        }
-    }
-
-    Ok(())
-}
-```
-
-## Async Usage
-
-For async/await workflows, use the async API with tokio:
+Track focus changes using the async API with tokio:
 
 ```rust
 use focus_tracker::FocusTracker;
@@ -70,12 +40,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tracker = FocusTracker::new();
     let stop_signal = Arc::new(AtomicBool::new(false));
 
-    tracker.track_focus_async_with_stop(
+    tracker.track_focus_with_stop(
         |window| async move {
             println!("Focused: {}",
                 window.window_title.as_deref().unwrap_or("Unknown"));
-
-            some_async_function().await?;
 
             Ok(())
         },
@@ -107,11 +75,8 @@ let tracker = FocusTracker::with_config(config);
 Run the included examples:
 
 ```bash
-# Channel-based focus tracking
+# Basic focus tracking
 cargo run --example basic
-
-# Async focus tracking (requires async feature)
-cargo run --example async --features async
 
 # Advanced example with icon saving and statistics
 cargo run --example advanced
