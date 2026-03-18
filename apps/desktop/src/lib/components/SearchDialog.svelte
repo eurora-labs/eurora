@@ -76,6 +76,8 @@
 			.replace(/&/g, '&amp;')
 			.replace(/</g, '&lt;')
 			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;')
 			.replace(/&lt;mark&gt;/g, '<mark>')
 			.replace(/&lt;\/mark&gt;/g, '</mark>');
 	}

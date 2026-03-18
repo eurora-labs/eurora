@@ -319,7 +319,6 @@ pub struct SearchResultMessage {
     pub id: Uuid,
     pub thread_id: Uuid,
     pub message_type: MessageType,
-    pub content: String,
     pub snippet: String,
     pub rank: f32,
     pub created_at: DateTime<Utc>,

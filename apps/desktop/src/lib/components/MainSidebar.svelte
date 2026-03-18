@@ -32,6 +32,13 @@
 
 	let quitDialogOpen = $state(false);
 	let searchOpen = $state(false);
+
+	function handleKeydown(e: KeyboardEvent) {
+		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+			e.preventDefault();
+			searchOpen = true;
+		}
+	}
 	let visibleTimelineItems = $derived.by(() => {
 		const limit = sidebarState.open ? 3 : 1;
 		return timelineItems.slice(-limit);
@@ -239,6 +246,8 @@
 		</DropdownMenu.Root>
 	</Sidebar.Footer>
 </Sidebar.Root>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <SearchDialog bind:open={searchOpen} />
 

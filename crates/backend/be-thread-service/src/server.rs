@@ -1110,19 +1110,13 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        tracing::debug!(
-            "[search_messages] query='{}', returned {} results",
-            req.query,
-            results.len()
-        );
-
         let results = results
             .into_iter()
             .map(|r| SearchMessageResult {
                 id: r.id.to_string(),
                 thread_id: r.thread_id.to_string(),
                 message_type: r.message_type.to_string(),
-                content: r.content,
+                content: String::new(),
                 rank: r.rank,
                 created_at: Some(Timestamp {
                     seconds: r.created_at.timestamp(),
