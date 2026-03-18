@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import type {
-		SearchMessageResultView,
-		SearchThreadResultView,
+	import {
+		type SearchMessageResultView,
+		type SearchThreadResultView,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
@@ -126,7 +126,7 @@
 						value="thread-{thread.id}"
 						onSelect={() => selectThread(thread.id)}
 					>
-						<FileTextIcon class="size-4 text-muted-foreground" />
+						<FileTextIcon class="size-4 text-foreground" />
 						<span>{thread.title}</span>
 					</Command.Item>
 				{/each}
@@ -140,10 +140,9 @@
 						value="msg-{message.id}"
 						onSelect={() => selectMessage(message.thread_id)}
 					>
-						<MessageSquareIcon class="size-4 text-muted-foreground" />
+						<MessageSquareIcon class="size-4 text-foreground" />
 						<div class="flex flex-col gap-0.5 min-w-0">
-							<span class="text-xs text-muted-foreground">{message.message_type}</span
-							>
+							<span class="text-xs">{message.message_type}</span>
 							<span class="line-clamp-2 text-sm"
 								>{@html sanitizeSnippet(message.snippet)}</span
 							>
@@ -157,8 +156,14 @@
 
 <style>
 	:global([data-slot='dialog-content']:has([data-slot='command'])) {
-		top: 33% !important;
+		top: 25% !important;
+		width: 90% !important;
+		max-width: 680px !important;
 		translate: -50% 0 !important;
+	}
+
+	:global([data-slot='dialog-content'] [data-slot='command-list']) {
+		max-height: 400px;
 	}
 
 	:global([data-command-item] mark) {

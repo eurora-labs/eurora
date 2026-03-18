@@ -24,7 +24,7 @@
 		proOptions={{ hideAttribution: true }}
 		{...restProps}
 	>
-		<Background size={2} bgColor="var(--sidebar)" />
+		<Background bgColor="var(--sidebar)" />
 		{@render children?.()}
 	</SvelteFlow>
 </div>
