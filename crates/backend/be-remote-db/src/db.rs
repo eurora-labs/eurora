@@ -969,6 +969,23 @@ impl DatabaseManager {
     }
 
     #[builder]
+    pub async fn delete_thread(&self, id: Uuid, user_id: Uuid) -> DbResult<()> {
+        let result = sqlx::query("DELETE FROM threads WHERE id = $1 AND user_id = $2")
+            .bind(id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(DbError::NotFound {
+                entity: "thread",
+                id: Some(id.to_string()),
+            });
+        }
+        Ok(())
+    }
+
+    #[builder]
     pub async fn get_thread(&self, id: Uuid, user_id: Uuid) -> DbResult<Thread> {
         let thread = sqlx::query_as::<_, Thread>(
             r#"
