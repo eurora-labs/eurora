@@ -35,6 +35,14 @@
 	let quitDialogOpen = $state(false);
 	let searchOpen = $state(false);
 	let deleteThreadId: string | null = $state(null);
+	let deleteThreadTitle = $state('');
+
+	$effect(() => {
+		if (deleteThreadId) {
+			deleteThreadTitle =
+				threadService.threads.find((t) => t.id === deleteThreadId)?.title ?? 'New Thread';
+		}
+	});
 
 	function handleKeydown(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -321,11 +329,11 @@
 		<Dialog.Header>
 			<Dialog.Title>Delete Chat</Dialog.Title>
 			<Dialog.Description>
-				This will permanently delete this chat and all its messages. This action cannot be
-				undone.
+				Chat <span class="font-bold text-foreground">"{deleteThreadTitle}"</span> will be permanently
+				deleted along with all its messages. This action cannot be undone.
 			</Dialog.Description>
 		</Dialog.Header>
-		<Dialog.Footer class="gap-2 sm:gap-0">
+		<Dialog.Footer class="gap-2">
 			<Dialog.Close class={buttonVariants({ variant: 'outline' })}>Cancel</Dialog.Close>
 			<Button variant="destructive" onclick={deleteThread}>Delete</Button>
 		</Dialog.Footer>
