@@ -69,7 +69,7 @@ export class ThreadService {
 	async deleteThread(threadId: string) {
 		await this.taurpc.thread.delete(threadId);
 		this.threads = this.threads.filter((t) => t.id !== threadId);
-		this.offset -= 1;
+		this.offset = Math.max(0, this.offset - 1);
 		if (this.activeThreadId === threadId) {
 			this.activeThreadId = null;
 		}
