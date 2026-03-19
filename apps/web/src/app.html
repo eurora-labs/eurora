@@ -1,10 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<style>
+			:root {
+				background-color: var(--background);
+			}
+			.dark {
+				--background: oklch(0.2303 0.0125 264.2926);
+			}
+		</style>
 		<title>Eurora Labs</title>
 		<script async src="https://www.googletagmanager.com/gtag/js?id=G-5G3S3G4Z5B"></script>
 		<script>
