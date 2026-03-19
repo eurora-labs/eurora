@@ -91,6 +91,11 @@ pub trait ThreadApi {
 
     async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<ThreadView, String>;
 
+    async fn delete<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+    ) -> Result<(), String>;
+
     async fn get_messages<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
@@ -213,6 +218,19 @@ impl ThreadApi for ThreadApiImpl {
             .await
             .map_err(|e| e.to_string())?;
         Ok(thread.into())
+    }
+
+    async fn delete<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+    ) -> Result<(), String> {
+        let thread_state = thread_manager(&app_handle)?;
+        let thread_manager = thread_state.lock().await;
+        thread_manager
+            .delete_thread(thread_id)
+            .await
+            .map_err(|e| e.to_string())
     }
 
     async fn get_messages<R: Runtime>(

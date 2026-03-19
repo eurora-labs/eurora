@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import SearchDialog from '$lib/components/SearchDialog.svelte';
 	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
@@ -15,14 +16,15 @@
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
+	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import SearchDialog from './SearchDialog.svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	const threadService = inject(THREAD_SERVICE);
@@ -32,6 +34,7 @@
 
 	let quitDialogOpen = $state(false);
 	let searchOpen = $state(false);
+	let deleteThreadId: string | null = $state(null);
 
 	function handleKeydown(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -106,6 +109,21 @@
 			console.error('Failed to quit application:', error);
 		});
 	}
+
+	async function deleteThread() {
+		if (!deleteThreadId) return;
+		const id = deleteThreadId;
+		deleteThreadId = null;
+		try {
+			await threadService.deleteThread(id);
+			if (threadService.activeThreadId === null) {
+				goto('/');
+			}
+		} catch (error) {
+			console.error('Failed to delete thread:', error);
+			toast.error('Failed to delete chat');
+		}
+	}
 </script>
 
 <Sidebar.Root collapsible="icon" class="border-none">
@@ -174,6 +192,26 @@
 								</a>
 							{/snippet}
 						</Sidebar.MenuButton>
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Sidebar.MenuAction {...props} showOnHover>
+										<EllipsisIcon />
+										<span class="sr-only">More</span>
+									</Sidebar.MenuAction>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content side="right" align="start">
+								<DropdownMenu.Item
+									onclick={() => {
+										deleteThreadId = item.id ?? null;
+									}}
+								>
+									<Trash2Icon />
+									<span>Delete</span>
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					</Sidebar.MenuItem>
 				{/snippet}
 			</InfiniteList.Root>
@@ -269,6 +307,27 @@
 		<Dialog.Footer class="gap-2 sm:gap-0">
 			<Dialog.Close class={buttonVariants({ variant: 'outline' })}>Cancel</Dialog.Close>
 			<Button variant="destructive" onclick={quit}>Quit</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<Dialog.Root
+	open={deleteThreadId !== null}
+	onOpenChange={(open) => {
+		if (!open) deleteThreadId = null;
+	}}
+>
+	<Dialog.Content class="sm:max-w-100">
+		<Dialog.Header>
+			<Dialog.Title>Delete Chat</Dialog.Title>
+			<Dialog.Description>
+				This will permanently delete this chat and all its messages. This action cannot be
+				undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Dialog.Footer class="gap-2 sm:gap-0">
+			<Dialog.Close class={buttonVariants({ variant: 'outline' })}>Cancel</Dialog.Close>
+			<Button variant="destructive" onclick={deleteThread}>Delete</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

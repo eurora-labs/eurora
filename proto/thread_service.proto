@@ -9,6 +9,7 @@ service ProtoThreadService {
   rpc CreateThread(CreateThreadRequest) returns (CreateThreadResponse);
   rpc ListThreads(ListThreadsRequest) returns (ListThreadsResponse);
   rpc GetThread(GetThreadRequest) returns (GetThreadResponse);
+  rpc DeleteThread(DeleteThreadRequest) returns (DeleteThreadResponse);
 
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
   rpc AddHiddenHumanMessage(AddHiddenHumanMessageRequest) returns (AddHiddenHumanMessageResponse);
@@ -105,6 +106,12 @@ message GetThreadRequest {
 message GetThreadResponse {
   Thread thread = 1;
 }
+
+message DeleteThreadRequest {
+  string thread_id = 1;
+}
+
+message DeleteThreadResponse {}
 
 message AddSystemMessageRequest {
   string thread_id = 1;

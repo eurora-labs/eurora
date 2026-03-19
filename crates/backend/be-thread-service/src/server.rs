@@ -16,12 +16,12 @@ pub use proto_gen::thread::proto_thread_service_server::{
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
     AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
-    CreateThreadRequest, CreateThreadResponse, GenerateThreadTitleRequest,
-    GenerateThreadTitleResponse, GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest,
-    GetMessagesResponse, GetThreadResponse, ListThreadsRequest, ListThreadsResponse,
-    MessageSiblingInfo, MessageTreeNode, SearchMessageResult, SearchMessagesRequest,
-    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
-    SwitchBranchRequest, Thread,
+    CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest, DeleteThreadResponse,
+    GenerateThreadTitleRequest, GenerateThreadTitleResponse, GetMessageTreeRequest,
+    GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
+    ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, MessageTreeNode,
+    SearchMessageResult, SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult,
+    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest, Thread,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -794,6 +794,33 @@ impl ProtoThreadService for ThreadService {
         Ok(Response::new(GetThreadResponse {
             thread: thread.try_into().ok(),
         }))
+    }
+
+    async fn delete_thread(
+        &self,
+        request: Request<DeleteThreadRequest>,
+    ) -> Result<Response<DeleteThreadResponse>, Status> {
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
+                source: e,
+            })?;
+
+        self.db
+            .delete_thread()
+            .id(thread_id)
+            .user_id(user_id)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        tracing::info!("Deleted thread {}", thread_id);
+
+        Ok(Response::new(DeleteThreadResponse {}))
     }
 
     async fn generate_thread_title(
