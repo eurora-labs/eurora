@@ -7,10 +7,10 @@ use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
-    ChatStreamRequest, CreateThreadRequest, GenerateThreadTitleRequest, GetMessageTreeRequest,
-    GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadRequest,
-    ListThreadsRequest, SearchMessagesRequest, SearchMessagesResponse, SearchThreadsRequest,
-    SearchThreadsResponse, SwitchBranchRequest,
+    ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,
+    GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
+    GetThreadRequest, ListThreadsRequest, SearchMessagesRequest, SearchMessagesResponse,
+    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest,
     proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
@@ -71,6 +71,14 @@ impl ThreadManager {
             .into_iter()
             .map(AnyMessage::from)
             .collect())
+    }
+
+    pub async fn delete_thread(&self, thread_id: String) -> Result<()> {
+        let mut client = self.client();
+        client
+            .delete_thread(DeleteThreadRequest { thread_id })
+            .await?;
+        Ok(())
     }
 
     pub async fn get_thread(&self, thread_id: String) -> Result<Thread> {
