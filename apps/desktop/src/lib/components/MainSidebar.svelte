@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import SearchDialog from '$lib/components/SearchDialog.svelte';
 	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
@@ -18,13 +19,12 @@
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PowerIcon from '@lucide/svelte/icons/power';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import SearchDialog from './SearchDialog.svelte';
 
 	const taurpc = inject(TAURPC_SERVICE);
 	const threadService = inject(THREAD_SERVICE);
