@@ -1,22 +1,21 @@
 use bon::bon;
+use serde::de::{self, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
+use std::fmt;
 
-use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env, merge_content};
-use super::content::MessageContent;
-use crate::utils::merge::{merge_dicts, merge_obj};
+use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
+use super::content::{ContentBlock, ContentBlocks};
+use crate::load::Serializable;
+use crate::utils::merge::{merge_dicts, merge_lists, merge_obj};
 
-fn deserialize_tool_call_id<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value = serde_json::Value::deserialize(deserializer)?;
+fn deserialize_tool_call_id(value: &serde_json::Value) -> String {
     match value {
-        serde_json::Value::String(s) => Ok(s),
-        serde_json::Value::Number(n) => Ok(n.to_string()),
-        serde_json::Value::Null => Ok(String::new()),
-        other => Ok(other.to_string()),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Null => String::new(),
+        other => other.to_string(),
     }
 }
 
@@ -115,21 +114,15 @@ impl InvalidToolCall {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ToolMessage {
-    pub content: MessageContent,
-    #[serde(deserialize_with = "deserialize_tool_call_id")]
+    pub content: ContentBlocks,
     pub tool_call_id: String,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default = "default_status")]
     pub status: ToolStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub artifact: Option<serde_json::Value>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -138,7 +131,7 @@ impl BaseMessage for ToolMessage {
         self.id.clone()
     }
 
-    fn content(&self) -> &MessageContent {
+    fn content(&self) -> &ContentBlocks {
         &self.content
     }
 
@@ -196,8 +189,71 @@ impl Serialize for ToolMessage {
     }
 }
 
-fn default_status() -> ToolStatus {
-    ToolStatus::Success
+impl<'de> Deserialize<'de> for ToolMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ToolMessageVisitor;
+
+        impl<'de> Visitor<'de> for ToolMessageVisitor {
+            type Value = ToolMessage;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a ToolMessage object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<ToolMessage, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut tool_call_id: Option<serde_json::Value> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut status: Option<ToolStatus> = None;
+                let mut artifact: Option<serde_json::Value> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "content" => content = Some(map.next_value()?),
+                        "tool_call_id" => tool_call_id = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "status" => status = Some(map.next_value()?),
+                        "artifact" => artifact = map.next_value()?,
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let tool_call_id = tool_call_id
+                    .map(|v| deserialize_tool_call_id(&v))
+                    .ok_or_else(|| de::Error::missing_field("tool_call_id"))?;
+
+                Ok(ToolMessage {
+                    content: content.unwrap_or_default(),
+                    tool_call_id,
+                    id,
+                    name,
+                    status: status.unwrap_or(ToolStatus::Success),
+                    artifact,
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(ToolMessageVisitor)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -246,7 +302,7 @@ impl PartialEq<&str> for ToolStatus {
 impl ToolMessage {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
+        content: impl Into<ContentBlocks>,
         tool_call_id: impl Into<String>,
         id: Option<String>,
         name: Option<String>,
@@ -268,7 +324,14 @@ impl ToolMessage {
     }
 
     pub fn text(&self) -> String {
-        self.content.as_text()
+        self.content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     pub fn pretty_repr(&self, html: bool) -> String {
@@ -278,7 +341,7 @@ impl ToolMessage {
         } else {
             String::new()
         };
-        format!("{}{}\n\n{}", title, name_line, self.content)
+        format!("{}{}\n\n{}", title, name_line, self.text())
     }
 
     pub fn pretty_print(&self) {
@@ -288,21 +351,15 @@ impl ToolMessage {
 
 impl ToolOutputMixin for ToolMessage {}
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ToolMessageChunk {
-    pub content: MessageContent,
-    #[serde(deserialize_with = "deserialize_tool_call_id")]
+    pub content: ContentBlocks,
     pub tool_call_id: String,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default = "default_status")]
     pub status: ToolStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub artifact: Option<serde_json::Value>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -339,11 +396,78 @@ impl Serialize for ToolMessageChunk {
     }
 }
 
+impl<'de> Deserialize<'de> for ToolMessageChunk {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ToolMessageChunkVisitor;
+
+        impl<'de> Visitor<'de> for ToolMessageChunkVisitor {
+            type Value = ToolMessageChunk;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a ToolMessageChunk object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<ToolMessageChunk, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut tool_call_id: Option<serde_json::Value> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut status: Option<ToolStatus> = None;
+                let mut artifact: Option<serde_json::Value> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "content" => content = Some(map.next_value()?),
+                        "tool_call_id" => tool_call_id = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "status" => status = Some(map.next_value()?),
+                        "artifact" => artifact = map.next_value()?,
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let tool_call_id = tool_call_id
+                    .map(|v| deserialize_tool_call_id(&v))
+                    .ok_or_else(|| de::Error::missing_field("tool_call_id"))?;
+
+                Ok(ToolMessageChunk {
+                    content: content.unwrap_or_default(),
+                    tool_call_id,
+                    id,
+                    name,
+                    status: status.unwrap_or(ToolStatus::Success),
+                    artifact,
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(ToolMessageChunkVisitor)
+    }
+}
+
 #[bon]
 impl ToolMessageChunk {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
+        content: impl Into<ContentBlocks>,
         tool_call_id: impl Into<String>,
         id: Option<String>,
         name: Option<String>,
@@ -368,12 +492,45 @@ impl ToolMessageChunk {
         "ToolMessageChunk"
     }
 
+    pub fn text(&self) -> String {
+        self.content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     pub fn concat(&self, other: &ToolMessageChunk) -> ToolMessageChunk {
         if self.tool_call_id != other.tool_call_id {
             panic!("Cannot concatenate ToolMessageChunks with different names.");
         }
 
-        let content = merge_content(self.content.as_text_ref(), other.content.as_text_ref()).into();
+        let left: Vec<serde_json::Value> = self
+            .content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        let right: Vec<serde_json::Value> = other
+            .content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+
+        let content: ContentBlocks =
+            match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
+                Ok(Some(merged)) => merged
+                    .into_iter()
+                    .filter_map(|v| serde_json::from_value(v).ok())
+                    .collect(),
+                _ => {
+                    let mut blocks = self.content.clone();
+                    blocks.extend(other.content.iter().cloned());
+                    blocks
+                }
+            };
 
         let artifact = match (&self.artifact, &other.artifact) {
             (Some(left), Some(right)) => merge_obj(left.clone(), right.clone()).ok(),
@@ -438,7 +595,7 @@ impl std::iter::Sum for ToolMessageChunk {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|a, b| a + b).unwrap_or_else(|| {
             ToolMessageChunk::builder()
-                .content("")
+                .content(ContentBlocks::new())
                 .tool_call_id("")
                 .build()
         })
@@ -577,8 +734,6 @@ pub fn default_tool_chunk_parser(raw_tool_calls: &[serde_json::Value]) -> Vec<To
 
     chunks
 }
-
-use crate::load::Serializable;
 
 impl Serializable for ToolMessage {
     fn is_lc_serializable() -> bool {
