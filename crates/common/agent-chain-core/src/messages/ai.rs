@@ -373,8 +373,8 @@ impl AIMessage {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, ToolCallBlock,
-            ToolCallChunkBlock, VideoContentBlock,
+            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
+            VideoContentBlock,
         };
 
         blocks_json
@@ -835,8 +835,8 @@ impl AIMessageChunk {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, ToolCallBlock,
-            ToolCallChunkBlock, VideoContentBlock,
+            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
+            VideoContentBlock,
         };
 
         blocks_json

@@ -470,37 +470,30 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
                 let last_content = last_chunk.content();
                 let curr_content = curr_chunk.content();
                 if !last_content.is_empty() && !curr_content.is_empty() {
-                    let last_is_str =
-                        matches!(last_content, super::content::MessageContent::Text(_));
-                    let curr_is_str =
-                        matches!(curr_content, super::content::MessageContent::Text(_));
-                    if last_is_str && curr_is_str {
-                        match &mut curr_chunk {
-                            AnyMessageChunk::AIMessageChunk(c) => {
-                                if let super::content::MessageContent::Text(ref mut s) = c.content {
-                                    *s = format!("{}{}", chunk_separator, s);
-                                }
+                    // Prepend chunk_separator to the first text block in curr_chunk's content
+                    fn prepend_separator(content: &mut super::content::ContentBlocks, sep: &str) {
+                        for block in content.iter_mut() {
+                            if let super::content::ContentBlock::Text(t) = block {
+                                t.text = format!("{}{}", sep, t.text);
+                                return;
                             }
-                            AnyMessageChunk::HumanMessageChunk(c) => {
-                                if let super::content::MessageContent::Text(ref mut s) = c.content {
-                                    *s = format!("{}{}", chunk_separator, s);
-                                }
-                            }
-                            AnyMessageChunk::SystemMessageChunk(c) => {
-                                if let super::content::MessageContent::Text(ref mut s) = c.content {
-                                    *s = format!("{}{}", chunk_separator, s);
-                                }
-                            }
-                            AnyMessageChunk::ChatMessageChunk(c) => {
-                                if let super::content::MessageContent::Text(ref mut s) = c.content {
-                                    *s = format!("{}{}", chunk_separator, s);
-                                }
-                            }
-                            AnyMessageChunk::ToolMessageChunk(c) => {
-                                if let super::content::MessageContent::Text(ref mut s) = c.content {
-                                    *s = format!("{}{}", chunk_separator, s);
-                                }
-                            }
+                        }
+                    }
+                    match &mut curr_chunk {
+                        AnyMessageChunk::AIMessageChunk(c) => {
+                            prepend_separator(&mut c.content, chunk_separator)
+                        }
+                        AnyMessageChunk::HumanMessageChunk(c) => {
+                            prepend_separator(&mut c.content, chunk_separator)
+                        }
+                        AnyMessageChunk::SystemMessageChunk(c) => {
+                            prepend_separator(&mut c.content, chunk_separator)
+                        }
+                        AnyMessageChunk::ChatMessageChunk(c) => {
+                            prepend_separator(&mut c.content, chunk_separator)
+                        }
+                        AnyMessageChunk::ToolMessageChunk(c) => {
+                            prepend_separator(&mut c.content, chunk_separator)
                         }
                     }
                 }
@@ -659,9 +652,16 @@ fn convert_single_to_openai_message(
     }
 
     let raw_content = message.content();
-    let content_list: Option<Vec<serde_json::Value>> = match raw_content {
-        super::content::MessageContent::Parts(_) => Some(raw_content.as_json_values()),
-        super::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
+    let content_list: Option<Vec<serde_json::Value>> = {
+        let values: Vec<serde_json::Value> = raw_content
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect();
+        if values.is_empty() {
+            None
+        } else {
+            Some(values)
+        }
     };
 
     let mut tool_messages: Vec<serde_json::Value> = Vec::new();
@@ -991,9 +991,16 @@ where
         let mut included_partial = false;
 
         let excluded_content = messages[idx].content();
-        let content_blocks_opt: Option<Vec<serde_json::Value>> = match excluded_content {
-            super::content::MessageContent::Parts(_) => Some(excluded_content.as_json_values()),
-            super::content::MessageContent::Text(s) => serde_json::from_str(s).ok(),
+        let content_blocks_opt: Option<Vec<serde_json::Value>> = {
+            let values: Vec<serde_json::Value> = excluded_content
+                .iter()
+                .filter_map(|block| serde_json::to_value(block).ok())
+                .collect();
+            if values.is_empty() {
+                None
+            } else {
+                Some(values)
+            }
         };
         if let Some(mut content_blocks) = content_blocks_opt
             && content_blocks.len() > 1

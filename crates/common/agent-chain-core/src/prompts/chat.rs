@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 use crate::messages::get_buffer_string;
 use crate::messages::{
-    AIMessage, AnyMessage, ChatMessage, ContentPart, HumanMessage, ImageDetail, ImageSource,
-    MessageContent, SystemMessage,
+    AIMessage, AnyMessage, ChatMessage, ContentBlocks, HumanMessage, SystemMessage,
 };
 use crate::utils::input::get_colored_text;
 use crate::utils::interactive_env::is_interactive_env;
@@ -176,27 +175,35 @@ impl MessagePromptContentPart {
         }
     }
 
-    fn format_to_content_part(&self, kwargs: &HashMap<String, String>) -> Result<ContentPart> {
+    fn format_to_content_block(
+        &self,
+        kwargs: &HashMap<String, String>,
+    ) -> Result<crate::messages::content::ContentBlock> {
+        use crate::messages::content::{
+            ContentBlock, ImageContentBlock, NonStandardContentBlock, TextContentBlock,
+        };
         match self {
             Self::Text(p) => {
                 let text = StringPromptTemplate::format(p, kwargs)?;
-                Ok(ContentPart::Text { text })
+                Ok(ContentBlock::Text(TextContentBlock::new(text)))
             }
             Self::Image(p) => {
                 let image_url = p.format_image(kwargs)?;
-                let detail = image_url.detail.as_deref().map(|d| match d {
-                    "low" => ImageDetail::Low,
-                    "high" => ImageDetail::High,
-                    _ => ImageDetail::Auto,
-                });
-                Ok(ContentPart::Image {
-                    source: ImageSource::Url { url: image_url.url },
-                    detail,
-                })
+                Ok(ContentBlock::Image(ImageContentBlock::from_url(
+                    image_url.url,
+                )))
             }
             Self::Dict(p) => {
                 let value = p.format(kwargs)?;
-                Ok(ContentPart::Other(value))
+                // Try to deserialize as a known ContentBlock, fall back to NonStandard
+                match serde_json::from_value::<ContentBlock>(value.clone()) {
+                    Ok(block) => Ok(block),
+                    Err(_) => {
+                        let mut map = std::collections::HashMap::new();
+                        map.insert("original_json".to_string(), value);
+                        Ok(ContentBlock::NonStandard(NonStandardContentBlock::new(map)))
+                    }
+                }
             }
         }
     }
@@ -205,19 +212,20 @@ impl MessagePromptContentPart {
 fn format_content_parts(
     parts: &[MessagePromptContentPart],
     kwargs: &HashMap<String, String>,
-) -> Result<MessageContent> {
+) -> Result<ContentBlocks> {
+    use crate::messages::content::ContentBlock;
     if parts.len() == 1
         && let MessagePromptContentPart::Text(p) = &parts[0]
     {
         let text = StringPromptTemplate::format(p, kwargs)?;
-        return Ok(MessageContent::Text(text));
+        return Ok(ContentBlocks::from(text));
     }
 
-    let content_parts: Result<Vec<ContentPart>> = parts
+    let content_blocks: Result<Vec<ContentBlock>> = parts
         .iter()
-        .map(|part| part.format_to_content_part(kwargs))
+        .map(|part| part.format_to_content_block(kwargs))
         .collect();
-    Ok(MessageContent::Parts(content_parts?))
+    Ok(ContentBlocks::from(content_blocks?))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

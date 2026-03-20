@@ -242,16 +242,6 @@ impl ChatAnthropic {
                         "content": m.content
                     }));
                 }
-                AnyMessage::FunctionMessage(m) => {
-                    thread.push(serde_json::json!({
-                        "role": "user",
-                        "content": [{
-                            "type": "tool_result",
-                            "tool_use_id": m.name, // Use function name as tool_use_id
-                            "content": m.content
-                        }]
-                    }));
-                }
                 AnyMessage::RemoveMessage(_) => {
                     continue;
                 }

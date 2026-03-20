@@ -67,8 +67,7 @@ use crate::language_models::ChatGenerationStream;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
 use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
 use crate::messages::{
-    AIMessage, AnyMessage, ContentPart, ImageDetail, ImageSource, InvalidToolCall, MessageContent,
-    ToolCall,
+    AIMessage, AnyMessage, ContentBlock, ContentBlocks, InvalidToolCall, ToolCall,
 };
 use crate::outputs::ChatGenerationChunk;
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
@@ -128,10 +127,10 @@ pub struct TextAnnotation {
     pub title: Option<String>,
 }
 
-/// Content block in a response.
+/// Content block in an OpenAI response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum ContentBlock {
+pub enum OpenAIContentBlock {
     #[serde(rename = "text")]
     Text {
         text: String,
@@ -458,6 +457,107 @@ fn convert_to_openai_data_block(block: &serde_json::Value, api: &str) -> serde_j
     }
 }
 
+/// Convert ContentBlocks into a JSON value for the chat/completions API.
+/// If the content is plain text (single text block or empty), returns a JSON string.
+/// Otherwise returns the formatted array via `ChatOpenAI::format_message_content`.
+fn content_blocks_to_chat_completions(content: &ContentBlocks, role: &str) -> serde_json::Value {
+    if content.len() <= 1 && !content.has_images() {
+        return serde_json::json!(content.as_text());
+    }
+    let content_parts: Vec<serde_json::Value> = content
+        .iter()
+        .map(|block| match block {
+            ContentBlock::Text(t) => {
+                serde_json::json!({"type": "text", "text": t.text})
+            }
+            ContentBlock::Image(img) => {
+                let url = if let Some(ref u) = img.url {
+                    u.clone()
+                } else if let (Some(data), Some(mime)) = (&img.base64, &img.mime_type) {
+                    format!("data:{mime};base64,{data}")
+                } else if let Some(ref file_id) = img.file_id {
+                    file_id.clone()
+                } else {
+                    String::new()
+                };
+                let mut image_url = serde_json::json!({"url": url});
+                if let Some(ref extras) = img.extras
+                    && let Some(detail) = extras.get("detail")
+                {
+                    image_url["detail"] = detail.clone();
+                }
+                serde_json::json!({"type": "image_url", "image_url": image_url})
+            }
+            other => serde_json::to_value(other).unwrap_or_default(),
+        })
+        .collect();
+    let raw = serde_json::Value::Array(content_parts);
+    ChatOpenAI::format_message_content(&raw, "chat/completions", Some(role))
+}
+
+/// Convert ContentBlocks into a JSON value for the responses API.
+/// Blocks matching `mcp_approval_response` are pushed directly into `input`.
+fn content_blocks_to_responses(
+    content: &ContentBlocks,
+    role: &str,
+    input: &mut Vec<serde_json::Value>,
+) -> serde_json::Value {
+    if content.len() <= 1 && !content.has_images() {
+        return serde_json::json!(content.as_text());
+    }
+    let mut new_blocks = Vec::new();
+    for block in content.iter() {
+        match block {
+            ContentBlock::Text(t) => {
+                new_blocks.push(serde_json::json!({"type": "input_text", "text": t.text}));
+            }
+            ContentBlock::Image(img) => {
+                let url = if let Some(ref u) = img.url {
+                    u.clone()
+                } else if let (Some(data), Some(mime)) = (&img.base64, &img.mime_type) {
+                    format!("data:{mime};base64,{data}")
+                } else if let Some(ref file_id) = img.file_id {
+                    file_id.clone()
+                } else {
+                    String::new()
+                };
+                let mut b = serde_json::json!({
+                    "type": "input_image",
+                    "image_url": url
+                });
+                if let Some(ref extras) = img.extras
+                    && let Some(detail) = extras.get("detail")
+                {
+                    b["detail"] = detail.clone();
+                }
+                new_blocks.push(b);
+            }
+            other => {
+                let value = serde_json::to_value(other).unwrap_or_default();
+                let block_type = value
+                    .get("type")
+                    .and_then(|t: &serde_json::Value| t.as_str());
+                match block_type {
+                    Some("text") | Some("image_url") | Some("file") => {
+                        new_blocks.push(convert_cc_block_to_responses(&value));
+                    }
+                    Some("input_text" | "input_image" | "input_file") => {
+                        new_blocks.push(value);
+                    }
+                    Some("mcp_approval_response") => {
+                        input.push(value);
+                    }
+                    _ => {
+                        new_blocks.push(value);
+                    }
+                }
+            }
+        }
+    }
+    let raw = serde_json::Value::Array(new_blocks);
+    ChatOpenAI::format_message_content(&raw, "responses", Some(role))
+}
+
 /// Convert Chat Completions content blocks to Responses API format.
 fn convert_cc_block_to_responses(block: &serde_json::Value) -> serde_json::Value {
     match block.get("type").and_then(|t| t.as_str()) {
@@ -502,39 +602,51 @@ fn pop_index_and_sub_index(block: &serde_json::Value) -> serde_json::Value {
 }
 
 /// Ensure tool message content is valid for the Responses API.
-fn ensure_valid_tool_message_content(content: &MessageContent) -> serde_json::Value {
-    match content {
-        MessageContent::Text(text) => serde_json::json!(text),
-        MessageContent::Parts(parts) => {
-            let blocks: Vec<serde_json::Value> = parts
-                .iter()
-                .filter_map(|part| match part {
-                    ContentPart::Text { text } => {
-                        Some(serde_json::json!({"type": "input_text", "text": text}))
-                    }
-                    ContentPart::Image { .. } => Some(convert_cc_block_to_responses(
-                        &serde_json::to_value(part).unwrap_or_default(),
-                    )),
-                    ContentPart::Other(value) => {
-                        let block_type = value.get("type").and_then(|t| t.as_str());
-                        match block_type {
-                            Some("input_text" | "input_image" | "input_file") => {
-                                Some(value.clone())
-                            }
-                            Some("text" | "image_url" | "file") => {
-                                Some(convert_cc_block_to_responses(value))
-                            }
-                            _ => None,
-                        }
-                    }
-                })
-                .collect();
-            if blocks.is_empty() {
-                serde_json::json!(content.as_text())
-            } else {
-                serde_json::Value::Array(blocks)
+fn ensure_valid_tool_message_content(content: &ContentBlocks) -> serde_json::Value {
+    if content.len() <= 1 && !content.has_images() {
+        return serde_json::json!(content.as_text());
+    }
+    let blocks: Vec<serde_json::Value> = content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::Text(t) => {
+                Some(serde_json::json!({"type": "input_text", "text": t.text}))
             }
-        }
+            ContentBlock::Image(_) => Some(convert_cc_block_to_responses(
+                &serde_json::to_value(block).unwrap_or_default(),
+            )),
+            ContentBlock::NonStandard(ns) => {
+                let value = serde_json::to_value(ns).unwrap_or_default();
+                let block_type = value
+                    .get("type")
+                    .and_then(|t: &serde_json::Value| t.as_str());
+                match block_type {
+                    Some("input_text" | "input_image" | "input_file") => Some(value),
+                    Some("text" | "image_url" | "file") => {
+                        Some(convert_cc_block_to_responses(&value))
+                    }
+                    _ => None,
+                }
+            }
+            _ => {
+                let value = serde_json::to_value(block).unwrap_or_default();
+                let block_type = value
+                    .get("type")
+                    .and_then(|t: &serde_json::Value| t.as_str());
+                match block_type {
+                    Some("input_text" | "input_image" | "input_file") => Some(value),
+                    Some("text" | "image_url" | "file") => {
+                        Some(convert_cc_block_to_responses(&value))
+                    }
+                    _ => None,
+                }
+            }
+        })
+        .collect();
+    if blocks.is_empty() {
+        serde_json::json!(content.as_text())
+    } else {
+        serde_json::Value::Array(blocks)
     }
 }
 
@@ -544,36 +656,40 @@ fn make_computer_call_output(m: &crate::messages::ToolMessage) -> Option<serde_j
         return None;
     }
     let mut output = None;
-    match &m.content {
-        MessageContent::Parts(parts) => {
-            for part in parts {
-                if let ContentPart::Other(block) = part {
-                    let block_type = block.get("type").and_then(|t| t.as_str());
-                    if block_type == Some("input_image") {
-                        output = Some(serde_json::json!({
-                            "call_id": m.tool_call_id,
-                            "type": "computer_call_output",
-                            "output": block
-                        }));
-                        break;
-                    }
-                    if block_type == Some("non_standard")
-                        && let Some(value) = block.get("value")
-                        && value.get("type").and_then(|t| t.as_str())
-                            == Some("computer_call_output")
-                    {
-                        output = Some(value.clone());
-                        break;
-                    }
-                }
-            }
-        }
-        MessageContent::Text(text) => {
+    if m.content.len() <= 1 && !m.content.has_images() {
+        let text = m.content.as_text();
+        if !text.is_empty() {
             output = Some(serde_json::json!({
                 "call_id": m.tool_call_id,
                 "type": "computer_call_output",
                 "output": {"type": "input_image", "image_url": text}
             }));
+        }
+    }
+    if output.is_none() {
+        for block in m.content.iter() {
+            let value = serde_json::to_value(block).unwrap_or_default();
+            let block_type = value
+                .get("type")
+                .and_then(|t: &serde_json::Value| t.as_str());
+            if block_type == Some("input_image") {
+                output = Some(serde_json::json!({
+                    "call_id": m.tool_call_id,
+                    "type": "computer_call_output",
+                    "output": value
+                }));
+                break;
+            }
+            if block_type == Some("non_standard")
+                && let Some(inner) = value.get("value")
+                && inner
+                    .get("type")
+                    .and_then(|t: &serde_json::Value| t.as_str())
+                    == Some("computer_call_output")
+            {
+                output = Some(inner.clone());
+                break;
+            }
         }
     }
     if let Some(ref mut out) = output
@@ -586,24 +702,26 @@ fn make_computer_call_output(m: &crate::messages::ToolMessage) -> Option<serde_j
 
 /// Create a custom_tool_call_output from a ToolMessage.
 fn make_custom_tool_output(m: &crate::messages::ToolMessage) -> Option<serde_json::Value> {
-    if let MessageContent::Parts(parts) = &m.content {
-        for part in parts {
-            if let ContentPart::Other(block) = part {
-                let block_type = block.get("type").and_then(|t| t.as_str());
-                if block_type == Some("custom_tool_call_output") {
-                    return Some(serde_json::json!({
-                        "type": "custom_tool_call_output",
-                        "call_id": m.tool_call_id,
-                        "output": block.get("output").cloned().unwrap_or(serde_json::json!(""))
-                    }));
-                }
-                if block_type == Some("non_standard")
-                    && let Some(value) = block.get("value")
-                    && value.get("type").and_then(|t| t.as_str()) == Some("custom_tool_call_output")
-                {
-                    return Some(value.clone());
-                }
-            }
+    for block in m.content.iter() {
+        let value = serde_json::to_value(block).unwrap_or_default();
+        let block_type = value
+            .get("type")
+            .and_then(|t: &serde_json::Value| t.as_str());
+        if block_type == Some("custom_tool_call_output") {
+            return Some(serde_json::json!({
+                "type": "custom_tool_call_output",
+                "call_id": m.tool_call_id,
+                "output": value.get("output").cloned().unwrap_or(serde_json::json!(""))
+            }));
+        }
+        if block_type == Some("non_standard")
+            && let Some(inner) = value.get("value")
+            && inner
+                .get("type")
+                .and_then(|t: &serde_json::Value| t.as_str())
+                == Some("custom_tool_call_output")
+        {
+            return Some(inner.clone());
         }
     }
     None
@@ -938,40 +1056,7 @@ impl ChatOpenAI {
                 Some(message)
             }
             AnyMessage::HumanMessage(m) => {
-                let content = match &m.content {
-                    MessageContent::Text(text) => serde_json::json!(text),
-                    MessageContent::Parts(parts) => {
-                        let content_parts: Vec<serde_json::Value> = parts
-                            .iter()
-                            .map(|part| match part {
-                                ContentPart::Text { text } => {
-                                    serde_json::json!({"type": "text", "text": text})
-                                }
-                                ContentPart::Image { source, detail } => {
-                                    let url = match source {
-                                        ImageSource::Url { url } => url.clone(),
-                                        ImageSource::Base64 { media_type, data } => {
-                                            format!("data:{media_type};base64,{data}")
-                                        }
-                                        ImageSource::FileId { file_id } => file_id.clone(),
-                                    };
-                                    let mut image_url = serde_json::json!({"url": url});
-                                    if let Some(d) = detail {
-                                        image_url["detail"] = serde_json::json!(match d {
-                                            ImageDetail::Low => "low",
-                                            ImageDetail::High => "high",
-                                            ImageDetail::Auto => "auto",
-                                        });
-                                    }
-                                    serde_json::json!({"type": "image_url", "image_url": image_url})
-                                }
-                                ContentPart::Other(value) => value.clone(),
-                            })
-                            .collect();
-                        let raw = serde_json::Value::Array(content_parts);
-                        Self::format_message_content(&raw, "chat/completions", Some("human"))
-                    }
-                };
+                let content = content_blocks_to_chat_completions(&m.content, "human");
                 let mut message = serde_json::json!({"role": "user", "content": content});
                 if let Some(ref name) = m.name {
                     message["name"] = serde_json::json!(name);
@@ -1028,15 +1113,22 @@ impl ChatOpenAI {
                 }
 
                 let mut audio: Option<serde_json::Value> = None;
-                if let MessageContent::Parts(parts) = &m.content {
-                    for part in parts {
-                        if let ContentPart::Other(block) = part
-                            && block.get("type").and_then(|t| t.as_str()) == Some("audio")
-                            && let Some(id) = block.get("id")
-                        {
-                            audio = Some(serde_json::json!({"id": id}));
-                            break;
-                        }
+                for block in m.content.iter() {
+                    if let ContentBlock::Audio(a) = block
+                        && let Some(ref id) = a.id
+                    {
+                        audio = Some(serde_json::json!({"id": id}));
+                        break;
+                    }
+                    let value = serde_json::to_value(block).unwrap_or_default();
+                    if value
+                        .get("type")
+                        .and_then(|t: &serde_json::Value| t.as_str())
+                        == Some("audio")
+                        && let Some(id) = value.get("id")
+                    {
+                        audio = Some(serde_json::json!({"id": id}));
+                        break;
                     }
                 }
                 if audio.is_none()
@@ -1055,40 +1147,7 @@ impl ChatOpenAI {
                 Some(message)
             }
             AnyMessage::ToolMessage(m) => {
-                let content = match &m.content {
-                    MessageContent::Parts(parts) => {
-                        let content_parts: Vec<serde_json::Value> = parts
-                            .iter()
-                            .map(|part| match part {
-                                ContentPart::Text { text } => {
-                                    serde_json::json!({"type": "text", "text": text})
-                                }
-                                ContentPart::Image { source, detail } => {
-                                    let url = match source {
-                                        ImageSource::Url { url } => url.clone(),
-                                        ImageSource::Base64 { media_type, data } => {
-                                            format!("data:{media_type};base64,{data}")
-                                        }
-                                        ImageSource::FileId { file_id } => file_id.clone(),
-                                    };
-                                    let mut image_url = serde_json::json!({"url": url});
-                                    if let Some(d) = detail {
-                                        image_url["detail"] = serde_json::json!(match d {
-                                            ImageDetail::Low => "low",
-                                            ImageDetail::High => "high",
-                                            ImageDetail::Auto => "auto",
-                                        });
-                                    }
-                                    serde_json::json!({"type": "image_url", "image_url": image_url})
-                                }
-                                ContentPart::Other(value) => value.clone(),
-                            })
-                            .collect();
-                        let raw = serde_json::Value::Array(content_parts);
-                        Self::format_message_content(&raw, "chat/completions", Some("tool"))
-                    }
-                    other => serde_json::json!(other),
-                };
+                let content = content_blocks_to_chat_completions(&m.content, "tool");
                 Some(serde_json::json!({
                     "role": "tool",
                     "tool_call_id": m.tool_call_id,
@@ -1133,175 +1192,111 @@ impl ChatOpenAI {
                     }));
                 }
                 AnyMessage::HumanMessage(m) => {
-                    let content = match &m.content {
-                        MessageContent::Text(text) => serde_json::json!(text),
-                        MessageContent::Parts(parts) => {
-                            let mut new_blocks = Vec::new();
-                            for part in parts {
-                                match part {
-                                    ContentPart::Text { text } => {
-                                        new_blocks.push(
-                                            serde_json::json!({"type": "input_text", "text": text}),
-                                        );
-                                    }
-                                    ContentPart::Image { source, detail } => {
-                                        let url = match source {
-                                            ImageSource::Url { url } => url.clone(),
-                                            ImageSource::Base64 { media_type, data } => {
-                                                format!("data:{media_type};base64,{data}")
-                                            }
-                                            ImageSource::FileId { file_id } => file_id.clone(),
-                                        };
-                                        let mut block = serde_json::json!({
-                                            "type": "input_image",
-                                            "image_url": url
-                                        });
-                                        if let Some(d) = detail {
-                                            block["detail"] = serde_json::json!(match d {
-                                                ImageDetail::Low => "low",
-                                                ImageDetail::High => "high",
-                                                ImageDetail::Auto => "auto",
-                                            });
-                                        }
-                                        new_blocks.push(block);
-                                    }
-                                    ContentPart::Other(value) => {
-                                        let block_type = value.get("type").and_then(|t| t.as_str());
-                                        match block_type {
-                                            Some("text") | Some("image_url") | Some("file") => {
-                                                new_blocks
-                                                    .push(convert_cc_block_to_responses(value));
-                                            }
-                                            Some("input_text" | "input_image" | "input_file") => {
-                                                new_blocks.push(value.clone());
-                                            }
-                                            Some("mcp_approval_response") => {
-                                                input.push(value.clone());
-                                            }
-                                            _ => {
-                                                new_blocks.push(value.clone());
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            let raw = serde_json::Value::Array(new_blocks);
-                            Self::format_message_content(&raw, "responses", Some("human"))
-                        }
-                    };
+                    let content = content_blocks_to_responses(&m.content, "human", &mut input);
                     if !content.as_array().map(|a| a.is_empty()).unwrap_or(false) {
                         input.push(serde_json::json!({"role": "user", "content": content}));
                     }
                 }
                 AnyMessage::AIMessage(m) => {
-                    let has_structured_blocks = if let MessageContent::Parts(parts) = &m.content {
-                        parts.iter().any(|p| {
-                            if let ContentPart::Other(block) = p {
-                                matches!(
-                                    block.get("type").and_then(|t| t.as_str()),
-                                    Some(
-                                        "output_text"
-                                            | "refusal"
-                                            | "reasoning"
-                                            | "function_call"
-                                            | "web_search_call"
-                                            | "file_search_call"
-                                            | "computer_call"
-                                            | "custom_tool_call"
-                                            | "code_interpreter_call"
-                                            | "mcp_call"
-                                            | "mcp_list_tools"
-                                            | "mcp_approval_request"
-                                            | "image_generation_call"
-                                    )
-                                )
-                            } else {
-                                false
-                            }
-                        })
-                    } else {
-                        false
-                    };
+                    let structured_types: &[&str] = &[
+                        "output_text",
+                        "refusal",
+                        "reasoning",
+                        "function_call",
+                        "web_search_call",
+                        "file_search_call",
+                        "computer_call",
+                        "custom_tool_call",
+                        "code_interpreter_call",
+                        "mcp_call",
+                        "mcp_list_tools",
+                        "mcp_approval_request",
+                        "image_generation_call",
+                    ];
+                    let json_blocks: Vec<serde_json::Value> = m.content.as_json_values();
+                    let has_structured_blocks = json_blocks.iter().any(|block| {
+                        let bt = block
+                            .get("type")
+                            .and_then(|t: &serde_json::Value| t.as_str());
+                        bt.map(|t| structured_types.contains(&t)).unwrap_or(false)
+                    });
 
                     if has_structured_blocks {
-                        if let MessageContent::Parts(parts) = &m.content {
-                            let mut msg_content_blocks: Vec<serde_json::Value> = Vec::new();
-                            let mut content_call_ids: HashSet<String> = HashSet::new();
+                        let mut msg_content_blocks: Vec<serde_json::Value> = Vec::new();
+                        let mut content_call_ids: HashSet<String> = HashSet::new();
 
-                            for part in parts {
-                                if let ContentPart::Other(block) = part {
-                                    let block_type = block.get("type").and_then(|t| t.as_str());
-                                    match block_type {
-                                        Some("output_text" | "text" | "refusal") => {
-                                            let mut b = block.clone();
-                                            if let Some("text") = block_type
-                                                && let Some(obj) = b.as_object_mut()
-                                            {
-                                                obj.insert(
-                                                    "type".to_string(),
-                                                    serde_json::json!("output_text"),
-                                                );
-                                            }
-                                            if let Some(anns) =
-                                                b.get("annotations").and_then(|a| a.as_array())
-                                            {
-                                                let converted: Vec<serde_json::Value> = anns
-                                                    .iter()
-                                                    .map(format_annotation_from_lc)
-                                                    .collect();
-                                                b["annotations"] =
-                                                    serde_json::Value::Array(converted);
-                                            }
-                                            msg_content_blocks.push(b);
-                                        }
-                                        Some(
-                                            "reasoning"
-                                            | "web_search_call"
-                                            | "file_search_call"
-                                            | "computer_call"
-                                            | "custom_tool_call"
-                                            | "code_interpreter_call"
-                                            | "mcp_call"
-                                            | "mcp_list_tools"
-                                            | "mcp_approval_request",
-                                        ) => {
-                                            input.push(pop_index_and_sub_index(block));
-                                        }
-                                        Some("function_call") => {
-                                            if let Some(call_id) =
-                                                block.get("call_id").and_then(|v| v.as_str())
-                                            {
-                                                content_call_ids.insert(call_id.to_string());
-                                            }
-                                            input.push(pop_index_and_sub_index(block));
-                                        }
-                                        Some("image_generation_call") => {
-                                            input.push(serde_json::json!({
-                                                "type": "image_generation_call",
-                                                "id": block["id"]
-                                            }));
-                                        }
-                                        _ => {}
+                        for block in &json_blocks {
+                            let block_type = block
+                                .get("type")
+                                .and_then(|t: &serde_json::Value| t.as_str());
+                            match block_type {
+                                Some("output_text" | "text" | "refusal") => {
+                                    let mut b = block.clone();
+                                    if let Some("text") = block_type
+                                        && let Some(obj) = b.as_object_mut()
+                                    {
+                                        obj.insert(
+                                            "type".to_string(),
+                                            serde_json::json!("output_text"),
+                                        );
                                     }
+                                    if let Some(anns) = b
+                                        .get("annotations")
+                                        .and_then(|a: &serde_json::Value| a.as_array())
+                                    {
+                                        let converted: Vec<serde_json::Value> =
+                                            anns.iter().map(format_annotation_from_lc).collect();
+                                        b["annotations"] = serde_json::Value::Array(converted);
+                                    }
+                                    msg_content_blocks.push(b);
                                 }
-                            }
-                            if !msg_content_blocks.is_empty() {
-                                input.push(serde_json::json!({
-                                    "type": "message",
-                                    "role": "assistant",
-                                    "content": msg_content_blocks
-                                }));
-                            }
-                            for tc in &m.tool_calls {
-                                let tc_id = tc.id.as_deref().unwrap_or("");
-                                if !content_call_ids.contains(tc_id) {
+                                Some(
+                                    "reasoning"
+                                    | "web_search_call"
+                                    | "file_search_call"
+                                    | "computer_call"
+                                    | "custom_tool_call"
+                                    | "code_interpreter_call"
+                                    | "mcp_call"
+                                    | "mcp_list_tools"
+                                    | "mcp_approval_request",
+                                ) => {
+                                    input.push(pop_index_and_sub_index(block));
+                                }
+                                Some("function_call") => {
+                                    if let Some(call_id) = block
+                                        .get("call_id")
+                                        .and_then(|v: &serde_json::Value| v.as_str())
+                                    {
+                                        content_call_ids.insert(call_id.to_string());
+                                    }
+                                    input.push(pop_index_and_sub_index(block));
+                                }
+                                Some("image_generation_call") => {
                                     input.push(serde_json::json!({
-                                        "type": "function_call",
-                                        "name": tc.name,
-                                        "arguments": tc.args.to_string(),
-                                        "call_id": tc.id
+                                        "type": "image_generation_call",
+                                        "id": block["id"]
                                     }));
                                 }
+                                _ => {}
+                            }
+                        }
+                        if !msg_content_blocks.is_empty() {
+                            input.push(serde_json::json!({
+                                "type": "message",
+                                "role": "assistant",
+                                "content": msg_content_blocks
+                            }));
+                        }
+                        for tc in &m.tool_calls {
+                            let tc_id = tc.id.as_deref().unwrap_or("");
+                            if !content_call_ids.contains(tc_id) {
+                                input.push(serde_json::json!({
+                                    "type": "function_call",
+                                    "name": tc.name,
+                                    "arguments": tc.args.to_string(),
+                                    "call_id": tc.id
+                                }));
                             }
                         }
                     } else {

@@ -1,6 +1,6 @@
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    ContentBlock, ContentPart, HumanMessage, HumanMessageChunk, MessageContent, SystemMessage,
+    ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk, SystemMessage,
     SystemMessageChunk, TextContentBlock,
 };
 
@@ -9,7 +9,7 @@ fn test_init_basic() {
     let msg = SystemMessage::builder()
         .content("You are a helpful assistant.")
         .build();
-    assert!(matches!(&msg.content, MessageContent::Text(s) if s == "You are a helpful assistant."));
+    assert!(msg.content == "You are a helpful assistant.");
     assert_eq!(msg.message_type(), "system");
 }
 
@@ -83,9 +83,7 @@ fn test_serialization_roundtrip() {
     assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "system");
 
     let deserialized: SystemMessage = serde_json::from_value(serialized).unwrap();
-    assert!(
-        matches!(&deserialized.content, MessageContent::Text(s) if s == "You are a helpful assistant.")
-    );
+    assert!(deserialized.content == "You are a helpful assistant.");
     assert_eq!(deserialized.name, Some("system_prompt".to_string()));
     assert_eq!(deserialized.id, Some("sys-123".to_string()));
     assert_eq!(
@@ -97,13 +95,13 @@ fn test_serialization_roundtrip() {
 #[test]
 fn test_text_content() {
     let msg = SystemMessage::builder().content("Hello world").build();
-    assert!(matches!(&msg.content, MessageContent::Text(s) if s == "Hello world"));
+    assert!(msg.content == "Hello world");
 }
 
 #[test]
 fn test_empty_content() {
     let msg = SystemMessage::builder().content("").build();
-    assert!(matches!(&msg.content, MessageContent::Text(s) if s.is_empty()));
+    assert!(msg.content.is_empty());
 }
 
 #[test]
@@ -129,7 +127,7 @@ fn test_chunk_init_basic() {
     let chunk = SystemMessageChunk::builder()
         .content("Instructions")
         .build();
-    assert!(matches!(&chunk.content, MessageContent::Text(s) if s == "Instructions"));
+    assert!(chunk.content == "Instructions");
     assert_eq!(chunk.message_type(), "SystemMessageChunk");
 }
 
@@ -147,7 +145,7 @@ fn test_chunk_add_two_chunks() {
         .build();
     let chunk2 = SystemMessageChunk::builder().content(" world").build();
     let result = chunk1 + chunk2;
-    assert!(matches!(&result.content, MessageContent::Text(s) if s == "Hello world"));
+    assert!(result.content == "Hello world");
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -236,7 +234,7 @@ fn test_chunk_serialization_roundtrip() {
     );
 
     let deserialized: SystemMessageChunk = serde_json::from_value(serialized).unwrap();
-    assert!(matches!(&deserialized.content, MessageContent::Text(s) if s == "Instructions"));
+    assert!(deserialized.content == "Instructions");
     assert_eq!(deserialized.name, Some("sys_prompt".to_string()));
     assert_eq!(deserialized.id, Some("chunk-123".to_string()));
 }
@@ -247,7 +245,7 @@ fn test_chunk_multiple_additions() {
     let chunk2 = SystemMessageChunk::builder().content("b").build();
     let chunk3 = SystemMessageChunk::builder().content("c").build();
     let result = chunk1 + chunk2 + chunk3;
-    assert!(matches!(&result.content, MessageContent::Text(s) if s == "abc"));
+    assert!(result.content == "abc");
 }
 
 #[test]
@@ -255,7 +253,7 @@ fn test_chunk_empty_content() {
     let chunk1 = SystemMessageChunk::builder().content("Hello").build();
     let chunk2 = SystemMessageChunk::builder().content("").build();
     let result = chunk1 + chunk2;
-    assert!(matches!(&result.content, MessageContent::Text(s) if s == "Hello"));
+    assert!(result.content == "Hello");
 }
 
 #[test]
@@ -269,14 +267,8 @@ fn test_chunk_add_different_chunk_type() {
     let msg1 = chunk1.to_message();
     let msg2: HumanMessage = chunk2.into();
 
-    let content1 = match &msg1.content {
-        MessageContent::Text(s) => s.as_str(),
-        MessageContent::Parts(_) => "",
-    };
-    let content2 = match &msg2.content {
-        MessageContent::Text(s) => s.as_str(),
-        MessageContent::Parts(_) => "",
-    };
+    let content1 = msg1.content.as_text();
+    let content2 = msg2.content.as_text();
     assert_eq!(content1, "Hello");
     assert_eq!(content2, " world");
 
@@ -287,7 +279,7 @@ fn test_chunk_add_different_chunk_type() {
 #[test]
 fn test_chunk_text_content() {
     let chunk = SystemMessageChunk::builder().content("Hello world").build();
-    assert!(matches!(&chunk.content, MessageContent::Text(s) if s == "Hello world"));
+    assert!(chunk.content == "Hello world");
 }
 
 #[test]
@@ -343,46 +335,34 @@ fn test_multiple_system_messages_with_different_roles() {
 
 #[test]
 fn test_init_with_list_content() {
-    let parts = vec![ContentPart::Text {
-        text: "Instructions".to_string(),
-    }];
-    let msg = SystemMessage::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
-    match &msg.content {
-        MessageContent::Parts(p) => {
-            assert_eq!(p.len(), 1);
-            match &p[0] {
-                ContentPart::Text { text } => assert_eq!(text, "Instructions"),
-                other => panic!("expected Text content part, got {:?}", other),
-            }
-        }
-        other => panic!("expected Parts content, got {:?}", other),
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new(
+        "Instructions",
+    ))]);
+    let msg = SystemMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 1);
+    if let ContentBlock::Text(tb) = &msg.content[0] {
+        assert_eq!(tb.text, "Instructions");
+    } else {
+        panic!("expected Text content block, got {:?}", &msg.content[0]);
     }
 }
 
 #[test]
 fn test_init_with_content_blocks() {
-    let blocks = vec![
+    let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("First instruction")),
         ContentBlock::Text(TextContentBlock::new("Second instruction")),
-    ];
-    let msg = SystemMessage::builder()
-        .content("")
-        .content_blocks(blocks)
-        .build();
-    assert!(matches!(&msg.content, MessageContent::Parts(_)));
+    ]);
+    let msg = SystemMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 2);
 }
 
 #[test]
 fn test_empty_list_content() {
     let msg = SystemMessage::builder()
-        .content(MessageContent::Parts(vec![]))
+        .content(ContentBlocks::new())
         .build();
-    match &msg.content {
-        MessageContent::Parts(p) => assert!(p.is_empty()),
-        other => panic!("expected Parts content, got {:?}", other),
-    }
+    assert!(msg.content.is_empty());
 }
 
 #[test]
@@ -393,17 +373,11 @@ fn test_text_method() {
 
 #[test]
 fn test_text_method_list_content() {
-    let parts = vec![
-        ContentPart::Text {
-            text: "Part 1".to_string(),
-        },
-        ContentPart::Text {
-            text: "Part 2".to_string(),
-        },
-    ];
-    let msg = SystemMessage::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("Part 1")),
+        ContentBlock::Text(TextContentBlock::new("Part 2")),
+    ]);
+    let msg = SystemMessage::builder().content(blocks).build();
     assert_eq!(msg.text(), "Part 1 Part 2");
 }
 
@@ -416,7 +390,7 @@ fn test_text_method_empty_content() {
 #[test]
 fn test_text_method_empty_list_content() {
     let msg = SystemMessage::builder()
-        .content(MessageContent::Parts(vec![]))
+        .content(ContentBlocks::new())
         .build();
     assert_eq!(msg.text(), "");
 }
@@ -445,7 +419,7 @@ fn test_content_blocks_empty_string() {
 #[test]
 fn test_content_blocks_empty_list() {
     let msg = SystemMessage::builder()
-        .content(MessageContent::Parts(vec![]))
+        .content(ContentBlocks::new())
         .build();
     let blocks = msg.content_blocks();
     assert!(blocks.is_empty());
@@ -480,27 +454,21 @@ fn test_pretty_repr_with_name() {
 
 #[test]
 fn test_init_with_content_blocks_sets_content() {
-    let blocks = vec![
+    let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("First instruction")),
         ContentBlock::Text(TextContentBlock::new("Second instruction")),
-    ];
-    let msg = SystemMessage::builder()
-        .content("")
-        .content_blocks(blocks)
-        .build();
-    assert!(matches!(&msg.content, MessageContent::Parts(_)));
+    ]);
+    let msg = SystemMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 2);
 }
 
 #[test]
 fn test_content_blocks_roundtrip() {
-    let blocks = vec![
+    let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("Rule 1")),
         ContentBlock::Text(TextContentBlock::new("Rule 2")),
-    ];
-    let msg = SystemMessage::builder()
-        .content("")
-        .content_blocks(blocks)
-        .build();
+    ]);
+    let msg = SystemMessage::builder().content(blocks).build();
     let result_blocks = msg.content_blocks();
     assert_eq!(result_blocks.len(), 2);
     match &result_blocks[0] {
@@ -586,61 +554,55 @@ fn test_same_content_and_metadata_are_equal() {
 #[test]
 fn test_chunk_add_with_list_content() {
     let chunk1 = SystemMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Text {
-            text: "Hello".to_string(),
-        }]))
+        .content(ContentBlocks::from(vec![ContentBlock::Text(
+            TextContentBlock::new("Hello"),
+        )]))
         .build();
     let chunk2 = SystemMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Text {
-            text: " world".to_string(),
-        }]))
+        .content(ContentBlocks::from(vec![ContentBlock::Text(
+            TextContentBlock::new(" world"),
+        )]))
         .build();
     let result = chunk1 + chunk2;
-    match &result.content {
-        MessageContent::Parts(parts) => {
-            assert_eq!(parts.len(), 2);
-            match &parts[0] {
-                ContentPart::Text { text } => assert_eq!(text, "Hello"),
-                other => panic!("expected Text, got {:?}", other),
-            }
-            match &parts[1] {
-                ContentPart::Text { text } => assert_eq!(text, " world"),
-                other => panic!("expected Text, got {:?}", other),
-            }
-        }
-        other => panic!("expected Parts content, got {:?}", other),
+    assert_eq!(result.content.len(), 2);
+    if let ContentBlock::Text(tb) = &result.content[0] {
+        assert_eq!(tb.text, "Hello");
+    } else {
+        panic!("expected Text, got {:?}", &result.content[0]);
+    }
+    if let ContentBlock::Text(tb) = &result.content[1] {
+        assert_eq!(tb.text, " world");
+    } else {
+        panic!("expected Text, got {:?}", &result.content[1]);
     }
 }
 
 #[test]
 fn test_chunk_add_with_list_content_with_index() {
     let chunk1 = SystemMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            serde_json::json!({"type": "text", "text": "Hello", "index": 0}),
-        )]))
+        .content(ContentBlocks::from(vec![
+            serde_json::from_value::<ContentBlock>(
+                serde_json::json!({"type": "text", "text": "Hello", "index": 0}),
+            )
+            .unwrap(),
+        ]))
         .build();
     let chunk2 = SystemMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            serde_json::json!({"type": "text", "text": " world", "index": 0}),
-        )]))
+        .content(ContentBlocks::from(vec![
+            serde_json::from_value::<ContentBlock>(
+                serde_json::json!({"type": "text", "text": " world", "index": 0}),
+            )
+            .unwrap(),
+        ]))
         .build();
     let result = chunk1 + chunk2;
-    match &result.content {
-        MessageContent::Parts(parts) => {
-            assert_eq!(
-                parts.len(),
-                1,
-                "expected 1 merged part, got {}",
-                parts.len()
-            );
-            match &parts[0] {
-                ContentPart::Text { text } => assert_eq!(text, "Hello world"),
-                ContentPart::Other(v) => assert_eq!(v["text"], "Hello world"),
-                other => panic!("expected Text or Other content part, got {:?}", other),
-            }
-        }
-        other => panic!("expected Parts content, got {:?}", other),
-    }
+    assert_eq!(
+        result.content.len(),
+        1,
+        "expected 1 merged part, got {}",
+        result.content.len()
+    );
+    assert_eq!(result.content.as_text(), "Hello world");
 }
 
 #[test]
@@ -686,7 +648,7 @@ fn test_chunk_content_blocks_empty_string() {
 #[test]
 fn test_chunk_content_blocks_empty_list() {
     let chunk = SystemMessageChunk::builder()
-        .content(MessageContent::Parts(vec![]))
+        .content(ContentBlocks::new())
         .build();
     let msg: SystemMessage = chunk.into();
     let blocks = msg.content_blocks();

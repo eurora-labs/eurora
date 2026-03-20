@@ -1,4 +1,4 @@
-use crate::messages::content::{ContentPart, MessageContent};
+use crate::messages::content::{ContentBlock, ContentBlocks};
 use crate::messages::{AnyMessage, BaseMessage};
 use std::collections::HashMap;
 
@@ -273,11 +273,13 @@ pub fn update_message_content_to_blocks(
         .filter_map(|block| serde_json::to_value(block).ok())
         .collect();
 
-    let new_content: MessageContent = if block_values.is_empty() {
+    let new_content: ContentBlocks = if block_values.is_empty() {
         message.content.clone()
     } else {
-        let values: Vec<serde_json::Value> = block_values;
-        values.into()
+        block_values
+            .into_iter()
+            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .collect()
     };
 
     let mut new_metadata = message.response_metadata.clone();
@@ -302,53 +304,50 @@ pub fn normalize_messages(messages: Vec<AnyMessage>) -> Vec<AnyMessage> {
 }
 
 fn normalize_single_message(mut message: AnyMessage) -> AnyMessage {
-    let parts = match message.content() {
-        MessageContent::Parts(parts) => parts.clone(),
-        MessageContent::Text(_) => return message,
-    };
+    let blocks: Vec<serde_json::Value> = message
+        .content()
+        .iter()
+        .filter_map(|block| serde_json::to_value(block).ok())
+        .collect();
 
     let mut modified = false;
-    let new_parts: Vec<ContentPart> = parts
+    let new_blocks: Vec<serde_json::Value> = blocks
         .into_iter()
-        .map(|part| match &part {
-            ContentPart::Other(value) => {
-                let block_type = value.get("type").and_then(|t| t.as_str());
+        .map(|value| {
+            let block_type = value.get("type").and_then(|t| t.as_str());
 
-                if matches!(block_type, Some("input_audio") | Some("file"))
-                    && is_openai_data_block(value, None)
-                {
-                    modified = true;
-                    let converted = convert_openai_format_to_data_block(value);
-                    let value = serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
-                    return ContentPart::Other(value);
-                }
-
-                let source_type = value.get("source_type").and_then(|s| s.as_str());
-                if matches!(block_type, Some("image") | Some("audio") | Some("file"))
-                    && matches!(
-                        source_type,
-                        Some("url") | Some("base64") | Some("id") | Some("text")
-                    )
-                {
-                    modified = true;
-                    if let Some(obj) = value.as_object() {
-                        let block_map: HashMap<String, serde_json::Value> =
-                            obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                        let converted = convert_legacy_v0_content_block_to_v1(&block_map);
-                        let value =
-                            serde_json::to_value(converted).unwrap_or_else(|_| value.clone());
-                        return ContentPart::Other(value);
-                    }
-                }
-
-                part
+            if matches!(block_type, Some("input_audio") | Some("file"))
+                && is_openai_data_block(&value, None)
+            {
+                modified = true;
+                let converted = convert_openai_format_to_data_block(&value);
+                return serde_json::to_value(converted).unwrap_or(value);
             }
-            _ => part,
+
+            let source_type = value.get("source_type").and_then(|s| s.as_str());
+            if matches!(block_type, Some("image") | Some("audio") | Some("file"))
+                && matches!(
+                    source_type,
+                    Some("url") | Some("base64") | Some("id") | Some("text")
+                )
+                && let Some(obj) = value.as_object()
+            {
+                modified = true;
+                let block_map: HashMap<String, serde_json::Value> =
+                    obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                let converted = convert_legacy_v0_content_block_to_v1(&block_map);
+                return serde_json::to_value(converted).unwrap_or(value);
+            }
+
+            value
         })
         .collect();
 
     if modified {
-        let new_content = MessageContent::Parts(new_parts);
+        let new_content: ContentBlocks = new_blocks
+            .into_iter()
+            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .collect();
         match &mut message {
             AnyMessage::HumanMessage(m) => m.content = new_content,
             AnyMessage::SystemMessage(m) => m.content = new_content,
@@ -373,11 +372,13 @@ pub fn update_chunk_content_to_blocks(
         .filter_map(|block| serde_json::to_value(block).ok())
         .collect();
 
-    let new_content: MessageContent = if block_values.is_empty() {
+    let new_content: ContentBlocks = if block_values.is_empty() {
         chunk.content.clone()
     } else {
-        let values: Vec<serde_json::Value> = block_values;
-        values.into()
+        block_values
+            .into_iter()
+            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .collect()
     };
 
     let mut new_metadata = chunk.response_metadata.clone();
@@ -555,18 +556,19 @@ mod tests {
     #[test]
     fn test_normalize_messages_v1_blocks_passthrough() {
         use crate::messages::HumanMessage;
-        use crate::messages::content::ContentPart;
+        use crate::messages::content::{ContentBlock, ContentBlocks, TextContentBlock};
 
-        let parts = vec![
-            ContentPart::Text {
-                text: "Hello".to_string(),
-            },
-            ContentPart::Other(json!({"type": "image", "url": "https://example.com/img.png"})),
-        ];
+        let blocks: ContentBlocks = vec![
+            ContentBlock::Text(TextContentBlock::new("Hello")),
+            serde_json::from_value::<ContentBlock>(
+                json!({"type": "image", "url": "https://example.com/img.png"}),
+            )
+            .unwrap(),
+        ]
+        .into_iter()
+        .collect();
         let messages = vec![AnyMessage::HumanMessage(
-            HumanMessage::builder()
-                .content(MessageContent::Parts(parts))
-                .build(),
+            HumanMessage::builder().content(blocks).build(),
         )];
         let result = normalize_messages(messages.clone());
         assert_eq!(result, messages);
@@ -575,167 +577,157 @@ mod tests {
     #[test]
     fn test_normalize_messages_openai_audio_converted() {
         use crate::messages::HumanMessage;
-        use crate::messages::content::ContentPart;
+        use crate::messages::content::{ContentBlock, ContentBlocks, NonStandardContentBlock};
 
-        let parts = vec![ContentPart::Other(json!({
-            "type": "input_audio",
-            "input_audio": {
-                "data": "base64audiodata",
-                "format": "wav"
-            }
-        }))];
+        let mut value_map = HashMap::new();
+        value_map.insert("type".to_string(), json!("input_audio"));
+        value_map.insert(
+            "input_audio".to_string(),
+            json!({"data": "base64audiodata", "format": "wav"}),
+        );
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
+            value_map,
+        ))]
+        .into_iter()
+        .collect();
         let messages = vec![AnyMessage::HumanMessage(
-            HumanMessage::builder()
-                .content(MessageContent::Parts(parts))
-                .build(),
+            HumanMessage::builder().content(blocks).build(),
         )];
         let result = normalize_messages(messages);
         let content = result[0].content();
-        if let MessageContent::Parts(parts) = content {
-            if let ContentPart::Other(val) = &parts[0] {
-                assert_eq!(val.get("type").unwrap(), "audio");
-                assert_eq!(val.get("base64").unwrap(), "base64audiodata");
-                assert_eq!(val.get("mime_type").unwrap(), "audio/wav");
-            } else {
-                panic!("Expected Other content part");
-            }
-        } else {
-            panic!("Expected Parts content");
-        }
+        let values: Vec<serde_json::Value> = content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        assert_eq!(values[0].get("type").unwrap(), "audio");
+        assert_eq!(values[0].get("base64").unwrap(), "base64audiodata");
+        assert_eq!(values[0].get("mime_type").unwrap(), "audio/wav");
     }
 
     #[test]
     fn test_normalize_messages_openai_file_converted() {
         use crate::messages::HumanMessage;
-        use crate::messages::content::ContentPart;
+        use crate::messages::content::{ContentBlock, ContentBlocks, NonStandardContentBlock};
 
-        let parts = vec![ContentPart::Other(json!({
-            "type": "file",
-            "file": {
-                "file_id": "file-123"
-            }
-        }))];
+        let mut value_map = HashMap::new();
+        value_map.insert("type".to_string(), json!("file"));
+        value_map.insert("file".to_string(), json!({"file_id": "file-123"}));
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
+            value_map,
+        ))]
+        .into_iter()
+        .collect();
         let messages = vec![AnyMessage::HumanMessage(
-            HumanMessage::builder()
-                .content(MessageContent::Parts(parts))
-                .build(),
+            HumanMessage::builder().content(blocks).build(),
         )];
         let result = normalize_messages(messages);
         let content = result[0].content();
-        if let MessageContent::Parts(parts) = content {
-            if let ContentPart::Other(val) = &parts[0] {
-                assert_eq!(val.get("type").unwrap(), "file");
-                assert_eq!(val.get("file_id").unwrap(), "file-123");
-            } else {
-                panic!("Expected Other content part");
-            }
-        } else {
-            panic!("Expected Parts content");
-        }
+        let values: Vec<serde_json::Value> = content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        assert_eq!(values[0].get("type").unwrap(), "file");
+        assert_eq!(values[0].get("file_id").unwrap(), "file-123");
     }
 
     #[test]
     fn test_normalize_messages_v0_image_url_converted() {
         use crate::messages::HumanMessage;
-        use crate::messages::content::ContentPart;
+        use crate::messages::content::{ContentBlock, ContentBlocks, NonStandardContentBlock};
 
-        let parts = vec![ContentPart::Other(json!({
-            "type": "image",
-            "source_type": "url",
-            "url": "https://example.com/img.png",
-            "mime_type": "image/png"
-        }))];
+        let mut value_map = HashMap::new();
+        value_map.insert("type".to_string(), json!("image"));
+        value_map.insert("source_type".to_string(), json!("url"));
+        value_map.insert("url".to_string(), json!("https://example.com/img.png"));
+        value_map.insert("mime_type".to_string(), json!("image/png"));
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
+            value_map,
+        ))]
+        .into_iter()
+        .collect();
         let messages = vec![AnyMessage::HumanMessage(
-            HumanMessage::builder()
-                .content(MessageContent::Parts(parts))
-                .build(),
+            HumanMessage::builder().content(blocks).build(),
         )];
         let result = normalize_messages(messages);
         let content = result[0].content();
-        if let MessageContent::Parts(parts) = content {
-            if let ContentPart::Other(val) = &parts[0] {
-                assert_eq!(val.get("type").unwrap(), "image");
-                assert_eq!(val.get("url").unwrap(), "https://example.com/img.png");
-                assert!(val.get("source_type").is_none());
-            } else {
-                panic!("Expected Other content part");
-            }
-        } else {
-            panic!("Expected Parts content");
-        }
+        let values: Vec<serde_json::Value> = content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        assert_eq!(values[0].get("type").unwrap(), "image");
+        assert_eq!(values[0].get("url").unwrap(), "https://example.com/img.png");
+        assert!(values[0].get("source_type").is_none());
     }
 
     #[test]
     fn test_normalize_messages_v0_image_base64_converted() {
         use crate::messages::HumanMessage;
-        use crate::messages::content::ContentPart;
+        use crate::messages::content::{ContentBlock, ContentBlocks, NonStandardContentBlock};
 
-        let parts = vec![ContentPart::Other(json!({
-            "type": "image",
-            "source_type": "base64",
-            "data": "iVBORw0KGgo=",
-            "mime_type": "image/png"
-        }))];
+        let mut value_map = HashMap::new();
+        value_map.insert("type".to_string(), json!("image"));
+        value_map.insert("source_type".to_string(), json!("base64"));
+        value_map.insert("data".to_string(), json!("iVBORw0KGgo="));
+        value_map.insert("mime_type".to_string(), json!("image/png"));
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
+            value_map,
+        ))]
+        .into_iter()
+        .collect();
         let messages = vec![AnyMessage::HumanMessage(
-            HumanMessage::builder()
-                .content(MessageContent::Parts(parts))
-                .build(),
+            HumanMessage::builder().content(blocks).build(),
         )];
         let result = normalize_messages(messages);
         let content = result[0].content();
-        if let MessageContent::Parts(parts) = content {
-            if let ContentPart::Other(val) = &parts[0] {
-                assert_eq!(val.get("type").unwrap(), "image");
-                assert_eq!(val.get("base64").unwrap(), "iVBORw0KGgo=");
-                assert_eq!(val.get("mime_type").unwrap(), "image/png");
-                assert!(val.get("source_type").is_none());
-            } else {
-                panic!("Expected Other content part");
-            }
-        } else {
-            panic!("Expected Parts content");
-        }
+        let values: Vec<serde_json::Value> = content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        assert_eq!(values[0].get("type").unwrap(), "image");
+        assert_eq!(values[0].get("base64").unwrap(), "iVBORw0KGgo=");
+        assert_eq!(values[0].get("mime_type").unwrap(), "image/png");
+        assert!(values[0].get("source_type").is_none());
     }
 
     #[test]
     fn test_normalize_messages_mixed_blocks() {
         use crate::messages::HumanMessage;
-        use crate::messages::content::ContentPart;
+        use crate::messages::content::{
+            ContentBlock, ContentBlocks, NonStandardContentBlock, TextContentBlock,
+        };
 
-        let parts = vec![
-            ContentPart::Text {
-                text: "Hello".to_string(),
-            },
-            ContentPart::Other(json!({
-                "type": "input_audio",
-                "input_audio": { "data": "audiodata", "format": "mp3" }
-            })),
-            ContentPart::Other(json!({"type": "image", "url": "https://example.com/img.png"})),
-        ];
+        let mut audio_map = HashMap::new();
+        audio_map.insert("type".to_string(), json!("input_audio"));
+        audio_map.insert(
+            "input_audio".to_string(),
+            json!({"data": "audiodata", "format": "mp3"}),
+        );
+
+        let blocks: ContentBlocks = vec![
+            ContentBlock::Text(TextContentBlock::new("Hello")),
+            ContentBlock::NonStandard(NonStandardContentBlock::new(audio_map)),
+            serde_json::from_value::<ContentBlock>(
+                json!({"type": "image", "url": "https://example.com/img.png"}),
+            )
+            .unwrap(),
+        ]
+        .into_iter()
+        .collect();
         let messages = vec![AnyMessage::HumanMessage(
-            HumanMessage::builder()
-                .content(MessageContent::Parts(parts))
-                .build(),
+            HumanMessage::builder().content(blocks).build(),
         )];
         let result = normalize_messages(messages);
         let content = result[0].content();
-        if let MessageContent::Parts(parts) = content {
-            assert_eq!(parts.len(), 3);
-            assert!(matches!(&parts[0], ContentPart::Text { text } if text == "Hello"));
-            if let ContentPart::Other(val) = &parts[1] {
-                assert_eq!(val.get("type").unwrap(), "audio");
-            } else {
-                panic!("Expected Other content part for audio");
-            }
-            if let ContentPart::Other(val) = &parts[2] {
-                assert_eq!(val.get("type").unwrap(), "image");
-                assert_eq!(val.get("url").unwrap(), "https://example.com/img.png");
-            } else {
-                panic!("Expected Other content part for image");
-            }
-        } else {
-            panic!("Expected Parts content");
-        }
+        let values: Vec<serde_json::Value> = content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values[0].get("type").unwrap(), "text");
+        assert_eq!(values[0].get("text").unwrap(), "Hello");
+        assert_eq!(values[1].get("type").unwrap(), "audio");
+        assert_eq!(values[2].get("type").unwrap(), "image");
+        assert_eq!(values[2].get("url").unwrap(), "https://example.com/img.png");
     }
 
     #[test]
