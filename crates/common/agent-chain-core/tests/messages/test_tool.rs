@@ -166,7 +166,8 @@ fn test_chunk_add_same_tool_call_id_chunks() {
         .tool_call_id("call-123")
         .build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content, "Hello world");
+    assert_eq!(result.content.len(), 2);
+    assert_eq!(result.content.as_text(), "Hello  world");
     assert_eq!(result.tool_call_id, "call-123");
     assert_eq!(result.id, Some("1".to_string()));
 }
@@ -679,7 +680,8 @@ fn test_both_success_statuses_result_in_success() {
         .build();
     let result = chunk1 + chunk2;
     assert_eq!(result.status, ToolStatus::Success);
-    assert_eq!(result.content, "Part A Part B");
+    assert_eq!(result.content.len(), 2);
+    assert_eq!(result.content.as_text(), "Part A  Part B");
 }
 
 #[test]

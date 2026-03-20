@@ -3,7 +3,6 @@ mod test_ai;
 mod test_base;
 mod test_chat;
 mod test_content;
-mod test_function;
 mod test_human;
 mod test_imports;
 mod test_modifier;

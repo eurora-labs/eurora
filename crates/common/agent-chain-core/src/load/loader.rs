@@ -441,10 +441,19 @@ mod tests {
         let result = reviver.revive(&value).unwrap();
         match result {
             RevivedValue::Value(v) => {
-                assert_eq!(
-                    v.get("content").and_then(|v| v.as_str()),
-                    Some("Hello, world!")
-                );
+                let content = v.get("content").unwrap();
+                let text = if let Some(s) = content.as_str() {
+                    s.to_string()
+                } else if let Some(arr) = content.as_array() {
+                    arr[0]
+                        .get("text")
+                        .and_then(|t| t.as_str())
+                        .unwrap()
+                        .to_string()
+                } else {
+                    panic!("Unexpected content format");
+                };
+                assert_eq!(text, "Hello, world!");
                 assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
             }
             RevivedValue::Constructor(info) => {
@@ -471,7 +480,19 @@ mod tests {
         let result = reviver.revive(&value).unwrap();
         match result {
             RevivedValue::Value(v) => {
-                assert_eq!(v.get("content").and_then(|v| v.as_str()), Some("Hello!"));
+                let content = v.get("content").unwrap();
+                let text = if let Some(s) = content.as_str() {
+                    s.to_string()
+                } else if let Some(arr) = content.as_array() {
+                    arr[0]
+                        .get("text")
+                        .and_then(|t| t.as_str())
+                        .unwrap()
+                        .to_string()
+                } else {
+                    panic!("Unexpected content format");
+                };
+                assert_eq!(text, "Hello!");
                 assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
             }
             RevivedValue::Constructor(info) => {

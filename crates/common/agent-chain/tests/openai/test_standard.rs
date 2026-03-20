@@ -748,7 +748,9 @@ async fn test_json_mode() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, MessageContent};
+    use agent_chain_core::messages::{
+        ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock,
+    };
 
     let model = make_model();
 
@@ -756,16 +758,11 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
     let tiny_png_b64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==";
 
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "What do you see in this image? Be very brief.".to_string(),
-            },
-            ContentPart::Other(serde_json::json!({
-                "type": "image_url",
-                "image_url": {
-                    "url": format!("data:image/png;base64,{}", tiny_png_b64)
-                }
-            })),
+        .content(ContentBlocks::from(vec![
+            ContentBlock::Text(TextContentBlock::new(
+                "What do you see in this image? Be very brief.",
+            )),
+            ContentBlock::Image(ImageContentBlock::from_base64(tiny_png_b64, "image/png")),
         ]))
         .build();
 
@@ -1107,7 +1104,7 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, MessageContent};
+    use agent_chain_core::messages::ContentBlocks;
 
     let model = make_model();
 
@@ -1123,16 +1120,12 @@ async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
 
     // LangChain standard format
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Summarize this document:".to_string(),
-            },
-            ContentPart::Other(serde_json::json!({
-                "type": "file",
-                "base64": pdf_b64,
-                "mime_type": "application/pdf"
-            })),
-        ]))
+        .content(serde_json::from_value::<ContentBlocks>(
+            serde_json::json!([
+                {"type": "text", "text": "Summarize this document:"},
+                {"type": "file", "base64": pdf_b64, "mime_type": "application/pdf"}
+            ]),
+        )?)
         .build();
 
     let result = model.invoke(vec![message.into()], None).await?;
@@ -1140,18 +1133,18 @@ async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
 
     // OpenAI Chat Completions format
     let message2 = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Summarize this document:".to_string(),
-            },
-            ContentPart::Other(serde_json::json!({
-                "type": "file",
-                "file": {
-                    "filename": "test_file.pdf",
-                    "file_data": format!("data:application/pdf;base64,{}", pdf_b64)
+        .content(serde_json::from_value::<ContentBlocks>(
+            serde_json::json!([
+                {"type": "text", "text": "Summarize this document:"},
+                {
+                    "type": "file",
+                    "file": {
+                        "filename": "test_file.pdf",
+                        "file_data": format!("data:application/pdf;base64,{}", pdf_b64)
+                    }
                 }
-            })),
-        ]))
+            ]),
+        )?)
         .build();
 
     let result2 = model.invoke(vec![message2.into()], None).await?;
@@ -1170,7 +1163,7 @@ async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, MessageContent};
+    use agent_chain_core::messages::ContentBlocks;
 
     let model = ChatOpenAI::new("gpt-4o-audio-preview");
 
@@ -1188,16 +1181,12 @@ async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
 
     // LangChain standard format
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Describe this audio:".to_string(),
-            },
-            ContentPart::Other(serde_json::json!({
-                "type": "audio",
-                "mime_type": "audio/wav",
-                "base64": audio_b64
-            })),
-        ]))
+        .content(serde_json::from_value::<ContentBlocks>(
+            serde_json::json!([
+                {"type": "text", "text": "Describe this audio:"},
+                {"type": "audio", "mime_type": "audio/wav", "base64": audio_b64}
+            ]),
+        )?)
         .build();
 
     let result = model.invoke(vec![message.into()], None).await?;
@@ -1205,15 +1194,12 @@ async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
 
     // OpenAI Chat Completions input_audio format
     let message2 = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Describe this audio:".to_string(),
-            },
-            ContentPart::Other(serde_json::json!({
-                "type": "input_audio",
-                "input_audio": {"data": audio_b64, "format": "wav"}
-            })),
-        ]))
+        .content(serde_json::from_value::<ContentBlocks>(
+            serde_json::json!([
+                {"type": "text", "text": "Describe this audio:"},
+                {"type": "input_audio", "input_audio": {"data": audio_b64, "format": "wav"}}
+            ]),
+        )?)
         .build();
 
     let result2 = model.invoke(vec![message2.into()], None).await?;
@@ -1232,7 +1218,7 @@ async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, MessageContent};
+    use agent_chain_core::messages::ContentBlocks;
 
     let model = make_model();
 
@@ -1267,12 +1253,12 @@ async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
             .build()
             .into(),
         ToolMessage::builder()
-            .content(MessageContent::Parts(vec![ContentPart::Other(
-                serde_json::json!({
+            .content(serde_json::from_value::<ContentBlocks>(
+                serde_json::json!([{
                     "type": "image_url",
                     "image_url": {"url": format!("data:image/png;base64,{}", tiny_png_b64)}
-                }),
-            )]))
+                }]),
+            )?)
             .tool_call_id("1")
             .build()
             .into(),
@@ -1290,7 +1276,7 @@ async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, MessageContent};
+    use agent_chain_core::messages::ContentBlocks;
 
     let model = make_model();
 
@@ -1330,13 +1316,13 @@ async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
             .build()
             .into(),
         ToolMessage::builder()
-            .content(MessageContent::Parts(vec![ContentPart::Other(
-                serde_json::json!({
+            .content(serde_json::from_value::<ContentBlocks>(
+                serde_json::json!([{
                     "type": "file",
                     "base64": pdf_b64,
                     "mime_type": "application/pdf"
-                }),
-            )]))
+                }]),
+            )?)
             .tool_call_id("1")
             .build()
             .into(),
@@ -1359,7 +1345,7 @@ async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, MessageContent, SystemMessage};
+    use agent_chain_core::messages::{ContentBlocks, SystemMessage};
 
     let model = make_model();
 
@@ -1383,17 +1369,17 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
             .build()
             .into(),
         AIMessage::builder()
-            .content(MessageContent::Parts(vec![
-                ContentPart::Text {
-                    text: "Hmm let me think about that".to_string(),
-                },
-                ContentPart::Other(serde_json::json!({
-                    "type": "tool_use",
-                    "input": {"fav_color": "purple"},
-                    "id": "foo",
-                    "name": "color_picker"
-                })),
-            ]))
+            .content(serde_json::from_value::<ContentBlocks>(
+                serde_json::json!([
+                    {"type": "text", "text": "Hmm let me think about that"},
+                    {
+                        "type": "tool_use",
+                        "input": {"fav_color": "purple"},
+                        "id": "foo",
+                        "name": "color_picker"
+                    }
+                ]),
+            )?)
             .tool_calls(vec![
                 ToolCall::builder()
                     .name("color_picker")
@@ -1418,16 +1404,16 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
     let messages2: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("Hello").build().into(),
         AIMessage::builder()
-            .content(MessageContent::Parts(vec![
-                ContentPart::Other(serde_json::json!({
-                    "type": "thinking",
-                    "thinking": "This is a simple greeting. I should respond warmly.",
-                    "signature": "dummy_signature"
-                })),
-                ContentPart::Text {
-                    text: "Hello, how are you?".to_string(),
-                },
-            ]))
+            .content(serde_json::from_value::<ContentBlocks>(
+                serde_json::json!([
+                    {
+                        "type": "thinking",
+                        "thinking": "This is a simple greeting. I should respond warmly.",
+                        "signature": "dummy_signature"
+                    },
+                    {"type": "text", "text": "Hello, how are you?"}
+                ]),
+            )?)
             .build()
             .into(),
         HumanMessage::builder()

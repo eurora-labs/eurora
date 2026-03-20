@@ -1,4 +1,5 @@
-use agent_chain_core::{AnyMessage, ContentPart, HumanMessage, ImageSource};
+use agent_chain_core::messages::{ContentBlock, ImageContentBlock};
+use agent_chain_core::{AnyMessage, HumanMessage};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -95,24 +96,12 @@ impl YoutubeSnapshot {
 
 impl SnapshotFunctionality for YoutubeSnapshot {
     fn construct_messages(&self) -> Vec<AnyMessage> {
-        let mut content_parts = vec![];
-
         if let Some(image) = &self.video_frame
             && !image.is_empty()
         {
-            content_parts.push(ContentPart::Image {
-                source: ImageSource::Url {
-                    url: format!("data:image/png;base64,{}", image.clone()),
-                },
-                detail: None,
-            });
+            let block = ContentBlock::Image(ImageContentBlock::from_base64(image, "image/png"));
 
-            vec![
-                HumanMessage::builder()
-                    .content(content_parts)
-                    .build()
-                    .into(),
-            ]
+            vec![HumanMessage::builder().content(vec![block]).build().into()]
         } else {
             vec![]
         }

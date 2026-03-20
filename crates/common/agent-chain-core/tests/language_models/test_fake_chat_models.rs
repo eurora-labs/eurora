@@ -677,20 +677,15 @@ mod test_parrot_fake_chat_model {
 
     #[tokio::test]
     async fn test_with_complex_content() {
-        use agent_chain_core::messages::{ContentPart, ImageSource, MessageContent};
+        use agent_chain_core::messages::{
+            ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock,
+        };
 
         let model = ParrotFakeChatModel::builder().build();
         let message = HumanMessage::builder()
-            .content(MessageContent::Parts(vec![
-                ContentPart::Text {
-                    text: "Hello".to_string(),
-                },
-                ContentPart::Image {
-                    source: ImageSource::Url {
-                        url: "https://example.com/img.png".to_string(),
-                    },
-                    detail: None,
-                },
+            .content(ContentBlocks::from(vec![
+                ContentBlock::Text(TextContentBlock::new("Hello")),
+                ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
             ]))
             .build();
 

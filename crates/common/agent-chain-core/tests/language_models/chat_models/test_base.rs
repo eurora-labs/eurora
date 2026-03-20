@@ -841,8 +841,20 @@ fn test_generate_from_stream_accumulates_chunks() {
     ];
     let result = generate_from_stream(chunks.into_iter()).unwrap();
     assert_eq!(result.generations.len(), 1);
-    assert!(result.generations[0].message.content().contains("hello"));
-    assert!(result.generations[0].message.content().contains("world"));
+    assert!(
+        result.generations[0]
+            .message
+            .content()
+            .as_text()
+            .contains("hello")
+    );
+    assert!(
+        result.generations[0]
+            .message
+            .content()
+            .as_text()
+            .contains("world")
+    );
 }
 
 #[test]
@@ -1543,6 +1555,6 @@ async fn test_structured_output_with_raw_serializes_message() {
         .unwrap();
 
     let raw = &result["raw"];
-    assert_eq!(raw["content"], "some content");
+    assert_eq!(raw["content"][0]["text"], "some content");
     assert_eq!(raw["type"], "ai");
 }

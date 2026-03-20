@@ -5,8 +5,6 @@ fn test_all_imports() {
     use agent_chain_core::messages::AIMessageChunk;
     use agent_chain_core::messages::ChatMessage;
     use agent_chain_core::messages::ChatMessageChunk;
-    use agent_chain_core::messages::FunctionMessage;
-    use agent_chain_core::messages::FunctionMessageChunk;
     use agent_chain_core::messages::HumanMessage;
     use agent_chain_core::messages::HumanMessageChunk;
     use agent_chain_core::messages::RemoveMessage;
@@ -47,10 +45,6 @@ fn test_all_imports() {
     let _ = HumanMessage::builder().content("test").build();
     let _ = SystemMessage::builder().content("test").build();
     let _ = ChatMessage::builder().content("test").role("user").build();
-    let _ = FunctionMessage::builder()
-        .content("test")
-        .name("func")
-        .build();
     let _ = ToolMessage::builder()
         .content("test")
         .tool_call_id("call-123")
@@ -63,10 +57,6 @@ fn test_all_imports() {
     let _ = ChatMessageChunk::builder()
         .content("test")
         .role("user")
-        .build();
-    let _ = FunctionMessageChunk::builder()
-        .content("test")
-        .name("func")
         .build();
     let _ = ToolMessageChunk::builder()
         .content("test")
@@ -96,8 +86,7 @@ fn test_all_imports() {
 #[test]
 fn test_base_message_variants() {
     use agent_chain_core::messages::{
-        AIMessage, AnyMessage, ChatMessage, FunctionMessage, HumanMessage, RemoveMessage,
-        SystemMessage, ToolMessage,
+        AIMessage, AnyMessage, ChatMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage,
     };
 
     let _human = AnyMessage::HumanMessage(HumanMessage::builder().content("test").build());
@@ -105,12 +94,6 @@ fn test_base_message_variants() {
     let _system = AnyMessage::SystemMessage(SystemMessage::builder().content("test").build());
     let _chat =
         AnyMessage::ChatMessage(ChatMessage::builder().content("test").role("user").build());
-    let _function = AnyMessage::FunctionMessage(
-        FunctionMessage::builder()
-            .content("test")
-            .name("func")
-            .build(),
-    );
     let _tool = AnyMessage::ToolMessage(
         ToolMessage::builder()
             .content("test")

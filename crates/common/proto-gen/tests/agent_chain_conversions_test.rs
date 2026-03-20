@@ -176,46 +176,34 @@ mod tests {
 
     #[test]
     fn test_multimodal_human_message_roundtrip() {
-        let parts = vec![
-            ContentPart::Text {
-                text: "What's in this image?".to_string(),
-            },
-            ContentPart::Image {
-                source: ImageSource::Url {
-                    url: "https://example.com/image.jpg".to_string(),
-                },
-                detail: Some(ImageDetail::High),
-            },
+        let blocks: Vec<ContentBlock> = vec![
+            ContentBlock::Text(TextContentBlock::new("What's in this image?")),
+            ContentBlock::Image(ImageContentBlock {
+                id: None,
+                file_id: None,
+                mime_type: None,
+                index: None,
+                url: Some("https://example.com/image.jpg".to_string()),
+                base64: None,
+                extras: None,
+            }),
         ];
 
-        let original = HumanMessage::builder()
-            .content(MessageContent::Parts(parts))
-            .build();
+        let original = HumanMessage::builder().content(blocks).build();
 
         let proto: ProtoHumanMessage = original.clone().into();
         let roundtrip: HumanMessage = proto.into();
 
-        match &roundtrip.content {
-            MessageContent::Parts(parts) => {
-                assert_eq!(parts.len(), 2);
-                match &parts[0] {
-                    ContentPart::Text { text } => assert_eq!(text, "What's in this image?"),
-                    _ => panic!("Expected text part"),
-                }
-                match &parts[1] {
-                    ContentPart::Image { source, detail } => {
-                        match source {
-                            ImageSource::Url { url } => {
-                                assert_eq!(url, "https://example.com/image.jpg")
-                            }
-                            _ => panic!("Expected URL source"),
-                        }
-                        assert_eq!(detail, &Some(ImageDetail::High));
-                    }
-                    _ => panic!("Expected image part"),
-                }
+        assert_eq!(roundtrip.content.len(), 2);
+        match &roundtrip.content[0] {
+            ContentBlock::Text(block) => assert_eq!(block.text, "What's in this image?"),
+            _ => panic!("Expected text block"),
+        }
+        match &roundtrip.content[1] {
+            ContentBlock::Image(block) => {
+                assert_eq!(block.url, Some("https://example.com/image.jpg".to_string()));
             }
-            _ => panic!("Expected Parts content"),
+            _ => panic!("Expected image block"),
         }
     }
 
@@ -238,7 +226,6 @@ mod tests {
         };
 
         let original = TextContentBlock {
-            block_type: "text".to_string(),
             id: Some("block_1".to_string()),
             text: "It's sunny.".to_string(),
             annotations: Some(vec![citation]),

@@ -3,7 +3,6 @@ mod base;
 pub mod block_translators;
 mod chat;
 pub mod content;
-mod function;
 mod human;
 mod modifier;
 mod system;
@@ -16,7 +15,7 @@ pub use ai::{
 };
 
 pub use base::{
-    AnyMessage, AnyMessageChunk, BaseMessage, HasId, MergeableContent,
+    AnyMessage, AnyMessageChunk, BaseMessage, BaseMessageChunk, HasId, MergeableContent,
     extract_reasoning_from_additional_kwargs, get_bolded_text, get_msg_title_repr,
     is_interactive_env, merge_content, merge_content_complex, merge_content_vec,
     message_to_dict as base_message_to_dict, messages_to_dict as base_messages_to_dict,
@@ -25,18 +24,15 @@ pub use base::{
 pub use chat::{ChatMessage, ChatMessageChunk};
 
 pub use content::{
-    Annotation, AudioContentBlock, BlockIndex, ContentBlock, ContentPart, DataContentBlock,
+    Annotation, AudioContentBlock, BlockIndex, ContentBlock, ContentBlocks, DataContentBlock,
     FileContentBlock, ImageContentBlock, ImageDetail, ImageSource, InvalidToolCallBlock,
-    KNOWN_BLOCK_TYPES, MessageContent, NonStandardContentBlock, PlainTextBlockConfig,
-    PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolCallChunk,
-    ServerToolResult, ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock,
-    ToolContentBlock, VideoContentBlock, create_audio_block, create_citation, create_file_block,
-    create_image_block, create_non_standard_block, create_plaintext_block, create_reasoning_block,
-    create_text_block, create_tool_call, create_video_block, get_data_content_block_types,
-    is_data_content_block,
+    KNOWN_BLOCK_TYPES, NonStandardContentBlock, PlainTextBlockConfig, PlainTextContentBlock,
+    ReasoningContentBlock, ServerToolCall, ServerToolCallChunk, ServerToolResult, ServerToolStatus,
+    TextContentBlock, ToolCallBlock, ToolCallChunkBlock, ToolContentBlock, VideoContentBlock,
+    create_audio_block, create_citation, create_file_block, create_image_block,
+    create_non_standard_block, create_plaintext_block, create_reasoning_block, create_text_block,
+    create_tool_call, create_video_block, get_data_content_block_types, is_data_content_block,
 };
-
-pub use function::{FunctionMessage, FunctionMessageChunk};
 
 pub use human::{HumanMessage, HumanMessageChunk};
 
@@ -62,7 +58,6 @@ pub mod prelude {
     pub use super::ai::{AIMessage, AIMessageChunk};
     pub use super::base::{AnyMessage, AnyMessageChunk, BaseMessage};
     pub use super::chat::{ChatMessage, ChatMessageChunk};
-    pub use super::function::{FunctionMessage, FunctionMessageChunk};
     pub use super::human::{HumanMessage, HumanMessageChunk};
     pub use super::modifier::RemoveMessage;
     pub use super::system::{SystemMessage, SystemMessageChunk};

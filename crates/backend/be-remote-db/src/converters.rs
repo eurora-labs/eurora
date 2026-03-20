@@ -3,8 +3,9 @@ use crate::types::{Message, MessageType, Thread};
 use chrono::DateTime;
 use prost_types::Timestamp;
 use proto_gen::agent_chain::{
-    ProtoAiMessage, ProtoBaseMessage, ProtoHumanMessage, ProtoMessageContent, ProtoSystemMessage,
-    ProtoToolCall, ProtoToolMessage, ProtoToolStatus, proto_base_message, proto_message_content,
+    ProtoAiMessage, ProtoBaseMessage, ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage,
+    ProtoTextContentBlock, ProtoToolCall, ProtoToolMessage, ProtoToolStatus, proto_base_message,
+    proto_content_block,
 };
 
 use uuid::Uuid;
@@ -82,9 +83,15 @@ impl From<Message> for ProtoBaseMessage {
             serde_json::to_string(&kwargs).ok()
         };
 
-        let content = Some(ProtoMessageContent {
-            content: Some(proto_message_content::Content::Text(msg.content)),
-        });
+        let content = vec![ProtoContentBlock {
+            block: Some(proto_content_block::Block::Text(ProtoTextContentBlock {
+                id: None,
+                text: msg.content,
+                annotations: vec![],
+                index: None,
+                extras: None,
+            })),
+        }];
 
         match msg.message_type {
             MessageType::Human => ProtoBaseMessage {

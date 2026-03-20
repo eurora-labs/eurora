@@ -867,7 +867,7 @@ pub trait BaseChatModel: BaseLanguageModel {
                         if let Some(ref rm) = run_manager {
                             let chunk_json = serde_json::to_value(&generation_chunk).ok();
                             rm.on_llm_new_token(
-                                ai_chunk.content.as_text_ref(),
+                                &ai_chunk.text(),
                                 chunk_json.as_ref(),
                             );
                         }
@@ -1272,30 +1272,32 @@ fn apply_block_indices(
     block_index: &mut i64,
     block_index_type: &mut String,
 ) {
-    let content_str = match &chunk.content {
-        crate::messages::content::MessageContent::Text(s) => s.clone(),
-        crate::messages::content::MessageContent::Parts(_) => return,
-    };
+    let mut blocks: Vec<Value> = chunk
+        .content
+        .iter()
+        .filter_map(|b| serde_json::to_value(b).ok())
+        .collect();
 
-    if let Ok(mut blocks) = serde_json::from_str::<Vec<Value>>(&content_str) {
-        let mut changed = false;
-        for block in &mut blocks {
-            if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
-                if block_type != block_index_type.as_str() {
-                    *block_index_type = block_type.to_string();
-                    *block_index += 1;
-                }
-                if block.get("index").is_none() {
-                    block.as_object_mut().map(|obj| {
-                        obj.insert("index".to_string(), Value::Number((*block_index).into()))
-                    });
-                    changed = true;
-                }
+    let mut changed = false;
+    for block in &mut blocks {
+        if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+            if block_type != block_index_type.as_str() {
+                *block_index_type = block_type.to_string();
+                *block_index += 1;
+            }
+            if block.get("index").is_none() {
+                block.as_object_mut().map(|obj| {
+                    obj.insert("index".to_string(), Value::Number((*block_index).into()))
+                });
+                changed = true;
             }
         }
-        if changed && let Ok(new_content) = serde_json::to_string(&blocks) {
-            chunk.content = crate::messages::content::MessageContent::Text(new_content);
-        }
+    }
+    if changed {
+        chunk.content = blocks
+            .into_iter()
+            .filter_map(|v| serde_json::from_value(v).ok())
+            .collect();
     }
 }
 

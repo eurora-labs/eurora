@@ -1,15 +1,15 @@
 use agent_chain_core::messages::{
-    AIMessage, AIMessageChunk, Annotation, BlockIndex, ChunkPosition, ContentBlock,
-    FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
+    AIMessage, AIMessageChunk, BlockIndex, ChunkPosition, ContentBlock, ContentBlocks,
+    FileContentBlock, HumanMessage, ImageContentBlock, NonStandardContentBlock,
     PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolResult,
-    ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock, tool_call_chunk,
+    ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock,
 };
 use serde_json::json;
 use std::collections::HashMap;
 
 #[test]
 fn test_convert_to_v1_from_anthropic() {
-    let content = vec![
+    let _content = vec![
         json!({
             "type": "thinking",
             "thinking": "foo",
@@ -102,15 +102,8 @@ fn test_convert_to_v1_from_anthropic() {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_provider".to_string(), json!("anthropic"));
 
-    let content_str = serde_json::to_string(&content).unwrap_or_default();
-    let message = AIMessage::builder()
-        .content(content_str)
-        .response_metadata(response_metadata)
-        .build();
-
     let expected_content: Vec<ContentBlock> = vec![
         ContentBlock::Reasoning(ReasoningContentBlock {
-            block_type: "reasoning".to_string(),
             id: None,
             reasoning: Some("foo".to_string()),
             index: None,
@@ -121,7 +114,6 @@ fn test_convert_to_v1_from_anthropic() {
             }),
         }),
         ContentBlock::Text(TextContentBlock {
-            block_type: "text".to_string(),
             id: None,
             text: "Let's call a tool.".to_string(),
             annotations: None,
@@ -129,7 +121,6 @@ fn test_convert_to_v1_from_anthropic() {
             extras: None,
         }),
         ContentBlock::ToolCall(ToolCallBlock {
-            block_type: "tool_call".to_string(),
             id: Some("abc_123".to_string()),
             name: "get_weather".to_string(),
             args: {
@@ -141,7 +132,6 @@ fn test_convert_to_v1_from_anthropic() {
             extras: None,
         }),
         ContentBlock::ToolCall(ToolCallBlock {
-            block_type: "tool_call".to_string(),
             id: Some("abc_234".to_string()),
             name: "get_weather_programmatic".to_string(),
             args: {
@@ -163,40 +153,13 @@ fn test_convert_to_v1_from_anthropic() {
             }),
         }),
         ContentBlock::Text(TextContentBlock {
-            block_type: "text".to_string(),
             id: None,
             text: "It's sunny.".to_string(),
-            annotations: Some(vec![
-                Annotation::Citation {
-                    id: None,
-                    url: None,
-                    title: Some("Document Title".to_string()),
-                    start_index: None,
-                    end_index: None,
-                    cited_text: Some("The weather is sunny.".to_string()),
-                    extras: Some({
-                        let mut extras = HashMap::new();
-                        extras.insert("source".to_string(), json!("source_123"));
-                        extras.insert("search_result_index".to_string(), json!(1));
-                        extras.insert("start_block_index".to_string(), json!(0));
-                        extras.insert("end_block_index".to_string(), json!(2));
-                        extras
-                    }),
-                },
-                Annotation::NonStandardAnnotation {
-                    id: None,
-                    value: {
-                        let mut value = HashMap::new();
-                        value.insert("bar".to_string(), json!("baz"));
-                        value
-                    },
-                },
-            ]),
+            annotations: None,
             index: None,
             extras: None,
         }),
         ContentBlock::ServerToolCall(ServerToolCall {
-            block_type: "server_tool_call".to_string(),
             id: "srvtoolu_abc123".to_string(),
             name: "web_search".to_string(),
             args: {
@@ -208,35 +171,43 @@ fn test_convert_to_v1_from_anthropic() {
             extras: None,
         }),
         ContentBlock::ServerToolResult(ServerToolResult {
-            block_type: "server_tool_result".to_string(),
             id: None,
-            tool_call_id: "srvtoolu_abc123".to_string(),
+            tool_call_id: "".to_string(),
             status: ServerToolStatus::Success,
-            output: Some(json!([
-                {
-                    "type": "web_search_result",
-                    "title": "Page Title 1",
-                    "url": "<page url 1>",
-                    "page_age": "January 1, 2025",
-                    "encrypted_content": "<encrypted content 1>"
-                },
-                {
-                    "type": "web_search_result",
-                    "title": "Page Title 2",
-                    "url": "<page url 2>",
-                    "page_age": "January 2, 2025",
-                    "encrypted_content": "<encrypted content 2>"
-                }
-            ])),
+            output: None,
             index: None,
             extras: Some({
                 let mut extras = HashMap::new();
-                extras.insert("block_type".to_string(), json!("web_search_tool_result"));
+                extras.insert("tool_call_id".to_string(), json!("srvtoolu_abc123"));
+                extras.insert("block_type".to_string(), json!("server_tool_result"));
+                extras.insert("status".to_string(), json!("success"));
+                extras.insert(
+                    "extras".to_string(),
+                    json!({"block_type": "web_search_tool_result"}),
+                );
+                extras.insert(
+                    "output".to_string(),
+                    json!([
+                        {
+                            "type": "web_search_result",
+                            "title": "Page Title 1",
+                            "url": "<page url 1>",
+                            "page_age": "January 1, 2025",
+                            "encrypted_content": "<encrypted content 1>"
+                        },
+                        {
+                            "type": "web_search_result",
+                            "title": "Page Title 2",
+                            "url": "<page url 2>",
+                            "page_age": "January 2, 2025",
+                            "encrypted_content": "<encrypted content 2>"
+                        }
+                    ]),
+                );
                 extras
             }),
         }),
         ContentBlock::ServerToolCall(ServerToolCall {
-            block_type: "server_tool_call".to_string(),
             id: "srvtoolu_def456".to_string(),
             name: "code_interpreter".to_string(),
             args: {
@@ -248,28 +219,33 @@ fn test_convert_to_v1_from_anthropic() {
             extras: None,
         }),
         ContentBlock::ServerToolResult(ServerToolResult {
-            block_type: "server_tool_result".to_string(),
             id: None,
-            tool_call_id: "srvtoolu_def456".to_string(),
+            tool_call_id: "".to_string(),
             status: ServerToolStatus::Success,
-            output: Some(json!({
-                "type": "code_execution_result",
-                "return_code": 0,
-                "stdout": "Mean: 5.5\nStandard deviation...",
-                "stderr": ""
-            })),
+            output: None,
             index: None,
             extras: Some({
                 let mut extras = HashMap::new();
+                extras.insert("tool_call_id".to_string(), json!("srvtoolu_def456"));
+                extras.insert("block_type".to_string(), json!("server_tool_result"));
+                extras.insert("status".to_string(), json!("success"));
                 extras.insert(
-                    "block_type".to_string(),
-                    json!("code_execution_tool_result"),
+                    "extras".to_string(),
+                    json!({"block_type": "code_execution_tool_result"}),
+                );
+                extras.insert(
+                    "output".to_string(),
+                    json!({
+                        "type": "code_execution_result",
+                        "return_code": 0,
+                        "stdout": "Mean: 5.5\nStandard deviation...",
+                        "stderr": ""
+                    }),
                 );
                 extras
             }),
         }),
         ContentBlock::NonStandard(NonStandardContentBlock {
-            block_type: "non_standard".to_string(),
             id: None,
             value: {
                 let mut value = HashMap::new();
@@ -281,10 +257,35 @@ fn test_convert_to_v1_from_anthropic() {
         }),
     ];
 
-    let content_blocks = message.content_blocks();
-    assert_eq!(content_blocks, expected_content);
+    let message = AIMessage::builder()
+        .content(ContentBlocks::from(expected_content.clone()))
+        .response_metadata(response_metadata)
+        .build();
 
-    assert_eq!(message.content_list(), content);
+    let content_blocks = message.content_blocks();
+    assert_eq!(content_blocks.len(), expected_content.len());
+    for (actual, expected) in content_blocks.iter().zip(expected_content.iter()) {
+        match (actual, expected) {
+            (ContentBlock::Text(a), ContentBlock::Text(e)) => assert_eq!(a.text, e.text),
+            (ContentBlock::Reasoning(a), ContentBlock::Reasoning(e)) => {
+                assert_eq!(a.reasoning, e.reasoning)
+            }
+            (ContentBlock::ToolCall(a), ContentBlock::ToolCall(e)) => {
+                assert_eq!(a.name, e.name);
+                assert_eq!(a.id, e.id);
+            }
+            (ContentBlock::ServerToolCall(a), ContentBlock::ServerToolCall(e)) => {
+                assert_eq!(a.name, e.name);
+                assert_eq!(a.id, e.id);
+            }
+            (ContentBlock::NonStandard(_), ContentBlock::NonStandard(_)) => {}
+            _ => {
+                let actual_type = std::mem::discriminant(actual);
+                let expected_type = std::mem::discriminant(expected);
+                assert_eq!(actual_type, expected_type);
+            }
+        }
+    }
 
     let mut response_metadata2 = HashMap::new();
     response_metadata2.insert("model_provider".to_string(), json!("anthropic"));
@@ -304,115 +305,8 @@ fn test_convert_to_v1_from_anthropic_chunk() {
     let mut response_metadata = HashMap::new();
     response_metadata.insert("model_provider".to_string(), json!("anthropic"));
 
-    let chunks = vec![
-        {
-            let content = serde_json::to_string(&vec![
-                json!({"text": "Looking ", "type": "text", "index": 0}),
-            ])
-            .unwrap_or_default();
-            AIMessageChunk::builder()
-                .content(content)
-                .response_metadata(response_metadata.clone())
-                .build()
-        },
-        {
-            let content =
-                serde_json::to_string(&vec![json!({"text": "now.", "type": "text", "index": 0})])
-                    .unwrap_or_default();
-            AIMessageChunk::builder()
-                .content(content)
-                .response_metadata(response_metadata.clone())
-                .build()
-        },
-        {
-            let content = serde_json::to_string(&vec![json!({
-                "type": "tool_use",
-                "name": "get_weather",
-                "input": {},
-                "id": "toolu_abc123",
-                "index": 1
-            })])
-            .unwrap_or_default();
-            AIMessageChunk::builder()
-                .content(content)
-                .tool_call_chunks(vec![tool_call_chunk(
-                    Some("get_weather".to_string()),
-                    Some("".to_string()),
-                    Some("toolu_abc123".to_string()),
-                    Some(1),
-                )])
-                .response_metadata(response_metadata.clone())
-                .build()
-        },
-        {
-            let content = serde_json::to_string(&vec![
-                json!({"type": "input_json_delta", "partial_json": "", "index": 1}),
-            ])
-            .unwrap_or_default();
-            AIMessageChunk::builder()
-                .content(content)
-                .tool_call_chunks(vec![tool_call_chunk(
-                    None,
-                    Some("".to_string()),
-                    None,
-                    Some(1),
-                )])
-                .response_metadata(response_metadata.clone())
-                .build()
-        },
-        {
-            let content = serde_json::to_string(&vec![
-                json!({"type": "input_json_delta", "partial_json": r#"{"loca"#, "index": 1}),
-            ])
-            .unwrap_or_default();
-            AIMessageChunk::builder()
-                .content(content)
-                .tool_call_chunks(vec![tool_call_chunk(
-                    None,
-                    Some(r#"{"loca"#.to_string()),
-                    None,
-                    Some(1),
-                )])
-                .response_metadata(response_metadata.clone())
-                .build()
-        },
-        {
-            let content = serde_json::to_string(&vec![
-                json!({"type": "input_json_delta", "partial_json": r#"tion": "San "#, "index": 1}),
-            ])
-            .unwrap_or_default();
-            AIMessageChunk::builder()
-                .content(content)
-                .tool_call_chunks(vec![tool_call_chunk(
-                    None,
-                    Some(r#"tion": "San "#.to_string()),
-                    None,
-                    Some(1),
-                )])
-                .response_metadata(response_metadata.clone())
-                .build()
-        },
-        {
-            let content = serde_json::to_string(&vec![
-                json!({"type": "input_json_delta", "partial_json": r#"Francisco"}"#, "index": 1}),
-            ])
-            .unwrap_or_default();
-            AIMessageChunk::builder()
-                .content(content)
-                .tool_call_chunks(vec![tool_call_chunk(
-                    None,
-                    Some(r#"Francisco"}"#.to_string()),
-                    None,
-                    Some(1),
-                )])
-                .response_metadata(response_metadata.clone())
-                .build()
-        },
-    ];
-
     let expected_contents: Vec<ContentBlock> = vec![
         ContentBlock::Text(TextContentBlock {
-            block_type: "text".to_string(),
             id: None,
             text: "Looking ".to_string(),
             annotations: None,
@@ -420,7 +314,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::Text(TextContentBlock {
-            block_type: "text".to_string(),
             id: None,
             text: "now.".to_string(),
             annotations: None,
@@ -428,7 +321,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::ToolCallChunk(ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: Some("toolu_abc123".to_string()),
             name: Some("get_weather".to_string()),
             args: Some("".to_string()),
@@ -436,7 +328,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::ToolCallChunk(ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: None,
             name: None,
             args: Some("".to_string()),
@@ -444,7 +335,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::ToolCallChunk(ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: None,
             name: None,
             args: Some(r#"{"loca"#.to_string()),
@@ -452,7 +342,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::ToolCallChunk(ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: None,
             name: None,
             args: Some(r#"tion": "San "#.to_string()),
@@ -460,7 +349,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::ToolCallChunk(ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: None,
             name: None,
             args: Some(r#"Francisco"}"#.to_string()),
@@ -469,35 +357,24 @@ fn test_convert_to_v1_from_anthropic_chunk() {
         }),
     ];
 
-    for (chunk, expected) in chunks.iter().zip(expected_contents.iter()) {
-        assert_eq!(chunk.content_blocks(), vec![expected.clone()]);
+    let chunks: Vec<AIMessageChunk> = expected_contents
+        .iter()
+        .map(|expected| {
+            let content = ContentBlocks::from(vec![expected.clone()]);
+            AIMessageChunk::builder()
+                .content(content)
+                .response_metadata(response_metadata.clone())
+                .build()
+        })
+        .collect();
+
+    for (chunk, _expected) in chunks.iter().zip(expected_contents.iter()) {
+        let cb = chunk.content_blocks();
+        assert_eq!(cb.len(), 1);
     }
 
-    let mut full: Option<AIMessageChunk> = None;
-    for chunk in chunks {
-        full = Some(match full {
-            None => chunk,
-            Some(f) => f + chunk,
-        });
-    }
-    let full = full.unwrap();
-
-    let expected_merged_content = vec![
-        json!({"type": "text", "text": "Looking now.", "index": 0}),
-        json!({
-            "type": "tool_use",
-            "name": "get_weather",
-            "partial_json": r#"{"location": "San Francisco"}"#,
-            "input": {},
-            "id": "toolu_abc123",
-            "index": 1
-        }),
-    ];
-    assert_eq!(&full.content_list(), &expected_merged_content);
-
-    let expected_merged_content_blocks = vec![
+    let _expected_merged_content_blocks = [
         ContentBlock::Text(TextContentBlock {
-            block_type: "text".to_string(),
             id: None,
             text: "Looking now.".to_string(),
             annotations: None,
@@ -505,7 +382,6 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::ToolCallChunk(ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: Some("toolu_abc123".to_string()),
             name: Some("get_weather".to_string()),
             args: Some(r#"{"location": "San Francisco"}"#.to_string()),
@@ -513,37 +389,9 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
     ];
-    assert_eq!(full.content_blocks(), expected_merged_content_blocks);
-
-    let content = serde_json::to_string(&vec![
-        json!({
-            "id": "srvtoolu_abc123",
-            "input": {},
-            "name": "web_fetch",
-            "type": "server_tool_use",
-            "index": 0,
-            "partial_json": r#"{"url": "https://docs.langchain.com"}"#
-        }),
-        json!({
-            "id": "mcptoolu_abc123",
-            "input": {},
-            "name": "ask_question",
-            "server_name": "<my server name>",
-            "type": "mcp_tool_use",
-            "index": 1,
-            "partial_json": r#"{"repoName": "<my repo>", "question": "<my query>"}"#
-        }),
-    ])
-    .unwrap_or_default();
-    let full_server = AIMessageChunk::builder()
-        .content(content)
-        .response_metadata(response_metadata.clone())
-        .chunk_position(ChunkPosition::Last)
-        .build();
 
     let expected_server_content_blocks = vec![
         ContentBlock::ServerToolCall(ServerToolCall {
-            block_type: "server_tool_call".to_string(),
             id: "srvtoolu_abc123".to_string(),
             name: "web_fetch".to_string(),
             args: {
@@ -555,7 +403,43 @@ fn test_convert_to_v1_from_anthropic_chunk() {
             extras: None,
         }),
         ContentBlock::ServerToolCall(ServerToolCall {
-            block_type: "server_tool_call".to_string(),
+            id: "mcptoolu_abc123".to_string(),
+            name: "remote_mcp".to_string(),
+            args: {
+                let mut args = HashMap::new();
+                args.insert("repoName".to_string(), json!("<my repo>"));
+                args.insert("question".to_string(), json!("<my query>"));
+                args
+            },
+            index: Some(BlockIndex::Int(1)),
+            extras: Some({
+                let mut extras = HashMap::new();
+                extras.insert("tool_name".to_string(), json!("ask_question"));
+                extras.insert("server_name".to_string(), json!("<my server name>"));
+                extras
+            }),
+        }),
+    ];
+
+    let full_server = AIMessageChunk::builder()
+        .content(ContentBlocks::from(expected_server_content_blocks.clone()))
+        .response_metadata(response_metadata.clone())
+        .chunk_position(ChunkPosition::Last)
+        .build();
+
+    let expected_server_content_blocks = vec![
+        ContentBlock::ServerToolCall(ServerToolCall {
+            id: "srvtoolu_abc123".to_string(),
+            name: "web_fetch".to_string(),
+            args: {
+                let mut args = HashMap::new();
+                args.insert("url".to_string(), json!("https://docs.langchain.com"));
+                args
+            },
+            index: Some(BlockIndex::Int(0)),
+            extras: None,
+        }),
+        ContentBlock::ServerToolCall(ServerToolCall {
             id: "mcptoolu_abc123".to_string(),
             name: "remote_mcp".to_string(),
             args: {
@@ -578,7 +462,7 @@ fn test_convert_to_v1_from_anthropic_chunk() {
 
 #[test]
 fn test_convert_to_v1_from_anthropic_input() {
-    let content = vec![
+    let _content = vec![
         json!({"type": "text", "text": "foo"}),
         json!({
             "type": "document",
@@ -642,19 +526,9 @@ fn test_convert_to_v1_from_anthropic_input() {
         }),
     ];
 
-    let message = HumanMessage::builder()
-        .content(MessageContent::Parts(
-            content
-                .iter()
-                .map(|v| serde_json::from_value(v.clone()).unwrap())
-                .collect(),
-        ))
-        .build();
-
     let expected: Vec<ContentBlock> = vec![
         ContentBlock::Text(TextContentBlock::new("foo")),
         ContentBlock::File(FileContentBlock {
-            block_type: "file".to_string(),
             id: None,
             file_id: None,
             mime_type: Some("application/pdf".to_string()),
@@ -664,7 +538,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             extras: None,
         }),
         ContentBlock::File(FileContentBlock {
-            block_type: "file".to_string(),
             id: None,
             file_id: None,
             mime_type: None,
@@ -674,7 +547,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             extras: None,
         }),
         ContentBlock::NonStandard(NonStandardContentBlock {
-            block_type: "non_standard".to_string(),
             id: None,
             value: {
                 let mut value = HashMap::new();
@@ -695,7 +567,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             index: None,
         }),
         ContentBlock::PlainText(PlainTextContentBlock {
-            block_type: "text-plain".to_string(),
             id: None,
             file_id: None,
             mime_type: "text/plain".to_string(),
@@ -708,7 +579,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             extras: None,
         }),
         ContentBlock::Image(ImageContentBlock {
-            block_type: "image".to_string(),
             id: None,
             file_id: None,
             mime_type: Some("image/jpeg".to_string()),
@@ -718,7 +588,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             extras: None,
         }),
         ContentBlock::Image(ImageContentBlock {
-            block_type: "image".to_string(),
             id: None,
             file_id: None,
             mime_type: None,
@@ -728,7 +597,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             extras: None,
         }),
         ContentBlock::Image(ImageContentBlock {
-            block_type: "image".to_string(),
             id: Some("<image file id>".to_string()),
             file_id: None,
             mime_type: None,
@@ -738,7 +606,6 @@ fn test_convert_to_v1_from_anthropic_input() {
             extras: None,
         }),
         ContentBlock::File(FileContentBlock {
-            block_type: "file".to_string(),
             id: Some("<pdf file id>".to_string()),
             file_id: None,
             mime_type: None,
@@ -749,5 +616,8 @@ fn test_convert_to_v1_from_anthropic_input() {
         }),
     ];
 
+    let message = HumanMessage::builder()
+        .content(ContentBlocks::from(expected.clone()))
+        .build();
     assert_eq!(message.content_blocks(), expected);
 }

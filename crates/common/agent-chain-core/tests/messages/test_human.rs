@@ -1,8 +1,8 @@
 use agent_chain_core::load::Serializable;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    ContentBlock, ContentPart, HumanMessage, HumanMessageChunk, ImageContentBlock, ImageSource,
-    MessageContent, SystemMessageChunk, TextContentBlock,
+    ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk, ImageContentBlock,
+    SystemMessageChunk, TextContentBlock,
 };
 
 #[test]
@@ -126,7 +126,16 @@ fn test_chunk_add_two_chunks() {
         .build();
     let chunk2 = HumanMessageChunk::builder().content(" world").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " world"]);
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -226,7 +235,16 @@ fn test_chunk_multiple_additions() {
     let chunk2 = HumanMessageChunk::builder().content("b").build();
     let chunk3 = HumanMessageChunk::builder().content("c").build();
     let result = chunk1 + chunk2 + chunk3;
-    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
 }
 
 #[test]
@@ -262,66 +280,50 @@ fn test_chunk_sum() {
         HumanMessageChunk::builder().content("world!").build(),
     ];
     let result: HumanMessageChunk = chunks.into_iter().sum();
-    assert_eq!(result.content.as_text(), "Hello beautiful world!");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello ", "beautiful ", "world!"]);
 }
 
 #[test]
 fn test_init_with_list_content() {
-    let parts = vec![ContentPart::Text {
-        text: "Hello".to_string(),
-    }];
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
-    match &msg.content {
-        MessageContent::Parts(p) => {
-            assert_eq!(p.len(), 1);
-            match &p[0] {
-                ContentPart::Text { text } => assert_eq!(text, "Hello"),
-                other => panic!("expected Text content part, got {:?}", other),
-            }
-        }
-        other => panic!("expected Parts content, got {:?}", other),
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let msg = HumanMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 1);
+    if let ContentBlock::Text(tb) = &msg.content[0] {
+        assert_eq!(tb.text, "Hello");
+    } else {
+        panic!("expected Text content block, got {:?}", &msg.content[0]);
     }
 }
 
 #[test]
 fn test_init_with_multimodal_content() {
-    let parts = vec![
-        ContentPart::Text {
-            text: "What's in this image?".to_string(),
-        },
-        ContentPart::Image {
-            source: ImageSource::Url {
-                url: "https://example.com/img.png".to_string(),
-            },
-            detail: None,
-        },
-    ];
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
-    match &msg.content {
-        MessageContent::Parts(p) => {
-            assert_eq!(p.len(), 2);
-            assert!(matches!(&p[0], ContentPart::Text { .. }));
-            assert!(matches!(&p[1], ContentPart::Image { .. }));
-        }
-        other => panic!("expected Parts content, got {:?}", other),
-    }
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("What's in this image?")),
+        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 2);
+    assert!(matches!(&msg.content[0], ContentBlock::Text(_)));
+    assert!(matches!(&msg.content[1], ContentBlock::Image(_)));
 }
 
 #[test]
 fn test_init_with_content_blocks() {
-    let blocks = vec![
+    let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("Hello")),
         ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
-    ];
-    let msg = HumanMessage::builder()
-        .content("")
-        .content_blocks(blocks)
-        .build();
-    assert!(matches!(&msg.content, MessageContent::Parts(_)));
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 2);
 }
 
 #[test]
@@ -332,39 +334,22 @@ fn test_text_method() {
 
 #[test]
 fn test_text_method_list_content() {
-    let parts = vec![
-        ContentPart::Text {
-            text: "Part 1".to_string(),
-        },
-        ContentPart::Text {
-            text: "Part 2".to_string(),
-        },
-    ];
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("Part 1")),
+        ContentBlock::Text(TextContentBlock::new("Part 2")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.text(), "Part 1 Part 2");
 }
 
 #[test]
 fn test_text_method_multimodal_content() {
-    let parts = vec![
-        ContentPart::Text {
-            text: "Hello".to_string(),
-        },
-        ContentPart::Image {
-            source: ImageSource::Url {
-                url: "https://example.com".to_string(),
-            },
-            detail: None,
-        },
-        ContentPart::Text {
-            text: "world".to_string(),
-        },
-    ];
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("Hello")),
+        ContentBlock::Image(ImageContentBlock::from_url("https://example.com")),
+        ContentBlock::Text(TextContentBlock::new("world")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.text(), "Hello world");
 }
 
@@ -375,7 +360,6 @@ fn test_content_blocks_property() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::Text(tb) => {
-            assert_eq!(tb.block_type, "text");
             assert_eq!(tb.text, "Hello");
         }
         other => panic!("expected Text content block, got {:?}", other),
@@ -384,20 +368,11 @@ fn test_content_blocks_property() {
 
 #[test]
 fn test_content_blocks_multimodal() {
-    let parts = vec![
-        ContentPart::Text {
-            text: "What's in this?".to_string(),
-        },
-        ContentPart::Image {
-            source: ImageSource::Url {
-                url: "https://example.com/img.png".to_string(),
-            },
-            detail: None,
-        },
-    ];
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("What's in this?")),
+        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
     assert!(blocks.len() >= 2);
     assert!(matches!(&blocks[0], ContentBlock::Text(_)));
@@ -433,12 +408,9 @@ fn test_pretty_repr_with_name() {
 #[test]
 fn test_empty_list_content() {
     let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![]))
+        .content(ContentBlocks::new())
         .build();
-    match &msg.content {
-        MessageContent::Parts(p) => assert!(p.is_empty()),
-        other => panic!("expected Parts content, got {:?}", other),
-    }
+    assert!(msg.content.is_empty());
     assert_eq!(msg.text(), "");
 }
 
@@ -450,7 +422,7 @@ fn test_model_dump_exact_keys_and_values() {
         .name("alice".to_string())
         .build();
     let dumped = serde_json::to_value(&msg).unwrap();
-    assert_eq!(dumped["content"], "Hello world");
+    assert_eq!(dumped["content"][0]["text"], "Hello world");
     assert_eq!(dumped["type"], "human");
     assert_eq!(dumped["name"], "alice");
     assert_eq!(dumped["id"], "msg-001");
@@ -462,7 +434,7 @@ fn test_model_dump_exact_keys_and_values() {
 fn test_model_dump_default_values() {
     let msg = HumanMessage::builder().content("Test").build();
     let dumped = serde_json::to_value(&msg).unwrap();
-    assert_eq!(dumped["content"], "Test");
+    assert_eq!(dumped["content"][0]["text"], "Test");
     assert_eq!(dumped["type"], "human");
     assert!(dumped["id"].is_null());
     assert_eq!(dumped["additional_kwargs"], serde_json::json!({}));
@@ -514,27 +486,21 @@ fn test_same_content_and_metadata_are_equal() {
 
 #[test]
 fn test_init_with_content_blocks_sets_content() {
-    let blocks = vec![
+    let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("Hello")),
         ContentBlock::Text(TextContentBlock::new(" world")),
-    ];
-    let msg = HumanMessage::builder()
-        .content("")
-        .content_blocks(blocks)
-        .build();
-    assert!(matches!(&msg.content, MessageContent::Parts(_)));
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 2);
 }
 
 #[test]
 fn test_content_blocks_roundtrip() {
-    let blocks = vec![
+    let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("First")),
         ContentBlock::Text(TextContentBlock::new("Second")),
-    ];
-    let msg = HumanMessage::builder()
-        .content("")
-        .content_blocks(blocks)
-        .build();
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     let result_blocks = msg.content_blocks();
     assert!(result_blocks.len() >= 2);
 }
@@ -542,29 +508,26 @@ fn test_content_blocks_roundtrip() {
 #[test]
 fn test_chunk_add_with_list_content() {
     let chunk1 = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Text {
-            text: "Hello".to_string(),
-        }]))
+        .content(ContentBlocks::from(vec![ContentBlock::Text(
+            TextContentBlock::new("Hello"),
+        )]))
         .build();
     let chunk2 = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Text {
-            text: " world".to_string(),
-        }]))
+        .content(ContentBlocks::from(vec![ContentBlock::Text(
+            TextContentBlock::new(" world"),
+        )]))
         .build();
     let result = chunk1 + chunk2;
-    match &result.content {
-        MessageContent::Parts(parts) => {
-            assert_eq!(parts.len(), 2);
-            match &parts[0] {
-                ContentPart::Text { text } => assert_eq!(text, "Hello"),
-                other => panic!("expected Text, got {:?}", other),
-            }
-            match &parts[1] {
-                ContentPart::Text { text } => assert_eq!(text, " world"),
-                other => panic!("expected Text, got {:?}", other),
-            }
-        }
-        other => panic!("expected Parts content, got {:?}", other),
+    assert_eq!(result.content.len(), 2);
+    if let ContentBlock::Text(tb) = &result.content[0] {
+        assert_eq!(tb.text, "Hello");
+    } else {
+        panic!("expected Text, got {:?}", &result.content[0]);
+    }
+    if let ContentBlock::Text(tb) = &result.content[1] {
+        assert_eq!(tb.text, " world");
+    } else {
+        panic!("expected Text, got {:?}", &result.content[1]);
     }
 }
 
@@ -579,7 +542,16 @@ fn test_chunk_add_list_of_chunks() {
     let result = vec![chunk2, chunk3]
         .into_iter()
         .fold(chunk1, |acc, c| acc + c);
-    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -591,7 +563,6 @@ fn test_chunk_content_blocks_property() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::Text(tb) => {
-            assert_eq!(tb.block_type, "text");
             assert_eq!(tb.text, "Hello");
         }
         other => panic!("expected Text content block, got {:?}", other),
@@ -600,20 +571,11 @@ fn test_chunk_content_blocks_property() {
 
 #[test]
 fn test_chunk_content_blocks_multimodal() {
-    let parts = vec![
-        ContentPart::Text {
-            text: "Check this:".to_string(),
-        },
-        ContentPart::Image {
-            source: ImageSource::Url {
-                url: "https://example.com/img.png".to_string(),
-            },
-            detail: None,
-        },
-    ];
-    let chunk = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(parts))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("Check this:")),
+        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+    ]);
+    let chunk = HumanMessageChunk::builder().content(blocks).build();
     let msg: HumanMessage = chunk.into();
     let blocks = msg.content_blocks();
     assert!(blocks.len() >= 2);
@@ -631,7 +593,7 @@ fn test_chunk_content_blocks_empty_string() {
 #[test]
 fn test_chunk_content_blocks_empty_list() {
     let chunk = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(vec![]))
+        .content(ContentBlocks::new())
         .build();
     let msg: HumanMessage = chunk.into();
     let blocks = msg.content_blocks();
@@ -641,32 +603,29 @@ fn test_chunk_content_blocks_empty_list() {
 #[test]
 fn test_chunk_add_with_list_content_with_index() {
     let chunk1 = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            serde_json::json!({"type": "text", "text": "Hello", "index": 0}),
-        )]))
+        .content(ContentBlocks::from(vec![
+            serde_json::from_value::<ContentBlock>(
+                serde_json::json!({"type": "text", "text": "Hello", "index": 0}),
+            )
+            .unwrap(),
+        ]))
         .build();
     let chunk2 = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            serde_json::json!({"type": "text", "text": " world", "index": 0}),
-        )]))
+        .content(ContentBlocks::from(vec![
+            serde_json::from_value::<ContentBlock>(
+                serde_json::json!({"type": "text", "text": " world", "index": 0}),
+            )
+            .unwrap(),
+        ]))
         .build();
     let result = chunk1 + chunk2;
-    match &result.content {
-        MessageContent::Parts(parts) => {
-            assert_eq!(
-                parts.len(),
-                1,
-                "expected 1 merged part, got {}",
-                parts.len()
-            );
-            match &parts[0] {
-                ContentPart::Text { text } => assert_eq!(text, "Hello world"),
-                ContentPart::Other(v) => assert_eq!(v["text"], "Hello world"),
-                other => panic!("expected Text or Other content part, got {:?}", other),
-            }
-        }
-        other => panic!("expected Parts content, got {:?}", other),
-    }
+    assert_eq!(
+        result.content.len(),
+        1,
+        "expected 1 merged part, got {}",
+        result.content.len()
+    );
+    assert_eq!(result.content.as_text(), "Hello world");
 }
 
 #[test]
@@ -681,7 +640,16 @@ fn test_chunk_add_different_chunk_type() {
         matches!(&result, HumanMessageChunk { .. }),
         "result should be HumanMessageChunk"
     );
-    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " world"]);
 }
 
 #[test]

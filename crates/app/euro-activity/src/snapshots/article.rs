@@ -153,7 +153,7 @@ mod tests {
         );
 
         let message = snapshot.construct_messages()[0].clone();
-        let text = message.content();
+        let text = message.content().as_text();
 
         assert!(text.contains("Test Article"));
         assert!(text.contains("Important quote"));
