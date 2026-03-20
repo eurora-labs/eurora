@@ -1,78 +1,12 @@
-use super::ai::{AIMessage, AIMessageChunk};
-use super::base::{AnyMessage, AnyMessageChunk, BaseMessage};
-use super::chat::{ChatMessage, ChatMessageChunk};
-use super::human::{HumanMessage, HumanMessageChunk};
+use super::ai::AIMessage;
+use super::base::{AnyMessage, AnyMessageChunk, BaseMessage, BaseMessageChunk};
+use super::chat::ChatMessage;
+use super::human::HumanMessage;
 use super::modifier::RemoveMessage;
-use super::system::{SystemMessage, SystemMessageChunk};
-use super::tool::{ToolCall, ToolMessage, ToolMessageChunk};
+use super::system::SystemMessage;
+use super::tool::{ToolCall, ToolMessage};
 
 pub type MessageLikeRepresentation = serde_json::Value;
-
-pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
-    match message {
-        AnyMessage::HumanMessage(m) => AnyMessageChunk::HumanMessageChunk(
-            HumanMessageChunk::builder()
-                .content(m.content.clone())
-                .maybe_id(m.id.clone())
-                .maybe_name(m.name.clone())
-                .additional_kwargs(m.additional_kwargs.clone())
-                .response_metadata(m.response_metadata.clone())
-                .build(),
-        ),
-        AnyMessage::AIMessage(m) => {
-            let mut chunk = AIMessageChunk::builder()
-                .content(m.content.clone())
-                .maybe_id(m.id.clone())
-                .maybe_name(m.name.clone())
-                .tool_calls(m.tool_calls.clone())
-                .invalid_tool_calls(m.invalid_tool_calls.clone())
-                .maybe_usage_metadata(m.usage_metadata.clone())
-                .additional_kwargs(m.additional_kwargs.clone())
-                .response_metadata(m.response_metadata.clone())
-                .build();
-            chunk.init_tool_calls();
-            AnyMessageChunk::AIMessageChunk(chunk)
-        }
-        AnyMessage::SystemMessage(m) => AnyMessageChunk::SystemMessageChunk(
-            SystemMessageChunk::builder()
-                .content(m.content.clone())
-                .maybe_id(m.id.clone())
-                .maybe_name(m.name.clone())
-                .additional_kwargs(m.additional_kwargs.clone())
-                .response_metadata(m.response_metadata.clone())
-                .build(),
-        ),
-        AnyMessage::ToolMessage(m) => AnyMessageChunk::ToolMessageChunk(
-            ToolMessageChunk::builder()
-                .content(m.content.clone())
-                .tool_call_id(m.tool_call_id.clone())
-                .maybe_id(m.id.clone())
-                .maybe_name(m.name.clone())
-                .status(m.status.clone())
-                .maybe_artifact(m.artifact.clone())
-                .additional_kwargs(m.additional_kwargs.clone())
-                .response_metadata(m.response_metadata.clone())
-                .build(),
-        ),
-        AnyMessage::ChatMessage(m) => AnyMessageChunk::ChatMessageChunk(
-            ChatMessageChunk::builder()
-                .content(m.content.clone())
-                .role(m.role.clone())
-                .maybe_id(m.id.clone())
-                .maybe_name(m.name.clone())
-                .additional_kwargs(m.additional_kwargs.clone())
-                .response_metadata(m.response_metadata.clone())
-                .build(),
-        ),
-        AnyMessage::RemoveMessage(_) => {
-            panic!("Cannot convert RemoveMessage to chunk")
-        }
-    }
-}
-
-pub(crate) fn chunk_to_msg(chunk: &AnyMessageChunk) -> AnyMessage {
-    chunk.to_message()
-}
 
 pub fn get_buffer_string(messages: &[AnyMessage], human_prefix: &str, ai_prefix: &str) -> String {
     messages
@@ -455,8 +389,8 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
             merged.push(last);
             merged.push(msg.clone());
         } else {
-            let last_chunk = msg_to_chunk(&last);
-            let mut curr_chunk = msg_to_chunk(msg);
+            let last_chunk = AnyMessageChunk::from(&last);
+            let mut curr_chunk = AnyMessageChunk::from(msg);
 
             match &mut curr_chunk {
                 AnyMessageChunk::AIMessageChunk(c) => c.response_metadata.clear(),
@@ -505,7 +439,7 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
                 ai_chunk.init_tool_calls();
             }
 
-            merged.push(chunk_to_msg(&merged_chunk));
+            merged.push(merged_chunk.to_message());
         }
     }
 

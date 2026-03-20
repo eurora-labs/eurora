@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 
-use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
+use super::base::{AnyMessage, BaseMessage, BaseMessageChunk, get_msg_title_repr, is_interactive_env};
 use super::content::{ContentBlock, ContentBlocks, TextContentBlock};
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
@@ -469,6 +469,17 @@ impl std::iter::Sum for SystemMessageChunk {
                 .build()
         })
     }
+}
+
+impl BaseMessageChunk for SystemMessageChunk {
+    fn id(&self) -> Option<String> { self.id.clone() }
+    fn content(&self) -> &ContentBlocks { &self.content }
+    fn name(&self) -> Option<String> { self.name.clone() }
+    fn set_id(&mut self, id: String) { self.id = Some(id); }
+    fn message_type(&self) -> &'static str { "SystemMessageChunk" }
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> { &self.additional_kwargs }
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> { &self.response_metadata }
+    fn to_message(&self) -> AnyMessage { AnyMessage::SystemMessage(self.to_message()) }
 }
 
 impl From<SystemMessageChunk> for SystemMessage {
