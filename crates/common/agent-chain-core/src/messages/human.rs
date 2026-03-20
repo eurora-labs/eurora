@@ -389,16 +389,6 @@ impl HumanMessageChunk {
         }
     }
 
-    pub fn from_text(text: impl Into<String>) -> Self {
-        Self {
-            content: ContentBlocks::from(text.into()),
-            id: None,
-            name: None,
-            additional_kwargs: HashMap::new(),
-            response_metadata: HashMap::new(),
-        }
-    }
-
     pub fn message_type(&self) -> &'static str {
         "HumanMessageChunk"
     }
