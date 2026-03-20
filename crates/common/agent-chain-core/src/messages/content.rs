@@ -113,8 +113,6 @@ impl Annotation {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TextContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     pub text: String,
@@ -129,7 +127,6 @@ pub struct TextContentBlock {
 impl TextContentBlock {
     pub fn new(text: impl Into<String>) -> Self {
         Self {
-            block_type: "text".to_string(),
             id: None,
             text: text.into(),
             annotations: None,
@@ -141,8 +138,6 @@ impl TextContentBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     pub id: Option<String>,
     pub name: String,
     pub args: HashMap<String, serde_json::Value>,
@@ -155,7 +150,6 @@ pub struct ToolCallBlock {
 impl ToolCallBlock {
     pub fn new(name: impl Into<String>, args: HashMap<String, serde_json::Value>) -> Self {
         Self {
-            block_type: "tool_call".to_string(),
             id: None,
             name: name.into(),
             args,
@@ -167,8 +161,6 @@ impl ToolCallBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolCallChunkBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     pub id: Option<String>,
     pub name: Option<String>,
     pub args: Option<String>,
@@ -181,7 +173,6 @@ pub struct ToolCallChunkBlock {
 impl ToolCallChunkBlock {
     pub fn new() -> Self {
         Self {
-            block_type: "tool_call_chunk".to_string(),
             id: None,
             name: None,
             args: None,
@@ -199,8 +190,6 @@ impl Default for ToolCallChunkBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InvalidToolCallBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     pub id: Option<String>,
     pub name: Option<String>,
     pub args: Option<String>,
@@ -214,7 +203,6 @@ pub struct InvalidToolCallBlock {
 impl InvalidToolCallBlock {
     pub fn new() -> Self {
         Self {
-            block_type: "invalid_tool_call".to_string(),
             id: None,
             name: None,
             args: None,
@@ -233,8 +221,6 @@ impl Default for InvalidToolCallBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolCall {
-    #[serde(rename = "type")]
-    pub block_type: String,
     pub id: String,
     pub name: String,
     pub args: HashMap<String, serde_json::Value>,
@@ -251,7 +237,6 @@ impl ServerToolCall {
         args: HashMap<String, serde_json::Value>,
     ) -> Self {
         Self {
-            block_type: "server_tool_call".to_string(),
             id: id.into(),
             name: name.into(),
             args,
@@ -263,8 +248,6 @@ impl ServerToolCall {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolCallChunk {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -280,7 +263,6 @@ pub struct ServerToolCallChunk {
 impl ServerToolCallChunk {
     pub fn new() -> Self {
         Self {
-            block_type: "server_tool_call_chunk".to_string(),
             name: None,
             args: None,
             id: None,
@@ -305,8 +287,6 @@ pub enum ServerToolStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ServerToolResult {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     pub tool_call_id: String,
@@ -322,7 +302,6 @@ pub struct ServerToolResult {
 impl ServerToolResult {
     pub fn success(tool_call_id: impl Into<String>) -> Self {
         Self {
-            block_type: "server_tool_result".to_string(),
             id: None,
             tool_call_id: tool_call_id.into(),
             status: ServerToolStatus::Success,
@@ -334,7 +313,6 @@ impl ServerToolResult {
 
     pub fn error(tool_call_id: impl Into<String>) -> Self {
         Self {
-            block_type: "server_tool_result".to_string(),
             id: None,
             tool_call_id: tool_call_id.into(),
             status: ServerToolStatus::Error,
@@ -345,10 +323,8 @@ impl ServerToolResult {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ReasoningContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -362,7 +338,6 @@ pub struct ReasoningContentBlock {
 impl ReasoningContentBlock {
     pub fn new(reasoning: impl Into<String>) -> Self {
         Self {
-            block_type: "reasoning".to_string(),
             id: None,
             reasoning: Some(reasoning.into()),
             index: None,
@@ -375,22 +350,8 @@ impl ReasoningContentBlock {
     }
 }
 
-impl Default for ReasoningContentBlock {
-    fn default() -> Self {
-        Self {
-            block_type: "reasoning".to_string(),
-            id: None,
-            reasoning: None,
-            index: None,
-            extras: None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -410,7 +371,6 @@ pub struct ImageContentBlock {
 impl ImageContentBlock {
     pub fn new() -> Self {
         Self {
-            block_type: "image".to_string(),
             id: None,
             file_id: None,
             mime_type: None,
@@ -423,7 +383,6 @@ impl ImageContentBlock {
 
     pub fn from_url(url: impl Into<String>) -> Self {
         Self {
-            block_type: "image".to_string(),
             id: None,
             file_id: None,
             mime_type: None,
@@ -436,7 +395,6 @@ impl ImageContentBlock {
 
     pub fn from_base64(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
         Self {
-            block_type: "image".to_string(),
             id: None,
             file_id: None,
             mime_type: Some(mime_type.into()),
@@ -456,8 +414,6 @@ impl Default for ImageContentBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VideoContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -477,7 +433,6 @@ pub struct VideoContentBlock {
 impl VideoContentBlock {
     pub fn new() -> Self {
         Self {
-            block_type: "video".to_string(),
             id: None,
             file_id: None,
             mime_type: None,
@@ -497,8 +452,6 @@ impl Default for VideoContentBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AudioContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -518,7 +471,6 @@ pub struct AudioContentBlock {
 impl AudioContentBlock {
     pub fn new() -> Self {
         Self {
-            block_type: "audio".to_string(),
             id: None,
             file_id: None,
             mime_type: None,
@@ -538,8 +490,6 @@ impl Default for AudioContentBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlainTextContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -564,7 +514,6 @@ pub struct PlainTextContentBlock {
 impl PlainTextContentBlock {
     pub fn new() -> Self {
         Self {
-            block_type: "text-plain".to_string(),
             id: None,
             file_id: None,
             mime_type: "text/plain".to_string(),
@@ -587,8 +536,6 @@ impl Default for PlainTextContentBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FileContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -608,7 +555,6 @@ pub struct FileContentBlock {
 impl FileContentBlock {
     pub fn new() -> Self {
         Self {
-            block_type: "file".to_string(),
             id: None,
             file_id: None,
             mime_type: None,
@@ -628,8 +574,6 @@ impl Default for FileContentBlock {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NonStandardContentBlock {
-    #[serde(rename = "type")]
-    pub block_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     pub value: HashMap<String, serde_json::Value>,
@@ -640,7 +584,6 @@ pub struct NonStandardContentBlock {
 impl NonStandardContentBlock {
     pub fn new(value: HashMap<String, serde_json::Value>) -> Self {
         Self {
-            block_type: "non_standard".to_string(),
             id: None,
             value,
             index: None,
@@ -1056,7 +999,6 @@ pub fn create_text_block(
     extras: Option<HashMap<String, serde_json::Value>>,
 ) -> TextContentBlock {
     TextContentBlock {
-        block_type: "text".to_string(),
         text: text.into(),
         id: Some(ensure_id(id)),
         annotations,
@@ -1079,7 +1021,6 @@ pub fn create_image_block(
     }
 
     Ok(ImageContentBlock {
-        block_type: "image".to_string(),
         id: Some(ensure_id(id)),
         url,
         base64,
@@ -1108,7 +1049,6 @@ pub fn create_video_block(
     }
 
     Ok(VideoContentBlock {
-        block_type: "video".to_string(),
         id: Some(ensure_id(id)),
         url,
         base64,
@@ -1137,7 +1077,6 @@ pub fn create_audio_block(
     }
 
     Ok(AudioContentBlock {
-        block_type: "audio".to_string(),
         id: Some(ensure_id(id)),
         url,
         base64,
@@ -1166,7 +1105,6 @@ pub fn create_file_block(
     }
 
     Ok(FileContentBlock {
-        block_type: "file".to_string(),
         id: Some(ensure_id(id)),
         url,
         base64,
@@ -1192,7 +1130,6 @@ pub struct PlainTextBlockConfig {
 
 pub fn create_plaintext_block(config: PlainTextBlockConfig) -> PlainTextContentBlock {
     PlainTextContentBlock {
-        block_type: "text-plain".to_string(),
         mime_type: "text/plain".to_string(),
         id: Some(ensure_id(config.id)),
         text: config.text,
@@ -1214,7 +1151,6 @@ pub fn create_tool_call(
     extras: Option<HashMap<String, serde_json::Value>>,
 ) -> ToolCallBlock {
     ToolCallBlock {
-        block_type: "tool_call".to_string(),
         name: name.into(),
         args,
         id: Some(ensure_id(id)),
@@ -1230,7 +1166,6 @@ pub fn create_reasoning_block(
     extras: Option<HashMap<String, serde_json::Value>>,
 ) -> ReasoningContentBlock {
     ReasoningContentBlock {
-        block_type: "reasoning".to_string(),
         reasoning: Some(reasoning.unwrap_or_default()),
         id: Some(ensure_id(id)),
         index,
@@ -1264,7 +1199,6 @@ pub fn create_non_standard_block(
     index: Option<BlockIndex>,
 ) -> NonStandardContentBlock {
     NonStandardContentBlock {
-        block_type: "non_standard".to_string(),
         value,
         id: Some(ensure_id(id)),
         index,
@@ -1277,7 +1211,7 @@ mod tests {
 
     #[test]
     fn test_text_content_block_serialization() {
-        let block = TextContentBlock::new("Hello, world!");
+        let block = ContentBlock::Text(TextContentBlock::new("Hello, world!"));
         let json = serde_json::to_string(&block).unwrap();
         assert!(json.contains("\"type\":\"text\""));
         assert!(json.contains("\"text\":\"Hello, world!\""));
@@ -1320,7 +1254,6 @@ mod tests {
     fn test_reasoning_content_block() {
         let block = ReasoningContentBlock::new("Thinking...");
         assert_eq!(block.reasoning(), Some("Thinking..."));
-        assert_eq!(block.block_type, "reasoning");
     }
 
     #[test]
@@ -1458,7 +1391,6 @@ mod tests {
         };
 
         let text_block = TextContentBlock {
-            block_type: "text".to_string(),
             id: None,
             text: "It's sunny.".to_string(),
             annotations: Some(vec![citation, non_standard]),
@@ -1466,7 +1398,8 @@ mod tests {
             extras: None,
         };
 
-        let json = serde_json::to_value(&text_block).unwrap();
+        let wrapped = ContentBlock::Text(text_block);
+        let json = serde_json::to_value(&wrapped).unwrap();
         assert_eq!(json["type"], "text");
         assert_eq!(json["text"], "It's sunny.");
 

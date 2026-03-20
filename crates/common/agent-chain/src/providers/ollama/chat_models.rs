@@ -1301,16 +1301,7 @@ fn extract_content_and_images(content: &ContentBlocks) -> (String, Vec<String>) 
         }
     }
 
-    let combined_content = if text_parts.is_empty() {
-        String::new()
-    } else {
-        let mut result = String::new();
-        for part in &text_parts {
-            result.push('\n');
-            result.push_str(part);
-        }
-        result
-    };
+    let combined_content = text_parts.join("\n");
     (combined_content, images)
 }
 
@@ -1562,7 +1553,7 @@ mod tests {
             )),
         ]);
         let (text, images) = extract_content_and_images(&content);
-        assert_eq!(text, "\nWhat's in this image?");
+        assert_eq!(text, "What's in this image?");
         assert_eq!(images, vec!["abc123"]);
     }
 
@@ -1591,7 +1582,7 @@ mod tests {
         let formatted = model.format_messages(&messages).unwrap();
         assert_eq!(formatted.len(), 1);
         assert_eq!(formatted[0]["role"], "user");
-        assert_eq!(formatted[0]["content"], "\nDescribe this");
+        assert_eq!(formatted[0]["content"], "Describe this");
         assert_eq!(formatted[0]["images"][0], "base64data");
     }
 

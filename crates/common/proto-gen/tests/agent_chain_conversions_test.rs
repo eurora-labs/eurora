@@ -179,7 +179,6 @@ mod tests {
         let blocks: Vec<ContentBlock> = vec![
             ContentBlock::Text(TextContentBlock::new("What's in this image?")),
             ContentBlock::Image(ImageContentBlock {
-                block_type: "image".to_string(),
                 id: None,
                 file_id: None,
                 mime_type: None,
@@ -227,7 +226,6 @@ mod tests {
         };
 
         let original = TextContentBlock {
-            block_type: "text".to_string(),
             id: Some("block_1".to_string()),
             text: "It's sunny.".to_string(),
             annotations: Some(vec![citation]),

@@ -1555,6 +1555,6 @@ async fn test_structured_output_with_raw_serializes_message() {
         .unwrap();
 
     let raw = &result["raw"];
-    assert_eq!(raw["content"], "some content");
+    assert_eq!(raw["content"][0]["text"], "some content");
     assert_eq!(raw["type"], "ai");
 }
