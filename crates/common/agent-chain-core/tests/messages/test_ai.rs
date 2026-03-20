@@ -976,28 +976,42 @@ fn test_ai_message_chunk_content_blocks_reasoning_from_additional_kwargs() {
 
 #[test]
 fn test_ai_message_chunk_content_blocks_with_output_version_v1() {
-    let content_list = json!([
-        {"type": "text", "text": "hello"},
-        {"type": "tool_call", "name": "foo", "args": {"a": 1}, "id": "tc1"}
+    use agent_chain_core::messages::{
+        ContentBlock, ContentBlocks, TextContentBlock, ToolCallBlock,
+    };
+
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("hello")),
+        ContentBlock::ToolCall(ToolCallBlock {
+            id: Some("tc1".to_string()),
+            name: "foo".to_string(),
+            args: {
+                let mut args = std::collections::HashMap::new();
+                args.insert("a".to_string(), json!(1));
+                args
+            },
+            index: None,
+            extras: None,
+        }),
     ]);
 
     let mut response_metadata = std::collections::HashMap::new();
     response_metadata.insert("output_version".to_string(), json!("v1"));
 
     let chunk = AIMessageChunk::builder()
-        .content(serde_json::to_string(&content_list).unwrap())
+        .content(blocks)
         .response_metadata(response_metadata)
         .build();
 
-    let blocks = chunk.content_blocks();
-    assert_eq!(blocks.len(), 2);
-    match &blocks[0] {
+    let content_blocks = chunk.content_blocks();
+    assert_eq!(content_blocks.len(), 2);
+    match &content_blocks[0] {
         agent_chain_core::messages::ContentBlock::Text(t) => {
             assert_eq!(t.text, "hello");
         }
         _ => panic!("Expected Text content block"),
     }
-    match &blocks[1] {
+    match &content_blocks[1] {
         agent_chain_core::messages::ContentBlock::ToolCall(tc) => {
             assert_eq!(tc.name, "foo");
         }

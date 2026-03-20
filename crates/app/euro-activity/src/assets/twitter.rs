@@ -131,16 +131,7 @@ impl AssetFunctionality for TwitterAsset {
             let mut blocks: Vec<ContentBlock> =
                 vec![ContentBlock::Text(TextContentBlock::new(&text))];
             for image in main_tweet_images {
-                blocks.push(ContentBlock::Image(ImageContentBlock {
-                    block_type: "image".to_string(),
-                    id: None,
-                    file_id: None,
-                    mime_type: None,
-                    index: None,
-                    url: Some(image.clone()),
-                    base64: None,
-                    extras: None,
-                }));
+                blocks.push(ContentBlock::Image(ImageContentBlock::from_url(image)));
             }
             vec![HumanMessage::builder().content(blocks).build().into()]
         }

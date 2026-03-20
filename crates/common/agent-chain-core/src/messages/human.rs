@@ -101,8 +101,8 @@ impl<'de> Deserialize<'de> for HumanMessage {
                 let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
                 let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
 
-                while let Some(key) = map.next_key::<&str>()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "content" => content = Some(map.next_value()?),
                         "id" => id = map.next_value()?,
                         "name" => name = map.next_value()?,
@@ -272,7 +272,6 @@ impl HumanMessage {
                         serde_json::Value::String(block_type.to_string()),
                     );
                     ContentBlock::NonStandard(NonStandardContentBlock {
-                        block_type: "non_standard".to_string(),
                         id: None,
                         value: error_value,
                         index: v.get("index").and_then(|i| serde_json::from_value(i.clone()).ok()),
@@ -341,8 +340,8 @@ impl<'de> Deserialize<'de> for HumanMessageChunk {
                 let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
                 let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
 
-                while let Some(key) = map.next_key::<&str>()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "content" => content = Some(map.next_value()?),
                         "id" => id = map.next_value()?,
                         "name" => name = map.next_value()?,

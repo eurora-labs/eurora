@@ -9,7 +9,7 @@ message ProtoBaseMessage {
     ProtoAIMessage ai = 3;
     ProtoToolMessage tool = 4;
     ProtoChatMessage chat = 5;
-    ProtoRemoveMessage remove = 7;
+    ProtoRemoveMessage remove = 6;
   }
 }
 

@@ -756,7 +756,6 @@ impl From<TextContentBlock> for ProtoTextContentBlock {
 impl From<ProtoTextContentBlock> for TextContentBlock {
     fn from(proto: ProtoTextContentBlock) -> Self {
         TextContentBlock {
-            block_type: "text".to_string(),
             id: proto.id,
             text: proto.text,
             annotations: if proto.annotations.is_empty() {
@@ -790,7 +789,6 @@ impl From<ReasoningContentBlock> for ProtoReasoningContentBlock {
 impl From<ProtoReasoningContentBlock> for ReasoningContentBlock {
     fn from(proto: ProtoReasoningContentBlock) -> Self {
         ReasoningContentBlock {
-            block_type: "reasoning".to_string(),
             id: proto.id,
             reasoning: proto.reasoning,
             index: proto.index.map(Into::into),
@@ -822,7 +820,6 @@ impl From<ImageContentBlock> for ProtoImageContentBlock {
 impl From<ProtoImageContentBlock> for ImageContentBlock {
     fn from(proto: ProtoImageContentBlock) -> Self {
         ImageContentBlock {
-            block_type: "image".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -857,7 +854,6 @@ impl From<VideoContentBlock> for ProtoVideoContentBlock {
 impl From<ProtoVideoContentBlock> for VideoContentBlock {
     fn from(proto: ProtoVideoContentBlock) -> Self {
         VideoContentBlock {
-            block_type: "video".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -892,7 +888,6 @@ impl From<AudioContentBlock> for ProtoAudioContentBlock {
 impl From<ProtoAudioContentBlock> for AudioContentBlock {
     fn from(proto: ProtoAudioContentBlock) -> Self {
         AudioContentBlock {
-            block_type: "audio".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -930,7 +925,6 @@ impl From<PlainTextContentBlock> for ProtoPlainTextContentBlock {
 impl From<ProtoPlainTextContentBlock> for PlainTextContentBlock {
     fn from(proto: ProtoPlainTextContentBlock) -> Self {
         PlainTextContentBlock {
-            block_type: "text-plain".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -968,7 +962,6 @@ impl From<FileContentBlock> for ProtoFileContentBlock {
 impl From<ProtoFileContentBlock> for FileContentBlock {
     fn from(proto: ProtoFileContentBlock) -> Self {
         FileContentBlock {
-            block_type: "file".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -996,7 +989,6 @@ impl From<NonStandardContentBlock> for ProtoNonStandardContentBlock {
 impl From<ProtoNonStandardContentBlock> for NonStandardContentBlock {
     fn from(proto: ProtoNonStandardContentBlock) -> Self {
         NonStandardContentBlock {
-            block_type: "non_standard".to_string(),
             id: proto.id,
             value: serde_json::from_str(&proto.value).unwrap_or_default(),
             index: proto.index.map(Into::into),
@@ -1022,7 +1014,6 @@ impl From<ToolCallBlock> for ProtoToolCallBlock {
 impl From<ProtoToolCallBlock> for ToolCallBlock {
     fn from(proto: ProtoToolCallBlock) -> Self {
         ToolCallBlock {
-            block_type: "tool_call".to_string(),
             id: proto.id,
             name: proto.name,
             args: serde_json::from_str(&proto.args).unwrap_or_default(),
@@ -1053,7 +1044,6 @@ impl From<ToolCallChunkBlock> for ProtoToolCallChunkBlock {
 impl From<ProtoToolCallChunkBlock> for ToolCallChunkBlock {
     fn from(proto: ProtoToolCallChunkBlock) -> Self {
         ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: proto.id,
             name: proto.name,
             args: proto.args,
@@ -1085,7 +1075,6 @@ impl From<InvalidToolCallBlock> for ProtoInvalidToolCallBlock {
 impl From<ProtoInvalidToolCallBlock> for InvalidToolCallBlock {
     fn from(proto: ProtoInvalidToolCallBlock) -> Self {
         InvalidToolCallBlock {
-            block_type: "invalid_tool_call".to_string(),
             id: proto.id,
             name: proto.name,
             args: proto.args,
@@ -1117,7 +1106,6 @@ impl From<ServerToolCall> for ProtoServerToolCall {
 impl From<ProtoServerToolCall> for ServerToolCall {
     fn from(proto: ProtoServerToolCall) -> Self {
         ServerToolCall {
-            block_type: "server_tool_call".to_string(),
             id: proto.id,
             name: proto.name,
             args: serde_json::from_str(&proto.args).unwrap_or_default(),
@@ -1148,7 +1136,6 @@ impl From<ServerToolCallChunk> for ProtoServerToolCallChunk {
 impl From<ProtoServerToolCallChunk> for ServerToolCallChunk {
     fn from(proto: ProtoServerToolCallChunk) -> Self {
         ServerToolCallChunk {
-            block_type: "server_tool_call_chunk".to_string(),
             name: proto.name,
             args: proto.args,
             id: proto.id,
@@ -1199,7 +1186,6 @@ impl From<ServerToolResult> for ProtoServerToolResult {
 impl From<ProtoServerToolResult> for ServerToolResult {
     fn from(proto: ProtoServerToolResult) -> Self {
         ServerToolResult {
-            block_type: "server_tool_result".to_string(),
             id: proto.id,
             tool_call_id: proto.tool_call_id,
             status: ProtoServerToolStatus::try_from(proto.status)

@@ -187,7 +187,16 @@ fn test_chunk_add_same_role_chunks() {
         .role("user")
         .build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " world"]);
     assert_eq!(result.role, "user");
     assert_eq!(result.id, Some("1".to_string()));
 }
@@ -318,7 +327,16 @@ fn test_chunk_add_chat_chunk_to_human_chunk() {
         .build();
     let chunk2 = HumanMessageChunk::builder().content(" world").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " world"]);
     assert_eq!(result.role, "user");
     assert_eq!(result.id, Some("1".to_string()));
 }
@@ -374,7 +392,16 @@ fn test_chunk_multiple_additions() {
         .role("user")
         .build();
     let result = chunk1 + chunk2 + chunk3;
-    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
     assert_eq!(result.role, "user");
 }
 
@@ -418,7 +445,6 @@ fn test_content_blocks_with_mixed_list_content() {
     let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("Hello")),
         ContentBlock::Image(agent_chain_core::messages::ImageContentBlock {
-            block_type: "image".to_string(),
             id: None,
             file_id: None,
             mime_type: Some("image/png".to_string()),
@@ -450,7 +476,7 @@ fn test_model_dump_includes_role() {
         .build();
     let dumped = serde_json::to_value(&msg).unwrap();
     assert_eq!(dumped.get("role").unwrap().as_str().unwrap(), "moderator");
-    assert_eq!(dumped.get("content").unwrap().as_str().unwrap(), "Hello");
+    assert_eq!(dumped["content"][0]["text"], "Hello");
     assert_eq!(dumped.get("type").unwrap().as_str().unwrap(), "chat");
     assert!(dumped.get("additional_kwargs").is_some());
     assert!(dumped.get("response_metadata").is_some());
@@ -519,7 +545,16 @@ fn test_add_multiple_chat_chunks_chained() {
         .role("user")
         .build();
     let result = chunk1 + chunk2 + chunk3 + chunk4;
-    assert_eq!(result.content.as_text(), "abcd");
+    assert_eq!(result.content.len(), 4);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c", "d"]);
     assert_eq!(result.role, "user");
     assert_eq!(result.id, Some("1".to_string()));
 }
@@ -537,7 +572,16 @@ fn test_add_multiple_mixed_chunks_chained() {
         .role("user")
         .build();
     let result = (chunk1 + chunk2) + chunk3;
-    assert_eq!(result.content.as_text(), "Hello from world");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " from", " world"]);
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -568,7 +612,15 @@ fn test_add_accumulates_additional_kwargs() {
         .additional_kwargs(kwargs3)
         .build();
     let result = chunk1 + chunk2 + chunk3;
-    assert_eq!(result.content.as_text(), "abc");
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
     assert_eq!(
         result.additional_kwargs.get("k1").unwrap(),
         &serde_json::json!("v1")

@@ -126,7 +126,16 @@ fn test_chunk_add_two_chunks() {
         .build();
     let chunk2 = HumanMessageChunk::builder().content(" world").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " world"]);
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -226,7 +235,16 @@ fn test_chunk_multiple_additions() {
     let chunk2 = HumanMessageChunk::builder().content("b").build();
     let chunk3 = HumanMessageChunk::builder().content("c").build();
     let result = chunk1 + chunk2 + chunk3;
-    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
 }
 
 #[test]
@@ -262,7 +280,16 @@ fn test_chunk_sum() {
         HumanMessageChunk::builder().content("world!").build(),
     ];
     let result: HumanMessageChunk = chunks.into_iter().sum();
-    assert_eq!(result.content.as_text(), "Hello beautiful world!");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello ", "beautiful ", "world!"]);
 }
 
 #[test]
@@ -333,7 +360,6 @@ fn test_content_blocks_property() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::Text(tb) => {
-            assert_eq!(tb.block_type, "text");
             assert_eq!(tb.text, "Hello");
         }
         other => panic!("expected Text content block, got {:?}", other),
@@ -396,7 +422,7 @@ fn test_model_dump_exact_keys_and_values() {
         .name("alice".to_string())
         .build();
     let dumped = serde_json::to_value(&msg).unwrap();
-    assert_eq!(dumped["content"], "Hello world");
+    assert_eq!(dumped["content"][0]["text"], "Hello world");
     assert_eq!(dumped["type"], "human");
     assert_eq!(dumped["name"], "alice");
     assert_eq!(dumped["id"], "msg-001");
@@ -408,7 +434,7 @@ fn test_model_dump_exact_keys_and_values() {
 fn test_model_dump_default_values() {
     let msg = HumanMessage::builder().content("Test").build();
     let dumped = serde_json::to_value(&msg).unwrap();
-    assert_eq!(dumped["content"], "Test");
+    assert_eq!(dumped["content"][0]["text"], "Test");
     assert_eq!(dumped["type"], "human");
     assert!(dumped["id"].is_null());
     assert_eq!(dumped["additional_kwargs"], serde_json::json!({}));
@@ -516,7 +542,16 @@ fn test_chunk_add_list_of_chunks() {
     let result = vec![chunk2, chunk3]
         .into_iter()
         .fold(chunk1, |acc, c| acc + c);
-    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -528,7 +563,6 @@ fn test_chunk_content_blocks_property() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::Text(tb) => {
-            assert_eq!(tb.block_type, "text");
             assert_eq!(tb.text, "Hello");
         }
         other => panic!("expected Text content block, got {:?}", other),
@@ -606,7 +640,16 @@ fn test_chunk_add_different_chunk_type() {
         matches!(&result, HumanMessageChunk { .. }),
         "result should be HumanMessageChunk"
     );
-    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " world"]);
 }
 
 #[test]

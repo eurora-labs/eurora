@@ -314,7 +314,22 @@ fn normalize_single_message(mut message: AnyMessage) -> AnyMessage {
     let new_blocks: Vec<serde_json::Value> = blocks
         .into_iter()
         .map(|value| {
-            let block_type = value.get("type").and_then(|t| t.as_str());
+            // For NonStandard blocks, the real content is in the "value" sub-object.
+            // Unwrap it so downstream checks see the original type.
+            let (value, block_type) = if value.get("type").and_then(|t| t.as_str())
+                == Some("non_standard")
+            {
+                if let Some(inner) = value.get("value") {
+                    let inner_type = inner.get("type").and_then(|t| t.as_str()).map(String::from);
+                    (inner.clone(), inner_type)
+                } else {
+                    (value, Some("non_standard".to_string()))
+                }
+            } else {
+                let bt = value.get("type").and_then(|t| t.as_str()).map(String::from);
+                (value, bt)
+            };
+            let block_type = block_type.as_deref();
 
             if matches!(block_type, Some("input_audio") | Some("file"))
                 && is_openai_data_block(&value, None)

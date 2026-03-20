@@ -238,36 +238,11 @@ fn test_message_to_dict_human_message() {
         .build();
     let result = message_to_dict(&AnyMessage::HumanMessage(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "human");
-    assert_eq!(
-        result
-            .get("data")
-            .unwrap()
-            .get("content")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-        "Hello"
-    );
-    assert_eq!(
-        result
-            .get("data")
-            .unwrap()
-            .get("name")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-        "user1"
-    );
-    assert_eq!(
-        result
-            .get("data")
-            .unwrap()
-            .get("id")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-        "msg1"
-    );
+    let data = result.get("data").unwrap();
+    let content = data.get("content").unwrap();
+    assert_eq!(content[0]["text"], "Hello");
+    assert_eq!(data.get("name").unwrap().as_str().unwrap(), "user1");
+    assert_eq!(data.get("id").unwrap().as_str().unwrap(), "msg1");
 }
 
 #[test]
@@ -278,26 +253,10 @@ fn test_message_to_dict_ai_message() {
         .build();
     let result = message_to_dict(&AnyMessage::AIMessage(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "ai");
-    assert_eq!(
-        result
-            .get("data")
-            .unwrap()
-            .get("content")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-        "Hi there"
-    );
-    assert_eq!(
-        result
-            .get("data")
-            .unwrap()
-            .get("id")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-        "ai1"
-    );
+    let data = result.get("data").unwrap();
+    let content = data.get("content").unwrap();
+    assert_eq!(content[0]["text"], "Hi there");
+    assert_eq!(data.get("id").unwrap().as_str().unwrap(), "ai1");
 }
 
 #[test]
@@ -307,16 +266,9 @@ fn test_message_to_dict_system_message() {
         .build();
     let result = message_to_dict(&AnyMessage::SystemMessage(msg));
     assert_eq!(result.get("type").unwrap().as_str().unwrap(), "system");
-    assert_eq!(
-        result
-            .get("data")
-            .unwrap()
-            .get("content")
-            .unwrap()
-            .as_str()
-            .unwrap(),
-        "You are a helpful assistant"
-    );
+    let data = result.get("data").unwrap();
+    let content = data.get("content").unwrap();
+    assert_eq!(content[0]["text"], "You are a helpful assistant");
 }
 
 #[test]
@@ -376,7 +328,6 @@ fn test_content_blocks_string_content() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::Text(tb) => {
-            assert_eq!(tb.block_type, "text");
             assert_eq!(tb.text, "Hello");
         }
         other => panic!("Expected Text block, got {:?}", other),
@@ -447,7 +398,6 @@ fn test_content_blocks_non_standard_block() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::NonStandard(ns) => {
-            assert_eq!(ns.block_type, "non_standard");
             assert_eq!(
                 ns.value.get("type").unwrap().as_str().unwrap(),
                 "custom_type"
@@ -497,7 +447,6 @@ fn test_dict_with_type_not_in_known_block_types() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::NonStandard(ns) => {
-            assert_eq!(ns.block_type, "non_standard");
             assert_eq!(
                 ns.value.get("type").unwrap().as_str().unwrap(),
                 "completely_unknown_type_xyz"
@@ -522,9 +471,7 @@ fn test_dict_with_no_type_key() {
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
-        ContentBlock::NonStandard(ns) => {
-            assert_eq!(ns.block_type, "non_standard");
-        }
+        ContentBlock::NonStandard(_ns) => {}
         other => panic!("Expected NonStandard block, got {:?}", other),
     }
 }
@@ -537,7 +484,17 @@ fn test_add_human_message_chunks() {
         .build();
     let chunk2 = HumanMessageChunk::builder().content(" world").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content.as_text(), "Hello world");
+    assert_eq!(result.content.len(), 2);
+    if let ContentBlock::Text(t) = &result.content[0] {
+        assert_eq!(t.text, "Hello");
+    } else {
+        panic!("expected Text block");
+    }
+    if let ContentBlock::Text(t) = &result.content[1] {
+        assert_eq!(t.text, " world");
+    } else {
+        panic!("expected Text block");
+    }
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -546,7 +503,17 @@ fn test_add_system_message_chunks() {
     let chunk1 = SystemMessageChunk::builder().content("You are").build();
     let chunk2 = SystemMessageChunk::builder().content(" helpful").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content.as_text(), "You are helpful");
+    assert_eq!(result.content.len(), 2);
+    if let ContentBlock::Text(t) = &result.content[0] {
+        assert_eq!(t.text, "You are");
+    } else {
+        panic!("expected Text block");
+    }
+    if let ContentBlock::Text(t) = &result.content[1] {
+        assert_eq!(t.text, " helpful");
+    } else {
+        panic!("expected Text block");
+    }
 }
 
 #[test]
@@ -632,7 +599,16 @@ fn test_add_list_of_mixed_message_chunks() {
         HumanMessageChunk::builder().content(" end").build(),
     ];
     let result = others.into_iter().fold(chunk1, |acc, c| acc + c);
-    assert_eq!(result.content.as_text(), "Start middle end");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Start", " middle", " end"]);
     assert_eq!(result.id, Some("main".to_string()));
 }
 
@@ -676,7 +652,16 @@ fn test_add_list_of_chunks_with_metadata() {
         .into_iter()
         .fold(chunk1, |acc, c| acc + c);
 
-    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
     assert_eq!(result.id, Some("1".to_string()));
     assert_eq!(
         result.additional_kwargs.get("key1").unwrap(),
@@ -712,7 +697,16 @@ fn test_add_single_element_list() {
         .build();
     let chunk2 = HumanMessageChunk::builder().content(" World").build();
     let result = chunk1 + chunk2;
-    assert_eq!(result.content.as_text(), "Hello World");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " World"]);
     assert_eq!(result.id, Some("x".to_string()));
 }
 
@@ -963,7 +957,6 @@ fn test_string_reasoning_content_returns_reasoning_block() {
     let result = extract_reasoning_from_additional_kwargs(&additional_kwargs);
     assert!(result.is_some());
     let block = result.unwrap();
-    assert_eq!(block.block_type, "reasoning");
     assert_eq!(block.reasoning(), Some("I think therefore I am"));
 }
 

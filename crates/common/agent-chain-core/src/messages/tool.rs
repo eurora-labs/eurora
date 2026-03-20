@@ -218,8 +218,8 @@ impl<'de> Deserialize<'de> for ToolMessage {
                 let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
                 let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
 
-                while let Some(key) = map.next_key::<&str>()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "content" => content = Some(map.next_value()?),
                         "tool_call_id" => tool_call_id = Some(map.next_value()?),
                         "id" => id = map.next_value()?,
@@ -425,8 +425,8 @@ impl<'de> Deserialize<'de> for ToolMessageChunk {
                 let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
                 let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
 
-                while let Some(key) = map.next_key::<&str>()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "content" => content = Some(map.next_value()?),
                         "tool_call_id" => tool_call_id = Some(map.next_value()?),
                         "id" => id = map.next_value()?,

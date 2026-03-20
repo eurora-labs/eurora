@@ -224,8 +224,8 @@ impl<'de> Deserialize<'de> for AIMessage {
                 let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
                 let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
 
-                while let Some(key) = map.next_key::<&str>()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "content" => content = Some(map.next_value()?),
                         "id" => id = map.next_value()?,
                         "name" => name = map.next_value()?,
@@ -294,14 +294,7 @@ impl AIMessage {
     }
 
     pub fn text(&self) -> String {
-        self.content
-            .iter()
-            .filter_map(|b| match b {
-                ContentBlock::Text(t) => Some(t.text.as_str()),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
+        self.content.as_text()
     }
 
     pub fn content_list(&self) -> Vec<serde_json::Value> {
@@ -449,7 +442,6 @@ impl AIMessage {
                         serde_json::Value::String(block_type.to_string()),
                     );
                     ContentBlock::NonStandard(NonStandardContentBlock {
-                        block_type: "non_standard".to_string(),
                         id: None,
                         value: error_value,
                         index: v.get("index").and_then(|i| {
@@ -648,8 +640,8 @@ impl<'de> Deserialize<'de> for AIMessageChunk {
                 let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
                 let mut chunk_position: Option<Option<ChunkPosition>> = None;
 
-                while let Some(key) = map.next_key::<&str>()? {
-                    match key {
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
                         "content" => content = Some(map.next_value()?),
                         "id" => id = map.next_value()?,
                         "name" => name = map.next_value()?,
@@ -726,14 +718,7 @@ impl AIMessageChunk {
     }
 
     pub fn text(&self) -> String {
-        self.content
-            .iter()
-            .filter_map(|b| match b {
-                ContentBlock::Text(t) => Some(t.text.as_str()),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
+        self.content.as_text()
     }
 
     pub fn content_list(&self) -> Vec<serde_json::Value> {
@@ -911,7 +896,6 @@ impl AIMessageChunk {
                         serde_json::Value::String(block_type.to_string()),
                     );
                     ContentBlock::NonStandard(NonStandardContentBlock {
-                        block_type: "non_standard".to_string(),
                         id: None,
                         value: error_value,
                         index: v.get("index").and_then(|i| {
@@ -1152,6 +1136,11 @@ impl AIMessageChunk {
 
 fn merge_message_content(first: &ContentBlocks, others: &[&ContentBlocks]) -> ContentBlocks {
     let to_mergeable = |cb: &ContentBlocks| -> MergeableContent {
+        if cb.len() == 1
+            && let ContentBlock::Text(t) = &cb[0]
+        {
+            return MergeableContent::Text(t.text.clone());
+        }
         let values: Vec<serde_json::Value> = cb
             .iter()
             .filter_map(|block| serde_json::to_value(block).ok())

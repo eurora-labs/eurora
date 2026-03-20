@@ -99,16 +99,7 @@ impl SnapshotFunctionality for YoutubeSnapshot {
         if let Some(image) = &self.video_frame
             && !image.is_empty()
         {
-            let block = ContentBlock::Image(ImageContentBlock {
-                block_type: "image".to_string(),
-                id: None,
-                file_id: None,
-                mime_type: Some("image/png".to_string()),
-                index: None,
-                url: None,
-                base64: Some(image.clone()),
-                extras: None,
-            });
+            let block = ContentBlock::Image(ImageContentBlock::from_base64(image, "image/png"));
 
             vec![HumanMessage::builder().content(vec![block]).build().into()]
         } else {

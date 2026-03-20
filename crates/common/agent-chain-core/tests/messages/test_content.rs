@@ -251,7 +251,6 @@ fn test_edge_case_missing_type() {
 #[test]
 fn test_basic_text_block() {
     let block = create_text_block("Hello world", None, None, None, None);
-    assert_eq!(block.block_type, "text");
     assert_eq!(block.text, "Hello world");
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
 }
@@ -322,7 +321,6 @@ fn test_create_image_block_with_url() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "image");
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/image.png");
     assert!(block.id.is_some());
 }
@@ -339,7 +337,6 @@ fn test_create_image_block_with_base64() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "image");
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "image/png");
 }
@@ -356,7 +353,6 @@ fn test_create_image_block_with_file_id() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "image");
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
@@ -429,7 +425,6 @@ fn test_create_image_block_base64_without_mime_type_does_not_raise() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "image");
     assert_eq!(block.base64.as_ref().unwrap(), "iVBORw0KGgo=");
     assert!(block.mime_type.is_none());
 }
@@ -446,7 +441,6 @@ fn test_create_video_block_with_url() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "video");
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/video.mp4");
 }
 
@@ -462,7 +456,6 @@ fn test_create_video_block_with_base64() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "video");
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "video/mp4");
 }
@@ -479,7 +472,6 @@ fn test_create_video_block_with_file_id() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "video");
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
@@ -532,7 +524,6 @@ fn test_create_audio_block_with_url() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "audio");
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/audio.mp3");
 }
 
@@ -548,7 +539,6 @@ fn test_create_audio_block_with_base64() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "audio");
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "audio/mp3");
 }
@@ -565,7 +555,6 @@ fn test_create_audio_block_with_file_id() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "audio");
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
@@ -618,7 +607,6 @@ fn test_create_file_block_with_url() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "file");
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/doc.pdf");
 }
 
@@ -634,7 +622,6 @@ fn test_create_file_block_with_base64() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "file");
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "application/pdf");
 }
@@ -651,7 +638,6 @@ fn test_create_file_block_with_file_id() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "file");
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
@@ -704,7 +690,6 @@ fn test_create_file_block_all_fields_populated() {
         None,
     )
     .unwrap();
-    assert_eq!(block.block_type, "file");
     assert_eq!(
         block.url.as_ref().unwrap(),
         "https://example.com/report.pdf"
@@ -720,7 +705,6 @@ fn test_plaintext_block_with_text() {
         text: Some("Hello world".to_string()),
         ..Default::default()
     });
-    assert_eq!(block.block_type, "text-plain");
     assert_eq!(block.text.as_ref().unwrap(), "Hello world");
     assert_eq!(block.mime_type, "text/plain");
 }
@@ -731,7 +715,6 @@ fn test_plaintext_block_with_url() {
         url: Some("https://example.com/file.txt".to_string()),
         ..Default::default()
     });
-    assert_eq!(block.block_type, "text-plain");
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/file.txt");
 }
 
@@ -741,7 +724,6 @@ fn test_plaintext_block_with_base64() {
         base64: Some("SGVsbG8gd29ybGQ=".to_string()),
         ..Default::default()
     });
-    assert_eq!(block.block_type, "text-plain");
     assert_eq!(block.base64.as_ref().unwrap(), "SGVsbG8gd29ybGQ=");
 }
 
@@ -751,7 +733,6 @@ fn test_plaintext_block_with_file_id() {
         file_id: Some("file-123".to_string()),
         ..Default::default()
     });
-    assert_eq!(block.block_type, "text-plain");
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
@@ -798,7 +779,6 @@ fn test_plaintext_block_all_fields_populated() {
         index: Some(3.into()),
         extras: None,
     });
-    assert_eq!(block.block_type, "text-plain");
     assert_eq!(block.mime_type, "text/plain");
     assert_eq!(block.text.as_ref().unwrap(), "some text");
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/file.txt");
@@ -830,7 +810,6 @@ fn test_basic_tool_call() {
     let mut args = HashMap::new();
     args.insert("param".to_string(), json!("value"));
     let block = create_tool_call("test_tool", args, None, None, None);
-    assert_eq!(block.block_type, "tool_call");
     assert_eq!(block.name, "test_tool");
     assert_eq!(block.args["param"], json!("value"));
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
@@ -914,7 +893,6 @@ fn test_basic_reasoning_block() {
         None,
         None,
     );
-    assert_eq!(block.block_type, "reasoning");
     assert_eq!(
         block.reasoning.as_ref().unwrap(),
         "Let me think about this..."
@@ -957,7 +935,6 @@ fn test_reasoning_block_with_extras() {
 fn test_reasoning_block_none_reasoning_defaults_to_empty_string() {
     let block = create_reasoning_block(None, None, None, None);
     assert_eq!(block.reasoning.as_ref().unwrap(), "");
-    assert_eq!(block.block_type, "reasoning");
     assert!(block.id.is_some());
 }
 
@@ -1064,7 +1041,6 @@ fn test_basic_non_standard_block() {
     let mut value = HashMap::new();
     value.insert("custom".to_string(), json!("data"));
     let block = create_non_standard_block(value.clone(), None, None);
-    assert_eq!(block.block_type, "non_standard");
     assert_eq!(block.value["custom"], json!("data"));
     assert!(block.id.is_some());
 }
@@ -1100,7 +1076,6 @@ fn test_non_standard_block_complex_value() {
 #[test]
 fn test_non_standard_block_empty_dict_value() {
     let block = create_non_standard_block(HashMap::new(), None, None);
-    assert_eq!(block.block_type, "non_standard");
     assert!(block.value.is_empty());
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
 }
@@ -1108,7 +1083,6 @@ fn test_non_standard_block_empty_dict_value() {
 #[test]
 fn test_text_content_block_structure() {
     let block = TextContentBlock::new("Hello");
-    assert_eq!(block.block_type, "text");
     assert_eq!(block.text, "Hello");
 }
 
@@ -1118,7 +1092,6 @@ fn test_tool_call_block_structure() {
     args.insert("param".to_string(), json!("value"));
     let mut block = ToolCallBlock::new("test_tool", args);
     block.id = Some("123".to_string());
-    assert_eq!(block.block_type, "tool_call");
     assert_eq!(block.name, "test_tool");
 }
 
@@ -1128,7 +1101,6 @@ fn test_tool_call_chunk_block_structure() {
     block.id = Some("123".to_string());
     block.name = Some("test_tool".to_string());
     block.args = Some(r#"{"param": "value"}"#.to_string());
-    assert_eq!(block.block_type, "tool_call_chunk");
     assert_eq!(block.args.as_ref().unwrap(), r#"{"param": "value"}"#);
 }
 
@@ -1139,49 +1111,47 @@ fn test_invalid_tool_call_block_structure() {
     block.name = Some("test_tool".to_string());
     block.args = Some("invalid json".to_string());
     block.error = Some("JSON parse error".to_string());
-    assert_eq!(block.block_type, "invalid_tool_call");
     assert_eq!(block.error.as_ref().unwrap(), "JSON parse error");
 }
 
 #[test]
 fn test_reasoning_content_block_structure() {
     let block = ReasoningContentBlock::new("Let me think...");
-    assert_eq!(block.block_type, "reasoning");
+    assert!(block.reasoning.is_some());
 }
 
 #[test]
 fn test_image_content_block_structure() {
     let mut block = ImageContentBlock::new();
     block.url = Some("https://example.com/image.png".to_string());
-    assert_eq!(block.block_type, "image");
+    assert_eq!(block.url.as_ref().unwrap(), "https://example.com/image.png");
 }
 
 #[test]
 fn test_audio_content_block_structure() {
     let mut block = AudioContentBlock::new();
     block.url = Some("https://example.com/audio.mp3".to_string());
-    assert_eq!(block.block_type, "audio");
+    assert_eq!(block.url.as_ref().unwrap(), "https://example.com/audio.mp3");
 }
 
 #[test]
 fn test_video_content_block_structure() {
     let mut block = VideoContentBlock::new();
     block.url = Some("https://example.com/video.mp4".to_string());
-    assert_eq!(block.block_type, "video");
+    assert_eq!(block.url.as_ref().unwrap(), "https://example.com/video.mp4");
 }
 
 #[test]
 fn test_file_content_block_structure() {
     let mut block = FileContentBlock::new();
     block.url = Some("https://example.com/doc.pdf".to_string());
-    assert_eq!(block.block_type, "file");
+    assert_eq!(block.url.as_ref().unwrap(), "https://example.com/doc.pdf");
 }
 
 #[test]
 fn test_plaintext_content_block_structure() {
     let mut block = PlainTextContentBlock::new();
     block.text = Some("Hello".to_string());
-    assert_eq!(block.block_type, "text-plain");
     assert_eq!(block.mime_type, "text/plain");
 }
 
@@ -1212,19 +1182,18 @@ fn test_server_tool_call_structure() {
     let mut args = HashMap::new();
     args.insert("query".to_string(), json!("test"));
     let block = ServerToolCall::new("stc-123", "web_search", args);
-    assert_eq!(block.block_type, "server_tool_call");
+    assert_eq!(block.name, "web_search");
 }
 
 #[test]
 fn test_server_tool_call_chunk_structure() {
     let block = ServerToolCallChunk::new();
-    assert_eq!(block.block_type, "server_tool_call_chunk");
+    assert!(block.id.is_none());
 }
 
 #[test]
 fn test_server_tool_result_structure() {
     let block = ServerToolResult::success("stc-123");
-    assert_eq!(block.block_type, "server_tool_result");
     assert_eq!(block.tool_call_id, "stc-123");
     assert_eq!(block.status, ServerToolStatus::Success);
 }
@@ -1235,7 +1204,7 @@ fn test_non_standard_content_block_structure() {
     value.insert("provider".to_string(), json!("custom"));
     value.insert("data".to_string(), json!("value"));
     let block = NonStandardContentBlock::new(value);
-    assert_eq!(block.block_type, "non_standard");
+    assert_eq!(block.value["provider"], json!("custom"));
 }
 
 #[test]

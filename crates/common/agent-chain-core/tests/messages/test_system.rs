@@ -145,7 +145,16 @@ fn test_chunk_add_two_chunks() {
         .build();
     let chunk2 = SystemMessageChunk::builder().content(" world").build();
     let result = chunk1 + chunk2;
-    assert!(result.content == "Hello world");
+    assert_eq!(result.content.len(), 2);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["Hello", " world"]);
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -245,7 +254,16 @@ fn test_chunk_multiple_additions() {
     let chunk2 = SystemMessageChunk::builder().content("b").build();
     let chunk3 = SystemMessageChunk::builder().content("c").build();
     let result = chunk1 + chunk2 + chunk3;
-    assert!(result.content == "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
 }
 
 #[test]
@@ -402,7 +420,6 @@ fn test_content_blocks_property() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::Text(tb) => {
-            assert_eq!(tb.block_type, "text");
             assert_eq!(tb.text, "Instructions");
         }
         other => panic!("expected Text content block, got {:?}", other),
@@ -489,7 +506,7 @@ fn test_model_dump_exact_keys_and_values() {
         .maybe_name(Some("prompt".to_string()))
         .build();
     let dumped = serde_json::to_value(&msg).unwrap();
-    assert_eq!(dumped["content"], "Be helpful");
+    assert_eq!(dumped["content"][0]["text"], "Be helpful");
     assert_eq!(dumped["type"], "system");
     assert_eq!(dumped["name"], "prompt");
     assert_eq!(dumped["id"], "sys-001");
@@ -501,7 +518,7 @@ fn test_model_dump_exact_keys_and_values() {
 fn test_model_dump_default_values() {
     let msg = SystemMessage::builder().content("Instructions").build();
     let dumped = serde_json::to_value(&msg).unwrap();
-    assert_eq!(dumped["content"], "Instructions");
+    assert_eq!(dumped["content"][0]["text"], "Instructions");
     assert_eq!(dumped["type"], "system");
     assert!(dumped.get("name").is_none() || dumped["name"].is_null());
     assert!(dumped["id"].is_null());
@@ -616,7 +633,16 @@ fn test_chunk_add_list_of_chunks() {
     let result = vec![chunk2, chunk3]
         .into_iter()
         .fold(chunk1, |acc, c| acc + c);
-    assert_eq!(result.content.as_text(), "abc");
+    assert_eq!(result.content.len(), 3);
+    let texts: Vec<&str> = result
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, vec!["a", "b", "c"]);
     assert_eq!(result.id, Some("1".to_string()));
 }
 
@@ -630,7 +656,6 @@ fn test_chunk_content_blocks_property() {
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
         ContentBlock::Text(tb) => {
-            assert_eq!(tb.block_type, "text");
             assert_eq!(tb.text, "Instructions");
         }
         other => panic!("expected Text content block, got {:?}", other),
