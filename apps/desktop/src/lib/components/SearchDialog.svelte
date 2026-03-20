@@ -92,7 +92,7 @@
 	<Command.Input
 		placeholder="Search chats and messages..."
 		bind:value={query}
-		class="!border-0 !shadow-none !ring-0 !outline-none"
+		class="border-0! shadow-none! ring-0! outline-none!"
 	/>
 	<Command.List>
 		{#if query.trim().length < 2}
