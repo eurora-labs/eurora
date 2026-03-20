@@ -18,6 +18,7 @@
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
+	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
 	import PowerIcon from '@lucide/svelte/icons/power';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -32,6 +33,7 @@
 	const sidebarState = useSidebar();
 	let timelineItems: TimelineAppEvent[] = $state([]);
 
+	let logoHovered = $state(false);
 	let quitDialogOpen = $state(false);
 	let searchOpen = $state(false);
 	let deleteThreadId: string | null = $state(null);
@@ -137,9 +139,21 @@
 <Sidebar.Root collapsible="icon" class="border-none">
 	<Sidebar.Header>
 		<div class="flex items-center justify-between">
-			<div class="flex items-center gap-2">
-				<EuroraLogo class="size-7" onclick={() => sidebarState.setOpen(true)} />
-			</div>
+			{#if sidebarState.open}
+				<EuroraLogo class="size-7" />
+			{:else}
+				<Button
+					variant="ghost"
+					size="icon"
+					class="size-7"
+					onmouseenter={() => (logoHovered = true)}
+					onmouseleave={() => (logoHovered = false)}
+					onclick={() => sidebarState.toggle()}
+				>
+					<PanelLeftIcon class={logoHovered ? 'size-4' : 'hidden'} />
+					<EuroraLogo class={logoHovered ? 'hidden' : 'size-7'} />
+				</Button>
+			{/if}
 
 			{#if sidebarState.open}
 				<Sidebar.Trigger />
@@ -247,7 +261,7 @@
 					<Button
 						{...props}
 						variant="ghost"
-						class="flex items-center gap-2 min-w-0 h-auto px-1 py-1 w-full justify-start"
+						class="flex items-center gap-2 min-w-0 h-auto px-1 py-1 w-full justify-start cursor-pointer"
 					>
 						<div
 							class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium"
@@ -262,17 +276,18 @@
 				{/snippet}
 			</DropdownMenu.Trigger>
 			<DropdownMenu.Content side="top" align="start" class="w-56">
-				<DropdownMenu.Item onclick={() => goto('/settings')}>
+				<DropdownMenu.Item class="cursor-pointer" onclick={() => goto('/settings')}>
 					<SettingsIcon />
 					<span>Settings</span>
 				</DropdownMenu.Item>
 				<DropdownMenu.Sub>
-					<DropdownMenu.SubTrigger>
+					<DropdownMenu.SubTrigger class="cursor-pointer">
 						<PowerIcon />
 						<span>Power</span>
 					</DropdownMenu.SubTrigger>
 					<DropdownMenu.SubContent class="w-40">
 						<DropdownMenu.Item
+							class="cursor-pointer"
 							onclick={() => {
 								user.logout().then(() => {
 									goto('/onboarding');
@@ -282,7 +297,10 @@
 							<LogoutIcon />
 							<span>Log Out</span>
 						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={() => (quitDialogOpen = true)}>
+						<DropdownMenu.Item
+							class="cursor-pointer"
+							onclick={() => (quitDialogOpen = true)}
+						>
 							<PowerIcon />
 							<span>Quit</span>
 						</DropdownMenu.Item>
