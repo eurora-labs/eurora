@@ -40,7 +40,7 @@ use crate::chat_models::{
 use crate::error::{Error, Result};
 use crate::language_models::ToolLike;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
-use crate::messages::{AIMessage, AnyMessage, ContentPart, ImageSource, MessageContent, ToolCall};
+use crate::messages::{AIMessage, AnyMessage, ContentBlock, ContentBlocks, ImageSource, ToolCall};
 use crate::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult, LLMResult};
 use crate::runnables::base::Runnable;
 use crate::tools::{BaseTool, ToolDefinition};
@@ -304,9 +304,10 @@ impl ChatOllama {
                     if is_v1 {
                         let content_values = ai.content.as_json_values();
                         let converted = convert_from_v1_to_ollama(&content_values);
-                        let new_content = MessageContent::Parts(
-                            converted.into_iter().map(ContentPart::Other).collect(),
-                        );
+                        let new_content: ContentBlocks = converted
+                            .into_iter()
+                            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+                            .collect();
                         let mut new_ai = ai.clone();
                         new_ai.content = new_content;
                         return std::borrow::Cow::Owned(AnyMessage::AIMessage(new_ai));
@@ -363,11 +364,6 @@ impl ChatOllama {
                     "images": [],
                 }),
                 AnyMessage::RemoveMessage(_) => continue,
-                _ => {
-                    return Err(Error::Other(
-                        "Received unsupported message type for Ollama.".to_string(),
-                    ));
-                }
             };
             ollama_messages.push(formatted);
         }
@@ -1244,62 +1240,78 @@ fn get_image_from_data_content_block(block: &serde_json::Value) -> Result<String
     )))
 }
 
-/// Extract content text and base64 images from a MessageContent.
-fn extract_content_and_images(content: &MessageContent) -> (String, Vec<String>) {
-    match content {
-        MessageContent::Text(s) => (s.clone(), vec![]),
-        MessageContent::Parts(parts) => {
-            let mut text_parts = Vec::new();
-            let mut images = Vec::new();
+/// Extract content text and base64 images from ContentBlocks.
+fn extract_content_and_images(content: &ContentBlocks) -> (String, Vec<String>) {
+    let mut text_parts: Vec<String> = Vec::new();
+    let mut images = Vec::new();
 
-            for part in parts {
-                match part {
-                    ContentPart::Text { text } => {
-                        text_parts.push(text.as_str());
+    for block in content.iter() {
+        match block {
+            ContentBlock::Text(t) => {
+                text_parts.push(t.text.clone());
+            }
+            ContentBlock::Image(img) => {
+                let source = if let Some(ref url) = img.url {
+                    Some(ImageSource::Url { url: url.clone() })
+                } else if let (Some(data), Some(mime)) = (&img.base64, &img.mime_type) {
+                    Some(ImageSource::Base64 {
+                        media_type: mime.clone(),
+                        data: data.clone(),
+                    })
+                } else {
+                    img.file_id.as_ref().map(|file_id| ImageSource::FileId {
+                        file_id: file_id.clone(),
+                    })
+                };
+                if let Some(ref src) = source
+                    && let Some(image_data) = extract_image_data(src)
+                {
+                    images.push(image_data);
+                }
+            }
+            ContentBlock::NonStandard(ns) => {
+                let value = serde_json::to_value(ns).unwrap_or_default();
+                let part_type = value
+                    .get("type")
+                    .and_then(|t: &serde_json::Value| t.as_str());
+                match part_type {
+                    Some("text") => {
+                        if let Some(text) = value
+                            .get("text")
+                            .and_then(|t: &serde_json::Value| t.as_str())
+                        {
+                            text_parts.push(text.to_string());
+                        }
                     }
-                    ContentPart::Image { source, .. } => {
-                        if let Some(image_data) = extract_image_data(source) {
+                    Some("image_url") => {
+                        if let Some(image_data) = extract_image_url_data(&value) {
                             images.push(image_data);
                         }
                     }
-                    ContentPart::Other(value) => {
-                        let part_type = value.get("type").and_then(|t| t.as_str());
-                        match part_type {
-                            Some("text") => {
-                                if let Some(text) = value.get("text").and_then(|t| t.as_str()) {
-                                    text_parts.push(text);
-                                }
-                            }
-                            Some("image_url") => {
-                                if let Some(image_data) = extract_image_url_data(value) {
-                                    images.push(image_data);
-                                }
-                            }
-                            Some("image") => {
-                                if let Ok(image_data) = get_image_from_data_content_block(value) {
-                                    images.push(image_data);
-                                }
-                            }
-                            Some("tool_use") => {}
-                            _ => {}
+                    Some("image") => {
+                        if let Ok(image_data) = get_image_from_data_content_block(&value) {
+                            images.push(image_data);
                         }
                     }
+                    Some("tool_use") => {}
+                    _ => {}
                 }
             }
-
-            let combined_content = if text_parts.is_empty() {
-                String::new()
-            } else {
-                let mut result = String::new();
-                for part in &text_parts {
-                    result.push('\n');
-                    result.push_str(part);
-                }
-                result
-            };
-            (combined_content, images)
+            _ => {}
         }
     }
+
+    let combined_content = if text_parts.is_empty() {
+        String::new()
+    } else {
+        let mut result = String::new();
+        for part in &text_parts {
+            result.push('\n');
+            result.push_str(part);
+        }
+        result
+    };
+    (combined_content, images)
 }
 
 /// Extract base64 image data from an ImageSource.
@@ -1392,6 +1404,7 @@ impl BoundChatOllama {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::messages::{ImageContentBlock, TextContentBlock};
 
     #[test]
     fn test_new() {
@@ -1533,7 +1546,7 @@ mod tests {
 
     #[test]
     fn test_extract_content_and_images_text() {
-        let content = MessageContent::Text("hello".to_string());
+        let content = ContentBlocks::from("hello");
         let (text, images) = extract_content_and_images(&content);
         assert_eq!(text, "hello");
         assert!(images.is_empty());
@@ -1541,17 +1554,12 @@ mod tests {
 
     #[test]
     fn test_extract_content_and_images_multipart() {
-        let content = MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "What's in this image?".to_string(),
-            },
-            ContentPart::Image {
-                source: ImageSource::Base64 {
-                    media_type: "image/jpeg".to_string(),
-                    data: "abc123".to_string(),
-                },
-                detail: None,
-            },
+        let content = ContentBlocks::from(vec![
+            ContentBlock::Text(TextContentBlock::new("What's in this image?")),
+            ContentBlock::Image(ImageContentBlock::from_base64(
+                "abc123".to_string(),
+                "image/jpeg".to_string(),
+            )),
         ]);
         let (text, images) = extract_content_and_images(&content);
         assert_eq!(text, "\nWhat's in this image?");
@@ -1571,17 +1579,12 @@ mod tests {
         let model = ChatOllama::new("llama3.2-vision");
         let messages = vec![AnyMessage::HumanMessage(
             crate::messages::HumanMessage::builder()
-                .content(MessageContent::Parts(vec![
-                    ContentPart::Text {
-                        text: "Describe this".to_string(),
-                    },
-                    ContentPart::Image {
-                        source: ImageSource::Base64 {
-                            media_type: "image/png".to_string(),
-                            data: "base64data".to_string(),
-                        },
-                        detail: None,
-                    },
+                .content(ContentBlocks::from(vec![
+                    ContentBlock::Text(TextContentBlock::new("Describe this")),
+                    ContentBlock::Image(ImageContentBlock::from_base64(
+                        "base64data".to_string(),
+                        "image/png".to_string(),
+                    )),
                 ]))
                 .build(),
         )];

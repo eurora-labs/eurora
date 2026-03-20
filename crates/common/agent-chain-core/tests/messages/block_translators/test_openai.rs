@@ -3,7 +3,7 @@ use agent_chain_core::messages::block_translators::openai::{
 };
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, Annotation, AudioContentBlock, BlockIndex, ContentBlock,
-    FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
+    ContentBlocks, FileContentBlock, HumanMessage, ImageContentBlock, NonStandardContentBlock,
     ReasoningContentBlock, ServerToolCall, ServerToolResult, ServerToolStatus, TextContentBlock,
     ToolCallBlock, tool_call, tool_call_chunk,
 };
@@ -505,13 +505,12 @@ fn test_convert_to_v1_from_openai_input() {
         }),
     ];
 
+    let blocks: Vec<ContentBlock> = content
+        .iter()
+        .map(|v| serde_json::from_value(v.clone()).unwrap())
+        .collect();
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(
-            content
-                .iter()
-                .map(|v| serde_json::from_value(v.clone()).unwrap())
-                .collect(),
-        ))
+        .content(ContentBlocks::from(blocks))
         .build();
 
     let expected: Vec<ContentBlock> = vec![

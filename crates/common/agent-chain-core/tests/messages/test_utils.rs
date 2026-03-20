@@ -1,12 +1,11 @@
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, AnyMessage, AnyMessageChunk, ChatMessage, ChatMessageChunk,
-    CountTokensConfig, ExcludeToolCalls, FunctionMessage, FunctionMessageChunk, HumanMessage,
-    HumanMessageChunk, SystemMessage, SystemMessageChunk, TextFormat, ToolMessage,
-    ToolMessageChunk, TrimMessagesConfig, TrimStrategy, convert_to_messages,
-    convert_to_openai_messages, count_tokens_approximately, filter_messages, get_buffer_string,
-    merge_message_runs, message_chunk_to_message, messages_from_dict, messages_to_dict, tool_call,
-    trim_messages,
+    CountTokensConfig, ExcludeToolCalls, HumanMessage, HumanMessageChunk, SystemMessage,
+    SystemMessageChunk, TextFormat, ToolMessage, ToolMessageChunk, TrimMessagesConfig,
+    TrimStrategy, convert_to_messages, convert_to_openai_messages, count_tokens_approximately,
+    filter_messages, get_buffer_string, merge_message_runs, message_chunk_to_message,
+    messages_from_dict, messages_to_dict, tool_call, trim_messages,
 };
 
 #[test]
@@ -1026,18 +1025,6 @@ fn test_get_buffer_string_with_tool_messages() {
 }
 
 #[test]
-fn test_get_buffer_string_with_function_messages() {
-    let messages = vec![AnyMessage::FunctionMessage(
-        FunctionMessage::builder()
-            .content("function output")
-            .name("my_func")
-            .build(),
-    )];
-    let result = get_buffer_string(&messages, "Human", "AI");
-    assert_eq!(result, "Function: function output");
-}
-
-#[test]
 fn test_get_buffer_string_with_empty_content() {
     let messages = vec![AnyMessage::HumanMessage(
         HumanMessage::builder().content("").build(),
@@ -1098,24 +1085,6 @@ fn test_message_chunk_to_message_tool() {
 }
 
 #[test]
-fn test_message_chunk_to_message_function() {
-    let chunk = AnyMessageChunk::FunctionMessageChunk(
-        FunctionMessageChunk::builder()
-            .content("func result")
-            .name("my_function")
-            .build(),
-    );
-    let msg = message_chunk_to_message(&chunk);
-    assert!(matches!(msg, AnyMessage::FunctionMessage(_)));
-    assert_eq!(msg.content(), "func result");
-    if let AnyMessage::FunctionMessage(func_msg) = &msg {
-        assert_eq!(func_msg.name, "my_function");
-    } else {
-        panic!("Expected AnyMessage::Function");
-    }
-}
-
-#[test]
 fn test_message_chunk_to_message_chat() {
     let chunk = AnyMessageChunk::ChatMessageChunk(
         ChatMessageChunk::builder()
@@ -1145,12 +1114,6 @@ fn test_messages_from_dict_round_trip() {
                 .tool_call_id("tc1")
                 .build(),
         ),
-        AnyMessage::FunctionMessage(
-            FunctionMessage::builder()
-                .content("func msg")
-                .name("my_func")
-                .build(),
-        ),
         AnyMessage::ChatMessage(
             ChatMessage::builder()
                 .content("chat msg")
@@ -1176,16 +1139,10 @@ fn test_messages_from_dict_round_trip() {
         panic!("Expected AnyMessage::Tool at index 3");
     }
 
-    if let AnyMessage::FunctionMessage(func_msg) = &roundtripped[4] {
-        assert_eq!(func_msg.name, "my_func");
-    } else {
-        panic!("Expected AnyMessage::Function at index 4");
-    }
-
-    if let AnyMessage::ChatMessage(chat_msg) = &roundtripped[5] {
+    if let AnyMessage::ChatMessage(chat_msg) = &roundtripped[4] {
         assert_eq!(chat_msg.role, "custom");
     } else {
-        panic!("Expected AnyMessage::Chat at index 5");
+        panic!("Expected AnyMessage::Chat at index 4");
     }
 }
 

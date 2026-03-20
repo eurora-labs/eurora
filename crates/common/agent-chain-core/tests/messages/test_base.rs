@@ -1,7 +1,7 @@
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    AIMessage, AnyMessage, ContentBlock, ContentPart, HumanMessage, HumanMessageChunk,
-    MergeableContent, MessageContent, SystemMessage, SystemMessageChunk, TextContentBlock,
+    AIMessage, AnyMessage, ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk,
+    ImageContentBlock, MergeableContent, SystemMessage, SystemMessageChunk, TextContentBlock,
     extract_reasoning_from_additional_kwargs, get_msg_title_repr, merge_content,
     merge_content_complex, message_to_dict, messages_to_dict,
 };
@@ -15,37 +15,22 @@ fn test_text_property_string_content() {
 
 #[test]
 fn test_text_property_list_content_with_text_blocks() {
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "First part".to_string(),
-            },
-            ContentPart::Text {
-                text: "second part".to_string(),
-            },
-        ]))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("First part")),
+        ContentBlock::Text(TextContentBlock::new("second part")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.as_text(), "First part second part");
 }
 
 #[test]
 fn test_text_property_list_content_with_mixed_blocks() {
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Hello".to_string(),
-            },
-            ContentPart::Image {
-                source: agent_chain_core::messages::ImageSource::Url {
-                    url: "http://example.com/img.png".to_string(),
-                },
-                detail: None,
-            },
-            ContentPart::Text {
-                text: "world".to_string(),
-            },
-        ]))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("Hello")),
+        ContentBlock::Image(ImageContentBlock::from_url("http://example.com/img.png")),
+        ContentBlock::Text(TextContentBlock::new("world")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.as_text(), "Hello world");
 }
 
@@ -58,21 +43,17 @@ fn test_text_property_empty_content() {
 #[test]
 fn test_text_property_empty_list_content() {
     let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![]))
+        .content(ContentBlocks::new())
         .build();
     assert_eq!(msg.content.as_text(), "");
 }
 
 #[test]
 fn test_text_property_no_text_blocks() {
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Image {
-            source: agent_chain_core::messages::ImageSource::Url {
-                url: "http://example.com".to_string(),
-            },
-            detail: None,
-        }]))
-        .build();
+    let blocks = ContentBlocks::from(vec![ContentBlock::Image(ImageContentBlock::from_url(
+        "http://example.com",
+    ))]);
+    let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.as_text(), "");
 }
 
@@ -411,16 +392,11 @@ fn test_content_blocks_empty_string() {
 
 #[test]
 fn test_content_blocks_list_with_string() {
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Hello".to_string(),
-            },
-            ContentPart::Text {
-                text: "world".to_string(),
-            },
-        ]))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("Hello")),
+        ContentBlock::Text(TextContentBlock::new("world")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 2);
     match &blocks[0] {
@@ -439,11 +415,8 @@ fn test_content_blocks_list_with_string() {
 
 #[test]
 fn test_content_blocks_standard_text_block() {
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            json!({"type": "text", "text": "Hello"}),
-        )]))
-        .build();
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 1);
     match &blocks[0] {
@@ -456,10 +429,19 @@ fn test_content_blocks_standard_text_block() {
 
 #[test]
 fn test_content_blocks_non_standard_block() {
+    let block: ContentBlock = serde_json::from_value(
+        json!({"type": "custom_type", "data": "value"}),
+    )
+    .unwrap_or_else(|_| {
+        ContentBlock::NonStandard(agent_chain_core::messages::NonStandardContentBlock::new({
+            let mut value = std::collections::HashMap::new();
+            value.insert("type".to_string(), json!("custom_type"));
+            value.insert("data".to_string(), json!("value"));
+            value
+        }))
+    });
     let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            json!({"type": "custom_type", "data": "value"}),
-        )]))
+        .content(ContentBlocks::from(vec![block]))
         .build();
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 1);
@@ -477,15 +459,12 @@ fn test_content_blocks_non_standard_block() {
 
 #[test]
 fn test_content_blocks_mixed_content() {
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Plain string".to_string(),
-            },
-            ContentPart::Other(json!({"type": "text", "text": "Text block"})),
-            ContentPart::Other(json!({"type": "image", "url": "http://example.com/img.png"})),
-        ]))
-        .build();
+    let blocks = ContentBlocks::from(vec![
+        ContentBlock::Text(TextContentBlock::new("Plain string")),
+        ContentBlock::Text(TextContentBlock::new("Text block")),
+        ContentBlock::Image(ImageContentBlock::from_url("http://example.com/img.png")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 3);
     match &blocks[0] {
@@ -504,10 +483,15 @@ fn test_content_blocks_mixed_content() {
 
 #[test]
 fn test_dict_with_type_not_in_known_block_types() {
+    let block =
+        ContentBlock::NonStandard(agent_chain_core::messages::NonStandardContentBlock::new({
+            let mut value = std::collections::HashMap::new();
+            value.insert("type".to_string(), json!("completely_unknown_type_xyz"));
+            value.insert("payload".to_string(), json!({"key": "value"}));
+            value
+        }));
     let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            json!({"type": "completely_unknown_type_xyz", "payload": {"key": "value"}}),
-        )]))
+        .content(ContentBlocks::from(vec![block]))
         .build();
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 1);
@@ -525,10 +509,15 @@ fn test_dict_with_type_not_in_known_block_types() {
 
 #[test]
 fn test_dict_with_no_type_key() {
+    let block =
+        ContentBlock::NonStandard(agent_chain_core::messages::NonStandardContentBlock::new({
+            let mut value = std::collections::HashMap::new();
+            value.insert("data".to_string(), json!("some data"));
+            value.insert("format".to_string(), json!("raw"));
+            value
+        }));
     let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            json!({"data": "some data", "format": "raw"}),
-        )]))
+        .content(ContentBlocks::from(vec![block]))
         .build();
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 1);
@@ -619,22 +608,17 @@ fn test_add_chunks_with_response_metadata() {
 #[test]
 fn test_add_chunk_list_content() {
     let chunk1 = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            json!({"type": "text", "text": "Hello"}),
+        .content(ContentBlocks::from(vec![ContentBlock::Text(
+            TextContentBlock::new("Hello"),
         )]))
         .build();
     let chunk2 = HumanMessageChunk::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            json!({"type": "text", "text": " world"}),
+        .content(ContentBlocks::from(vec![ContentBlock::Text(
+            TextContentBlock::new(" world"),
         )]))
         .build();
     let result = chunk1 + chunk2;
-    match &result.content {
-        MessageContent::Parts(parts) => {
-            assert_eq!(parts.len(), 2);
-        }
-        other => panic!("Expected Parts content, got {:?}", other),
-    }
+    assert_eq!(result.content.len(), 2);
 }
 
 #[test]
@@ -799,11 +783,8 @@ fn test_pretty_print_does_not_raise_empty_content() {
 
 #[test]
 fn test_pretty_print_does_not_raise_list_content() {
-    let msg = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Other(
-            json!({"type": "text", "text": "Hello"}),
-        )]))
-        .build();
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let msg = HumanMessage::builder().content(blocks).build();
     msg.pretty_print(); // Should not panic
 }
 
@@ -893,22 +874,12 @@ fn test_known_title_exact_output() {
 
 #[test]
 fn test_init_with_content_blocks() {
-    let blocks = vec![
+    let blocks = ContentBlocks::from(vec![
         ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Image(agent_chain_core::messages::ImageContentBlock::from_url(
-            "http://example.com/img.png",
-        )),
-    ];
-    let msg = HumanMessage::builder()
-        .content("")
-        .content_blocks(blocks)
-        .build();
-    match &msg.content {
-        MessageContent::Parts(parts) => {
-            assert_eq!(parts.len(), 2);
-        }
-        other => panic!("Expected Parts content, got {:?}", other),
-    }
+        ContentBlock::Image(ImageContentBlock::from_url("http://example.com/img.png")),
+    ]);
+    let msg = HumanMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 2);
 }
 
 #[test]
@@ -919,16 +890,9 @@ fn test_init_with_string_content() {
 
 #[test]
 fn test_init_with_list_content() {
-    let content = MessageContent::Parts(vec![ContentPart::Other(
-        json!({"type": "text", "text": "Hello"}),
-    )]);
-    let msg = HumanMessage::builder().content(content).build();
-    match &msg.content {
-        MessageContent::Parts(parts) => {
-            assert_eq!(parts.len(), 1);
-        }
-        other => panic!("Expected Parts content, got {:?}", other),
-    }
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let msg = HumanMessage::builder().content(blocks).build();
+    assert_eq!(msg.content.len(), 1);
 }
 
 #[test]

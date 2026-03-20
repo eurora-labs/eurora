@@ -8,7 +8,7 @@ use std::fmt;
 
 use super::ai::{AIMessage, AIMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
-use super::content::{ContentBlocks, MessageContent, ReasoningContentBlock};
+use super::content::{ContentBlocks, ReasoningContentBlock};
 use super::human::{HumanMessage, HumanMessageChunk};
 use super::modifier::RemoveMessage;
 use super::system::{SystemMessage, SystemMessageChunk};

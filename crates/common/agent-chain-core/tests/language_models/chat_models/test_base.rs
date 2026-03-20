@@ -841,8 +841,20 @@ fn test_generate_from_stream_accumulates_chunks() {
     ];
     let result = generate_from_stream(chunks.into_iter()).unwrap();
     assert_eq!(result.generations.len(), 1);
-    assert!(result.generations[0].message.content().contains("hello"));
-    assert!(result.generations[0].message.content().contains("world"));
+    assert!(
+        result.generations[0]
+            .message
+            .content()
+            .as_text()
+            .contains("hello")
+    );
+    assert!(
+        result.generations[0]
+            .message
+            .content()
+            .as_text()
+            .contains("world")
+    );
 }
 
 #[test]

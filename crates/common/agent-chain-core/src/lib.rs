@@ -70,8 +70,8 @@ pub use language_models::{
 };
 
 pub use messages::{
-    AIMessage, AnyMessage, ContentPart, HasId, HumanMessage, ImageDetail, ImageSource,
-    MergeableContent, MessageContent, SystemMessage, ToolCall, ToolMessage, convert_to_message,
+    AIMessage, AnyMessage, ContentBlocks, HasId, HumanMessage, ImageDetail, ImageSource,
+    MergeableContent, SystemMessage, ToolCall, ToolMessage, convert_to_message,
     convert_to_messages,
 };
 

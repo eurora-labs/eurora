@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::LazyLock;
 
 use crate::utils::base::ensure_id;
 
@@ -27,207 +26,6 @@ pub enum ImageSource {
     FileId {
         file_id: String,
     },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum ContentPart {
-    Text {
-        text: String,
-    },
-    Image {
-        source: ImageSource,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        detail: Option<ImageDetail>,
-    },
-    #[serde(untagged)]
-    Other(serde_json::Value),
-}
-
-impl From<&str> for ContentPart {
-    fn from(text: &str) -> Self {
-        ContentPart::Text {
-            text: text.to_string(),
-        }
-    }
-}
-
-impl From<String> for ContentPart {
-    fn from(text: String) -> Self {
-        ContentPart::Text { text }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-pub enum MessageContent {
-    Text(String),
-    Parts(Vec<ContentPart>),
-}
-
-static EMPTY_MESSAGE_CONTENT: LazyLock<MessageContent> =
-    LazyLock::new(|| MessageContent::Text(String::new()));
-
-impl MessageContent {
-    pub fn empty() -> &'static MessageContent {
-        &EMPTY_MESSAGE_CONTENT
-    }
-    pub fn as_text(&self) -> String {
-        match self {
-            MessageContent::Text(s) => s.clone(),
-            MessageContent::Parts(parts) => parts
-                .iter()
-                .filter_map(|p| match p {
-                    ContentPart::Text { text } => Some(text.as_str()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join(" "),
-        }
-    }
-
-    pub fn as_text_ref(&self) -> &str {
-        match self {
-            MessageContent::Text(s) => s,
-            MessageContent::Parts(_) => "",
-        }
-    }
-
-    pub fn has_images(&self) -> bool {
-        match self {
-            MessageContent::Text(_) => false,
-            MessageContent::Parts(parts) => {
-                parts.iter().any(|p| matches!(p, ContentPart::Image { .. }))
-            }
-        }
-    }
-
-    pub fn parts(&self) -> Vec<ContentPart> {
-        match self {
-            MessageContent::Text(s) => vec![ContentPart::Text { text: s.clone() }],
-            MessageContent::Parts(parts) => parts.clone(),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        match self {
-            MessageContent::Text(s) => s.len(),
-            MessageContent::Parts(parts) => parts.len(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        match self {
-            MessageContent::Text(s) => s.is_empty(),
-            MessageContent::Parts(parts) => parts.is_empty(),
-        }
-    }
-
-    pub fn as_json_values(&self) -> Vec<serde_json::Value> {
-        match self {
-            MessageContent::Text(s) => {
-                if s.is_empty() {
-                    vec![]
-                } else {
-                    vec![serde_json::json!({"type": "text", "text": s})]
-                }
-            }
-            MessageContent::Parts(parts) => parts
-                .iter()
-                .filter_map(|p| serde_json::to_value(p).ok())
-                .collect(),
-        }
-    }
-}
-
-impl Default for MessageContent {
-    fn default() -> Self {
-        MessageContent::Text(String::new())
-    }
-}
-
-impl From<String> for MessageContent {
-    fn from(s: String) -> Self {
-        MessageContent::Text(s)
-    }
-}
-
-impl From<&str> for MessageContent {
-    fn from(s: &str) -> Self {
-        MessageContent::Text(s.to_string())
-    }
-}
-
-impl From<&String> for MessageContent {
-    fn from(s: &String) -> Self {
-        MessageContent::Text(s.clone())
-    }
-}
-
-impl From<Vec<ContentPart>> for MessageContent {
-    fn from(parts: Vec<ContentPart>) -> Self {
-        MessageContent::Parts(parts)
-    }
-}
-
-impl From<Vec<serde_json::Value>> for MessageContent {
-    fn from(values: Vec<serde_json::Value>) -> Self {
-        let parts: Vec<ContentPart> = values.into_iter().map(ContentPart::Other).collect();
-        MessageContent::Parts(parts)
-    }
-}
-impl std::fmt::Display for MessageContent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MessageContent::Text(s) => write!(f, "{}", s),
-            MessageContent::Parts(parts) => {
-                let texts: Vec<&str> = parts
-                    .iter()
-                    .filter_map(|p| match p {
-                        ContentPart::Text { text } => Some(text.as_str()),
-                        _ => None,
-                    })
-                    .collect();
-                write!(f, "{}", texts.join(" "))
-            }
-        }
-    }
-}
-impl PartialEq<str> for MessageContent {
-    fn eq(&self, other: &str) -> bool {
-        match self {
-            MessageContent::Text(s) => s == other,
-            MessageContent::Parts(_) => false,
-        }
-    }
-}
-
-impl PartialEq<&str> for MessageContent {
-    fn eq(&self, other: &&str) -> bool {
-        match self {
-            MessageContent::Text(s) => s == *other,
-            MessageContent::Parts(_) => false,
-        }
-    }
-}
-
-impl MessageContent {
-    pub fn contains(&self, pattern: &str) -> bool {
-        match self {
-            MessageContent::Text(s) => s.contains(pattern),
-            MessageContent::Parts(parts) => parts.iter().any(|p| match p {
-                ContentPart::Text { text } => text.contains(pattern),
-                _ => false,
-            }),
-        }
-    }
-
-    pub fn split(&self, pattern: &str) -> Vec<String> {
-        match self {
-            MessageContent::Text(s) => s.split(pattern).map(String::from).collect(),
-            MessageContent::Parts(_) => vec![self.as_text()],
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -943,6 +741,30 @@ impl ContentBlocks {
     pub fn into_inner(self) -> Vec<ContentBlock> {
         self.0
     }
+
+    pub fn as_text(&self) -> String {
+        self.to_string()
+    }
+
+    pub fn as_text_ref(&self) -> &str {
+        if self.0.len() == 1
+            && let ContentBlock::Text(ref t) = self.0[0]
+        {
+            return &t.text;
+        }
+        ""
+    }
+
+    pub fn has_images(&self) -> bool {
+        self.0.iter().any(|b| matches!(b, ContentBlock::Image(_)))
+    }
+
+    pub fn as_json_values(&self) -> Vec<serde_json::Value> {
+        self.0
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect()
+    }
 }
 
 // --- Deref / DerefMut: makes ContentBlocks behave like Vec<ContentBlock> ---
@@ -1088,6 +910,48 @@ impl AsRef<[ContentBlock]> for ContentBlocks {
 impl std::borrow::Borrow<[ContentBlock]> for ContentBlocks {
     fn borrow(&self) -> &[ContentBlock] {
         &self.0
+    }
+}
+
+// --- PartialEq<str>: compare text content with string literals ---
+
+impl PartialEq<str> for ContentBlocks {
+    fn eq(&self, other: &str) -> bool {
+        // Single text block: compare directly without allocating
+        if self.0.len() == 1
+            && let ContentBlock::Text(ref t) = self.0[0]
+        {
+            return t.text == other;
+        }
+        // Empty content vs empty string
+        if self.0.is_empty() {
+            return other.is_empty();
+        }
+        // Fall back to joining text blocks
+        let mut remaining = other;
+        let mut first = true;
+        for block in &self.0 {
+            if let ContentBlock::Text(t) = block {
+                if !first {
+                    if !remaining.starts_with(' ') {
+                        return false;
+                    }
+                    remaining = &remaining[1..];
+                }
+                if !remaining.starts_with(&t.text[..]) {
+                    return false;
+                }
+                remaining = &remaining[t.text.len()..];
+                first = false;
+            }
+        }
+        remaining.is_empty()
+    }
+}
+
+impl PartialEq<&str> for ContentBlocks {
+    fn eq(&self, other: &&str) -> bool {
+        self == *other
     }
 }
 
@@ -1487,22 +1351,6 @@ mod tests {
         let block = ContentBlock::Text(TextContentBlock::new("Hello"));
         let json = serde_json::to_string(&block).unwrap();
         assert!(json.contains("\"type\":\"text\""));
-    }
-
-    #[test]
-    fn test_legacy_message_content() {
-        let content = MessageContent::Text("Hello".to_string());
-        assert_eq!(content.as_text(), "Hello");
-
-        let content = MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "Hello".to_string(),
-            },
-            ContentPart::Text {
-                text: "World".to_string(),
-            },
-        ]);
-        assert_eq!(content.as_text(), "Hello World");
     }
 
     #[test]

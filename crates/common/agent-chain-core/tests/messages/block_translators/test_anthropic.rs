@@ -1,6 +1,6 @@
 use agent_chain_core::messages::{
-    AIMessage, AIMessageChunk, Annotation, BlockIndex, ChunkPosition, ContentBlock,
-    FileContentBlock, HumanMessage, ImageContentBlock, MessageContent, NonStandardContentBlock,
+    AIMessage, AIMessageChunk, Annotation, BlockIndex, ChunkPosition, ContentBlock, ContentBlocks,
+    FileContentBlock, HumanMessage, ImageContentBlock, NonStandardContentBlock,
     PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolResult,
     ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock, tool_call_chunk,
 };
@@ -642,13 +642,12 @@ fn test_convert_to_v1_from_anthropic_input() {
         }),
     ];
 
+    let blocks: Vec<ContentBlock> = content
+        .iter()
+        .map(|v| serde_json::from_value(v.clone()).unwrap())
+        .collect();
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(
-            content
-                .iter()
-                .map(|v| serde_json::from_value(v.clone()).unwrap())
-                .collect(),
-        ))
+        .content(ContentBlocks::from(blocks))
         .build();
 
     let expected: Vec<ContentBlock> = vec![

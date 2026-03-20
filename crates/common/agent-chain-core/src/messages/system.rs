@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
-use super::content::{ContentBlock, ContentBlocks, MessageContent, TextContentBlock};
+use super::content::{ContentBlock, ContentBlocks, TextContentBlock};
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
@@ -463,8 +463,11 @@ impl std::ops::Add for SystemMessageChunk {
 
 impl std::iter::Sum for SystemMessageChunk {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(|a, b| a + b)
-            .unwrap_or_else(|| SystemMessageChunk::builder().content(ContentBlocks::new()).build())
+        iter.reduce(|a, b| a + b).unwrap_or_else(|| {
+            SystemMessageChunk::builder()
+                .content(ContentBlocks::new())
+                .build()
+        })
     }
 }
 
