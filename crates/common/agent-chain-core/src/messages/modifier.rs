@@ -2,11 +2,12 @@ use bon::bon;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
-
-use crate::MessageContent;
+use std::sync::LazyLock;
 
 use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
-use super::content::ContentBlock;
+use super::content::{ContentBlock, ContentBlocks};
+
+static EMPTY_CONTENT_BLOCKS: LazyLock<ContentBlocks> = LazyLock::new(ContentBlocks::new);
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct RemoveMessage {
@@ -24,8 +25,8 @@ impl BaseMessage for RemoveMessage {
         Some(self.id.clone())
     }
 
-    fn content(&self) -> &MessageContent {
-        MessageContent::empty()
+    fn content(&self) -> &ContentBlocks {
+        &EMPTY_CONTENT_BLOCKS
     }
 
     fn name(&self) -> Option<String> {
@@ -54,11 +55,11 @@ impl Serialize for RemoveMessage {
     where
         S: Serializer,
     {
-        let mut field_count = 4; // type, content, id, additional_kwargs, response_metadata
+        let mut field_count = 4;
         if self.name.is_some() {
             field_count += 1;
         }
-        field_count += 1; // response_metadata
+        field_count += 1;
 
         let mut map = serializer.serialize_map(Some(field_count))?;
         map.serialize_entry("type", "remove")?;
@@ -102,7 +103,7 @@ impl RemoveMessage {
         } else {
             String::new()
         };
-        format!("{}{}\n\n{}", title, name_line, self.content())
+        format!("{}{}\n\n", title, name_line)
     }
 
     pub fn pretty_print(&self) {

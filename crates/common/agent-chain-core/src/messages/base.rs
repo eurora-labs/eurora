@@ -8,8 +8,7 @@ use std::fmt;
 
 use super::ai::{AIMessage, AIMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
-use super::content::{MessageContent, ReasoningContentBlock};
-use super::function::{FunctionMessage, FunctionMessageChunk};
+use super::content::{ContentBlocks, ReasoningContentBlock};
 use super::human::{HumanMessage, HumanMessageChunk};
 use super::modifier::RemoveMessage;
 use super::system::{SystemMessage, SystemMessageChunk};
@@ -19,7 +18,7 @@ use crate::utils::merge::merge_lists;
 #[enum_dispatch]
 pub trait BaseMessage {
     fn id(&self) -> Option<String>;
-    fn content(&self) -> &MessageContent;
+    fn content(&self) -> &ContentBlocks;
     fn name(&self) -> Option<String>;
     fn set_id(&mut self, id: String);
     fn message_type(&self) -> &'static str;
@@ -35,7 +34,6 @@ pub enum AnyMessage {
     AIMessage,
     ToolMessage,
     ChatMessage,
-    FunctionMessage,
     RemoveMessage,
 }
 
@@ -50,7 +48,6 @@ impl Serialize for AnyMessage {
             AnyMessage::AIMessage(m) => m.serialize(serializer),
             AnyMessage::ToolMessage(m) => m.serialize(serializer),
             AnyMessage::ChatMessage(m) => m.serialize(serializer),
-            AnyMessage::FunctionMessage(m) => m.serialize(serializer),
             AnyMessage::RemoveMessage(m) => m.serialize(serializer),
         }
     }
@@ -115,11 +112,6 @@ impl<'de> Deserialize<'de> for AnyMessage {
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
                         Ok(AnyMessage::ChatMessage(msg))
                     }
-                    "function" => {
-                        let msg: FunctionMessage =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessage::FunctionMessage(msg))
-                    }
                     "remove" => {
                         let msg: RemoveMessage =
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
@@ -141,7 +133,7 @@ impl<'de> Deserialize<'de> for AnyMessage {
 
 impl AnyMessage {
     pub fn text(&self) -> String {
-        self.content().as_text()
+        self.content().to_string()
     }
 
     pub fn tool_calls(&self) -> &[ToolCall] {
@@ -165,7 +157,7 @@ impl AnyMessage {
             String::new()
         };
 
-        format!("{}{}\n\n{}", title, name_line, self.content())
+        format!("{}{}\n\n{}", title, name_line, self.text())
     }
 }
 
@@ -179,15 +171,27 @@ impl HasId for AnyMessage {
     }
 }
 
+#[enum_dispatch]
+pub trait BaseMessageChunk {
+    fn id(&self) -> Option<String>;
+    fn content(&self) -> &ContentBlocks;
+    fn name(&self) -> Option<String>;
+    fn set_id(&mut self, id: String);
+    fn message_type(&self) -> &'static str;
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value>;
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value>;
+    fn to_message(&self) -> AnyMessage;
+}
+
+#[enum_dispatch(BaseMessageChunk)]
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum AnyMessageChunk {
-    AIMessageChunk(AIMessageChunk),
-    HumanMessageChunk(HumanMessageChunk),
-    SystemMessageChunk(SystemMessageChunk),
-    ToolMessageChunk(ToolMessageChunk),
-    ChatMessageChunk(ChatMessageChunk),
-    FunctionMessageChunk(FunctionMessageChunk),
+    AIMessageChunk,
+    HumanMessageChunk,
+    SystemMessageChunk,
+    ToolMessageChunk,
+    ChatMessageChunk,
 }
 
 impl Serialize for AnyMessageChunk {
@@ -201,7 +205,6 @@ impl Serialize for AnyMessageChunk {
             AnyMessageChunk::SystemMessageChunk(m) => m.serialize(serializer),
             AnyMessageChunk::ToolMessageChunk(m) => m.serialize(serializer),
             AnyMessageChunk::ChatMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::FunctionMessageChunk(m) => m.serialize(serializer),
         }
     }
 }
@@ -265,11 +268,6 @@ impl<'de> Deserialize<'de> for AnyMessageChunk {
                             serde_json::from_value(json_value).map_err(de::Error::custom)?;
                         Ok(AnyMessageChunk::ChatMessageChunk(msg))
                     }
-                    "FunctionMessageChunk" => {
-                        let msg: FunctionMessageChunk =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessageChunk::FunctionMessageChunk(msg))
-                    }
                     _ => Err(de::Error::unknown_variant(
                         &message_type,
                         &[
@@ -278,7 +276,6 @@ impl<'de> Deserialize<'de> for AnyMessageChunk {
                             "SystemMessageChunk",
                             "ToolMessageChunk",
                             "ChatMessageChunk",
-                            "FunctionMessageChunk",
                         ],
                     )),
                 }
@@ -290,84 +287,8 @@ impl<'de> Deserialize<'de> for AnyMessageChunk {
 }
 
 impl AnyMessageChunk {
-    pub fn content(&self) -> &MessageContent {
-        match self {
-            AnyMessageChunk::AIMessageChunk(m) => &m.content,
-            AnyMessageChunk::HumanMessageChunk(m) => &m.content,
-            AnyMessageChunk::SystemMessageChunk(m) => &m.content,
-            AnyMessageChunk::ToolMessageChunk(m) => &m.content,
-            AnyMessageChunk::ChatMessageChunk(m) => &m.content,
-            AnyMessageChunk::FunctionMessageChunk(m) => &m.content,
-        }
-    }
-
-    pub fn id(&self) -> Option<String> {
-        match self {
-            AnyMessageChunk::AIMessageChunk(m) => m.id.clone(),
-            AnyMessageChunk::HumanMessageChunk(m) => m.id.clone(),
-            AnyMessageChunk::SystemMessageChunk(m) => m.id.clone(),
-            AnyMessageChunk::ToolMessageChunk(m) => m.id.clone(),
-            AnyMessageChunk::ChatMessageChunk(m) => m.id.clone(),
-            AnyMessageChunk::FunctionMessageChunk(m) => m.id.clone(),
-        }
-    }
-
-    pub fn message_type(&self) -> &'static str {
-        match self {
-            AnyMessageChunk::AIMessageChunk(_) => "AIMessageChunk",
-            AnyMessageChunk::HumanMessageChunk(_) => "HumanMessageChunk",
-            AnyMessageChunk::SystemMessageChunk(_) => "SystemMessageChunk",
-            AnyMessageChunk::ToolMessageChunk(_) => "ToolMessageChunk",
-            AnyMessageChunk::ChatMessageChunk(_) => "ChatMessageChunk",
-            AnyMessageChunk::FunctionMessageChunk(_) => "FunctionMessageChunk",
-        }
-    }
-
-    pub fn to_message(&self) -> AnyMessage {
-        match self {
-            AnyMessageChunk::AIMessageChunk(m) => AnyMessage::AIMessage(m.to_message()),
-            AnyMessageChunk::HumanMessageChunk(m) => AnyMessage::HumanMessage(m.to_message()),
-            AnyMessageChunk::SystemMessageChunk(m) => AnyMessage::SystemMessage(m.to_message()),
-            AnyMessageChunk::ToolMessageChunk(m) => AnyMessage::ToolMessage(m.to_message()),
-            AnyMessageChunk::ChatMessageChunk(m) => AnyMessage::ChatMessage(m.to_message()),
-            AnyMessageChunk::FunctionMessageChunk(m) => AnyMessage::FunctionMessage(m.to_message()),
-        }
-    }
-}
-
-impl From<AIMessageChunk> for AnyMessageChunk {
-    fn from(chunk: AIMessageChunk) -> Self {
-        AnyMessageChunk::AIMessageChunk(chunk)
-    }
-}
-
-impl From<HumanMessageChunk> for AnyMessageChunk {
-    fn from(chunk: HumanMessageChunk) -> Self {
-        AnyMessageChunk::HumanMessageChunk(chunk)
-    }
-}
-
-impl From<SystemMessageChunk> for AnyMessageChunk {
-    fn from(chunk: SystemMessageChunk) -> Self {
-        AnyMessageChunk::SystemMessageChunk(chunk)
-    }
-}
-
-impl From<ToolMessageChunk> for AnyMessageChunk {
-    fn from(chunk: ToolMessageChunk) -> Self {
-        AnyMessageChunk::ToolMessageChunk(chunk)
-    }
-}
-
-impl From<ChatMessageChunk> for AnyMessageChunk {
-    fn from(chunk: ChatMessageChunk) -> Self {
-        AnyMessageChunk::ChatMessageChunk(chunk)
-    }
-}
-
-impl From<FunctionMessageChunk> for AnyMessageChunk {
-    fn from(chunk: FunctionMessageChunk) -> Self {
-        AnyMessageChunk::FunctionMessageChunk(chunk)
+    pub fn text(&self) -> String {
+        self.content().to_string()
     }
 }
 
@@ -391,10 +312,6 @@ impl std::ops::Add for AnyMessageChunk {
             (AnyMessageChunk::ChatMessageChunk(a), AnyMessageChunk::ChatMessageChunk(b)) => {
                 AnyMessageChunk::ChatMessageChunk(a + b)
             }
-            (
-                AnyMessageChunk::FunctionMessageChunk(a),
-                AnyMessageChunk::FunctionMessageChunk(b),
-            ) => AnyMessageChunk::FunctionMessageChunk(a + b),
             (left, right) => {
                 panic!(
                     "unsupported operand type(s) for +: \"{}\" and \"{}\"",
@@ -415,6 +332,70 @@ impl From<&str> for AnyMessage {
 impl From<String> for AnyMessage {
     fn from(text: String) -> Self {
         AnyMessage::HumanMessage(HumanMessage::builder().content(text).build())
+    }
+}
+
+impl From<&AnyMessage> for AnyMessageChunk {
+    fn from(message: &AnyMessage) -> Self {
+        match message {
+            AnyMessage::HumanMessage(m) => AnyMessageChunk::HumanMessageChunk(
+                HumanMessageChunk::builder()
+                    .content(m.content.clone())
+                    .maybe_id(m.id.clone())
+                    .maybe_name(m.name.clone())
+                    .additional_kwargs(m.additional_kwargs.clone())
+                    .response_metadata(m.response_metadata.clone())
+                    .build(),
+            ),
+            AnyMessage::AIMessage(m) => {
+                let mut chunk = AIMessageChunk::builder()
+                    .content(m.content.clone())
+                    .maybe_id(m.id.clone())
+                    .maybe_name(m.name.clone())
+                    .tool_calls(m.tool_calls.clone())
+                    .invalid_tool_calls(m.invalid_tool_calls.clone())
+                    .maybe_usage_metadata(m.usage_metadata.clone())
+                    .additional_kwargs(m.additional_kwargs.clone())
+                    .response_metadata(m.response_metadata.clone())
+                    .build();
+                chunk.init_tool_calls();
+                AnyMessageChunk::AIMessageChunk(chunk)
+            }
+            AnyMessage::SystemMessage(m) => AnyMessageChunk::SystemMessageChunk(
+                SystemMessageChunk::builder()
+                    .content(m.content.clone())
+                    .maybe_id(m.id.clone())
+                    .maybe_name(m.name.clone())
+                    .additional_kwargs(m.additional_kwargs.clone())
+                    .response_metadata(m.response_metadata.clone())
+                    .build(),
+            ),
+            AnyMessage::ToolMessage(m) => AnyMessageChunk::ToolMessageChunk(
+                ToolMessageChunk::builder()
+                    .content(m.content.clone())
+                    .tool_call_id(m.tool_call_id.clone())
+                    .maybe_id(m.id.clone())
+                    .maybe_name(m.name.clone())
+                    .status(m.status.clone())
+                    .maybe_artifact(m.artifact.clone())
+                    .additional_kwargs(m.additional_kwargs.clone())
+                    .response_metadata(m.response_metadata.clone())
+                    .build(),
+            ),
+            AnyMessage::ChatMessage(m) => AnyMessageChunk::ChatMessageChunk(
+                ChatMessageChunk::builder()
+                    .content(m.content.clone())
+                    .role(m.role.clone())
+                    .maybe_id(m.id.clone())
+                    .maybe_name(m.name.clone())
+                    .additional_kwargs(m.additional_kwargs.clone())
+                    .response_metadata(m.response_metadata.clone())
+                    .build(),
+            ),
+            AnyMessage::RemoveMessage(_) => {
+                panic!("Cannot convert RemoveMessage to chunk")
+            }
+        }
     }
 }
 

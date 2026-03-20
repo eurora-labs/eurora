@@ -1,10 +1,9 @@
 use crate::agent_chain::*;
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, Annotation, AnyMessage, AnyMessageChunk, AudioContentBlock,
-    BlockIndex, ChatMessage, ChatMessageChunk, ChunkPosition, ContentBlock, ContentPart,
-    FileContentBlock, FunctionMessage, FunctionMessageChunk, HumanMessage, HumanMessageChunk,
-    ImageContentBlock, ImageDetail, ImageSource, InputTokenDetails, InvalidToolCall,
-    InvalidToolCallBlock, MessageContent, NonStandardContentBlock, OutputTokenDetails,
+    BlockIndex, ChatMessage, ChatMessageChunk, ChunkPosition, ContentBlock, ContentBlocks,
+    FileContentBlock, HumanMessage, HumanMessageChunk, ImageContentBlock, InputTokenDetails,
+    InvalidToolCall, InvalidToolCallBlock, NonStandardContentBlock, OutputTokenDetails,
     PlainTextContentBlock, ReasoningContentBlock, RemoveMessage, ServerToolCall,
     ServerToolCallChunk, ServerToolResult, ServerToolStatus, SystemMessage, SystemMessageChunk,
     TextContentBlock, ToolCall, ToolCallBlock, ToolCallChunk, ToolCallChunkBlock, ToolMessage,
@@ -32,6 +31,19 @@ fn value_to_json_string(value: &serde_json::Value) -> String {
 
 fn json_string_to_value(s: &Option<String>) -> Option<serde_json::Value> {
     s.as_ref().and_then(|json| serde_json::from_str(json).ok())
+}
+
+fn content_blocks_to_proto(content: ContentBlocks) -> Vec<ProtoContentBlock> {
+    Vec::from(content).into_iter().map(Into::into).collect()
+}
+
+fn proto_to_content_blocks(proto: Vec<ProtoContentBlock>) -> ContentBlocks {
+    ContentBlocks::from(
+        proto
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<ContentBlock>>(),
+    )
 }
 
 impl From<InputTokenDetails> for ProtoInputTokenDetails {
@@ -228,145 +240,6 @@ impl From<ProtoChunkPosition> for Option<ChunkPosition> {
     }
 }
 
-impl From<ImageDetail> for ProtoImageDetail {
-    fn from(detail: ImageDetail) -> Self {
-        match detail {
-            ImageDetail::Low => ProtoImageDetail::ImageDetailLow,
-            ImageDetail::High => ProtoImageDetail::ImageDetailHigh,
-            ImageDetail::Auto => ProtoImageDetail::ImageDetailAuto,
-        }
-    }
-}
-
-impl From<ProtoImageDetail> for ImageDetail {
-    fn from(proto: ProtoImageDetail) -> Self {
-        match proto {
-            ProtoImageDetail::ImageDetailUnspecified | ProtoImageDetail::ImageDetailAuto => {
-                ImageDetail::Auto
-            }
-            ProtoImageDetail::ImageDetailLow => ImageDetail::Low,
-            ProtoImageDetail::ImageDetailHigh => ImageDetail::High,
-        }
-    }
-}
-
-impl From<ImageSource> for ProtoImageSource {
-    fn from(source: ImageSource) -> Self {
-        match source {
-            ImageSource::Url { url } => ProtoImageSource {
-                source: Some(proto_image_source::Source::Url(url)),
-            },
-            ImageSource::Base64 { media_type, data } => ProtoImageSource {
-                source: Some(proto_image_source::Source::Base64(ProtoBase64Image {
-                    media_type,
-                    data,
-                })),
-            },
-            ImageSource::FileId { file_id } => ProtoImageSource {
-                source: Some(proto_image_source::Source::FileId(file_id)),
-            },
-        }
-    }
-}
-
-impl From<ProtoImageSource> for ImageSource {
-    fn from(proto: ProtoImageSource) -> Self {
-        match proto.source {
-            Some(proto_image_source::Source::Url(url)) => {
-                if let Some(file_id) = url.strip_prefix("file://") {
-                    ImageSource::FileId {
-                        file_id: file_id.to_string(),
-                    }
-                } else {
-                    ImageSource::Url { url }
-                }
-            }
-            Some(proto_image_source::Source::Base64(b64)) => ImageSource::Base64 {
-                media_type: b64.media_type,
-                data: b64.data,
-            },
-            Some(proto_image_source::Source::FileId(file_id)) => ImageSource::FileId { file_id },
-            None => ImageSource::Url { url: String::new() },
-        }
-    }
-}
-
-impl From<ContentPart> for ProtoContentPart {
-    fn from(part: ContentPart) -> Self {
-        match part {
-            ContentPart::Text { text } => ProtoContentPart {
-                part: Some(proto_content_part::Part::Text(ProtoTextPart { text })),
-            },
-            ContentPart::Image { source, detail } => ProtoContentPart {
-                part: Some(proto_content_part::Part::Image(ProtoImagePart {
-                    source: Some(source.into()),
-                    detail: detail.map(|d| i32::from(ProtoImageDetail::from(d))),
-                })),
-            },
-            ContentPart::Other(value) => {
-                let json = serde_json::to_string(&value).unwrap_or_default();
-                ProtoContentPart {
-                    part: Some(proto_content_part::Part::Other(json)),
-                }
-            }
-        }
-    }
-}
-
-impl From<ProtoContentPart> for ContentPart {
-    fn from(proto: ProtoContentPart) -> Self {
-        match proto.part {
-            Some(proto_content_part::Part::Text(text_part)) => ContentPart::Text {
-                text: text_part.text,
-            },
-            Some(proto_content_part::Part::Image(image_part)) => ContentPart::Image {
-                source: image_part
-                    .source
-                    .map(Into::into)
-                    .unwrap_or(ImageSource::Url { url: String::new() }),
-                detail: image_part.detail.map(|d| {
-                    ProtoImageDetail::try_from(d)
-                        .unwrap_or(ProtoImageDetail::ImageDetailAuto)
-                        .into()
-                }),
-            },
-            Some(proto_content_part::Part::Other(json)) => {
-                ContentPart::Other(serde_json::from_str(&json).unwrap_or_default())
-            }
-            None => ContentPart::Text {
-                text: String::new(),
-            },
-        }
-    }
-}
-
-impl From<MessageContent> for ProtoMessageContent {
-    fn from(content: MessageContent) -> Self {
-        match content {
-            MessageContent::Text(text) => ProtoMessageContent {
-                content: Some(proto_message_content::Content::Text(text)),
-            },
-            MessageContent::Parts(parts) => ProtoMessageContent {
-                content: Some(proto_message_content::Content::Parts(ProtoContentParts {
-                    parts: parts.into_iter().map(Into::into).collect(),
-                })),
-            },
-        }
-    }
-}
-
-impl From<ProtoMessageContent> for MessageContent {
-    fn from(proto: ProtoMessageContent) -> Self {
-        match proto.content {
-            Some(proto_message_content::Content::Text(text)) => MessageContent::Text(text),
-            Some(proto_message_content::Content::Parts(parts)) => {
-                MessageContent::Parts(parts.parts.into_iter().map(Into::into).collect())
-            }
-            None => MessageContent::Text(String::new()),
-        }
-    }
-}
-
 impl From<BlockIndex> for ProtoBlockIndex {
     fn from(index: BlockIndex) -> Self {
         match index {
@@ -458,10 +331,12 @@ impl From<ProtoAnnotation> for Annotation {
     }
 }
 
+// --- Message conversions ---
+
 impl From<HumanMessage> for ProtoHumanMessage {
     fn from(msg: HumanMessage) -> Self {
         ProtoHumanMessage {
-            content: Some(msg.content.into()),
+            content: content_blocks_to_proto(msg.content),
             id: msg.id,
             name: msg.name,
             additional_kwargs: hashmap_to_json_string(&msg.additional_kwargs),
@@ -474,12 +349,7 @@ impl From<ProtoHumanMessage> for HumanMessage {
     fn from(proto: ProtoHumanMessage) -> Self {
         HumanMessage::builder()
             .maybe_id(proto.id)
-            .content(
-                proto
-                    .content
-                    .map(Into::into)
-                    .unwrap_or(MessageContent::Text(String::new())),
-            )
+            .content(proto_to_content_blocks(proto.content))
             .maybe_name(proto.name)
             .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
             .build()
@@ -489,7 +359,7 @@ impl From<ProtoHumanMessage> for HumanMessage {
 impl From<HumanMessageChunk> for ProtoHumanMessageChunk {
     fn from(chunk: HumanMessageChunk) -> Self {
         ProtoHumanMessageChunk {
-            content: Some(chunk.content.into()),
+            content: content_blocks_to_proto(chunk.content),
             id: chunk.id,
             name: chunk.name,
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
@@ -500,14 +370,9 @@ impl From<HumanMessageChunk> for ProtoHumanMessageChunk {
 
 impl From<ProtoHumanMessageChunk> for HumanMessageChunk {
     fn from(proto: ProtoHumanMessageChunk) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
         HumanMessageChunk::builder()
             .maybe_id(proto.id)
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .maybe_name(proto.name)
             .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
             .response_metadata(json_string_to_hashmap(&proto.response_metadata))
@@ -518,7 +383,7 @@ impl From<ProtoHumanMessageChunk> for HumanMessageChunk {
 impl From<SystemMessage> for ProtoSystemMessage {
     fn from(msg: SystemMessage) -> Self {
         ProtoSystemMessage {
-            content: Some(msg.content.into()),
+            content: content_blocks_to_proto(msg.content),
             id: msg.id,
             name: msg.name,
             additional_kwargs: hashmap_to_json_string(&msg.additional_kwargs),
@@ -529,13 +394,8 @@ impl From<SystemMessage> for ProtoSystemMessage {
 
 impl From<ProtoSystemMessage> for SystemMessage {
     fn from(proto: ProtoSystemMessage) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
         SystemMessage::builder()
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .maybe_id(proto.id)
             .maybe_name(proto.name)
             .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
@@ -546,7 +406,7 @@ impl From<ProtoSystemMessage> for SystemMessage {
 impl From<SystemMessageChunk> for ProtoSystemMessageChunk {
     fn from(chunk: SystemMessageChunk) -> Self {
         ProtoSystemMessageChunk {
-            content: Some(chunk.content.into()),
+            content: content_blocks_to_proto(chunk.content),
             id: chunk.id,
             name: chunk.name,
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
@@ -557,13 +417,8 @@ impl From<SystemMessageChunk> for ProtoSystemMessageChunk {
 
 impl From<ProtoSystemMessageChunk> for SystemMessageChunk {
     fn from(proto: ProtoSystemMessageChunk) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
         SystemMessageChunk::builder()
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .maybe_id(proto.id)
             .maybe_name(proto.name)
             .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
@@ -575,7 +430,7 @@ impl From<ProtoSystemMessageChunk> for SystemMessageChunk {
 impl From<AIMessage> for ProtoAiMessage {
     fn from(msg: AIMessage) -> Self {
         ProtoAiMessage {
-            content: Some(msg.content.into()),
+            content: content_blocks_to_proto(msg.content),
             id: msg.id,
             name: msg.name,
             tool_calls: msg.tool_calls.into_iter().map(Into::into).collect(),
@@ -589,26 +444,19 @@ impl From<AIMessage> for ProtoAiMessage {
 
 impl From<ProtoAiMessage> for AIMessage {
     fn from(proto: ProtoAiMessage) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-        let tool_calls: Vec<ToolCall> = proto.tool_calls.into_iter().map(Into::into).collect();
-        let invalid_tool_calls: Vec<InvalidToolCall> = proto
-            .invalid_tool_calls
-            .into_iter()
-            .map(Into::into)
-            .collect();
-
-        let usage_metadata = proto.usage_metadata.map(Into::into);
-
         AIMessage::builder()
             .maybe_id(proto.id)
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .maybe_name(proto.name)
-            .maybe_usage_metadata(usage_metadata)
-            .tool_calls(tool_calls)
-            .invalid_tool_calls(invalid_tool_calls)
+            .maybe_usage_metadata(proto.usage_metadata.map(Into::into))
+            .tool_calls(proto.tool_calls.into_iter().map(Into::into).collect())
+            .invalid_tool_calls(
+                proto
+                    .invalid_tool_calls
+                    .into_iter()
+                    .map(Into::into)
+                    .collect(),
+            )
             .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
             .response_metadata(json_string_to_hashmap(&proto.response_metadata))
             .build()
@@ -622,7 +470,7 @@ impl From<AIMessageChunk> for ProtoAiMessageChunk {
             .map(|p| i32::from(ProtoChunkPosition::from(p.clone())));
 
         ProtoAiMessageChunk {
-            content: Some(chunk.content.into()),
+            content: content_blocks_to_proto(chunk.content),
             id: chunk.id,
             name: chunk.name,
             tool_calls: chunk.tool_calls.into_iter().map(Into::into).collect(),
@@ -642,13 +490,6 @@ impl From<AIMessageChunk> for ProtoAiMessageChunk {
 
 impl From<ProtoAiMessageChunk> for AIMessageChunk {
     fn from(proto: ProtoAiMessageChunk) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-        let tool_call_chunks: Vec<ToolCallChunk> =
-            proto.tool_call_chunks.into_iter().map(Into::into).collect();
-
         let chunk_position: Option<ChunkPosition> = match proto.chunk_position {
             Some(pos) => ProtoChunkPosition::try_from(pos)
                 .unwrap_or(ProtoChunkPosition::ChunkPositionUnspecified)
@@ -659,8 +500,8 @@ impl From<ProtoAiMessageChunk> for AIMessageChunk {
         AIMessageChunk::builder()
             .maybe_id(proto.id)
             .maybe_name(proto.name)
-            .tool_call_chunks(tool_call_chunks)
-            .content(content)
+            .tool_call_chunks(proto.tool_call_chunks.into_iter().map(Into::into).collect())
+            .content(proto_to_content_blocks(proto.content))
             .maybe_usage_metadata(proto.usage_metadata.map(Into::into))
             .tool_calls(proto.tool_calls.into_iter().map(Into::into).collect())
             .invalid_tool_calls(
@@ -680,7 +521,7 @@ impl From<ProtoAiMessageChunk> for AIMessageChunk {
 impl From<ToolMessage> for ProtoToolMessage {
     fn from(msg: ToolMessage) -> Self {
         ProtoToolMessage {
-            content: Some(msg.content.into()),
+            content: content_blocks_to_proto(msg.content),
             tool_call_id: msg.tool_call_id,
             id: msg.id,
             name: msg.name,
@@ -694,19 +535,13 @@ impl From<ToolMessage> for ProtoToolMessage {
 
 impl From<ProtoToolMessage> for ToolMessage {
     fn from(proto: ProtoToolMessage) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-        let status: ToolStatus = i32_to_tool_status(proto.status);
-
         ToolMessage::builder()
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .tool_call_id(proto.tool_call_id)
             .maybe_id(proto.id)
             .maybe_name(proto.name)
             .maybe_artifact(json_string_to_value(&proto.artifact))
-            .status(status)
+            .status(i32_to_tool_status(proto.status))
             .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
             .response_metadata(json_string_to_hashmap(&proto.response_metadata))
             .build()
@@ -716,7 +551,7 @@ impl From<ProtoToolMessage> for ToolMessage {
 impl From<ToolMessageChunk> for ProtoToolMessageChunk {
     fn from(chunk: ToolMessageChunk) -> Self {
         ProtoToolMessageChunk {
-            content: Some(chunk.content.into()),
+            content: content_blocks_to_proto(chunk.content),
             tool_call_id: chunk.tool_call_id,
             id: chunk.id,
             name: chunk.name,
@@ -730,13 +565,8 @@ impl From<ToolMessageChunk> for ProtoToolMessageChunk {
 
 impl From<ProtoToolMessageChunk> for ToolMessageChunk {
     fn from(proto: ProtoToolMessageChunk) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
         ToolMessageChunk::builder()
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .tool_call_id(proto.tool_call_id)
             .maybe_id(proto.id)
             .maybe_name(proto.name)
@@ -751,7 +581,7 @@ impl From<ProtoToolMessageChunk> for ToolMessageChunk {
 impl From<ChatMessage> for ProtoChatMessage {
     fn from(msg: ChatMessage) -> Self {
         ProtoChatMessage {
-            content: Some(msg.content.into()),
+            content: content_blocks_to_proto(msg.content),
             role: msg.role,
             id: msg.id,
             name: msg.name,
@@ -763,13 +593,8 @@ impl From<ChatMessage> for ProtoChatMessage {
 
 impl From<ProtoChatMessage> for ChatMessage {
     fn from(proto: ProtoChatMessage) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
         ChatMessage::builder()
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .role(proto.role)
             .maybe_id(proto.id)
             .maybe_name(proto.name)
@@ -782,7 +607,7 @@ impl From<ProtoChatMessage> for ChatMessage {
 impl From<ChatMessageChunk> for ProtoChatMessageChunk {
     fn from(chunk: ChatMessageChunk) -> Self {
         ProtoChatMessageChunk {
-            content: Some(chunk.content.into()),
+            content: content_blocks_to_proto(chunk.content),
             role: chunk.role,
             id: chunk.id,
             name: chunk.name,
@@ -794,74 +619,11 @@ impl From<ChatMessageChunk> for ProtoChatMessageChunk {
 
 impl From<ProtoChatMessageChunk> for ChatMessageChunk {
     fn from(proto: ProtoChatMessageChunk) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
         ChatMessageChunk::builder()
-            .content(content)
+            .content(proto_to_content_blocks(proto.content))
             .role(proto.role)
             .maybe_id(proto.id)
             .maybe_name(proto.name)
-            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
-            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
-            .build()
-    }
-}
-
-impl From<FunctionMessage> for ProtoFunctionMessage {
-    fn from(msg: FunctionMessage) -> Self {
-        ProtoFunctionMessage {
-            content: Some(msg.content.into()),
-            name: msg.name,
-            id: msg.id,
-            additional_kwargs: hashmap_to_json_string(&msg.additional_kwargs),
-            response_metadata: hashmap_to_json_string(&msg.response_metadata),
-        }
-    }
-}
-
-impl From<ProtoFunctionMessage> for FunctionMessage {
-    fn from(proto: ProtoFunctionMessage) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
-        FunctionMessage::builder()
-            .content(content)
-            .name(proto.name)
-            .maybe_id(proto.id)
-            .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
-            .response_metadata(json_string_to_hashmap(&proto.response_metadata))
-            .build()
-    }
-}
-
-impl From<FunctionMessageChunk> for ProtoFunctionMessageChunk {
-    fn from(chunk: FunctionMessageChunk) -> Self {
-        ProtoFunctionMessageChunk {
-            content: Some(chunk.content.into()),
-            name: chunk.name,
-            id: chunk.id,
-            additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
-            response_metadata: hashmap_to_json_string(&chunk.response_metadata),
-        }
-    }
-}
-
-impl From<ProtoFunctionMessageChunk> for FunctionMessageChunk {
-    fn from(proto: ProtoFunctionMessageChunk) -> Self {
-        let content: MessageContent = proto
-            .content
-            .map(Into::into)
-            .unwrap_or(MessageContent::Text(String::new()));
-
-        FunctionMessageChunk::builder()
-            .content(content)
-            .name(proto.name)
-            .maybe_id(proto.id)
             .additional_kwargs(json_string_to_hashmap(&proto.additional_kwargs))
             .response_metadata(json_string_to_hashmap(&proto.response_metadata))
             .build()
@@ -885,6 +647,8 @@ impl From<ProtoRemoveMessage> for RemoveMessage {
     }
 }
 
+// --- AnyMessage / AnyMessageChunk conversions ---
+
 impl From<AnyMessage> for ProtoBaseMessage {
     fn from(msg: AnyMessage) -> Self {
         match msg {
@@ -903,9 +667,6 @@ impl From<AnyMessage> for ProtoBaseMessage {
             AnyMessage::ChatMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Chat(m.into())),
             },
-            AnyMessage::FunctionMessage(m) => ProtoBaseMessage {
-                message: Some(proto_base_message::Message::Function(m.into())),
-            },
             AnyMessage::RemoveMessage(m) => ProtoBaseMessage {
                 message: Some(proto_base_message::Message::Remove(m.into())),
             },
@@ -921,7 +682,6 @@ impl From<ProtoBaseMessage> for AnyMessage {
             Some(proto_base_message::Message::Ai(m)) => AnyMessage::AIMessage(m.into()),
             Some(proto_base_message::Message::Tool(m)) => AnyMessage::ToolMessage(m.into()),
             Some(proto_base_message::Message::Chat(m)) => AnyMessage::ChatMessage(m.into()),
-            Some(proto_base_message::Message::Function(m)) => AnyMessage::FunctionMessage(m.into()),
             Some(proto_base_message::Message::Remove(m)) => AnyMessage::RemoveMessage(m.into()),
             None => AnyMessage::HumanMessage(HumanMessage::builder().content("").build()),
         }
@@ -946,9 +706,6 @@ impl From<AnyMessageChunk> for ProtoBaseMessageChunk {
             AnyMessageChunk::ChatMessageChunk(c) => ProtoBaseMessageChunk {
                 chunk: Some(proto_base_message_chunk::Chunk::Chat(c.into())),
             },
-            AnyMessageChunk::FunctionMessageChunk(c) => ProtoBaseMessageChunk {
-                chunk: Some(proto_base_message_chunk::Chunk::Function(c.into())),
-            },
         }
     }
 }
@@ -971,13 +728,12 @@ impl From<ProtoBaseMessageChunk> for AnyMessageChunk {
             Some(proto_base_message_chunk::Chunk::Chat(c)) => {
                 AnyMessageChunk::ChatMessageChunk(c.into())
             }
-            Some(proto_base_message_chunk::Chunk::Function(c)) => {
-                AnyMessageChunk::FunctionMessageChunk(c.into())
-            }
             None => AnyMessageChunk::AIMessageChunk(AIMessageChunk::builder().content("").build()),
         }
     }
 }
+
+// --- ContentBlock conversions ---
 
 impl From<TextContentBlock> for ProtoTextContentBlock {
     fn from(block: TextContentBlock) -> Self {
@@ -1000,7 +756,6 @@ impl From<TextContentBlock> for ProtoTextContentBlock {
 impl From<ProtoTextContentBlock> for TextContentBlock {
     fn from(proto: ProtoTextContentBlock) -> Self {
         TextContentBlock {
-            block_type: "text".to_string(),
             id: proto.id,
             text: proto.text,
             annotations: if proto.annotations.is_empty() {
@@ -1034,7 +789,6 @@ impl From<ReasoningContentBlock> for ProtoReasoningContentBlock {
 impl From<ProtoReasoningContentBlock> for ReasoningContentBlock {
     fn from(proto: ProtoReasoningContentBlock) -> Self {
         ReasoningContentBlock {
-            block_type: "reasoning".to_string(),
             id: proto.id,
             reasoning: proto.reasoning,
             index: proto.index.map(Into::into),
@@ -1066,7 +820,6 @@ impl From<ImageContentBlock> for ProtoImageContentBlock {
 impl From<ProtoImageContentBlock> for ImageContentBlock {
     fn from(proto: ProtoImageContentBlock) -> Self {
         ImageContentBlock {
-            block_type: "image".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -1101,7 +854,6 @@ impl From<VideoContentBlock> for ProtoVideoContentBlock {
 impl From<ProtoVideoContentBlock> for VideoContentBlock {
     fn from(proto: ProtoVideoContentBlock) -> Self {
         VideoContentBlock {
-            block_type: "video".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -1136,7 +888,6 @@ impl From<AudioContentBlock> for ProtoAudioContentBlock {
 impl From<ProtoAudioContentBlock> for AudioContentBlock {
     fn from(proto: ProtoAudioContentBlock) -> Self {
         AudioContentBlock {
-            block_type: "audio".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -1174,7 +925,6 @@ impl From<PlainTextContentBlock> for ProtoPlainTextContentBlock {
 impl From<ProtoPlainTextContentBlock> for PlainTextContentBlock {
     fn from(proto: ProtoPlainTextContentBlock) -> Self {
         PlainTextContentBlock {
-            block_type: "text-plain".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -1212,7 +962,6 @@ impl From<FileContentBlock> for ProtoFileContentBlock {
 impl From<ProtoFileContentBlock> for FileContentBlock {
     fn from(proto: ProtoFileContentBlock) -> Self {
         FileContentBlock {
-            block_type: "file".to_string(),
             id: proto.id,
             file_id: proto.file_id,
             mime_type: proto.mime_type,
@@ -1240,7 +989,6 @@ impl From<NonStandardContentBlock> for ProtoNonStandardContentBlock {
 impl From<ProtoNonStandardContentBlock> for NonStandardContentBlock {
     fn from(proto: ProtoNonStandardContentBlock) -> Self {
         NonStandardContentBlock {
-            block_type: "non_standard".to_string(),
             id: proto.id,
             value: serde_json::from_str(&proto.value).unwrap_or_default(),
             index: proto.index.map(Into::into),
@@ -1266,7 +1014,6 @@ impl From<ToolCallBlock> for ProtoToolCallBlock {
 impl From<ProtoToolCallBlock> for ToolCallBlock {
     fn from(proto: ProtoToolCallBlock) -> Self {
         ToolCallBlock {
-            block_type: "tool_call".to_string(),
             id: proto.id,
             name: proto.name,
             args: serde_json::from_str(&proto.args).unwrap_or_default(),
@@ -1297,7 +1044,6 @@ impl From<ToolCallChunkBlock> for ProtoToolCallChunkBlock {
 impl From<ProtoToolCallChunkBlock> for ToolCallChunkBlock {
     fn from(proto: ProtoToolCallChunkBlock) -> Self {
         ToolCallChunkBlock {
-            block_type: "tool_call_chunk".to_string(),
             id: proto.id,
             name: proto.name,
             args: proto.args,
@@ -1329,7 +1075,6 @@ impl From<InvalidToolCallBlock> for ProtoInvalidToolCallBlock {
 impl From<ProtoInvalidToolCallBlock> for InvalidToolCallBlock {
     fn from(proto: ProtoInvalidToolCallBlock) -> Self {
         InvalidToolCallBlock {
-            block_type: "invalid_tool_call".to_string(),
             id: proto.id,
             name: proto.name,
             args: proto.args,
@@ -1361,7 +1106,6 @@ impl From<ServerToolCall> for ProtoServerToolCall {
 impl From<ProtoServerToolCall> for ServerToolCall {
     fn from(proto: ProtoServerToolCall) -> Self {
         ServerToolCall {
-            block_type: "server_tool_call".to_string(),
             id: proto.id,
             name: proto.name,
             args: serde_json::from_str(&proto.args).unwrap_or_default(),
@@ -1392,7 +1136,6 @@ impl From<ServerToolCallChunk> for ProtoServerToolCallChunk {
 impl From<ProtoServerToolCallChunk> for ServerToolCallChunk {
     fn from(proto: ProtoServerToolCallChunk) -> Self {
         ServerToolCallChunk {
-            block_type: "server_tool_call_chunk".to_string(),
             name: proto.name,
             args: proto.args,
             id: proto.id,
@@ -1443,7 +1186,6 @@ impl From<ServerToolResult> for ProtoServerToolResult {
 impl From<ProtoServerToolResult> for ServerToolResult {
     fn from(proto: ProtoServerToolResult) -> Self {
         ServerToolResult {
-            block_type: "server_tool_result".to_string(),
             id: proto.id,
             tool_call_id: proto.tool_call_id,
             status: ProtoServerToolStatus::try_from(proto.status)

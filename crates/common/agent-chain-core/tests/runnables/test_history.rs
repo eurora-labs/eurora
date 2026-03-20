@@ -430,14 +430,14 @@ async fn test_dict_input_with_history_messages_key() {
     let messages: Vec<AnyMessage> =
         serde_json::from_value(output).expect("output should deserialize to messages");
     assert!(
-        messages[0].content().contains("history=0"),
+        messages[0].content().as_text().contains("history=0"),
         "first call should have no history, got: {}",
-        messages[0].content()
+        messages[0].content().as_text()
     );
     assert!(
-        messages[0].content().contains("What is 2+2?"),
+        messages[0].content().as_text().contains("What is 2+2?"),
         "first call should echo question, got: {}",
-        messages[0].content()
+        messages[0].content().as_text()
     );
 
     let output = with_history
@@ -451,14 +451,17 @@ async fn test_dict_input_with_history_messages_key() {
     let messages: Vec<AnyMessage> =
         serde_json::from_value(output).expect("output should deserialize to messages");
     assert!(
-        messages[0].content().contains("history=2"),
+        messages[0].content().as_text().contains("history=2"),
         "second call should see 2 history messages, got: {}",
-        messages[0].content()
+        messages[0].content().as_text()
     );
     assert!(
-        messages[0].content().contains("What is its inverse?"),
+        messages[0]
+            .content()
+            .as_text()
+            .contains("What is its inverse?"),
         "second call should echo question, got: {}",
-        messages[0].content()
+        messages[0].content().as_text()
     );
 }
 
@@ -525,9 +528,12 @@ async fn test_dict_input_with_output_messages_key() {
     );
     assert_eq!(hist.messages()[0].content(), "hello");
     assert!(
-        hist.messages()[1].content().contains("you said: hello"),
+        hist.messages()[1]
+            .content()
+            .as_text()
+            .contains("you said: hello"),
         "AI response should contain 'you said: hello', got: {}",
-        hist.messages()[1].content()
+        hist.messages()[1].content().as_text()
     );
 }
 
