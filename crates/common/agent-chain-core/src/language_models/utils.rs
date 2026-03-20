@@ -355,7 +355,6 @@ fn normalize_single_message(mut message: AnyMessage) -> AnyMessage {
             AnyMessage::AIMessage(m) => m.content = new_content,
             AnyMessage::ToolMessage(m) => m.content = new_content,
             AnyMessage::ChatMessage(m) => m.content = new_content,
-            AnyMessage::FunctionMessage(m) => m.content = new_content,
             AnyMessage::RemoveMessage(_) => {}
         }
     }

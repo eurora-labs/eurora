@@ -36,8 +36,6 @@ pub use content::{
     is_data_content_block,
 };
 
-pub use function::{FunctionMessage, FunctionMessageChunk};
-
 pub use human::{HumanMessage, HumanMessageChunk};
 
 pub use modifier::RemoveMessage;
@@ -62,7 +60,6 @@ pub mod prelude {
     pub use super::ai::{AIMessage, AIMessageChunk};
     pub use super::base::{AnyMessage, AnyMessageChunk, BaseMessage};
     pub use super::chat::{ChatMessage, ChatMessageChunk};
-    pub use super::function::{FunctionMessage, FunctionMessageChunk};
     pub use super::human::{HumanMessage, HumanMessageChunk};
     pub use super::modifier::RemoveMessage;
     pub use super::system::{SystemMessage, SystemMessageChunk};
