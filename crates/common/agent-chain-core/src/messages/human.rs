@@ -1,23 +1,22 @@
 use bon::bon;
+use serde::de::{self, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
+use std::fmt;
 
-use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env, merge_content};
-use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
+use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
+use super::content::{ContentBlock, ContentBlocks, MessageContent, TextContentBlock};
 use super::system::SystemMessageChunk;
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HumanMessage {
-    pub content: MessageContent,
+    pub content: ContentBlocks,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -27,7 +26,8 @@ impl BaseMessage for HumanMessage {
     }
 
     fn content(&self) -> &MessageContent {
-        &self.content
+        // TODO: Remove once BaseMessage trait is updated to use Vec<ContentBlock>
+        panic!("HumanMessage::content() is deprecated - use .content field directly or .text()")
     }
 
     fn name(&self) -> Option<String> {
@@ -76,29 +76,72 @@ impl Serialize for HumanMessage {
     }
 }
 
+impl<'de> Deserialize<'de> for HumanMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct HumanMessageVisitor;
+
+        impl<'de> Visitor<'de> for HumanMessageVisitor {
+            type Value = HumanMessage;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a HumanMessage object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<HumanMessage, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "content" => content = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(HumanMessage {
+                    content: content.unwrap_or_default(),
+                    id,
+                    name,
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(HumanMessageVisitor)
+    }
+}
+
 #[bon]
 impl HumanMessage {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
-        content_blocks: Option<Vec<ContentBlock>>,
+        content: impl Into<ContentBlocks>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
         #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
-        let resolved_content = if let Some(blocks) = content_blocks {
-            let parts: Vec<ContentPart> = blocks
-                .into_iter()
-                .filter_map(|block| serde_json::to_value(&block).ok().map(ContentPart::Other))
-                .collect();
-            MessageContent::Parts(parts)
-        } else {
-            content.into()
-        };
-
         Self {
-            content: resolved_content,
+            content: content.into(),
             id,
             name,
             additional_kwargs,
@@ -107,23 +150,20 @@ impl HumanMessage {
     }
 
     pub fn has_images(&self) -> bool {
-        self.content.has_images()
-    }
-
-    pub fn content_list(&self) -> Vec<serde_json::Value> {
-        match &self.content {
-            MessageContent::Text(s) => {
-                vec![serde_json::json!({"type": "text", "text": s})]
-            }
-            MessageContent::Parts(parts) => parts
-                .iter()
-                .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
-                .collect(),
-        }
+        self.content
+            .iter()
+            .any(|b| matches!(b, ContentBlock::Image(_)))
     }
 
     pub fn text(&self) -> String {
-        self.content.as_text()
+        self.content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     pub fn pretty_repr(&self, html: bool) -> String {
@@ -133,54 +173,36 @@ impl HumanMessage {
         } else {
             String::new()
         };
-        format!("{}{}\n\n{}", title, name_line, self.content.as_text_ref())
+        format!("{}{}\n\n{}", title, name_line, self.text())
     }
 
     pub fn pretty_print(&self) {
         println!("{}", self.pretty_repr(is_interactive_env()));
     }
 
+    /// Returns content blocks after applying provider-specific input translations.
+    /// This normalizes provider-specific formats (OpenAI image_url, Anthropic source blocks, etc.)
+    /// into the standard ContentBlock representation.
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
-            ToolCallChunkBlock, VideoContentBlock,
+            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
+            VideoContentBlock,
         };
         use crate::messages::block_translators::anthropic::convert_input_to_standard_blocks as anthropic_convert;
         use crate::messages::block_translators::openai::convert_to_v1_from_chat_completions_input;
 
-        let mut blocks: Vec<serde_json::Value> = Vec::new();
+        // Convert stored blocks to JSON for the translators
+        let raw_values: Vec<serde_json::Value> = self
+            .content
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect();
 
-        let items: Vec<serde_json::Value> = match &self.content {
-            MessageContent::Text(s) => {
-                if s.is_empty() {
-                    vec![]
-                } else {
-                    vec![serde_json::Value::String(s.clone())]
-                }
-            }
-            MessageContent::Parts(parts) => parts
-                .iter()
-                .filter_map(|p| serde_json::to_value(p).ok())
-                .collect(),
-        };
-
-        for item in items {
-            if let Some(s) = item.as_str() {
-                blocks.push(serde_json::json!({"type": "text", "text": s}));
-            } else if item.is_object() {
-                let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
-
-                if !KNOWN_BLOCK_TYPES.contains(&item_type) || item.get("source_type").is_some() {
-                    blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
-                } else {
-                    blocks.push(item);
-                }
-            }
-        }
-
-        blocks = convert_to_v1_from_chat_completions_input(&blocks);
+        // Apply input-side translators (these handle provider-specific formats
+        // that may have been stored as NonStandard blocks)
+        let mut blocks = convert_to_v1_from_chat_completions_input(&raw_values);
         blocks = anthropic_convert(&blocks);
 
         blocks
@@ -260,15 +282,12 @@ impl HumanMessage {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HumanMessageChunk {
-    pub content: MessageContent,
+    pub content: ContentBlocks,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -297,11 +316,65 @@ impl Serialize for HumanMessageChunk {
     }
 }
 
+impl<'de> Deserialize<'de> for HumanMessageChunk {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct HumanMessageChunkVisitor;
+
+        impl<'de> Visitor<'de> for HumanMessageChunkVisitor {
+            type Value = HumanMessageChunk;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a HumanMessageChunk object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<HumanMessageChunk, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "content" => content = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(HumanMessageChunk {
+                    content: content.unwrap_or_default(),
+                    id,
+                    name,
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(HumanMessageChunkVisitor)
+    }
+}
+
 #[bon]
 impl HumanMessageChunk {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
+        content: impl Into<ContentBlocks>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
@@ -316,50 +389,56 @@ impl HumanMessageChunk {
         }
     }
 
+    pub fn from_text(text: impl Into<String>) -> Self {
+        Self {
+            content: ContentBlocks::from(text.into()),
+            id: None,
+            name: None,
+            additional_kwargs: HashMap::new(),
+            response_metadata: HashMap::new(),
+        }
+    }
+
     pub fn message_type(&self) -> &'static str {
         "HumanMessageChunk"
     }
 
+    pub fn text(&self) -> String {
+        self.content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     pub fn concat(&self, other: &HumanMessageChunk) -> HumanMessageChunk {
-        let content = match (&self.content, &other.content) {
-            (MessageContent::Text(a), MessageContent::Text(b)) => {
-                MessageContent::Text(merge_content(a, b))
-            }
-            (MessageContent::Parts(a), MessageContent::Parts(b)) => {
-                let left: Vec<serde_json::Value> = a
-                    .iter()
-                    .filter_map(|p| serde_json::to_value(p).ok())
-                    .collect();
-                let right: Vec<serde_json::Value> = b
-                    .iter()
-                    .filter_map(|p| serde_json::to_value(p).ok())
-                    .collect();
-                match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
-                    Ok(Some(merged)) => {
-                        let parts: Vec<ContentPart> = merged
-                            .into_iter()
-                            .filter_map(|v| serde_json::from_value(v).ok())
-                            .collect();
-                        MessageContent::Parts(parts)
-                    }
-                    _ => {
-                        let mut parts = a.clone();
-                        parts.extend(b.clone());
-                        MessageContent::Parts(parts)
-                    }
+        // Merge content blocks: serialize to Value, use merge_lists, deserialize back
+        let left: Vec<serde_json::Value> = self
+            .content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        let right: Vec<serde_json::Value> = other
+            .content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+
+        let content: ContentBlocks =
+            match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
+                Ok(Some(merged)) => merged
+                    .into_iter()
+                    .filter_map(|v| serde_json::from_value(v).ok())
+                    .collect(),
+                _ => {
+                    let mut blocks = self.content.clone();
+                    blocks.extend(other.content.iter().cloned());
+                    blocks
                 }
-            }
-            (MessageContent::Text(a), MessageContent::Parts(b)) => {
-                let mut parts = vec![ContentPart::Text { text: a.clone() }];
-                parts.extend(b.clone());
-                MessageContent::Parts(parts)
-            }
-            (MessageContent::Parts(a), MessageContent::Text(b)) => {
-                let mut parts = a.clone();
-                parts.push(ContentPart::Text { text: b.clone() });
-                MessageContent::Parts(parts)
-            }
-        };
+            };
 
         let additional_kwargs = {
             let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
@@ -409,8 +488,11 @@ impl std::ops::Add for HumanMessageChunk {
 
 impl std::iter::Sum for HumanMessageChunk {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.reduce(|a, b| a + b)
-            .unwrap_or_else(|| HumanMessageChunk::builder().content("").build())
+        iter.reduce(|a, b| a + b).unwrap_or_else(|| {
+            HumanMessageChunk::builder()
+                .content(ContentBlocks::new())
+                .build()
+        })
     }
 }
 
@@ -424,8 +506,19 @@ impl std::ops::Add<SystemMessageChunk> for HumanMessageChunk {
     type Output = HumanMessageChunk;
 
     fn add(self, other: SystemMessageChunk) -> HumanMessageChunk {
+        let other_content: ContentBlocks = match &other.content {
+            MessageContent::Text(s) => ContentBlocks::from(s.as_str()),
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| {
+                    serde_json::to_value(p)
+                        .ok()
+                        .and_then(|v| serde_json::from_value(v).ok())
+                })
+                .collect(),
+        };
         let other_as_human = HumanMessageChunk {
-            content: other.content,
+            content: other_content,
             id: other.id,
             name: other.name,
             additional_kwargs: other.additional_kwargs,

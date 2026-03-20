@@ -880,6 +880,217 @@ pub enum ToolContentBlock {
     ServerToolResult(ServerToolResult),
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Default)]
+pub struct ContentBlocks(Vec<ContentBlock>);
+
+impl<'de> serde::Deserialize<'de> for ContentBlocks {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, SeqAccess, Visitor};
+
+        struct ContentBlocksVisitor;
+
+        impl<'de> Visitor<'de> for ContentBlocksVisitor {
+            type Value = ContentBlocks;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string or array of content blocks")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<ContentBlocks, E>
+            where
+                E: de::Error,
+            {
+                Ok(ContentBlocks::from(value))
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<ContentBlocks, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut blocks = Vec::new();
+                while let Some(value) = seq.next_element::<serde_json::Value>()? {
+                    if let Some(text) = value.as_str() {
+                        blocks.push(ContentBlock::Text(TextContentBlock::new(text)));
+                    } else {
+                        match serde_json::from_value::<ContentBlock>(value.clone()) {
+                            Ok(block) => blocks.push(block),
+                            Err(_) => {
+                                let mut error_value = HashMap::new();
+                                error_value.insert("original_json".to_string(), value);
+                                blocks.push(ContentBlock::NonStandard(
+                                    NonStandardContentBlock::new(error_value),
+                                ));
+                            }
+                        }
+                    }
+                }
+                Ok(ContentBlocks(blocks))
+            }
+        }
+
+        deserializer.deserialize_any(ContentBlocksVisitor)
+    }
+}
+
+impl ContentBlocks {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn into_inner(self) -> Vec<ContentBlock> {
+        self.0
+    }
+}
+
+// --- Deref / DerefMut: makes ContentBlocks behave like Vec<ContentBlock> ---
+
+impl std::ops::Deref for ContentBlocks {
+    type Target = Vec<ContentBlock>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for ContentBlocks {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+// --- IntoIterator: for block in content / for block in &content ---
+
+impl IntoIterator for ContentBlocks {
+    type Item = ContentBlock;
+    type IntoIter = std::vec::IntoIter<ContentBlock>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a ContentBlocks {
+    type Item = &'a ContentBlock;
+    type IntoIter = std::slice::Iter<'a, ContentBlock>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut ContentBlocks {
+    type Item = &'a mut ContentBlock;
+    type IntoIter = std::slice::IterMut<'a, ContentBlock>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
+
+// --- FromIterator / Extend: collect() and extend() support ---
+
+impl FromIterator<ContentBlock> for ContentBlocks {
+    fn from_iter<I: IntoIterator<Item = ContentBlock>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl Extend<ContentBlock> for ContentBlocks {
+    fn extend<I: IntoIterator<Item = ContentBlock>>(&mut self, iter: I) {
+        self.0.extend(iter);
+    }
+}
+
+// --- From conversions ---
+
+impl From<Vec<ContentBlock>> for ContentBlocks {
+    fn from(blocks: Vec<ContentBlock>) -> Self {
+        Self(blocks)
+    }
+}
+
+impl From<ContentBlocks> for Vec<ContentBlock> {
+    fn from(blocks: ContentBlocks) -> Self {
+        blocks.0
+    }
+}
+
+impl From<&str> for ContentBlocks {
+    fn from(s: &str) -> Self {
+        if s.is_empty() {
+            Self(vec![])
+        } else {
+            Self(vec![ContentBlock::Text(TextContentBlock::new(s))])
+        }
+    }
+}
+
+impl From<String> for ContentBlocks {
+    fn from(s: String) -> Self {
+        if s.is_empty() {
+            Self(vec![])
+        } else {
+            Self(vec![ContentBlock::Text(TextContentBlock::new(s))])
+        }
+    }
+}
+
+impl From<&String> for ContentBlocks {
+    fn from(s: &String) -> Self {
+        Self::from(s.as_str())
+    }
+}
+
+impl From<ContentBlock> for ContentBlocks {
+    fn from(block: ContentBlock) -> Self {
+        Self(vec![block])
+    }
+}
+
+// --- Index: content[0] support ---
+
+impl std::ops::Index<usize> for ContentBlocks {
+    type Output = ContentBlock;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for ContentBlocks {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
+// --- Display ---
+
+impl std::fmt::Display for ContentBlocks {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let texts: Vec<&str> = self
+            .0
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect();
+        write!(f, "{}", texts.join(" "))
+    }
+}
+
+// --- AsRef / Borrow: for APIs that accept &[ContentBlock] ---
+
+impl AsRef<[ContentBlock]> for ContentBlocks {
+    fn as_ref(&self) -> &[ContentBlock] {
+        &self.0
+    }
+}
+
+impl std::borrow::Borrow<[ContentBlock]> for ContentBlocks {
+    fn borrow(&self) -> &[ContentBlock] {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type")]
 pub enum ContentBlock {
