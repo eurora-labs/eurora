@@ -13,6 +13,7 @@
 	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
+	import { Skeleton } from '@eurora/ui/components/skeleton/index';
 	import { MessageGraph } from '@eurora/ui/custom-components/message-graph/index';
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -85,6 +86,10 @@
 	const treeNodes = $derived(threadData?.treeNodes ?? []);
 	const treeHasMore = $derived(threadData?.treeHasMore ?? false);
 	const treeLoading = $derived(threadData?.treeLoading ?? false);
+	const threadTitle = $derived(
+		threadService.threads.find((t) => t.id === threadId)?.title ?? 'New Chat',
+	);
+	const messagesLoading = $derived(threadData?.loading ?? false);
 	const reasoningData = $derived(threadData?.reasoningData ?? {});
 	const showSuggestions = $derived(messages.length === 0 && assets.length === 0);
 
@@ -320,6 +325,8 @@
 			<MessageGraph
 				{treeNodes}
 				{activeMessageIds}
+				startLabel={threadTitle}
+				loading={treeLoading}
 				hasMoreLevels={treeHasMore}
 				loadingMoreLevels={treeLoading}
 				onmessagedblclick={handleGraphNodeDblClick}
@@ -329,7 +336,32 @@
 	{:else}
 		<Conversation.Root class="min-h-0 flex-1">
 			<Conversation.Content>
-				{#if messages.length === 0}
+				{#if messages.length === 0 && messagesLoading}
+					{#each Array(4) as _, i}
+						<div
+							class="flex w-full max-w-[95%] flex-col gap-2 {i % 2 === 0
+								? 'ml-auto items-end'
+								: 'items-start'}"
+						>
+							<div class="flex flex-col gap-2 rounded-lg px-4 py-3">
+								<Skeleton
+									class="bg-muted h-4 w-48"
+									style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
+								/>
+								<Skeleton
+									class="bg-muted h-4 w-36"
+									style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
+								/>
+								{#if i % 2 === 1}
+									<Skeleton
+										class="bg-muted h-4 w-56"
+										style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
+									/>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				{:else if messages.length === 0}
 					<Empty.Root>
 						<Empty.Header>
 							{#if latestTimelineItem?.icon_base64}
