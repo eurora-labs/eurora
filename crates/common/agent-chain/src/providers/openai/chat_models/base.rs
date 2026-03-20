@@ -1106,11 +1106,6 @@ impl ChatOpenAI {
                 }
                 Some(message)
             }
-            AnyMessage::FunctionMessage(m) => Some(serde_json::json!({
-                "role": "function",
-                "name": m.name,
-                "content": m.content
-            })),
         }
     }
 
@@ -1356,13 +1351,6 @@ impl ChatOpenAI {
                     input.push(serde_json::json!({
                         "role": m.role,
                         "content": m.content.as_text()
-                    }));
-                }
-                AnyMessage::FunctionMessage(m) => {
-                    input.push(serde_json::json!({
-                        "type": "function_call_output",
-                        "name": m.name,
-                        "output": m.content
                     }));
                 }
             }
