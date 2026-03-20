@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
-use super::content::{ContentBlock, ContentBlocks, MessageContent, TextContentBlock};
+use super::content::{ContentBlock, ContentBlocks, TextContentBlock};
 use super::system::SystemMessageChunk;
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
@@ -25,9 +25,8 @@ impl BaseMessage for HumanMessage {
         self.id.clone()
     }
 
-    fn content(&self) -> &MessageContent {
-        // TODO: Remove once BaseMessage trait is updated to use Vec<ContentBlock>
-        panic!("HumanMessage::content() is deprecated - use .content field directly or .text()")
+    fn content(&self) -> &ContentBlocks {
+        &self.content
     }
 
     fn name(&self) -> Option<String> {
@@ -496,19 +495,8 @@ impl std::ops::Add<SystemMessageChunk> for HumanMessageChunk {
     type Output = HumanMessageChunk;
 
     fn add(self, other: SystemMessageChunk) -> HumanMessageChunk {
-        let other_content: ContentBlocks = match &other.content {
-            MessageContent::Text(s) => ContentBlocks::from(s.as_str()),
-            MessageContent::Parts(parts) => parts
-                .iter()
-                .filter_map(|p| {
-                    serde_json::to_value(p)
-                        .ok()
-                        .and_then(|v| serde_json::from_value(v).ok())
-                })
-                .collect(),
-        };
         let other_as_human = HumanMessageChunk {
-            content: other_content,
+            content: other.content,
             id: other.id,
             name: other.name,
             additional_kwargs: other.additional_kwargs,

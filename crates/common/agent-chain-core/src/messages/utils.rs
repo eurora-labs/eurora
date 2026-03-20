@@ -1,7 +1,6 @@
 use super::ai::{AIMessage, AIMessageChunk};
 use super::base::{AnyMessage, AnyMessageChunk, BaseMessage};
 use super::chat::{ChatMessage, ChatMessageChunk};
-use super::function::{FunctionMessage, FunctionMessageChunk};
 use super::human::{HumanMessage, HumanMessageChunk};
 use super::modifier::RemoveMessage;
 use super::system::{SystemMessage, SystemMessageChunk};
@@ -65,15 +64,6 @@ pub(crate) fn msg_to_chunk(message: &AnyMessage) -> AnyMessageChunk {
                 .response_metadata(m.response_metadata.clone())
                 .build(),
         ),
-        AnyMessage::FunctionMessage(m) => AnyMessageChunk::FunctionMessageChunk(
-            FunctionMessageChunk::builder()
-                .content(m.content.clone())
-                .name(m.name.clone())
-                .maybe_id(m.id.clone())
-                .additional_kwargs(m.additional_kwargs.clone())
-                .response_metadata(m.response_metadata.clone())
-                .build(),
-        ),
         AnyMessage::RemoveMessage(_) => {
             panic!("Cannot convert RemoveMessage to chunk")
         }
@@ -94,7 +84,6 @@ pub fn get_buffer_string(messages: &[AnyMessage], human_prefix: &str, ai_prefix:
                 AnyMessage::AIMessage(_) => ai_prefix,
                 AnyMessage::ToolMessage(_) => "Tool",
                 AnyMessage::ChatMessage(c) => &c.role,
-                AnyMessage::FunctionMessage(_) => "Function",
                 AnyMessage::RemoveMessage(_) => "Remove",
             };
             let mut message = format!("{}: {}", role, m.text());
@@ -298,16 +287,6 @@ fn create_message_from_role(
             );
             Ok(AnyMessage::SystemMessage(msg))
         }
-        "function" => {
-            let fn_name = name.ok_or("Function messages require a name")?;
-            Ok(AnyMessage::FunctionMessage(
-                FunctionMessage::builder()
-                    .name(fn_name)
-                    .content(content)
-                    .maybe_id(id.map(|i| i.to_string()))
-                    .build(),
-            ))
-        }
         "tool" => {
             let tc_id = tool_call_id.ok_or("Tool messages require a tool_call_id")?;
             Ok(AnyMessage::ToolMessage(
@@ -485,7 +464,6 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
                 AnyMessageChunk::SystemMessageChunk(c) => c.response_metadata.clear(),
                 AnyMessageChunk::ToolMessageChunk(c) => c.response_metadata.clear(),
                 AnyMessageChunk::ChatMessageChunk(c) => c.response_metadata.clear(),
-                AnyMessageChunk::FunctionMessageChunk(c) => c.response_metadata.clear(),
             }
 
             if !chunk_separator.is_empty() {
@@ -514,11 +492,6 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
                                 }
                             }
                             AnyMessageChunk::ChatMessageChunk(c) => {
-                                if let super::content::MessageContent::Text(ref mut s) = c.content {
-                                    *s = format!("{}{}", chunk_separator, s);
-                                }
-                            }
-                            AnyMessageChunk::FunctionMessageChunk(c) => {
                                 if let super::content::MessageContent::Text(ref mut s) = c.content {
                                     *s = format!("{}{}", chunk_separator, s);
                                 }
@@ -620,7 +593,6 @@ fn get_message_openai_role(message: &AnyMessage) -> &'static str {
                 "system"
             }
         }
-        AnyMessage::FunctionMessage(_) => "function",
         AnyMessage::ChatMessage(c) => match c.role.as_str() {
             "user" => "user",
             "assistant" => "assistant",
@@ -1201,13 +1173,6 @@ fn create_message_with_content(original: &AnyMessage, content: &str) -> AnyMessa
             ChatMessage::builder()
                 .content(content)
                 .role(&m.role)
-                .maybe_id(m.id.clone())
-                .build(),
-        ),
-        AnyMessage::FunctionMessage(m) => AnyMessage::FunctionMessage(
-            FunctionMessage::builder()
-                .name(&m.name)
-                .content(content)
                 .maybe_id(m.id.clone())
                 .build(),
         ),

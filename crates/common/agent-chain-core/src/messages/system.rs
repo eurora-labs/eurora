@@ -1,21 +1,21 @@
 use bon::bon;
+use serde::de::{self, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
+use std::fmt;
 
-use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env, merge_content};
-use super::content::{ContentBlock, ContentPart, KNOWN_BLOCK_TYPES, MessageContent};
+use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
+use super::content::{ContentBlock, ContentBlocks, MessageContent, TextContentBlock};
+use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SystemMessage {
-    pub content: MessageContent,
+    pub content: ContentBlocks,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -24,7 +24,7 @@ impl BaseMessage for SystemMessage {
         self.id.clone()
     }
 
-    fn content(&self) -> &MessageContent {
+    fn content(&self) -> &ContentBlocks {
         &self.content
     }
 
@@ -74,29 +74,72 @@ impl Serialize for SystemMessage {
     }
 }
 
+impl<'de> Deserialize<'de> for SystemMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct SystemMessageVisitor;
+
+        impl<'de> Visitor<'de> for SystemMessageVisitor {
+            type Value = SystemMessage;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a SystemMessage object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<SystemMessage, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "content" => content = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(SystemMessage {
+                    content: content.unwrap_or_default(),
+                    id,
+                    name,
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(SystemMessageVisitor)
+    }
+}
+
 #[bon]
 impl SystemMessage {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
-        content_blocks: Option<Vec<ContentBlock>>,
+        content: impl Into<ContentBlocks>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
         #[builder(default)] response_metadata: HashMap<String, serde_json::Value>,
     ) -> Self {
-        let resolved_content = if let Some(blocks) = content_blocks {
-            let parts: Vec<ContentPart> = blocks
-                .into_iter()
-                .filter_map(|block| serde_json::to_value(&block).ok().map(ContentPart::Other))
-                .collect();
-            MessageContent::Parts(parts)
-        } else {
-            content.into()
-        };
-
         Self {
-            content: resolved_content,
+            content: content.into(),
             id,
             name,
             additional_kwargs,
@@ -104,20 +147,15 @@ impl SystemMessage {
         }
     }
 
-    pub fn content_list(&self) -> Vec<serde_json::Value> {
-        match &self.content {
-            MessageContent::Text(s) => {
-                vec![serde_json::json!({"type": "text", "text": s})]
-            }
-            MessageContent::Parts(parts) => parts
-                .iter()
-                .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null))
-                .collect(),
-        }
-    }
-
     pub fn text(&self) -> String {
-        self.content.as_text()
+        self.content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     pub fn pretty_repr(&self, html: bool) -> String {
@@ -127,7 +165,7 @@ impl SystemMessage {
         } else {
             String::new()
         };
-        format!("{}{}\n\n{}", title, name_line, self.content.as_text_ref())
+        format!("{}{}\n\n{}", title, name_line, self.text())
     }
 
     pub fn pretty_print(&self) {
@@ -138,43 +176,19 @@ impl SystemMessage {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
-            ToolCallChunkBlock, VideoContentBlock,
+            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
+            VideoContentBlock,
         };
         use crate::messages::block_translators::anthropic::convert_input_to_standard_blocks as anthropic_convert;
         use crate::messages::block_translators::openai::convert_to_v1_from_chat_completions_input;
 
-        let mut blocks: Vec<serde_json::Value> = Vec::new();
+        let raw_values: Vec<serde_json::Value> = self
+            .content
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect();
 
-        let items: Vec<serde_json::Value> = match &self.content {
-            MessageContent::Text(s) => {
-                if s.is_empty() {
-                    vec![]
-                } else {
-                    vec![serde_json::Value::String(s.clone())]
-                }
-            }
-            MessageContent::Parts(parts) => parts
-                .iter()
-                .filter_map(|p| serde_json::to_value(p).ok())
-                .collect(),
-        };
-
-        for item in items {
-            if let Some(s) = item.as_str() {
-                blocks.push(serde_json::json!({"type": "text", "text": s}));
-            } else if item.is_object() {
-                let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
-
-                if !KNOWN_BLOCK_TYPES.contains(&item_type) || item.get("source_type").is_some() {
-                    blocks.push(serde_json::json!({"type": "non_standard", "value": item}));
-                } else {
-                    blocks.push(item);
-                }
-            }
-        }
-
-        blocks = convert_to_v1_from_chat_completions_input(&blocks);
+        let mut blocks = convert_to_v1_from_chat_completions_input(&raw_values);
         blocks = anthropic_convert(&blocks);
 
         blocks
@@ -254,15 +268,12 @@ impl SystemMessage {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SystemMessageChunk {
-    pub content: MessageContent,
+    pub content: ContentBlocks,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -291,11 +302,65 @@ impl Serialize for SystemMessageChunk {
     }
 }
 
+impl<'de> Deserialize<'de> for SystemMessageChunk {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct SystemMessageChunkVisitor;
+
+        impl<'de> Visitor<'de> for SystemMessageChunkVisitor {
+            type Value = SystemMessageChunk;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a SystemMessageChunk object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<SystemMessageChunk, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+
+                while let Some(key) = map.next_key::<&str>()? {
+                    match key {
+                        "content" => content = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(SystemMessageChunk {
+                    content: content.unwrap_or_default(),
+                    id,
+                    name,
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(SystemMessageChunkVisitor)
+    }
+}
+
 #[bon]
 impl SystemMessageChunk {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
+        content: impl Into<ContentBlocks>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] additional_kwargs: HashMap<String, serde_json::Value>,
@@ -314,46 +379,41 @@ impl SystemMessageChunk {
         "SystemMessageChunk"
     }
 
+    pub fn text(&self) -> String {
+        self.content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     pub fn concat(&self, other: &SystemMessageChunk) -> SystemMessageChunk {
-        let content = match (&self.content, &other.content) {
-            (MessageContent::Text(a), MessageContent::Text(b)) => {
-                MessageContent::Text(merge_content(a, b))
-            }
-            (MessageContent::Parts(a), MessageContent::Parts(b)) => {
-                let left: Vec<serde_json::Value> = a
-                    .iter()
-                    .filter_map(|p| serde_json::to_value(p).ok())
-                    .collect();
-                let right: Vec<serde_json::Value> = b
-                    .iter()
-                    .filter_map(|p| serde_json::to_value(p).ok())
-                    .collect();
-                match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
-                    Ok(Some(merged)) => {
-                        let parts: Vec<ContentPart> = merged
-                            .into_iter()
-                            .filter_map(|v| serde_json::from_value(v).ok())
-                            .collect();
-                        MessageContent::Parts(parts)
-                    }
-                    _ => {
-                        let mut parts = a.clone();
-                        parts.extend(b.clone());
-                        MessageContent::Parts(parts)
-                    }
+        let left: Vec<serde_json::Value> = self
+            .content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+        let right: Vec<serde_json::Value> = other
+            .content
+            .iter()
+            .filter_map(|b| serde_json::to_value(b).ok())
+            .collect();
+
+        let content: ContentBlocks =
+            match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
+                Ok(Some(merged)) => merged
+                    .into_iter()
+                    .filter_map(|v| serde_json::from_value(v).ok())
+                    .collect(),
+                _ => {
+                    let mut blocks = self.content.clone();
+                    blocks.extend(other.content.iter().cloned());
+                    blocks
                 }
-            }
-            (MessageContent::Text(a), MessageContent::Parts(b)) => {
-                let mut parts = vec![ContentPart::Text { text: a.clone() }];
-                parts.extend(b.clone());
-                MessageContent::Parts(parts)
-            }
-            (MessageContent::Parts(a), MessageContent::Text(b)) => {
-                let mut parts = a.clone();
-                parts.push(ContentPart::Text { text: b.clone() });
-                MessageContent::Parts(parts)
-            }
-        };
+            };
 
         let additional_kwargs = {
             let left_val = serde_json::to_value(&self.additional_kwargs).unwrap_or_default();
@@ -404,7 +464,7 @@ impl std::ops::Add for SystemMessageChunk {
 impl std::iter::Sum for SystemMessageChunk {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.reduce(|a, b| a + b)
-            .unwrap_or_else(|| SystemMessageChunk::builder().content("").build())
+            .unwrap_or_else(|| SystemMessageChunk::builder().content(ContentBlocks::new()).build())
     }
 }
 
@@ -413,8 +473,6 @@ impl From<SystemMessageChunk> for SystemMessage {
         chunk.to_message()
     }
 }
-
-use crate::load::Serializable;
 
 impl Serializable for SystemMessage {
     fn is_lc_serializable() -> bool {
