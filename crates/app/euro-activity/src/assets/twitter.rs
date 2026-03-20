@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use agent_chain_core::{AnyMessage, ContentPart, HumanMessage, ImageSource};
+use agent_chain_core::messages::{ContentBlock, ImageContentBlock, TextContentBlock};
+use agent_chain_core::{AnyMessage, HumanMessage};
 use async_trait::async_trait;
 use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet, ParseResult};
 use serde::{Deserialize, Serialize};
@@ -127,14 +128,12 @@ impl AssetFunctionality for TwitterAsset {
         if main_tweet_images.is_empty() {
             vec![HumanMessage::builder().content(text).build().into()]
         } else {
-            let mut parts: Vec<ContentPart> = vec![ContentPart::Text { text }];
+            let mut blocks: Vec<ContentBlock> =
+                vec![ContentBlock::Text(TextContentBlock::new(&text))];
             for image in main_tweet_images {
-                parts.push(ContentPart::Image {
-                    source: ImageSource::Url { url: image.clone() },
-                    detail: None,
-                });
+                blocks.push(ContentBlock::Image(ImageContentBlock::from_url(image)));
             }
-            vec![HumanMessage::builder().content(parts).build().into()]
+            vec![HumanMessage::builder().content(blocks).build().into()]
         }
     }
 

@@ -1043,7 +1043,9 @@ async fn test_openai_response_headers_responses_api() -> Result<(), Box<dyn std:
 
 async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, ImageSource, MessageContent};
+    use agent_chain_core::messages::{
+        ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock,
+    };
 
     let model = ChatOpenAI::builder()
         .model("gpt-4o")
@@ -1052,16 +1054,9 @@ async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Erro
     let image_url = "https://raw.githubusercontent.com/langchain-ai/docs/9f99bb977307a1bd5efeb8dc6b67eb13904c4af1/src/oss/images/checkpoints.jpg";
 
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "describe the weather in this image".to_string(),
-            },
-            ContentPart::Image {
-                source: ImageSource::Url {
-                    url: image_url.to_string(),
-                },
-                detail: None,
-            },
+        .content(ContentBlocks::from(vec![
+            ContentBlock::Text(TextContentBlock::new("describe the weather in this image")),
+            ContentBlock::Image(ImageContentBlock::from_url(image_url)),
         ]))
         .build();
 
@@ -1077,7 +1072,9 @@ async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Erro
 
 async fn test_image_token_counting_png() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, ImageSource, MessageContent};
+    use agent_chain_core::messages::{
+        ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock,
+    };
 
     let model = ChatOpenAI::builder()
         .model("gpt-4o")
@@ -1086,16 +1083,9 @@ async fn test_image_token_counting_png() -> Result<(), Box<dyn std::error::Error
     let image_url = "https://raw.githubusercontent.com/langchain-ai/docs/4d11d08b6b0e210bd456943f7a22febbd168b543/src/images/agentic-rag-output.png";
 
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![
-            ContentPart::Text {
-                text: "how many dice are in this image".to_string(),
-            },
-            ContentPart::Image {
-                source: ImageSource::Url {
-                    url: image_url.to_string(),
-                },
-                detail: None,
-            },
+        .content(ContentBlocks::from(vec![
+            ContentBlock::Text(TextContentBlock::new("how many dice are in this image")),
+            ContentBlock::Image(ImageContentBlock::from_url(image_url)),
         ]))
         .build();
 
@@ -1420,7 +1410,7 @@ async fn test_audio_output_modality() -> Result<(), Box<dyn std::error::Error>> 
 
 async fn test_audio_input_modality() -> Result<(), Box<dyn std::error::Error>> {
     load_env();
-    use agent_chain_core::messages::{ContentPart, MessageContent};
+    use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
 
     let mut model_kwargs = HashMap::new();
     model_kwargs.insert(
@@ -1438,11 +1428,10 @@ async fn test_audio_input_modality() -> Result<(), Box<dyn std::error::Error>> {
         .model_kwargs(model_kwargs)
         .build();
 
-    // Create a minimal audio content part using Other variant
     let message = HumanMessage::builder()
-        .content(MessageContent::Parts(vec![ContentPart::Text {
-            text: "Say hello in a cheerful voice".to_string(),
-        }]))
+        .content(ContentBlocks::from(vec![ContentBlock::Text(
+            TextContentBlock::new("Say hello in a cheerful voice"),
+        )]))
         .build();
 
     let output = llm.invoke(vec![message.into()], None).await?;

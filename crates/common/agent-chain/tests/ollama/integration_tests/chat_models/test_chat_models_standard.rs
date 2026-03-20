@@ -478,15 +478,17 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
             .into(),
         AnyMessage::AIMessage(
             AIMessage::builder()
-                .content(vec![
-                    serde_json::json!({"type": "text", "text": "some text"}),
-                    serde_json::json!({
+                .content(serde_json::from_value::<
+                    agent_chain_core::messages::ContentBlocks,
+                >(serde_json::json!([
+                    {"type": "text", "text": "some text"},
+                    {
                         "type": "tool_use",
                         "id": "abc123",
                         "name": "my_adder_tool",
                         "input": {"a": 1, "b": 2}
-                    }),
-                ])
+                    }
+                ]))?)
                 .tool_calls(vec![agent_chain_core::messages::ToolCall {
                     name: "my_adder_tool".to_string(),
                     args: serde_json::json!({"a": 1, "b": 2}),
@@ -699,13 +701,15 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
     let image_data = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
 
     let message: AnyMessage = HumanMessage::builder()
-        .content(vec![
-            serde_json::json!({"type": "text", "text": "Give a concise description of this image."}),
-            serde_json::json!({
+        .content(serde_json::from_value::<
+            agent_chain_core::messages::ContentBlocks,
+        >(serde_json::json!([
+            {"type": "text", "text": "Give a concise description of this image."},
+            {
                 "type": "image_url",
                 "image_url": {"url": format!("data:image/png;base64,{image_data}")}
-            }),
-        ])
+            }
+        ]))?)
         .build()
         .into();
 
