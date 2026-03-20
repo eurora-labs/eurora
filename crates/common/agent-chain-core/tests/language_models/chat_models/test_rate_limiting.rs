@@ -142,7 +142,7 @@ async fn test_rate_limit_stream() {
         )
         .await
         .unwrap();
-    assert!(result.content.contains("hello"));
+    assert!(result.content.as_text().contains("hello"));
     assert_eq!(limiter.acquire_count(), 1);
 
     let _ = model

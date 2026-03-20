@@ -4,6 +4,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::ops::Add;
 
+use crate::messages::BaseMessageChunk;
+
 use crate::load::Serializable;
 use crate::messages::AnyMessage;
 
@@ -91,10 +93,10 @@ impl Add for ChatGenerationChunk {
         let generation_info =
             super::merge_generation_info(self.generation_info, other.generation_info);
 
-        let self_chunk = crate::messages::utils::msg_to_chunk(&self.message);
-        let other_chunk = crate::messages::utils::msg_to_chunk(&other.message);
+        let self_chunk = crate::messages::AnyMessageChunk::from(&self.message);
+        let other_chunk = crate::messages::AnyMessageChunk::from(&other.message);
         let merged_chunk = self_chunk + other_chunk;
-        let merged_message = crate::messages::utils::chunk_to_msg(&merged_chunk);
+        let merged_message = merged_chunk.to_message();
 
         ChatGenerationChunk {
             message: merged_message,

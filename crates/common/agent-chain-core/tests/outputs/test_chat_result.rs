@@ -1,5 +1,5 @@
-use agent_chain_core::messages::content::{ContentPart, MessageContent};
 use agent_chain_core::messages::{AIMessage, AIMessageChunk};
+use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
 use agent_chain_core::outputs::{ChatGeneration, ChatGenerationChunk, ChatResult};
 use serde_json::json;
 use std::collections::HashMap;
@@ -392,9 +392,9 @@ mod chat_result_model_behavior_tests {
         let gen_list = ChatGeneration::builder()
             .message(
                 AIMessage::builder()
-                    .content(MessageContent::Parts(vec![ContentPart::Text {
-                        text: "list content".to_string(),
-                    }]))
+                    .content(ContentBlocks::from(vec![ContentBlock::Text(
+                        TextContentBlock::new("list content"),
+                    )]))
                     .build()
                     .into(),
             )

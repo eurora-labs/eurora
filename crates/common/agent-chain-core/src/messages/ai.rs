@@ -1,10 +1,15 @@
 use bon::bon;
+use serde::de::{self, MapAccess, Visitor};
 use serde::ser::SerializeMap;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
+use std::fmt;
 
-use super::base::{BaseMessage, MergeableContent, get_msg_title_repr, merge_content_complex};
-use super::content::{ContentBlock, ContentPart, MessageContent};
+use super::base::{
+    AnyMessage, BaseMessage, BaseMessageChunk, MergeableContent, get_msg_title_repr,
+    merge_content_complex,
+};
+use super::content::{ContentBlock, ContentBlocks, TextContentBlock};
 use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
     invalid_tool_call, tool_call,
@@ -116,21 +121,15 @@ impl UsageMetadata {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AIMessage {
-    pub content: MessageContent,
+    pub content: ContentBlocks,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
-    #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -139,7 +138,7 @@ impl BaseMessage for AIMessage {
         self.id.clone()
     }
 
-    fn content(&self) -> &MessageContent {
+    fn content(&self) -> &ContentBlocks {
         &self.content
     }
 
@@ -198,11 +197,74 @@ impl Serialize for AIMessage {
     }
 }
 
+impl<'de> Deserialize<'de> for AIMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct AIMessageVisitor;
+
+        impl<'de> Visitor<'de> for AIMessageVisitor {
+            type Value = AIMessage;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an AIMessage object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<AIMessage, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut tool_calls: Option<Vec<ToolCall>> = None;
+                let mut invalid_tool_calls: Option<Vec<InvalidToolCall>> = None;
+                let mut usage_metadata: Option<Option<UsageMetadata>> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "content" => content = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "tool_calls" => tool_calls = Some(map.next_value()?),
+                        "invalid_tool_calls" => invalid_tool_calls = Some(map.next_value()?),
+                        "usage_metadata" => usage_metadata = Some(map.next_value()?),
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(AIMessage {
+                    content: content.unwrap_or_default(),
+                    id,
+                    name,
+                    tool_calls: tool_calls.unwrap_or_default(),
+                    invalid_tool_calls: invalid_tool_calls.unwrap_or_default(),
+                    usage_metadata: usage_metadata.unwrap_or(None),
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(AIMessageVisitor)
+    }
+}
+
 #[bon]
 impl AIMessage {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
+        content: impl Into<ContentBlocks>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] tool_calls: Vec<ToolCall>,
@@ -224,8 +286,11 @@ impl AIMessage {
     }
 
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
-        let content: MessageContent = content_list.into();
-        Self::builder().content(content).build()
+        let blocks: ContentBlocks = content_list
+            .into_iter()
+            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .collect();
+        Self::builder().content(blocks).build()
     }
 
     pub fn text(&self) -> String {
@@ -233,16 +298,10 @@ impl AIMessage {
     }
 
     pub fn content_list(&self) -> Vec<serde_json::Value> {
-        match &self.content {
-            MessageContent::Text(s) => {
-                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
-                    arr
-                } else {
-                    self.content.as_json_values()
-                }
-            }
-            MessageContent::Parts(_) => self.content.as_json_values(),
-        }
+        self.content
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect()
     }
 
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
@@ -310,8 +369,8 @@ impl AIMessage {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
-            ToolCallChunkBlock, VideoContentBlock,
+            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
+            VideoContentBlock,
         };
 
         blocks_json
@@ -383,7 +442,6 @@ impl AIMessage {
                         serde_json::Value::String(block_type.to_string()),
                     );
                     ContentBlock::NonStandard(NonStandardContentBlock {
-                        block_type: "non_standard".to_string(),
                         id: None,
                         value: error_value,
                         index: v.get("index").and_then(|i| {
@@ -402,7 +460,7 @@ impl AIMessage {
         } else {
             String::new()
         };
-        let base = format!("{}{}\n\n{}", title, name_line, self.content.as_text());
+        let base = format!("{}{}\n\n{}", title, name_line, self.text());
 
         let mut lines = Vec::new();
         format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
@@ -498,25 +556,17 @@ pub enum ChunkPosition {
     Last,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AIMessageChunk {
-    pub content: MessageContent,
+    pub content: ContentBlocks,
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
-    #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
-    #[serde(default)]
     pub tool_call_chunks: Vec<ToolCallChunk>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,
-    #[serde(default)]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[serde(default)]
     pub response_metadata: HashMap<String, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub chunk_position: Option<ChunkPosition>,
 }
 
@@ -561,11 +611,80 @@ impl Serialize for AIMessageChunk {
     }
 }
 
+impl<'de> Deserialize<'de> for AIMessageChunk {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct AIMessageChunkVisitor;
+
+        impl<'de> Visitor<'de> for AIMessageChunkVisitor {
+            type Value = AIMessageChunk;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an AIMessageChunk object")
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<AIMessageChunk, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut content: Option<ContentBlocks> = None;
+                let mut id: Option<String> = None;
+                let mut name: Option<String> = None;
+                let mut tool_calls: Option<Vec<ToolCall>> = None;
+                let mut invalid_tool_calls: Option<Vec<InvalidToolCall>> = None;
+                let mut tool_call_chunks: Option<Vec<ToolCallChunk>> = None;
+                let mut usage_metadata: Option<Option<UsageMetadata>> = None;
+                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
+                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
+                let mut chunk_position: Option<Option<ChunkPosition>> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "content" => content = Some(map.next_value()?),
+                        "id" => id = map.next_value()?,
+                        "name" => name = map.next_value()?,
+                        "tool_calls" => tool_calls = Some(map.next_value()?),
+                        "invalid_tool_calls" => invalid_tool_calls = Some(map.next_value()?),
+                        "tool_call_chunks" => tool_call_chunks = Some(map.next_value()?),
+                        "usage_metadata" => usage_metadata = Some(map.next_value()?),
+                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
+                        "response_metadata" => response_metadata = Some(map.next_value()?),
+                        "chunk_position" => chunk_position = Some(map.next_value()?),
+                        "type" => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                        _ => {
+                            let _ = map.next_value::<de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                Ok(AIMessageChunk {
+                    content: content.unwrap_or_default(),
+                    id,
+                    name,
+                    tool_calls: tool_calls.unwrap_or_default(),
+                    invalid_tool_calls: invalid_tool_calls.unwrap_or_default(),
+                    tool_call_chunks: tool_call_chunks.unwrap_or_default(),
+                    usage_metadata: usage_metadata.unwrap_or(None),
+                    additional_kwargs: additional_kwargs.unwrap_or_default(),
+                    response_metadata: response_metadata.unwrap_or_default(),
+                    chunk_position: chunk_position.unwrap_or(None),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(AIMessageChunkVisitor)
+    }
+}
+
 #[bon]
 impl AIMessageChunk {
     #[builder]
     pub fn new(
-        content: impl Into<MessageContent>,
+        content: impl Into<ContentBlocks>,
         id: Option<String>,
         name: Option<String>,
         #[builder(default)] tool_calls: Vec<ToolCall>,
@@ -591,8 +710,11 @@ impl AIMessageChunk {
     }
 
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
-        let content: MessageContent = content_list.into();
-        Self::builder().content(content).build()
+        let blocks: ContentBlocks = content_list
+            .into_iter()
+            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .collect();
+        Self::builder().content(blocks).build()
     }
 
     pub fn text(&self) -> String {
@@ -600,16 +722,10 @@ impl AIMessageChunk {
     }
 
     pub fn content_list(&self) -> Vec<serde_json::Value> {
-        match &self.content {
-            MessageContent::Text(s) => {
-                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
-                    arr
-                } else {
-                    self.content.as_json_values()
-                }
-            }
-            MessageContent::Parts(_) => self.content.as_json_values(),
-        }
+        self.content
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect()
     }
 
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
@@ -707,8 +823,8 @@ impl AIMessageChunk {
         use super::content::{
             AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
             NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, TextContentBlock, ToolCallBlock,
-            ToolCallChunkBlock, VideoContentBlock,
+            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
+            VideoContentBlock,
         };
 
         blocks_json
@@ -780,7 +896,6 @@ impl AIMessageChunk {
                         serde_json::Value::String(block_type.to_string()),
                     );
                     ContentBlock::NonStandard(NonStandardContentBlock {
-                        block_type: "non_standard".to_string(),
                         id: None,
                         value: error_value,
                         index: v.get("index").and_then(|i| {
@@ -888,49 +1003,52 @@ impl AIMessageChunk {
                 .and_then(|v| v.as_str())
                 == Some("v1")
         {
-            let content_list_opt: Option<Vec<serde_json::Value>> = match &self.content {
-                MessageContent::Parts(_) => Some(self.content.as_json_values()),
-                MessageContent::Text(s) => serde_json::from_str(s).ok(),
-            };
-            if let Some(mut content_list) = content_list_opt {
-                let id_to_tc: HashMap<String, serde_json::Value> = self
-                    .tool_calls
-                    .iter()
-                    .filter_map(|tc| {
-                        tc.id.as_ref().map(|id| {
-                            let mut tc_val = serde_json::json!({
-                                "type": "tool_call",
-                                "name": tc.name,
-                                "args": tc.args,
-                                "id": id,
-                            });
-                            tc_val
-                                .as_object_mut()
-                                .map(|m| (id.clone(), serde_json::Value::Object(m.clone())))
-                        })
+            let mut content_list: Vec<serde_json::Value> = self
+                .content
+                .iter()
+                .filter_map(|block| serde_json::to_value(block).ok())
+                .collect();
+
+            let id_to_tc: HashMap<String, serde_json::Value> = self
+                .tool_calls
+                .iter()
+                .filter_map(|tc| {
+                    tc.id.as_ref().map(|id| {
+                        let mut tc_val = serde_json::json!({
+                            "type": "tool_call",
+                            "name": tc.name,
+                            "args": tc.args,
+                            "id": id,
+                        });
+                        tc_val
+                            .as_object_mut()
+                            .map(|m| (id.clone(), serde_json::Value::Object(m.clone())))
                     })
-                    .flatten()
-                    .collect();
+                })
+                .flatten()
+                .collect();
 
-                let mut changed = false;
-                for block in &mut content_list {
-                    if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
-                        && block_type == "tool_call_chunk"
-                        && let Some(call_id) = block.get("id").and_then(|i| i.as_str())
-                        && let Some(tc) = id_to_tc.get(call_id)
-                    {
-                        let mut replacement = tc.clone();
-                        if let Some(extras) = block.get("extras") {
-                            replacement["extras"] = extras.clone();
-                        }
-                        *block = replacement;
-                        changed = true;
+            let mut changed = false;
+            for block in &mut content_list {
+                if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
+                    && block_type == "tool_call_chunk"
+                    && let Some(call_id) = block.get("id").and_then(|i| i.as_str())
+                    && let Some(tc) = id_to_tc.get(call_id)
+                {
+                    let mut replacement = tc.clone();
+                    if let Some(extras) = block.get("extras") {
+                        replacement["extras"] = extras.clone();
                     }
+                    *block = replacement;
+                    changed = true;
                 }
+            }
 
-                if changed {
-                    self.content = content_list.into();
-                }
+            if changed {
+                self.content = content_list
+                    .into_iter()
+                    .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+                    .collect();
             }
         }
     }
@@ -949,28 +1067,31 @@ impl AIMessageChunk {
             return;
         }
 
-        let server_content_opt: Option<Vec<serde_json::Value>> = match &self.content {
-            MessageContent::Parts(_) => Some(self.content.as_json_values()),
-            MessageContent::Text(s) => serde_json::from_str(s).ok(),
-        };
-        if let Some(mut content_list) = server_content_opt {
-            let mut changed = false;
-            for block in &mut content_list {
-                if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
-                    && (block_type == "server_tool_call" || block_type == "server_tool_call_chunk")
-                    && let Some(args_str) = block.get("args").and_then(|a| a.as_str())
-                    && let Ok(args) = serde_json::from_str::<serde_json::Value>(args_str)
-                    && args.is_object()
-                {
-                    block["type"] = serde_json::Value::String("server_tool_call".to_string());
-                    block["args"] = args;
-                    changed = true;
-                }
-            }
+        let mut content_list: Vec<serde_json::Value> = self
+            .content
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect();
 
-            if changed {
-                self.content = content_list.into();
+        let mut changed = false;
+        for block in &mut content_list {
+            if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
+                && (block_type == "server_tool_call" || block_type == "server_tool_call_chunk")
+                && let Some(args_str) = block.get("args").and_then(|a| a.as_str())
+                && let Ok(args) = serde_json::from_str::<serde_json::Value>(args_str)
+                && args.is_object()
+            {
+                block["type"] = serde_json::Value::String("server_tool_call".to_string());
+                block["args"] = args;
+                changed = true;
             }
+        }
+
+        if changed {
+            self.content = content_list
+                .into_iter()
+                .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+                .collect();
         }
     }
 
@@ -998,7 +1119,7 @@ impl AIMessageChunk {
         } else {
             String::new()
         };
-        let base = format!("{}{}\n\n{}", title, name_line, self.content.as_text());
+        let base = format!("{}{}\n\n{}", title, name_line, self.text());
 
         let mut lines = Vec::new();
         format_tool_calls_repr(&self.tool_calls, &self.invalid_tool_calls, &mut lines);
@@ -1013,38 +1134,32 @@ impl AIMessageChunk {
     }
 }
 
-fn merge_message_content(first: &MessageContent, others: &[&MessageContent]) -> MessageContent {
-    let to_mergeable = |mc: &MessageContent| -> MergeableContent {
-        match mc {
-            MessageContent::Text(s) => {
-                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
-                    MergeableContent::List(arr)
-                } else {
-                    MergeableContent::Text(s.clone())
-                }
-            }
-            MessageContent::Parts(parts) => {
-                let values: Vec<serde_json::Value> = parts
-                    .iter()
-                    .filter_map(|p| serde_json::to_value(p).ok())
-                    .collect();
-                MergeableContent::List(values)
-            }
+fn merge_message_content(first: &ContentBlocks, others: &[&ContentBlocks]) -> ContentBlocks {
+    let to_mergeable = |cb: &ContentBlocks| -> MergeableContent {
+        if cb.len() == 1
+            && let ContentBlock::Text(t) = &cb[0]
+        {
+            return MergeableContent::Text(t.text.clone());
         }
+        let values: Vec<serde_json::Value> = cb
+            .iter()
+            .filter_map(|block| serde_json::to_value(block).ok())
+            .collect();
+        MergeableContent::List(values)
     };
 
     let first_mergeable = to_mergeable(first);
     let other_mergeables: Vec<MergeableContent> =
-        others.iter().map(|mc| to_mergeable(mc)).collect();
+        others.iter().map(|cb| to_mergeable(cb)).collect();
 
     let merged = merge_content_complex(first_mergeable, other_mergeables);
 
     match merged {
-        MergeableContent::Text(s) => MessageContent::Text(s),
-        MergeableContent::List(values) => {
-            let parts: Vec<ContentPart> = values.into_iter().map(ContentPart::Other).collect();
-            MessageContent::Parts(parts)
-        }
+        MergeableContent::Text(s) => ContentBlocks::from(s.as_str()),
+        MergeableContent::List(values) => values
+            .into_iter()
+            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .collect(),
     }
 }
 
@@ -1198,6 +1313,33 @@ pub fn add_ai_message_chunks(left: AIMessageChunk, others: Vec<AIMessageChunk>) 
     result
 }
 
+impl BaseMessageChunk for AIMessageChunk {
+    fn id(&self) -> Option<String> {
+        self.id.clone()
+    }
+    fn content(&self) -> &ContentBlocks {
+        &self.content
+    }
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+    fn set_id(&mut self, id: String) {
+        self.id = Some(id);
+    }
+    fn message_type(&self) -> &'static str {
+        "AIMessageChunk"
+    }
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
+    fn to_message(&self) -> AnyMessage {
+        AnyMessage::AIMessage(self.to_message())
+    }
+}
+
 impl std::ops::Add for AIMessageChunk {
     type Output = AIMessageChunk;
 
@@ -1210,7 +1352,9 @@ impl std::iter::Sum for AIMessageChunk {
     fn sum<I: Iterator<Item = AIMessageChunk>>(iter: I) -> AIMessageChunk {
         let chunks: Vec<AIMessageChunk> = iter.collect();
         if chunks.is_empty() {
-            AIMessageChunk::builder().content("").build()
+            AIMessageChunk::builder()
+                .content(ContentBlocks::new())
+                .build()
         } else {
             let first = chunks[0].clone();
             let rest = chunks[1..].to_vec();
@@ -1595,7 +1739,7 @@ mod tests {
 
         let result = chunk1 + chunk2;
 
-        assert_eq!(result.content, "Hello world!");
+        assert_eq!(result.text(), "Hello world!");
     }
 
     #[test]
@@ -1608,7 +1752,7 @@ mod tests {
 
         let result: AIMessageChunk = chunks.into_iter().sum();
 
-        assert_eq!(result.content, "Hello beautiful world!");
+        assert_eq!(result.text(), "Hello beautiful world!");
     }
 
     #[test]
@@ -1621,7 +1765,7 @@ mod tests {
 
         let result = add_ai_message_chunks(chunk1, vec![chunk2]);
 
-        assert_eq!(result.content, "Hello world!");
+        assert_eq!(result.text(), "Hello world!");
         assert!(result.usage_metadata.is_some());
         let usage = result.usage_metadata.as_ref().unwrap();
         assert_eq!(usage.input_tokens, 5);

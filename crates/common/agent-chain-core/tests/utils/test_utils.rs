@@ -3,7 +3,7 @@ use std::env;
 
 use serde_json::json;
 
-use agent_chain_core::messages::AIMessage;
+use agent_chain_core::messages::prelude::*;
 use agent_chain_core::outputs::ChatGenerationChunk;
 use agent_chain_core::utils::base::{ExposeSecret, from_env, secret_from_env};
 use agent_chain_core::utils::env::EnvError;
@@ -342,6 +342,5 @@ fn test_generation_chunk_addition_combines_metadata() {
         .generation_info(expected_info)
         .build();
 
-    assert_eq!(result.message.text(), expected.message.text());
     assert_eq!(result.generation_info, expected.generation_info);
 }

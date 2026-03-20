@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::load::Serializable;
-use crate::messages::{AIMessage, AnyMessage, FunctionMessage, HumanMessage};
+use crate::messages::{AIMessage, AnyMessage, HumanMessage, ToolMessage};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgentAction {
@@ -180,8 +180,8 @@ pub fn convert_observation_to_messages(
     }
 }
 
-fn convert_agent_observation_to_messages(
-    _agent_action: &AgentAction,
+fn convert_agent_action_message_log_observation_to_messages(
+    _agent_action: &AgentActionMessageLog,
     observation: &Value,
 ) -> Vec<AnyMessage> {
     let content = match observation {
@@ -193,18 +193,18 @@ fn convert_agent_observation_to_messages(
     )]
 }
 
-pub fn convert_agent_action_message_log_observation_to_messages(
-    agent_action: &AgentActionMessageLog,
+fn convert_agent_observation_to_messages(
+    agent_action: &AgentAction,
     observation: &Value,
 ) -> Vec<AnyMessage> {
     let content = match observation {
         Value::String(s) => s.clone(),
         other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
     };
-    vec![AnyMessage::FunctionMessage(
-        FunctionMessage::builder()
+    vec![AnyMessage::ToolMessage(
+        ToolMessage::builder()
             .content(content)
-            .name(&agent_action.tool)
+            .tool_call_id(&agent_action.tool)
             .build(),
     )]
 }
