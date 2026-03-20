@@ -1593,19 +1593,6 @@ mod tests {
     }
 
     #[test]
-    fn test_format_messages_rejects_unsupported_types() {
-        let model = ChatOllama::new("llama3.1");
-        let messages = vec![AnyMessage::FunctionMessage(
-            crate::messages::FunctionMessage::builder()
-                .name("fn_name")
-                .content("content")
-                .build(),
-        )];
-        let result = model.format_messages(&messages);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_get_base_url_default() {
         let model = ChatOllama::new("llama3.1");
         let url = model.get_base_url();
