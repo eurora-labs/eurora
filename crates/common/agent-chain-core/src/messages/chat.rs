@@ -5,7 +5,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 
-use super::base::{AnyMessage, BaseMessage, BaseMessageChunk, get_msg_title_repr, is_interactive_env};
+use super::base::{
+    AnyMessage, BaseMessage, BaseMessageChunk, get_msg_title_repr, is_interactive_env,
+};
 use super::content::{ContentBlock, ContentBlocks};
 use super::human::HumanMessageChunk;
 use crate::load::Serializable;
@@ -570,14 +572,30 @@ impl ChatMessageChunk {
 }
 
 impl BaseMessageChunk for ChatMessageChunk {
-    fn id(&self) -> Option<String> { self.id.clone() }
-    fn content(&self) -> &ContentBlocks { &self.content }
-    fn name(&self) -> Option<String> { self.name.clone() }
-    fn set_id(&mut self, id: String) { self.id = Some(id); }
-    fn message_type(&self) -> &'static str { "ChatMessageChunk" }
-    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> { &self.additional_kwargs }
-    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> { &self.response_metadata }
-    fn to_message(&self) -> AnyMessage { AnyMessage::ChatMessage(self.to_message()) }
+    fn id(&self) -> Option<String> {
+        self.id.clone()
+    }
+    fn content(&self) -> &ContentBlocks {
+        &self.content
+    }
+    fn name(&self) -> Option<String> {
+        self.name.clone()
+    }
+    fn set_id(&mut self, id: String) {
+        self.id = Some(id);
+    }
+    fn message_type(&self) -> &'static str {
+        "ChatMessageChunk"
+    }
+    fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
+        &self.additional_kwargs
+    }
+    fn response_metadata(&self) -> &HashMap<String, serde_json::Value> {
+        &self.response_metadata
+    }
+    fn to_message(&self) -> AnyMessage {
+        AnyMessage::ChatMessage(self.to_message())
+    }
 }
 
 impl std::ops::Add for ChatMessageChunk {
