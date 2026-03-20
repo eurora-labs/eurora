@@ -148,7 +148,10 @@
 					class="size-7"
 					onmouseenter={() => (logoHovered = true)}
 					onmouseleave={() => (logoHovered = false)}
-					onclick={() => sidebarState.toggle()}
+					onclick={() => {
+						sidebarState.toggle();
+						logoHovered = false;
+					}}
 				>
 					<PanelLeftIcon class={logoHovered ? 'size-4' : 'hidden'} />
 					<EuroraLogo class={logoHovered ? 'hidden' : 'size-7'} />
