@@ -3,7 +3,11 @@
 	import { EdgeAnimated, EdgeTemporary } from '$lib/components/ai-elements/edge/index';
 	import FitViewOnChange from '$lib/custom-components/message-graph/fit-view-on-change.svelte';
 	import MessageNode from '$lib/custom-components/message-graph/message-node.svelte';
+	import SkeletonNode from '$lib/custom-components/message-graph/skeleton-node.svelte';
+	import StartNode from '$lib/custom-components/message-graph/start-node.svelte';
 	import type { MessageNodeData } from '$lib/custom-components/message-graph/message-node.svelte';
+	import type { SkeletonNodeData } from '$lib/custom-components/message-graph/skeleton-node.svelte';
+	import type { StartNodeData } from '$lib/custom-components/message-graph/start-node.svelte';
 
 	export interface TreeNodeData {
 		id: string;
@@ -19,6 +23,8 @@
 	interface Props {
 		treeNodes: TreeNodeData[];
 		activeMessageIds?: Set<string>;
+		startLabel?: string;
+		loading?: boolean;
 		hasMoreLevels?: boolean;
 		loadingMoreLevels?: boolean;
 		onmessagedblclick?: (messageId: string) => void;
@@ -29,6 +35,8 @@
 	let {
 		treeNodes,
 		activeMessageIds,
+		startLabel = 'Start',
+		loading = false,
 		hasMoreLevels = false,
 		loadingMoreLevels = false,
 		onmessagedblclick,
@@ -39,16 +47,38 @@
 	const NODE_X_GAP = 450;
 	const NODE_Y_GAP = 250;
 
-	const nodeTypes = { message: MessageNode };
+	const nodeTypes = { message: MessageNode, start: StartNode, skeleton: SkeletonNode };
 	const edgeTypes = { animated: EdgeAnimated, temporary: EdgeTemporary };
 
 	type Node = {
 		id: string;
 		type: string;
 		position: { x: number; y: number };
-		data: MessageNodeData;
+		data: MessageNodeData | StartNodeData | SkeletonNodeData;
 	};
 	type Edge = { id: string; source: string; target: string; type: string };
+
+	function addSkeletonPath(nodes: Node[], edges: Edge[], sourceId: string, depth: number) {
+		let prevId = sourceId;
+		for (let i = 0; i < depth; i++) {
+			const role: 'user' | 'assistant' = i % 2 === 0 ? 'user' : 'assistant';
+			const id = `__skeleton_${i}__`;
+			const isLast = i === depth - 1;
+			nodes.push({
+				id,
+				type: 'skeleton',
+				position: { x: (i + 1) * NODE_X_GAP, y: 0 },
+				data: { role, handles: { target: true, source: !isLast } },
+			});
+			edges.push({
+				id: `e-${prevId}-${id}`,
+				source: prevId,
+				target: id,
+				type: 'animated',
+			});
+			prevId = id;
+		}
+	}
 
 	const graphData = $derived.by(() => {
 		const nodes: Node[] = [];
@@ -57,17 +87,20 @@
 		const startId = '__start__';
 		nodes.push({
 			id: startId,
-			type: 'message',
+			type: 'start',
 			position: { x: 0, y: 0 },
 			data: {
-				role: 'assistant',
-				label: 'Start',
-				content: '',
+				label: startLabel,
 				handles: { target: false, source: true },
 			},
 		});
 
-		if (treeNodes.length === 0) return { nodes, edges };
+		if (treeNodes.length === 0) {
+			if (loading) {
+				addSkeletonPath(nodes, edges, startId, 2);
+			}
+			return { nodes, edges };
+		}
 
 		const maxLevel = Math.max(...treeNodes.map((n) => n.level));
 
