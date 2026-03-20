@@ -3,7 +3,7 @@ use std::env;
 
 use serde_json::json;
 
-use agent_chain_core::messages::{AIMessage, BaseMessage};
+use agent_chain_core::messages::prelude::*;
 use agent_chain_core::outputs::ChatGenerationChunk;
 use agent_chain_core::utils::base::{ExposeSecret, from_env, secret_from_env};
 use agent_chain_core::utils::env::EnvError;
