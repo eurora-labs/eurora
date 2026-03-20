@@ -3,7 +3,6 @@ mod base;
 pub mod block_translators;
 mod chat;
 pub mod content;
-mod function;
 mod human;
 mod modifier;
 mod system;
