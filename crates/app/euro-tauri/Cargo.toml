@@ -70,7 +70,7 @@ tauri-plugin-stronghold = "2"
 tauri-plugin-tracing = { version = "0.3.2", features = ["colored"] }
 tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
-taurpc = "0.6.0"
+taurpc = "0.7.1"
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tracing = { workspace = true }
