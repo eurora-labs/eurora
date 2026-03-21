@@ -19,7 +19,6 @@
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
 	let email = $state('');
-	let username = $state('');
 	let password = $state('');
 	let showRegisterFields = $state(false);
 
@@ -49,12 +48,11 @@
 	}
 
 	async function handleRegister() {
-		if (!username.trim() || !email.trim() || !password) return;
+		if (!email.trim() || !password) return;
 		loading = true;
 		submitError = null;
 		try {
 			const request = create(RegisterRequestSchema, {
-				username: username.trim(),
 				email: email.trim(),
 				password,
 			});
@@ -143,14 +141,6 @@
 						disabled={loading}
 						autocomplete="email"
 					/>
-					<Input
-						id="username"
-						type="text"
-						placeholder="Username"
-						bind:value={username}
-						disabled={loading}
-						autocomplete="username"
-					/>
 					<div>
 						<Input
 							id="password"
@@ -167,7 +157,7 @@
 					<Button
 						type="submit"
 						class="w-full"
-						disabled={loading || !username.trim() || !email.trim() || !password}
+						disabled={loading || !email.trim() || !password}
 					>
 						{loading ? 'Creating account...' : 'Create account'}
 					</Button>
@@ -178,7 +168,6 @@
 						disabled={loading}
 						onclick={() => {
 							showRegisterFields = false;
-							username = '';
 							password = '';
 							submitError = null;
 						}}
