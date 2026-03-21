@@ -9,9 +9,13 @@
 	import {
 		Provider,
 		AssociateLoginTokenRequestSchema,
+		LoginRequestSchema,
+		CheckEmailRequestSchema,
+		RegisterRequestSchema,
 	} from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
+	import { Input } from '@eurora/ui/components/input/index';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 
@@ -80,11 +84,93 @@
 
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
+	let email = $state('');
+	let password = $state('');
+	let username = $state('');
+	let showPassword = $state(false);
+	let showRegister = $state(false);
 
 	function storeRedirectParam() {
 		const redirect = page.url.searchParams.get('redirect');
 		if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
 			sessionStorage.setItem('postLoginRedirect', redirect);
+		}
+	}
+
+	async function handleEmailContinue() {
+		if (!email.trim()) return;
+		loading = true;
+		submitError = null;
+		try {
+			storeRedirectParam();
+			const resp = await authService.checkEmail(
+				create(CheckEmailRequestSchema, { email: email.trim() }),
+			);
+			if (resp.status === 'oauth' && resp.provider !== null) {
+				const provider =
+					resp.provider === Provider.GOOGLE ? Provider.GOOGLE : Provider.GITHUB;
+				const url = (await authService.getThirdPartyAuthUrl(provider)).url;
+				window.location.href = url;
+				return;
+			}
+			if (resp.status === 'not_found') {
+				showRegister = true;
+				return;
+			}
+			showPassword = true;
+		} catch (err) {
+			console.error('Check email error:', err);
+			submitError =
+				err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleEmailPasswordLogin() {
+		if (!email.trim() || !password) return;
+		loading = true;
+		submitError = null;
+		try {
+			const request = create(LoginRequestSchema, {
+				credential: {
+					case: 'emailPassword',
+					value: { login: email.trim(), password },
+				},
+			});
+			const tokens = await authService.login(request);
+			auth.login(tokens);
+			const redirect = sessionStorage.getItem('postLoginRedirect');
+			sessionStorage.removeItem('postLoginRedirect');
+			goto(redirect || '/');
+		} catch (err) {
+			console.error('Email/password login error:', err);
+			submitError =
+				err instanceof Error ? err.message : 'Invalid email/username or password.';
+			loading = false;
+		}
+	}
+
+	async function handleRegister() {
+		if (!username.trim() || !email.trim() || !password) return;
+		loading = true;
+		submitError = null;
+		try {
+			const request = create(RegisterRequestSchema, {
+				username: username.trim(),
+				email: email.trim(),
+				password,
+			});
+			const tokens = await authService.register(request);
+			auth.login(tokens);
+			const redirect = sessionStorage.getItem('postLoginRedirect');
+			sessionStorage.removeItem('postLoginRedirect');
+			goto(redirect || '/');
+		} catch (err) {
+			console.error('Registration error:', err);
+			submitError =
+				err instanceof Error ? err.message : 'Registration failed. Please try again.';
+			loading = false;
 		}
 	}
 
@@ -125,7 +211,7 @@
 	/>
 </svelte:head>
 
-<div class="flex min-h-screen items-center justify-center px-4">
+<div class="flex min-h-screen items-start justify-center px-4 pt-[25vh]">
 	<div class="w-full max-w-md space-y-8">
 		{#if desktopLoginDone}
 			<div class="text-center">
@@ -167,11 +253,9 @@
 				</div>
 			</Card.Root>
 		{:else}
-			<div class="text-center">
-				<h1 class="text-3xl font-bold tracking-tight">Welcome back</h1>
-				<p class="text-muted-foreground mt-2">
-					Sign in to your account to continue with Eurora Labs
-				</p>
+			<div class="text-left">
+				<h1 class="text-3xl font-bold tracking-tight">Welcome to Eurora</h1>
+				<p class="text-muted-foreground mt-2">A better, easier way to use AI.</p>
 			</div>
 
 			<Card.Root class="p-6">
@@ -187,10 +271,146 @@
 					onGoogle={handleGoogleLogin}
 					onGitHub={handleGitHubLogin}
 				/>
+
+				{#if showRegister}
+					<form
+						class="mt-3 space-y-4"
+						onsubmit={(e) => {
+							e.preventDefault();
+							handleRegister();
+						}}
+					>
+						<Input
+							id="email"
+							type="email"
+							placeholder="Email"
+							bind:value={email}
+							disabled={loading}
+							autocomplete="email"
+						/>
+						<Input
+							id="username"
+							type="text"
+							placeholder="Username"
+							bind:value={username}
+							disabled={loading}
+							autocomplete="username"
+						/>
+						<div>
+							<Input
+								id="password"
+								type="password"
+								placeholder="Password"
+								bind:value={password}
+								disabled={loading}
+								autocomplete="new-password"
+							/>
+							<p class="text-muted-foreground mt-1 text-xs">
+								Must be at least 8 characters
+							</p>
+						</div>
+						<Button
+							type="submit"
+							class="w-full"
+							disabled={loading || !username.trim() || !email.trim() || !password}
+						>
+							{loading ? 'Creating account...' : 'Create account'}
+						</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							class="w-full"
+							disabled={loading}
+							onclick={() => {
+								showRegister = false;
+								username = '';
+								password = '';
+								submitError = null;
+							}}
+						>
+							Back
+						</Button>
+					</form>
+				{:else if showPassword}
+					<form
+						class="mt-3 space-y-4"
+						onsubmit={(e) => {
+							e.preventDefault();
+							handleEmailPasswordLogin();
+						}}
+					>
+						<Input
+							id="email"
+							type="email"
+							placeholder="Email"
+							bind:value={email}
+							disabled={loading}
+							autocomplete="username"
+						/>
+						<Input
+							id="password"
+							type="password"
+							placeholder="Password"
+							bind:value={password}
+							disabled={loading}
+							autocomplete="current-password"
+						/>
+						<Button
+							type="submit"
+							class="w-full"
+							disabled={loading || !email.trim() || !password}
+						>
+							{loading ? 'Signing in...' : 'Sign in'}
+						</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							class="w-full"
+							disabled={loading}
+							onclick={() => {
+								showPassword = false;
+								password = '';
+								submitError = null;
+							}}
+						>
+							Back
+						</Button>
+					</form>
+				{:else}
+					<form
+						class="mt-3 space-y-4"
+						onsubmit={(e) => {
+							e.preventDefault();
+							handleEmailContinue();
+						}}
+					>
+						<Input
+							id="email"
+							type="email"
+							placeholder="Email"
+							bind:value={email}
+							disabled={loading}
+							autocomplete="username"
+						/>
+						<Button
+							type="submit"
+							class="w-full"
+							variant="outline"
+							disabled={loading ||
+								!email.includes('@') ||
+								!email.split('@')[1]?.includes('.')}
+						>
+							{loading ? 'Checking...' : 'Continue'}
+						</Button>
+					</form>
+				{/if}
 			</Card.Root>
 
 			<p class="text-muted-foreground text-center text-sm">
-				Email &amp; password login is coming soon.
+				Don't have an account?
+				<Button variant="link" href="/register" class="h-auto p-0 font-normal">
+					Create one
+				</Button>
 			</p>
 		{/if}
 	</div>

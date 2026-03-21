@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use argon2::{
     Argon2,
-    password_hash::{PasswordHasher, SaltString, rand_core::OsRng},
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 
 pub mod crypto;
@@ -781,9 +781,57 @@ impl ProtoAuthService for AuthService {
         })?;
 
         match credential {
-            Credential::EmailPassword(_) => Err(Status::unimplemented(
-                "Password authentication is disabled. Please use Google or GitHub to sign in.",
-            )),
+            Credential::EmailPassword(creds) => {
+                let login = creds.login.trim();
+                let password = &creds.password;
+
+                if login.is_empty() || password.is_empty() {
+                    return Err(Status::invalid_argument("Email and password are required"));
+                }
+
+                let user = match self.db.get_user().email(login.to_string()).call().await {
+                    Ok(user) => user,
+                    Err(_) => self
+                        .db
+                        .get_user()
+                        .username(login.to_string())
+                        .call()
+                        .await
+                        .map_err(|_| {
+                            Status::unauthenticated("Invalid email/username or password")
+                        })?,
+                };
+
+                let pw_creds = self
+                    .db
+                    .get_password_credentials()
+                    .user_id(user.id)
+                    .call()
+                    .await
+                    .map_err(|_| Status::unauthenticated("Invalid email/username or password"))?;
+
+                let parsed_hash = PasswordHash::new(&pw_creds.password_hash)
+                    .map_err(|_| Status::internal("Internal authentication error"))?;
+
+                Argon2::default()
+                    .verify_password(password.as_bytes(), &parsed_hash)
+                    .map_err(|_| Status::unauthenticated("Invalid email/username or password"))?;
+
+                let role = self
+                    .ensure_plan_and_resolve_role(user.id, &user.email)
+                    .await
+                    .map_err(Status::from)?;
+                let (access_token, refresh_token) = self
+                    .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
+                    .await
+                    .map_err(Status::from)?;
+
+                Ok(Response::new(TokenResponse {
+                    access_token,
+                    refresh_token,
+                    expires_in: self.jwt_config.access_token_expiry_hours * 3600,
+                }))
+            }
             Credential::ThirdParty(creds) => {
                 let provider = Provider::try_from(creds.provider)
                     .map_err(|_| Status::invalid_argument("Invalid provider"))?;
@@ -802,11 +850,14 @@ impl ProtoAuthService for AuthService {
 
     async fn register(
         &self,
-        _request: Request<RegisterRequest>,
+        request: Request<RegisterRequest>,
     ) -> Result<Response<TokenResponse>, Status> {
-        Err(Status::unimplemented(
-            "Password registration is disabled. Please use Google or GitHub to sign in.",
-        ))
+        let req = request.into_inner();
+        let response = self
+            .register_user(&req.username, &req.email, &req.password, req.display_name)
+            .await
+            .map_err(Status::from)?;
+        Ok(Response::new(response))
     }
 
     async fn refresh_token(
