@@ -40,7 +40,7 @@ export class UserService {
 			this.taurpc.auth.auth_state_changed.on((claims) => {
 				if (claims) {
 					this.authenticated = true;
-					this.username = claims.username;
+					this.username = claims.email;
 					this.email = claims.email;
 					this.role = claims.role;
 				} else {
@@ -58,8 +58,8 @@ export class UserService {
 		await this.fetchProfile();
 	}
 
-	async register(username: string, email: string, password: string): Promise<void> {
-		await this.taurpc.auth.register(username, email, password);
+	async register(email: string, password: string): Promise<void> {
+		await this.taurpc.auth.register(email, password);
 		await this.fetchProfile();
 	}
 
