@@ -86,7 +86,6 @@
 	let submitError = $state<string | null>(null);
 	let email = $state('');
 	let password = $state('');
-	let username = $state('');
 	let showPassword = $state(false);
 	let showRegister = $state(false);
 
@@ -145,19 +144,17 @@
 			goto(redirect || '/');
 		} catch (err) {
 			console.error('Email/password login error:', err);
-			submitError =
-				err instanceof Error ? err.message : 'Invalid email/username or password.';
+			submitError = err instanceof Error ? err.message : 'Invalid email or password.';
 			loading = false;
 		}
 	}
 
 	async function handleRegister() {
-		if (!username.trim() || !email.trim() || !password) return;
+		if (!email.trim() || !password) return;
 		loading = true;
 		submitError = null;
 		try {
 			const request = create(RegisterRequestSchema, {
-				username: username.trim(),
 				email: email.trim(),
 				password,
 			});
@@ -288,14 +285,6 @@
 							disabled={loading}
 							autocomplete="email"
 						/>
-						<Input
-							id="username"
-							type="text"
-							placeholder="Username"
-							bind:value={username}
-							disabled={loading}
-							autocomplete="username"
-						/>
 						<div>
 							<Input
 								id="password"
@@ -312,7 +301,7 @@
 						<Button
 							type="submit"
 							class="w-full"
-							disabled={loading || !username.trim() || !email.trim() || !password}
+							disabled={loading || !email.trim() || !password}
 						>
 							{loading ? 'Creating account...' : 'Create account'}
 						</Button>
@@ -323,7 +312,6 @@
 							disabled={loading}
 							onclick={() => {
 								showRegister = false;
-								username = '';
 								password = '';
 								submitError = null;
 							}}

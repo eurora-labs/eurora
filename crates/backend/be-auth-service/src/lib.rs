@@ -35,8 +35,6 @@ use secrecy::ExposeSecret;
 
 const MIN_PASSWORD_LENGTH: usize = 8;
 const MAX_PASSWORD_LENGTH: usize = 128;
-const MIN_USERNAME_LENGTH: usize = 3;
-const MAX_USERNAME_LENGTH: usize = 32;
 const LOGIN_TOKEN_EXPIRY_MINUTES: i64 = 20;
 const OAUTH_STATE_EXPIRY_MINUTES: i64 = 10;
 
@@ -130,30 +128,6 @@ impl AuthService {
         Ok(())
     }
 
-    fn validate_username(username: &str) -> Result<(), AuthError> {
-        if username.len() < MIN_USERNAME_LENGTH {
-            return Err(AuthError::InvalidInput(format!(
-                "Username must be at least {} characters",
-                MIN_USERNAME_LENGTH
-            )));
-        }
-        if username.len() > MAX_USERNAME_LENGTH {
-            return Err(AuthError::InvalidInput(format!(
-                "Username must be at most {} characters",
-                MAX_USERNAME_LENGTH
-            )));
-        }
-        if !username
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-        {
-            return Err(AuthError::InvalidInput(
-                "Username may only contain letters, digits, underscores, and dashes".into(),
-            ));
-        }
-        Ok(())
-    }
-
     fn validate_email(email: &str) -> Result<(), AuthError> {
         let at_pos = email.find('@');
         let valid = match at_pos {
@@ -231,7 +205,6 @@ impl AuthService {
     fn generate_jwt_tokens(
         &self,
         user_id: &str,
-        username: &str,
         email: &str,
         role: Role,
     ) -> Result<(String, String, Vec<u8>, DateTime<Utc>), AuthError> {
@@ -241,7 +214,6 @@ impl AuthService {
 
         let access_claims = Claims {
             sub: user_id.to_string(),
-            username: username.to_string(),
             email: email.to_string(),
             exp: access_exp.timestamp(),
             iat: now.timestamp(),
@@ -252,7 +224,6 @@ impl AuthService {
 
         let refresh_claims = Claims {
             sub: user_id.to_string(),
-            username: username.to_string(),
             email: email.to_string(),
             exp: refresh_exp.timestamp(),
             iat: now.timestamp(),
@@ -285,12 +256,11 @@ impl AuthService {
     async fn generate_tokens(
         &self,
         user_id: &str,
-        username: &str,
         email: &str,
         role: Role,
     ) -> Result<(String, String), AuthError> {
         let (access_token, refresh_token, token_hash, refresh_exp) =
-            self.generate_jwt_tokens(user_id, username, email, role)?;
+            self.generate_jwt_tokens(user_id, email, role)?;
 
         let user_uuid = Uuid::parse_str(user_id)
             .map_err(|e| AuthError::Internal(format!("Invalid user ID format: {e}")))?;
@@ -335,7 +305,7 @@ impl AuthService {
             Ok(_) => {
                 tracing::info!(
                     "Successfully associated login token with user: {}",
-                    user.username
+                    user.email
                 );
             }
             Err(e) => {
@@ -364,7 +334,6 @@ impl AuthService {
         email: &str,
         email_verified: bool,
         name: &str,
-        username: &str,
         encrypted_access_token: Vec<u8>,
         encrypted_refresh_token: Option<Vec<u8>>,
         token_expiry: Option<chrono::DateTime<Utc>>,
@@ -408,7 +377,7 @@ impl AuthService {
                     tracing::info!(
                         "Linking {} provider to existing user {} via email match",
                         provider,
-                        existing_user.username
+                        existing_user.email
                     );
                     self.db
                         .create_oauth_credentials()
@@ -424,52 +393,21 @@ impl AuthService {
                     return Ok(existing_user);
                 }
 
-                let base_username = username.to_string();
-                let mut final_username = base_username.clone();
-                let mut counter = 0u32;
-                const MAX_RETRIES: u32 = 5;
-
-                loop {
-                    match self
-                        .db
-                        .create_user_with_oauth()
-                        .username(final_username.clone())
-                        .email(email.to_string())
-                        .display_name(name.to_string())
-                        .email_verified(email_verified)
-                        .provider(provider)
-                        .provider_user_id(provider_user_id.to_string())
-                        .access_token(encrypted_access_token.clone())
-                        .maybe_refresh_token(encrypted_refresh_token.clone())
-                        .maybe_access_token_expiry(token_expiry)
-                        .scope(scope.clone())
-                        .call()
-                        .await
-                    {
-                        Ok(user) => break Ok(user),
-                        Err(be_remote_db::DbError::Duplicate { value, .. })
-                            if value.contains("username") =>
-                        {
-                            counter += 1;
-                            if counter >= MAX_RETRIES {
-                                tracing::error!(
-                                    "Failed to create unique username after {} attempts",
-                                    MAX_RETRIES
-                                );
-                                return Err(AuthError::Internal(
-                                    "Failed to create user account".into(),
-                                ));
-                            }
-                            final_username = format!("{}_{}", base_username, counter);
-                            tracing::info!(
-                                "Username conflict ({}), retrying with '{}'",
-                                value,
-                                final_username
-                            );
-                        }
-                        Err(e) => break Err(AuthError::Database(e)),
-                    }
-                }
+                let user = self
+                    .db
+                    .create_user_with_oauth()
+                    .email(email.to_string())
+                    .display_name(name.to_string())
+                    .email_verified(email_verified)
+                    .provider(provider)
+                    .provider_user_id(provider_user_id.to_string())
+                    .access_token(encrypted_access_token)
+                    .maybe_refresh_token(encrypted_refresh_token)
+                    .maybe_access_token_expiry(token_expiry)
+                    .scope(scope)
+                    .call()
+                    .await?;
+                Ok(user)
             }
         }
     }
@@ -481,31 +419,15 @@ impl AuthService {
 
     pub async fn register_user(
         &self,
-        username: &str,
         email: &str,
         password: &str,
         display_name: Option<String>,
     ) -> Result<TokenResponse, AuthError> {
-        Self::validate_username(username)?;
         Self::validate_email(email)?;
         Self::validate_password(password)?;
 
-        if self
-            .db
-            .user_exists_by_username()
-            .username(username)
-            .call()
-            .await?
-        {
-            return Err(AuthError::InvalidInput(
-                "Username or email already taken".into(),
-            ));
-        }
-
         if self.db.user_exists_by_email().email(email).call().await? {
-            return Err(AuthError::InvalidInput(
-                "Username or email already taken".into(),
-            ));
+            return Err(AuthError::InvalidInput("Email already taken".into()));
         }
 
         let password_hash = self.hash_password(password)?;
@@ -513,7 +435,6 @@ impl AuthService {
         let user = self
             .db
             .create_user()
-            .username(username.to_string())
             .email(email.to_string())
             .maybe_display_name(display_name)
             .password_hash(password_hash)
@@ -524,7 +445,7 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
+            .generate_tokens(&user.id.to_string(), &user.email, role)
             .await?;
 
         Ok(TokenResponse {
@@ -554,7 +475,7 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, new_refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
+            .generate_tokens(&user.id.to_string(), &user.email, role)
             .await?;
 
         Ok(TokenResponse {
@@ -633,21 +554,6 @@ impl AuthService {
             chrono::Utc::now() + chrono::Duration::seconds(duration.as_secs() as i64)
         });
 
-        let username = user_info
-            .email
-            .split('@')
-            .next()
-            .filter(|s| !s.is_empty())
-            .unwrap_or(&user_info.name)
-            .to_string();
-
-        if username.is_empty() {
-            tracing::warn!("Empty username detected");
-            return Err(AuthError::InvalidInput(
-                "Unable to determine username from OAuth profile".into(),
-            ));
-        }
-
         let user = self
             .find_or_create_oauth_user()
             .provider(OAuthProvider::Google)
@@ -655,7 +561,6 @@ impl AuthService {
             .email(&user_info.email)
             .email_verified(user_info.verified_email)
             .name(&user_info.name)
-            .username(&username)
             .encrypted_access_token(oauth_access_token)
             .maybe_encrypted_refresh_token(oauth_refresh_token)
             .maybe_token_expiry(oauth_token_expiry)
@@ -672,7 +577,7 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
+            .generate_tokens(&user.id.to_string(), &user.email, role)
             .await?;
 
         let response = TokenResponse {
@@ -736,7 +641,6 @@ impl AuthService {
             .email(&user_info.email)
             .email_verified(user_info.verified_email)
             .name(&user_info.name)
-            .username(&user_info.username)
             .encrypted_access_token(oauth_access_token)
             .scope(user_info.scope)
             .call()
@@ -751,7 +655,7 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
+            .generate_tokens(&user.id.to_string(), &user.email, role)
             .await?;
 
         let response = TokenResponse {
@@ -780,25 +684,20 @@ impl ProtoAuthService for AuthService {
 
         match credential {
             Credential::EmailPassword(creds) => {
-                let login = creds.login.trim();
+                let email = creds.login.trim();
                 let password = &creds.password;
 
-                if login.is_empty() || password.is_empty() {
+                if email.is_empty() || password.is_empty() {
                     return Err(Status::invalid_argument("Email and password are required"));
                 }
 
-                let user = match self.db.get_user().email(login.to_string()).call().await {
-                    Ok(user) => user,
-                    Err(_) => self
-                        .db
-                        .get_user()
-                        .username(login.to_string())
-                        .call()
-                        .await
-                        .map_err(|_| {
-                            Status::unauthenticated("Invalid email/username or password")
-                        })?,
-                };
+                let user = self
+                    .db
+                    .get_user()
+                    .email(email.to_string())
+                    .call()
+                    .await
+                    .map_err(|_| Status::unauthenticated("Invalid email or password"))?;
 
                 let pw_creds = self
                     .db
@@ -806,21 +705,21 @@ impl ProtoAuthService for AuthService {
                     .user_id(user.id)
                     .call()
                     .await
-                    .map_err(|_| Status::unauthenticated("Invalid email/username or password"))?;
+                    .map_err(|_| Status::unauthenticated("Invalid email or password"))?;
 
                 let parsed_hash = PasswordHash::new(&pw_creds.password_hash)
                     .map_err(|_| Status::internal("Internal authentication error"))?;
 
                 Argon2::default()
                     .verify_password(password.as_bytes(), &parsed_hash)
-                    .map_err(|_| Status::unauthenticated("Invalid email/username or password"))?;
+                    .map_err(|_| Status::unauthenticated("Invalid email or password"))?;
 
                 let role = self
                     .ensure_plan_and_resolve_role(user.id, &user.email)
                     .await
                     .map_err(Status::from)?;
                 let (access_token, refresh_token) = self
-                    .generate_tokens(&user.id.to_string(), &user.username, &user.email, role)
+                    .generate_tokens(&user.id.to_string(), &user.email, role)
                     .await
                     .map_err(Status::from)?;
 
@@ -852,7 +751,7 @@ impl ProtoAuthService for AuthService {
     ) -> Result<Response<TokenResponse>, Status> {
         let req = request.into_inner();
         let response = self
-            .register_user(&req.username, &req.email, &req.password, req.display_name)
+            .register_user(&req.email, &req.password, req.display_name)
             .await
             .map_err(Status::from)?;
         Ok(Response::new(response))
@@ -998,7 +897,7 @@ impl ProtoAuthService for AuthService {
         let role = self.resolve_role(user.id).await;
 
         let (access_token, refresh_token, refresh_token_hash, refresh_exp) = self
-            .generate_jwt_tokens(&user.id.to_string(), &user.username, &user.email, role)
+            .generate_jwt_tokens(&user.id.to_string(), &user.email, role)
             .map_err(Status::from)?;
 
         self.db

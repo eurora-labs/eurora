@@ -40,10 +40,9 @@ enum Provider {
   GITHUB = 2;
 }
 message RegisterRequest {
-  string username = 1;
-  string email = 2;
-  string password = 3;
-  optional string display_name = 4;
+  string email = 1;
+  string password = 2;
+  optional string display_name = 3;
 }
 
 message RefreshTokenRequest {}

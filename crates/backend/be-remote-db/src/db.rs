@@ -85,7 +85,6 @@ impl DatabaseManager {
     #[builder]
     pub async fn create_user(
         &self,
-        username: String,
         email: String,
         display_name: Option<String>,
         password_hash: Option<String>,
@@ -97,13 +96,12 @@ impl DatabaseManager {
 
         let user = sqlx::query_as::<_, User>(
             r#"
-            INSERT INTO users (id, username, email, display_name, email_verified, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
+            INSERT INTO users (id, email, display_name, email_verified, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, email, display_name, email_verified, created_at, updated_at
             "#,
         )
         .bind(user_id)
-        .bind(&username)
         .bind(&email)
         .bind(&display_name)
         .bind(false)
@@ -135,7 +133,6 @@ impl DatabaseManager {
     #[builder]
     pub async fn create_user_with_oauth(
         &self,
-        username: String,
         email: String,
         display_name: Option<String>,
         email_verified: bool,
@@ -154,13 +151,12 @@ impl DatabaseManager {
 
         let user = sqlx::query_as::<_, User>(
             r#"
-            INSERT INTO users (id, username, email, display_name, email_verified, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING id, username, email, display_name, email_verified, created_at, updated_at
+            INSERT INTO users (id, email, display_name, email_verified, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, email, display_name, email_verified, created_at, updated_at
             "#,
         )
         .bind(user_id)
-        .bind(&username)
         .bind(&email)
         .bind(&display_name)
         .bind(email_verified)
@@ -197,16 +193,10 @@ impl DatabaseManager {
     }
 
     #[builder]
-    pub async fn get_user(
-        &self,
-        id: Option<Uuid>,
-        username: Option<String>,
-        email: Option<String>,
-    ) -> DbResult<User> {
-        let (clause, bind_value) = match (id, username, email) {
-            (Some(id), _, _) => ("id = $1::uuid", id.to_string()),
-            (_, Some(username), _) => ("username = $1", username),
-            (_, _, Some(email)) => ("email = $1", email),
+    pub async fn get_user(&self, id: Option<Uuid>, email: Option<String>) -> DbResult<User> {
+        let (clause, bind_value) = match (id, email) {
+            (Some(id), _) => ("id = $1::uuid", id.to_string()),
+            (_, Some(email)) => ("email = $1", email),
             _ => {
                 return Err(DbError::Internal(
                     "get_user requires at least one filter".into(),
@@ -215,7 +205,7 @@ impl DatabaseManager {
         };
 
         let query = format!(
-            "SELECT id, username, email, display_name, email_verified, created_at, updated_at FROM users WHERE {clause}"
+            "SELECT id, email, display_name, email_verified, created_at, updated_at FROM users WHERE {clause}"
         );
 
         let user = sqlx::query_as::<_, User>(&query)
@@ -240,20 +230,6 @@ impl DatabaseManager {
         .await?;
 
         Ok(credentials)
-    }
-
-    #[builder]
-    pub async fn user_exists_by_username(&self, username: &str) -> DbResult<bool> {
-        let count: (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(*) FROM users WHERE username = $1
-            "#,
-        )
-        .bind(username)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(count.0 > 0)
     }
 
     #[builder]
@@ -394,7 +370,7 @@ impl DatabaseManager {
     ) -> DbResult<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT u.id, u.username, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at
+            SELECT u.id, u.email, u.email_verified, u.created_at, u.updated_at
             FROM users u
             INNER JOIN oauth_credentials oc ON u.id = oc.user_id
             WHERE oc.provider = $1 AND oc.provider_user_id = $2
