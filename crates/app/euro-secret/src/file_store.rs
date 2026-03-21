@@ -6,7 +6,7 @@ use std::sync::{Mutex, OnceLock};
 use anyhow::{Context, Result, bail};
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
-use rand::RngCore;
+use rand::Rng;
 use zeroize::Zeroize;
 
 const STORE_FILENAME: &str = "secrets.enc";

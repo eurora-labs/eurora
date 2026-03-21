@@ -17,7 +17,6 @@
 	let login = $state('');
 	let password = $state('');
 
-	let regUsername = $state('');
 	let regEmail = $state('');
 	let regPassword = $state('');
 
@@ -36,7 +35,7 @@
 	async function handleRegister() {
 		submitting = true;
 		try {
-			await user.register(regUsername, regEmail, regPassword);
+			await user.register(regEmail, regPassword);
 			goto('/');
 		} catch (error) {
 			toast.error(`Registration failed: ${error}`);
@@ -62,10 +61,11 @@
 
 		<Tabs.Content value="login" class="flex flex-col gap-4 pt-4">
 			<div class="flex flex-col gap-2">
-				<Label for="login" class="text-sm font-medium">Username or Email</Label>
+				<Label for="login" class="text-sm font-medium">Email</Label>
 				<Input
 					id="login"
-					placeholder="Enter your username or email"
+					type="email"
+					placeholder="Enter your email"
 					bind:value={login}
 					disabled={submitting}
 				/>
@@ -91,15 +91,6 @@
 		</Tabs.Content>
 
 		<Tabs.Content value="register" class="flex flex-col gap-4 pt-4">
-			<div class="flex flex-col gap-2">
-				<Label for="reg-username" class="text-sm font-medium">Username</Label>
-				<Input
-					id="reg-username"
-					placeholder="Choose a username"
-					bind:value={regUsername}
-					disabled={submitting}
-				/>
-			</div>
 			<div class="flex flex-col gap-2">
 				<Label for="reg-email" class="text-sm font-medium">Email</Label>
 				<Input

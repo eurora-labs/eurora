@@ -44,7 +44,7 @@
 		{:else}
 			<div class="flex items-center justify-between">
 				<span class="text-sm">Name</span>
-				<Input class="max-w-60" disabled value={user.username} />
+				<Input class="max-w-60" disabled value={user.displayName ?? ''} />
 			</div>
 			<div class="flex items-center justify-between">
 				<span class="text-sm">Email</span>

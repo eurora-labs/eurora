@@ -257,6 +257,7 @@
 			</Timeline.Root>
 		</div>
 	{/if}
+
 	<Sidebar.Footer>
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
@@ -269,10 +270,12 @@
 						<div
 							class="flex size-7 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground text-xs font-medium"
 						>
-							{getFirstLetterAndCapitalize(user.username)}
+							{getFirstLetterAndCapitalize(user.displayName ?? user.email)}
 						</div>
 						{#if sidebarState.open}
-							<span class="truncate text-sm flex-1 text-left">{user.username}</span>
+							<span class="truncate text-sm flex-1 text-left"
+								>{user.displayName ?? user.email}</span
+							>
 							<ChevronUpIcon class="size-4 shrink-0" />
 						{/if}
 					</Button>

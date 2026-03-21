@@ -43,7 +43,6 @@ impl AuthClient {
 
     pub async fn register(
         &mut self,
-        username: impl Into<String>,
         email: impl Into<String>,
         password: impl Into<String>,
         display_name: Option<String>,
@@ -51,7 +50,6 @@ impl AuthClient {
         let mut client = self.client();
         let response = client
             .register(RegisterRequest {
-                username: username.into(),
                 email: email.into(),
                 password: password.into(),
                 display_name,

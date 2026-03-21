@@ -141,7 +141,7 @@ export const auth = {
 			const user: User = {
 				id: payload.sub || payload.user_id || 'unknown',
 				email: payload.email || 'unknown@example.com',
-				name: payload.name || payload.username,
+				name: payload.name || payload.email,
 				avatar: payload.avatar || payload.picture,
 			};
 

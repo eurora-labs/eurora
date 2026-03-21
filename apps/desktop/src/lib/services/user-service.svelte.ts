@@ -4,8 +4,8 @@ import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
 	authenticated = $state(false);
-	username = $state('');
 	email = $state('');
+	displayName = $state<string | null>(null);
 	role = $state('');
 
 	readonly planLabel = $derived(this.role === 'Tier1' ? 'Pro' : 'Free');
@@ -18,14 +18,14 @@ export class UserService {
 	}
 
 	private async fetchProfile() {
-		const [u, e, r] = await Promise.all([
-			this.taurpc.auth.get_username(),
+		const [e, d, r] = await Promise.all([
 			this.taurpc.auth.get_email(),
+			this.taurpc.auth.get_display_name(),
 			this.taurpc.auth.get_role(),
 		]);
 		this.authenticated = true;
-		this.username = u;
 		this.email = e;
+		this.displayName = d;
 		this.role = r;
 	}
 
@@ -40,13 +40,13 @@ export class UserService {
 			this.taurpc.auth.auth_state_changed.on((claims) => {
 				if (claims) {
 					this.authenticated = true;
-					this.username = claims.username;
 					this.email = claims.email;
+					this.displayName = claims.display_name ?? null;
 					this.role = claims.role;
 				} else {
 					this.authenticated = false;
-					this.username = '';
 					this.email = '';
+					this.displayName = null;
 					this.role = '';
 				}
 			}),
@@ -58,8 +58,8 @@ export class UserService {
 		await this.fetchProfile();
 	}
 
-	async register(username: string, email: string, password: string): Promise<void> {
-		await this.taurpc.auth.register(username, email, password);
+	async register(email: string, password: string): Promise<void> {
+		await this.taurpc.auth.register(email, password);
 		await this.fetchProfile();
 	}
 

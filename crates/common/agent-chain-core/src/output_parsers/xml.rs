@@ -103,7 +103,9 @@ impl StreamingParser {
                     current_text.clear();
                 }
                 Ok(quick_xml::events::Event::Text(ref e)) => {
-                    if let Ok(text) = e.unescape() {
+                    if let Ok(decoded) = e.decode()
+                        && let Ok(text) = quick_xml::escape::unescape(&decoded)
+                    {
                         current_text.push_str(&text);
                     }
                 }
@@ -255,7 +257,9 @@ fn read_element_content(reader: &mut quick_xml::Reader<&[u8]>, parent_tag: &str)
                 children.push(Value::Object(child_map));
             }
             Ok(quick_xml::events::Event::Text(ref e)) => {
-                if let Ok(t) = e.unescape() {
+                if let Ok(decoded) = e.decode()
+                    && let Ok(t) = quick_xml::escape::unescape(&decoded)
+                {
                     text_content.push_str(&t);
                 }
             }

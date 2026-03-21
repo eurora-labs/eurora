@@ -4,8 +4,11 @@ import { InjectionToken } from '@eurora/shared/context';
 import {
 	ProtoAuthService,
 	type LoginRequest,
+	type RegisterRequest,
 	type TokenResponse,
 	type RefreshTokenRequest,
+	type CheckEmailRequest,
+	type CheckEmailResponse,
 	Provider,
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
@@ -38,6 +41,14 @@ export class AuthService {
 		return await this.client.login(data);
 	}
 
+	public async register(data: RegisterRequest): Promise<TokenResponse> {
+		return await this.client.register(data);
+	}
+
+	public async checkEmail(data: CheckEmailRequest): Promise<CheckEmailResponse> {
+		return await this.client.checkEmail(data);
+	}
+
 	public async refreshToken(data: RefreshTokenRequest): Promise<TokenResponse> {
 		return await this.client.refreshToken(data);
 	}
@@ -63,8 +74,11 @@ export class AuthService {
 export const AUTH_SERVICE = new InjectionToken<AuthService>('AuthService');
 export type {
 	LoginRequest,
+	RegisterRequest,
 	TokenResponse,
 	RefreshTokenRequest,
+	CheckEmailRequest,
+	CheckEmailResponse,
 	Provider,
 	ThirdPartyAuthUrlResponse,
 	LoginByLoginTokenRequest,

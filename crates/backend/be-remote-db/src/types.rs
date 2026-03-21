@@ -63,7 +63,6 @@ impl PaginationParams {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: Uuid,
-    pub username: String,
     pub email: String,
     pub display_name: Option<String>,
     pub email_verified: bool,

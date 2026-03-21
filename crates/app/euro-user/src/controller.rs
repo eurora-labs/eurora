@@ -52,11 +52,10 @@ impl Controller {
 
     pub async fn register(
         &mut self,
-        username: impl Into<String>,
         email: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<SecretString> {
-        self.auth_manager.register(username, email, password).await
+        self.auth_manager.register(email, password).await
     }
 
     pub async fn login(

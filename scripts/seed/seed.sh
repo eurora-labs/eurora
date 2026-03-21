@@ -59,7 +59,7 @@ echo "  Loading plans..."
 $PSQL -c "\COPY plans (id, name, description, created_at, updated_at, monthly_token_limit) FROM '$DATA_DIR/plans.csv' WITH (FORMAT csv, HEADER true);"
 
 echo "  Loading users..."
-$PSQL -c "\COPY users (id, username, email, display_name, email_verified, created_at, updated_at, stripe_customer_id, plan_id) FROM '$DATA_DIR/users.csv' WITH (FORMAT csv, HEADER true);"
+$PSQL -c "\COPY users (id, email, display_name, email_verified, created_at, updated_at, stripe_customer_id, plan_id) FROM '$DATA_DIR/users.csv' WITH (FORMAT csv, HEADER true);"
 
 echo "  Loading assets..."
 $PSQL -c "\COPY assets (id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, created_at, updated_at, metadata) FROM '$DATA_DIR/assets.csv' WITH (FORMAT csv, HEADER true);"
