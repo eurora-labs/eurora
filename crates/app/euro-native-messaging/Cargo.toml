@@ -22,12 +22,11 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = [
   "derive",
-  "export",
+  "collect",
   "function",
-  "serde",
   "serde_json"
 ] }
-specta-typescript = { version = "0.0.9" }
+specta-typescript = { version = "0.0.10" }
 strum_macros = { workspace = true }
 tiny-skia = "0.12"
 tokio = { workspace = true, features = ["full"] }

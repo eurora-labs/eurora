@@ -58,7 +58,7 @@ pub fn generate_typescript_definitions() -> Result<()> {
         .bigint(BigIntExportBehavior::Fail)
         .export_to(
             "apps/browser/src/shared/content/bindings.ts",
-            &specta::export(),
+            &specta::collect(),
         )
     {
         tracing::debug!("Failed to generate TypeScript definitions: {}", e);
