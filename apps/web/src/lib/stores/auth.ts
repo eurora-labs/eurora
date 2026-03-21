@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
-import { authService, type TokenResponse } from '$lib/services/auth-service';
+import { AUTH_SERVICE, type AuthService, type TokenResponse } from '$lib/services/auth-service.js';
 import { create } from '@bufbuild/protobuf';
+import { inject } from '@eurora/shared/context';
 import { RefreshTokenRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
 import { writable, derived, get } from 'svelte/store';
 
@@ -25,6 +26,10 @@ const STORAGE_KEYS = {
 	EXPIRES_AT: 'eurora_expires_at',
 	USER: 'eurora_user',
 } as const;
+
+function getAuthService(): AuthService {
+	return inject(AUTH_SERVICE);
+}
 
 function initializeAuthState(): AuthState {
 	if (!browser) {
@@ -163,7 +168,7 @@ export const auth = {
 
 		try {
 			const refreshRequest = create(RefreshTokenRequestSchema, {});
-			const tokens = await authService.refreshToken(refreshRequest);
+			const tokens = await getAuthService().refreshToken(refreshRequest);
 
 			if (currentState.user) {
 				storeTokens(tokens, currentState.user);
@@ -209,9 +214,3 @@ export const auth = {
 export const isAuthenticated = derived(authStore, ($auth) => $auth.isAuthenticated);
 export const currentUser = derived(authStore, ($auth) => $auth.user);
 export const accessToken = derived(authStore, ($auth) => $auth.accessToken);
-
-if (browser) {
-	auth.ensureValidToken().catch((error) => {
-		console.error('Failed to ensure valid token on app load:', error);
-	});
-}

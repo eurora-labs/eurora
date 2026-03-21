@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 	import { auth, accessToken } from '$lib/stores/auth.js';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
@@ -9,7 +11,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onMount } from 'svelte';
 
-	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
+	const REST_API_URL = inject(CONFIG_SERVICE).restApiUrl;
 
 	let status = $state<'loading' | 'complete' | 'failed'>('loading');
 	let countdown = $state(5);

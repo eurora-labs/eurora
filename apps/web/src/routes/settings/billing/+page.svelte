@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 	import { auth, accessToken, isAuthenticated } from '$lib/stores/auth.js';
 	import {
 		subscriptionStore,
@@ -7,6 +8,7 @@
 		subscriptionLoading,
 		subscriptionError,
 	} from '$lib/stores/subscription.js';
+	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
@@ -15,8 +17,8 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onMount } from 'svelte';
 
-	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
-	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
+	const { restApiUrl: REST_API_URL, stripeProPriceId: STRIPE_PRO_PRICE_ID } =
+		inject(CONFIG_SERVICE);
 
 	let portalLoading = $state(false);
 	let portalError = $state<string | null>(null);

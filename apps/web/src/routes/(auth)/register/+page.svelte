@@ -1,7 +1,10 @@
 <script lang="ts">
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
-	import { authService } from '$lib/services/auth-service';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
+	import { inject } from '@eurora/shared/context';
 	import { Provider } from '@eurora/shared/proto/auth_service_pb.js';
+
+	const authService = inject(AUTH_SERVICE);
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 
