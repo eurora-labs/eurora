@@ -8,7 +8,7 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit, Payload},
 };
 use hkdf::Hkdf;
-use rand::RngCore;
+use rand::Rng;
 use sha2::Sha256;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
