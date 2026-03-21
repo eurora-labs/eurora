@@ -24,7 +24,6 @@ pub trait AuthApi {
 
     async fn register<R: Runtime>(
         app_handle: AppHandle<R>,
-        username: String,
         email: String,
         password: String,
     ) -> Result<(), String>;
@@ -155,7 +154,6 @@ impl AuthApi for AuthApiImpl {
     async fn register<R: Runtime>(
         self,
         app_handle: AppHandle<R>,
-        username: String,
         email: String,
         password: String,
     ) -> Result<(), String> {
@@ -163,7 +161,7 @@ impl AuthApi for AuthApiImpl {
         let mut controller = user_state.lock().await;
 
         controller
-            .register(&username, &email, &password)
+            .register(&email, &password)
             .await
             .ctx("Registration failed")?;
 
@@ -273,7 +271,7 @@ impl AuthApi for AuthApiImpl {
         let claims = controller
             .get_access_token_payload()
             .ctx("Failed to get access token payload")?;
-        Ok(claims.username)
+        Ok(claims.email)
     }
 
     async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {

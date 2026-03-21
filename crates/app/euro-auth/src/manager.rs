@@ -51,14 +51,10 @@ impl AuthManager {
 
     pub async fn register(
         &mut self,
-        username: impl Into<String>,
         email: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<SecretString> {
-        let response = self
-            .auth_client
-            .register(username, email, password, None)
-            .await?;
+        let response = self.auth_client.register(email, password, None).await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
