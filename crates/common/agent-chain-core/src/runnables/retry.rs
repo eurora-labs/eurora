@@ -5,7 +5,7 @@ use std::time::Duration;
 use async_trait::async_trait;
 use backon::{BackoffBuilder, Retryable};
 use bon::bon;
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 
 use crate::callbacks::CallbackManagerForChainRun;

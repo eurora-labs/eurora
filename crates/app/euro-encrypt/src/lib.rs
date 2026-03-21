@@ -7,7 +7,7 @@ use chacha20poly1305::{
 };
 use euro_secret::{self, ExposeSecret, SecretString, secret};
 use hkdf::Hkdf;
-use rand::RngCore;
+use rand::Rng;
 use sha2::Sha256;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
