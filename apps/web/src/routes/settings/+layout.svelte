@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import MenuBar from '$lib/components/MenuBar.svelte';
+	import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
 	import {
 		subscriptionStore,
 		subscription,
 		subscriptionLoading,
 	} from '$lib/stores/subscription.js';
+	import { inject } from '@eurora/shared/context';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { ContactDialog } from '@eurora/ui/custom-components/contact-dialog/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
@@ -15,7 +17,7 @@
 
 	let contactDialogOpen = $state(false);
 
-	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
+	const STRIPE_PRO_PRICE_ID = inject(CONFIG_SERVICE).stripeProPriceId;
 
 	let { children } = $props();
 

@@ -1,11 +1,8 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
-	import {
-		getDownloadOptions,
-		getDownloadUrl,
-		type DownloadOption,
-	} from '$lib/services/download-service';
+	import { DOWNLOAD_SERVICE, type DownloadOption } from '$lib/services/download-service.js';
 	import { getArch, getOS } from '$lib/utils/getOS';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Collapsible from '@eurora/ui/components/collapsible/index';
 	import AppleIcon from '@lucide/svelte/icons/apple';
@@ -14,15 +11,22 @@
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import type { Component } from 'svelte';
 
-	const detectedOS = getOS();
-	const detectedArch = getArch();
-	const downloadOptions = getDownloadOptions(detectedOS, detectedArch);
-	const allOptions = getDownloadOptions('unknown', 'unknown');
-	const platformDetected = detectedOS !== 'unknown';
-	const alternatives = downloadOptions.slice(1);
+	const downloadService = inject(DOWNLOAD_SERVICE);
+
+	let detectedOS = $state(getOS());
+	let detectedArch = $state(getArch());
+	let downloadOptions = $derived(downloadService.getDownloadOptions(detectedOS, detectedArch));
+	const allOptions = downloadService.getDownloadOptions('unknown', 'unknown');
+	let platformDetected = $derived(detectedOS !== 'unknown');
+	let alternatives = $derived(downloadOptions.slice(1));
+
+	$effect(() => {
+		detectedOS = getOS();
+		detectedArch = getArch();
+	});
 
 	function handleDownload(option: DownloadOption) {
-		window.location.href = getDownloadUrl(option);
+		window.location.href = downloadService.getDownloadUrl(option);
 	}
 
 	function getOSIcon(os: string): Component<{ class?: string }> {

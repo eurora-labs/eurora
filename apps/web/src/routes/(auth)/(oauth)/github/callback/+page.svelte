@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { authService } from '$lib/services/auth-service';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
 	import { auth } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
+	import { inject } from '@eurora/shared/context';
 	import { LoginRequestSchema, Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import { onMount } from 'svelte';
+
+	const authService = inject(AUTH_SERVICE);
 
 	onMount(async () => {
 		const query = new URLSearchParams(window.location.search);

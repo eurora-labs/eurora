@@ -1,5 +1,6 @@
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
+import { InjectionToken } from '@eurora/shared/context';
 import {
 	ProtoAuthService,
 	type LoginRequest,
@@ -10,23 +11,27 @@ import {
 	type LoginByLoginTokenRequest,
 	type AssociateLoginTokenRequest,
 } from '@eurora/shared/proto/auth_service_pb.js';
+import type { ConfigService } from '$lib/services/config-service.js';
 
-const VITE_GRPC_API_URL: string = import.meta.env.VITE_GRPC_API_URL;
+export class AuthService {
+	private _client: Client<typeof ProtoAuthService> | null = null;
+	private readonly config: ConfigService;
 
-if (!VITE_GRPC_API_URL) {
-	throw new Error('VITE_GRPC_API_URL environment variable is required but not defined');
-}
+	constructor(config: ConfigService) {
+		this.config = config;
+	}
 
-class AuthService {
-	private readonly client: Client<typeof ProtoAuthService>;
-	constructor() {
-		this.client = createClient(
-			ProtoAuthService,
-			createGrpcWebTransport({
-				baseUrl: VITE_GRPC_API_URL,
-				useBinaryFormat: true,
-			}),
-		);
+	private get client(): Client<typeof ProtoAuthService> {
+		if (!this._client) {
+			this._client = createClient(
+				ProtoAuthService,
+				createGrpcWebTransport({
+					baseUrl: this.config.grpcApiUrl,
+					useBinaryFormat: true,
+				}),
+			);
+		}
+		return this._client;
 	}
 
 	public async login(data: LoginRequest): Promise<TokenResponse> {
@@ -55,7 +60,7 @@ class AuthService {
 	}
 }
 
-export const authService = new AuthService();
+export const AUTH_SERVICE = new InjectionToken<AuthService>('AuthService');
 export type {
 	LoginRequest,
 	TokenResponse,

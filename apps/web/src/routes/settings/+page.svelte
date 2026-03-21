@@ -1,13 +1,10 @@
 <script lang="ts">
 	import GetProButton from '$lib/components/GetProButton.svelte';
-	import {
-		getDownloadOptions,
-		getDownloadUrl,
-		type DownloadOption,
-	} from '$lib/services/download-service';
+	import { DOWNLOAD_SERVICE, type DownloadOption } from '$lib/services/download-service.js';
 	import { currentUser } from '$lib/stores/auth.js';
 	import { subscription, subscriptionLoading } from '$lib/stores/subscription.js';
 	import { getArch, getOS } from '$lib/utils/getOS';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import * as Collapsible from '@eurora/ui/components/collapsible/index';
@@ -19,16 +16,17 @@
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import type { Component } from 'svelte';
 
+	const downloadService = inject(DOWNLOAD_SERVICE);
 	const isFreePlan = $derived(!$subscriptionLoading && !$subscription?.subscription_id);
 
 	let detectedOS = $state(getOS());
 	let detectedArch = $state(getArch());
-	let downloadOptions = $derived(getDownloadOptions(detectedOS, detectedArch));
-	let allOptions = $derived(getDownloadOptions('unknown', 'unknown'));
+	let downloadOptions = $derived(downloadService.getDownloadOptions(detectedOS, detectedArch));
+	let allOptions = $derived(downloadService.getDownloadOptions('unknown', 'unknown'));
 	let platformDetected = $derived(detectedOS !== 'unknown');
 
 	function handleDownload(option: DownloadOption) {
-		window.location.href = getDownloadUrl(option);
+		window.location.href = downloadService.getDownloadUrl(option);
 	}
 
 	function getOSIcon(os: string): Component<{ class?: string }> {
