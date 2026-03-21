@@ -20,7 +20,7 @@ export interface AuthState {
 	expiresAt: number | null;
 }
 
-const STORAGE_KEYS = {
+const COOKIE_KEYS = {
 	ACCESS_TOKEN: 'eurora_access_token',
 	REFRESH_TOKEN: 'eurora_refresh_token',
 	EXPIRES_AT: 'eurora_expires_at',
@@ -29,6 +29,14 @@ const STORAGE_KEYS = {
 
 function getAuthService(): AuthService {
 	return inject(AUTH_SERVICE);
+}
+
+function setCookie(name: string, value: string, maxAgeSec: number) {
+	document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSec}; samesite=lax`;
+}
+
+function deleteCookie(name: string) {
+	document.cookie = `${name}=; path=/; max-age=0`;
 }
 
 function initializeAuthState(): AuthState {
@@ -43,29 +51,28 @@ function initializeAuthState(): AuthState {
 	}
 
 	try {
-		const accessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-		const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-		const expiresAt = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT);
-		const userStr = localStorage.getItem(STORAGE_KEYS.USER);
+		const accessToken = getCookie(COOKIE_KEYS.ACCESS_TOKEN);
+		const refreshToken = getCookie(COOKIE_KEYS.REFRESH_TOKEN);
+		const expiresAtStr = getCookie(COOKIE_KEYS.EXPIRES_AT);
+		const userStr = getCookie(COOKIE_KEYS.USER);
 
-		if (accessToken && refreshToken && expiresAt && userStr) {
-			const user = JSON.parse(userStr) as User;
-			const expiresAtNum = parseInt(expiresAt, 10);
+		if (accessToken && refreshToken && expiresAtStr && userStr) {
+			const user = JSON.parse(decodeURIComponent(userStr)) as User;
+			const expiresAt = parseInt(expiresAtStr, 10);
 			const now = Date.now();
-
-			const isValid = expiresAtNum > now + 5 * 60 * 1000;
+			const isValid = expiresAt > now + 5 * 60 * 1000;
 
 			return {
 				isAuthenticated: isValid,
 				user: isValid ? user : null,
 				accessToken: isValid ? accessToken : null,
 				refreshToken,
-				expiresAt: expiresAtNum,
+				expiresAt,
 			};
 		}
 	} catch (_error) {
 		console.error('Error initializing auth state:', _error);
-		clearStoredTokens();
+		clearTokens();
 	}
 
 	return {
@@ -77,26 +84,30 @@ function initializeAuthState(): AuthState {
 	};
 }
 
+function getCookie(name: string): string | null {
+	const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+	return match ? match[1] : null;
+}
+
 const authStore = writable<AuthState>(initializeAuthState());
 
-function clearStoredTokens() {
+function clearTokens() {
 	if (!browser) return;
-
-	localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-	localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-	localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT);
-	localStorage.removeItem(STORAGE_KEYS.USER);
+	deleteCookie(COOKIE_KEYS.ACCESS_TOKEN);
+	deleteCookie(COOKIE_KEYS.REFRESH_TOKEN);
+	deleteCookie(COOKIE_KEYS.EXPIRES_AT);
+	deleteCookie(COOKIE_KEYS.USER);
 }
 
 function storeTokens(tokens: TokenResponse, user: User) {
 	if (!browser) return;
-
 	const expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
+	const maxAgeSec = Number(tokens.expiresIn);
 
-	localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken);
-	localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken);
-	localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, expiresAt.toString());
-	localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+	setCookie(COOKIE_KEYS.ACCESS_TOKEN, tokens.accessToken, maxAgeSec);
+	setCookie(COOKIE_KEYS.REFRESH_TOKEN, tokens.refreshToken, maxAgeSec * 10);
+	setCookie(COOKIE_KEYS.EXPIRES_AT, expiresAt.toString(), maxAgeSec * 10);
+	setCookie(COOKIE_KEYS.USER, encodeURIComponent(JSON.stringify(user)), maxAgeSec * 10);
 }
 
 function decodeJWTPayload(token: string): any {
@@ -113,6 +124,16 @@ function decodeJWTPayload(token: string): any {
 	} catch (_error) {
 		console.error('Error decoding JWT:', _error);
 		return null;
+	}
+}
+
+export function initAuthFromServer(user: User | null) {
+	if (user) {
+		authStore.update((state) => ({
+			...state,
+			isAuthenticated: true,
+			user,
+		}));
 	}
 }
 
@@ -149,7 +170,7 @@ export const auth = {
 	},
 
 	logout: () => {
-		clearStoredTokens();
+		clearTokens();
 		authStore.set({
 			isAuthenticated: false,
 			user: null,

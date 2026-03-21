@@ -2,24 +2,21 @@
 	import { page } from '$app/state';
 	import MenuBar from '$lib/components/MenuBar.svelte';
 	import { CONFIG_SERVICE } from '$lib/services/config-service.js';
-	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
-	import {
-		subscriptionStore,
-		subscription,
-		subscriptionLoading,
-	} from '$lib/stores/subscription.js';
+	import { currentUser } from '$lib/stores/auth.js';
+	import { initSubscriptionFromServer } from '$lib/stores/subscription.js';
+	import { subscription } from '$lib/stores/subscription.js';
 	import { inject } from '@eurora/shared/context';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { ContactDialog } from '@eurora/ui/custom-components/contact-dialog/index';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
-	import { onMount } from 'svelte';
 
 	let contactDialogOpen = $state(false);
 
 	const STRIPE_PRO_PRICE_ID = inject(CONFIG_SERVICE).stripeProPriceId;
 
-	let { children } = $props();
+	let { data, children } = $props();
+
+	initSubscriptionFromServer(data.subscription ?? null);
 
 	const planLabel = $derived(
 		$subscription?.subscription_id && $subscription?.status === 'active'
@@ -37,11 +34,6 @@
 	let items = $derived(
 		navItems.map((item) => ({ ...item, isActive: item.url === page.url.pathname })),
 	);
-
-	onMount(() => {
-		if (!$isAuthenticated) return;
-		subscriptionStore.fetch();
-	});
 </script>
 
 <div class="flex min-h-screen flex-col">
@@ -85,27 +77,20 @@
 			<nav class="hidden md:flex w-56 shrink-0 flex-col gap-0.5">
 				{#if $currentUser}
 					<div class="mb-4 flex flex-col overflow-hidden py-1 px-2">
-						{#if $subscriptionLoading}
-							<div class="flex items-center gap-2 py-0.5">
-								<Loader2Icon size={14} class="animate-spin text-muted-foreground" />
-								<span class="text-xs text-muted-foreground">Loading…</span>
-							</div>
-						{:else}
-							<span class="flex items-center gap-1.5 leading-tight">
-								<span class="truncate text-sm font-medium"
-									>{$currentUser.name || 'User'}</span
-								>
-								<a
-									href="/settings"
-									class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-								>
-									<SquarePen size={11} />
-								</a>
-							</span>
-							<span class="truncate text-xs leading-tight text-muted-foreground">
-								{planLabel} - {$currentUser.email}
-							</span>
-						{/if}
+						<span class="flex items-center gap-1.5 leading-tight">
+							<span class="truncate text-sm font-medium"
+								>{$currentUser.name || 'User'}</span
+							>
+							<a
+								href="/settings"
+								class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+							>
+								<SquarePen size={11} />
+							</a>
+						</span>
+						<span class="truncate text-xs leading-tight text-muted-foreground">
+							{planLabel} - {$currentUser.email}
+						</span>
 					</div>
 				{/if}
 
