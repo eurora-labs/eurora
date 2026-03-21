@@ -57,23 +57,22 @@ function initializeAuthState(): AuthState {
 		const expiresAtStr = getCookie(COOKIE_KEYS.EXPIRES_AT);
 		const userStr = getCookie(COOKIE_KEYS.USER);
 
-		if (accessToken && refreshToken && expiresAtStr && userStr) {
+		if (refreshToken && expiresAtStr && userStr) {
 			const user = JSON.parse(decodeURIComponent(userStr)) as User;
 			const expiresAt = parseInt(expiresAtStr, 10);
 			const now = Date.now();
-			const isValid = expiresAt > now + 5 * 60 * 1000;
+			const accessFresh = !!accessToken && expiresAt > now + 5 * 60 * 1000;
 
 			return {
-				isAuthenticated: isValid,
-				user: isValid ? user : null,
-				accessToken: isValid ? accessToken : null,
+				isAuthenticated: true,
+				user,
+				accessToken: accessFresh ? accessToken : null,
 				refreshToken,
 				expiresAt,
 			};
 		}
 	} catch (_error) {
 		console.error('Error initializing auth state:', _error);
-		clearTokens();
 	}
 
 	return {
