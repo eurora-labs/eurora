@@ -206,6 +206,7 @@ impl AuthService {
         &self,
         user_id: &str,
         email: &str,
+        display_name: Option<String>,
         role: Role,
     ) -> Result<(String, String, Vec<u8>, DateTime<Utc>), AuthError> {
         let now = Utc::now();
@@ -215,6 +216,7 @@ impl AuthService {
         let access_claims = Claims {
             sub: user_id.to_string(),
             email: email.to_string(),
+            display_name: display_name.clone(),
             exp: access_exp.timestamp(),
             iat: now.timestamp(),
             token_type: "access".to_string(),
@@ -225,6 +227,7 @@ impl AuthService {
         let refresh_claims = Claims {
             sub: user_id.to_string(),
             email: email.to_string(),
+            display_name,
             exp: refresh_exp.timestamp(),
             iat: now.timestamp(),
             token_type: "refresh".to_string(),
@@ -257,10 +260,11 @@ impl AuthService {
         &self,
         user_id: &str,
         email: &str,
+        display_name: Option<String>,
         role: Role,
     ) -> Result<(String, String), AuthError> {
         let (access_token, refresh_token, token_hash, refresh_exp) =
-            self.generate_jwt_tokens(user_id, email, role)?;
+            self.generate_jwt_tokens(user_id, email, display_name, role)?;
 
         let user_uuid = Uuid::parse_str(user_id)
             .map_err(|e| AuthError::Internal(format!("Invalid user ID format: {e}")))?;
@@ -445,7 +449,12 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.email, role)
+            .generate_tokens(
+                &user.id.to_string(),
+                &user.email,
+                user.display_name.clone(),
+                role,
+            )
             .await?;
 
         Ok(TokenResponse {
@@ -475,7 +484,12 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, new_refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.email, role)
+            .generate_tokens(
+                &user.id.to_string(),
+                &user.email,
+                user.display_name.clone(),
+                role,
+            )
             .await?;
 
         Ok(TokenResponse {
@@ -577,7 +591,12 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.email, role)
+            .generate_tokens(
+                &user.id.to_string(),
+                &user.email,
+                user.display_name.clone(),
+                role,
+            )
             .await?;
 
         let response = TokenResponse {
@@ -655,7 +674,12 @@ impl AuthService {
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
         let (access_token, refresh_token) = self
-            .generate_tokens(&user.id.to_string(), &user.email, role)
+            .generate_tokens(
+                &user.id.to_string(),
+                &user.email,
+                user.display_name.clone(),
+                role,
+            )
             .await?;
 
         let response = TokenResponse {
@@ -719,7 +743,12 @@ impl ProtoAuthService for AuthService {
                     .await
                     .map_err(Status::from)?;
                 let (access_token, refresh_token) = self
-                    .generate_tokens(&user.id.to_string(), &user.email, role)
+                    .generate_tokens(
+                        &user.id.to_string(),
+                        &user.email,
+                        user.display_name.clone(),
+                        role,
+                    )
                     .await
                     .map_err(Status::from)?;
 
@@ -897,7 +926,12 @@ impl ProtoAuthService for AuthService {
         let role = self.resolve_role(user.id).await;
 
         let (access_token, refresh_token, refresh_token_hash, refresh_exp) = self
-            .generate_jwt_tokens(&user.id.to_string(), &user.email, role)
+            .generate_jwt_tokens(
+                &user.id.to_string(),
+                &user.email,
+                user.display_name.clone(),
+                role,
+            )
             .map_err(Status::from)?;
 
         self.db
