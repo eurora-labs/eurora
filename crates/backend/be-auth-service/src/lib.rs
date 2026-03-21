@@ -11,7 +11,7 @@ use proto_gen::auth::{
     ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse,
     login_request::Credential, proto_auth_service_server::ProtoAuthService,
 };
-use rand::TryRngCore;
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::OnceCell;
@@ -309,9 +309,7 @@ impl AuthService {
     fn generate_random_string(&self, length: usize) -> Result<String, AuthError> {
         let byte_len = length.div_ceil(2);
         let mut bytes = vec![0u8; byte_len];
-        rand::rngs::OsRng
-            .try_fill_bytes(&mut bytes)
-            .map_err(|e| AuthError::Internal(format!("Failed to generate random bytes: {e}")))?;
+        rand::rng().fill_bytes(&mut bytes);
 
         let mut hex = hex::encode(bytes);
         hex.truncate(length);

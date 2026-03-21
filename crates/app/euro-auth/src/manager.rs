@@ -4,7 +4,7 @@ use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use euro_secret::{ExposeSecret, SecretString, secret};
 use jsonwebtoken::dangerous::insecure_decode;
-use rand::{TryRngCore, rngs::OsRng};
+use rand::Rng;
 use sha2::{Digest, Sha256};
 use tokio::sync::watch;
 use tonic::transport::Channel;
@@ -136,10 +136,7 @@ impl AuthManager {
 
     pub async fn get_login_tokens(&self) -> Result<(String, String)> {
         let mut verifier_bytes = vec![0u8; 32];
-        OsRng.try_fill_bytes(&mut verifier_bytes).map_err(|e| {
-            tracing::error!("Failed to generate random bytes: {}", e);
-            anyhow!("Failed to generate random bytes")
-        })?;
+        rand::rng().fill_bytes(&mut verifier_bytes);
 
         let code_verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
         let mut hasher = Sha256::new();
