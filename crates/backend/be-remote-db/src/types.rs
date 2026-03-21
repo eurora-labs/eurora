@@ -64,6 +64,7 @@ impl PaginationParams {
 pub struct User {
     pub id: Uuid,
     pub email: String,
+    pub display_name: Option<String>,
     pub email_verified: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

@@ -370,7 +370,7 @@ impl DatabaseManager {
     ) -> DbResult<User> {
         let user = sqlx::query_as::<_, User>(
             r#"
-            SELECT u.id, u.email, u.email_verified, u.created_at, u.updated_at
+            SELECT u.id, u.email, u.display_name, u.email_verified, u.created_at, u.updated_at
             FROM users u
             INNER JOIN oauth_credentials oc ON u.id = oc.user_id
             WHERE oc.provider = $1 AND oc.provider_user_id = $2
