@@ -38,11 +38,6 @@ export function getArch(): ArchType {
 		if (platform.includes('arm') || platform.includes('aarch64')) return 'aarch64';
 	}
 
-	if ('userAgentData' in navigator && navigator.userAgentData) {
-		const uaData = navigator.userAgentData as { platform?: string };
-		if (uaData.platform === 'macOS') return 'unknown';
-	}
-
 	if (
 		ua.includes('x86_64') ||
 		ua.includes('x86-64') ||

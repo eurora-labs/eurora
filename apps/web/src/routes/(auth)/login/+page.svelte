@@ -2,9 +2,10 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
-	import { authService } from '$lib/services/auth-service';
-	import { auth, accessToken, currentUser } from '$lib/stores/auth';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
+	import { auth, accessToken, currentUser } from '$lib/stores/auth.js';
 	import { create } from '@bufbuild/protobuf';
+	import { inject } from '@eurora/shared/context';
 	import {
 		Provider,
 		AssociateLoginTokenRequestSchema,
@@ -15,6 +16,7 @@
 	import { get } from 'svelte/store';
 
 	let desktopLoginDone = $state(false);
+	const authService = inject(AUTH_SERVICE);
 	let pendingDesktopLogin = $state<string | null>(null);
 
 	onMount(async () => {
@@ -81,7 +83,7 @@
 
 	function storeRedirectParam() {
 		const redirect = page.url.searchParams.get('redirect');
-		if (redirect) {
+		if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
 			sessionStorage.setItem('postLoginRedirect', redirect);
 		}
 	}
