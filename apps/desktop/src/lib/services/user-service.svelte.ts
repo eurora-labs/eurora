@@ -41,7 +41,7 @@ export class UserService {
 				if (claims) {
 					this.authenticated = true;
 					this.email = claims.email;
-					this.displayName = claims.display_name ?? null;
+					this.displayName = claims.display_name;
 					this.role = claims.role;
 				} else {
 					this.authenticated = false;
