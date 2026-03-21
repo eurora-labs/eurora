@@ -31,7 +31,7 @@ resvg = { version = "0.47" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
-taurpc = { version = "0.7.1" }
+taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 thiserror = { workspace = true }
 tiny-skia = "0.12"
 tokio = { workspace = true, features = [
