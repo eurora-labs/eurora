@@ -1,2 +1,2 @@
-id,username,email,display_name,email_verified,created_at,updated_at,stripe_customer_id,plan_id
-019cf78a-200a-7283-80bf-86aa22de75de,andre,andre@eurora-labs.com,Andre Roelofs,t,2026-03-16 17:45:50.47485+01,2026-03-18 16:27:28.226964+01,,tier1
+id,email,display_name,email_verified,created_at,updated_at,stripe_customer_id,plan_id
+019cf78a-200a-7283-80bf-86aa22de75de,andre@eurora-labs.com,Andre Roelofs,t,2026-03-16 17:45:50.47485+01,2026-03-18 16:27:28.226964+01,,tier1

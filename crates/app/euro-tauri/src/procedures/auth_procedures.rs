@@ -24,7 +24,6 @@ pub trait AuthApi {
 
     async fn register<R: Runtime>(
         app_handle: AppHandle<R>,
-        username: String,
         email: String,
         password: String,
     ) -> Result<(), String>;
@@ -38,8 +37,10 @@ pub trait AuthApi {
     async fn logout<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
     async fn is_authenticated<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
     async fn get_role<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
-    async fn get_username<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
     async fn get_email<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
+    async fn get_display_name<R: Runtime>(
+        app_handle: AppHandle<R>,
+    ) -> Result<Option<String>, String>;
     async fn refresh_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
 }
 
@@ -155,7 +156,6 @@ impl AuthApi for AuthApiImpl {
     async fn register<R: Runtime>(
         self,
         app_handle: AppHandle<R>,
-        username: String,
         email: String,
         password: String,
     ) -> Result<(), String> {
@@ -163,7 +163,7 @@ impl AuthApi for AuthApiImpl {
         let mut controller = user_state.lock().await;
 
         controller
-            .register(&username, &email, &password)
+            .register(&email, &password)
             .await
             .ctx("Registration failed")?;
 
@@ -263,19 +263,6 @@ impl AuthApi for AuthApiImpl {
         Ok(claims.role.to_string())
     }
 
-    async fn get_username<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
-            .get_or_refresh_access_token()
-            .await
-            .ctx("Failed to get access token")?;
-        let claims = controller
-            .get_access_token_payload()
-            .ctx("Failed to get access token payload")?;
-        Ok(claims.username)
-    }
-
     async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
         let mut controller = user_state.lock().await;
@@ -302,5 +289,21 @@ impl AuthApi for AuthApiImpl {
             .get_access_token_payload()
             .ctx("Failed to get access token payload")?;
         Ok(claims.email)
+    }
+
+    async fn get_display_name<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+    ) -> Result<Option<String>, String> {
+        let user_state = user_controller(&app_handle)?;
+        let mut controller = user_state.lock().await;
+        controller
+            .get_or_refresh_access_token()
+            .await
+            .ctx("Failed to get access token")?;
+        let claims = controller
+            .get_access_token_payload()
+            .ctx("Failed to get access token payload")?;
+        Ok(claims.display_name)
     }
 }

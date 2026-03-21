@@ -32,8 +32,9 @@ impl std::fmt::Display for Role {
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct Claims {
     pub sub: String,
-    pub username: String,
     pub email: String,
+    #[serde(default)]
+    pub display_name: Option<String>,
     pub exp: i64,
     pub iat: i64,
     pub token_type: String,
