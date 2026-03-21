@@ -25,10 +25,6 @@ const store = writable<SubscriptionState>({
 	fetched: false,
 });
 
-export function initSubscriptionFromServer(data: SubscriptionStatus | null) {
-	store.set({ data, loading: false, error: null, fetched: true });
-}
-
 export const subscriptionStore = {
 	subscribe: store.subscribe,
 

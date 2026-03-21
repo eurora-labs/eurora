@@ -1,15 +1,13 @@
 <script lang="ts">
 	import '$lib/../app.css';
 	import { initDependencies } from '$lib/bootstrap/deps.js';
-	import { initAuthFromServer } from '$lib/stores/auth.js';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
 
-	let { data, children } = $props();
+	let { children } = $props();
 
 	initDependencies();
-	initAuthFromServer(data.user ?? null);
 
 	onMount(() => {
 		setMode('dark');

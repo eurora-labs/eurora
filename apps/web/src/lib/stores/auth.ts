@@ -32,7 +32,8 @@ function getAuthService(): AuthService {
 }
 
 function setCookie(name: string, value: string, maxAgeSec: number) {
-	document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSec}; samesite=lax`;
+	const secure = location.protocol === 'https:' ? '; secure' : '';
+	document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSec}; samesite=lax${secure}`;
 }
 
 function deleteCookie(name: string) {
@@ -124,16 +125,6 @@ function decodeJWTPayload(token: string): any {
 	} catch (_error) {
 		console.error('Error decoding JWT:', _error);
 		return null;
-	}
-}
-
-export function initAuthFromServer(user: User | null) {
-	if (user) {
-		authStore.update((state) => ({
-			...state,
-			isAuthenticated: true,
-			user,
-		}));
 	}
 }
 
