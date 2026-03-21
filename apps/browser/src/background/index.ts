@@ -7,4 +7,18 @@ browser.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
 	return true;
 });
 
+browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+	if (message.type === 'FETCH_URL') {
+		fetch(message.url)
+			.then(async (res) => {
+				if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+				return await res.text();
+			})
+			.then((text) => sendResponse({ ok: true, text }))
+			.catch((err) => sendResponse({ ok: false, error: String(err) }));
+		return true;
+	}
+	return false;
+});
+
 startNativeMessenger();
