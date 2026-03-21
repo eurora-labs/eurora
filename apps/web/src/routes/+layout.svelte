@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '$lib/../app.css';
+	import { browser } from '$app/environment';
 	import { initDependencies } from '$lib/bootstrap/deps.js';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { ModeWatcher, setMode } from 'mode-watcher';
@@ -7,7 +8,9 @@
 
 	let { children } = $props();
 
-	initDependencies();
+	if (browser) {
+		initDependencies();
+	}
 
 	onMount(() => {
 		setMode('dark');

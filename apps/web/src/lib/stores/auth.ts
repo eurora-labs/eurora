@@ -86,7 +86,8 @@ function initializeAuthState(): AuthState {
 }
 
 function getCookie(name: string): string | null {
-	const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
 	return match ? match[1] : null;
 }
 
