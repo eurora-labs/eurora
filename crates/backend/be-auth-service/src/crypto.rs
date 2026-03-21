@@ -2,7 +2,7 @@ use chacha20poly1305::{
     Key, XChaCha20Poly1305, XNonce,
     aead::{Aead, KeyInit},
 };
-use rand::TryRngCore;
+use rand::Rng;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -65,9 +65,7 @@ pub fn encrypt_sensitive_string(verifier: &str) -> Result<Vec<u8>, CryptoError> 
     let cipher = XChaCha20Poly1305::new(&key);
 
     let mut nonce_bytes = [0u8; NONCE_SIZE];
-    rand::rngs::OsRng
-        .try_fill_bytes(&mut nonce_bytes)
-        .map_err(|e| CryptoError::EncryptionFailed(format!("Failed to generate nonce: {e}")))?;
+    rand::rng().fill_bytes(&mut nonce_bytes);
     let nonce = XNonce::from_slice(&nonce_bytes);
 
     let ciphertext = cipher.encrypt(nonce, verifier.as_bytes()).map_err(|e| {

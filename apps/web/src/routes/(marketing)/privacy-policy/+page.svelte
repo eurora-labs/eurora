@@ -50,8 +50,8 @@
 					<p>We collect the following information you provide us with directly:</p>
 					<ul class="mt-2 list-disc space-y-1 pl-5">
 						<li>
-							Your username, display name, password and e-mail address when you
-							register for an account;
+							Your display name, password and e-mail address when you register for an
+							account;
 						</li>
 						<li>
 							Authentication data when you sign in via a third-party provider (Google

@@ -22,13 +22,13 @@ governor = { workspace = true }
 graphviz-rust = { version = "0.9", optional = true }
 inventory = "0.3"
 itertools = "0.14"
-json-patch = "3"
+json-patch = "4"
 mime_guess = "2"
 minijinja = "2"
 moka = { version = "0.12", features = ["sync"] }
 mustache = "0.9"
 owo-colors = "4"
-quick-xml = "0.37"
+quick-xml = "0.39"
 rand = { workspace = true }
 rand_distr = { workspace = true }
 regex = { workspace = true }
