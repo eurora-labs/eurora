@@ -2,24 +2,35 @@ import browser from 'webextension-polyfill';
 import type { NativeArticleAsset } from '../../../shared/content/bindings';
 import type { NativeResponse } from '../../../shared/content/models';
 
+// Text is error if ok is false
+type FetchUrlResponse = { ok: true; text: string };
+
+type GoogleDocType = 'document' | 'spreadsheets';
+
+function detectDocType(): GoogleDocType | null {
+	const path = window.location.pathname;
+	if (path.startsWith('/document/')) return 'document';
+	if (path.startsWith('/spreadsheets/')) return 'spreadsheets';
+	return null;
+}
+
 function getDocTitle(): string {
 	const titleInput = document.querySelector<HTMLInputElement>('.docs-title-input');
 	if (titleInput?.value) return titleInput.value;
 	const titleWidget = document.querySelector('.docs-title-widget');
 	if (titleWidget?.textContent) return titleWidget.textContent.trim();
-	return document.title.replace(/ - Google Docs$/, '');
+	return document.title.replace(/ - Google (Docs|Sheets)$/, '');
 }
 
-function getDocumentId(): string | null {
-	const match = window.location.pathname.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+function getResourceId(docType: GoogleDocType): string | null {
+	const pattern = new RegExp(`\\/${docType}\\/d\\/([a-zA-Z0-9_-]+)`);
+	const match = window.location.pathname.match(pattern);
 	return match?.[1] ?? null;
 }
 
-// Text is error if ok is false
-type FetchUrlResponse = { ok: true; text: string };
-
-async function fetchDocumentText(docId: string): Promise<string> {
-	const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
+async function fetchExport(docType: GoogleDocType, resourceId: string): Promise<string> {
+	const format = docType === 'spreadsheets' ? 'csv' : 'txt';
+	const exportUrl = `https://docs.google.com/${docType}/d/${resourceId}/export?format=${format}`;
 	const result = (await browser.runtime.sendMessage({
 		type: 'FETCH_URL',
 		url: exportUrl,
@@ -30,22 +41,31 @@ async function fetchDocumentText(docId: string): Promise<string> {
 	return result.text;
 }
 
+function siteName(docType: GoogleDocType): string {
+	return docType === 'spreadsheets' ? 'Google Sheets' : 'Google Docs';
+}
+
 export async function createGoogleDocsAsset(): Promise<NativeResponse> {
 	try {
+		const docType = detectDocType();
+		if (!docType) {
+			return { kind: 'Error', data: 'Unsupported Google Docs page type' };
+		}
+
 		const title = getDocTitle();
-		const docId = getDocumentId();
-		if (!docId) {
+		const resourceId = getResourceId(docType);
+		if (!resourceId) {
 			return { kind: 'Error', data: 'Could not extract document ID from URL' };
 		}
 
-		const textContent = await fetchDocumentText(docId);
+		const textContent = await fetchExport(docType, resourceId);
 
 		const reportData: NativeArticleAsset = {
 			title,
 			url: window.location.href,
 			content: '',
 			text_content: textContent,
-			site_name: 'Google Docs',
+			site_name: siteName(docType),
 			selected_text: window.getSelection()?.toString() || '',
 			language: document.documentElement.lang || '',
 			excerpt: textContent.slice(0, 200),
