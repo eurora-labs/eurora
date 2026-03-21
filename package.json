@@ -109,8 +109,7 @@
 			"effect": ">=3.20.0",
 			"fast-xml-parser": ">=5.5.7",
 			"lodash": ">=4.17.23",
-			"mdast-util-to-hast": ">=13.2.1",
-			"ajv": ">=8.18.0"
+			"mdast-util-to-hast": ">=13.2.1"
 		}
 	},
 	"config": {

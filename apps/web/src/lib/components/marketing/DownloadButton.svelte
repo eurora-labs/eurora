@@ -1,10 +1,11 @@
 <script lang="ts">
 	import {
-		getDownloadUrlForOS,
+		DOWNLOAD_SERVICE,
 		type OSType,
 		type ArchType,
-	} from '$lib/services/download-service';
+	} from '$lib/services/download-service.js';
 	import { getArch, getOS, getOSDisplayName } from '$lib/utils/getOS';
+	import { inject } from '@eurora/shared/context';
 	import ArrowRight from '@lucide/svelte/icons/arrow-right';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 
@@ -13,6 +14,8 @@
 	}
 
 	let { class: className = '' }: Props = $props();
+
+	const downloadService = inject(DOWNLOAD_SERVICE);
 
 	let os = $state<OSType>('unknown');
 	let arch = $state<ArchType>('unknown');
@@ -28,7 +31,7 @@
 			return;
 		}
 
-		window.location.href = getDownloadUrlForOS(os, arch);
+		window.location.href = downloadService.getDownloadUrlForOS(os, arch);
 	}
 </script>
 

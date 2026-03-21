@@ -116,6 +116,18 @@ export default ts.config(
 		...ts.configs.disableTypeChecked,
 	},
 	{
+		files: [
+			'**/+layout.server.ts',
+			'**/+page.server.ts',
+			'**/+layout.ts',
+			'**/+page.ts',
+			'**/+server.ts',
+		],
+		rules: {
+			'no-relative-import-paths/no-relative-import-paths': 'off',
+		},
+	},
+	{
 		files: ['**/*.svelte', '**/*.svelte.ts'],
 		languageOptions: {
 			parserOptions: {

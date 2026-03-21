@@ -1,5 +1,11 @@
+import type { SubscriptionStatus } from '$lib/stores/subscription.js';
+
 declare global {
-	namespace App {}
+	namespace App {
+		interface PageData {
+			subscription?: SubscriptionStatus | null;
+		}
+	}
 }
 
 export {};

@@ -1,7 +1,7 @@
+import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 import { auth, accessToken } from '$lib/stores/auth.js';
+import { inject } from '@eurora/shared/context';
 import { writable, derived, get } from 'svelte/store';
-
-const REST_API_URL = import.meta.env.VITE_REST_API_URL;
 
 export interface SubscriptionStatus {
 	subscription_id: string | null;
@@ -37,8 +37,9 @@ export const subscriptionStore = {
 		try {
 			await auth.ensureValidToken();
 			const token = get(accessToken);
+			const { restApiUrl } = inject(CONFIG_SERVICE);
 
-			const res = await fetch(`${REST_API_URL}/payment/subscription`, {
+			const res = await fetch(`${restApiUrl}/payment/subscription`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 

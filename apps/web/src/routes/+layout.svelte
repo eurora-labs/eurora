@@ -1,14 +1,20 @@
 <script lang="ts">
 	import '$lib/../app.css';
+	import { browser } from '$app/environment';
+	import { initDependencies } from '$lib/bootstrap/deps.js';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
 
+	let { children } = $props();
+
+	if (browser) {
+		initDependencies();
+	}
+
 	onMount(() => {
 		setMode('dark');
 	});
-
-	let { children } = $props();
 </script>
 
 <ModeWatcher defaultMode="dark" track={false} />

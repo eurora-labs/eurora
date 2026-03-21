@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 	import { auth, isAuthenticated, accessToken } from '$lib/stores/auth.js';
+	import { inject } from '@eurora/shared/context';
 	import { Button, type ButtonProps } from '@eurora/ui/components/button/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import type { Snippet } from 'svelte';
 
-	const REST_API_URL = import.meta.env.VITE_REST_API_URL;
-	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
+	const { restApiUrl: REST_API_URL, stripeProPriceId: STRIPE_PRO_PRICE_ID } =
+		inject(CONFIG_SERVICE);
 
 	let {
 		class: className = '',
