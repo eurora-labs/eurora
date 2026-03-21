@@ -13,17 +13,12 @@
 
 	const downloadService = inject(DOWNLOAD_SERVICE);
 
-	let detectedOS = $state(getOS());
-	let detectedArch = $state(getArch());
-	let downloadOptions = $derived(downloadService.getDownloadOptions(detectedOS, detectedArch));
+	const detectedOS = getOS();
+	const detectedArch = getArch();
+	const downloadOptions = downloadService.getDownloadOptions(detectedOS, detectedArch);
 	const allOptions = downloadService.getDownloadOptions('unknown', 'unknown');
-	let platformDetected = $derived(detectedOS !== 'unknown');
-	let alternatives = $derived(downloadOptions.slice(1));
-
-	$effect(() => {
-		detectedOS = getOS();
-		detectedArch = getArch();
-	});
+	const platformDetected = detectedOS !== 'unknown';
+	const alternatives = downloadOptions.slice(1);
 
 	function handleDownload(option: DownloadOption) {
 		window.location.href = downloadService.getDownloadUrl(option);

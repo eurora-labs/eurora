@@ -9,14 +9,19 @@
 	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
 	import CheckIcon from '@lucide/svelte/icons/circle-check';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 
 	const REST_API_URL = inject(CONFIG_SERVICE).restApiUrl;
 
 	let status = $state<'loading' | 'complete' | 'failed'>('loading');
 	let countdown = $state(5);
+	let countdownInterval: ReturnType<typeof setInterval> | undefined;
 
 	const sessionId = page.url.searchParams.get('session_id');
+
+	onDestroy(() => {
+		if (countdownInterval) clearInterval(countdownInterval);
+	});
 
 	onMount(async () => {
 		if (!sessionId) {
@@ -45,10 +50,10 @@
 			status = data.status === 'complete' ? 'complete' : 'failed';
 
 			if (status === 'complete') {
-				const interval = setInterval(() => {
+				countdownInterval = setInterval(() => {
 					countdown--;
 					if (countdown <= 0) {
-						clearInterval(interval);
+						clearInterval(countdownInterval);
 						goto('/settings');
 					}
 				}, 1000);

@@ -19,11 +19,11 @@
 	const downloadService = inject(DOWNLOAD_SERVICE);
 	const isFreePlan = $derived(!$subscriptionLoading && !$subscription?.subscription_id);
 
-	let detectedOS = $state(getOS());
-	let detectedArch = $state(getArch());
-	let downloadOptions = $derived(downloadService.getDownloadOptions(detectedOS, detectedArch));
-	let allOptions = $derived(downloadService.getDownloadOptions('unknown', 'unknown'));
-	let platformDetected = $derived(detectedOS !== 'unknown');
+	const detectedOS = getOS();
+	const detectedArch = getArch();
+	const downloadOptions = downloadService.getDownloadOptions(detectedOS, detectedArch);
+	const allOptions = downloadService.getDownloadOptions('unknown', 'unknown');
+	const platformDetected = detectedOS !== 'unknown';
 
 	function handleDownload(option: DownloadOption) {
 		window.location.href = downloadService.getDownloadUrl(option);
@@ -37,11 +37,6 @@
 				return MonitorIcon;
 		}
 	}
-
-	$effect(() => {
-		detectedOS = getOS();
-		detectedArch = getArch();
-	});
 </script>
 
 <svelte:head>

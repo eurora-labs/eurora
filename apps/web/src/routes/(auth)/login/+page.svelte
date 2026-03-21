@@ -83,7 +83,7 @@
 
 	function storeRedirectParam() {
 		const redirect = page.url.searchParams.get('redirect');
-		if (redirect) {
+		if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
 			sessionStorage.setItem('postLoginRedirect', redirect);
 		}
 	}

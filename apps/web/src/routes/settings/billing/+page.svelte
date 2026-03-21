@@ -14,25 +14,16 @@
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 
-	const { restApiUrl: REST_API_URL, stripeProPriceId: STRIPE_PRO_PRICE_ID } =
-		inject(CONFIG_SERVICE);
+	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
 
 	let portalLoading = $state(false);
 	let portalError = $state<string | null>(null);
 
-	const planName = $derived.by(() => {
-		if (!$subscription?.price_id) return 'Free';
-		if ($subscription.price_id === STRIPE_PRO_PRICE_ID) return 'Pro';
-		return 'Pro';
-	});
+	const planName = $derived($subscription?.price_id ? 'Pro' : 'Free');
 
-	const planPrice = $derived.by(() => {
-		if (!$subscription?.price_id) return '$0.00 / month';
-		if ($subscription.price_id === STRIPE_PRO_PRICE_ID) return '$20.00 / month';
-		return 'Paid plan';
-	});
+	const planPrice = $derived($subscription?.price_id ? '€19.99 / month' : '€0.00 / month');
 
-	const hasPaidPlan = $derived($subscription?.subscription_id !== null);
+	const hasPaidPlan = $derived(!!$subscription?.subscription_id);
 
 	const isCanceling = $derived($subscription?.cancel_at_period_end === true);
 

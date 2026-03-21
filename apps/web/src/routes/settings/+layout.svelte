@@ -2,18 +2,14 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import MenuBar from '$lib/components/MenuBar.svelte';
-	import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
 	import { subscriptionStore, subscription } from '$lib/stores/subscription.js';
-	import { inject } from '@eurora/shared/context';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { ContactDialog } from '@eurora/ui/custom-components/contact-dialog/index';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 
 	let contactDialogOpen = $state(false);
-
-	const STRIPE_PRO_PRICE_ID = inject(CONFIG_SERVICE).stripeProPriceId;
 
 	let { children } = $props();
 
@@ -28,11 +24,7 @@
 	});
 
 	const planLabel = $derived(
-		$subscription?.subscription_id && $subscription?.status === 'active'
-			? $subscription.price_id === STRIPE_PRO_PRICE_ID
-				? 'Pro'
-				: 'Pro'
-			: 'Free',
+		$subscription?.subscription_id && $subscription?.status === 'active' ? 'Pro' : 'Free',
 	);
 
 	const navItems = [
