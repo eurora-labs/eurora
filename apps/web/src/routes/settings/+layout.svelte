@@ -1,30 +1,30 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import MenuBar from '$lib/components/MenuBar.svelte';
 	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
-	import {
-		subscriptionStore,
-		subscription,
-		subscriptionLoading,
-	} from '$lib/stores/subscription.js';
+	import { subscriptionStore, subscription } from '$lib/stores/subscription.js';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { ContactDialog } from '@eurora/ui/custom-components/contact-dialog/index';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
 
 	let contactDialogOpen = $state(false);
 
-	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID;
-
 	let { children } = $props();
 
+	$effect(() => {
+		if (!$isAuthenticated) {
+			goto('/login?redirect=/settings');
+		}
+	});
+
+	onMount(() => {
+		subscriptionStore.fetch();
+	});
+
 	const planLabel = $derived(
-		$subscription?.subscription_id && $subscription?.status === 'active'
-			? $subscription.price_id === STRIPE_PRO_PRICE_ID
-				? 'Pro'
-				: 'Pro'
-			: 'Free',
+		$subscription?.subscription_id && $subscription?.status === 'active' ? 'Pro' : 'Free',
 	);
 
 	const navItems = [
@@ -35,11 +35,6 @@
 	let items = $derived(
 		navItems.map((item) => ({ ...item, isActive: item.url === page.url.pathname })),
 	);
-
-	onMount(() => {
-		if (!$isAuthenticated) return;
-		subscriptionStore.fetch();
-	});
 </script>
 
 <div class="flex min-h-screen flex-col">
@@ -83,27 +78,20 @@
 			<nav class="hidden md:flex w-56 shrink-0 flex-col gap-0.5">
 				{#if $currentUser}
 					<div class="mb-4 flex flex-col overflow-hidden py-1 px-2">
-						{#if $subscriptionLoading}
-							<div class="flex items-center gap-2 py-0.5">
-								<Loader2Icon size={14} class="animate-spin text-muted-foreground" />
-								<span class="text-xs text-muted-foreground">Loading…</span>
-							</div>
-						{:else}
-							<span class="flex items-center gap-1.5 leading-tight">
-								<span class="truncate text-sm font-medium"
-									>{$currentUser.name || 'User'}</span
-								>
-								<a
-									href="/settings"
-									class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-								>
-									<SquarePen size={11} />
-								</a>
-							</span>
-							<span class="truncate text-xs leading-tight text-muted-foreground">
-								{planLabel} - {$currentUser.email}
-							</span>
-						{/if}
+						<span class="flex items-center gap-1.5 leading-tight">
+							<span class="truncate text-sm font-medium"
+								>{$currentUser.name || 'User'}</span
+							>
+							<a
+								href="/settings"
+								class="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+							>
+								<SquarePen size={11} />
+							</a>
+						</span>
+						<span class="truncate text-xs leading-tight text-muted-foreground">
+							{planLabel} - {$currentUser.email}
+						</span>
 					</div>
 				{/if}
 

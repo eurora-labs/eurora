@@ -1,3 +1,6 @@
+import { InjectionToken } from '@eurora/shared/context';
+import type { ConfigService } from '$lib/services/config-service.js';
+
 export type OSType = 'windows' | 'macos' | 'linux' | 'unknown';
 export type ArchType = 'x86_64' | 'aarch64' | 'unknown';
 export type LinuxPackageFormat = 'deb' | 'rpm' | 'appimage';
@@ -58,30 +61,6 @@ const ALL_DOWNLOAD_OPTIONS: DownloadOption[] = [
 	...makeLinuxOptions('aarch64', 'linux-aarch64', 'ARM (aarch64)'),
 ];
 
-export function detectLinuxFormat(): LinuxPackageFormat {
-	return 'deb';
-}
-
-export function getDownloadOptions(os: OSType, arch: ArchType): DownloadOption[] {
-	if (os === 'unknown') {
-		return ALL_DOWNLOAD_OPTIONS;
-	}
-
-	let options = ALL_DOWNLOAD_OPTIONS.filter((o) => o.os === os);
-
-	if (arch !== 'unknown') {
-		const exact = options.filter((o) => o.arch === arch);
-		if (exact.length > 0) options = exact;
-	}
-
-	if (os === 'linux') {
-		const detected = detectLinuxFormat();
-		options = sortByPreferredFormat(options, detected);
-	}
-
-	return options;
-}
-
 function sortByPreferredFormat(
 	options: DownloadOption[],
 	preferred: LinuxPackageFormat,
@@ -93,19 +72,53 @@ function sortByPreferredFormat(
 	});
 }
 
-export function getDownloadUrl(option: DownloadOption, channel: string = 'release'): string {
-	const baseUrl = import.meta.env.VITE_REST_API_URL ?? 'http://localhost:3000';
-	if (option.bundleType) {
-		return `${baseUrl}/download/${channel}/${option.targetArch}/${option.bundleType}`;
+export class DownloadService {
+	private readonly config: ConfigService;
+
+	constructor(config: ConfigService) {
+		this.config = config;
 	}
-	return `${baseUrl}/download/${channel}/${option.targetArch}`;
+
+	detectLinuxFormat(): LinuxPackageFormat {
+		return 'deb';
+	}
+
+	getDownloadOptions(os: OSType, arch: ArchType): DownloadOption[] {
+		if (os === 'unknown') {
+			return ALL_DOWNLOAD_OPTIONS;
+		}
+
+		let options = ALL_DOWNLOAD_OPTIONS.filter((o) => o.os === os);
+
+		if (arch !== 'unknown') {
+			const exact = options.filter((o) => o.arch === arch);
+			if (exact.length > 0) options = exact;
+		}
+
+		if (os === 'linux') {
+			const detected = this.detectLinuxFormat();
+			options = sortByPreferredFormat(options, detected);
+		}
+
+		return options;
+	}
+
+	getDownloadUrl(option: DownloadOption, channel: string = 'release'): string {
+		const baseUrl = this.config.restApiUrl;
+		if (option.bundleType) {
+			return `${baseUrl}/download/${channel}/${option.targetArch}/${option.bundleType}`;
+		}
+		return `${baseUrl}/download/${channel}/${option.targetArch}`;
+	}
+
+	getDownloadUrlForOS(
+		os: Exclude<OSType, 'unknown'>,
+		arch: ArchType = 'unknown',
+		channel: string = 'release',
+	): string {
+		const options = this.getDownloadOptions(os, arch);
+		return this.getDownloadUrl(options[0], channel);
+	}
 }
 
-export function getDownloadUrlForOS(
-	os: Exclude<OSType, 'unknown'>,
-	arch: ArchType = 'unknown',
-	channel: string = 'release',
-): string {
-	const options = getDownloadOptions(os, arch);
-	return getDownloadUrl(options[0], channel);
-}
+export const DOWNLOAD_SERVICE = new InjectionToken<DownloadService>('DownloadService');
