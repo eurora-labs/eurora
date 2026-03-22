@@ -320,13 +320,13 @@
 {/snippet}
 
 <div class="flex h-full flex-col overflow-hidden">
-	{#if messageService.viewMode === 'graph' && messages.length > 0}
+	{#if messageService.viewMode === 'graph' && (messages.length > 0 || messagesLoading)}
 		<div class="min-h-0 flex-1">
 			<MessageGraph
 				{treeNodes}
 				{activeMessageIds}
 				startLabel={threadTitle}
-				loading={treeLoading}
+				loading={messagesLoading || treeLoading}
 				hasMoreLevels={treeHasMore}
 				loadingMoreLevels={treeLoading}
 				onmessagedblclick={handleGraphNodeDblClick}

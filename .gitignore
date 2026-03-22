@@ -389,3 +389,7 @@ xcuserdata/
 
 apps/macos/Shared/Generated/*
 !apps/macos/Shared/Generated/.gitkeep
+
+.cocoindex_code/
+*.db
+thoughts/
