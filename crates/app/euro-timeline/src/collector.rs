@@ -19,6 +19,7 @@ use tokio::{
 
 pub struct CollectorService {
     storage: Arc<Mutex<TimelineStorage>>,
+    strategy: Arc<RwLock<ActivityStrategy>>,
     current_task: Option<JoinHandle<()>>,
     focus_thread_handle: Option<JoinHandle<()>>,
     focus_shutdown_signal: Option<Arc<AtomicBool>>,
@@ -38,9 +39,13 @@ impl CollectorService {
 
         let (activity_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
+        let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
+            DefaultStrategy,
+        )));
 
         Self {
             storage,
+            strategy,
             current_task: None,
             focus_thread_handle: None,
             focus_shutdown_signal: None,
@@ -75,11 +80,34 @@ impl CollectorService {
         self.assets_event_tx.subscribe()
     }
 
+    pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
+        let mut strategy = self.strategy.write().await;
+        let assets = strategy
+            .retrieve_assets()
+            .await
+            .map_err(|e| TimelineError::Storage(e.to_string()))?;
+        let snapshots = strategy
+            .retrieve_snapshots()
+            .await
+            .map_err(|e| TimelineError::Storage(e.to_string()))?;
+
+        let mut storage = self.storage.lock().await;
+        if let Some(activity) = storage.get_all_activities_mut().back_mut() {
+            if !assets.is_empty() {
+                activity.assets.clear();
+                activity.assets.extend(assets);
+            }
+            if !snapshots.is_empty() {
+                activity.snapshots.clear();
+                activity.snapshots.extend(snapshots);
+            }
+        }
+
+        Ok(())
+    }
+
     async fn start_focus_tracking(&mut self) -> TimelineResult<()> {
-        let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
-            DefaultStrategy,
-        )));
-        let strategy_clone = Arc::clone(&strategy);
+        let strategy_clone = Arc::clone(&self.strategy);
         let activity_event_tx = self.activity_event_tx.clone();
         let assets_event_tx = self.assets_event_tx.clone();
 

@@ -54,6 +54,8 @@ impl ChatApi for ChatApiImpl {
             let timeline = timeline_state.lock().await;
             let mut thread_manager = thread_state.lock().await;
 
+            let _ = timeline.refresh_current_activity().await;
+
             if timeline.save_current_activity_to_service().await.is_ok() && !query.assets.is_empty()
             {
                 let chips = timeline.get_context_chips().await;
