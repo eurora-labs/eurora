@@ -194,29 +194,48 @@ impl SafariStrategy {
         Ok(())
     }
 
+    async fn fetch_asset(
+        service: &BrowserBridgeService,
+        browser_pid: u32,
+    ) -> Option<ActivityAsset> {
+        let response = service
+            .send_request(browser_pid, "GET_ASSETS", None)
+            .await
+            .ok()?;
+        let payload = response.payload?;
+        let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
+        ActivityAsset::try_from(native_message).ok()
+    }
+
+    async fn fetch_snapshot(
+        service: &BrowserBridgeService,
+        browser_pid: u32,
+    ) -> Option<ActivitySnapshot> {
+        let response = service
+            .send_request(browser_pid, "GET_SNAPSHOT", None)
+            .await
+            .ok()?;
+        let payload = response.payload?;
+        let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
+        ActivitySnapshot::try_from(native_message).ok()
+    }
+
     async fn request_assets_and_snapshots(&mut self) {
         let Some(sender) = self.sender.clone() else {
             return;
         };
+        let Some(service) = self.bridge_service else {
+            return;
+        };
+        let Some(browser_pid) = self.active_browser_pid else {
+            return;
+        };
 
-        match self.retrieve_assets().await {
-            Ok(assets) if !assets.is_empty() => {
-                if sender.send(ActivityReport::Assets(assets)).is_err() {
-                    tracing::warn!("Failed to send assets report - receiver dropped");
-                }
-            }
-            Err(e) => tracing::debug!("Failed to retrieve assets: {}", e),
-            _ => {}
+        if let Some(asset) = Self::fetch_asset(service, browser_pid).await {
+            let _ = sender.send(ActivityReport::Assets(vec![asset]));
         }
-
-        match self.retrieve_snapshots().await {
-            Ok(snapshots) if !snapshots.is_empty() => {
-                if sender.send(ActivityReport::Snapshots(snapshots)).is_err() {
-                    tracing::warn!("Failed to send snapshots report - receiver dropped");
-                }
-            }
-            Err(e) => tracing::debug!("Failed to retrieve snapshots: {}", e),
-            _ => {}
+        if let Some(snapshot) = Self::fetch_snapshot(service, browser_pid).await {
+            let _ = sender.send(ActivityReport::Snapshots(vec![snapshot]));
         }
     }
 
@@ -366,65 +385,29 @@ impl ActivityStrategyFunctionality for SafariStrategy {
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        let service = self
-            .bridge_service
-            .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
-
-        let browser_pid = self
-            .active_browser_pid
-            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
-
-        let response_frame = service
-            .send_request(browser_pid, "GET_ASSETS", None)
-            .await
-            .map_err(|e| ActivityError::invalid_data(format!("Failed to get assets: {}", e)))?;
-
-        let Some(payload) = response_frame.payload else {
+        let Some(service) = self.bridge_service else {
             return Ok(vec![]);
         };
-
-        let native_message = serde_json::from_str::<NativeMessage>(&payload)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-        match ActivityAsset::try_from(native_message) {
-            Ok(asset) => Ok(vec![asset]),
-            Err(e) => {
-                tracing::warn!("Failed to convert asset response: {}", e);
-                Ok(vec![])
-            }
-        }
+        let Some(browser_pid) = self.active_browser_pid else {
+            return Ok(vec![]);
+        };
+        Ok(Self::fetch_asset(service, browser_pid)
+            .await
+            .into_iter()
+            .collect())
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        let service = self
-            .bridge_service
-            .as_ref()
-            .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
-
-        let browser_pid = self
-            .active_browser_pid
-            .ok_or_else(|| ActivityError::invalid_data("No active browser PID set"))?;
-
-        let response_frame = service
-            .send_request(browser_pid, "GET_SNAPSHOT", None)
-            .await
-            .map_err(|e| ActivityError::invalid_data(format!("Failed to get snapshot: {}", e)))?;
-
-        let Some(payload) = response_frame.payload else {
+        let Some(service) = self.bridge_service else {
             return Ok(vec![]);
         };
-
-        let native_message = serde_json::from_str::<NativeMessage>(&payload)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
-
-        match ActivitySnapshot::try_from(native_message) {
-            Ok(snapshot) => Ok(vec![snapshot]),
-            Err(e) => {
-                tracing::warn!("Failed to convert snapshot response: {}", e);
-                Ok(vec![])
-            }
-        }
+        let Some(browser_pid) = self.active_browser_pid else {
+            return Ok(vec![]);
+        };
+        Ok(Self::fetch_snapshot(service, browser_pid)
+            .await
+            .into_iter()
+            .collect())
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
