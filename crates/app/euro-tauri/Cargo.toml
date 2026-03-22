@@ -12,7 +12,6 @@ ignored = [
   "tauri-plugin-fs",
   "tauri-plugin-process",
   "tauri-plugin-store",
-  "tauri-plugin-stronghold",
 ]
 
 [lib]
@@ -66,7 +65,6 @@ tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-store = "2"
-tauri-plugin-stronghold = "2"
 tauri-plugin-tracing = { version = "0.3.2", features = ["colored"] }
 tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
