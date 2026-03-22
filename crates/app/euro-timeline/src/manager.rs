@@ -88,6 +88,10 @@ impl TimelineManager {
         }
     }
 
+    pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
+        self.collector.refresh_current_activity().await
+    }
+
     pub async fn save_current_activity_to_service(&self) -> TimelineResult<()> {
         let activity = {
             let storage = self.storage.lock().await;

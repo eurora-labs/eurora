@@ -312,6 +312,32 @@ impl BrowserStrategy {
         true
     }
 
+    async fn fetch_asset(
+        service: &BrowserBridgeService,
+        browser_pid: u32,
+    ) -> Option<ActivityAsset> {
+        let response = service
+            .send_request(browser_pid, "GET_ASSETS", None)
+            .await
+            .ok()?;
+        let payload = response.payload?;
+        let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
+        ActivityAsset::try_from(native_message).ok()
+    }
+
+    async fn fetch_snapshot(
+        service: &BrowserBridgeService,
+        browser_pid: u32,
+    ) -> Option<ActivitySnapshot> {
+        let response = service
+            .send_request(browser_pid, "GET_SNAPSHOT", None)
+            .await
+            .ok()?;
+        let payload = response.payload?;
+        let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
+        ActivitySnapshot::try_from(native_message).ok()
+    }
+
     async fn request_assets_and_snapshots(&self) {
         let Some(sender) = self.sender.clone() else {
             return;
@@ -325,21 +351,10 @@ impl BrowserStrategy {
             return;
         }
 
-        if let Ok(response) = service.send_request(browser_pid, "GET_ASSETS", None).await
-            && let Some(payload) = response.payload
-            && let Ok(native_message) = serde_json::from_str::<NativeMessage>(&payload)
-            && let Ok(asset) = ActivityAsset::try_from(native_message)
-        {
+        if let Some(asset) = Self::fetch_asset(service, browser_pid).await {
             let _ = sender.send(ActivityReport::Assets(vec![asset]));
         }
-
-        if let Ok(response) = service
-            .send_request(browser_pid, "GET_SNAPSHOT", None)
-            .await
-            && let Some(payload) = response.payload
-            && let Ok(native_message) = serde_json::from_str::<NativeMessage>(&payload)
-            && let Ok(snapshot) = ActivitySnapshot::try_from(native_message)
-        {
+        if let Some(snapshot) = Self::fetch_snapshot(service, browser_pid).await {
             let _ = sender.send(ActivityReport::Snapshots(vec![snapshot]));
         }
     }
@@ -491,11 +506,31 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     }
 
     async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        Ok(vec![])
+        let Some(service) = self.bridge_service else {
+            return Ok(vec![]);
+        };
+        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
+        if browser_pid == 0 {
+            return Ok(vec![]);
+        }
+        Ok(Self::fetch_asset(service, browser_pid)
+            .await
+            .into_iter()
+            .collect())
     }
 
     async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        Ok(vec![])
+        let Some(service) = self.bridge_service else {
+            return Ok(vec![]);
+        };
+        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
+        if browser_pid == 0 {
+            return Ok(vec![]);
+        }
+        Ok(Self::fetch_snapshot(service, browser_pid)
+            .await
+            .into_iter()
+            .collect())
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
