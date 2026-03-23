@@ -1546,11 +1546,18 @@ mod tests {
     #[test]
     fn test_extract_content_and_images_multipart() {
         let content = ContentBlocks::from(vec![
-            ContentBlock::Text(TextContentBlock::new("What's in this image?")),
-            ContentBlock::Image(ImageContentBlock::from_base64(
-                "abc123".to_string(),
-                "image/jpeg".to_string(),
-            )),
+            ContentBlock::Text(
+                TextContentBlock::builder()
+                    .text("What's in this image?")
+                    .build(),
+            ),
+            ContentBlock::Image(
+                ImageContentBlock::builder()
+                    .base64("abc123".to_string())
+                    .mime_type("image/jpeg".to_string())
+                    .build()
+                    .unwrap(),
+            ),
         ]);
         let (text, images) = extract_content_and_images(&content);
         assert_eq!(text, "What's in this image?");
@@ -1571,11 +1578,14 @@ mod tests {
         let messages = vec![AnyMessage::HumanMessage(
             crate::messages::HumanMessage::builder()
                 .content(ContentBlocks::from(vec![
-                    ContentBlock::Text(TextContentBlock::new("Describe this")),
-                    ContentBlock::Image(ImageContentBlock::from_base64(
-                        "base64data".to_string(),
-                        "image/png".to_string(),
-                    )),
+                    ContentBlock::Text(TextContentBlock::builder().text("Describe this").build()),
+                    ContentBlock::Image(
+                        ImageContentBlock::builder()
+                            .base64("base64data".to_string())
+                            .mime_type("image/png".to_string())
+                            .build()
+                            .unwrap(),
+                    ),
                 ]))
                 .build(),
         )];

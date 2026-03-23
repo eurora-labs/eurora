@@ -684,8 +684,13 @@ mod test_parrot_fake_chat_model {
         let model = ParrotFakeChatModel::builder().build();
         let message = HumanMessage::builder()
             .content(ContentBlocks::from(vec![
-                ContentBlock::Text(TextContentBlock::new("Hello")),
-                ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+                ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+                ContentBlock::Image(
+                    ImageContentBlock::builder()
+                        .url("https://example.com/img.png".to_string())
+                        .build()
+                        .unwrap(),
+                ),
             ]))
             .build();
 

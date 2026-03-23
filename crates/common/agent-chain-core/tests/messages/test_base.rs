@@ -16,8 +16,8 @@ fn test_text_property_string_content() {
 #[test]
 fn test_text_property_list_content_with_text_blocks() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("First part")),
-        ContentBlock::Text(TextContentBlock::new("second part")),
+        ContentBlock::Text(TextContentBlock::builder().text("First part").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("second part").build()),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.as_text(), "First part second part");
@@ -26,9 +26,14 @@ fn test_text_property_list_content_with_text_blocks() {
 #[test]
 fn test_text_property_list_content_with_mixed_blocks() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Image(ImageContentBlock::from_url("http://example.com/img.png")),
-        ContentBlock::Text(TextContentBlock::new("world")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("http://example.com/img.png".to_string())
+                .build()
+                .unwrap(),
+        ),
+        ContentBlock::Text(TextContentBlock::builder().text("world").build()),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.as_text(), "Hello world");
@@ -50,9 +55,12 @@ fn test_text_property_empty_list_content() {
 
 #[test]
 fn test_text_property_no_text_blocks() {
-    let blocks = ContentBlocks::from(vec![ContentBlock::Image(ImageContentBlock::from_url(
-        "http://example.com",
-    ))]);
+    let blocks = ContentBlocks::from(vec![ContentBlock::Image(
+        ImageContentBlock::builder()
+            .url("http://example.com".to_string())
+            .build()
+            .unwrap(),
+    )]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.as_text(), "");
 }
@@ -344,8 +352,8 @@ fn test_content_blocks_empty_string() {
 #[test]
 fn test_content_blocks_list_with_string() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Text(TextContentBlock::new("world")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("world").build()),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
@@ -366,7 +374,9 @@ fn test_content_blocks_list_with_string() {
 
 #[test]
 fn test_content_blocks_standard_text_block() {
-    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(
+        TextContentBlock::builder().text("Hello").build(),
+    )]);
     let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
     assert_eq!(blocks.len(), 1);
@@ -384,12 +394,16 @@ fn test_content_blocks_non_standard_block() {
         json!({"type": "custom_type", "data": "value"}),
     )
     .unwrap_or_else(|_| {
-        ContentBlock::NonStandard(agent_chain_core::messages::NonStandardContentBlock::new({
-            let mut value = std::collections::HashMap::new();
-            value.insert("type".to_string(), json!("custom_type"));
-            value.insert("data".to_string(), json!("value"));
-            value
-        }))
+        ContentBlock::NonStandard(
+            agent_chain_core::messages::NonStandardContentBlock::builder()
+                .value({
+                    let mut value = std::collections::HashMap::new();
+                    value.insert("type".to_string(), json!("custom_type"));
+                    value.insert("data".to_string(), json!("value"));
+                    value
+                })
+                .build(),
+        )
     });
     let msg = HumanMessage::builder()
         .content(ContentBlocks::from(vec![block]))
@@ -410,9 +424,14 @@ fn test_content_blocks_non_standard_block() {
 #[test]
 fn test_content_blocks_mixed_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Plain string")),
-        ContentBlock::Text(TextContentBlock::new("Text block")),
-        ContentBlock::Image(ImageContentBlock::from_url("http://example.com/img.png")),
+        ContentBlock::Text(TextContentBlock::builder().text("Plain string").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Text block").build()),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("http://example.com/img.png".to_string())
+                .build()
+                .unwrap(),
+        ),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
@@ -433,13 +452,16 @@ fn test_content_blocks_mixed_content() {
 
 #[test]
 fn test_dict_with_type_not_in_known_block_types() {
-    let block =
-        ContentBlock::NonStandard(agent_chain_core::messages::NonStandardContentBlock::new({
-            let mut value = std::collections::HashMap::new();
-            value.insert("type".to_string(), json!("completely_unknown_type_xyz"));
-            value.insert("payload".to_string(), json!({"key": "value"}));
-            value
-        }));
+    let block = ContentBlock::NonStandard(
+        agent_chain_core::messages::NonStandardContentBlock::builder()
+            .value({
+                let mut value = std::collections::HashMap::new();
+                value.insert("type".to_string(), json!("completely_unknown_type_xyz"));
+                value.insert("payload".to_string(), json!({"key": "value"}));
+                value
+            })
+            .build(),
+    );
     let msg = HumanMessage::builder()
         .content(ContentBlocks::from(vec![block]))
         .build();
@@ -458,13 +480,16 @@ fn test_dict_with_type_not_in_known_block_types() {
 
 #[test]
 fn test_dict_with_no_type_key() {
-    let block =
-        ContentBlock::NonStandard(agent_chain_core::messages::NonStandardContentBlock::new({
-            let mut value = std::collections::HashMap::new();
-            value.insert("data".to_string(), json!("some data"));
-            value.insert("format".to_string(), json!("raw"));
-            value
-        }));
+    let block = ContentBlock::NonStandard(
+        agent_chain_core::messages::NonStandardContentBlock::builder()
+            .value({
+                let mut value = std::collections::HashMap::new();
+                value.insert("data".to_string(), json!("some data"));
+                value.insert("format".to_string(), json!("raw"));
+                value
+            })
+            .build(),
+    );
     let msg = HumanMessage::builder()
         .content(ContentBlocks::from(vec![block]))
         .build();
@@ -576,12 +601,12 @@ fn test_add_chunks_with_response_metadata() {
 fn test_add_chunk_list_content() {
     let chunk1 = HumanMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new("Hello"),
+            TextContentBlock::builder().text("Hello").build(),
         )]))
         .build();
     let chunk2 = HumanMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new(" world"),
+            TextContentBlock::builder().text(" world").build(),
         )]))
         .build();
     let result = chunk1 + chunk2;
@@ -777,7 +802,9 @@ fn test_pretty_print_does_not_raise_empty_content() {
 
 #[test]
 fn test_pretty_print_does_not_raise_list_content() {
-    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(
+        TextContentBlock::builder().text("Hello").build(),
+    )]);
     let msg = HumanMessage::builder().content(blocks).build();
     msg.pretty_print(); // Should not panic
 }
@@ -869,8 +896,13 @@ fn test_known_title_exact_output() {
 #[test]
 fn test_init_with_content_blocks() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Image(ImageContentBlock::from_url("http://example.com/img.png")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("http://example.com/img.png".to_string())
+                .build()
+                .unwrap(),
+        ),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 2);
@@ -884,7 +916,9 @@ fn test_init_with_string_content() {
 
 #[test]
 fn test_init_with_list_content() {
-    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(
+        TextContentBlock::builder().text("Hello").build(),
+    )]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 1);
 }

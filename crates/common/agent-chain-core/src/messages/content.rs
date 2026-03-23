@@ -1,7 +1,6 @@
+use bon::bon;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-use crate::utils::base::ensure_id;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -93,21 +92,32 @@ pub enum Annotation {
     },
 }
 
+#[bon]
 impl Annotation {
-    pub fn citation() -> Self {
+    #[builder]
+    pub fn citation(
+        id: Option<String>,
+        url: Option<String>,
+        title: Option<String>,
+        start_index: Option<i64>,
+        end_index: Option<i64>,
+        cited_text: Option<String>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self::Citation {
-            id: None,
-            url: None,
-            title: None,
-            start_index: None,
-            end_index: None,
-            cited_text: None,
-            extras: None,
+            id,
+            url,
+            title,
+            start_index,
+            end_index,
+            cited_text,
+            extras,
         }
     }
 
-    pub fn non_standard(value: HashMap<String, serde_json::Value>) -> Self {
-        Self::NonStandardAnnotation { id: None, value }
+    #[builder]
+    pub fn non_standard(value: HashMap<String, serde_json::Value>, id: Option<String>) -> Self {
+        Self::NonStandardAnnotation { id, value }
     }
 }
 
@@ -124,14 +134,22 @@ pub struct TextContentBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl TextContentBlock {
-    pub fn new(text: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        text: impl Into<String>,
+        id: Option<String>,
+        annotations: Option<Vec<Annotation>>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self {
-            id: None,
+            id,
             text: text.into(),
-            annotations: None,
-            index: None,
-            extras: None,
+            annotations,
+            index,
+            extras,
         }
     }
 }
@@ -147,14 +165,22 @@ pub struct ToolCallBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl ToolCallBlock {
-    pub fn new(name: impl Into<String>, args: HashMap<String, serde_json::Value>) -> Self {
+    #[builder]
+    pub fn new(
+        name: impl Into<String>,
+        args: HashMap<String, serde_json::Value>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self {
-            id: None,
+            id,
             name: name.into(),
             args,
-            index: None,
-            extras: None,
+            index,
+            extras,
         }
     }
 }
@@ -170,21 +196,29 @@ pub struct ToolCallChunkBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl ToolCallChunkBlock {
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(
+        id: Option<String>,
+        name: Option<String>,
+        args: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self {
-            id: None,
-            name: None,
-            args: None,
-            index: None,
-            extras: None,
+            id,
+            name,
+            args,
+            index,
+            extras,
         }
     }
 }
 
 impl Default for ToolCallChunkBlock {
     fn default() -> Self {
-        Self::new()
+        Self::builder().build()
     }
 }
 
@@ -200,22 +234,31 @@ pub struct InvalidToolCallBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl InvalidToolCallBlock {
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(
+        id: Option<String>,
+        name: Option<String>,
+        args: Option<String>,
+        error: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self {
-            id: None,
-            name: None,
-            args: None,
-            error: None,
-            index: None,
-            extras: None,
+            id,
+            name,
+            args,
+            error,
+            index,
+            extras,
         }
     }
 }
 
 impl Default for InvalidToolCallBlock {
     fn default() -> Self {
-        Self::new()
+        Self::builder().build()
     }
 }
 
@@ -230,7 +273,9 @@ pub struct ServerToolCall {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl ServerToolCall {
+    #[builder]
     pub fn new(
         id: impl Into<String>,
         name: impl Into<String>,
@@ -260,21 +305,29 @@ pub struct ServerToolCallChunk {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl ServerToolCallChunk {
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(
+        name: Option<String>,
+        args: Option<String>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self {
-            name: None,
-            args: None,
-            id: None,
-            index: None,
-            extras: None,
+            name,
+            args,
+            id,
+            index,
+            extras,
         }
     }
 }
 
 impl Default for ServerToolCallChunk {
     fn default() -> Self {
-        Self::new()
+        Self::builder().build()
     }
 }
 
@@ -299,7 +352,9 @@ pub struct ServerToolResult {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl ServerToolResult {
+    #[builder]
     pub fn success(tool_call_id: impl Into<String>) -> Self {
         Self {
             id: None,
@@ -311,6 +366,7 @@ impl ServerToolResult {
         }
     }
 
+    #[builder]
     pub fn error(tool_call_id: impl Into<String>) -> Self {
         Self {
             id: None,
@@ -335,13 +391,20 @@ pub struct ReasoningContentBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl ReasoningContentBlock {
-    pub fn new(reasoning: impl Into<String>) -> Self {
+    #[builder]
+    pub fn new(
+        reasoning: impl Into<String>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self {
-            id: None,
+            id,
             reasoning: Some(reasoning.into()),
-            index: None,
-            extras: None,
+            index,
+            extras,
         }
     }
 
@@ -368,47 +431,34 @@ pub struct ImageContentBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl ImageContentBlock {
-    pub fn new() -> Self {
-        Self {
-            id: None,
-            file_id: None,
-            mime_type: None,
-            index: None,
-            url: None,
-            base64: None,
-            extras: None,
+    /// Create an image content block.
+    ///
+    /// Returns an error if none of `url`, `base64`, or `file_id` is provided.
+    #[builder]
+    pub fn new(
+        url: Option<String>,
+        base64: Option<String>,
+        file_id: Option<String>,
+        mime_type: Option<String>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<Self, &'static str> {
+        if url.is_none() && base64.is_none() && file_id.is_none() {
+            return Err("Must provide one of: url, base64, or file_id");
         }
-    }
 
-    pub fn from_url(url: impl Into<String>) -> Self {
-        Self {
-            id: None,
-            file_id: None,
-            mime_type: None,
-            index: None,
-            url: Some(url.into()),
-            base64: None,
-            extras: None,
-        }
-    }
-
-    pub fn from_base64(data: impl Into<String>, mime_type: impl Into<String>) -> Self {
-        Self {
-            id: None,
-            file_id: None,
-            mime_type: Some(mime_type.into()),
-            index: None,
-            url: None,
-            base64: Some(data.into()),
-            extras: None,
-        }
-    }
-}
-
-impl Default for ImageContentBlock {
-    fn default() -> Self {
-        Self::new()
+        Ok(Self {
+            id,
+            url,
+            base64,
+            file_id,
+            mime_type,
+            index,
+            extras,
+        })
     }
 }
 
@@ -430,23 +480,39 @@ pub struct VideoContentBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl VideoContentBlock {
-    pub fn new() -> Self {
-        Self {
-            id: None,
-            file_id: None,
-            mime_type: None,
-            index: None,
-            url: None,
-            base64: None,
-            extras: None,
+    /// Create a video content block.
+    ///
+    /// Returns an error if none of `url`, `base64`, or `file_id` is provided,
+    /// or if `mime_type` is missing when using `base64`.
+    #[builder]
+    pub fn new(
+        url: Option<String>,
+        base64: Option<String>,
+        file_id: Option<String>,
+        mime_type: Option<String>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<Self, &'static str> {
+        if url.is_none() && base64.is_none() && file_id.is_none() {
+            return Err("Must provide one of: url, base64, or file_id");
         }
-    }
-}
 
-impl Default for VideoContentBlock {
-    fn default() -> Self {
-        Self::new()
+        if base64.is_some() && mime_type.is_none() {
+            return Err("mime_type is required when using base64 data");
+        }
+
+        Ok(Self {
+            id,
+            url,
+            base64,
+            file_id,
+            mime_type,
+            index,
+            extras,
+        })
     }
 }
 
@@ -468,23 +534,39 @@ pub struct AudioContentBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl AudioContentBlock {
-    pub fn new() -> Self {
-        Self {
-            id: None,
-            file_id: None,
-            mime_type: None,
-            index: None,
-            url: None,
-            base64: None,
-            extras: None,
+    /// Create an audio content block.
+    ///
+    /// Returns an error if none of `url`, `base64`, or `file_id` is provided,
+    /// or if `mime_type` is missing when using `base64`.
+    #[builder]
+    pub fn new(
+        url: Option<String>,
+        base64: Option<String>,
+        file_id: Option<String>,
+        mime_type: Option<String>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<Self, &'static str> {
+        if url.is_none() && base64.is_none() && file_id.is_none() {
+            return Err("Must provide one of: url, base64, or file_id");
         }
-    }
-}
 
-impl Default for AudioContentBlock {
-    fn default() -> Self {
-        Self::new()
+        if base64.is_some() && mime_type.is_none() {
+            return Err("mime_type is required when using base64 data");
+        }
+
+        Ok(Self {
+            id,
+            url,
+            base64,
+            file_id,
+            mime_type,
+            index,
+            extras,
+        })
     }
 }
 
@@ -511,26 +593,39 @@ pub struct PlainTextContentBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl PlainTextContentBlock {
-    pub fn new() -> Self {
+    #[builder]
+    pub fn new(
+        id: Option<String>,
+        file_id: Option<String>,
+        #[builder(default = "text/plain".to_string())] mime_type: String,
+        index: Option<BlockIndex>,
+        url: Option<String>,
+        base64: Option<String>,
+        text: Option<String>,
+        title: Option<String>,
+        context: Option<String>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Self {
         Self {
-            id: None,
-            file_id: None,
-            mime_type: "text/plain".to_string(),
-            index: None,
-            url: None,
-            base64: None,
-            text: None,
-            title: None,
-            context: None,
-            extras: None,
+            id,
+            file_id,
+            mime_type,
+            index,
+            url,
+            base64,
+            text,
+            title,
+            context,
+            extras,
         }
     }
 }
 
 impl Default for PlainTextContentBlock {
     fn default() -> Self {
-        Self::new()
+        Self::builder().build()
     }
 }
 
@@ -552,23 +647,39 @@ pub struct FileContentBlock {
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+#[bon]
 impl FileContentBlock {
-    pub fn new() -> Self {
-        Self {
-            id: None,
-            file_id: None,
-            mime_type: None,
-            index: None,
-            url: None,
-            base64: None,
-            extras: None,
+    /// Create a file content block.
+    ///
+    /// Returns an error if none of `url`, `base64`, or `file_id` is provided,
+    /// or if `mime_type` is missing when using `base64`.
+    #[builder]
+    pub fn new(
+        url: Option<String>,
+        base64: Option<String>,
+        file_id: Option<String>,
+        mime_type: Option<String>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+        extras: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<Self, &'static str> {
+        if url.is_none() && base64.is_none() && file_id.is_none() {
+            return Err("Must provide one of: url, base64, or file_id");
         }
-    }
-}
 
-impl Default for FileContentBlock {
-    fn default() -> Self {
-        Self::new()
+        if base64.is_some() && mime_type.is_none() {
+            return Err("mime_type is required when using base64 data");
+        }
+
+        Ok(Self {
+            id,
+            url,
+            base64,
+            file_id,
+            mime_type,
+            index,
+            extras,
+        })
     }
 }
 
@@ -581,13 +692,15 @@ pub struct NonStandardContentBlock {
     pub index: Option<BlockIndex>,
 }
 
+#[bon]
 impl NonStandardContentBlock {
-    pub fn new(value: HashMap<String, serde_json::Value>) -> Self {
-        Self {
-            id: None,
-            value,
-            index: None,
-        }
+    #[builder]
+    pub fn new(
+        value: HashMap<String, serde_json::Value>,
+        id: Option<String>,
+        index: Option<BlockIndex>,
+    ) -> Self {
+        Self { id, value, index }
     }
 }
 
@@ -654,7 +767,9 @@ impl<'de> serde::Deserialize<'de> for ContentBlocks {
                 let mut blocks = Vec::new();
                 while let Some(value) = seq.next_element::<serde_json::Value>()? {
                     if let Some(text) = value.as_str() {
-                        blocks.push(ContentBlock::Text(TextContentBlock::new(text)));
+                        blocks.push(ContentBlock::Text(
+                            TextContentBlock::builder().text(text).build(),
+                        ));
                     } else {
                         match serde_json::from_value::<ContentBlock>(value.clone()) {
                             Ok(block) => blocks.push(block),
@@ -662,7 +777,9 @@ impl<'de> serde::Deserialize<'de> for ContentBlocks {
                                 let mut error_value = HashMap::new();
                                 error_value.insert("original_json".to_string(), value);
                                 blocks.push(ContentBlock::NonStandard(
-                                    NonStandardContentBlock::new(error_value),
+                                    NonStandardContentBlock::builder()
+                                        .value(error_value)
+                                        .build(),
                                 ));
                             }
                         }
@@ -784,7 +901,9 @@ impl From<&str> for ContentBlocks {
         if s.is_empty() {
             Self(vec![])
         } else {
-            Self(vec![ContentBlock::Text(TextContentBlock::new(s))])
+            Self(vec![ContentBlock::Text(
+                TextContentBlock::builder().text(s).build(),
+            )])
         }
     }
 }
@@ -794,7 +913,9 @@ impl From<String> for ContentBlocks {
         if s.is_empty() {
             Self(vec![])
         } else {
-            Self(vec![ContentBlock::Text(TextContentBlock::new(s))])
+            Self(vec![ContentBlock::Text(
+                TextContentBlock::builder().text(s).build(),
+            )])
         }
     }
 }
@@ -991,258 +1112,44 @@ pub fn is_data_content_block(block: &serde_json::Value) -> bool {
     false
 }
 
-pub fn create_text_block(
-    text: impl Into<String>,
-    id: Option<String>,
-    annotations: Option<Vec<Annotation>>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> TextContentBlock {
-    TextContentBlock {
-        text: text.into(),
-        id: Some(ensure_id(id)),
-        annotations,
-        index,
-        extras,
-    }
-}
-
-pub fn create_image_block(
-    url: Option<String>,
-    base64: Option<String>,
-    file_id: Option<String>,
-    mime_type: Option<String>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> Result<ImageContentBlock, &'static str> {
-    if url.is_none() && base64.is_none() && file_id.is_none() {
-        return Err("Must provide one of: url, base64, or file_id");
-    }
-
-    Ok(ImageContentBlock {
-        id: Some(ensure_id(id)),
-        url,
-        base64,
-        file_id,
-        mime_type,
-        index,
-        extras,
-    })
-}
-
-pub fn create_video_block(
-    url: Option<String>,
-    base64: Option<String>,
-    file_id: Option<String>,
-    mime_type: Option<String>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> Result<VideoContentBlock, &'static str> {
-    if url.is_none() && base64.is_none() && file_id.is_none() {
-        return Err("Must provide one of: url, base64, or file_id");
-    }
-
-    if base64.is_some() && mime_type.is_none() {
-        return Err("mime_type is required when using base64 data");
-    }
-
-    Ok(VideoContentBlock {
-        id: Some(ensure_id(id)),
-        url,
-        base64,
-        file_id,
-        mime_type,
-        index,
-        extras,
-    })
-}
-
-pub fn create_audio_block(
-    url: Option<String>,
-    base64: Option<String>,
-    file_id: Option<String>,
-    mime_type: Option<String>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> Result<AudioContentBlock, &'static str> {
-    if url.is_none() && base64.is_none() && file_id.is_none() {
-        return Err("Must provide one of: url, base64, or file_id");
-    }
-
-    if base64.is_some() && mime_type.is_none() {
-        return Err("mime_type is required when using base64 data");
-    }
-
-    Ok(AudioContentBlock {
-        id: Some(ensure_id(id)),
-        url,
-        base64,
-        file_id,
-        mime_type,
-        index,
-        extras,
-    })
-}
-
-pub fn create_file_block(
-    url: Option<String>,
-    base64: Option<String>,
-    file_id: Option<String>,
-    mime_type: Option<String>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> Result<FileContentBlock, &'static str> {
-    if url.is_none() && base64.is_none() && file_id.is_none() {
-        return Err("Must provide one of: url, base64, or file_id");
-    }
-
-    if base64.is_some() && mime_type.is_none() {
-        return Err("mime_type is required when using base64 data");
-    }
-
-    Ok(FileContentBlock {
-        id: Some(ensure_id(id)),
-        url,
-        base64,
-        file_id,
-        mime_type,
-        index,
-        extras,
-    })
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct PlainTextBlockConfig {
-    pub text: Option<String>,
-    pub url: Option<String>,
-    pub base64: Option<String>,
-    pub file_id: Option<String>,
-    pub title: Option<String>,
-    pub context: Option<String>,
-    pub id: Option<String>,
-    pub index: Option<BlockIndex>,
-    pub extras: Option<HashMap<String, serde_json::Value>>,
-}
-
-pub fn create_plaintext_block(config: PlainTextBlockConfig) -> PlainTextContentBlock {
-    PlainTextContentBlock {
-        mime_type: "text/plain".to_string(),
-        id: Some(ensure_id(config.id)),
-        text: config.text,
-        url: config.url,
-        base64: config.base64,
-        file_id: config.file_id,
-        title: config.title,
-        context: config.context,
-        index: config.index,
-        extras: config.extras,
-    }
-}
-
-pub fn create_tool_call(
-    name: impl Into<String>,
-    args: HashMap<String, serde_json::Value>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> ToolCallBlock {
-    ToolCallBlock {
-        name: name.into(),
-        args,
-        id: Some(ensure_id(id)),
-        index,
-        extras,
-    }
-}
-
-pub fn create_reasoning_block(
-    reasoning: Option<String>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> ReasoningContentBlock {
-    ReasoningContentBlock {
-        reasoning: Some(reasoning.unwrap_or_default()),
-        id: Some(ensure_id(id)),
-        index,
-        extras,
-    }
-}
-
-pub fn create_citation(
-    url: Option<String>,
-    title: Option<String>,
-    start_index: Option<i64>,
-    end_index: Option<i64>,
-    cited_text: Option<String>,
-    id: Option<String>,
-    extras: Option<HashMap<String, serde_json::Value>>,
-) -> Annotation {
-    Annotation::Citation {
-        id: Some(ensure_id(id)),
-        url,
-        title,
-        start_index,
-        end_index,
-        cited_text,
-        extras,
-    }
-}
-
-pub fn create_non_standard_block(
-    value: HashMap<String, serde_json::Value>,
-    id: Option<String>,
-    index: Option<BlockIndex>,
-) -> NonStandardContentBlock {
-    NonStandardContentBlock {
-        value,
-        id: Some(ensure_id(id)),
-        index,
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::utils::ensure_id;
+
     use super::*;
 
     #[test]
     fn test_text_content_block_serialization() {
-        let block = ContentBlock::Text(TextContentBlock::new("Hello, world!"));
+        let block = ContentBlock::Text(TextContentBlock::builder().text("Hello, world!").build());
         let json = serde_json::to_string(&block).unwrap();
         assert!(json.contains("\"type\":\"text\""));
         assert!(json.contains("\"text\":\"Hello, world!\""));
     }
 
     #[test]
-    fn test_create_text_block() {
-        let block = create_text_block("Test", None, None, None, None);
+    fn test_text_content_block_builder() {
+        let block = TextContentBlock::builder()
+            .text("Test")
+            .id(ensure_id(None))
+            .build();
         assert_eq!(block.text, "Test");
         assert!(block.id.unwrap().starts_with("lc_"));
     }
 
     #[test]
-    fn test_create_image_block() {
-        let block = create_image_block(
-            Some("https://example.com/image.png".to_string()),
-            None,
-            None,
-            Some("image/png".to_string()),
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+    fn test_image_content_block_builder() {
+        let block = ImageContentBlock::builder()
+            .url("https://example.com/image.png".to_string())
+            .mime_type("image/png".to_string())
+            .build()
+            .unwrap();
         assert_eq!(block.url.as_ref().unwrap(), "https://example.com/image.png");
         assert_eq!(block.mime_type.as_ref().unwrap(), "image/png");
     }
 
     #[test]
-    fn test_create_image_block_error() {
-        let result = create_image_block(None, None, None, None, None, None, None);
+    fn test_image_content_block_validation_error() {
+        let result = ImageContentBlock::builder().build();
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -1252,7 +1159,9 @@ mod tests {
 
     #[test]
     fn test_reasoning_content_block() {
-        let block = ReasoningContentBlock::new("Thinking...");
+        let block = ReasoningContentBlock::builder()
+            .reasoning("Thinking...")
+            .build();
         assert_eq!(block.reasoning(), Some("Thinking..."));
     }
 
@@ -1281,7 +1190,7 @@ mod tests {
 
     #[test]
     fn test_content_block_enum_serialization() {
-        let block = ContentBlock::Text(TextContentBlock::new("Hello"));
+        let block = ContentBlock::Text(TextContentBlock::builder().text("Hello").build());
         let json = serde_json::to_string(&block).unwrap();
         assert!(json.contains("\"type\":\"text\""));
     }
@@ -1416,16 +1325,15 @@ mod tests {
     }
 
     #[test]
-    fn test_create_citation_factory() {
-        let citation = create_citation(
-            Some("https://example.com".to_string()),
-            Some("Title".to_string()),
-            Some(0),
-            Some(10),
-            Some("Cited text".to_string()),
-            None,
-            None,
-        );
+    fn test_annotation_citation_builder() {
+        let citation = Annotation::citation()
+            .id(ensure_id(None))
+            .url("https://example.com".to_string())
+            .title("Title".to_string())
+            .start_index(0)
+            .end_index(10)
+            .cited_text("Cited text".to_string())
+            .call();
 
         match citation {
             Annotation::Citation { id, url, title, .. } => {

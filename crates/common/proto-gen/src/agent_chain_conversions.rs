@@ -1277,7 +1277,7 @@ impl From<ProtoContentBlock> for ContentBlock {
             Some(proto_content_block::Block::ServerToolResult(b)) => {
                 ContentBlock::ServerToolResult(b.into())
             }
-            None => ContentBlock::Text(TextContentBlock::new("")),
+            None => ContentBlock::Text(TextContentBlock::builder().text("").build()),
         }
     }
 }

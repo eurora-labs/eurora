@@ -574,7 +574,7 @@ mod tests {
         use crate::messages::content::{ContentBlock, ContentBlocks, TextContentBlock};
 
         let blocks: ContentBlocks = vec![
-            ContentBlock::Text(TextContentBlock::new("Hello")),
+            ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
             serde_json::from_value::<ContentBlock>(
                 json!({"type": "image", "url": "https://example.com/img.png"}),
             )
@@ -600,9 +600,9 @@ mod tests {
             "input_audio".to_string(),
             json!({"data": "base64audiodata", "format": "wav"}),
         );
-        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
-            value_map,
-        ))]
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(
+            NonStandardContentBlock::builder().value(value_map).build(),
+        )]
         .into_iter()
         .collect();
         let messages = vec![AnyMessage::HumanMessage(
@@ -627,9 +627,9 @@ mod tests {
         let mut value_map = HashMap::new();
         value_map.insert("type".to_string(), json!("file"));
         value_map.insert("file".to_string(), json!({"file_id": "file-123"}));
-        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
-            value_map,
-        ))]
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(
+            NonStandardContentBlock::builder().value(value_map).build(),
+        )]
         .into_iter()
         .collect();
         let messages = vec![AnyMessage::HumanMessage(
@@ -655,9 +655,9 @@ mod tests {
         value_map.insert("source_type".to_string(), json!("url"));
         value_map.insert("url".to_string(), json!("https://example.com/img.png"));
         value_map.insert("mime_type".to_string(), json!("image/png"));
-        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
-            value_map,
-        ))]
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(
+            NonStandardContentBlock::builder().value(value_map).build(),
+        )]
         .into_iter()
         .collect();
         let messages = vec![AnyMessage::HumanMessage(
@@ -684,9 +684,9 @@ mod tests {
         value_map.insert("source_type".to_string(), json!("base64"));
         value_map.insert("data".to_string(), json!("iVBORw0KGgo="));
         value_map.insert("mime_type".to_string(), json!("image/png"));
-        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(NonStandardContentBlock::new(
-            value_map,
-        ))]
+        let blocks: ContentBlocks = vec![ContentBlock::NonStandard(
+            NonStandardContentBlock::builder().value(value_map).build(),
+        )]
         .into_iter()
         .collect();
         let messages = vec![AnyMessage::HumanMessage(
@@ -719,8 +719,8 @@ mod tests {
         );
 
         let blocks: ContentBlocks = vec![
-            ContentBlock::Text(TextContentBlock::new("Hello")),
-            ContentBlock::NonStandard(NonStandardContentBlock::new(audio_map)),
+            ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+            ContentBlock::NonStandard(NonStandardContentBlock::builder().value(audio_map).build()),
             serde_json::from_value::<ContentBlock>(
                 json!({"type": "image", "url": "https://example.com/img.png"}),
             )

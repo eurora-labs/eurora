@@ -540,7 +540,11 @@ pub fn extract_reasoning_from_additional_kwargs(
     additional_kwargs: &HashMap<String, Value>,
 ) -> Option<ReasoningContentBlock> {
     if let Some(Value::String(reasoning_content)) = additional_kwargs.get("reasoning_content") {
-        Some(ReasoningContentBlock::new(reasoning_content.clone()))
+        Some(
+            ReasoningContentBlock::builder()
+                .reasoning(reasoning_content.clone())
+                .build(),
+        )
     } else {
         None
     }

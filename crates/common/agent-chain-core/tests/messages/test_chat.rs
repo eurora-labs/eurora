@@ -66,7 +66,9 @@ fn test_init_with_response_metadata() {
 
 #[test]
 fn test_init_with_list_content() {
-    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(
+        TextContentBlock::builder().text("Hello").build(),
+    )]);
     let msg = ChatMessage::builder()
         .content(blocks.clone())
         .role("user")
@@ -128,8 +130,8 @@ fn test_text_property() {
 #[test]
 fn test_text_property_list_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Part 1")),
-        ContentBlock::Text(TextContentBlock::new("Part 2")),
+        ContentBlock::Text(TextContentBlock::builder().text("Part 1").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Part 2").build()),
     ]);
     let msg = ChatMessage::builder().content(blocks).role("user").build();
     assert_eq!(msg.text(), "Part 1 Part 2");
@@ -279,13 +281,13 @@ fn test_chunk_add_with_response_metadata() {
 fn test_chunk_add_with_list_content() {
     let chunk1 = ChatMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new("Hello"),
+            TextContentBlock::builder().text("Hello").build(),
         )]))
         .role("user")
         .build();
     let chunk2 = ChatMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new(" world"),
+            TextContentBlock::builder().text(" world").build(),
         )]))
         .role("user")
         .build();
@@ -443,7 +445,7 @@ fn test_chunk_content_blocks_property() {
 #[test]
 fn test_content_blocks_with_mixed_list_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
         ContentBlock::Image(agent_chain_core::messages::ImageContentBlock {
             id: None,
             file_id: None,
@@ -657,8 +659,8 @@ fn test_pretty_repr_html_false() {
 #[test]
 fn test_init_with_content_blocks() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Text(TextContentBlock::new(" world")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Text(TextContentBlock::builder().text(" world").build()),
     ]);
     let msg = ChatMessage::builder().content(blocks).role("user").build();
     assert_eq!(msg.content.len(), 2);
@@ -667,8 +669,8 @@ fn test_init_with_content_blocks() {
 #[test]
 fn test_content_blocks_roundtrip() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("First")),
-        ContentBlock::Text(TextContentBlock::new("Second")),
+        ContentBlock::Text(TextContentBlock::builder().text("First").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Second").build()),
     ]);
     let msg = ChatMessage::builder()
         .content(blocks)

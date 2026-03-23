@@ -294,7 +294,9 @@ fn test_chunk_sum() {
 
 #[test]
 fn test_init_with_list_content() {
-    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new("Hello"))]);
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(
+        TextContentBlock::builder().text("Hello").build(),
+    )]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 1);
     if let ContentBlock::Text(tb) = &msg.content[0] {
@@ -307,8 +309,17 @@ fn test_init_with_list_content() {
 #[test]
 fn test_init_with_multimodal_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("What's in this image?")),
-        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+        ContentBlock::Text(
+            TextContentBlock::builder()
+                .text("What's in this image?")
+                .build(),
+        ),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("https://example.com/img.png".to_string())
+                .build()
+                .unwrap(),
+        ),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 2);
@@ -319,8 +330,13 @@ fn test_init_with_multimodal_content() {
 #[test]
 fn test_init_with_content_blocks() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("https://example.com/img.png".to_string())
+                .build()
+                .unwrap(),
+        ),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 2);
@@ -335,8 +351,8 @@ fn test_text_method() {
 #[test]
 fn test_text_method_list_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Part 1")),
-        ContentBlock::Text(TextContentBlock::new("Part 2")),
+        ContentBlock::Text(TextContentBlock::builder().text("Part 1").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Part 2").build()),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.text(), "Part 1 Part 2");
@@ -345,9 +361,14 @@ fn test_text_method_list_content() {
 #[test]
 fn test_text_method_multimodal_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Image(ImageContentBlock::from_url("https://example.com")),
-        ContentBlock::Text(TextContentBlock::new("world")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("https://example.com".to_string())
+                .build()
+                .unwrap(),
+        ),
+        ContentBlock::Text(TextContentBlock::builder().text("world").build()),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.text(), "Hello world");
@@ -369,8 +390,13 @@ fn test_content_blocks_property() {
 #[test]
 fn test_content_blocks_multimodal() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("What's in this?")),
-        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+        ContentBlock::Text(TextContentBlock::builder().text("What's in this?").build()),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("https://example.com/img.png".to_string())
+                .build()
+                .unwrap(),
+        ),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     let blocks = msg.content_blocks();
@@ -487,8 +513,8 @@ fn test_same_content_and_metadata_are_equal() {
 #[test]
 fn test_init_with_content_blocks_sets_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Text(TextContentBlock::new(" world")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Text(TextContentBlock::builder().text(" world").build()),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 2);
@@ -497,8 +523,8 @@ fn test_init_with_content_blocks_sets_content() {
 #[test]
 fn test_content_blocks_roundtrip() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("First")),
-        ContentBlock::Text(TextContentBlock::new("Second")),
+        ContentBlock::Text(TextContentBlock::builder().text("First").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Second").build()),
     ]);
     let msg = HumanMessage::builder().content(blocks).build();
     let result_blocks = msg.content_blocks();
@@ -509,12 +535,12 @@ fn test_content_blocks_roundtrip() {
 fn test_chunk_add_with_list_content() {
     let chunk1 = HumanMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new("Hello"),
+            TextContentBlock::builder().text("Hello").build(),
         )]))
         .build();
     let chunk2 = HumanMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new(" world"),
+            TextContentBlock::builder().text(" world").build(),
         )]))
         .build();
     let result = chunk1 + chunk2;
@@ -572,8 +598,13 @@ fn test_chunk_content_blocks_property() {
 #[test]
 fn test_chunk_content_blocks_multimodal() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Check this:")),
-        ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png")),
+        ContentBlock::Text(TextContentBlock::builder().text("Check this:").build()),
+        ContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("https://example.com/img.png".to_string())
+                .build()
+                .unwrap(),
+        ),
     ]);
     let chunk = HumanMessageChunk::builder().content(blocks).build();
     let msg: HumanMessage = chunk.into();
