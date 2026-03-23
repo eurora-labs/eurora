@@ -177,7 +177,11 @@ mod tests {
     #[test]
     fn test_multimodal_human_message_roundtrip() {
         let blocks: Vec<ContentBlock> = vec![
-            ContentBlock::Text(TextContentBlock::new("What's in this image?")),
+            ContentBlock::Text(
+                TextContentBlock::builder()
+                    .text("What's in this image?")
+                    .build(),
+            ),
             ContentBlock::Image(ImageContentBlock {
                 id: None,
                 file_id: None,
@@ -258,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_content_block_enum_roundtrip() {
-        let text_block = ContentBlock::Text(TextContentBlock::new("Hello"));
+        let text_block = ContentBlock::Text(TextContentBlock::builder().text("Hello").build());
         let proto: ProtoContentBlock = text_block.clone().into();
         let roundtrip: ContentBlock = proto.into();
 
@@ -272,7 +276,9 @@ mod tests {
 
     #[test]
     fn test_reasoning_content_block_roundtrip() {
-        let original = ReasoningContentBlock::new("Let me think about this...");
+        let original = ReasoningContentBlock::builder()
+            .reasoning("Let me think about this...")
+            .build();
 
         let proto: ProtoReasoningContentBlock = original.clone().into();
         let roundtrip: ReasoningContentBlock = proto.into();
@@ -288,7 +294,11 @@ mod tests {
             serde_json::Value::String("print('hello')".to_string()),
         );
 
-        let original = ServerToolCall::new("exec_123", "python_exec", args);
+        let original = ServerToolCall::builder()
+            .id("exec_123")
+            .name("python_exec")
+            .args(args)
+            .build();
 
         let proto: ProtoServerToolCall = original.clone().into();
         let roundtrip: ServerToolCall = proto.into();
@@ -300,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_server_tool_result_roundtrip() {
-        let original = ServerToolResult::success("call_123");
+        let original = ServerToolResult::success().tool_call_id("call_123").call();
 
         let proto: ProtoServerToolResult = original.clone().into();
         let roundtrip: ServerToolResult = proto.into();
