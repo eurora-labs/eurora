@@ -2,8 +2,6 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::utils::base::ensure_id;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageDetail {
@@ -107,7 +105,7 @@ impl Annotation {
         extras: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self::Citation {
-            id: Some(ensure_id(id)),
+            id,
             url,
             title,
             start_index,
@@ -119,10 +117,7 @@ impl Annotation {
 
     #[builder]
     pub fn non_standard(value: HashMap<String, serde_json::Value>, id: Option<String>) -> Self {
-        Self::NonStandardAnnotation {
-            id: Some(ensure_id(id)),
-            value,
-        }
+        Self::NonStandardAnnotation { id, value }
     }
 }
 
@@ -150,7 +145,7 @@ impl TextContentBlock {
         extras: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
-            id: Some(ensure_id(id)),
+            id,
             text: text.into(),
             annotations,
             index,
@@ -181,7 +176,7 @@ impl ToolCallBlock {
         extras: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
-            id: Some(ensure_id(id)),
+            id,
             name: name.into(),
             args,
             index,
@@ -406,7 +401,7 @@ impl ReasoningContentBlock {
         extras: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
-            id: Some(ensure_id(id)),
+            id,
             reasoning: Some(reasoning.into()),
             index,
             extras,
@@ -456,7 +451,7 @@ impl ImageContentBlock {
         }
 
         Ok(Self {
-            id: Some(ensure_id(id)),
+            id,
             url,
             base64,
             file_id,
@@ -510,7 +505,7 @@ impl VideoContentBlock {
         }
 
         Ok(Self {
-            id: Some(ensure_id(id)),
+            id,
             url,
             base64,
             file_id,
@@ -564,7 +559,7 @@ impl AudioContentBlock {
         }
 
         Ok(Self {
-            id: Some(ensure_id(id)),
+            id,
             url,
             base64,
             file_id,
@@ -614,7 +609,7 @@ impl PlainTextContentBlock {
         extras: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
-            id: Some(ensure_id(id)),
+            id,
             file_id,
             mime_type,
             index,
@@ -677,7 +672,7 @@ impl FileContentBlock {
         }
 
         Ok(Self {
-            id: Some(ensure_id(id)),
+            id,
             url,
             base64,
             file_id,
@@ -705,11 +700,7 @@ impl NonStandardContentBlock {
         id: Option<String>,
         index: Option<BlockIndex>,
     ) -> Self {
-        Self {
-            id: Some(ensure_id(id)),
-            value,
-            index,
-        }
+        Self { id, value, index }
     }
 }
 
@@ -1123,6 +1114,8 @@ pub fn is_data_content_block(block: &serde_json::Value) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::ensure_id;
+
     use super::*;
 
     #[test]
@@ -1135,7 +1128,10 @@ mod tests {
 
     #[test]
     fn test_text_content_block_builder() {
-        let block = TextContentBlock::builder().text("Test").build();
+        let block = TextContentBlock::builder()
+            .text("Test")
+            .id(ensure_id(None))
+            .build();
         assert_eq!(block.text, "Test");
         assert!(block.id.unwrap().starts_with("lc_"));
     }
@@ -1331,6 +1327,7 @@ mod tests {
     #[test]
     fn test_annotation_citation_builder() {
         let citation = Annotation::citation()
+            .id(ensure_id(None))
             .url("https://example.com".to_string())
             .title("Title".to_string())
             .start_index(0)

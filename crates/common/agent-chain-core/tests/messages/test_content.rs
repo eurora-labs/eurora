@@ -1,11 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
-use agent_chain_core::messages::{
-    Annotation, AudioContentBlock, ContentBlock, DataContentBlock, FileContentBlock,
-    ImageContentBlock, InvalidToolCallBlock, KNOWN_BLOCK_TYPES, NonStandardContentBlock,
-    PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolCallChunk,
-    ServerToolResult, ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock,
-    VideoContentBlock, get_data_content_block_types, is_data_content_block,
+use agent_chain_core::{
+    messages::{
+        Annotation, AudioContentBlock, ContentBlock, DataContentBlock, FileContentBlock,
+        ImageContentBlock, InvalidToolCallBlock, KNOWN_BLOCK_TYPES, NonStandardContentBlock,
+        PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolCallChunk,
+        ServerToolResult, ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock,
+        VideoContentBlock, get_data_content_block_types, is_data_content_block,
+    },
+    utils::ensure_id,
 };
 use serde_json::json;
 
@@ -247,7 +250,10 @@ fn test_edge_case_missing_type() {
 
 #[test]
 fn test_basic_text_block() {
-    let block = TextContentBlock::builder().text("Hello world").build();
+    let block = TextContentBlock::builder()
+        .id(ensure_id(None))
+        .text("Hello world")
+        .build();
     assert_eq!(block.text, "Hello world");
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
 }
@@ -316,6 +322,7 @@ fn test_text_block_with_none_extras() {
 fn test_create_image_block_with_url() {
     let block = ImageContentBlock::builder()
         .url("https://example.com/image.png".to_string())
+        .id(ensure_id(None))
         .build()
         .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/image.png");
@@ -680,6 +687,7 @@ fn test_basic_tool_call() {
     args.insert("param".to_string(), json!("value"));
     let block = ToolCallBlock::builder()
         .name("test_tool")
+        .id(ensure_id(None))
         .args(args)
         .build();
     assert_eq!(block.name, "test_tool");
@@ -753,6 +761,7 @@ fn test_tool_call_complex_args() {
 fn test_tool_call_auto_generates_id_when_not_provided() {
     let block = ToolCallBlock::builder()
         .name("my_tool")
+        .id(ensure_id(None))
         .args(HashMap::from([("x".to_string(), json!(1))]))
         .build();
     let id = block.id.as_ref().unwrap();
@@ -763,10 +772,12 @@ fn test_tool_call_auto_generates_id_when_not_provided() {
 fn test_tool_call_auto_generated_ids_are_unique() {
     let block_a = ToolCallBlock::builder()
         .name("t")
+        .id(ensure_id(None))
         .args(HashMap::new())
         .build();
     let block_b = ToolCallBlock::builder()
         .name("t")
+        .id(ensure_id(None))
         .args(HashMap::new())
         .build();
     assert_ne!(block_a.id, block_b.id);
@@ -775,6 +786,7 @@ fn test_tool_call_auto_generated_ids_are_unique() {
 #[test]
 fn test_basic_reasoning_block() {
     let block = ReasoningContentBlock::builder()
+        .id(ensure_id(None))
         .reasoning("Let me think about this...")
         .build();
     assert_eq!(
@@ -821,7 +833,10 @@ fn test_reasoning_block_with_extras() {
 
 #[test]
 fn test_reasoning_block_none_reasoning_defaults_to_empty_string() {
-    let block = ReasoningContentBlock::builder().reasoning("").build();
+    let block = ReasoningContentBlock::builder()
+        .reasoning("")
+        .id(ensure_id(None))
+        .build();
     assert_eq!(block.reasoning.as_ref().unwrap(), "");
     assert!(block.id.is_some());
 }
@@ -829,6 +844,7 @@ fn test_reasoning_block_none_reasoning_defaults_to_empty_string() {
 #[test]
 fn test_basic_citation() {
     let annotation = Annotation::citation()
+        .id(ensure_id(None))
         .url("https://example.com/source".to_string())
         .call();
     match &annotation {
@@ -889,7 +905,7 @@ fn test_citation_with_extras() {
 
 #[test]
 fn test_citation_with_no_optional_fields() {
-    let annotation = Annotation::citation().call();
+    let annotation = Annotation::citation().id(ensure_id(None)).call();
     match &annotation {
         Annotation::Citation {
             id,
@@ -917,6 +933,7 @@ fn test_basic_non_standard_block() {
     let mut value = HashMap::new();
     value.insert("custom".to_string(), json!("data"));
     let block = NonStandardContentBlock::builder()
+        .id(ensure_id(None))
         .value(value.clone())
         .build();
     assert_eq!(block.value["custom"], json!("data"));
@@ -961,6 +978,7 @@ fn test_non_standard_block_complex_value() {
 fn test_non_standard_block_empty_dict_value() {
     let block = NonStandardContentBlock::builder()
         .value(HashMap::new())
+        .id(ensure_id(None))
         .build();
     assert!(block.value.is_empty());
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
