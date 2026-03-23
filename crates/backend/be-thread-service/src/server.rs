@@ -34,6 +34,7 @@ use uuid::Uuid;
 use crate::converters::convert_db_message_to_base_message;
 use crate::error::ThreadServiceError;
 use crate::tools::firecrawl_tools;
+use crate::vision_tools::vision_tools;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
@@ -105,17 +106,55 @@ fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatMod
     }
 }
 
-fn build_tool_map() -> HashMap<String, Arc<dyn BaseTool>> {
-    firecrawl_tools()
+fn build_tool_map(
+    vision_model: Option<Arc<dyn BaseChatModel + Send + Sync>>,
+) -> HashMap<String, Arc<dyn BaseTool>> {
+    let mut tools: Vec<Arc<dyn BaseTool>> = firecrawl_tools();
+    if let Some(vm) = vision_model {
+        tools.extend(vision_tools(vm));
+    }
+    tools
         .into_iter()
         .map(|tool| (tool.name().to_string(), tool))
         .collect()
+}
+
+fn build_env_vision_model() -> Option<Arc<dyn BaseChatModel + Send + Sync>> {
+    let vision_model = std::env::var("VISION_MODEL").ok()?;
+    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
+        .map(|v| v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    let model: Box<dyn BaseChatModel + Send + Sync> = if local_mode {
+        let host = std::env::var("OLLAMA_HOST")
+            .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
+        Box::new(
+            ChatOllama::builder()
+                .model(&vision_model)
+                .base_url(resolve_host_url(&host))
+                .build(),
+        )
+    } else {
+        let api_key = std::env::var("NEBUL_API_KEY").ok()?;
+        Box::new(
+            ChatOpenAI::builder()
+                .model(&vision_model)
+                .api_key(&api_key)
+                .api_base(BASE_NEBUL_URL)
+                .build(),
+        )
+    };
+
+    tracing::info!("Vision model configured: {vision_model}");
+    Some(Arc::from(model))
 }
 
 fn build_env_fallback() -> Option<Providers> {
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
+
+    let vision_model = build_env_vision_model();
 
     if local_mode {
         let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
@@ -128,9 +167,10 @@ fn build_env_fallback() -> Option<Providers> {
         Some(Providers {
             chat,
             title,
-            tools: HashMap::new(),
+            tools: build_tool_map(vision_model),
         })
     } else {
+        let tools = build_tool_map(vision_model);
         let chat_model = ChatOpenAI::builder()
             .model(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
             .reasoning_effort("medium")
@@ -138,15 +178,10 @@ fn build_env_fallback() -> Option<Providers> {
             .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
             .use_responses_api(false)
             .build();
+        let tool_likes: Vec<ToolLike> = tools.values().cloned().map(ToolLike::Tool).collect();
         let bound = chat_model
-            .bind_tools(
-                &firecrawl_tools()
-                    .into_iter()
-                    .map(ToolLike::Tool)
-                    .collect::<Vec<_>>(),
-                None,
-            )
-            .expect("Failed to bind firecrawl_search tool");
+            .bind_tools(&tool_likes, None)
+            .expect("Failed to bind tools");
         let chat: Arc<dyn BaseChatModel + Send + Sync> =
             Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
 
@@ -158,11 +193,7 @@ fn build_env_fallback() -> Option<Providers> {
                 .build(),
         );
 
-        Some(Providers {
-            chat,
-            title,
-            tools: build_tool_map(),
-        })
+        Some(Providers { chat, title, tools })
     }
 }
 
@@ -184,7 +215,7 @@ impl ThreadService {
             .map(|s| Providers {
                 chat: build_chat_provider_from(&s).into(),
                 title: build_title_provider_from(&s).into(),
-                tools: build_tool_map(),
+                tools: build_tool_map(None),
             })
             .or(env_fallback);
 
@@ -203,7 +234,7 @@ impl ThreadService {
                     Providers {
                         chat: build_chat_provider_from(&s).into(),
                         title: build_title_provider_from(&s).into(),
-                        tools: build_tool_map(),
+                        tools: build_tool_map(None),
                     }
                 });
                 let mut lock = providers_handle.write().unwrap_or_else(|e| e.into_inner());
