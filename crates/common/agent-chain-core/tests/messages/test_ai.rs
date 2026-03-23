@@ -981,7 +981,7 @@ fn test_ai_message_chunk_content_blocks_with_output_version_v1() {
     };
 
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("hello")),
+        ContentBlock::Text(TextContentBlock::builder().text("hello").build()),
         ContentBlock::ToolCall(ToolCallBlock {
             id: Some("tc1".to_string()),
             name: "foo".to_string(),

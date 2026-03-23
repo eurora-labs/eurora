@@ -353,9 +353,9 @@ fn test_multiple_system_messages_with_different_roles() {
 
 #[test]
 fn test_init_with_list_content() {
-    let blocks = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock::new(
-        "Instructions",
-    ))]);
+    let blocks = ContentBlocks::from(vec![ContentBlock::Text(
+        TextContentBlock::builder().text("Instructions").build(),
+    )]);
     let msg = SystemMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 1);
     if let ContentBlock::Text(tb) = &msg.content[0] {
@@ -368,8 +368,16 @@ fn test_init_with_list_content() {
 #[test]
 fn test_init_with_content_blocks() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("First instruction")),
-        ContentBlock::Text(TextContentBlock::new("Second instruction")),
+        ContentBlock::Text(
+            TextContentBlock::builder()
+                .text("First instruction")
+                .build(),
+        ),
+        ContentBlock::Text(
+            TextContentBlock::builder()
+                .text("Second instruction")
+                .build(),
+        ),
     ]);
     let msg = SystemMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 2);
@@ -392,8 +400,8 @@ fn test_text_method() {
 #[test]
 fn test_text_method_list_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Part 1")),
-        ContentBlock::Text(TextContentBlock::new("Part 2")),
+        ContentBlock::Text(TextContentBlock::builder().text("Part 1").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Part 2").build()),
     ]);
     let msg = SystemMessage::builder().content(blocks).build();
     assert_eq!(msg.text(), "Part 1 Part 2");
@@ -472,8 +480,16 @@ fn test_pretty_repr_with_name() {
 #[test]
 fn test_init_with_content_blocks_sets_content() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("First instruction")),
-        ContentBlock::Text(TextContentBlock::new("Second instruction")),
+        ContentBlock::Text(
+            TextContentBlock::builder()
+                .text("First instruction")
+                .build(),
+        ),
+        ContentBlock::Text(
+            TextContentBlock::builder()
+                .text("Second instruction")
+                .build(),
+        ),
     ]);
     let msg = SystemMessage::builder().content(blocks).build();
     assert_eq!(msg.content.len(), 2);
@@ -482,8 +498,8 @@ fn test_init_with_content_blocks_sets_content() {
 #[test]
 fn test_content_blocks_roundtrip() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Rule 1")),
-        ContentBlock::Text(TextContentBlock::new("Rule 2")),
+        ContentBlock::Text(TextContentBlock::builder().text("Rule 1").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Rule 2").build()),
     ]);
     let msg = SystemMessage::builder().content(blocks).build();
     let result_blocks = msg.content_blocks();
@@ -572,12 +588,12 @@ fn test_same_content_and_metadata_are_equal() {
 fn test_chunk_add_with_list_content() {
     let chunk1 = SystemMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new("Hello"),
+            TextContentBlock::builder().text("Hello").build(),
         )]))
         .build();
     let chunk2 = SystemMessageChunk::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new(" world"),
+            TextContentBlock::builder().text(" world").build(),
         )]))
         .build();
     let result = chunk1 + chunk2;

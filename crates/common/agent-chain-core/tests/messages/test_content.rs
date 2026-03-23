@@ -1,14 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
-use agent_chain_core::messages::{
-    Annotation, AudioContentBlock, ContentBlock, DataContentBlock, FileContentBlock,
-    ImageContentBlock, InvalidToolCallBlock, KNOWN_BLOCK_TYPES, NonStandardContentBlock,
-    PlainTextBlockConfig, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-    ServerToolCallChunk, ServerToolResult, ServerToolStatus, TextContentBlock, ToolCallBlock,
-    ToolCallChunkBlock, VideoContentBlock, create_audio_block, create_citation, create_file_block,
-    create_image_block, create_non_standard_block, create_plaintext_block, create_reasoning_block,
-    create_text_block, create_tool_call, create_video_block, get_data_content_block_types,
-    is_data_content_block,
+use agent_chain_core::{
+    messages::{
+        Annotation, AudioContentBlock, ContentBlock, DataContentBlock, FileContentBlock,
+        ImageContentBlock, InvalidToolCallBlock, KNOWN_BLOCK_TYPES, NonStandardContentBlock,
+        PlainTextContentBlock, ReasoningContentBlock, ServerToolCall, ServerToolCallChunk,
+        ServerToolResult, ServerToolStatus, TextContentBlock, ToolCallBlock, ToolCallChunkBlock,
+        VideoContentBlock, get_data_content_block_types, is_data_content_block,
+    },
+    utils::ensure_id,
 };
 use serde_json::json;
 
@@ -250,36 +250,42 @@ fn test_edge_case_missing_type() {
 
 #[test]
 fn test_basic_text_block() {
-    let block = create_text_block("Hello world", None, None, None, None);
+    let block = TextContentBlock::builder()
+        .id(ensure_id(None))
+        .text("Hello world")
+        .build();
     assert_eq!(block.text, "Hello world");
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
 }
 
 #[test]
 fn test_text_block_with_custom_id() {
-    let block = create_text_block("Hello", Some("custom-id".to_string()), None, None, None);
+    let block = TextContentBlock::builder()
+        .text("Hello")
+        .id("custom-id".to_string())
+        .build();
     assert_eq!(block.id.as_ref().unwrap(), "custom-id");
 }
 
 #[test]
 fn test_text_block_with_annotations() {
-    let citation = create_citation(
-        Some("https://example.com".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    );
-    let block = create_text_block("Hello", None, Some(vec![citation]), None, None);
+    let citation = Annotation::citation()
+        .url("https://example.com".to_string())
+        .call();
+    let block = TextContentBlock::builder()
+        .text("Hello")
+        .annotations(vec![citation])
+        .build();
     assert!(block.annotations.is_some());
     assert_eq!(block.annotations.as_ref().unwrap().len(), 1);
 }
 
 #[test]
 fn test_text_block_with_index() {
-    let block = create_text_block("Hello", None, None, Some(0.into()), None);
+    let block = TextContentBlock::builder()
+        .text("Hello")
+        .index(0.into())
+        .build();
     assert!(block.index.is_some());
 }
 
@@ -290,7 +296,10 @@ fn test_text_block_with_extras() {
         "custom_field".to_string(),
         serde_json::Value::String("custom_value".to_string()),
     );
-    let block = create_text_block("Hello", None, None, None, Some(extras));
+    let block = TextContentBlock::builder()
+        .text("Hello")
+        .extras(extras)
+        .build();
     assert_eq!(
         block.extras.as_ref().unwrap()["custom_field"],
         json!("custom_value")
@@ -299,97 +308,71 @@ fn test_text_block_with_extras() {
 
 #[test]
 fn test_text_block_empty_text() {
-    let block = create_text_block("", None, None, None, None);
+    let block = TextContentBlock::builder().text("").build();
     assert_eq!(block.text, "");
 }
 
 #[test]
 fn test_text_block_with_none_extras() {
-    let block = create_text_block("hello", None, None, None, None);
+    let block = TextContentBlock::builder().text("hello").build();
     assert!(block.extras.is_none());
 }
 
 #[test]
 fn test_create_image_block_with_url() {
-    let block = create_image_block(
-        Some("https://example.com/image.png".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = ImageContentBlock::builder()
+        .url("https://example.com/image.png".to_string())
+        .id(ensure_id(None))
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/image.png");
     assert!(block.id.is_some());
 }
 
 #[test]
 fn test_create_image_block_with_base64() {
-    let block = create_image_block(
-        None,
-        Some("dGVzdA==".to_string()),
-        None,
-        Some("image/png".to_string()),
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = ImageContentBlock::builder()
+        .base64("dGVzdA==".to_string())
+        .mime_type("image/png".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "image/png");
 }
 
 #[test]
 fn test_create_image_block_with_file_id() {
-    let block = create_image_block(
-        None,
-        None,
-        Some("file-123".to_string()),
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = ImageContentBlock::builder()
+        .file_id("file-123".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
 #[test]
 fn test_create_image_block_requires_source() {
-    let result = create_image_block(None, None, None, None, None, None, None);
+    let result = ImageContentBlock::builder().build();
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Must provide one of"));
 }
 
 #[test]
 fn test_create_image_block_with_custom_id() {
-    let block = create_image_block(
-        Some("https://example.com/img.png".to_string()),
-        None,
-        None,
-        None,
-        Some("img-123".to_string()),
-        None,
-        None,
-    )
-    .unwrap();
+    let block = ImageContentBlock::builder()
+        .url("https://example.com/img.png".to_string())
+        .id("img-123".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.id.as_ref().unwrap(), "img-123");
 }
 
 #[test]
 fn test_create_image_block_with_index() {
-    let block = create_image_block(
-        Some("https://example.com/img.png".to_string()),
-        None,
-        None,
-        None,
-        None,
-        Some(0.into()),
-        None,
-    )
-    .unwrap();
+    let block = ImageContentBlock::builder()
+        .url("https://example.com/img.png".to_string())
+        .index(0.into())
+        .build()
+        .unwrap();
     assert!(block.index.is_some());
 }
 
@@ -400,296 +383,198 @@ fn test_create_image_block_with_extras() {
         "alt".to_string(),
         serde_json::Value::String("Test image".to_string()),
     );
-    let block = create_image_block(
-        Some("https://example.com/img.png".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some(extras),
-    )
-    .unwrap();
+    let block = ImageContentBlock::builder()
+        .url("https://example.com/img.png".to_string())
+        .extras(extras)
+        .build()
+        .unwrap();
     assert_eq!(block.extras.as_ref().unwrap()["alt"], json!("Test image"));
 }
 
 #[test]
 fn test_create_image_block_base64_without_mime_type_does_not_raise() {
-    let block = create_image_block(
-        None,
-        Some("iVBORw0KGgo=".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = ImageContentBlock::builder()
+        .base64("iVBORw0KGgo=".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.base64.as_ref().unwrap(), "iVBORw0KGgo=");
     assert!(block.mime_type.is_none());
 }
 
 #[test]
 fn test_create_video_block_with_url() {
-    let block = create_video_block(
-        Some("https://example.com/video.mp4".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = VideoContentBlock::builder()
+        .url("https://example.com/video.mp4".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/video.mp4");
 }
 
 #[test]
 fn test_create_video_block_with_base64() {
-    let block = create_video_block(
-        None,
-        Some("dGVzdA==".to_string()),
-        None,
-        Some("video/mp4".to_string()),
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = VideoContentBlock::builder()
+        .base64("dGVzdA==".to_string())
+        .mime_type("video/mp4".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "video/mp4");
 }
 
 #[test]
 fn test_create_video_block_with_file_id() {
-    let block = create_video_block(
-        None,
-        None,
-        Some("file-123".to_string()),
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = VideoContentBlock::builder()
+        .file_id("file-123".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
 #[test]
 fn test_create_video_block_requires_source() {
-    let result = create_video_block(None, None, None, None, None, None, None);
+    let result = VideoContentBlock::builder().build();
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Must provide one of"));
 }
 
 #[test]
 fn test_create_video_block_base64_requires_mime_type() {
-    let result = create_video_block(
-        None,
-        Some("dGVzdA==".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-    );
+    let result = VideoContentBlock::builder()
+        .base64("dGVzdA==".to_string())
+        .build();
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("mime_type is required"));
 }
 
 #[test]
 fn test_create_video_block_with_custom_id() {
-    let block = create_video_block(
-        Some("https://example.com/video.mp4".to_string()),
-        None,
-        None,
-        None,
-        Some("vid-123".to_string()),
-        None,
-        None,
-    )
-    .unwrap();
+    let block = VideoContentBlock::builder()
+        .url("https://example.com/video.mp4".to_string())
+        .id("vid-123".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.id.as_ref().unwrap(), "vid-123");
 }
 
 #[test]
 fn test_create_audio_block_with_url() {
-    let block = create_audio_block(
-        Some("https://example.com/audio.mp3".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = AudioContentBlock::builder()
+        .url("https://example.com/audio.mp3".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/audio.mp3");
 }
 
 #[test]
 fn test_create_audio_block_with_base64() {
-    let block = create_audio_block(
-        None,
-        Some("dGVzdA==".to_string()),
-        None,
-        Some("audio/mp3".to_string()),
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = AudioContentBlock::builder()
+        .base64("dGVzdA==".to_string())
+        .mime_type("audio/mp3".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "audio/mp3");
 }
 
 #[test]
 fn test_create_audio_block_with_file_id() {
-    let block = create_audio_block(
-        None,
-        None,
-        Some("file-123".to_string()),
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = AudioContentBlock::builder()
+        .file_id("file-123".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
 #[test]
 fn test_create_audio_block_requires_source() {
-    let result = create_audio_block(None, None, None, None, None, None, None);
+    let result = AudioContentBlock::builder().build();
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Must provide one of"));
 }
 
 #[test]
 fn test_create_audio_block_base64_requires_mime_type() {
-    let result = create_audio_block(
-        None,
-        Some("dGVzdA==".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-    );
+    let result = AudioContentBlock::builder()
+        .base64("dGVzdA==".to_string())
+        .build();
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("mime_type is required"));
 }
 
 #[test]
 fn test_create_audio_block_with_custom_id() {
-    let block = create_audio_block(
-        Some("https://example.com/audio.mp3".to_string()),
-        None,
-        None,
-        None,
-        Some("aud-123".to_string()),
-        None,
-        None,
-    )
-    .unwrap();
+    let block = AudioContentBlock::builder()
+        .url("https://example.com/audio.mp3".to_string())
+        .id("aud-123".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.id.as_ref().unwrap(), "aud-123");
 }
 
 #[test]
 fn test_create_file_block_with_url() {
-    let block = create_file_block(
-        Some("https://example.com/doc.pdf".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = FileContentBlock::builder()
+        .url("https://example.com/doc.pdf".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/doc.pdf");
 }
 
 #[test]
 fn test_create_file_block_with_base64() {
-    let block = create_file_block(
-        None,
-        Some("dGVzdA==".to_string()),
-        None,
-        Some("application/pdf".to_string()),
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = FileContentBlock::builder()
+        .base64("dGVzdA==".to_string())
+        .mime_type("application/pdf".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.base64.as_ref().unwrap(), "dGVzdA==");
     assert_eq!(block.mime_type.as_ref().unwrap(), "application/pdf");
 }
 
 #[test]
 fn test_create_file_block_with_file_id() {
-    let block = create_file_block(
-        None,
-        None,
-        Some("file-123".to_string()),
-        None,
-        None,
-        None,
-        None,
-    )
-    .unwrap();
+    let block = FileContentBlock::builder()
+        .file_id("file-123".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
 #[test]
 fn test_create_file_block_requires_source() {
-    let result = create_file_block(None, None, None, None, None, None, None);
+    let result = FileContentBlock::builder().build();
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Must provide one of"));
 }
 
 #[test]
 fn test_create_file_block_base64_requires_mime_type() {
-    let result = create_file_block(
-        None,
-        Some("dGVzdA==".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-    );
+    let result = FileContentBlock::builder()
+        .base64("dGVzdA==".to_string())
+        .build();
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("mime_type is required"));
 }
 
 #[test]
 fn test_create_file_block_with_custom_id() {
-    let block = create_file_block(
-        Some("https://example.com/doc.pdf".to_string()),
-        None,
-        None,
-        None,
-        Some("file-custom".to_string()),
-        None,
-        None,
-    )
-    .unwrap();
+    let block = FileContentBlock::builder()
+        .url("https://example.com/doc.pdf".to_string())
+        .id("file-custom".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.id.as_ref().unwrap(), "file-custom");
 }
 
 #[test]
 fn test_create_file_block_all_fields_populated() {
-    let block = create_file_block(
-        Some("https://example.com/report.pdf".to_string()),
-        None,
-        None,
-        Some("application/pdf".to_string()),
-        Some("file-all".to_string()),
-        Some(7.into()),
-        None,
-    )
-    .unwrap();
+    let block = FileContentBlock::builder()
+        .url("https://example.com/report.pdf".to_string())
+        .mime_type("application/pdf".to_string())
+        .id("file-all".to_string())
+        .index(7.into())
+        .build()
+        .unwrap();
     assert_eq!(
         block.url.as_ref().unwrap(),
         "https://example.com/report.pdf"
@@ -701,84 +586,76 @@ fn test_create_file_block_all_fields_populated() {
 
 #[test]
 fn test_plaintext_block_with_text() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        text: Some("Hello world".to_string()),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .text("Hello world".to_string())
+        .build();
     assert_eq!(block.text.as_ref().unwrap(), "Hello world");
     assert_eq!(block.mime_type, "text/plain");
 }
 
 #[test]
 fn test_plaintext_block_with_url() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        url: Some("https://example.com/file.txt".to_string()),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .url("https://example.com/file.txt".to_string())
+        .build();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/file.txt");
 }
 
 #[test]
 fn test_plaintext_block_with_base64() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        base64: Some("SGVsbG8gd29ybGQ=".to_string()),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .base64("SGVsbG8gd29ybGQ=".to_string())
+        .build();
     assert_eq!(block.base64.as_ref().unwrap(), "SGVsbG8gd29ybGQ=");
 }
 
 #[test]
 fn test_plaintext_block_with_file_id() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        file_id: Some("file-123".to_string()),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .file_id("file-123".to_string())
+        .build();
     assert_eq!(block.file_id.as_ref().unwrap(), "file-123");
 }
 
 #[test]
 fn test_plaintext_block_with_title() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        text: Some("Hello".to_string()),
-        title: Some("My Document".to_string()),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .text("Hello".to_string())
+        .title("My Document".to_string())
+        .build();
     assert_eq!(block.title.as_ref().unwrap(), "My Document");
 }
 
 #[test]
 fn test_plaintext_block_with_context() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        text: Some("Hello".to_string()),
-        context: Some("Important information".to_string()),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .text("Hello".to_string())
+        .context("Important information".to_string())
+        .build();
     assert_eq!(block.context.as_ref().unwrap(), "Important information");
 }
 
 #[test]
 fn test_plaintext_block_with_custom_id() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        text: Some("Hello".to_string()),
-        id: Some("txt-123".to_string()),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .text("Hello".to_string())
+        .id("txt-123".to_string())
+        .build();
     assert_eq!(block.id.as_ref().unwrap(), "txt-123");
 }
 
 #[test]
 fn test_plaintext_block_all_fields_populated() {
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        text: Some("some text".to_string()),
-        url: Some("https://example.com/file.txt".to_string()),
-        base64: Some("c29tZSB0ZXh0".to_string()),
-        file_id: Some("file-xyz".to_string()),
-        title: Some("My Document".to_string()),
-        context: Some("Summary context".to_string()),
-        id: Some("pt-999".to_string()),
-        index: Some(3.into()),
-        extras: None,
-    });
+    let block = PlainTextContentBlock::builder()
+        .text("some text".to_string())
+        .url("https://example.com/file.txt".to_string())
+        .base64("c29tZSB0ZXh0".to_string())
+        .file_id("file-xyz".to_string())
+        .title("My Document".to_string())
+        .context("Summary context".to_string())
+        .id("pt-999".to_string())
+        .index(3.into())
+        .build();
     assert_eq!(block.mime_type, "text/plain");
     assert_eq!(block.text.as_ref().unwrap(), "some text");
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/file.txt");
@@ -795,11 +672,10 @@ fn test_plaintext_block_with_extras() {
     let mut extras = HashMap::new();
     extras.insert("custom_key".to_string(), json!("custom_value"));
     extras.insert("another".to_string(), json!("val"));
-    let block = create_plaintext_block(PlainTextBlockConfig {
-        text: Some("hello".to_string()),
-        extras: Some(extras),
-        ..Default::default()
-    });
+    let block = PlainTextContentBlock::builder()
+        .text("hello".to_string())
+        .extras(extras)
+        .build();
     let block_extras = block.extras.as_ref().unwrap();
     assert_eq!(block_extras["custom_key"], json!("custom_value"));
     assert_eq!(block_extras["another"], json!("val"));
@@ -809,7 +685,11 @@ fn test_plaintext_block_with_extras() {
 fn test_basic_tool_call() {
     let mut args = HashMap::new();
     args.insert("param".to_string(), json!("value"));
-    let block = create_tool_call("test_tool", args, None, None, None);
+    let block = ToolCallBlock::builder()
+        .name("test_tool")
+        .id(ensure_id(None))
+        .args(args)
+        .build();
     assert_eq!(block.name, "test_tool");
     assert_eq!(block.args["param"], json!("value"));
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
@@ -817,19 +697,21 @@ fn test_basic_tool_call() {
 
 #[test]
 fn test_tool_call_with_custom_id() {
-    let block = create_tool_call(
-        "test_tool",
-        HashMap::new(),
-        Some("call-123".to_string()),
-        None,
-        None,
-    );
+    let block = ToolCallBlock::builder()
+        .name("test_tool")
+        .args(HashMap::new())
+        .id("call-123".to_string())
+        .build();
     assert_eq!(block.id.as_ref().unwrap(), "call-123");
 }
 
 #[test]
 fn test_tool_call_with_index() {
-    let block = create_tool_call("test_tool", HashMap::new(), None, Some(0.into()), None);
+    let block = ToolCallBlock::builder()
+        .name("test_tool")
+        .args(HashMap::new())
+        .index(0.into())
+        .build();
     assert!(block.index.is_some());
 }
 
@@ -837,13 +719,20 @@ fn test_tool_call_with_index() {
 fn test_tool_call_with_extras() {
     let mut extras = HashMap::new();
     extras.insert("custom".to_string(), json!("value"));
-    let block = create_tool_call("test_tool", HashMap::new(), None, None, Some(extras));
+    let block = ToolCallBlock::builder()
+        .name("test_tool")
+        .args(HashMap::new())
+        .extras(extras)
+        .build();
     assert_eq!(block.extras.as_ref().unwrap()["custom"], json!("value"));
 }
 
 #[test]
 fn test_tool_call_empty_args() {
-    let block = create_tool_call("test_tool", HashMap::new(), None, None, None);
+    let block = ToolCallBlock::builder()
+        .name("test_tool")
+        .args(HashMap::new())
+        .build();
     assert!(block.args.is_empty());
 }
 
@@ -858,7 +747,10 @@ fn test_tool_call_complex_args() {
     args.insert("nested".to_string(), json!({"key": "value"}));
     args.insert("list".to_string(), json!([1, 2, 3]));
 
-    let block = create_tool_call("test_tool", args.clone(), None, None, None);
+    let block = ToolCallBlock::builder()
+        .name("test_tool")
+        .args(args.clone())
+        .build();
     assert_eq!(block.args["string"], json!("value"));
     assert_eq!(block.args["number"], json!(42));
     assert_eq!(block.args["nested"], json!({"key": "value"}));
@@ -867,32 +759,36 @@ fn test_tool_call_complex_args() {
 
 #[test]
 fn test_tool_call_auto_generates_id_when_not_provided() {
-    let block = create_tool_call(
-        "my_tool",
-        HashMap::from([("x".to_string(), json!(1))]),
-        None,
-        None,
-        None,
-    );
+    let block = ToolCallBlock::builder()
+        .name("my_tool")
+        .id(ensure_id(None))
+        .args(HashMap::from([("x".to_string(), json!(1))]))
+        .build();
     let id = block.id.as_ref().unwrap();
     assert!(id.starts_with("lc_"));
 }
 
 #[test]
 fn test_tool_call_auto_generated_ids_are_unique() {
-    let block_a = create_tool_call("t", HashMap::new(), None, None, None);
-    let block_b = create_tool_call("t", HashMap::new(), None, None, None);
+    let block_a = ToolCallBlock::builder()
+        .name("t")
+        .id(ensure_id(None))
+        .args(HashMap::new())
+        .build();
+    let block_b = ToolCallBlock::builder()
+        .name("t")
+        .id(ensure_id(None))
+        .args(HashMap::new())
+        .build();
     assert_ne!(block_a.id, block_b.id);
 }
 
 #[test]
 fn test_basic_reasoning_block() {
-    let block = create_reasoning_block(
-        Some("Let me think about this...".to_string()),
-        None,
-        None,
-        None,
-    );
+    let block = ReasoningContentBlock::builder()
+        .id(ensure_id(None))
+        .reasoning("Let me think about this...")
+        .build();
     assert_eq!(
         block.reasoning.as_ref().unwrap(),
         "Let me think about this..."
@@ -902,24 +798,25 @@ fn test_basic_reasoning_block() {
 
 #[test]
 fn test_reasoning_block_with_custom_id() {
-    let block = create_reasoning_block(
-        Some("Thinking...".to_string()),
-        Some("reason-123".to_string()),
-        None,
-        None,
-    );
+    let block = ReasoningContentBlock::builder()
+        .reasoning("Thinking...")
+        .id("reason-123".to_string())
+        .build();
     assert_eq!(block.id.as_ref().unwrap(), "reason-123");
 }
 
 #[test]
 fn test_reasoning_block_with_index() {
-    let block = create_reasoning_block(Some("Thinking...".to_string()), None, Some(0.into()), None);
+    let block = ReasoningContentBlock::builder()
+        .reasoning("Thinking...")
+        .index(0.into())
+        .build();
     assert!(block.index.is_some());
 }
 
 #[test]
 fn test_reasoning_block_empty_reasoning() {
-    let block = create_reasoning_block(None, None, None, None);
+    let block = ReasoningContentBlock::builder().reasoning("").build();
     assert_eq!(block.reasoning.as_ref().unwrap(), "");
 }
 
@@ -927,28 +824,29 @@ fn test_reasoning_block_empty_reasoning() {
 fn test_reasoning_block_with_extras() {
     let mut extras = HashMap::new();
     extras.insert("signature".to_string(), json!("abc123"));
-    let block = create_reasoning_block(Some("Thinking...".to_string()), None, None, Some(extras));
+    let block = ReasoningContentBlock::builder()
+        .reasoning("Thinking...")
+        .extras(extras)
+        .build();
     assert_eq!(block.extras.as_ref().unwrap()["signature"], json!("abc123"));
 }
 
 #[test]
 fn test_reasoning_block_none_reasoning_defaults_to_empty_string() {
-    let block = create_reasoning_block(None, None, None, None);
+    let block = ReasoningContentBlock::builder()
+        .reasoning("")
+        .id(ensure_id(None))
+        .build();
     assert_eq!(block.reasoning.as_ref().unwrap(), "");
     assert!(block.id.is_some());
 }
 
 #[test]
 fn test_basic_citation() {
-    let annotation = create_citation(
-        Some("https://example.com/source".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
-    );
+    let annotation = Annotation::citation()
+        .id(ensure_id(None))
+        .url("https://example.com/source".to_string())
+        .call();
     match &annotation {
         Annotation::Citation { url, id, .. } => {
             assert_eq!(url.as_ref().unwrap(), "https://example.com/source");
@@ -960,15 +858,14 @@ fn test_basic_citation() {
 
 #[test]
 fn test_citation_with_all_fields() {
-    let annotation = create_citation(
-        Some("https://example.com/source".to_string()),
-        Some("Source Document".to_string()),
-        Some(0),
-        Some(100),
-        Some("This is the cited text.".to_string()),
-        Some("cite-123".to_string()),
-        None,
-    );
+    let annotation = Annotation::citation()
+        .url("https://example.com/source".to_string())
+        .title("Source Document".to_string())
+        .start_index(0)
+        .end_index(100)
+        .cited_text("This is the cited text.".to_string())
+        .id("cite-123".to_string())
+        .call();
     match &annotation {
         Annotation::Citation {
             url,
@@ -981,8 +878,8 @@ fn test_citation_with_all_fields() {
         } => {
             assert_eq!(url.as_ref().unwrap(), "https://example.com/source");
             assert_eq!(title.as_ref().unwrap(), "Source Document");
-            assert_eq!(*start_index, Some(0));
-            assert_eq!(*end_index, Some(100));
+            assert_eq!(start_index, &Some(0));
+            assert_eq!(end_index, &Some(100));
             assert_eq!(cited_text.as_ref().unwrap(), "This is the cited text.");
             assert_eq!(id.as_ref().unwrap(), "cite-123");
         }
@@ -994,15 +891,10 @@ fn test_citation_with_all_fields() {
 fn test_citation_with_extras() {
     let mut extras = HashMap::new();
     extras.insert("custom_field".to_string(), json!("value"));
-    let annotation = create_citation(
-        Some("https://example.com".to_string()),
-        None,
-        None,
-        None,
-        None,
-        None,
-        Some(extras),
-    );
+    let annotation = Annotation::citation()
+        .url("https://example.com".to_string())
+        .extras(extras)
+        .call();
     match &annotation {
         Annotation::Citation { extras, .. } => {
             assert_eq!(extras.as_ref().unwrap()["custom_field"], json!("value"));
@@ -1013,7 +905,7 @@ fn test_citation_with_extras() {
 
 #[test]
 fn test_citation_with_no_optional_fields() {
-    let annotation = create_citation(None, None, None, None, None, None, None);
+    let annotation = Annotation::citation().id(ensure_id(None)).call();
     match &annotation {
         Annotation::Citation {
             id,
@@ -1040,7 +932,10 @@ fn test_citation_with_no_optional_fields() {
 fn test_basic_non_standard_block() {
     let mut value = HashMap::new();
     value.insert("custom".to_string(), json!("data"));
-    let block = create_non_standard_block(value.clone(), None, None);
+    let block = NonStandardContentBlock::builder()
+        .id(ensure_id(None))
+        .value(value.clone())
+        .build();
     assert_eq!(block.value["custom"], json!("data"));
     assert!(block.id.is_some());
 }
@@ -1049,7 +944,10 @@ fn test_basic_non_standard_block() {
 fn test_non_standard_block_with_custom_id() {
     let mut value = HashMap::new();
     value.insert("key".to_string(), json!("value"));
-    let block = create_non_standard_block(value, Some("ns-123".to_string()), None);
+    let block = NonStandardContentBlock::builder()
+        .value(value)
+        .id("ns-123".to_string())
+        .build();
     assert_eq!(block.id.as_ref().unwrap(), "ns-123");
 }
 
@@ -1057,7 +955,10 @@ fn test_non_standard_block_with_custom_id() {
 fn test_non_standard_block_with_index() {
     let mut value = HashMap::new();
     value.insert("key".to_string(), json!("value"));
-    let block = create_non_standard_block(value, None, Some(0.into()));
+    let block = NonStandardContentBlock::builder()
+        .value(value)
+        .index(0.into())
+        .build();
     assert!(block.index.is_some());
 }
 
@@ -1067,7 +968,7 @@ fn test_non_standard_block_complex_value() {
     value.insert("nested".to_string(), json!({"deep": {"data": "value"}}));
     value.insert("list".to_string(), json!([1, 2, 3]));
     value.insert("string".to_string(), json!("text"));
-    let block = create_non_standard_block(value, None, None);
+    let block = NonStandardContentBlock::builder().value(value).build();
     assert_eq!(block.value["nested"], json!({"deep": {"data": "value"}}));
     assert_eq!(block.value["list"], json!([1, 2, 3]));
     assert_eq!(block.value["string"], json!("text"));
@@ -1075,14 +976,17 @@ fn test_non_standard_block_complex_value() {
 
 #[test]
 fn test_non_standard_block_empty_dict_value() {
-    let block = create_non_standard_block(HashMap::new(), None, None);
+    let block = NonStandardContentBlock::builder()
+        .value(HashMap::new())
+        .id(ensure_id(None))
+        .build();
     assert!(block.value.is_empty());
     assert!(block.id.as_ref().unwrap().starts_with("lc_"));
 }
 
 #[test]
 fn test_text_content_block_structure() {
-    let block = TextContentBlock::new("Hello");
+    let block = TextContentBlock::builder().text("Hello").build();
     assert_eq!(block.text, "Hello");
 }
 
@@ -1090,14 +994,17 @@ fn test_text_content_block_structure() {
 fn test_tool_call_block_structure() {
     let mut args = HashMap::new();
     args.insert("param".to_string(), json!("value"));
-    let mut block = ToolCallBlock::new("test_tool", args);
+    let mut block = ToolCallBlock::builder()
+        .name("test_tool")
+        .args(args)
+        .build();
     block.id = Some("123".to_string());
     assert_eq!(block.name, "test_tool");
 }
 
 #[test]
 fn test_tool_call_chunk_block_structure() {
-    let mut block = ToolCallChunkBlock::new();
+    let mut block = ToolCallChunkBlock::builder().build();
     block.id = Some("123".to_string());
     block.name = Some("test_tool".to_string());
     block.args = Some(r#"{"param": "value"}"#.to_string());
@@ -1106,7 +1013,7 @@ fn test_tool_call_chunk_block_structure() {
 
 #[test]
 fn test_invalid_tool_call_block_structure() {
-    let mut block = InvalidToolCallBlock::new();
+    let mut block = InvalidToolCallBlock::builder().build();
     block.id = Some("123".to_string());
     block.name = Some("test_tool".to_string());
     block.args = Some("invalid json".to_string());
@@ -1116,48 +1023,58 @@ fn test_invalid_tool_call_block_structure() {
 
 #[test]
 fn test_reasoning_content_block_structure() {
-    let block = ReasoningContentBlock::new("Let me think...");
+    let block = ReasoningContentBlock::builder()
+        .reasoning("Let me think...")
+        .build();
     assert!(block.reasoning.is_some());
 }
 
 #[test]
 fn test_image_content_block_structure() {
-    let mut block = ImageContentBlock::new();
-    block.url = Some("https://example.com/image.png".to_string());
+    let block = ImageContentBlock::builder()
+        .url("https://example.com/image.png".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/image.png");
 }
 
 #[test]
 fn test_audio_content_block_structure() {
-    let mut block = AudioContentBlock::new();
-    block.url = Some("https://example.com/audio.mp3".to_string());
+    let block = AudioContentBlock::builder()
+        .url("https://example.com/audio.mp3".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/audio.mp3");
 }
 
 #[test]
 fn test_video_content_block_structure() {
-    let mut block = VideoContentBlock::new();
-    block.url = Some("https://example.com/video.mp4".to_string());
+    let block = VideoContentBlock::builder()
+        .url("https://example.com/video.mp4".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/video.mp4");
 }
 
 #[test]
 fn test_file_content_block_structure() {
-    let mut block = FileContentBlock::new();
-    block.url = Some("https://example.com/doc.pdf".to_string());
+    let block = FileContentBlock::builder()
+        .url("https://example.com/doc.pdf".to_string())
+        .build()
+        .unwrap();
     assert_eq!(block.url.as_ref().unwrap(), "https://example.com/doc.pdf");
 }
 
 #[test]
 fn test_plaintext_content_block_structure() {
-    let mut block = PlainTextContentBlock::new();
+    let mut block = PlainTextContentBlock::builder().build();
     block.text = Some("Hello".to_string());
     assert_eq!(block.mime_type, "text/plain");
 }
 
 #[test]
 fn test_citation_structure() {
-    let annotation = Annotation::citation();
+    let annotation = Annotation::citation().call();
     match &annotation {
         Annotation::Citation { .. } => {}
         _ => panic!("Expected Citation variant"),
@@ -1168,7 +1085,7 @@ fn test_citation_structure() {
 fn test_non_standard_annotation_structure() {
     let mut value = HashMap::new();
     value.insert("custom".to_string(), json!("data"));
-    let annotation = Annotation::non_standard(value);
+    let annotation = Annotation::non_standard().value(value).call();
     match &annotation {
         Annotation::NonStandardAnnotation { value, .. } => {
             assert_eq!(value["custom"], json!("data"));
@@ -1181,19 +1098,23 @@ fn test_non_standard_annotation_structure() {
 fn test_server_tool_call_structure() {
     let mut args = HashMap::new();
     args.insert("query".to_string(), json!("test"));
-    let block = ServerToolCall::new("stc-123", "web_search", args);
+    let block = ServerToolCall::builder()
+        .id("stc-123")
+        .name("web_search")
+        .args(args)
+        .build();
     assert_eq!(block.name, "web_search");
 }
 
 #[test]
 fn test_server_tool_call_chunk_structure() {
-    let block = ServerToolCallChunk::new();
+    let block = ServerToolCallChunk::builder().build();
     assert!(block.id.is_none());
 }
 
 #[test]
 fn test_server_tool_result_structure() {
-    let block = ServerToolResult::success("stc-123");
+    let block = ServerToolResult::success().tool_call_id("stc-123").call();
     assert_eq!(block.tool_call_id, "stc-123");
     assert_eq!(block.status, ServerToolStatus::Success);
 }
@@ -1203,7 +1124,7 @@ fn test_non_standard_content_block_structure() {
     let mut value = HashMap::new();
     value.insert("provider".to_string(), json!("custom"));
     value.insert("data".to_string(), json!("value"));
-    let block = NonStandardContentBlock::new(value);
+    let block = NonStandardContentBlock::builder().value(value).build();
     assert_eq!(block.value["provider"], json!("custom"));
 }
 
@@ -1306,13 +1227,16 @@ fn assert_content_block_has_type(block: &ContentBlock) {
 
 #[test]
 fn test_content_block_text() {
-    let block = ContentBlock::Text(TextContentBlock::new("hi"));
+    let block = ContentBlock::Text(TextContentBlock::builder().text("hi").build());
     assert_content_block_has_type(&block);
 }
 
 #[test]
 fn test_content_block_tool_call() {
-    let mut block = ToolCallBlock::new("fn", HashMap::new());
+    let mut block = ToolCallBlock::builder()
+        .name("fn")
+        .args(HashMap::new())
+        .build();
     block.id = Some("tc1".to_string());
     let cb = ContentBlock::ToolCall(block);
     assert_content_block_has_type(&cb);
@@ -1320,7 +1244,7 @@ fn test_content_block_tool_call() {
 
 #[test]
 fn test_content_block_invalid_tool_call() {
-    let mut block = InvalidToolCallBlock::new();
+    let mut block = InvalidToolCallBlock::builder().build();
     block.id = Some("itc1".to_string());
     block.name = Some("fn".to_string());
     block.args = Some("bad".to_string());
@@ -1331,7 +1255,7 @@ fn test_content_block_invalid_tool_call() {
 
 #[test]
 fn test_content_block_tool_call_chunk() {
-    let mut block = ToolCallChunkBlock::new();
+    let mut block = ToolCallChunkBlock::builder().build();
     block.id = Some("tcc1".to_string());
     block.name = Some("fn".to_string());
     block.args = Some(r#"{"a":1}"#.to_string());
@@ -1341,36 +1265,47 @@ fn test_content_block_tool_call_chunk() {
 
 #[test]
 fn test_content_block_reasoning() {
-    let block = ReasoningContentBlock::new("thinking");
+    let block = ReasoningContentBlock::builder()
+        .reasoning("thinking")
+        .build();
     let cb = ContentBlock::Reasoning(block);
     assert_content_block_has_type(&cb);
 }
 
 #[test]
 fn test_content_block_image() {
-    let cb = ContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png"));
+    let cb = ContentBlock::Image(
+        ImageContentBlock::builder()
+            .url("https://example.com/img.png".to_string())
+            .build()
+            .unwrap(),
+    );
     assert_content_block_has_type(&cb);
 }
 
 #[test]
 fn test_content_block_video() {
-    let mut block = VideoContentBlock::new();
-    block.url = Some("https://example.com/vid.mp4".to_string());
+    let block = VideoContentBlock::builder()
+        .url("https://example.com/vid.mp4".to_string())
+        .build()
+        .unwrap();
     let cb = ContentBlock::Video(block);
     assert_content_block_has_type(&cb);
 }
 
 #[test]
 fn test_content_block_audio() {
-    let mut block = AudioContentBlock::new();
-    block.url = Some("https://example.com/aud.mp3".to_string());
+    let block = AudioContentBlock::builder()
+        .url("https://example.com/aud.mp3".to_string())
+        .build()
+        .unwrap();
     let cb = ContentBlock::Audio(block);
     assert_content_block_has_type(&cb);
 }
 
 #[test]
 fn test_content_block_plaintext() {
-    let mut block = PlainTextContentBlock::new();
+    let mut block = PlainTextContentBlock::builder().build();
     block.text = Some("hello".to_string());
     let cb = ContentBlock::PlainText(block);
     assert_content_block_has_type(&cb);
@@ -1378,28 +1313,35 @@ fn test_content_block_plaintext() {
 
 #[test]
 fn test_content_block_file() {
-    let mut block = FileContentBlock::new();
-    block.url = Some("https://example.com/doc.pdf".to_string());
+    let block = FileContentBlock::builder()
+        .url("https://example.com/doc.pdf".to_string())
+        .build()
+        .unwrap();
     let cb = ContentBlock::File(block);
     assert_content_block_has_type(&cb);
 }
 
 #[test]
 fn test_content_block_server_tool_call() {
-    let block = ServerToolCall::new("stc1", "search", HashMap::new());
+    let block = ServerToolCall::builder()
+        .id("stc1")
+        .name("search")
+        .args(HashMap::new())
+        .build();
     let cb = ContentBlock::ServerToolCall(block);
     assert_content_block_has_type(&cb);
 }
 
 #[test]
 fn test_content_block_server_tool_call_chunk() {
-    let cb = ContentBlock::ServerToolCallChunk(ServerToolCallChunk::new());
+    let cb = ContentBlock::ServerToolCallChunk(ServerToolCallChunk::builder().build());
     assert_content_block_has_type(&cb);
 }
 
 #[test]
 fn test_content_block_server_tool_result() {
-    let cb = ContentBlock::ServerToolResult(ServerToolResult::success("stc1"));
+    let cb =
+        ContentBlock::ServerToolResult(ServerToolResult::success().tool_call_id("stc1").call());
     assert_content_block_has_type(&cb);
 }
 
@@ -1407,7 +1349,7 @@ fn test_content_block_server_tool_result() {
 fn test_content_block_non_standard() {
     let mut value = HashMap::new();
     value.insert("data".to_string(), json!("custom"));
-    let cb = ContentBlock::NonStandard(NonStandardContentBlock::new(value));
+    let cb = ContentBlock::NonStandard(NonStandardContentBlock::builder().value(value).build());
     assert_content_block_has_type(&cb);
 }
 
@@ -1418,29 +1360,38 @@ fn assert_data_block_has_type(block: &DataContentBlock) {
 
 #[test]
 fn test_data_content_block_image() {
-    let block = DataContentBlock::Image(ImageContentBlock::from_url("https://example.com/img.png"));
+    let block = DataContentBlock::Image(
+        ImageContentBlock::builder()
+            .url("https://example.com/img.png".to_string())
+            .build()
+            .unwrap(),
+    );
     assert_data_block_has_type(&block);
 }
 
 #[test]
 fn test_data_content_block_video() {
-    let mut block = VideoContentBlock::new();
-    block.url = Some("https://example.com/vid.mp4".to_string());
+    let block = VideoContentBlock::builder()
+        .url("https://example.com/vid.mp4".to_string())
+        .build()
+        .unwrap();
     let dcb = DataContentBlock::Video(block);
     assert_data_block_has_type(&dcb);
 }
 
 #[test]
 fn test_data_content_block_audio() {
-    let mut block = AudioContentBlock::new();
-    block.url = Some("https://example.com/aud.mp3".to_string());
+    let block = AudioContentBlock::builder()
+        .url("https://example.com/aud.mp3".to_string())
+        .build()
+        .unwrap();
     let dcb = DataContentBlock::Audio(block);
     assert_data_block_has_type(&dcb);
 }
 
 #[test]
 fn test_data_content_block_plaintext() {
-    let mut block = PlainTextContentBlock::new();
+    let mut block = PlainTextContentBlock::builder().build();
     block.text = Some("hi".to_string());
     let dcb = DataContentBlock::PlainText(block);
     assert_data_block_has_type(&dcb);
@@ -1448,8 +1399,10 @@ fn test_data_content_block_plaintext() {
 
 #[test]
 fn test_data_content_block_file() {
-    let mut block = FileContentBlock::new();
-    block.url = Some("https://example.com/doc.pdf".to_string());
+    let block = FileContentBlock::builder()
+        .url("https://example.com/doc.pdf".to_string())
+        .build()
+        .unwrap();
     let dcb = DataContentBlock::File(block);
     assert_data_block_has_type(&dcb);
 }
@@ -1457,11 +1410,31 @@ fn test_data_content_block_file() {
 #[test]
 fn test_data_content_block_union_has_exactly_five_members() {
     let variants: Vec<DataContentBlock> = vec![
-        DataContentBlock::Image(ImageContentBlock::new()),
-        DataContentBlock::Video(VideoContentBlock::new()),
-        DataContentBlock::Audio(AudioContentBlock::new()),
-        DataContentBlock::PlainText(PlainTextContentBlock::new()),
-        DataContentBlock::File(FileContentBlock::new()),
+        DataContentBlock::Image(
+            ImageContentBlock::builder()
+                .url("dummy".to_string())
+                .build()
+                .unwrap(),
+        ),
+        DataContentBlock::Video(
+            VideoContentBlock::builder()
+                .url("dummy".to_string())
+                .build()
+                .unwrap(),
+        ),
+        DataContentBlock::Audio(
+            AudioContentBlock::builder()
+                .url("dummy".to_string())
+                .build()
+                .unwrap(),
+        ),
+        DataContentBlock::PlainText(PlainTextContentBlock::builder().build()),
+        DataContentBlock::File(
+            FileContentBlock::builder()
+                .url("dummy".to_string())
+                .build()
+                .unwrap(),
+        ),
     ];
     assert_eq!(variants.len(), 5);
 

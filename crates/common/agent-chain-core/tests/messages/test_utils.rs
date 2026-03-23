@@ -1889,8 +1889,16 @@ fn test_trim_messages_partial_text_splitting() {
 #[test]
 fn test_trim_messages_mixed_content_with_partial() {
     let blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("First part of text.")),
-        ContentBlock::Text(TextContentBlock::new("Second part that should be trimmed.")),
+        ContentBlock::Text(
+            TextContentBlock::builder()
+                .text("First part of text.")
+                .build(),
+        ),
+        ContentBlock::Text(
+            TextContentBlock::builder()
+                .text("Second part that should be trimmed.")
+                .build(),
+        ),
     ]);
     let messages = vec![AnyMessage::AIMessage(
         AIMessage::builder().content(blocks).build(),
@@ -1966,12 +1974,12 @@ fn test_trim_messages_include_system_strategy_last_empty_messages() {
 #[test]
 fn test_convert_to_openai_messages_openai_string() {
     let human_blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
-        ContentBlock::Text(TextContentBlock::new("World")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("World").build()),
     ]);
     let ai_blocks = ContentBlocks::from(vec![
-        ContentBlock::Text(TextContentBlock::new("Hi")),
-        ContentBlock::Text(TextContentBlock::new("there")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hi").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("there").build()),
     ]);
     let messages = vec![
         AnyMessage::HumanMessage(HumanMessage::builder().content(human_blocks).build()),
@@ -2010,7 +2018,7 @@ fn test_convert_to_openai_messages_openai_block() {
 fn test_convert_to_openai_messages_openai_image() {
     let base64_image = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
     let content_blocks: Vec<ContentBlock> = vec![
-        ContentBlock::Text(TextContentBlock::new("Here's an image:")),
+        ContentBlock::Text(TextContentBlock::builder().text("Here's an image:").build()),
         ContentBlock::Image(ImageContentBlock {
             id: None,
             file_id: None,
@@ -2149,8 +2157,8 @@ fn test_convert_to_openai_messages_include_id() {
 fn test_convert_to_openai_messages_mixed_content_types() {
     let base64_image = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
     let content_blocks: Vec<ContentBlock> = vec![
-        ContentBlock::Text(TextContentBlock::new("Text message")),
-        ContentBlock::Text(TextContentBlock::new("Structured text")),
+        ContentBlock::Text(TextContentBlock::builder().text("Text message").build()),
+        ContentBlock::Text(TextContentBlock::builder().text("Structured text").build()),
         ContentBlock::Image(ImageContentBlock {
             id: None,
             file_id: None,
@@ -2462,7 +2470,7 @@ fn test_convert_to_openai_messages_reasoning_content() {
     assert_eq!(blocks2[0]["type"], "reasoning");
 
     let content_blocks3: Vec<ContentBlock> = vec![
-        ContentBlock::Text(TextContentBlock::new("Regular response")),
+        ContentBlock::Text(TextContentBlock::builder().text("Regular response").build()),
         serde_json::from_value(serde_json::json!({
             "type": "reasoning",
             "summary": [{"type": "text", "text": "My reasoning process"}],
@@ -2496,7 +2504,7 @@ fn test_convert_to_openai_messages_thinking_blocks() {
                 m
             }),
         }),
-        ContentBlock::Text(TextContentBlock::new("Response text.")),
+        ContentBlock::Text(TextContentBlock::builder().text("Response text.").build()),
     ];
 
     let messages = vec![AnyMessage::AIMessage(
