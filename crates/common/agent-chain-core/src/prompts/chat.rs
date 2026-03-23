@@ -185,13 +185,17 @@ impl MessagePromptContentPart {
         match self {
             Self::Text(p) => {
                 let text = StringPromptTemplate::format(p, kwargs)?;
-                Ok(ContentBlock::Text(TextContentBlock::new(text)))
+                Ok(ContentBlock::Text(
+                    TextContentBlock::builder().text(text).build(),
+                ))
             }
             Self::Image(p) => {
                 let image_url = p.format_image(kwargs)?;
-                Ok(ContentBlock::Image(ImageContentBlock::from_url(
-                    image_url.url,
-                )))
+                let content_block = ImageContentBlock::builder()
+                    .url(image_url.url)
+                    .build()
+                    .map_err(Error::output_parser_simple)?;
+                Ok(ContentBlock::Image(content_block))
             }
             Self::Dict(p) => {
                 let value = p.format(kwargs)?;
@@ -201,7 +205,9 @@ impl MessagePromptContentPart {
                     Err(_) => {
                         let mut map = std::collections::HashMap::new();
                         map.insert("original_json".to_string(), value);
-                        Ok(ContentBlock::NonStandard(NonStandardContentBlock::new(map)))
+                        Ok(ContentBlock::NonStandard(
+                            NonStandardContentBlock::builder().value(map).build(),
+                        ))
                     }
                 }
             }

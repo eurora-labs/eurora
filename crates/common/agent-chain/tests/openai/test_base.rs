@@ -1055,8 +1055,17 @@ async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Erro
 
     let message = HumanMessage::builder()
         .content(ContentBlocks::from(vec![
-            ContentBlock::Text(TextContentBlock::new("describe the weather in this image")),
-            ContentBlock::Image(ImageContentBlock::from_url(image_url)),
+            ContentBlock::Text(
+                TextContentBlock::builder()
+                    .text("describe the weather in this image")
+                    .build(),
+            ),
+            ContentBlock::Image(
+                ImageContentBlock::builder()
+                    .url(image_url.to_string())
+                    .build()
+                    .unwrap(),
+            ),
         ]))
         .build();
 
@@ -1084,8 +1093,17 @@ async fn test_image_token_counting_png() -> Result<(), Box<dyn std::error::Error
 
     let message = HumanMessage::builder()
         .content(ContentBlocks::from(vec![
-            ContentBlock::Text(TextContentBlock::new("how many dice are in this image")),
-            ContentBlock::Image(ImageContentBlock::from_url(image_url)),
+            ContentBlock::Text(
+                TextContentBlock::builder()
+                    .text("how many dice are in this image")
+                    .build(),
+            ),
+            ContentBlock::Image(
+                ImageContentBlock::builder()
+                    .url(image_url.to_string())
+                    .build()
+                    .unwrap(),
+            ),
         ]))
         .build();
 
@@ -1430,7 +1448,9 @@ async fn test_audio_input_modality() -> Result<(), Box<dyn std::error::Error>> {
 
     let message = HumanMessage::builder()
         .content(ContentBlocks::from(vec![ContentBlock::Text(
-            TextContentBlock::new("Say hello in a cheerful voice"),
+            TextContentBlock::builder()
+                .text("Say hello in a cheerful voice")
+                .build(),
         )]))
         .build();
 

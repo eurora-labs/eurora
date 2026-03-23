@@ -128,10 +128,14 @@ impl AssetFunctionality for TwitterAsset {
         if main_tweet_images.is_empty() {
             vec![HumanMessage::builder().content(text).build().into()]
         } else {
-            let mut blocks: Vec<ContentBlock> =
-                vec![ContentBlock::Text(TextContentBlock::new(&text))];
+            let mut blocks: Vec<ContentBlock> = vec![ContentBlock::Text(
+                TextContentBlock::builder().text(&text).build(),
+            )];
             for image in main_tweet_images {
-                blocks.push(ContentBlock::Image(ImageContentBlock::from_url(image)));
+                match ImageContentBlock::builder().url(image.to_string()).build() {
+                    Ok(block) => blocks.push(ContentBlock::Image(block)),
+                    Err(e) => tracing::warn!("Failed to create image block: {e}"),
+                }
             }
             vec![HumanMessage::builder().content(blocks).build().into()]
         }
