@@ -393,7 +393,7 @@ mod chat_result_model_behavior_tests {
             .message(
                 AIMessage::builder()
                     .content(ContentBlocks::from(vec![ContentBlock::Text(
-                        TextContentBlock::new("list content"),
+                        TextContentBlock::builder().text("list content").build(),
                     )]))
                     .build()
                     .into(),

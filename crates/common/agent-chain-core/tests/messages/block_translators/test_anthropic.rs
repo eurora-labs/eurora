@@ -295,7 +295,9 @@ fn test_convert_to_v1_from_anthropic() {
         .response_metadata(response_metadata2)
         .build();
 
-    let expected_content2 = vec![ContentBlock::Text(TextContentBlock::new("Hello"))];
+    let expected_content2 = vec![ContentBlock::Text(
+        TextContentBlock::builder().text("Hello").build(),
+    )];
     assert_eq!(message2.content_blocks(), expected_content2);
     assert_ne!(message2.content, "");
 }
@@ -527,7 +529,7 @@ fn test_convert_to_v1_from_anthropic_input() {
     ];
 
     let expected: Vec<ContentBlock> = vec![
-        ContentBlock::Text(TextContentBlock::new("foo")),
+        ContentBlock::Text(TextContentBlock::builder().text("foo").build()),
         ContentBlock::File(FileContentBlock {
             id: None,
             file_id: None,

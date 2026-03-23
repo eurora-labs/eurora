@@ -759,10 +759,18 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
 
     let message = HumanMessage::builder()
         .content(ContentBlocks::from(vec![
-            ContentBlock::Text(TextContentBlock::new(
-                "What do you see in this image? Be very brief.",
-            )),
-            ContentBlock::Image(ImageContentBlock::from_base64(tiny_png_b64, "image/png")),
+            ContentBlock::Text(
+                TextContentBlock::builder()
+                    .text("What do you see in this image? Be very brief.")
+                    .build(),
+            ),
+            ContentBlock::Image(
+                ImageContentBlock::builder()
+                    .base64(tiny_png_b64.to_string())
+                    .mime_type("image/png".to_string())
+                    .build()
+                    .unwrap(),
+            ),
         ]))
         .build();
 
