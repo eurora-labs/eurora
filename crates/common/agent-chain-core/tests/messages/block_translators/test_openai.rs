@@ -343,7 +343,7 @@ fn test_convert_to_v1_from_openai_input() {
     ];
 
     let expected: Vec<ContentBlock> = vec![
-        ContentBlock::Text(TextContentBlock::new("Hello")),
+        ContentBlock::Text(TextContentBlock::builder().text("Hello").build()),
         ContentBlock::Image(ImageContentBlock {
             id: None,
             file_id: None,
