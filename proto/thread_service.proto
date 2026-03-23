@@ -56,6 +56,7 @@ message ChatStreamRequest {
   string content = 2;
   optional string parent_message_id = 3;
   optional string asset_chips_json = 4;
+  optional string image_asset_ids_json = 5;
 }
 
 message AddHumanMessageRequest {

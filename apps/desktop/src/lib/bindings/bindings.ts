@@ -34,6 +34,11 @@ export type GeneralSettings = {
 	autostart: boolean,
 };
 
+export type ImageAssetId = {
+	asset_id: string,
+	mime_type: string,
+};
+
 export type LocalBackendInfo = {
 	grpc_port: number,
 	http_port: number,
@@ -96,6 +101,7 @@ export type Query = {
 	text: string,
 	assets: string[],
 	parent_message_id: string | null,
+	image_asset_ids: ImageAssetId[] | null,
 };
 
 export type ReasoningBlock = {

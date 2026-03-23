@@ -4,9 +4,10 @@ use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
-use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
+use be_remote_db::{Asset, DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use proto_gen::agent_chain::ProtoAiMessageChunk;
@@ -31,7 +32,10 @@ use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-use crate::converters::convert_db_message_to_base_message;
+use crate::converters::{
+    convert_db_message_to_base_message, convert_db_message_to_base_message_async,
+    create_image_assets, extract_message_content,
+};
 use crate::error::ThreadServiceError;
 use crate::tools::firecrawl_tools;
 use crate::vision_tools::vision_tools;
@@ -199,11 +203,16 @@ fn build_env_fallback() -> Option<Providers> {
 
 pub struct ThreadService {
     db: Arc<DatabaseManager>,
+    asset_service: Arc<AssetService>,
     providers: Arc<RwLock<Option<Providers>>>,
 }
 
 impl ThreadService {
-    pub fn new(db: Arc<DatabaseManager>, mut settings_rx: SettingsReceiver) -> Self {
+    pub fn new(
+        db: Arc<DatabaseManager>,
+        asset_service: Arc<AssetService>,
+        mut settings_rx: SettingsReceiver,
+    ) -> Self {
         let env_fallback = build_env_fallback();
         tracing::info!(
             "Creating new ThreadService instance (env fallback: {})",
@@ -242,7 +251,7 @@ impl ThreadService {
             }
         });
 
-        Self { db, providers }
+        Self { db, asset_service, providers }
     }
 
     fn get_chat_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
@@ -375,7 +384,28 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-        let content = human_message.content.as_text();
+        
+        // Extract text and images from message content
+        let extracted = extract_message_content(&human_message);
+        
+        // Create assets for any images and get references
+        let image_refs = if !extracted.images.is_empty() {
+            create_image_assets(&extracted.images, &self.asset_service, user_id)
+                .await
+                .map_err(|e| Status::internal(format!("Failed to create image assets: {}", e)))?
+        } else {
+            Vec::new()
+        };
+        
+        // Build additional_kwargs with image asset refs
+        let additional_kwargs = if !image_refs.is_empty() {
+            serde_json::to_value(serde_json::json!({
+                "image_assets": image_refs
+            }))
+            .map_err(|e| Status::internal(format!("Failed to serialize additional_kwargs: {}", e)))?
+        } else {
+            serde_json::json!({})
+        };
 
         let message = self
             .db
@@ -383,7 +413,8 @@ impl ProtoThreadService for ThreadService {
             .thread_id(thread_id)
             .user_id(user_id)
             .message_type(MessageType::Human)
-            .content(content)
+            .content(extracted.text)
+            .additional_kwargs(additional_kwargs)
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -416,7 +447,28 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-        let content = human_message.content.as_text();
+        
+        // Extract text and images from message content
+        let extracted = extract_message_content(&human_message);
+        
+        // Create assets for any images and get references
+        let image_refs = if !extracted.images.is_empty() {
+            create_image_assets(&extracted.images, &self.asset_service, user_id)
+                .await
+                .map_err(|e| Status::internal(format!("Failed to create image assets: {}", e)))?
+        } else {
+            Vec::new()
+        };
+        
+        // Build additional_kwargs with image asset refs
+        let additional_kwargs = if !image_refs.is_empty() {
+            serde_json::to_value(serde_json::json!({
+                "image_assets": image_refs
+            }))
+            .map_err(|e| Status::internal(format!("Failed to serialize additional_kwargs: {}", e)))?
+        } else {
+            serde_json::json!({})
+        };
 
         let message = self
             .db
@@ -424,7 +476,8 @@ impl ProtoThreadService for ThreadService {
             .thread_id(thread_id)
             .user_id(user_id)
             .message_type(MessageType::Human)
-            .content(content)
+            .content(extracted.text)
+            .additional_kwargs(additional_kwargs)
             .hidden_from_ui(true)
             .call()
             .await
@@ -560,14 +613,15 @@ impl ProtoThreadService for ThreadService {
 
         hidden_messages.extend(visible_messages);
 
-        let mut messages: Vec<AnyMessage> = hidden_messages
-            .into_iter()
-            .filter_map(|msg| {
-                convert_db_message_to_base_message(msg)
-                    .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
-                    .ok()
-            })
-            .collect();
+        // Use async converter with asset cache for image support
+        let mut asset_cache: HashMap<Uuid, Asset> = HashMap::new();
+        let mut messages: Vec<AnyMessage> = Vec::with_capacity(hidden_messages.len());
+        for msg in hidden_messages {
+            match convert_db_message_to_base_message_async(msg, &self.db, &mut asset_cache).await {
+                Ok(m) => messages.push(m),
+                Err(e) => tracing::warn!("Skipping unconvertible message: {e}"),
+            }
+        }
 
         let mut human_additional_kwargs = HashMap::new();
         if let Some(ref chips_json) = req.asset_chips_json
@@ -576,10 +630,77 @@ impl ProtoThreadService for ThreadService {
             human_additional_kwargs.insert("asset_chips".to_string(), chips_value);
         }
 
-        let human_message = HumanMessage::builder()
-            .content(req.content.clone())
-            .additional_kwargs(human_additional_kwargs)
-            .build();
+        // Parse and validate image asset IDs
+        let image_asset_refs: Vec<crate::converters::ImageAssetRef> = 
+            if let Some(ref image_ids_json) = req.image_asset_ids_json {
+                match serde_json::from_str::<Vec<crate::converters::ImageAssetRef>>(image_ids_json) {
+                    Ok(refs) => {
+                        // Validate each asset exists and belongs to user
+                        let mut valid_refs = Vec::new();
+                        for r in refs {
+                            match self.db.get_asset().id(r.asset_id).call().await {
+                                Ok(asset) => {
+                                    if asset.user_id == user_id {
+                                        valid_refs.push(r);
+                                    } else {
+                                        tracing::warn!(
+                                            "Image asset {} does not belong to user {}",
+                                            r.asset_id, user_id
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Image asset {} not found: {}", r.asset_id, e);
+                                }
+                            }
+                        }
+                        valid_refs
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to parse image_asset_ids_json: {}", e);
+                        Vec::new()
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+
+        // Store image asset refs in additional_kwargs for persistence
+        if !image_asset_refs.is_empty() {
+            human_additional_kwargs.insert(
+                "image_assets".to_string(),
+                serde_json::to_value(&image_asset_refs).unwrap_or(serde_json::json!([])),
+            );
+        }
+
+        // Build human message with image content blocks for current request
+        let human_message = if image_asset_refs.is_empty() {
+            HumanMessage::builder()
+                .content(req.content.clone())
+                .additional_kwargs(human_additional_kwargs)
+                .build()
+        } else {
+            use agent_chain::messages::content::{ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock};
+            
+            let mut content_blocks: Vec<ContentBlock> = vec![
+                ContentBlock::Text(TextContentBlock::new(&req.content))
+            ];
+            
+            for r in &image_asset_refs {
+                if let Ok(asset) = self.db.get_asset().id(r.asset_id).call().await {
+                    content_blocks.push(ContentBlock::Image(ImageContentBlock {
+                        url: Some(asset.storage_uri.clone()),
+                        mime_type: Some(r.mime_type.clone()),
+                        ..Default::default()
+                    }));
+                }
+            }
+            
+            HumanMessage::builder()
+                .content(ContentBlocks::from(content_blocks))
+                .additional_kwargs(human_additional_kwargs)
+                .build()
+        };
 
         messages.push(human_message.clone().into());
 

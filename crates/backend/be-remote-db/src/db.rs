@@ -884,6 +884,23 @@ impl DatabaseManager {
     }
 
     #[builder]
+    pub async fn get_asset(&self, id: Uuid) -> DbResult<Asset> {
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256,
+                   storage_backend, storage_uri, status, metadata, created_at, updated_at
+            FROM assets
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(asset)
+    }
+
+    #[builder]
     pub async fn link_asset_to_activity(
         &self,
         activity_id: Uuid,

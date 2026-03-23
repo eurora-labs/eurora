@@ -17,6 +17,13 @@ pub struct Query {
     text: String,
     assets: Vec<String>,
     parent_message_id: Option<String>,
+    image_asset_ids: Option<Vec<ImageAssetId>>,
+}
+
+#[taurpc::ipc_type]
+pub struct ImageAssetId {
+    asset_id: String,
+    mime_type: String,
 }
 
 #[taurpc::procedures(path = "chat")]
