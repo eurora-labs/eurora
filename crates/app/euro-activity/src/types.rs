@@ -3,7 +3,6 @@ use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use euro_native_messaging::NativeMessage;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -17,23 +16,8 @@ use crate::{
 #[taurpc::ipc_type]
 pub struct ContextChip {
     pub id: String,
-    pub extension_id: String,
     pub name: String,
-    pub attrs: HashMap<String, String>,
     pub icon: Option<String>,
-    pub position: Option<u32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DisplayAsset {
-    pub name: String,
-    pub icon: String,
-}
-
-impl DisplayAsset {
-    pub fn new(name: String, icon: String) -> Self {
-        Self { name, icon }
-    }
 }
 
 #[enum_dispatch(SaveableAsset, AssetFunctionality)]
@@ -70,7 +54,6 @@ pub trait AssetFunctionality {
     fn get_name(&self) -> &str;
     fn get_icon(&self) -> Option<&str>;
     fn construct_messages(&self) -> ContentBlocks;
-    fn get_context_chip(&self) -> Option<ContextChip>;
 }
 
 #[enum_dispatch]
@@ -109,6 +92,7 @@ impl TryFrom<NativeMessage> for ActivitySnapshot {
 pub struct Activity {
     pub id: String,
     pub name: String,
+    pub title: Option<String>,
     #[serde(skip)]
     pub icon: Option<Arc<image::RgbaImage>>,
     pub process_name: String,
@@ -121,6 +105,7 @@ pub struct Activity {
 impl Activity {
     pub fn new(
         name: String,
+        title: Option<String>,
         icon: Option<Arc<image::RgbaImage>>,
         process_name: String,
         assets: Vec<ActivityAsset>,
@@ -128,6 +113,7 @@ impl Activity {
         Self {
             id: Uuid::new_v4().to_string(),
             name,
+            title,
             icon,
             process_name,
             start: Utc::now(),
@@ -137,24 +123,12 @@ impl Activity {
         }
     }
 
-    pub fn get_display_assets(&self) -> Vec<DisplayAsset> {
-        self.assets
-            .iter()
-            .map(|asset| {
-                if let Some(icon) = asset.get_icon() {
-                    DisplayAsset::new(asset.get_name().to_string(), icon.to_string())
-                } else {
-                    DisplayAsset::new(asset.get_name().to_string(), "".to_string())
-                }
-            })
-            .collect()
-    }
-
-    pub fn get_context_chips(&self) -> Vec<ContextChip> {
-        self.assets
-            .iter()
-            .filter_map(|asset| asset.get_context_chip())
-            .collect()
+    pub fn get_context_chip(&self) -> ContextChip {
+        ContextChip {
+            id: self.id.clone(),
+            name: self.title.clone().unwrap_or_else(|| self.name.clone()),
+            icon: None,
+        }
     }
 
     pub fn add_asset(&mut self, asset: ActivityAsset) {

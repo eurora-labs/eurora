@@ -7,10 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::{
-    ActivityResult,
-    error::ActivityError,
-    storage::SaveableAsset,
-    types::{AssetFunctionality, ContextChip},
+    ActivityResult, error::ActivityError, storage::SaveableAsset, types::AssetFunctionality,
 };
 
 const TWITTER_EXTENSION_ID: &str = "2c434895-d32c-485f-8525-c4394863b83a";
@@ -133,17 +130,6 @@ impl AssetFunctionality for TwitterAsset {
         }
 
         blocks.into()
-    }
-
-    fn get_context_chip(&self) -> Option<ContextChip> {
-        Some(ContextChip {
-            id: self.id.clone(),
-            name: "twitter".to_string(),
-            extension_id: TWITTER_EXTENSION_ID.to_string(),
-            attrs: HashMap::new(),
-            icon: None,
-            position: Some(0),
-        })
     }
 
     fn get_id(&self) -> &str {
@@ -435,22 +421,6 @@ mod tests {
     }
 
     #[test]
-    fn test_context_chip() {
-        let asset = TwitterAsset::new(
-            "test-id".to_string(),
-            "https://twitter.com/timeline".to_string(),
-            "Timeline".to_string(),
-            vec![],
-            TwitterContextType::Timeline,
-        );
-
-        let chip = asset.get_context_chip().unwrap();
-        assert_eq!(chip.id, "test-id");
-        assert_eq!(chip.name, "twitter");
-        assert_eq!(chip.extension_id, "2c434895-d32c-485f-8525-c4394863b83a");
-    }
-
-    #[test]
     fn trait_methods_work() {
         use crate::types::AssetFunctionality;
         let asset = TwitterAsset::new(
@@ -463,7 +433,5 @@ mod tests {
         let blocks = AssetFunctionality::construct_messages(&asset);
         assert_eq!(blocks.len(), 1);
         assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
-        let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(chip.is_some());
     }
 }

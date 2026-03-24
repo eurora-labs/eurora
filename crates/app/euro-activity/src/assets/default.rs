@@ -2,11 +2,7 @@ use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    ActivityResult,
-    storage::SaveableAsset,
-    types::{AssetFunctionality, ContextChip},
-};
+use crate::{ActivityResult, storage::SaveableAsset, types::AssetFunctionality};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DefaultAsset {
@@ -75,10 +71,6 @@ impl AssetFunctionality for DefaultAsset {
         vec![block.into()].into()
     }
 
-    fn get_context_chip(&self) -> Option<ContextChip> {
-        None
-    }
-
     fn get_id(&self) -> &str {
         &self.id
     }
@@ -136,12 +128,6 @@ mod tests {
     }
 
     #[test]
-    fn test_context_chip() {
-        let asset = DefaultAsset::simple("Test App".to_string());
-        assert!(asset.get_context_chip().is_none());
-    }
-
-    #[test]
     fn trait_methods_work() {
         use crate::types::AssetFunctionality;
         let asset = DefaultAsset::new(
@@ -153,7 +139,5 @@ mod tests {
         let blocks = AssetFunctionality::construct_messages(&asset);
         assert_eq!(blocks.len(), 1);
         assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
-        let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(chip.is_none());
     }
 }
