@@ -344,7 +344,9 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-        let content = human_message.content.as_text();
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let message = self
             .db
@@ -385,7 +387,9 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-        let content = human_message.content.as_text();
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let message = self
             .db
@@ -427,7 +431,9 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let system_message: SystemMessage = proto_message.into();
-        let content = system_message.content.as_text();
+        let content = serde_json::to_value(&system_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let message = self
             .db
@@ -552,7 +558,9 @@ impl ProtoThreadService for ThreadService {
 
         messages.push(human_message.clone().into());
 
-        let content = human_message.content.as_text();
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let additional_kwargs =
             serde_json::to_value(&human_message.additional_kwargs).map_err(|e| {
@@ -673,11 +681,13 @@ impl ProtoThreadService for ThreadService {
                     }])),
                 };
 
+                let content_value = serde_json::json!([{"type": "text", "text": full_content}]);
+
                 let save_result = db.create_message()
                     .thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
-                    .content(full_content.clone())
+                    .content(content_value)
                     .maybe_reasoning_blocks(reasoning_blocks)
                     .call()
                     .await;
@@ -1069,7 +1079,7 @@ impl ProtoThreadService for ThreadService {
                     id: n.id.to_string(),
                     parent_message_id: n.parent_message_id.map(|id| id.to_string()),
                     message_type: n.message_type.to_string(),
-                    content: n.content,
+                    content: serde_json::to_string(&n.content).unwrap_or_default(),
                     level: n.level as u32,
                     sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
                     sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
