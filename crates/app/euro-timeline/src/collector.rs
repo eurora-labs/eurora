@@ -6,7 +6,8 @@ use crate::{
 };
 use euro_activity::DefaultStrategy;
 use euro_activity::strategies::ActivityReport;
-use euro_activity::{ContextChip, strategies::ActivityStrategyFunctionality};
+use euro_activity::strategies::StrategySupport;
+use euro_activity::{ContextChip, NoStrategy, strategies::ActivityStrategyFunctionality};
 use focus_tracker::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use std::sync::{
     Arc,
@@ -135,8 +136,8 @@ impl CollectorService {
 
                         tracing::debug!("Received new activity report: {}", activity.name);
                         last_activity_name = Some(activity.name.clone());
-                        let context_chips = activity.get_context_chips();
-                        let _ = assets_event_tx_for_reports.send(context_chips);
+                        let context_chip = activity.get_context_chip();
+                        let _ = assets_event_tx_for_reports.send(vec![context_chip]);
 
                         let focus_event = ActivityEvent {
                             name: activity.name.clone(),
@@ -146,26 +147,6 @@ impl CollectorService {
 
                         let mut storage = storage_for_reports.lock().await;
                         storage.add_activity(activity);
-                    }
-                    ActivityReport::Snapshots(snapshots) => {
-                        tracing::debug!("Received {} snapshots", snapshots.len());
-                        let mut storage = storage_for_reports.lock().await;
-                        if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
-                        {
-                            current_activity.snapshots.clear();
-                            current_activity.snapshots.extend(snapshots);
-                        }
-                    }
-                    ActivityReport::Assets(assets) => {
-                        tracing::debug!("Received {} additional assets", assets.len());
-                        let mut storage = storage_for_reports.lock().await;
-                        if let Some(current_activity) = storage.get_all_activities_mut().back_mut()
-                        {
-                            current_activity.assets.clear();
-                            current_activity.assets.extend(assets);
-                            let context_chips = current_activity.get_context_chips();
-                            let _ = assets_event_tx_for_reports.send(context_chips);
-                        }
                     }
                     ActivityReport::Stopping => {
                         tracing::debug!("Strategy reported stopping");
@@ -201,6 +182,16 @@ impl CollectorService {
 
                         let mut prev = prev_focus.lock().await;
                         if new_focus != *prev {
+                            if NoStrategy::get_supported_processes()
+                                .contains(&process_name.as_str())
+                            {
+                                tracing::debug!(
+                                    "Ignoring focus change to own process: {}",
+                                    process_name
+                                );
+                                return Ok(());
+                            }
+
                             let mut strategy_write = strategy_for_update.write().await;
 
                             match strategy_write.handle_process_change(&window).await {

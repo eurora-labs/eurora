@@ -109,9 +109,10 @@ impl SafariStrategy {
                         *prev = Some(url);
 
                         let icon = metadata.icon.clone();
+                        let title = metadata.title.clone();
                         let url_str = metadata.url.clone().unwrap_or_default();
 
-                        let activity = Activity::new(url_str, icon, "".to_string(), vec![]);
+                        let activity = Activity::new(url_str, title, icon, "".to_string(), vec![]);
 
                         tracing::info!(
                             "Creating new activity from event: browser_pid={}, name={}",
@@ -124,66 +125,7 @@ impl SafariStrategy {
                         }
                     }
 
-                    "ASSETS" => {
-                        let native_message =
-                            match serde_json::from_str::<NativeMessage>(&payload_str) {
-                                Ok(msg) => msg,
-                                Err(e) => {
-                                    tracing::warn!("Failed to parse asset payload: {}", e);
-                                    continue;
-                                }
-                            };
-
-                        match ActivityAsset::try_from(native_message) {
-                            Ok(asset) => {
-                                tracing::debug!("Received asset from browser PID {}", browser_pid);
-                                if sender.send(ActivityReport::Assets(vec![asset])).is_err() {
-                                    tracing::warn!("Failed to send assets - receiver dropped");
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                tracing::warn!("Failed to convert native message to asset: {}", e);
-                            }
-                        }
-                    }
-
-                    "SNAPSHOT" => {
-                        let native_message =
-                            match serde_json::from_str::<NativeMessage>(&payload_str) {
-                                Ok(msg) => msg,
-                                Err(e) => {
-                                    tracing::warn!("Failed to parse snapshot payload: {}", e);
-                                    continue;
-                                }
-                            };
-
-                        match ActivitySnapshot::try_from(native_message) {
-                            Ok(snapshot) => {
-                                tracing::debug!(
-                                    "Received snapshot from browser PID {}",
-                                    browser_pid
-                                );
-                                if sender
-                                    .send(ActivityReport::Snapshots(vec![snapshot]))
-                                    .is_err()
-                                {
-                                    tracing::warn!("Failed to send snapshots - receiver dropped");
-                                    break;
-                                }
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    "Failed to convert native message to snapshot: {}",
-                                    e
-                                );
-                            }
-                        }
-                    }
-
-                    other => {
-                        tracing::debug!("Ignoring unknown event action: {}", other);
-                    }
+                    _ => {}
                 }
             }
 
@@ -218,25 +160,6 @@ impl SafariStrategy {
         let payload = response.payload?;
         let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
         ActivitySnapshot::try_from(native_message).ok()
-    }
-
-    async fn request_assets_and_snapshots(&mut self) {
-        let Some(sender) = self.sender.clone() else {
-            return;
-        };
-        let Some(service) = self.bridge_service else {
-            return;
-        };
-        let Some(browser_pid) = self.active_browser_pid else {
-            return;
-        };
-
-        if let Some(asset) = Self::fetch_asset(service, browser_pid).await {
-            let _ = sender.send(ActivityReport::Assets(vec![asset]));
-        }
-        if let Some(snapshot) = Self::fetch_snapshot(service, browser_pid).await {
-            let _ = sender.send(ActivityReport::Snapshots(vec![snapshot]));
-        }
     }
 
     pub async fn new() -> ActivityResult<Self> {
@@ -281,6 +204,7 @@ impl ActivityStrategyFunctionality for SafariStrategy {
             Ok(metadata) => {
                 let activity = Activity::new(
                     metadata.url.unwrap_or_default(),
+                    metadata.title,
                     metadata.icon,
                     "".to_string(),
                     vec![],
@@ -297,8 +221,6 @@ impl ActivityStrategyFunctionality for SafariStrategy {
                 tracing::warn!("Failed to get initial metadata on start_tracking: {}", e);
             }
         }
-
-        self.request_assets_and_snapshots().await;
 
         tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
         Ok(())
@@ -328,6 +250,7 @@ impl ActivityStrategyFunctionality for SafariStrategy {
                     if let Some(sender) = &self.sender {
                         let activity = Activity::new(
                             metadata.url.unwrap_or_default(),
+                            metadata.title,
                             metadata.icon,
                             "".to_string(),
                             vec![],
@@ -346,6 +269,7 @@ impl ActivityStrategyFunctionality for SafariStrategy {
                     if let Some(sender) = &self.sender {
                         let activity = Activity::new(
                             focus_window.process_name.clone(),
+                            None,
                             focus_window.icon.clone(),
                             focus_window.process_name.clone(),
                             vec![],
@@ -356,8 +280,6 @@ impl ActivityStrategyFunctionality for SafariStrategy {
                     }
                 }
             }
-
-            self.request_assets_and_snapshots().await;
 
             Ok(true)
         } else {

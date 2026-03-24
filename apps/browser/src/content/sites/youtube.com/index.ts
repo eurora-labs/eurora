@@ -4,7 +4,6 @@ import {
 	Watcher,
 	type BrowserObj,
 	type WatcherResponse,
-	type SnapshotPolicy,
 } from '../../../shared/content/extensions/watchers/watcher';
 import { ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import browser from 'webextension-polyfill';
@@ -21,10 +20,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	constructor(params: WatcherParams) {
 		super(params);
 		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
-	}
-
-	protected getSnapshotPolicy(): SnapshotPolicy {
-		return { type: 'interval', ms: 5000 };
 	}
 
 	private async ensureTranscript(videoId?: string): Promise<any> {
@@ -48,13 +43,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 			return true;
 		}
 		return super.listen(obj, sender, sendResponse);
-	}
-
-	public startChangeDetection(): void {
-		super.startChangeDetection();
-		document.addEventListener('yt-navigate-finish', () => {
-			this.onChangeDetected();
-		});
 	}
 
 	public async handlePlay(
@@ -227,6 +215,4 @@ export function main() {
 	});
 
 	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
-	watcher.startChangeDetection();
-	watcher.triggerInitialChange();
 }
