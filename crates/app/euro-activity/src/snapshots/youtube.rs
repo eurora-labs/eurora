@@ -10,6 +10,7 @@ use crate::{error::ActivityError, types::SnapshotFunctionality};
 pub struct YoutubeSnapshot {
     pub id: String,
     pub current_time: f32,
+    #[serde(skip_serializing)]
     pub video_frame: Option<String>,
     pub video_duration: Option<f32>,
     pub video_title: Option<String>,
