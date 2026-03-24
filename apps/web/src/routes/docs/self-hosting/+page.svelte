@@ -121,6 +121,14 @@ volumes:
 	];
 </script>
 
+<svelte:head>
+	<title>Self-Hosting — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Self-host Eurora with Docker Compose and Ollama. Run AI locally with full control over your data. Step-by-step guide with environment variable reference."
+	/>
+</svelte:head>
+
 <div>
 	<h1 class="mb-4 text-4xl font-bold">Self-Hosting</h1>
 	<p class="mb-12 text-lg text-muted-foreground">
