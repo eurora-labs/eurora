@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-
-use agent_chain_core::messages::{ContentBlock, ImageContentBlock, TextContentBlock};
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::messages::{
+    ContentBlock, ContentBlocks, ImageContentBlock, PlainTextContentBlock,
+};
 use async_trait::async_trait;
 use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet, ParseResult};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::{
     ActivityResult,
@@ -12,6 +12,8 @@ use crate::{
     storage::SaveableAsset,
     types::{AssetFunctionality, ContextChip},
 };
+
+const TWITTER_EXTENSION_ID: &str = "2c434895-d32c-485f-8525-c4394863b83a";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TwitterTweet {
@@ -87,14 +89,8 @@ impl AssetFunctionality for TwitterAsset {
         Some("twitter")
     }
 
-    fn construct_messages(&self) -> Vec<AnyMessage> {
-        let max_tweets = 20usize;
-        let tweet_texts: Vec<String> = self
-            .tweets
-            .iter()
-            .take(max_tweets)
-            .map(|tweet| tweet.get_formatted_text())
-            .collect();
+    fn construct_messages(&self) -> ContentBlocks {
+        let asset_json = serde_json::to_string(&self).unwrap_or_default();
 
         let context_description = match self.context_type {
             TwitterContextType::Timeline => "timeline",
@@ -105,19 +101,23 @@ impl AssetFunctionality for TwitterAsset {
             TwitterContextType::Other => "other",
         };
 
-        let mut text = format!(
-            "The user is looking at Twitter {} content titled '{}' and has a question about it. \
-                         Here are the tweets they're seeing: \n\n{}",
-            context_description,
-            self.title,
-            tweet_texts.join("\n\n")
-        );
-        if self.tweets.len() > max_tweets {
-            text.push_str(&format!(
-                "\n\n(+{} more tweets truncated)",
-                self.tweets.len() - max_tweets,
-            ));
-        }
+        let extras = HashMap::from([(
+            "asset_id".to_string(),
+            serde_json::json!(TWITTER_EXTENSION_ID),
+        )]);
+
+        let block = PlainTextContentBlock::builder()
+            .context(format!(
+                "Twitter {} content titled: '{}'",
+                context_description, self.title
+            ))
+            .title(format!("{}.json", self.title))
+            .mime_type("application/json".to_string())
+            .text(asset_json)
+            .extras(extras)
+            .build();
+
+        let mut blocks: Vec<ContentBlock> = vec![block.into()];
 
         let main_tweet_images: Vec<&String> = self
             .tweets
@@ -125,27 +125,21 @@ impl AssetFunctionality for TwitterAsset {
             .map(|t| t.images.iter().collect())
             .unwrap_or_default();
 
-        if main_tweet_images.is_empty() {
-            vec![HumanMessage::builder().content(text).build().into()]
-        } else {
-            let mut blocks: Vec<ContentBlock> = vec![ContentBlock::Text(
-                TextContentBlock::builder().text(&text).build(),
-            )];
-            for image in main_tweet_images {
-                match ImageContentBlock::builder().url(image.to_string()).build() {
-                    Ok(block) => blocks.push(ContentBlock::Image(block)),
-                    Err(e) => tracing::warn!("Failed to create image block: {e}"),
-                }
+        for image in main_tweet_images {
+            match ImageContentBlock::builder().url(image.to_string()).build() {
+                Ok(img) => blocks.push(ContentBlock::Image(img)),
+                Err(e) => tracing::warn!("Failed to create image block: {e}"),
             }
-            vec![HumanMessage::builder().content(blocks).build().into()]
         }
+
+        blocks.into()
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
         Some(ContextChip {
             id: self.id.clone(),
             name: "twitter".to_string(),
-            extension_id: "2c434895-d32c-485f-8525-c4394863b83a".to_string(),
+            extension_id: TWITTER_EXTENSION_ID.to_string(),
             attrs: HashMap::new(),
             icon: None,
             position: Some(0),
@@ -466,10 +460,10 @@ mod tests {
             vec![],
             TwitterContextType::Timeline,
         );
-        let messages = AssetFunctionality::construct_messages(&asset);
-        let msg = messages[0].clone();
+        let blocks = AssetFunctionality::construct_messages(&asset);
+        assert_eq!(blocks.len(), 1);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, AnyMessage::HumanMessage(_)));
         assert!(chip.is_some());
     }
 }

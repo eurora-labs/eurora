@@ -1,4 +1,4 @@
-use agent_chain_core::AnyMessage;
+use agent_chain_core::messages::ContentBlocks;
 use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use std::sync::Arc;
@@ -110,56 +110,57 @@ impl TimelineManager {
         }
     }
 
-    pub async fn construct_messages_from_last_snapshot(&self) -> Vec<AnyMessage> {
+    pub async fn construct_messages_from_last_snapshot(&self) -> ContentBlocks {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(snapshot) = activity.snapshots.last() {
                 snapshot.construct_messages()
             } else {
-                vec![]
+                ContentBlocks::new()
             }
         } else {
-            vec![]
+            ContentBlocks::new()
         }
     }
 
-    pub async fn construct_messages_from_last_asset(&self) -> Vec<AnyMessage> {
+    pub async fn construct_messages_from_last_asset(&self) -> ContentBlocks {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(asset) = activity.assets.last() {
                 asset.construct_messages()
             } else {
-                vec![]
+                ContentBlocks::new()
             }
         } else {
-            vec![]
+            ContentBlocks::new()
         }
     }
 
-    pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> Vec<AnyMessage> {
+    pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> ContentBlocks {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             activity
                 .assets
                 .iter()
                 .filter(|asset| ids.contains(&asset.get_id().to_string()))
-                .flat_map(|asset| asset.construct_messages())
-                .collect()
+                .flat_map(|asset| asset.construct_messages().into_inner())
+                .collect::<Vec<_>>()
+                .into()
         } else {
-            Vec::new()
+            ContentBlocks::new()
         }
     }
 
-    pub async fn construct_snapshot_messages_by_ids(&self, _ids: &[String]) -> Vec<AnyMessage> {
+    pub async fn construct_snapshot_messages_by_ids(&self, _ids: &[String]) -> ContentBlocks {
         let storage = self.storage.lock().await;
         if let Some(activity) = storage.get_current_activity() {
             if let Some(snapshot) = activity.snapshots.last() {
                 snapshot.construct_messages()
             } else {
-                Vec::new()
+                ContentBlocks::new()
             }
         } else {
-            Vec::new()
+            ContentBlocks::new()
         }
     }
 

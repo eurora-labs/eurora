@@ -1,3 +1,4 @@
+use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
 use agent_chain_core::{AIMessage, AnyMessage};
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
@@ -49,6 +50,7 @@ impl ChatApi for ChatApiImpl {
             .ok_or_else(|| "Timeline not available".to_string())?;
 
         let mut asset_chips_json: Option<String> = None;
+        let mut context_blocks = ContentBlocks::new();
 
         {
             let timeline = timeline_state.lock().await;
@@ -63,36 +65,29 @@ impl ChatApi for ChatApiImpl {
                     asset_chips_json = serde_json::to_string(&chips).ok();
                 }
 
-                let mut messages = Vec::new();
-                let asset_messages = timeline.construct_messages_from_last_asset().await;
-                if let Some(last_asset_message) = asset_messages.last() {
-                    messages.push(last_asset_message);
-                }
+                let mut all_blocks = ContentBlocks::new();
 
-                let snapshot_messages = timeline.construct_messages_from_last_snapshot().await;
-                if let Some(last_snapshot_message) = snapshot_messages.last() {
-                    messages.push(last_snapshot_message);
-                }
+                let asset_blocks = timeline.construct_messages_from_last_asset().await;
+                all_blocks.extend(asset_blocks.into_inner());
 
-                for message in messages {
-                    match &message {
-                        AnyMessage::SystemMessage(m) => {
-                            let _ = thread_manager
-                                .add_system_message(thread_id.clone(), m)
-                                .await;
-                        }
-                        AnyMessage::HumanMessage(m) => {
-                            let _ = thread_manager
-                                .add_hidden_human_message(thread_id.clone(), m)
-                                .await;
-                        }
-                        _ => {
-                            tracing::warn!("Unexpected message type in asset context");
-                        }
+                let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
+                all_blocks.extend(snapshot_blocks.into_inner());
+
+                if !all_blocks.is_empty() {
+                    match thread_manager
+                        .save_preliminary_content_blocks(thread_id.clone(), all_blocks)
+                        .await
+                    {
+                        Ok(returned) => context_blocks = returned,
+                        Err(e) => tracing::warn!("Failed to save preliminary blocks: {e}"),
                     }
                 }
             }
         }
+
+        let user_text_block: ContentBlock =
+            TextContentBlock::builder().text(&query.text).build().into();
+        context_blocks.push(user_text_block);
 
         let mut complete_response = String::new();
 
@@ -102,7 +97,7 @@ impl ChatApi for ChatApiImpl {
             thread_manager
                 .chat_stream(
                     thread_id.clone(),
-                    query.text.clone(),
+                    context_blocks,
                     query.parent_message_id.clone(),
                     asset_chips_json,
                 )
