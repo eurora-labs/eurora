@@ -112,6 +112,14 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Roadmap — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Eurora's public roadmap: see what we've shipped, what's in progress, and what's planned. Desktop apps, browser extensions, memories, and more."
+	/>
+</svelte:head>
+
 <div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
 	<div class="mb-6">
 		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-3">

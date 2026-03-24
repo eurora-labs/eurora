@@ -53,6 +53,14 @@
 	];
 </script>
 
+<svelte:head>
+	<title>About — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Meet the team behind Eurora. A Netherlands-based, self-funded company building private, open-source AI tools with EU data residency and full transparency."
+	/>
+</svelte:head>
+
 <div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
 	<!-- Hero -->
 	<div class="text-center mb-20">

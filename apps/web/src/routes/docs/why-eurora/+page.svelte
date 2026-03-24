@@ -3,6 +3,14 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 </script>
 
+<svelte:head>
+	<title>Why Eurora — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Why Eurora exists: an AI assistant with full context awareness that doesn't sacrifice your privacy. Open source, EU-based, self-hostable, no vendor lock-in."
+	/>
+</svelte:head>
+
 <div>
 	<h1 class="mb-4 text-4xl font-bold">Why Eurora</h1>
 	<p class="mb-12 text-lg text-muted-foreground">

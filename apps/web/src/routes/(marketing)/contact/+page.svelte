@@ -28,6 +28,14 @@
 	];
 </script>
 
+<svelte:head>
+	<title>Contact — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Get in touch with Eurora Labs by email or join our community on Discord, GitHub, Reddit, Bluesky, and X. Based in Vlijmen, The Netherlands."
+	/>
+</svelte:head>
+
 <div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
 	<div class="mb-6">
 		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-3">Get in touch</p>
