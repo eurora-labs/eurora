@@ -23,11 +23,8 @@ export type Claims = {
 
 export type ContextChip = {
 	id: string,
-	extension_id: string,
 	name: string,
-	attrs: { [key in string]: string },
 	icon: string | null,
-	position: number | null,
 };
 
 export type GeneralSettings = {

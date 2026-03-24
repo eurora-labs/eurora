@@ -174,6 +174,7 @@ async function handleGetMetadata(reqFrame: RequestFrame): Promise<void> {
 						data: {
 							url: activeTab.url,
 							icon_base64: iconBase64,
+							title: activeTab.title ?? null,
 						} as NativeMetadata,
 					}),
 				},
