@@ -26,6 +26,14 @@
 	let activeTab = $state<(typeof tabs)[number]['id']>('assistant');
 </script>
 
+<svelte:head>
+	<title>Eurora — AI Assistant for Your Browser</title>
+	<meta
+		name="description"
+		content="Free, open-source AI assistant that reads what you read. Ask about any YouTube video, article, or tweet without copy-pasting. Private and built in Europe."
+	/>
+</svelte:head>
+
 <div class="mx-auto w-full max-w-7xl px-4">
 	<div class="flex flex-col items-start py-12 max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
