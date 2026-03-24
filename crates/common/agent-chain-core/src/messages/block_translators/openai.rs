@@ -566,6 +566,9 @@ fn convert_from_v03(content: &[Value], context: &OpenAiContext) -> Vec<Value> {
         {
             function_call["id"] = mapped_id.clone();
         }
+        if let Some(index) = tool_call_chunk.get("index") {
+            function_call["index"] = index.clone();
+        }
         buckets[6].1.push(function_call);
     } else {
         for tool_call in &context.tool_calls {
@@ -1161,12 +1164,6 @@ pub fn convert_to_v1_from_chat_completions_input(content: &[Value]) -> Vec<Value
     for block in &unpacked_blocks {
         let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
-        if block_type == "text-plain" {
-            let text = block.get("text").and_then(|v| v.as_str()).unwrap_or("");
-            converted_blocks.push(json!({"type": "text", "text": text}));
-            continue;
-        }
-
         if matches!(block_type, "image_url" | "input_audio" | "file") && is_openai_data_block(block)
         {
             let converted = convert_openai_format_to_data_block(block);
@@ -1685,26 +1682,27 @@ mod tests {
     }
 
     #[test]
-    fn test_text_plain_block_converted_to_text() {
+    fn test_text_plain_block_passthrough() {
         let content = vec![json!({
             "type": "text-plain",
             "text": "some plain text content",
             "mime_type": "text/plain",
         })];
         let result = convert_to_v1_from_chat_completions_input(&content);
-        assert_eq!(result[0]["type"], "text");
+        assert_eq!(result[0]["type"], "text-plain");
         assert_eq!(result[0]["text"], "some plain text content");
+        assert_eq!(result[0]["mime_type"], "text/plain");
     }
 
     #[test]
-    fn test_text_plain_block_with_url_converted_to_text() {
+    fn test_text_plain_block_with_url_passthrough() {
         let content = vec![json!({
             "type": "text-plain",
             "url": "https://example.com/file.txt",
             "mime_type": "text/plain",
         })];
         let result = convert_to_v1_from_chat_completions_input(&content);
-        // Should not pass through as text-plain since OpenAI doesn't support it
-        assert_ne!(result[0]["type"], "text-plain");
+        assert_eq!(result[0]["type"], "text-plain");
+        assert_eq!(result[0]["url"], "https://example.com/file.txt");
     }
 }
