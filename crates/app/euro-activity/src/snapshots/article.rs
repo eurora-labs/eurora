@@ -1,4 +1,4 @@
-use agent_chain_core::messages::prelude::*;
+use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use euro_native_messaging::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -51,37 +51,28 @@ impl ArticleSnapshot {
 }
 
 impl SnapshotFunctionality for ArticleSnapshot {
-    fn construct_messages(&self) -> Vec<AnyMessage> {
+    fn construct_messages(&self) -> ContentBlocks {
         if let Some(highlight) = &self.highlight
             && highlight.is_empty()
         {
-            return vec![];
-        }
-        let mut content = String::new();
-
-        if let Some(title) = &self.page_title {
-            content.push_str(&format!("From article titled '{}': ", title));
+            return ContentBlocks::new();
         }
 
-        if let Some(highlight) = &self.highlight {
-            content.push_str(&format!(
-                "user highlighted the following text: \"{}\"",
-                highlight
-            ));
-        } else if let Some(selection) = &self.selection_text {
-            content.push_str(&format!(
-                "user selected the following text: \"{}\"",
-                selection
-            ));
-        } else {
-            content.push_str("user is reading an article");
-        }
+        let snapshot_json = serde_json::to_string(&self).unwrap_or_default();
 
-        if let Some(url) = &self.page_url {
-            content.push_str(&format!(" (from: {})", url));
-        }
+        let context = match &self.page_title {
+            Some(title) => format!("Article snapshot from '{}'", title),
+            None => "Article snapshot".to_string(),
+        };
 
-        vec![HumanMessage::builder().content(content).build().into()]
+        let block = PlainTextContentBlock::builder()
+            .context(context)
+            .title("article_snapshot.json".to_string())
+            .mime_type("application/json".to_string())
+            .text(snapshot_json)
+            .build();
+
+        vec![block.into()].into()
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -107,6 +98,7 @@ impl From<NativeArticleSnapshot> for ArticleSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_chain_core::messages::ContentBlock;
 
     #[test]
     fn test_article_snapshot_creation() {
@@ -152,11 +144,8 @@ mod tests {
             Some("Test Article".to_string()),
         );
 
-        let message = snapshot.construct_messages()[0].clone();
-        let text = message.content().as_text();
-
-        assert!(text.contains("Test Article"));
-        assert!(text.contains("Important quote"));
-        assert!(text.contains("https://example.com"));
+        let blocks = snapshot.construct_messages();
+        assert_eq!(blocks.len(), 1);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
     }
 }

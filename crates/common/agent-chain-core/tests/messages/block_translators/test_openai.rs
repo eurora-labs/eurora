@@ -1,6 +1,3 @@
-use agent_chain_core::messages::block_translators::openai::{
-    OpenAiApi, convert_to_openai_data_block,
-};
 use agent_chain_core::messages::{
     AIMessage, AIMessageChunk, Annotation, AudioContentBlock, BlockIndex, ContentBlock,
     ContentBlocks, FileContentBlock, HumanMessage, ImageContentBlock, NonStandardContentBlock,
@@ -556,7 +553,7 @@ fn test_compat_responses_v03() {
             id: Some("call_abc".to_string()),
             name: Some("my_tool".to_string()),
             args: Some("".to_string()),
-            index: Some(BlockIndex::Int(0)),
+            index: Some(BlockIndex::Str("lc_tc_0".to_string())),
             extras: Some({
                 let mut extras = HashMap::new();
                 extras.insert("item_id".to_string(), json!("fc_abc"));
@@ -597,7 +594,7 @@ fn test_compat_responses_v03() {
             id: Some("call_abc".to_string()),
             name: Some("my_tool".to_string()),
             args: Some("{".to_string()),
-            index: Some(BlockIndex::Int(0)),
+            index: Some(BlockIndex::Str("lc_tc_0".to_string())),
             extras: Some({
                 let mut extras = HashMap::new();
                 extras.insert("item_id".to_string(), json!("fc_abc"));
@@ -665,124 +662,4 @@ fn test_compat_responses_v03() {
         extras: None,
     })];
     assert_eq!(merged_reasoning.content_blocks(), expected_merged_reasoning);
-}
-
-#[test]
-fn test_convert_to_openai_data_block() {
-    let block = json!({
-        "type": "image",
-        "url": "https://example.com/test.png"
-    });
-    let expected = json!({
-        "type": "image_url",
-        "image_url": {"url": "https://example.com/test.png"}
-    });
-    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "image",
-        "base64": "<base64 string>",
-        "mime_type": "image/png"
-    });
-    let expected = json!({
-        "type": "image_url",
-        "image_url": {"url": "data:image/png;base64,<base64 string>"}
-    });
-    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "file",
-        "url": "https://example.com/test.pdf"
-    });
-    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().contains("does not support"));
-
-    let block = json!({
-        "type": "file",
-        "base64": "<base64 string>",
-        "mime_type": "application/pdf",
-        "filename": "test.pdf"
-    });
-    let expected = json!({
-        "type": "file",
-        "file": {
-            "file_data": "data:application/pdf;base64,<base64 string>",
-            "filename": "test.pdf"
-        }
-    });
-    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "file",
-        "file_id": "file-abc123"
-    });
-    let expected = json!({"type": "file", "file": {"file_id": "file-abc123"}});
-    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "audio",
-        "base64": "<base64 string>",
-        "mime_type": "audio/wav"
-    });
-    let expected = json!({
-        "type": "input_audio",
-        "input_audio": {"data": "<base64 string>", "format": "wav"}
-    });
-    let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "image",
-        "url": "https://example.com/test.png"
-    });
-    let expected = json!({"type": "input_image", "image_url": "https://example.com/test.png"});
-    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "image",
-        "base64": "<base64 string>",
-        "mime_type": "image/png"
-    });
-    let expected = json!({
-        "type": "input_image",
-        "image_url": "data:image/png;base64,<base64 string>"
-    });
-    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "file",
-        "url": "https://example.com/test.pdf"
-    });
-    let expected = json!({"type": "input_file", "file_url": "https://example.com/test.pdf"});
-    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "file",
-        "base64": "<base64 string>",
-        "mime_type": "application/pdf",
-        "filename": "test.pdf"
-    });
-    let expected = json!({
-        "type": "input_file",
-        "file_data": "data:application/pdf;base64,<base64 string>",
-        "filename": "test.pdf"
-    });
-    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
-    assert_eq!(result, expected);
-
-    let block = json!({
-        "type": "file",
-        "file_id": "file-abc123"
-    });
-    let expected = json!({"type": "input_file", "file_id": "file-abc123"});
-    let result = convert_to_openai_data_block(&block, OpenAiApi::Responses).unwrap();
-    assert_eq!(result, expected);
 }

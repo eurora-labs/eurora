@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use async_trait::async_trait;
 use euro_native_messaging::NativeYoutubeAsset;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::{
     ActivityResult,
@@ -11,6 +10,8 @@ use crate::{
     storage::SaveableAsset,
     types::{AssetFunctionality, ContextChip},
 };
+
+const YOUTUBE_EXTENSION_ID: &str = "7c7b59bb-d44d-431a-9f4d-64240172e092";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptLine {
@@ -68,41 +69,26 @@ impl AssetFunctionality for YoutubeAsset {
         Some("youtube")
     }
 
-    fn construct_messages(&self) -> Vec<AnyMessage> {
-        let transcript_content = format!(
-            "The user is watching a YouTube video titled '{}'. \
-             Here's the transcript of the video: \n {}",
-            self.title,
-            self.transcript
-                .iter()
-                .map(|line| format!("{} ({}s)", line.text, line.start))
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
+    fn construct_messages(&self) -> ContentBlocks {
+        let asset_json = serde_json::to_string(&self).unwrap_or_default();
 
-        let recent_words: Vec<&str> = self
-            .transcript
-            .iter()
-            .filter(|line| line.start + line.duration <= self.current_time)
-            .flat_map(|line| line.text.split_whitespace())
-            .collect();
-        let last_20: String = recent_words
-            .iter()
-            .rev()
-            .take(20)
-            .copied()
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect::<Vec<_>>()
-            .join(" ");
+        let extras = HashMap::from([(
+            "asset_id".to_string(),
+            serde_json::json!(YOUTUBE_EXTENSION_ID),
+        )]);
 
-        let content = format!(
-            "{}\nThe professor just said this: {}",
-            transcript_content, last_20
-        );
+        let block = PlainTextContentBlock::builder()
+            .context(format!(
+                "Transcript of the YouTube video titled: '{}'",
+                self.title
+            ))
+            .title(format!("{}.json", self.title))
+            .mime_type("application/json".to_string())
+            .text(asset_json)
+            .extras(extras)
+            .build();
 
-        vec![HumanMessage::builder().content(content).build().into()]
+        vec![block.into()].into()
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -111,7 +97,7 @@ impl AssetFunctionality for YoutubeAsset {
         Some(ContextChip {
             id: self.id.clone(),
             name: title,
-            extension_id: "7c7b59bb-d44d-431a-9f4d-64240172e092".to_string(),
+            extension_id: YOUTUBE_EXTENSION_ID.to_string(),
             attrs: HashMap::new(),
             icon: None,
             position: Some(0),
@@ -152,6 +138,7 @@ impl From<NativeYoutubeAsset> for YoutubeAsset {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_chain_core::messages::ContentBlock;
 
     #[test]
     fn test_youtube_asset_creation() {
@@ -208,9 +195,9 @@ mod tests {
             vec![],
             0.0,
         );
-        let messages = AssetFunctionality::construct_messages(&asset);
-        assert_eq!(messages.len(), 1);
-        assert!(matches!(messages[0], AnyMessage::HumanMessage(_)));
+        let blocks = AssetFunctionality::construct_messages(&asset);
+        assert_eq!(blocks.len(), 1);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
         assert!(chip.is_some());
     }

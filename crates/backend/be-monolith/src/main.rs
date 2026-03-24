@@ -182,7 +182,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let assets_service = AssetService::new(db_manager.clone(), storage.clone());
     let (settings_tx, settings_rx) = be_local_settings::settings_channel();
 
-    let thread_service = ThreadService::new(db_manager.clone(), settings_rx);
+    let thread_service = ThreadService::new(db_manager.clone(), core_asset.clone(), settings_rx);
 
     tracing::info!("Starting gRPC server at {}", grpc_addr);
     tracing::info!("Starting HTTP server at {}", http_addr);

@@ -1,9 +1,8 @@
-use std::collections::HashMap;
-
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use async_trait::async_trait;
 use euro_native_messaging::NativeArticleAsset;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::{
     ActivityResult,
@@ -11,6 +10,8 @@ use crate::{
     storage::SaveableAsset,
     types::{AssetFunctionality, ContextChip},
 };
+
+const ARTICLE_EXTENSION_ID: &str = "309f0906-d48c-4439-9751-7bcf915cdfc5";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ArticleAsset {
@@ -53,18 +54,23 @@ impl AssetFunctionality for ArticleAsset {
         Some("article")
     }
 
-    fn construct_messages(&self) -> Vec<AnyMessage> {
-        let mut content = format!(
-            "The user is on a website titled '{}' and has a question about it.",
-            self.title
-        );
+    fn construct_messages(&self) -> ContentBlocks {
+        let asset_json = serde_json::to_string(&self).unwrap_or_default();
 
-        content.push_str(&format!(
-            " Here's the text content of the website: \n {}",
-            self.content
-        ));
+        let extras = HashMap::from([(
+            "asset_id".to_string(),
+            serde_json::json!(ARTICLE_EXTENSION_ID),
+        )]);
 
-        vec![HumanMessage::builder().content(content).build().into()]
+        let block = PlainTextContentBlock::builder()
+            .context(format!("Content of the website titled: '{}'", self.title))
+            .title(format!("{}.json", self.title))
+            .mime_type("application/json".to_string())
+            .text(asset_json)
+            .extras(extras)
+            .build();
+
+        vec![block.into()].into()
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -72,7 +78,7 @@ impl AssetFunctionality for ArticleAsset {
         Some(ContextChip {
             id: self.id.clone(),
             name,
-            extension_id: "309f0906-d48c-4439-9751-7bcf915cdfc5".to_string(),
+            extension_id: ARTICLE_EXTENSION_ID.to_string(),
             attrs: HashMap::new(),
             icon: None,
             position: Some(0),
@@ -113,6 +119,7 @@ impl From<NativeArticleAsset> for ArticleAsset {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_chain_core::messages::ContentBlock;
 
     #[test]
     fn test_article_asset_creation() {
@@ -151,10 +158,10 @@ mod tests {
             "Test Article".to_string(),
             "This is a test article with some content.".to_string(),
         );
-        let messages = AssetFunctionality::construct_messages(&asset);
-        let msg = messages[0].clone();
+        let blocks = AssetFunctionality::construct_messages(&asset);
+        assert_eq!(blocks.len(), 1);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, AnyMessage::HumanMessage(_)));
         assert!(chip.is_some());
     }
 }

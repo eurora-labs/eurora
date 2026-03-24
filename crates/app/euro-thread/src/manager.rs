@@ -2,16 +2,17 @@ use crate::{
     Thread,
     error::{Error, Result},
 };
+use agent_chain::messages::{ContentBlock, ContentBlocks};
 use agent_chain::{AnyMessage, HumanMessage, SystemMessage, messages::AIMessageChunk};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
-use proto_gen::agent_chain::{ProtoHumanMessage, ProtoSystemMessage};
+use proto_gen::agent_chain::{ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
     ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,
     GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
-    GetThreadRequest, ListThreadsRequest, SearchMessagesRequest, SearchMessagesResponse,
-    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest,
-    proto_thread_service_client::ProtoThreadServiceClient,
+    GetThreadRequest, ListThreadsRequest, SavePreliminaryContentBlocksRequest,
+    SearchMessagesRequest, SearchMessagesResponse, SearchThreadsRequest, SearchThreadsResponse,
+    SwitchBranchRequest, proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::watch;
@@ -261,21 +262,52 @@ impl ThreadManager {
             .await?;
         Ok(())
     }
+
+    pub async fn save_preliminary_content_blocks(
+        &mut self,
+        thread_id: String,
+        blocks: ContentBlocks,
+    ) -> Result<ContentBlocks> {
+        let mut client = self.client();
+        let proto_blocks: Vec<ProtoContentBlock> =
+            blocks.into_inner().into_iter().map(|b| b.into()).collect();
+
+        let response = client
+            .save_preliminary_content_blocks(SavePreliminaryContentBlocksRequest {
+                thread_id,
+                content_blocks: proto_blocks,
+            })
+            .await?
+            .into_inner();
+
+        let content_blocks: Vec<ContentBlock> = response
+            .content_blocks
+            .into_iter()
+            .map(ContentBlock::from)
+            .collect();
+
+        Ok(content_blocks.into())
+    }
 }
 
 impl ThreadManager {
     pub async fn chat_stream(
         &mut self,
         thread_id: String,
-        content: String,
+        content_blocks: ContentBlocks,
         parent_message_id: Option<String>,
         asset_chips_json: Option<String>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>> {
         let mut client = self.client();
+        let proto_blocks: Vec<ProtoContentBlock> = content_blocks
+            .into_inner()
+            .into_iter()
+            .map(|b| b.into())
+            .collect();
         let stream = client
             .chat_stream(ChatStreamRequest {
                 thread_id,
-                content,
+                content_blocks: proto_blocks,
                 parent_message_id,
                 asset_chips_json,
             })

@@ -1,15 +1,18 @@
 use agent_chain::SystemMessage;
+use agent_chain::messages::{ContentBlock, ImageContentBlock, PlainTextContentBlock};
 use agent_chain::openai::BuiltinTool;
 use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
 use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use proto_gen::agent_chain::ProtoAiMessageChunk;
+use proto_gen::agent_chain::ProtoContentBlock;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
 };
@@ -20,8 +23,9 @@ use proto_gen::thread::{
     GenerateThreadTitleRequest, GenerateThreadTitleResponse, GetMessageTreeRequest,
     GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
     ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, MessageTreeNode,
-    SearchMessageResult, SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult,
-    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest, Thread,
+    SavePreliminaryContentBlocksRequest, SavePreliminaryContentBlocksResponse, SearchMessageResult,
+    SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
+    SearchThreadsResponse, SwitchBranchRequest, Thread,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -168,11 +172,16 @@ fn build_env_fallback() -> Option<Providers> {
 
 pub struct ThreadService {
     db: Arc<DatabaseManager>,
+    asset_service: Arc<AssetService>,
     providers: Arc<RwLock<Option<Providers>>>,
 }
 
 impl ThreadService {
-    pub fn new(db: Arc<DatabaseManager>, mut settings_rx: SettingsReceiver) -> Self {
+    pub fn new(
+        db: Arc<DatabaseManager>,
+        asset_service: Arc<AssetService>,
+        mut settings_rx: SettingsReceiver,
+    ) -> Self {
         let env_fallback = build_env_fallback();
         tracing::info!(
             "Creating new ThreadService instance (env fallback: {})",
@@ -211,7 +220,11 @@ impl ThreadService {
             }
         });
 
-        Self { db, providers }
+        Self {
+            db,
+            asset_service,
+            providers,
+        }
     }
 
     fn get_chat_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
@@ -235,6 +248,87 @@ impl ThreadService {
     fn get_tools(&self) -> HashMap<String, Arc<dyn BaseTool>> {
         let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
         lock.as_ref().map(|p| p.tools.clone()).unwrap_or_default()
+    }
+
+    async fn upload_block_content(
+        &self,
+        name: &str,
+        content: &[u8],
+        mime_type: &str,
+        extras: &Option<HashMap<String, serde_json::Value>>,
+        user_id: Uuid,
+    ) -> Result<(String, String), Status> {
+        let asset_response = self
+            .asset_service
+            .create_asset(
+                proto_gen::asset::CreateAssetRequest {
+                    name: name.to_string(),
+                    content: content.to_vec(),
+                    mime_type: mime_type.to_string(),
+                    metadata: extras.as_ref().and_then(|e| serde_json::to_string(e).ok()),
+                    activity_id: None,
+                },
+                user_id,
+            )
+            .await
+            .map_err(|e| Status::internal(format!("Failed to save content block as asset: {e}")))?;
+
+        let asset_id = asset_response
+            .asset
+            .as_ref()
+            .map(|a| a.id.clone())
+            .unwrap_or_default();
+        let storage_uri = asset_response
+            .asset
+            .as_ref()
+            .map(|a| a.storage_uri.clone())
+            .unwrap_or_default();
+
+        Ok((asset_id, storage_uri))
+    }
+
+    async fn resolve_blocks(&self, messages: &mut [AnyMessage]) {
+        use base64::{Engine as _, engine::general_purpose};
+
+        let storage = self.asset_service.storage();
+        for message in messages.iter_mut() {
+            let content = match message {
+                AnyMessage::HumanMessage(m) => &mut m.content,
+                AnyMessage::SystemMessage(m) => &mut m.content,
+                _ => continue,
+            };
+            for block in content.iter_mut() {
+                match block {
+                    ContentBlock::PlainText(pt) if pt.text.is_none() => {
+                        let url = match pt.url.as_deref() {
+                            Some(u) => u,
+                            None => continue,
+                        };
+                        match storage.download(url).await {
+                            Ok(bytes) => {
+                                pt.text = Some(String::from_utf8_lossy(&bytes).into_owned());
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to download plain-text asset {url}: {e}");
+                            }
+                        }
+                    }
+                    ContentBlock::Image(img) if img.base64.is_none() && img.url.is_some() => {
+                        let url = img.url.as_deref().unwrap();
+                        match storage.download(url).await {
+                            Ok(bytes) => {
+                                img.base64 = Some(general_purpose::STANDARD.encode(&bytes));
+                                img.url = None;
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to download image asset {url}: {e}");
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn db_thread_to_proto(thread: be_remote_db::Thread) -> Thread {
@@ -344,7 +438,9 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-        let content = human_message.content.as_text();
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let message = self
             .db
@@ -385,7 +481,9 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let human_message: HumanMessage = proto_message.into();
-        let content = human_message.content.as_text();
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let message = self
             .db
@@ -427,7 +525,9 @@ impl ProtoThreadService for ThreadService {
             .ok_or_else(|| Status::invalid_argument("message field is required"))?;
 
         let system_message: SystemMessage = proto_message.into();
-        let content = system_message.content.as_text();
+        let content = serde_json::to_value(&system_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let message = self
             .db
@@ -545,14 +645,22 @@ impl ProtoThreadService for ThreadService {
             human_additional_kwargs.insert("asset_chips".to_string(), chips_value);
         }
 
+        let content_blocks: Vec<ContentBlock> = req
+            .content_blocks
+            .into_iter()
+            .map(ContentBlock::from)
+            .collect();
+
         let human_message = HumanMessage::builder()
-            .content(req.content.clone())
+            .content(content_blocks)
             .additional_kwargs(human_additional_kwargs)
             .build();
 
         messages.push(human_message.clone().into());
 
-        let content = human_message.content.as_text();
+        let content = serde_json::to_value(&human_message.content).map_err(|e| {
+            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
+        })?;
 
         let additional_kwargs =
             serde_json::to_value(&human_message.additional_kwargs).map_err(|e| {
@@ -573,6 +681,8 @@ impl ProtoThreadService for ThreadService {
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
+
+        self.resolve_blocks(&mut messages).await;
 
         let chat_provider = self.get_chat_provider()?;
         let tools = self.get_tools();
@@ -673,11 +783,13 @@ impl ProtoThreadService for ThreadService {
                     }])),
                 };
 
+                let content_value = serde_json::json!([{"type": "text", "text": full_content}]);
+
                 let save_result = db.create_message()
                     .thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
-                    .content(full_content.clone())
+                    .content(content_value)
                     .maybe_reasoning_blocks(reasoning_blocks)
                     .call()
                     .await;
@@ -1069,7 +1181,7 @@ impl ProtoThreadService for ThreadService {
                     id: n.id.to_string(),
                     parent_message_id: n.parent_message_id.map(|id| id.to_string()),
                     message_type: n.message_type.to_string(),
-                    content: n.content,
+                    content: serde_json::to_string(&n.content).unwrap_or_default(),
                     level: n.level as u32,
                     sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
                     sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
@@ -1154,5 +1266,103 @@ impl ProtoThreadService for ThreadService {
             .collect();
 
         Ok(Response::new(SearchMessagesResponse { results }))
+    }
+
+    async fn save_preliminary_content_blocks(
+        &self,
+        request: Request<SavePreliminaryContentBlocksRequest>,
+    ) -> Result<Response<SavePreliminaryContentBlocksResponse>, Status> {
+        tracing::info!("SavePreliminaryContentBlocks request received");
+
+        let claims = extract_claims(&request)?;
+        let user_id = parse_user_id(claims)?;
+        let req = request.into_inner();
+
+        let _thread_id =
+            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
+                field: "thread_id",
+                source: e,
+            })?;
+
+        let blocks: Vec<ContentBlock> = req
+            .content_blocks
+            .into_iter()
+            .map(ContentBlock::from)
+            .collect();
+
+        let mut result_blocks: Vec<ContentBlock> = Vec::with_capacity(blocks.len());
+
+        for block in blocks {
+            match block {
+                ContentBlock::PlainText(plain) if plain.text.is_some() => {
+                    let text = plain.text.as_ref().unwrap();
+                    let content = text.as_bytes().to_vec();
+                    let name = plain
+                        .title
+                        .clone()
+                        .unwrap_or_else(|| "content.json".to_string());
+
+                    let (asset_id, storage_uri) = self
+                        .upload_block_content(
+                            &name,
+                            &content,
+                            &plain.mime_type,
+                            &plain.extras,
+                            user_id,
+                        )
+                        .await?;
+
+                    let mutated = PlainTextContentBlock {
+                        text: None,
+                        file_id: Some(asset_id),
+                        url: Some(storage_uri),
+                        ..plain
+                    };
+
+                    result_blocks.push(ContentBlock::PlainText(mutated));
+                }
+                ContentBlock::Image(image) if image.base64.is_some() => {
+                    use base64::{Engine as _, engine::general_purpose};
+
+                    let b64 = image.base64.as_ref().unwrap();
+                    let content = general_purpose::STANDARD.decode(b64).map_err(|e| {
+                        Status::invalid_argument(format!("Invalid base64 in image block: {e}"))
+                    })?;
+                    let mime = image
+                        .mime_type
+                        .clone()
+                        .unwrap_or_else(|| "image/png".to_string());
+                    let name = format!(
+                        "image.{}",
+                        be_storage::StorageService::extension_from_mime(&mime)
+                    );
+
+                    let (asset_id, storage_uri) = self
+                        .upload_block_content(&name, &content, &mime, &image.extras, user_id)
+                        .await?;
+
+                    let mutated = ImageContentBlock {
+                        base64: None,
+                        file_id: Some(asset_id),
+                        url: Some(storage_uri),
+                        ..image
+                    };
+
+                    result_blocks.push(ContentBlock::Image(mutated));
+                }
+                other => {
+                    result_blocks.push(other);
+                }
+            }
+        }
+
+        let proto_blocks: Vec<ProtoContentBlock> = result_blocks
+            .into_iter()
+            .map(ProtoContentBlock::from)
+            .collect();
+
+        Ok(Response::new(SavePreliminaryContentBlocksResponse {
+            content_blocks: proto_blocks,
+        }))
     }
 }

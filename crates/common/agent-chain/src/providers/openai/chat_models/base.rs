@@ -67,7 +67,8 @@ use crate::language_models::ChatGenerationStream;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
 use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
 use crate::messages::{
-    AIMessage, AnyMessage, ContentBlock, ContentBlocks, InvalidToolCall, ToolCall,
+    AIMessage, AnyMessage, ContentBlock, ContentBlocks, InvalidToolCall, PlainTextContentBlock,
+    ToolCall,
 };
 use crate::outputs::ChatGenerationChunk;
 use crate::outputs::{ChatGeneration, ChatResult, LLMResult};
@@ -460,8 +461,24 @@ fn convert_to_openai_data_block(block: &serde_json::Value, api: &str) -> serde_j
 /// Convert ContentBlocks into a JSON value for the chat/completions API.
 /// If the content is plain text (single text block or empty), returns a JSON string.
 /// Otherwise returns the formatted array via `ChatOpenAI::format_message_content`.
+fn plain_text_block_to_text(pt: &PlainTextContentBlock) -> String {
+    if let Some(ref text) = pt.text {
+        return text.clone();
+    }
+    if let Some(ref ctx) = pt.context {
+        return ctx.clone();
+    }
+    pt.title.clone().unwrap_or_default()
+}
+
+fn has_plain_text_blocks(content: &ContentBlocks) -> bool {
+    content
+        .iter()
+        .any(|b| matches!(b, ContentBlock::PlainText(_)))
+}
+
 fn content_blocks_to_chat_completions(content: &ContentBlocks, role: &str) -> serde_json::Value {
-    if content.len() <= 1 && !content.has_images() {
+    if content.len() <= 1 && !content.has_images() && !has_plain_text_blocks(content) {
         return serde_json::json!(content.as_text());
     }
     let content_parts: Vec<serde_json::Value> = content
@@ -488,6 +505,9 @@ fn content_blocks_to_chat_completions(content: &ContentBlocks, role: &str) -> se
                 }
                 serde_json::json!({"type": "image_url", "image_url": image_url})
             }
+            ContentBlock::PlainText(pt) => {
+                serde_json::json!({"type": "text", "text": plain_text_block_to_text(pt)})
+            }
             other => serde_json::to_value(other).unwrap_or_default(),
         })
         .collect();
@@ -502,7 +522,7 @@ fn content_blocks_to_responses(
     role: &str,
     input: &mut Vec<serde_json::Value>,
 ) -> serde_json::Value {
-    if content.len() <= 1 && !content.has_images() {
+    if content.len() <= 1 && !content.has_images() && !has_plain_text_blocks(content) {
         return serde_json::json!(content.as_text());
     }
     let mut new_blocks = Vec::new();
@@ -510,6 +530,11 @@ fn content_blocks_to_responses(
         match block {
             ContentBlock::Text(t) => {
                 new_blocks.push(serde_json::json!({"type": "input_text", "text": t.text}));
+            }
+            ContentBlock::PlainText(pt) => {
+                new_blocks.push(
+                    serde_json::json!({"type": "input_text", "text": plain_text_block_to_text(pt)}),
+                );
             }
             ContentBlock::Image(img) => {
                 let url = if let Some(ref u) = img.url {

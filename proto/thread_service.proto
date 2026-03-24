@@ -23,6 +23,8 @@ service ProtoThreadService {
 
   rpc SearchThreads(SearchThreadsRequest) returns (SearchThreadsResponse);
   rpc SearchMessages(SearchMessagesRequest) returns (SearchMessagesResponse);
+
+  rpc SavePreliminaryContentBlocks(SavePreliminaryContentBlocksRequest) returns (SavePreliminaryContentBlocksResponse);
 }
 
 message CreateThreadRequest {
@@ -53,7 +55,7 @@ message ListThreadsResponse {
 
 message ChatStreamRequest {
   string thread_id = 1;
-  string content = 2;
+  repeated agent_chain.ProtoContentBlock content_blocks = 2;
   optional string parent_message_id = 3;
   optional string asset_chips_json = 4;
 }
@@ -190,4 +192,13 @@ message SearchMessageResult {
   float rank = 5;
   google.protobuf.Timestamp created_at = 6;
   string snippet = 7;
+}
+
+message SavePreliminaryContentBlocksRequest {
+  string thread_id = 1;
+  repeated agent_chain.ProtoContentBlock content_blocks = 2;
+}
+
+message SavePreliminaryContentBlocksResponse {
+  repeated agent_chain.ProtoContentBlock content_blocks = 1;
 }
