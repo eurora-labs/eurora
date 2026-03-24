@@ -1,5 +1,6 @@
-use agent_chain_core::messages::{ContentBlock, ImageContentBlock};
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::messages::{
+    ContentBlock, ContentBlocks, ImageContentBlock, PlainTextContentBlock,
+};
 use euro_native_messaging::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 
@@ -95,7 +96,23 @@ impl YoutubeSnapshot {
 }
 
 impl SnapshotFunctionality for YoutubeSnapshot {
-    fn construct_messages(&self) -> Vec<AnyMessage> {
+    fn construct_messages(&self) -> ContentBlocks {
+        let snapshot_json = serde_json::to_string(&self).unwrap_or_default();
+
+        let context = match &self.video_title {
+            Some(title) => format!("YouTube snapshot for '{}'", title),
+            None => "YouTube snapshot".to_string(),
+        };
+
+        let snapshot_block = PlainTextContentBlock::builder()
+            .context(context)
+            .title("youtube_snapshot.json".to_string())
+            .mime_type("application/json".to_string())
+            .text(snapshot_json)
+            .build();
+
+        let mut blocks: Vec<ContentBlock> = vec![snapshot_block.into()];
+
         if let Some(image) = &self.video_frame
             && !image.is_empty()
         {
@@ -104,20 +121,12 @@ impl SnapshotFunctionality for YoutubeSnapshot {
                 .mime_type("image/png".to_string())
                 .build()
             {
-                Ok(block) => vec![
-                    HumanMessage::builder()
-                        .content(vec![ContentBlock::Image(block)])
-                        .build()
-                        .into(),
-                ],
-                Err(e) => {
-                    tracing::warn!("Failed to create image block: {e}");
-                    vec![]
-                }
+                Ok(block) => blocks.push(ContentBlock::Image(block)),
+                Err(e) => tracing::warn!("Failed to create image block: {e}"),
             }
-        } else {
-            vec![]
         }
+
+        blocks.into()
     }
 
     fn get_updated_at(&self) -> u64 {

@@ -1,4 +1,4 @@
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -53,26 +53,26 @@ impl AssetFunctionality for DefaultAsset {
         Some("default")
     }
 
-    fn construct_messages(&self) -> Vec<AnyMessage> {
-        let mut content = format!(
-            "The user is working with an application called '{}'",
-            self.name
-        );
+    fn construct_messages(&self) -> ContentBlocks {
+        let asset_json = serde_json::to_string(&self).unwrap_or_default();
 
-        if let Some(description) = &self.description {
-            content.push_str(&format!(" - {}", description));
-        }
+        let extras = std::collections::HashMap::from([
+            ("type".to_string(), serde_json::json!("asset")),
+            ("kind".to_string(), serde_json::json!("default")),
+        ]);
 
-        if !self.metadata.is_empty() {
-            content.push_str(" with the following context:");
-            for (key, value) in &self.metadata {
-                content.push_str(&format!("\n- {}: {}", key, value));
-            }
-        }
+        let block = PlainTextContentBlock::builder()
+            .context(format!(
+                "The user is working with an application called '{}'",
+                self.name
+            ))
+            .title(format!("{}.json", self.name))
+            .mime_type("application/json".to_string())
+            .text(asset_json)
+            .extras(extras)
+            .build();
 
-        content.push_str(" and has a question about it.");
-
-        vec![HumanMessage::builder().content(content).build().into()]
+        vec![block.into()].into()
     }
 
     fn get_context_chip(&self) -> Option<ContextChip> {
@@ -107,6 +107,7 @@ impl SaveableAsset for DefaultAsset {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use agent_chain_core::messages::ContentBlock;
 
     #[test]
     fn test_default_asset_creation() {
@@ -149,10 +150,10 @@ mod tests {
             None,
             Some("A test application".to_string()),
         );
-        let messages = AssetFunctionality::construct_messages(&asset);
-        let msg = messages[0].clone();
+        let blocks = AssetFunctionality::construct_messages(&asset);
+        assert_eq!(blocks.len(), 1);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
         let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(matches!(msg, AnyMessage::HumanMessage(_)));
         assert!(chip.is_none());
     }
 }
