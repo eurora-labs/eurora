@@ -5,4 +5,5 @@ use specta::Type;
 pub struct NativeMetadata {
     pub url: Option<String>,
     pub icon_base64: Option<String>,
+    pub title: Option<String>,
 }

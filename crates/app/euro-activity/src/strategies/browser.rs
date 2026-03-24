@@ -27,8 +27,6 @@ pub use euro_browser::{
 #[derive(Clone, Default)]
 struct BrowserCache {
     metadata: Option<StrategyMetadata>,
-    asset: Option<ActivityAsset>,
-    snapshot: Option<ActivitySnapshot>,
 }
 
 type BrowserCacheMap = Arc<RwLock<HashMap<u32, BrowserCache>>>;
@@ -75,24 +73,11 @@ fn start_cache_task(service: &'static BrowserBridgeService) {
                     let mut map = cache.write().await;
                     let entry = map.entry(browser_pid).or_default();
 
-                    match event_frame.action.as_str() {
-                        "TAB_ACTIVATED" => {
-                            let NativeMessage::NativeMetadata(data) = native_message else {
-                                continue;
-                            };
-                            entry.metadata = Some(StrategyMetadata::from(data));
-                        }
-                        "ASSETS" => {
-                            if let Ok(asset) = ActivityAsset::try_from(native_message) {
-                                entry.asset = Some(asset);
-                            }
-                        }
-                        "SNAPSHOT" => {
-                            if let Ok(snapshot) = ActivitySnapshot::try_from(native_message) {
-                                entry.snapshot = Some(snapshot);
-                            }
-                        }
-                        _ => {}
+                    if event_frame.action.as_str() == "TAB_ACTIVATED" {
+                        let NativeMessage::NativeMetadata(data) = native_message else {
+                            continue;
+                        };
+                        entry.metadata = Some(StrategyMetadata::from(data));
                     }
                 }
                 result = disconnects_rx.recv() => {
@@ -192,77 +177,40 @@ impl BrowserStrategy {
                     }
                 };
 
-                match event_frame.action.as_str() {
-                    "TAB_ACTIVATED" => {
-                        let NativeMessage::NativeMetadata(data) = native_message else {
-                            continue;
-                        };
-                        let metadata = StrategyMetadata::from(data);
+                if event_frame.action.as_str() == "TAB_ACTIVATED" {
+                    let NativeMessage::NativeMetadata(data) = native_message else {
+                        continue;
+                    };
+                    let metadata = StrategyMetadata::from(data);
 
-                        let mut prev = last_url.lock().await;
-                        let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
-                            Ok(u) => u,
-                            Err(_) => continue,
-                        };
+                    let mut prev = last_url.lock().await;
+                    let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
+                        Ok(u) => u,
+                        Err(_) => continue,
+                    };
 
-                        if let Some(prev_url) = prev.take()
-                            && prev_url.domain() == url.domain()
-                        {
-                            *prev = Some(url);
-                            continue;
-                        }
+                    if let Some(prev_url) = prev.take()
+                        && prev_url.domain() == url.domain()
+                    {
                         *prev = Some(url);
-
-                        let icon = metadata.icon.clone();
-                        let url_str = metadata.url.clone().unwrap_or_default();
-
-                        let activity = Activity::new(url_str, icon, "".to_string(), vec![]);
-
-                        tracing::info!(
-                            "Creating new activity from event: browser_pid={}, name={}",
-                            browser_pid,
-                            activity.name
-                        );
-                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                            tracing::warn!("Failed to send new activity report - receiver dropped");
-                            break;
-                        }
+                        continue;
                     }
-                    "ASSETS" => {
-                        let asset = match ActivityAsset::try_from(native_message) {
-                            Ok(a) => a,
-                            Err(e) => {
-                                tracing::warn!("Failed to convert asset: {}", e);
-                                continue;
-                            }
-                        };
+                    *prev = Some(url);
 
-                        tracing::debug!("Received asset from browser PID {}", browser_pid);
-                        if sender.send(ActivityReport::Assets(vec![asset])).is_err() {
-                            tracing::warn!("Failed to send assets - receiver dropped");
-                            break;
-                        }
-                    }
-                    "SNAPSHOT" => {
-                        let snapshot = match ActivitySnapshot::try_from(native_message) {
-                            Ok(s) => s,
-                            Err(e) => {
-                                tracing::warn!("Failed to convert snapshot: {}", e);
-                                continue;
-                            }
-                        };
+                    let icon = metadata.icon.clone();
+                    let title = metadata.title.clone();
+                    let url_str = metadata.url.clone().unwrap_or_default();
 
-                        tracing::debug!("Received snapshot from browser PID {}", browser_pid);
-                        if sender
-                            .send(ActivityReport::Snapshots(vec![snapshot]))
-                            .is_err()
-                        {
-                            tracing::warn!("Failed to send snapshots - receiver dropped");
-                            break;
-                        }
-                    }
-                    other => {
-                        tracing::debug!("Ignoring unknown event action: {}", other);
+                    let activity = Activity::new(url_str, title, icon, "".to_string(), vec![]);
+
+                    tracing::info!(
+                        "Creating new activity from event: browser_pid={}, name={}",
+                        browser_pid,
+                        activity.name
+                    );
+                    if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                        tracing::warn!("Failed to send new activity report - receiver dropped");
+                        break;
                     }
                 }
             }
@@ -297,17 +245,12 @@ impl BrowserStrategy {
             }
             let activity = Activity::new(
                 metadata.url.unwrap_or_default(),
+                metadata.title,
                 metadata.icon,
                 process_name.to_string(),
                 vec![],
             );
             let _ = sender.send(ActivityReport::NewActivity(activity));
-        }
-        if let Some(asset) = cached.asset {
-            let _ = sender.send(ActivityReport::Assets(vec![asset]));
-        }
-        if let Some(snapshot) = cached.snapshot {
-            let _ = sender.send(ActivityReport::Snapshots(vec![snapshot]));
         }
         true
     }
@@ -336,27 +279,6 @@ impl BrowserStrategy {
         let payload = response.payload?;
         let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
         ActivitySnapshot::try_from(native_message).ok()
-    }
-
-    async fn request_assets_and_snapshots(&self) {
-        let Some(sender) = self.sender.clone() else {
-            return;
-        };
-        let Some(service) = self.bridge_service else {
-            return;
-        };
-
-        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
-        if browser_pid == 0 {
-            return;
-        }
-
-        if let Some(asset) = Self::fetch_asset(service, browser_pid).await {
-            let _ = sender.send(ActivityReport::Assets(vec![asset]));
-        }
-        if let Some(snapshot) = Self::fetch_snapshot(service, browser_pid).await {
-            let _ = sender.send(ActivityReport::Snapshots(vec![snapshot]));
-        }
     }
 
     async fn resolve_messenger_pid(&self, process_name: &str, fallback_pid: u32) -> u32 {
@@ -411,13 +333,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         self.init_collection().await?;
 
-        let cache_had_assets = {
-            let map = global_cache().read().await;
-            map.get(&messenger_pid)
-                .map(|c| c.asset.is_some())
-                .unwrap_or(false)
-        };
-
         if !Self::flush_cache(messenger_pid, &process_name, &sender, &self.last_url).await {
             match self.get_metadata().await {
                 Ok(metadata) => {
@@ -428,6 +343,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     }
                     let activity = Activity::new(
                         metadata.url.unwrap_or_default(),
+                        metadata.title,
                         metadata.icon,
                         process_name.clone(),
                         vec![],
@@ -439,6 +355,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 Err(err) => {
                     let activity = Activity::new(
                         focus_window.process_name.clone(),
+                        None,
                         focus_window.icon.clone(),
                         focus_window.process_name.clone(),
                         vec![],
@@ -449,9 +366,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                     tracing::warn!("Failed to get metadata: {}", err);
                 }
             }
-            self.request_assets_and_snapshots().await;
-        } else if !cache_had_assets {
-            self.request_assets_and_snapshots().await;
         }
 
         tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);

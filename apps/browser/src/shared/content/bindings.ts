@@ -46,6 +46,7 @@ export type NativeArticleSnapshot = {
 export type NativeMetadata = {
 	url: string | null;
 	icon_base64: string | null;
+	title: string | null;
 };
 
 export type NativeTwitterAsset = {

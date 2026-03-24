@@ -5,10 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::{
-    ActivityResult,
-    error::ActivityError,
-    storage::SaveableAsset,
-    types::{AssetFunctionality, ContextChip},
+    ActivityResult, error::ActivityError, storage::SaveableAsset, types::AssetFunctionality,
 };
 
 const YOUTUBE_EXTENSION_ID: &str = "7c7b59bb-d44d-431a-9f4d-64240172e092";
@@ -91,19 +88,6 @@ impl AssetFunctionality for YoutubeAsset {
         vec![block.into()].into()
     }
 
-    fn get_context_chip(&self) -> Option<ContextChip> {
-        let title: String = self.title.chars().take(50).collect();
-
-        Some(ContextChip {
-            id: self.id.clone(),
-            name: title,
-            extension_id: YOUTUBE_EXTENSION_ID.to_string(),
-            attrs: HashMap::new(),
-            icon: None,
-            position: Some(0),
-        })
-    }
-
     fn get_id(&self) -> &str {
         &self.id
     }
@@ -170,22 +154,6 @@ mod tests {
     }
 
     #[test]
-    fn test_context_chip() {
-        let asset = YoutubeAsset::new(
-            "test-id".to_string(),
-            "https://youtube.com/watch?v=test".to_string(),
-            "Test V".to_string(),
-            vec![],
-            0.0,
-        );
-
-        let chip = asset.get_context_chip().unwrap();
-        assert_eq!(chip.id, "test-id");
-        assert_eq!(chip.name, "Test V");
-        assert_eq!(chip.extension_id, "7c7b59bb-d44d-431a-9f4d-64240172e092");
-    }
-
-    #[test]
     fn trait_methods_work() {
         use crate::types::AssetFunctionality;
         let asset = YoutubeAsset::new(
@@ -198,7 +166,5 @@ mod tests {
         let blocks = AssetFunctionality::construct_messages(&asset);
         assert_eq!(blocks.len(), 1);
         assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
-        let chip = AssetFunctionality::get_context_chip(&asset);
-        assert!(chip.is_some());
     }
 }

@@ -1,4 +1,5 @@
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
+import { sendMessageWithRetry } from './messaging';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
 import { getCurrentTabIcon } from './tabs';
 import { isSafari } from './util';
@@ -93,6 +94,12 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 			}
 			return await onActionMetadata(frame);
 
+		case 'GET_ASSETS':
+			return await onActionContentData(frame, 'GENERATE_ASSETS');
+
+		case 'GET_SNAPSHOT':
+			return await onActionContentData(frame, 'GENERATE_SNAPSHOT');
+
 		default:
 			return {
 				kind: {
@@ -104,6 +111,47 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 					},
 				},
 			} as Frame;
+	}
+}
+
+async function onActionContentData(frame: RequestFrame, messageType: string): Promise<Frame> {
+	try {
+		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+
+		if (!activeTab || !activeTab.id) {
+			return {
+				kind: {
+					Response: {
+						id: frame.id,
+						action: frame.action,
+						payload: JSON.stringify({ kind: 'Error', data: 'No active tab found' }),
+					},
+				},
+			} as Frame;
+		}
+
+		const contentResponse = await sendMessageWithRetry(activeTab.id, { type: messageType });
+
+		return {
+			kind: {
+				Response: {
+					id: frame.id,
+					action: frame.action,
+					payload: JSON.stringify(contentResponse),
+				},
+			},
+		} as Frame;
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		return {
+			kind: {
+				Response: {
+					id: frame.id,
+					action: frame.action,
+					payload: JSON.stringify({ kind: 'Error', data: errorMessage }),
+				},
+			},
+		} as Frame;
 	}
 }
 
@@ -119,6 +167,7 @@ async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 			data: {
 				url: activeTab?.url,
 				icon_base64: iconBase64,
+				title: activeTab?.title ?? null,
 			},
 		}),
 	};

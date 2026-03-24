@@ -57,13 +57,11 @@ impl TimelineManager {
         Ok(())
     }
 
-    pub async fn get_context_chips(&self) -> Vec<ContextChip> {
+    pub async fn get_context_chip(&self) -> Option<ContextChip> {
         let storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_current_activity() {
-            activity.get_context_chips()
-        } else {
-            Vec::new()
-        }
+        storage
+            .get_current_activity()
+            .map(|activity| activity.get_context_chip())
     }
 
     pub async fn save_assets_to_service_by_ids(
