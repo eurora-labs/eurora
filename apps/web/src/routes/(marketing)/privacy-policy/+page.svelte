@@ -3,6 +3,14 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 </script>
 
+<svelte:head>
+	<title>Privacy Policy — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Eurora Labs privacy policy. Learn how we collect, use, and protect your data. GDPR-compliant, EU-hosted, open-source, with no data sold to third parties."
+	/>
+</svelte:head>
+
 <div class="container mx-auto max-w-4xl px-4 py-16">
 	<div class="mb-12 text-center">
 		<h1 class="mb-2 text-4xl font-bold">Privacy Policy</h1>

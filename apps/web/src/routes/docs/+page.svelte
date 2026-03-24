@@ -3,6 +3,14 @@
 	import 'svelte-medium-image-zoom/dist/styles.css';
 </script>
 
+<svelte:head>
+	<title>Documentation — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Eurora documentation. Get started with the context-aware, cross-platform, open-source AI assistant that integrates with your browser and operating system."
+	/>
+</svelte:head>
+
 <div>
 	<h1 class="mb-4 text-4xl font-bold">Welcome to Eurora</h1>
 	<p class="mb-12 text-lg text-muted-foreground">
