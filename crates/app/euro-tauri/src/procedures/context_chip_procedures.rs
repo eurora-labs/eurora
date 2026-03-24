@@ -22,9 +22,6 @@ impl ContextChipApi for ContextChipApiImpl {
             .ok_or_else(|| "Timeline not available".to_string())?;
         let timeline = timeline_state.lock().await;
 
-        let activities = timeline.get_context_chips().await;
-        let limited_activities = activities.into_iter().take(5).collect();
-
-        Ok(limited_activities)
+        Ok(timeline.get_context_chip().await.into_iter().collect())
     }
 }

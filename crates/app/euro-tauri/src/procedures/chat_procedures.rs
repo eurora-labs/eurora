@@ -60,9 +60,8 @@ impl ChatApi for ChatApiImpl {
 
             if timeline.save_current_activity_to_service().await.is_ok() && !query.assets.is_empty()
             {
-                let chips = timeline.get_context_chips().await;
-                if !chips.is_empty() {
-                    asset_chips_json = serde_json::to_string(&chips).ok();
+                if let Some(chip) = timeline.get_context_chip().await {
+                    asset_chips_json = serde_json::to_string(&vec![chip]).ok();
                 }
 
                 let mut all_blocks = ContentBlocks::new();

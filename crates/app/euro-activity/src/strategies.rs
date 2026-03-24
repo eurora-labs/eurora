@@ -26,14 +26,13 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 pub struct StrategyMetadata {
     pub url: Option<String>,
+    pub title: Option<String>,
     pub icon: Option<Arc<image::RgbaImage>>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ActivityReport {
     NewActivity(Activity),
-    Snapshots(Vec<ActivitySnapshot>),
-    Assets(Vec<ActivityAsset>),
     Stopping,
 }
 
@@ -58,6 +57,7 @@ impl From<NativeMetadata> for StrategyMetadata {
         };
         StrategyMetadata {
             url: metadata.url,
+            title: metadata.title,
             icon,
         }
     }
