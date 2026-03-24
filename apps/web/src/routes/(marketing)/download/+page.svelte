@@ -44,6 +44,14 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Download — Eurora Labs</title>
+	<meta
+		name="description"
+		content="Download Eurora for free on macOS, Windows, or Linux. A private, open-source AI assistant with browser integration for Chrome, Firefox, Edge, and Safari."
+	/>
+</svelte:head>
+
 <div class="mx-auto flex w-full max-w-5xl flex-col items-center gap-16 px-4 py-24">
 	<section class="flex flex-col items-center gap-6 text-center">
 		<p class="text-sm font-medium uppercase tracking-widest text-primary">Free & Open Source</p>
