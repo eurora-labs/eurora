@@ -1,202 +1,44 @@
+use std::collections::HashSet;
+use std::fmt::Write;
+
 use serde_json::{Value, json};
-use std::collections::{HashMap, HashSet};
 
 use crate::messages::content::KNOWN_BLOCK_TYPES;
-use crate::{is_openai_data_block, parse_data_uri};
 
-fn hex_encode(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+pub struct OpenAiContext {
+    pub tool_calls: Vec<Value>,
+    pub tool_call_chunks: Vec<Value>,
+    pub invalid_tool_calls: Vec<Value>,
+    pub additional_kwargs: Value,
+    pub response_metadata: Value,
+    pub message_id: Option<String>,
+    pub chunk_position: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OpenAiApi {
-    #[default]
-    ChatCompletions,
-    Responses,
+fn to_hex(bytes: &[u8]) -> String {
+    let mut hex_string = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(hex_string, "{byte:02x}");
+    }
+    hex_string
 }
 
-const FUNCTION_CALL_IDS_MAP_KEY: &str = "__openai_function_call_ids__";
-
-pub fn convert_to_openai_image_block(block: &Value) -> Result<Value, String> {
-    if let Some(url) = block.get("url").and_then(|v| v.as_str()) {
-        return Ok(json!({
-            "type": "image_url",
-            "image_url": {
-                "url": url
-            }
-        }));
+fn populate_extras(standard_block: &mut Value, block: &Value, known_fields: &HashSet<&str>) {
+    if standard_block.get("type").and_then(|v| v.as_str()) == Some("non_standard") {
+        return;
     }
 
-    let is_base64 = block.get("base64").is_some()
-        || block.get("source_type").and_then(|v| v.as_str()) == Some("base64");
-
-    if is_base64 {
-        let mime_type = block
-            .get("mime_type")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| "mime_type key is required for base64 data.".to_string())?;
-
-        let base64_data = if block.get("data").is_some() {
-            block.get("data").and_then(|v| v.as_str()).unwrap_or("")
-        } else {
-            block.get("base64").and_then(|v| v.as_str()).unwrap_or("")
-        };
-
-        return Ok(json!({
-            "type": "image_url",
-            "image_url": {
-                "url": format!("data:{};base64,{}", mime_type, base64_data)
-            }
-        }));
-    }
-
-    Err("Unsupported source type. Only 'url' and 'base64' are supported.".to_string())
-}
-
-pub fn convert_to_openai_data_block(block: &Value, api: OpenAiApi) -> Result<Value, String> {
-    let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
-
-    match block_type {
-        "image" => {
-            let chat_completions_block = convert_to_openai_image_block(block)?;
-
-            if api == OpenAiApi::Responses {
-                let mut formatted_block = json!({
-                    "type": "input_image",
-                    "image_url": chat_completions_block["image_url"]["url"]
-                });
-
-                if let Some(detail) = chat_completions_block
-                    .get("image_url")
-                    .and_then(|v| v.get("detail"))
-                {
-                    formatted_block["detail"] = detail.clone();
-                }
-
-                Ok(formatted_block)
-            } else {
-                Ok(chat_completions_block)
-            }
-        }
-
-        "file" => {
-            let is_base64 = block.get("source_type").and_then(|v| v.as_str()) == Some("base64")
-                || block.get("base64").is_some();
-
-            if is_base64 {
-                let base64_data = if block.get("source_type").is_some() {
-                    block.get("data").and_then(|v| v.as_str()).unwrap_or("")
-                } else {
-                    block.get("base64").and_then(|v| v.as_str()).unwrap_or("")
-                };
-
-                let mime_type = block
-                    .get("mime_type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-
-                let mut file = json!({
-                    "file_data": format!("data:{};base64,{}", mime_type, base64_data)
-                });
-
-                if let Some(filename) = block.get("filename").and_then(|v| v.as_str()) {
-                    file["filename"] = json!(filename);
-                } else if let Some(extras) = block.get("extras").and_then(|v| v.as_object()) {
-                    if let Some(filename) = extras.get("filename").and_then(|v| v.as_str()) {
-                        file["filename"] = json!(filename);
-                    }
-                } else if let Some(metadata) = block.get("metadata").and_then(|v| v.as_object()) {
-                    if let Some(filename) = metadata.get("filename").and_then(|v| v.as_str()) {
-                        file["filename"] = json!(filename);
-                    }
-                } else {
-                    tracing::warn!(
-                        "OpenAI may require a filename for file uploads. Specify a filename \
-                         in the content block, e.g.: {{'type': 'file', 'mime_type': \
-                         '...', 'base64': '...', 'filename': 'my-file.pdf'}}"
-                    );
-                }
-
-                let formatted_block = json!({"type": "file", "file": file});
-
-                if api == OpenAiApi::Responses {
-                    let mut response_block = json!({"type": "input_file"});
-                    if let Some(file_obj) = formatted_block.get("file").and_then(|v| v.as_object())
-                    {
-                        for (key, value) in file_obj {
-                            response_block[key] = value.clone();
-                        }
-                    }
-                    Ok(response_block)
-                } else {
-                    Ok(formatted_block)
-                }
-            } else if block.get("source_type").and_then(|v| v.as_str()) == Some("id")
-                || block.get("file_id").is_some()
+    if let Some(block_obj) = block.as_object() {
+        for (key, value) in block_obj {
+            if !known_fields.contains(key.as_str())
+                && let Some(obj) = standard_block.as_object_mut()
             {
-                let file_id = if block.get("source_type").is_some() {
-                    block.get("id").and_then(|v| v.as_str()).unwrap_or("")
-                } else {
-                    block.get("file_id").and_then(|v| v.as_str()).unwrap_or("")
-                };
-
-                let formatted_block = json!({
-                    "type": "file",
-                    "file": {"file_id": file_id}
-                });
-
-                if api == OpenAiApi::Responses {
-                    Ok(json!({
-                        "type": "input_file",
-                        "file_id": file_id
-                    }))
-                } else {
-                    Ok(formatted_block)
+                let extras = obj.entry("extras").or_insert_with(|| json!({}));
+                if let Some(extras_obj) = extras.as_object_mut() {
+                    extras_obj.insert(key.clone(), value.clone());
                 }
-            } else if block.get("url").is_some() {
-                if api == OpenAiApi::ChatCompletions {
-                    return Err("OpenAI Chat Completions does not support file URLs.".to_string());
-                }
-                let url = block.get("url").and_then(|v| v.as_str()).unwrap_or("");
-                Ok(json!({
-                    "type": "input_file",
-                    "file_url": url
-                }))
-            } else {
-                Err("Keys base64, url, or file_id required for file blocks.".to_string())
             }
         }
-
-        "audio" => {
-            let is_base64 = block.get("base64").is_some()
-                || block.get("source_type").and_then(|v| v.as_str()) == Some("base64");
-
-            if is_base64 {
-                let base64_data = if block.get("source_type").is_some() {
-                    block.get("data").and_then(|v| v.as_str()).unwrap_or("")
-                } else {
-                    block.get("base64").and_then(|v| v.as_str()).unwrap_or("")
-                };
-
-                let mime_type = block
-                    .get("mime_type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let audio_format = mime_type.split('/').next_back().unwrap_or("");
-
-                Ok(json!({
-                    "type": "input_audio",
-                    "input_audio": {
-                        "data": base64_data,
-                        "format": audio_format
-                    }
-                }))
-            } else {
-                Err("Key base64 is required for audio blocks.".to_string())
-            }
-        }
-
-        _ => Err(format!("Block of type {} is not supported.", block_type)),
     }
 }
 
@@ -204,182 +46,197 @@ fn extract_extras(block: &Value, known_keys: &HashSet<&str>) -> Value {
     let mut extras = json!({});
     if let Some(obj) = block.as_object() {
         for (key, value) in obj {
-            if !known_keys.contains(key.as_str()) {
-                extras[key] = value.clone();
+            if !known_keys.contains(key.as_str())
+                && let Some(extras_obj) = extras.as_object_mut()
+            {
+                extras_obj.insert(key.clone(), value.clone());
             }
         }
     }
     extras
 }
 
-pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
+fn parse_data_uri(uri: &str) -> Option<(String, String)> {
+    let stripped = uri.strip_prefix("data:")?;
+    let (mime_and_encoding, data) = stripped.split_once(',')?;
+    let mime_type = mime_and_encoding.strip_suffix(";base64")?;
+    if mime_type.is_empty() || data.is_empty() {
+        return None;
+    }
+    Some((mime_type.to_string(), data.to_string()))
+}
+
+fn is_openai_data_block(block: &Value) -> bool {
+    let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+    match block_type {
+        "image_url" => {
+            if let Some(image_url) = block.get("image_url").and_then(|v| v.as_object()) {
+                image_url.get("url").and_then(|v| v.as_str()).is_some()
+            } else {
+                false
+            }
+        }
+        "input_audio" => {
+            if let Some(audio) = block.get("input_audio").and_then(|v| v.as_object()) {
+                audio.get("data").and_then(|v| v.as_str()).is_some()
+                    && audio.get("format").and_then(|v| v.as_str()).is_some()
+            } else {
+                false
+            }
+        }
+        "file" => {
+            if let Some(file) = block.get("file").and_then(|v| v.as_object()) {
+                file.get("file_data").and_then(|v| v.as_str()).is_some()
+                    || file.get("file_id").and_then(|v| v.as_str()).is_some()
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+fn convert_openai_format_to_data_block(block: &Value) -> Value {
     let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
     if block_type == "image_url"
         && let Some(image_url) = block.get("image_url").and_then(|v| v.as_object())
         && let Some(url) = image_url.get("url").and_then(|v| v.as_str())
     {
-        if let Some(parsed) = parse_data_uri(url) {
-            let known_keys: HashSet<&str> = ["type", "image_url"].iter().copied().collect();
-            let extras = extract_extras(block, &known_keys);
+        let top_known: HashSet<&str> = ["type", "image_url"].iter().copied().collect();
+        let mut all_extras = extract_extras(block, &top_known);
 
-            let image_url_known_keys: HashSet<&str> = ["url"].iter().copied().collect();
-            let image_url_extras = extract_extras(&json!(image_url), &image_url_known_keys);
-
-            let mut all_extras = extras.as_object().cloned().unwrap_or_default();
-            if let Some(image_url_obj) = image_url_extras.as_object() {
-                for (key, value) in image_url_obj {
-                    if key == "detail" {
-                        all_extras.insert("detail".to_string(), value.clone());
-                    } else {
-                        all_extras.insert(format!("image_url_{}", key), value.clone());
-                    }
+        let url_known: HashSet<&str> = ["url"].iter().copied().collect();
+        let url_extras = extract_extras(&json!(image_url), &url_known);
+        if let Some(url_extras_obj) = url_extras.as_object() {
+            for (key, value) in url_extras_obj {
+                let prefixed_key = if key == "detail" {
+                    "detail".to_string()
+                } else {
+                    format!("image_url_{key}")
+                };
+                if let Some(all_obj) = all_extras.as_object_mut() {
+                    all_obj.insert(prefixed_key, value.clone());
                 }
             }
-
-            let mut result = json!({
-                "type": "image",
-                "base64": parsed.data,
-                "mime_type": parsed.mime_type
-            });
-
-            if !all_extras.is_empty() {
-                result["extras"] = json!(all_extras);
-            }
-
-            return result;
-        } else {
-            let known_keys: HashSet<&str> = ["type", "image_url"].iter().copied().collect();
-            let extras = extract_extras(block, &known_keys);
-
-            let image_url_known_keys: HashSet<&str> = ["url"].iter().copied().collect();
-            let image_url_extras = extract_extras(&json!(image_url), &image_url_known_keys);
-
-            let mut all_extras = extras.as_object().cloned().unwrap_or_default();
-            if let Some(image_url_obj) = image_url_extras.as_object() {
-                for (key, value) in image_url_obj {
-                    if key == "detail" {
-                        all_extras.insert("detail".to_string(), value.clone());
-                    } else {
-                        all_extras.insert(format!("image_url_{}", key), value.clone());
-                    }
-                }
-            }
-
-            let mut result = json!({
-                "type": "image",
-                "url": url
-            });
-
-            if !all_extras.is_empty() {
-                result["extras"] = json!(all_extras);
-            }
-
-            return result;
         }
+
+        if let Some((mime_type, data)) = parse_data_uri(url) {
+            let mut image_block = json!({
+                "type": "image",
+                "base64": data,
+                "mime_type": mime_type,
+            });
+            if let Some(extras_obj) = all_extras.as_object()
+                && !extras_obj.is_empty()
+            {
+                image_block["extras"] = all_extras;
+            }
+            return image_block;
+        }
+
+        let mut image_block = json!({
+            "type": "image",
+            "url": url,
+        });
+        if let Some(extras_obj) = all_extras.as_object()
+            && !extras_obj.is_empty()
+        {
+            image_block["extras"] = all_extras;
+        }
+        return image_block;
     }
 
     if block_type == "input_audio"
-        && let Some(input_audio) = block.get("input_audio").and_then(|v| v.as_object())
+        && let Some(audio) = block.get("input_audio").and_then(|v| v.as_object())
     {
-        let known_keys: HashSet<&str> = ["type", "input_audio"].iter().copied().collect();
-        let extras = extract_extras(block, &known_keys);
+        let top_known: HashSet<&str> = ["type", "input_audio"].iter().copied().collect();
+        let mut all_extras = extract_extras(block, &top_known);
 
-        let audio_known_keys: HashSet<&str> = ["data", "format"].iter().copied().collect();
-        let audio_extras = extract_extras(&json!(input_audio), &audio_known_keys);
-
-        let mut all_extras = extras.as_object().cloned().unwrap_or_default();
-        if let Some(audio_obj) = audio_extras.as_object() {
-            for (key, value) in audio_obj {
-                all_extras.insert(format!("audio_{}", key), value.clone());
+        let audio_known: HashSet<&str> = ["data", "format"].iter().copied().collect();
+        let audio_extras = extract_extras(&json!(audio), &audio_known);
+        if let Some(audio_extras_obj) = audio_extras.as_object() {
+            for (key, value) in audio_extras_obj {
+                if let Some(all_obj) = all_extras.as_object_mut() {
+                    all_obj.insert(format!("audio_{key}"), value.clone());
+                }
             }
         }
 
-        let data = input_audio
-            .get("data")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let format = input_audio
-            .get("format")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let audio_data = audio.get("data").and_then(|v| v.as_str()).unwrap_or("");
+        let audio_format = audio.get("format").and_then(|v| v.as_str()).unwrap_or("");
 
-        let mut result = json!({
+        let mut audio_block = json!({
             "type": "audio",
-            "base64": data,
-            "mime_type": format!("audio/{}", format)
+            "base64": audio_data,
+            "mime_type": format!("audio/{audio_format}"),
         });
-
-        if !all_extras.is_empty() {
-            result["extras"] = json!(all_extras);
+        if let Some(extras_obj) = all_extras.as_object()
+            && !extras_obj.is_empty()
+        {
+            audio_block["extras"] = all_extras;
         }
-
-        return result;
+        return audio_block;
     }
 
     if block_type == "file"
         && let Some(file) = block.get("file").and_then(|v| v.as_object())
     {
-        if file.get("file_id").is_some() {
-            let known_keys: HashSet<&str> = ["type", "file"].iter().copied().collect();
-            let extras = extract_extras(block, &known_keys);
+        let top_known: HashSet<&str> = ["type", "file"].iter().copied().collect();
 
-            let file_known_keys: HashSet<&str> = ["file_id"].iter().copied().collect();
-            let file_extras = extract_extras(&json!(file), &file_known_keys);
-
-            let mut all_extras = extras.as_object().cloned().unwrap_or_default();
-            if let Some(file_obj) = file_extras.as_object() {
-                for (key, value) in file_obj {
-                    all_extras.insert(format!("file_{}", key), value.clone());
+        if let Some(file_id) = file.get("file_id").and_then(|v| v.as_str()) {
+            let mut all_extras = extract_extras(block, &top_known);
+            let file_known: HashSet<&str> = ["file_id"].iter().copied().collect();
+            let file_extras = extract_extras(&json!(file), &file_known);
+            if let Some(file_extras_obj) = file_extras.as_object() {
+                for (key, value) in file_extras_obj {
+                    if let Some(all_obj) = all_extras.as_object_mut() {
+                        all_obj.insert(format!("file_{key}"), value.clone());
+                    }
                 }
             }
 
-            let file_id = file.get("file_id").and_then(|v| v.as_str()).unwrap_or("");
-
-            let mut result = json!({
+            let mut file_block = json!({
                 "type": "file",
-                "file_id": file_id
+                "file_id": file_id,
             });
-
-            if !all_extras.is_empty() {
-                result["extras"] = json!(all_extras);
+            if let Some(extras_obj) = all_extras.as_object()
+                && !extras_obj.is_empty()
+            {
+                file_block["extras"] = all_extras;
             }
-
-            return result;
+            return file_block;
         }
 
         if let Some(file_data) = file.get("file_data").and_then(|v| v.as_str())
-            && let Some(parsed) = parse_data_uri(file_data)
+            && let Some((_mime_type, data)) = parse_data_uri(file_data)
         {
-            let known_keys: HashSet<&str> = ["type", "file"].iter().copied().collect();
-            let extras = extract_extras(block, &known_keys);
-
-            let file_known_keys: HashSet<&str> =
-                ["file_data", "filename"].iter().copied().collect();
-            let file_extras = extract_extras(&json!(file), &file_known_keys);
-
-            let mut all_extras = extras.as_object().cloned().unwrap_or_default();
-            if let Some(file_obj) = file_extras.as_object() {
-                for (key, value) in file_obj {
-                    all_extras.insert(format!("file_{}", key), value.clone());
+            let mut all_extras = extract_extras(block, &top_known);
+            let file_known: HashSet<&str> = ["file_data", "filename"].iter().copied().collect();
+            let file_extras = extract_extras(&json!(file), &file_known);
+            if let Some(file_extras_obj) = file_extras.as_object() {
+                for (key, value) in file_extras_obj {
+                    if let Some(all_obj) = all_extras.as_object_mut() {
+                        all_obj.insert(format!("file_{key}"), value.clone());
+                    }
                 }
             }
 
-            if let Some(filename) = file.get("filename") {
-                all_extras.insert("filename".to_string(), filename.clone());
-            }
-
-            let mut result = json!({
+            let mut file_block = json!({
                 "type": "file",
-                "base64": parsed.data,
-                "mime_type": parsed.mime_type,
+                "base64": data,
+                "mime_type": "application/pdf",
             });
-
-            if !all_extras.is_empty() {
-                result["extras"] = json!(all_extras);
+            if let Some(filename) = file.get("filename").and_then(|v| v.as_str()) {
+                file_block["filename"] = json!(filename);
             }
-
-            return result;
+            if let Some(extras_obj) = all_extras.as_object()
+                && !extras_obj.is_empty()
+            {
+                file_block["extras"] = all_extras;
+            }
+            return file_block;
         }
     }
 
@@ -387,9 +244,12 @@ pub fn convert_openai_format_to_data_block(block: &Value) -> Value {
 }
 
 fn convert_annotation_to_v1(annotation: &Value) -> Value {
-    let annotation_type = annotation.get("type").and_then(|v| v.as_str());
+    let annotation_type = annotation
+        .get("type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
-    if annotation_type == Some("url_citation") {
+    if annotation_type == "url_citation" {
         let known_fields: HashSet<&str> = [
             "type",
             "url",
@@ -402,33 +262,35 @@ fn convert_annotation_to_v1(annotation: &Value) -> Value {
         .copied()
         .collect();
 
-        let mut url_citation = json!({"type": "citation"});
-
+        let mut citation = json!({"type": "citation"});
+        if let Some(url) = annotation.get("url") {
+            citation["url"] = url.clone();
+        }
         for field in ["end_index", "start_index", "title"] {
             if let Some(value) = annotation.get(field) {
-                url_citation[field] = value.clone();
+                citation[field] = value.clone();
             }
         }
 
-        if let Some(url) = annotation.get("url") {
-            url_citation["url"] = url.clone();
-        }
-
-        if let Some(obj) = annotation.as_object() {
-            for (field, value) in obj {
-                if !known_fields.contains(field.as_str()) {
-                    if url_citation.get("extras").is_none() {
-                        url_citation["extras"] = json!({});
+        if let Some(annotation_obj) = annotation.as_object() {
+            for (key, value) in annotation_obj {
+                if !known_fields.contains(key.as_str()) {
+                    let extras = citation
+                        .as_object_mut()
+                        .expect("citation should be an object")
+                        .entry("extras")
+                        .or_insert_with(|| json!({}));
+                    if let Some(extras_obj) = extras.as_object_mut() {
+                        extras_obj.insert(key.clone(), value.clone());
                     }
-                    url_citation["extras"][field] = value.clone();
                 }
             }
         }
 
-        return url_citation;
+        return citation;
     }
 
-    if annotation_type == Some("file_citation") {
+    if annotation_type == "file_citation" {
         let known_fields: HashSet<&str> = [
             "type",
             "title",
@@ -441,29 +303,32 @@ fn convert_annotation_to_v1(annotation: &Value) -> Value {
         .copied()
         .collect();
 
-        let mut document_citation = json!({"type": "citation"});
-
+        let mut citation = json!({"type": "citation"});
         if let Some(filename) = annotation.get("filename") {
-            document_citation["title"] = filename.clone();
+            citation["title"] = filename.clone();
         }
 
-        if let Some(obj) = annotation.as_object() {
-            for (field, value) in obj {
-                if !known_fields.contains(field.as_str()) {
-                    if document_citation.get("extras").is_none() {
-                        document_citation["extras"] = json!({});
+        if let Some(annotation_obj) = annotation.as_object() {
+            for (key, value) in annotation_obj {
+                if !known_fields.contains(key.as_str()) {
+                    let extras = citation
+                        .as_object_mut()
+                        .expect("citation should be an object")
+                        .entry("extras")
+                        .or_insert_with(|| json!({}));
+                    if let Some(extras_obj) = extras.as_object_mut() {
+                        extras_obj.insert(key.clone(), value.clone());
                     }
-                    document_citation["extras"][field] = value.clone();
                 }
             }
         }
 
-        return document_citation;
+        return citation;
     }
 
     json!({
         "type": "non_standard_annotation",
-        "value": annotation.clone()
+        "value": annotation.clone(),
     })
 }
 
@@ -477,135 +342,139 @@ fn explode_reasoning(block: &Value) -> Vec<Value> {
         .copied()
         .collect();
 
-    let mut block = block.clone();
-
-    let unknown_fields: Vec<String> = block
-        .as_object()
-        .map(|obj| {
-            obj.keys()
-                .filter(|k| *k != "summary" && !known_fields.contains(k.as_str()))
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default();
-
-    if !unknown_fields.is_empty() {
-        block["extras"] = json!({});
-        for field in &unknown_fields {
-            if let Some(value) = block.get(field).cloned() {
-                block["extras"][field] = value;
-            }
-        }
-        if let Some(obj) = block.as_object_mut() {
-            for field in &unknown_fields {
-                obj.remove(field);
+    let mut extras = json!({});
+    if let Some(block_obj) = block.as_object() {
+        for (key, value) in block_obj {
+            if key != "summary"
+                && !known_fields.contains(key.as_str())
+                && let Some(extras_obj) = extras.as_object_mut()
+            {
+                extras_obj.insert(key.clone(), value.clone());
             }
         }
     }
+    let has_extras = extras.as_object().map(|o| !o.is_empty()).unwrap_or(false);
 
-    let summary_clone = block.get("summary").and_then(|v| v.as_array()).cloned();
-
-    let summary = match summary_clone {
-        Some(ref s) if !s.is_empty() => s,
-        _ => {
-            let mut result = json!({});
-            if let Some(obj) = block.as_object() {
-                for (k, v) in obj {
-                    if k != "summary" {
-                        result[k] = v.clone();
+    let summary = match block.get("summary").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => {
+            // summary is present but not an array (or is empty/null)
+            let mut new_block = json!({});
+            if let Some(block_obj) = block.as_object() {
+                for (key, value) in block_obj {
+                    if key != "summary" {
+                        new_block[key] = value.clone();
                     }
                 }
             }
-
-            if let Some(index) = result.get("index").and_then(|v| v.as_i64()) {
-                let meaningful_idx = format!("{}_0", index);
-                result["index"] = json!(format!("lc_rs_{}", hex_encode(meaningful_idx.as_bytes())));
+            if has_extras {
+                new_block["extras"] = extras;
             }
-
-            return vec![result];
+            if let Some(index) = new_block.get("index").and_then(|v| v.as_i64()) {
+                let meaningful_idx = format!("{index}_0");
+                new_block["index"] = json!(format!("lc_rs_{}", to_hex(meaningful_idx.as_bytes())));
+            }
+            return vec![new_block];
         }
     };
 
+    if summary.is_empty() {
+        let mut new_block = json!({});
+        if let Some(block_obj) = block.as_object() {
+            for (key, value) in block_obj {
+                if key != "summary" {
+                    new_block[key] = value.clone();
+                }
+            }
+        }
+        if has_extras {
+            new_block["extras"] = extras;
+        }
+        if let Some(index) = new_block.get("index").and_then(|v| v.as_i64()) {
+            let meaningful_idx = format!("{index}_0");
+            new_block["index"] = json!(format!("lc_rs_{}", to_hex(meaningful_idx.as_bytes())));
+        }
+        return vec![new_block];
+    }
+
     let mut common = json!({});
-    if let Some(obj) = block.as_object() {
-        for (k, v) in obj {
-            if known_fields.contains(k.as_str()) {
-                common[k] = v.clone();
+    if let Some(block_obj) = block.as_object() {
+        for (key, value) in block_obj {
+            if known_fields.contains(key.as_str()) {
+                common[key] = value.clone();
             }
         }
     }
 
-    let first_only = block.get("extras").cloned();
-
-    let mut results = Vec::new();
-
+    let mut result = Vec::new();
     for (idx, part) in summary.iter().enumerate() {
         let mut new_block = common.clone();
-        new_block["reasoning"] = json!(part.get("text").and_then(|v| v.as_str()).unwrap_or(""));
+        let reasoning_text = part.get("text").and_then(|v| v.as_str()).unwrap_or("");
+        new_block["reasoning"] = json!(reasoning_text);
 
         if idx == 0
-            && let Some(ref extras) = first_only
+            && has_extras
+            && let Some(new_obj) = new_block.as_object_mut()
             && let Some(extras_obj) = extras.as_object()
         {
-            for (k, v) in extras_obj {
-                new_block[k] = v.clone();
+            for (key, value) in extras_obj {
+                new_obj.insert(key.clone(), value.clone());
             }
         }
 
         if let Some(block_index) = new_block.get("index").and_then(|v| v.as_i64()) {
             let summary_index = part.get("index").and_then(|v| v.as_i64()).unwrap_or(0);
-            let meaningful_idx = format!("{}_{}", block_index, summary_index);
-            new_block["index"] = json!(format!("lc_rs_{}", hex_encode(meaningful_idx.as_bytes())));
+            let meaningful_idx = format!("{block_index}_{summary_index}");
+            new_block["index"] = json!(format!("lc_rs_{}", to_hex(meaningful_idx.as_bytes())));
         }
 
-        results.push(new_block);
+        result.push(new_block);
     }
 
-    results
+    result
 }
 
-#[derive(Default)]
-pub struct OpenAiContext {
-    pub tool_calls: Vec<Value>,
-    pub tool_call_chunks: Vec<Value>,
-    pub invalid_tool_calls: Vec<Value>,
-    pub additional_kwargs: Value,
-    pub response_metadata: Value,
-    pub message_id: Option<String>,
-    pub chunk_position: Option<String>,
+fn set_status(result_block: &mut Value, status: Option<&str>) {
+    match status {
+        Some("failed") => {
+            result_block["status"] = json!("error");
+        }
+        Some("completed") => {
+            result_block["status"] = json!("success");
+        }
+        Some(other) => {
+            let extras = result_block
+                .as_object_mut()
+                .expect("result_block should be an object")
+                .entry("extras")
+                .or_insert_with(|| json!({}));
+            if let Some(extras_obj) = extras.as_object_mut() {
+                extras_obj.insert("status".to_string(), json!(other));
+            }
+        }
+        None => {}
+    }
 }
 
-pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
-    convert_to_standard_blocks_with_context(content, is_chunk, None)
-}
+const FUNCTION_CALL_IDS_MAP_KEY: &str = "__openai_function_call_ids__";
 
-pub fn convert_to_standard_blocks_with_context(
-    content: &[Value],
-    is_chunk: bool,
-    context: Option<&OpenAiContext>,
-) -> Vec<Value> {
-    let processed_content = if let Some(ctx) = context
-        && is_v03_format(content, ctx)
-    {
-        convert_from_v03_format(content, ctx, is_chunk)
-    } else {
-        content.to_vec()
-    };
+fn is_chatopenai_v03(content: &[Value], context: &OpenAiContext) -> bool {
+    let all_dicts = content.iter().all(|b| b.is_object());
+    if !all_dicts {
+        return false;
+    }
 
-    convert_to_v1_from_responses(&processed_content, is_chunk, context)
-}
-
-fn is_v03_format(content: &[Value], context: &OpenAiContext) -> bool {
-    let has_v03_kwargs = [
+    let additional_kwargs = &context.additional_kwargs;
+    let has_special_kwarg = [
         "reasoning",
         "tool_outputs",
         "refusal",
         FUNCTION_CALL_IDS_MAP_KEY,
     ]
     .iter()
-    .any(|key| context.additional_kwargs.get(key).is_some());
+    .any(|key| additional_kwargs.get(key).is_some());
 
-    if has_v03_kwargs {
+    if has_special_kwarg {
         return true;
     }
 
@@ -614,21 +483,14 @@ fn is_v03_format(content: &[Value], context: &OpenAiContext) -> bool {
         && let Some(resp_id) = context.response_metadata.get("id").and_then(|v| v.as_str())
         && resp_id.starts_with("resp_")
     {
-        let all_dicts = content.iter().all(|v| v.is_object());
-        if all_dicts {
-            return true;
-        }
+        return true;
     }
 
     false
 }
 
-fn convert_from_v03_format(
-    content: &[Value],
-    context: &OpenAiContext,
-    is_chunk: bool,
-) -> Vec<Value> {
-    let content_order = vec![
+fn convert_from_v03(content: &[Value], context: &OpenAiContext) -> Vec<Value> {
+    let content_order = [
         "reasoning",
         "code_interpreter_call",
         "mcp_call",
@@ -641,154 +503,164 @@ fn convert_from_v03_format(
         "mcp_approval_request",
     ];
 
-    let mut buckets: HashMap<&str, Vec<Value>> =
-        content_order.iter().map(|k| (*k, Vec::new())).collect();
-    let mut unknown_blocks = Vec::new();
+    let mut buckets: Vec<(&str, Vec<Value>)> =
+        content_order.iter().map(|key| (*key, Vec::new())).collect();
+    let mut unknown_blocks: Vec<Value> = Vec::new();
 
+    let is_chunk = context.chunk_position.as_deref() != Some("last");
+
+    // Reasoning from additional_kwargs
     if let Some(reasoning) = context.additional_kwargs.get("reasoning") {
-        if is_chunk && context.chunk_position.as_deref() != Some("last") {
-            let mut reasoning_with_type = reasoning.clone();
-            if reasoning_with_type.is_object() {
-                reasoning_with_type["type"] = json!("reasoning");
+        if is_chunk {
+            let mut reasoning_block = reasoning.clone();
+            if let Some(obj) = reasoning_block.as_object_mut() {
+                obj.insert("type".to_string(), json!("reasoning"));
             }
-            buckets
-                .entry("reasoning")
-                .or_default()
-                .push(reasoning_with_type);
+            buckets[0].1.push(reasoning_block);
         } else {
-            buckets
-                .entry("reasoning")
-                .or_default()
-                .push(reasoning.clone());
+            buckets[0].1.push(reasoning.clone());
         }
     }
 
-    if let Some(refusal) = context.additional_kwargs.get("refusal") {
-        buckets.entry("refusal").or_default().push(json!({
-            "type": "refusal",
-            "refusal": refusal
-        }));
+    // Refusal from additional_kwargs
+    if let Some(refusal) = context
+        .additional_kwargs
+        .get("refusal")
+        .and_then(|v| v.as_str())
+        && !refusal.is_empty()
+    {
+        buckets[5]
+            .1
+            .push(json!({"type": "refusal", "refusal": refusal}));
     }
 
+    // Text blocks from content
     for block in content {
-        if let Some(obj) = block.as_object()
-            && obj.get("type").and_then(|t| t.as_str()) == Some("text")
-        {
+        if block.get("type").and_then(|v| v.as_str()) == Some("text") {
             let mut block_copy = block.clone();
-            if let Some(id) = &context.message_id
-                && id.starts_with("msg_")
+            if let Some(msg_id) = &context.message_id
+                && msg_id.starts_with("msg_")
             {
-                block_copy["id"] = json!(id);
+                block_copy["id"] = json!(msg_id);
             }
-            buckets.entry("text").or_default().push(block_copy);
+            buckets[4].1.push(block_copy);
         } else {
             unknown_blocks.push(block.clone());
         }
     }
 
-    let function_call_ids = context
-        .additional_kwargs
-        .get(FUNCTION_CALL_IDS_MAP_KEY)
-        .and_then(|v| v.as_object());
+    // Function calls
+    let function_call_ids = context.additional_kwargs.get(FUNCTION_CALL_IDS_MAP_KEY);
 
-    if is_chunk
-        && context.tool_call_chunks.len() == 1
-        && context.chunk_position.as_deref() != Some("last")
-    {
-        if let Some(tool_call_chunk) = context.tool_call_chunks.first() {
-            let mut function_call = json!({
-                "type": "function_call",
-                "name": tool_call_chunk.get("name"),
-                "arguments": tool_call_chunk.get("args"),
-                "call_id": tool_call_chunk.get("id"),
-            });
-
-            if let Some(ids) = function_call_ids
-                && let Some(call_id) = tool_call_chunk.get("id").and_then(|v| v.as_str())
-                && let Some(id) = ids.get(call_id)
-            {
-                function_call["id"] = id.clone();
-            }
-
-            buckets
-                .entry("function_call")
-                .or_default()
-                .push(function_call);
+    if is_chunk && context.tool_call_chunks.len() == 1 {
+        let tool_call_chunk = &context.tool_call_chunks[0];
+        let mut function_call = json!({
+            "type": "function_call",
+            "name": tool_call_chunk.get("name").cloned().unwrap_or(Value::Null),
+            "arguments": tool_call_chunk.get("args").and_then(|v| v.as_str()).unwrap_or(""),
+            "call_id": tool_call_chunk.get("id").and_then(|v| v.as_str()).unwrap_or(""),
+        });
+        if let Some(ids_map) = function_call_ids
+            && let Some(tc_id) = tool_call_chunk.get("id").and_then(|v| v.as_str())
+            && let Some(mapped_id) = ids_map.get(tc_id)
+        {
+            function_call["id"] = mapped_id.clone();
         }
+        if let Some(index) = tool_call_chunk.get("index") {
+            function_call["index"] = index.clone();
+        }
+        buckets[6].1.push(function_call);
     } else {
         for tool_call in &context.tool_calls {
-            let arguments = if let Some(args) = tool_call.get("args") {
-                serde_json::to_string(args).unwrap_or_else(|_| "{}".to_string())
-            } else {
-                "{}".to_string()
+            let args_str = match tool_call.get("args") {
+                Some(args) if args.is_object() || args.is_array() => {
+                    serde_json::to_string(args).unwrap_or_default()
+                }
+                Some(args) if args.is_string() => args.as_str().unwrap_or("").to_string(),
+                _ => "{}".to_string(),
             };
-
+            let call_id = tool_call.get("id").and_then(|v| v.as_str()).unwrap_or("");
             let mut function_call = json!({
                 "type": "function_call",
-                "name": tool_call.get("name"),
-                "arguments": arguments,
-                "call_id": tool_call.get("id"),
+                "name": tool_call.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+                "arguments": args_str,
+                "call_id": call_id,
             });
-
-            if let Some(ids) = function_call_ids
-                && let Some(call_id) = tool_call.get("id").and_then(|v| v.as_str())
-                && let Some(id) = ids.get(call_id)
+            if let Some(ids_map) = function_call_ids
+                && let Some(mapped_id) = ids_map.get(call_id)
             {
-                function_call["id"] = id.clone();
+                function_call["id"] = mapped_id.clone();
             }
-
-            buckets
-                .entry("function_call")
-                .or_default()
-                .push(function_call);
+            buckets[6].1.push(function_call);
         }
     }
 
-    if let Some(tool_outputs) = context.additional_kwargs.get("tool_outputs")
-        && let Some(outputs_array) = tool_outputs.as_array()
+    // Tool outputs from additional_kwargs
+    if let Some(tool_outputs) = context
+        .additional_kwargs
+        .get("tool_outputs")
+        .and_then(|v| v.as_array())
     {
-        for block in outputs_array {
-            if let Some(obj) = block.as_object()
-                && let Some(key) = obj.get("type").and_then(|t| t.as_str())
-                && buckets.contains_key(key)
-            {
-                buckets.entry(key).or_default().push(block.clone());
+        for output_block in tool_outputs {
+            if let Some(block_type) = output_block.get("type").and_then(|v| v.as_str()) {
+                let placed = buckets.iter_mut().any(|(key, bucket)| {
+                    if *key == block_type {
+                        bucket.push(output_block.clone());
+                        true
+                    } else {
+                        false
+                    }
+                });
+                if !placed {
+                    unknown_blocks.push(output_block.clone());
+                }
             } else {
-                unknown_blocks.push(block.clone());
+                unknown_blocks.push(output_block.clone());
             }
         }
     }
 
+    // Reassemble in canonical order
     let mut new_content = Vec::new();
-    for key in content_order {
-        new_content.extend(buckets.remove(key).unwrap_or_default());
+    for (_key, bucket) in &buckets {
+        new_content.extend(bucket.iter().cloned());
     }
     new_content.extend(unknown_blocks);
 
     new_content
 }
 
-fn convert_to_v1_from_responses(
+pub fn convert_to_standard_blocks_with_context(
     content: &[Value],
     is_chunk: bool,
     context: Option<&OpenAiContext>,
 ) -> Vec<Value> {
+    let content = match context {
+        Some(ctx) if is_chatopenai_v03(content, ctx) => convert_from_v03(content, ctx),
+        _ => content.to_vec(),
+    };
+    convert_to_standard_blocks(&content, is_chunk)
+}
+
+pub fn convert_to_standard_blocks(content: &[Value], is_chunk: bool) -> Vec<Value> {
     let mut result = Vec::new();
 
-    for raw_block in content {
-        if !raw_block.is_object() {
+    for block in content {
+        if !block.is_object() {
+            if let Some(s) = block.as_str() {
+                result.push(json!({"type": "text", "text": s}));
+            }
             continue;
         }
 
-        let block = raw_block.clone();
         let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
         match block_type {
             "text" => {
-                let mut text_block = block.clone();
-                if text_block.get("text").is_none() {
-                    text_block["text"] = json!("");
-                }
+                let mut text_block = json!({
+                    "type": "text",
+                    "text": block.get("text").and_then(|v| v.as_str()).unwrap_or(""),
+                });
 
                 if let Some(annotations) = block.get("annotations").and_then(|v| v.as_array()) {
                     let converted: Vec<Value> =
@@ -796,51 +668,62 @@ fn convert_to_v1_from_responses(
                     text_block["annotations"] = json!(converted);
                 }
 
-                if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                    text_block["index"] = json!(format!("lc_txt_{}", index));
+                if let Some(index) = block.get("index") {
+                    text_block["index"] = json!(format!("lc_txt_{index}"));
                 }
+
+                let known_fields: HashSet<&str> =
+                    ["type", "text", "annotations", "index", "extras", "id"]
+                        .iter()
+                        .copied()
+                        .collect();
+                populate_extras(&mut text_block, block, &known_fields);
 
                 result.push(text_block);
             }
 
             "reasoning" => {
-                let exploded = explode_reasoning(&block);
-                result.extend(exploded);
+                for reasoning_block in explode_reasoning(block) {
+                    result.push(reasoning_block);
+                }
             }
 
             "image_generation_call" => {
                 if let Some(image_result) = block.get("result").and_then(|v| v.as_str()) {
                     let mut new_block = json!({
                         "type": "image",
-                        "base64": image_result
+                        "base64": image_result,
                     });
 
                     if let Some(output_format) = block.get("output_format").and_then(|v| v.as_str())
                     {
-                        new_block["mime_type"] = json!(format!("image/{}", output_format));
+                        new_block["mime_type"] = json!(format!("image/{output_format}"));
                     }
-
                     if let Some(id) = block.get("id") {
                         new_block["id"] = id.clone();
                     }
-
-                    if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                        new_block["index"] = json!(format!("lc_img_{}", index));
+                    if let Some(index) = block.get("index") {
+                        new_block["index"] = json!(format!("lc_img_{index}"));
                     }
 
-                    for extra_key in [
+                    let extra_keys = [
                         "status",
                         "background",
                         "output_format",
                         "quality",
                         "revised_prompt",
                         "size",
-                    ] {
+                    ];
+                    for extra_key in extra_keys {
                         if let Some(value) = block.get(extra_key) {
-                            if new_block.get("extras").is_none() {
-                                new_block["extras"] = json!({});
+                            let extras = new_block
+                                .as_object_mut()
+                                .expect("new_block should be an object")
+                                .entry("extras")
+                                .or_insert_with(|| json!({}));
+                            if let Some(extras_obj) = extras.as_object_mut() {
+                                extras_obj.insert(extra_key.to_string(), value.clone());
                             }
-                            new_block["extras"][extra_key] = value.clone();
                         }
                     }
 
@@ -851,101 +734,98 @@ fn convert_to_v1_from_responses(
             "function_call" => {
                 let call_id = block.get("call_id").and_then(|v| v.as_str()).unwrap_or("");
 
-                let tool_call_block: Option<Value> = if is_chunk
-                    && context
-                        .map(|c| c.tool_call_chunks.len() == 1)
-                        .unwrap_or(false)
-                    && context
-                        .map(|c| c.chunk_position.as_deref() != Some("last"))
-                        .unwrap_or(true)
-                    && let Some(ctx) = context
-                {
-                    let chunk = &ctx.tool_call_chunks[0];
-                    let mut tc = chunk.clone();
-                    tc["type"] = json!("tool_call_chunk");
-                    Some(tc)
-                } else if !call_id.is_empty() {
-                    let mut found = None;
+                if is_chunk {
+                    let mut tool_call_chunk = json!({
+                        "type": "tool_call_chunk",
+                        "name": block.get("name").cloned().unwrap_or(Value::Null),
+                        "args": block.get("arguments").and_then(|v| v.as_str()).unwrap_or(""),
+                        "id": call_id,
+                    });
 
-                    if let Some(ctx) = context {
-                        for tool_call in &ctx.tool_calls {
-                            if tool_call.get("id").and_then(|v| v.as_str()) == Some(call_id) {
-                                found = Some(json!({
-                                    "type": "tool_call",
-                                    "name": tool_call.get("name").cloned().unwrap_or(json!("")),
-                                    "args": tool_call.get("args").cloned().unwrap_or(json!({})),
-                                    "id": tool_call.get("id").cloned()
-                                }));
-                                break;
-                            }
-                        }
-
-                        if found.is_none() {
-                            for invalid_tool_call in &ctx.invalid_tool_calls {
-                                if invalid_tool_call.get("id").and_then(|v| v.as_str())
-                                    == Some(call_id)
-                                {
-                                    found = Some(invalid_tool_call.clone());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    found
-                } else {
-                    None
-                };
-
-                if let Some(mut tc) = tool_call_block {
                     if let Some(id) = block.get("id") {
-                        if tc.get("extras").is_none() {
-                            tc["extras"] = json!({});
+                        let extras = tool_call_chunk
+                            .as_object_mut()
+                            .expect("tool_call_chunk should be an object")
+                            .entry("extras")
+                            .or_insert_with(|| json!({}));
+                        if let Some(extras_obj) = extras.as_object_mut() {
+                            extras_obj.insert("item_id".to_string(), id.clone());
                         }
-                        tc["extras"]["item_id"] = id.clone();
                     }
 
-                    if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                        tc["index"] = json!(format!("lc_tc_{}", index));
+                    if let Some(index) = block.get("index") {
+                        tool_call_chunk["index"] = json!(format!("lc_tc_{index}"));
                     }
 
-                    result.push(tc);
+                    result.push(tool_call_chunk);
+                } else {
+                    let args = block
+                        .get("arguments")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| serde_json::from_str::<Value>(s).ok())
+                        .unwrap_or(json!({}));
+
+                    let mut tool_call_block = json!({
+                        "type": "tool_call",
+                        "name": block.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+                        "args": args,
+                        "id": call_id,
+                    });
+
+                    if let Some(id) = block.get("id") {
+                        let extras = tool_call_block
+                            .as_object_mut()
+                            .expect("tool_call_block should be an object")
+                            .entry("extras")
+                            .or_insert_with(|| json!({}));
+                        if let Some(extras_obj) = extras.as_object_mut() {
+                            extras_obj.insert("item_id".to_string(), id.clone());
+                        }
+                    }
+
+                    if let Some(index) = block.get("index") {
+                        tool_call_block["index"] = json!(format!("lc_tc_{index}"));
+                    }
+
+                    result.push(tool_call_block);
                 }
             }
 
             "web_search_call" => {
-                let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let block_id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
                 let mut web_search_call = json!({
                     "type": "server_tool_call",
                     "name": "web_search",
                     "args": {},
-                    "id": id
+                    "id": block_id,
                 });
 
-                if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                    web_search_call["index"] = json!(format!("lc_wsc_{}", index));
+                if let Some(index) = block.get("index") {
+                    web_search_call["index"] = json!(format!("lc_wsc_{index}"));
                 }
 
                 let mut sources: Option<Value> = None;
-
                 if let Some(action) = block.get("action").and_then(|v| v.as_object()) {
                     if let Some(s) = action.get("sources") {
                         sources = Some(s.clone());
                     }
-
                     let mut args = json!({});
-                    for (k, v) in action {
-                        if k != "sources" {
-                            args[k] = v.clone();
+                    for (key, value) in action {
+                        if key != "sources" {
+                            args[key] = value.clone();
                         }
                     }
                     web_search_call["args"] = args;
                 }
 
-                if let Some(obj) = block.as_object() {
-                    for (key, value) in obj {
-                        if !["type", "id", "action", "status", "index"].contains(&key.as_str()) {
+                let skip_keys: HashSet<&str> = ["type", "id", "action", "status", "index"]
+                    .iter()
+                    .copied()
+                    .collect();
+                if let Some(block_obj) = block.as_object() {
+                    for (key, value) in block_obj {
+                        if !skip_keys.contains(key.as_str()) {
                             web_search_call[key] = value.clone();
                         }
                     }
@@ -953,34 +833,23 @@ fn convert_to_v1_from_responses(
 
                 result.push(web_search_call);
 
-                let has_web_search_result = content.iter().any(|other_block| {
+                // Check if content already has a matching web_search_result
+                let has_existing_result = content.iter().any(|other_block| {
                     other_block.get("type").and_then(|v| v.as_str()) == Some("web_search_result")
-                        && other_block.get("id").and_then(|v| v.as_str()) == Some(id)
+                        && other_block.get("id").and_then(|v| v.as_str()) == Some(block_id)
                 });
 
-                if !has_web_search_result {
+                if !has_existing_result {
                     let mut web_search_result = json!({
                         "type": "server_tool_result",
-                        "tool_call_id": id
+                        "tool_call_id": block_id,
                     });
-
-                    if let Some(s) = sources {
-                        web_search_result["output"] = json!({"sources": s});
+                    if let Some(sources_val) = sources {
+                        web_search_result["output"] = json!({"sources": sources_val});
                     }
 
                     let status = block.get("status").and_then(|v| v.as_str());
-                    match status {
-                        Some("failed") => {
-                            web_search_result["status"] = json!("error");
-                        }
-                        Some("completed") => {
-                            web_search_result["status"] = json!("success");
-                        }
-                        Some(s) => {
-                            web_search_result["extras"] = json!({"status": s});
-                        }
-                        None => {}
-                    }
+                    set_status(&mut web_search_result, status);
 
                     if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
                         web_search_result["index"] = json!(format!("lc_wsr_{}", index + 1));
@@ -991,26 +860,29 @@ fn convert_to_v1_from_responses(
             }
 
             "file_search_call" => {
-                let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let block_id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
                 let mut file_search_call = json!({
                     "type": "server_tool_call",
                     "name": "file_search",
-                    "id": id,
+                    "id": block_id,
                     "args": {
-                        "queries": block.get("queries").cloned().unwrap_or(json!([]))
-                    }
+                        "queries": block.get("queries").cloned().unwrap_or(json!([])),
+                    },
                 });
 
-                if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                    file_search_call["index"] = json!(format!("lc_fsc_{}", index));
+                if let Some(index) = block.get("index") {
+                    file_search_call["index"] = json!(format!("lc_fsc_{index}"));
                 }
 
-                if let Some(obj) = block.as_object() {
-                    for (key, value) in obj {
-                        if !["type", "id", "queries", "results", "status", "index"]
-                            .contains(&key.as_str())
-                        {
+                let skip_keys: HashSet<&str> =
+                    ["type", "id", "queries", "results", "status", "index"]
+                        .iter()
+                        .copied()
+                        .collect();
+                if let Some(block_obj) = block.as_object() {
+                    for (key, value) in block_obj {
+                        if !skip_keys.contains(key.as_str()) {
                             file_search_call[key] = value.clone();
                         }
                     }
@@ -1020,26 +892,15 @@ fn convert_to_v1_from_responses(
 
                 let mut file_search_result = json!({
                     "type": "server_tool_result",
-                    "tool_call_id": id
+                    "tool_call_id": block_id,
                 });
 
-                if let Some(output) = block.get("results") {
-                    file_search_result["output"] = output.clone();
+                if let Some(results_val) = block.get("results") {
+                    file_search_result["output"] = results_val.clone();
                 }
 
                 let status = block.get("status").and_then(|v| v.as_str());
-                match status {
-                    Some("failed") => {
-                        file_search_result["status"] = json!("error");
-                    }
-                    Some("completed") => {
-                        file_search_result["status"] = json!("success");
-                    }
-                    Some(s) => {
-                        file_search_result["extras"] = json!({"status": s});
-                    }
-                    None => {}
-                }
+                set_status(&mut file_search_result, status);
 
                 if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
                     file_search_result["index"] = json!(format!("lc_fsr_{}", index + 1));
@@ -1049,20 +910,19 @@ fn convert_to_v1_from_responses(
             }
 
             "code_interpreter_call" => {
-                let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let block_id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
                 let mut code_interpreter_call = json!({
                     "type": "server_tool_call",
                     "name": "code_interpreter",
-                    "id": id
+                    "id": block_id,
                 });
 
                 if let Some(code) = block.get("code") {
-                    code_interpreter_call["args"] = json!({"code": code});
+                    code_interpreter_call["args"] = json!({"code": code.clone()});
                 }
-
-                if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                    code_interpreter_call["index"] = json!(format!("lc_cic_{}", index));
+                if let Some(index) = block.get("index") {
+                    code_interpreter_call["index"] = json!(format!("lc_cic_{index}"));
                 }
 
                 let known_fields: HashSet<&str> =
@@ -1070,21 +930,11 @@ fn convert_to_v1_from_responses(
                         .iter()
                         .copied()
                         .collect();
-
-                if let Some(obj) = block.as_object() {
-                    for (key, value) in obj {
-                        if !known_fields.contains(key.as_str()) {
-                            if code_interpreter_call.get("extras").is_none() {
-                                code_interpreter_call["extras"] = json!({});
-                            }
-                            code_interpreter_call["extras"][key] = value.clone();
-                        }
-                    }
-                }
+                populate_extras(&mut code_interpreter_call, block, &known_fields);
 
                 let mut code_interpreter_result = json!({
                     "type": "server_tool_result",
-                    "tool_call_id": id
+                    "tool_call_id": block_id,
                 });
 
                 if let Some(outputs) = block.get("outputs") {
@@ -1092,18 +942,7 @@ fn convert_to_v1_from_responses(
                 }
 
                 let status = block.get("status").and_then(|v| v.as_str());
-                match status {
-                    Some("failed") => {
-                        code_interpreter_result["status"] = json!("error");
-                    }
-                    Some("completed") => {
-                        code_interpreter_result["status"] = json!("success");
-                    }
-                    Some(s) => {
-                        code_interpreter_result["extras"] = json!({"status": s});
-                    }
-                    None => {}
-                }
+                set_status(&mut code_interpreter_result, status);
 
                 if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
                     code_interpreter_result["index"] = json!(format!("lc_cir_{}", index + 1));
@@ -1114,38 +953,56 @@ fn convert_to_v1_from_responses(
             }
 
             "mcp_call" => {
-                let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let block_id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
                 let mut mcp_call = json!({
                     "type": "server_tool_call",
                     "name": "remote_mcp",
-                    "id": id
+                    "id": block_id,
                 });
 
                 if let Some(arguments) = block.get("arguments").and_then(|v| v.as_str()) {
-                    if let Ok(parsed) = serde_json::from_str::<Value>(arguments) {
-                        mcp_call["args"] = parsed;
-                    } else {
-                        mcp_call["extras"] = json!({"arguments": arguments});
+                    match serde_json::from_str::<Value>(arguments) {
+                        Ok(parsed) => {
+                            mcp_call["args"] = parsed;
+                        }
+                        Err(_) => {
+                            let extras = mcp_call
+                                .as_object_mut()
+                                .expect("mcp_call should be an object")
+                                .entry("extras")
+                                .or_insert_with(|| json!({}));
+                            if let Some(extras_obj) = extras.as_object_mut() {
+                                extras_obj.insert("arguments".to_string(), json!(arguments));
+                            }
+                        }
                     }
                 }
 
                 if let Some(name) = block.get("name") {
-                    if mcp_call.get("extras").is_none() {
-                        mcp_call["extras"] = json!({});
+                    let extras = mcp_call
+                        .as_object_mut()
+                        .expect("mcp_call should be an object")
+                        .entry("extras")
+                        .or_insert_with(|| json!({}));
+                    if let Some(extras_obj) = extras.as_object_mut() {
+                        extras_obj.insert("tool_name".to_string(), name.clone());
                     }
-                    mcp_call["extras"]["tool_name"] = name.clone();
                 }
 
                 if let Some(server_label) = block.get("server_label") {
-                    if mcp_call.get("extras").is_none() {
-                        mcp_call["extras"] = json!({});
+                    let extras = mcp_call
+                        .as_object_mut()
+                        .expect("mcp_call should be an object")
+                        .entry("extras")
+                        .or_insert_with(|| json!({}));
+                    if let Some(extras_obj) = extras.as_object_mut() {
+                        extras_obj.insert("server_label".to_string(), server_label.clone());
                     }
-                    mcp_call["extras"]["server_label"] = server_label.clone();
                 }
 
-                if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                    mcp_call["index"] = json!(format!("lc_mcp_{}", index));
+                if let Some(index) = block.get("index") {
+                    mcp_call["index"] = json!(format!("lc_mcp_{index}"));
                 }
 
                 let known_fields: HashSet<&str> = [
@@ -1162,23 +1019,13 @@ fn convert_to_v1_from_responses(
                 .iter()
                 .copied()
                 .collect();
-
-                if let Some(obj) = block.as_object() {
-                    for (key, value) in obj {
-                        if !known_fields.contains(key.as_str()) {
-                            if mcp_call.get("extras").is_none() {
-                                mcp_call["extras"] = json!({});
-                            }
-                            mcp_call["extras"][key] = value.clone();
-                        }
-                    }
-                }
+                populate_extras(&mut mcp_call, block, &known_fields);
 
                 result.push(mcp_call);
 
                 let mut mcp_result = json!({
                     "type": "server_tool_result",
-                    "tool_call_id": id
+                    "tool_call_id": block_id,
                 });
 
                 if let Some(output) = block.get("output") {
@@ -1186,10 +1033,14 @@ fn convert_to_v1_from_responses(
                 }
 
                 if let Some(error) = block.get("error") {
-                    if mcp_result.get("extras").is_none() {
-                        mcp_result["extras"] = json!({});
+                    let extras = mcp_result
+                        .as_object_mut()
+                        .expect("mcp_result should be an object")
+                        .entry("extras")
+                        .or_insert_with(|| json!({}));
+                    if let Some(extras_obj) = extras.as_object_mut() {
+                        extras_obj.insert("error".to_string(), error.clone());
                     }
-                    mcp_result["extras"]["error"] = error.clone();
                     mcp_result["status"] = json!("error");
                 } else {
                     mcp_result["status"] = json!("success");
@@ -1203,22 +1054,20 @@ fn convert_to_v1_from_responses(
             }
 
             "mcp_list_tools" => {
-                let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let block_id = block.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
                 let mut mcp_list_tools_call = json!({
                     "type": "server_tool_call",
                     "name": "mcp_list_tools",
                     "args": {},
-                    "id": id
+                    "id": block_id,
                 });
 
                 if let Some(server_label) = block.get("server_label") {
-                    mcp_list_tools_call["extras"] = json!({});
-                    mcp_list_tools_call["extras"]["server_label"] = server_label.clone();
+                    mcp_list_tools_call["extras"] = json!({"server_label": server_label.clone()});
                 }
-
-                if let Some(index) = block.get("index").and_then(|v| v.as_i64()) {
-                    mcp_list_tools_call["index"] = json!(format!("lc_mlt_{}", index));
+                if let Some(index) = block.get("index") {
+                    mcp_list_tools_call["index"] = json!(format!("lc_mlt_{index}"));
                 }
 
                 let known_fields: HashSet<&str> = [
@@ -1234,23 +1083,13 @@ fn convert_to_v1_from_responses(
                 .iter()
                 .copied()
                 .collect();
-
-                if let Some(obj) = block.as_object() {
-                    for (key, value) in obj {
-                        if !known_fields.contains(key.as_str()) {
-                            if mcp_list_tools_call.get("extras").is_none() {
-                                mcp_list_tools_call["extras"] = json!({});
-                            }
-                            mcp_list_tools_call["extras"][key] = value.clone();
-                        }
-                    }
-                }
+                populate_extras(&mut mcp_list_tools_call, block, &known_fields);
 
                 result.push(mcp_list_tools_call);
 
                 let mut mcp_list_tools_result = json!({
                     "type": "server_tool_result",
-                    "tool_call_id": id
+                    "tool_call_id": block_id,
                 });
 
                 if let Some(tools) = block.get("tools") {
@@ -1258,10 +1097,14 @@ fn convert_to_v1_from_responses(
                 }
 
                 if let Some(error) = block.get("error") {
-                    if mcp_list_tools_result.get("extras").is_none() {
-                        mcp_list_tools_result["extras"] = json!({});
+                    let extras = mcp_list_tools_result
+                        .as_object_mut()
+                        .expect("mcp_list_tools_result should be an object")
+                        .entry("extras")
+                        .or_insert_with(|| json!({}));
+                    if let Some(extras_obj) = extras.as_object_mut() {
+                        extras_obj.insert("error".to_string(), error.clone());
                     }
-                    mcp_list_tools_result["extras"]["error"] = error.clone();
                     mcp_list_tools_result["status"] = json!("error");
                 } else {
                     mcp_list_tools_result["status"] = json!("success");
@@ -1274,27 +1117,29 @@ fn convert_to_v1_from_responses(
                 result.push(mcp_list_tools_result);
             }
 
+            "refusal" => {
+                result.push(block.clone());
+            }
+
             _ => {
                 if KNOWN_BLOCK_TYPES.contains(&block_type) {
-                    result.push(block);
+                    result.push(block.clone());
                 } else {
-                    let mut new_block = json!({
+                    let mut non_standard = json!({
                         "type": "non_standard",
-                        "value": block.clone()
+                        "value": block.clone(),
                     });
 
-                    if let Some(index) =
-                        new_block.get("value").and_then(|v| v.get("index")).cloned()
-                    {
-                        new_block["index"] = json!(format!("lc_ns_{}", index));
-                        if let Some(value) = new_block.get_mut("value")
+                    if let Some(index) = block.get("index") {
+                        non_standard["index"] = json!(format!("lc_ns_{index}"));
+                        if let Some(value) = non_standard.get_mut("value")
                             && let Some(obj) = value.as_object_mut()
                         {
                             obj.remove("index");
                         }
                     }
 
-                    result.push(new_block);
+                    result.push(non_standard);
                 }
             }
         }
@@ -1304,8 +1149,6 @@ fn convert_to_v1_from_responses(
 }
 
 pub fn convert_to_v1_from_chat_completions_input(content: &[Value]) -> Vec<Value> {
-    let mut converted_blocks = Vec::new();
-
     let unpacked_blocks: Vec<Value> = content
         .iter()
         .map(|block| {
@@ -1317,34 +1160,23 @@ pub fn convert_to_v1_from_chat_completions_input(content: &[Value]) -> Vec<Value
         })
         .collect();
 
-    for block in unpacked_blocks {
+    let mut converted_blocks = Vec::new();
+    for block in &unpacked_blocks {
         let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
-        if ["image_url", "input_audio", "file"].contains(&block_type)
-            && is_openai_data_block(&block, None)
+        if matches!(block_type, "image_url" | "input_audio" | "file") && is_openai_data_block(block)
         {
-            let converted_block = convert_openai_format_to_data_block(&block);
-
-            let converted_type = converted_block
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-
+            let converted = convert_openai_format_to_data_block(block);
+            let converted_type = converted.get("type").and_then(|v| v.as_str()).unwrap_or("");
             if KNOWN_BLOCK_TYPES.contains(&converted_type) {
-                converted_blocks.push(converted_block);
+                converted_blocks.push(converted);
             } else {
-                converted_blocks.push(json!({
-                    "type": "non_standard",
-                    "value": block
-                }));
+                converted_blocks.push(json!({"type": "non_standard", "value": block.clone()}));
             }
-        } else if KNOWN_BLOCK_TYPES.contains(&block_type) {
-            converted_blocks.push(block);
+        } else if block_type.is_empty() || KNOWN_BLOCK_TYPES.contains(&block_type) {
+            converted_blocks.push(block.clone());
         } else {
-            converted_blocks.push(json!({
-                "type": "non_standard",
-                "value": block
-            }));
+            converted_blocks.push(json!({"type": "non_standard", "value": block.clone()}));
         }
     }
 
@@ -1356,316 +1188,521 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_convert_to_openai_image_block_url() {
-        let block = json!({
-            "type": "image",
-            "url": "https://example.com/image.png"
-        });
+    fn test_parse_data_uri() {
+        let (mime, data) = parse_data_uri("data:image/jpeg;base64,/9j/4AAQ").expect("should parse");
+        assert_eq!(mime, "image/jpeg");
+        assert_eq!(data, "/9j/4AAQ");
 
-        let result = convert_to_openai_image_block(&block).unwrap();
-        assert_eq!(result["type"], "image_url");
-        assert_eq!(result["image_url"]["url"], "https://example.com/image.png");
+        assert!(parse_data_uri("not a data uri").is_none());
+        assert!(parse_data_uri("data:;base64,abc").is_none());
     }
 
     #[test]
-    fn test_convert_to_openai_image_block_base64() {
-        let block = json!({
-            "type": "image",
-            "base64": "iVBORw0KGgo=",
-            "mime_type": "image/png"
-        });
-
-        let result = convert_to_openai_image_block(&block).unwrap();
-        assert_eq!(result["type"], "image_url");
-        assert!(
-            result["image_url"]["url"]
-                .as_str()
-                .unwrap()
-                .starts_with("data:image/png;base64,")
-        );
-    }
-
-    #[test]
-    fn test_convert_to_openai_image_block_missing_mime_type() {
-        let block = json!({
-            "type": "image",
-            "base64": "iVBORw0KGgo="
-        });
-
-        let result = convert_to_openai_image_block(&block);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("mime_type"));
-    }
-
-    #[test]
-    fn test_convert_to_openai_data_block_audio() {
-        let block = json!({
-            "type": "audio",
-            "base64": "audio_data",
-            "mime_type": "audio/wav"
-        });
-
-        let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-        assert_eq!(result["type"], "input_audio");
-        assert_eq!(result["input_audio"]["data"], "audio_data");
-        assert_eq!(result["input_audio"]["format"], "wav");
-    }
-
-    #[test]
-    fn test_convert_to_openai_data_block_file_base64() {
-        let block = json!({
-            "type": "file",
-            "base64": "file_data",
-            "mime_type": "application/pdf",
-            "filename": "test.pdf"
-        });
-
-        let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-        assert_eq!(result["type"], "file");
-        assert!(
-            result["file"]["file_data"]
-                .as_str()
-                .unwrap()
-                .contains("base64")
-        );
-        assert_eq!(result["file"]["filename"], "test.pdf");
-    }
-
-    #[test]
-    fn test_convert_to_openai_data_block_file_id() {
-        let block = json!({
-            "type": "file",
-            "file_id": "file-123"
-        });
-
-        let result = convert_to_openai_data_block(&block, OpenAiApi::ChatCompletions).unwrap();
-        assert_eq!(result["type"], "file");
-        assert_eq!(result["file"]["file_id"], "file-123");
-    }
-
-    #[test]
-    fn test_convert_openai_format_to_data_block_image_url() {
+    fn test_is_openai_data_block_image() {
         let block = json!({
             "type": "image_url",
-            "image_url": {
-                "url": "https://example.com/image.png",
-                "detail": "high"
-            }
+            "image_url": {"url": "https://example.com/img.png"}
         });
+        assert!(is_openai_data_block(&block));
 
-        let result = convert_openai_format_to_data_block(&block);
-        assert_eq!(result["type"], "image");
-        assert_eq!(result["url"], "https://example.com/image.png");
-        assert_eq!(result["extras"]["detail"], "high");
+        let bad_block = json!({"type": "image_url"});
+        assert!(!is_openai_data_block(&bad_block));
     }
 
     #[test]
-    fn test_convert_openai_format_to_data_block_image_base64() {
-        let block = json!({
-            "type": "image_url",
-            "image_url": {
-                "url": "data:image/png;base64,iVBORw0KGgo="
-            }
-        });
-
-        let result = convert_openai_format_to_data_block(&block);
-        assert_eq!(result["type"], "image");
-        assert_eq!(result["base64"], "iVBORw0KGgo=");
-        assert_eq!(result["mime_type"], "image/png");
-    }
-
-    #[test]
-    fn test_convert_openai_format_to_data_block_audio() {
+    fn test_is_openai_data_block_audio() {
         let block = json!({
             "type": "input_audio",
-            "input_audio": {
-                "data": "audio_data",
-                "format": "wav"
-            }
+            "input_audio": {"data": "base64data", "format": "mp3"}
         });
-
-        let result = convert_openai_format_to_data_block(&block);
-        assert_eq!(result["type"], "audio");
-        assert_eq!(result["base64"], "audio_data");
-        assert_eq!(result["mime_type"], "audio/wav");
+        assert!(is_openai_data_block(&block));
     }
 
     #[test]
-    fn test_convert_openai_format_to_data_block_file_id() {
+    fn test_is_openai_data_block_file() {
         let block = json!({
             "type": "file",
-            "file": {
-                "file_id": "file-123"
-            }
+            "file": {"file_id": "file-123"}
         });
+        assert!(is_openai_data_block(&block));
 
-        let result = convert_openai_format_to_data_block(&block);
-        assert_eq!(result["type"], "file");
-        assert_eq!(result["file_id"], "file-123");
+        let block2 = json!({
+            "type": "file",
+            "file": {"file_data": "data:application/pdf;base64,abc"}
+        });
+        assert!(is_openai_data_block(&block2));
     }
 
     #[test]
-    fn test_convert_annotation_to_v1_url_citation() {
-        let annotation = json!({
-            "type": "url_citation",
-            "url": "https://example.com",
-            "title": "Example",
-            "start_index": 0,
-            "end_index": 10,
-            "custom_field": "value"
-        });
-
-        let result = convert_annotation_to_v1(&annotation);
-        assert_eq!(result["type"], "citation");
-        assert_eq!(result["url"], "https://example.com");
-        assert_eq!(result["title"], "Example");
-        assert_eq!(result["extras"]["custom_field"], "value");
-    }
-
-    #[test]
-    fn test_convert_annotation_to_v1_file_citation() {
-        let annotation = json!({
-            "type": "file_citation",
-            "filename": "document.pdf"
-        });
-
-        let result = convert_annotation_to_v1(&annotation);
-        assert_eq!(result["type"], "citation");
-        assert_eq!(result["title"], "document.pdf");
-    }
-
-    #[test]
-    fn test_convert_annotation_to_v1_non_standard() {
-        let annotation = json!({
-            "type": "unknown_type",
-            "data": "value"
-        });
-
-        let result = convert_annotation_to_v1(&annotation);
-        assert_eq!(result["type"], "non_standard_annotation");
-        assert_eq!(result["value"]["type"], "unknown_type");
-    }
-
-    #[test]
-    fn test_convert_to_standard_blocks_text() {
+    fn test_convert_text_block() {
         let content = vec![json!({
             "type": "text",
-            "text": "Hello, world!",
-            "index": 0
+            "text": "Hello world",
         })];
-
         let result = convert_to_standard_blocks(&content, false);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0]["type"], "text");
-        assert_eq!(result[0]["text"], "Hello, world!");
+        assert_eq!(result[0]["text"], "Hello world");
+    }
+
+    #[test]
+    fn test_convert_text_block_with_index() {
+        let content = vec![json!({
+            "type": "text",
+            "text": "Hello",
+            "index": 0,
+        })];
+        let result = convert_to_standard_blocks(&content, false);
         assert_eq!(result[0]["index"], "lc_txt_0");
     }
 
     #[test]
-    fn test_convert_to_standard_blocks_reasoning() {
+    fn test_convert_text_block_with_url_citation() {
         let content = vec![json!({
-            "type": "reasoning",
-            "reasoning": "Thinking...",
-            "id": "rs_123"
+            "type": "text",
+            "text": "cited text",
+            "annotations": [{
+                "type": "url_citation",
+                "url": "https://example.com",
+                "title": "Example",
+                "start_index": 0,
+                "end_index": 10,
+            }],
         })];
-
         let result = convert_to_standard_blocks(&content, false);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0]["type"], "reasoning");
-        assert_eq!(result[0]["reasoning"], "Thinking...");
+        assert_eq!(result[0]["annotations"][0]["type"], "citation");
+        assert_eq!(result[0]["annotations"][0]["url"], "https://example.com");
+        assert_eq!(result[0]["annotations"][0]["title"], "Example");
     }
 
     #[test]
-    fn test_convert_to_standard_blocks_web_search_call() {
+    fn test_convert_text_block_with_file_citation() {
+        let content = vec![json!({
+            "type": "text",
+            "text": "some text",
+            "annotations": [{
+                "type": "file_citation",
+                "filename": "doc.pdf",
+            }],
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result[0]["annotations"][0]["type"], "citation");
+        assert_eq!(result[0]["annotations"][0]["title"], "doc.pdf");
+    }
+
+    #[test]
+    fn test_convert_function_call_non_chunk() {
+        let content = vec![json!({
+            "type": "function_call",
+            "name": "get_weather",
+            "arguments": "{\"city\":\"NYC\"}",
+            "call_id": "call_123",
+            "id": "item_abc",
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["type"], "tool_call");
+        assert_eq!(result[0]["name"], "get_weather");
+        assert_eq!(result[0]["args"]["city"], "NYC");
+        assert_eq!(result[0]["id"], "call_123");
+        assert_eq!(result[0]["extras"]["item_id"], "item_abc");
+    }
+
+    #[test]
+    fn test_convert_function_call_chunk() {
+        let content = vec![json!({
+            "type": "function_call",
+            "name": "get_weather",
+            "arguments": "{\"city\":",
+            "call_id": "call_123",
+            "index": 0,
+        })];
+        let result = convert_to_standard_blocks(&content, true);
+        assert_eq!(result[0]["type"], "tool_call_chunk");
+        assert_eq!(result[0]["name"], "get_weather");
+        assert_eq!(result[0]["args"], "{\"city\":");
+        assert_eq!(result[0]["index"], "lc_tc_0");
+    }
+
+    #[test]
+    fn test_convert_web_search_call() {
         let content = vec![json!({
             "type": "web_search_call",
             "id": "ws_123",
-            "status": "completed",
             "action": {
-                "query": "test query",
-                "sources": [{"url": "https://example.com"}]
+                "query": "rust programming",
+                "sources": [{"url": "https://example.com"}],
             },
-            "index": 0
+            "status": "completed",
+            "index": 0,
         })];
-
         let result = convert_to_standard_blocks(&content, false);
         assert_eq!(result.len(), 2);
-
         assert_eq!(result[0]["type"], "server_tool_call");
         assert_eq!(result[0]["name"], "web_search");
-        assert_eq!(result[0]["id"], "ws_123");
-        assert_eq!(result[0]["args"]["query"], "test query");
-
+        assert_eq!(result[0]["args"]["query"], "rust programming");
         assert_eq!(result[1]["type"], "server_tool_result");
         assert_eq!(result[1]["tool_call_id"], "ws_123");
+        assert_eq!(
+            result[1]["output"]["sources"][0]["url"],
+            "https://example.com"
+        );
+        assert_eq!(result[1]["status"], "success");
+        assert_eq!(result[1]["index"], "lc_wsr_1");
+    }
+
+    #[test]
+    fn test_convert_file_search_call() {
+        let content = vec![json!({
+            "type": "file_search_call",
+            "id": "fs_123",
+            "queries": ["search term"],
+            "results": [{"file": "doc.pdf"}],
+            "status": "completed",
+            "index": 0,
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["type"], "server_tool_call");
+        assert_eq!(result[0]["name"], "file_search");
+        assert_eq!(result[1]["type"], "server_tool_result");
         assert_eq!(result[1]["status"], "success");
     }
 
     #[test]
-    fn test_convert_to_standard_blocks_non_standard() {
+    fn test_convert_code_interpreter_call() {
         let content = vec![json!({
-            "type": "unknown_block_type",
-            "data": "value",
-            "index": 5
+            "type": "code_interpreter_call",
+            "id": "ci_123",
+            "code": "print('hello')",
+            "outputs": [{"type": "logs", "logs": "hello"}],
+            "status": "completed",
+            "index": 0,
         })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["type"], "server_tool_call");
+        assert_eq!(result[0]["name"], "code_interpreter");
+        assert_eq!(result[0]["args"]["code"], "print('hello')");
+        assert_eq!(result[1]["type"], "server_tool_result");
+        assert_eq!(result[1]["status"], "success");
+    }
 
+    #[test]
+    fn test_convert_mcp_call() {
+        let content = vec![json!({
+            "type": "mcp_call",
+            "id": "mcp_123",
+            "name": "my_tool",
+            "arguments": "{\"key\":\"value\"}",
+            "server_label": "my_server",
+            "output": "result",
+            "index": 0,
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["type"], "server_tool_call");
+        assert_eq!(result[0]["name"], "remote_mcp");
+        assert_eq!(result[0]["args"]["key"], "value");
+        assert_eq!(result[0]["extras"]["tool_name"], "my_tool");
+        assert_eq!(result[0]["extras"]["server_label"], "my_server");
+        assert_eq!(result[1]["type"], "server_tool_result");
+        assert_eq!(result[1]["output"], "result");
+        assert_eq!(result[1]["status"], "success");
+    }
+
+    #[test]
+    fn test_convert_mcp_call_with_error() {
+        let content = vec![json!({
+            "type": "mcp_call",
+            "id": "mcp_123",
+            "arguments": "{}",
+            "error": "something went wrong",
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result[1]["status"], "error");
+        assert_eq!(result[1]["extras"]["error"], "something went wrong");
+    }
+
+    #[test]
+    fn test_convert_mcp_list_tools() {
+        let content = vec![json!({
+            "type": "mcp_list_tools",
+            "id": "mlt_123",
+            "server_label": "my_server",
+            "tools": [{"name": "tool1"}],
+            "index": 0,
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["type"], "server_tool_call");
+        assert_eq!(result[0]["name"], "mcp_list_tools");
+        assert_eq!(result[0]["extras"]["server_label"], "my_server");
+        assert_eq!(result[1]["type"], "server_tool_result");
+        assert_eq!(result[1]["output"][0]["name"], "tool1");
+        assert_eq!(result[1]["status"], "success");
+    }
+
+    #[test]
+    fn test_convert_image_generation_call() {
+        let content = vec![json!({
+            "type": "image_generation_call",
+            "result": "base64imagedata",
+            "output_format": "png",
+            "id": "img_123",
+            "status": "completed",
+            "quality": "hd",
+            "index": 0,
+        })];
         let result = convert_to_standard_blocks(&content, false);
         assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["type"], "image");
+        assert_eq!(result[0]["base64"], "base64imagedata");
+        assert_eq!(result[0]["mime_type"], "image/png");
+        assert_eq!(result[0]["id"], "img_123");
+        assert_eq!(result[0]["index"], "lc_img_0");
+        assert_eq!(result[0]["extras"]["status"], "completed");
+        assert_eq!(result[0]["extras"]["quality"], "hd");
+    }
+
+    #[test]
+    fn test_convert_reasoning_simple() {
+        let content = vec![json!({
+            "type": "reasoning",
+            "reasoning": "thinking...",
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["type"], "reasoning");
+        assert_eq!(result[0]["reasoning"], "thinking...");
+    }
+
+    #[test]
+    fn test_convert_reasoning_with_summary() {
+        let content = vec![json!({
+            "type": "reasoning",
+            "id": "rs_123",
+            "summary": [
+                {"text": "first thought", "index": 0},
+                {"text": "second thought", "index": 1},
+            ],
+            "index": 0,
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0]["reasoning"], "first thought");
+        assert_eq!(result[1]["reasoning"], "second thought");
+    }
+
+    #[test]
+    fn test_convert_reasoning_empty_summary() {
+        let content = vec![json!({
+            "type": "reasoning",
+            "id": "rs_123",
+            "summary": [],
+            "index": 0,
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["type"], "reasoning");
+        assert!(result[0].get("summary").is_none());
+    }
+
+    #[test]
+    fn test_convert_unknown_block_to_non_standard() {
+        let content = vec![json!({
+            "type": "computer_call",
+            "id": "cc_123",
+            "index": 5,
+        })];
+        let result = convert_to_standard_blocks(&content, false);
         assert_eq!(result[0]["type"], "non_standard");
         assert_eq!(result[0]["index"], "lc_ns_5");
         assert!(result[0]["value"].get("index").is_none());
     }
 
     #[test]
-    fn test_convert_to_v1_from_chat_completions_input() {
+    fn test_convert_known_block_passthrough() {
+        let content = vec![json!({
+            "type": "tool_call",
+            "name": "my_tool",
+            "args": {"key": "value"},
+            "id": "tc_123",
+        })];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result[0], content[0]);
+    }
+
+    #[test]
+    fn test_convert_openai_input_image_url() {
+        let content = vec![json!({
+            "type": "image_url",
+            "image_url": {"url": "https://example.com/img.png"}
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "image");
+        assert_eq!(result[0]["url"], "https://example.com/img.png");
+    }
+
+    #[test]
+    fn test_convert_openai_input_image_base64() {
+        let content = vec![json!({
+            "type": "image_url",
+            "image_url": {"url": "data:image/png;base64,abc123"}
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "image");
+        assert_eq!(result[0]["base64"], "abc123");
+        assert_eq!(result[0]["mime_type"], "image/png");
+    }
+
+    #[test]
+    fn test_convert_openai_input_audio() {
+        let content = vec![json!({
+            "type": "input_audio",
+            "input_audio": {"data": "audiodata", "format": "mp3"}
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "audio");
+        assert_eq!(result[0]["base64"], "audiodata");
+        assert_eq!(result[0]["mime_type"], "audio/mp3");
+    }
+
+    #[test]
+    fn test_convert_openai_input_file_id() {
+        let content = vec![json!({
+            "type": "file",
+            "file": {"file_id": "file-123"}
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "file");
+        assert_eq!(result[0]["file_id"], "file-123");
+    }
+
+    #[test]
+    fn test_convert_openai_input_file_base64() {
+        let content = vec![json!({
+            "type": "file",
+            "file": {
+                "file_data": "data:application/pdf;base64,pdfdata",
+                "filename": "doc.pdf",
+            }
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "file");
+        assert_eq!(result[0]["base64"], "pdfdata");
+        assert_eq!(result[0]["mime_type"], "application/pdf");
+        assert_eq!(result[0]["filename"], "doc.pdf");
+    }
+
+    #[test]
+    fn test_convert_openai_input_non_standard_unwrap() {
+        let content = vec![json!({
+            "type": "non_standard",
+            "value": {
+                "type": "image_url",
+                "image_url": {"url": "https://example.com/img.png"},
+            }
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "image");
+        assert_eq!(result[0]["url"], "https://example.com/img.png");
+    }
+
+    #[test]
+    fn test_convert_openai_input_unknown_becomes_non_standard() {
+        let content = vec![json!({
+            "type": "custom_thing",
+            "data": "something"
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "non_standard");
+    }
+
+    #[test]
+    fn test_convert_image_url_with_detail_extras() {
+        let content = vec![json!({
+            "type": "image_url",
+            "image_url": {"url": "https://example.com/img.png", "detail": "high"}
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "image");
+        assert_eq!(result[0]["extras"]["detail"], "high");
+    }
+
+    #[test]
+    fn test_string_content_becomes_text() {
+        let content = vec![json!("hello world")];
+        let result = convert_to_standard_blocks(&content, false);
+        assert_eq!(result[0]["type"], "text");
+        assert_eq!(result[0]["text"], "hello world");
+    }
+
+    #[test]
+    fn test_annotation_unknown_type() {
+        let annotation = json!({"type": "unknown_annotation", "data": "something"});
+        let result = convert_annotation_to_v1(&annotation);
+        assert_eq!(result["type"], "non_standard_annotation");
+        assert_eq!(result["value"]["type"], "unknown_annotation");
+    }
+
+    #[test]
+    fn test_web_search_no_duplicate_result() {
         let content = vec![
             json!({
-                "type": "image_url",
-                "image_url": {
-                    "url": "https://example.com/image.png"
-                }
+                "type": "web_search_call",
+                "id": "ws_123",
+                "status": "completed",
             }),
             json!({
-                "type": "text",
-                "text": "Hello"
+                "type": "web_search_result",
+                "id": "ws_123",
             }),
         ];
+        let result = convert_to_standard_blocks(&content, false);
+        let result_count = result
+            .iter()
+            .filter(|b| b.get("type").and_then(|v| v.as_str()) == Some("server_tool_result"))
+            .count();
+        assert_eq!(result_count, 0);
+    }
 
+    #[test]
+    fn test_set_status_failed() {
+        let mut block = json!({"type": "server_tool_result"});
+        set_status(&mut block, Some("failed"));
+        assert_eq!(block["status"], "error");
+    }
+
+    #[test]
+    fn test_set_status_unknown() {
+        let mut block = json!({"type": "server_tool_result"});
+        set_status(&mut block, Some("in_progress"));
+        assert_eq!(block["extras"]["status"], "in_progress");
+    }
+
+    #[test]
+    fn test_text_plain_block_passthrough() {
+        let content = vec![json!({
+            "type": "text-plain",
+            "text": "some plain text content",
+            "mime_type": "text/plain",
+        })];
         let result = convert_to_v1_from_chat_completions_input(&content);
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0]["type"], "image");
-        assert_eq!(result[0]["url"], "https://example.com/image.png");
-        assert_eq!(result[1]["type"], "text");
+        assert_eq!(result[0]["type"], "text-plain");
+        assert_eq!(result[0]["text"], "some plain text content");
+        assert_eq!(result[0]["mime_type"], "text/plain");
     }
 
     #[test]
-    fn test_explode_reasoning_no_summary() {
-        let block = json!({
-            "type": "reasoning",
-            "reasoning": "Simple thought",
-            "id": "rs_123"
-        });
-
-        let result = explode_reasoning(&block);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0]["reasoning"], "Simple thought");
-    }
-
-    #[test]
-    fn test_explode_reasoning_with_summary() {
-        let block = json!({
-            "type": "reasoning",
-            "id": "rs_123",
-            "index": 0,
-            "summary": [
-                {"text": "First thought", "index": 0},
-                {"text": "Second thought", "index": 1}
-            ]
-        });
-
-        let result = explode_reasoning(&block);
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0]["reasoning"], "First thought");
-        assert_eq!(result[1]["reasoning"], "Second thought");
+    fn test_text_plain_block_with_url_passthrough() {
+        let content = vec![json!({
+            "type": "text-plain",
+            "url": "https://example.com/file.txt",
+            "mime_type": "text/plain",
+        })];
+        let result = convert_to_v1_from_chat_completions_input(&content);
+        assert_eq!(result[0]["type"], "text-plain");
+        assert_eq!(result[0]["url"], "https://example.com/file.txt");
     }
 }

@@ -1,4 +1,4 @@
-use agent_chain_core::{AnyMessage, HumanMessage};
+use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use serde::{Deserialize, Serialize};
 
 use crate::types::SnapshotFunctionality;
@@ -26,17 +26,17 @@ impl DefaultSnapshot {
 }
 
 impl SnapshotFunctionality for DefaultSnapshot {
-    fn construct_messages(&self) -> Vec<AnyMessage> {
-        let mut content = format!("Current application state: {}", self.state);
+    fn construct_messages(&self) -> ContentBlocks {
+        let snapshot_json = serde_json::to_string(&self).unwrap_or_default();
 
-        if !self.metadata.is_empty() {
-            content.push_str(" with additional context:");
-            for (key, value) in &self.metadata {
-                content.push_str(&format!("\n- {}: {}", key, value));
-            }
-        }
+        let block = PlainTextContentBlock::builder()
+            .context(format!("Current application state: {}", self.state))
+            .title("default_snapshot.json".to_string())
+            .mime_type("application/json".to_string())
+            .text(snapshot_json)
+            .build();
 
-        vec![HumanMessage::builder().content(content).build().into()]
+        vec![block.into()].into()
     }
 
     fn get_updated_at(&self) -> u64 {
@@ -54,9 +54,8 @@ impl SnapshotFunctionality for DefaultSnapshot {
 
 #[cfg(test)]
 mod tests {
-    use agent_chain_core::messages::prelude::*;
-
     use super::*;
+    use agent_chain_core::messages::ContentBlock;
 
     #[test]
     fn test_default_snapshot_creation() {
@@ -71,9 +70,8 @@ mod tests {
     #[test]
     fn test_message_construction_no_metadata() {
         let snapshot = DefaultSnapshot::new("Simple state".to_string());
-        let message = snapshot.construct_messages()[0].clone();
-        let text = message.content();
-
-        assert_eq!(text, "Current application state: Simple state");
+        let blocks = snapshot.construct_messages();
+        assert_eq!(blocks.len(), 1);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
     }
 }

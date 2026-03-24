@@ -1691,6 +1691,7 @@ dependencies = [
 name = "be-remote-db"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-core",
  "bon",
  "chrono",
  "ipnet",
@@ -1726,9 +1727,12 @@ version = "0.0.0"
 dependencies = [
  "agent-chain",
  "async-stream",
+ "base64 0.22.1",
+ "be-asset",
  "be-authz",
  "be-local-settings",
  "be-remote-db",
+ "be-storage",
  "chrono",
  "prost",
  "prost-types",
