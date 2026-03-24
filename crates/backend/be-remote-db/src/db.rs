@@ -1191,7 +1191,7 @@ impl DatabaseManager {
         user_id: Uuid,
         parent_message_id: Option<Uuid>,
         message_type: MessageType,
-        content: String,
+        content: serde_json::Value,
         tool_call_id: Option<String>,
         tool_calls: Option<serde_json::Value>,
         additional_kwargs: Option<serde_json::Value>,
@@ -2050,7 +2050,8 @@ impl DatabaseManager {
         let results = sqlx::query_as::<_, SearchResultMessage>(
             r#"
             WITH matched AS (
-                SELECT id, thread_id, message_type, content,
+                SELECT id, thread_id, message_type,
+                       extract_content_text(content) AS content_text,
                        search_tsv @@ to_tsquery('english', $1) AS fts_match,
                        CASE WHEN search_tsv @@ to_tsquery('english', $1)
                             THEN ts_rank(search_tsv, to_tsquery('english', $1))
@@ -2060,13 +2061,13 @@ impl DatabaseManager {
                 FROM messages
                 WHERE user_id = $2
                   AND hidden_from_ui = false
-                  AND (search_tsv @@ to_tsquery('english', $1) OR content ILIKE $5)
+                  AND (search_tsv @@ to_tsquery('english', $1) OR extract_content_text(content) ILIKE $5)
                 ORDER BY rank DESC, created_at DESC
                 LIMIT $3 OFFSET $4
             )
             SELECT id, thread_id, message_type,
                    regexp_replace(
-                       substring(content from GREATEST(1, position(lower($7) in lower(content)) - 80) for 200),
+                       substring(content_text from GREATEST(1, position(lower($7) in lower(content_text)) - 80) for 200),
                        $6, '<mark>\&</mark>', 'gi'
                    ) AS snippet,
                    rank, created_at

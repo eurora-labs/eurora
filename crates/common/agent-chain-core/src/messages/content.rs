@@ -1052,6 +1052,54 @@ pub enum ContentBlock {
     ServerToolResult(ServerToolResult),
 }
 
+impl From<PlainTextContentBlock> for ContentBlock {
+    fn from(block: PlainTextContentBlock) -> Self {
+        ContentBlock::PlainText(block)
+    }
+}
+
+impl From<TextContentBlock> for ContentBlock {
+    fn from(block: TextContentBlock) -> Self {
+        ContentBlock::Text(block)
+    }
+}
+
+impl From<ImageContentBlock> for ContentBlock {
+    fn from(block: ImageContentBlock) -> Self {
+        ContentBlock::Image(block)
+    }
+}
+
+impl From<VideoContentBlock> for ContentBlock {
+    fn from(block: VideoContentBlock) -> Self {
+        ContentBlock::Video(block)
+    }
+}
+
+impl From<AudioContentBlock> for ContentBlock {
+    fn from(block: AudioContentBlock) -> Self {
+        ContentBlock::Audio(block)
+    }
+}
+
+impl From<FileContentBlock> for ContentBlock {
+    fn from(block: FileContentBlock) -> Self {
+        ContentBlock::File(block)
+    }
+}
+
+impl From<ReasoningContentBlock> for ContentBlock {
+    fn from(block: ReasoningContentBlock) -> Self {
+        ContentBlock::Reasoning(block)
+    }
+}
+
+impl From<ToolCallBlock> for ContentBlock {
+    fn from(block: ToolCallBlock) -> Self {
+        ContentBlock::ToolCall(block)
+    }
+}
+
 pub const KNOWN_BLOCK_TYPES: &[&str] = &[
     "text",
     "reasoning",
