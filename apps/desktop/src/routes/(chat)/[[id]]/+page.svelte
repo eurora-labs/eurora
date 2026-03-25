@@ -163,6 +163,30 @@
 		assets = assets.filter((a) => a.id !== id);
 	}
 
+	function middleTruncate(text: string, maxTokens = 5): string {
+		const parts = text.split(/([^a-zA-Z0-9]+)/);
+		const words = parts.filter((p) => /[a-zA-Z0-9]/.test(p));
+		if (words.length <= maxTokens * 2) return text;
+
+		let start = '';
+		let count = 0;
+		for (const part of parts) {
+			if (/[a-zA-Z0-9]/.test(part)) count++;
+			if (count > maxTokens) break;
+			start += part;
+		}
+
+		let end = '';
+		count = 0;
+		for (let i = parts.length - 1; i >= 0; i--) {
+			if (/[a-zA-Z0-9]/.test(parts[i])) count++;
+			if (count > maxTokens) break;
+			end = parts[i] + end;
+		}
+
+		return start + '(...)' + end;
+	}
+
 	onMount(() => {
 		taurpc.timeline.new_assets_event.on((chips) => {
 			assets = chips;
@@ -395,7 +419,7 @@
 											data={{
 												type: 'file',
 												id: asset.id,
-												filename: asset.name,
+												filename: middleTruncate(asset.name),
 											}}
 										>
 											<Attachment.Preview />
@@ -527,7 +551,11 @@
 						<Attachment.Root variant="inline">
 							{#each assets as asset (asset.id)}
 								<Attachment.Item
-									data={{ type: 'file', id: asset.id, filename: asset.name }}
+									data={{
+										type: 'file',
+										id: asset.id,
+										filename: middleTruncate(asset.name),
+									}}
 									onRemove={() => removeAsset(asset.id)}
 								>
 									<Attachment.Preview />

@@ -22,11 +22,8 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
 	}
 
-	private async fetchTranscript(videoId?: string): Promise<any> {
-		if (!videoId) {
-			videoId = this.params.videoId;
-		}
-
+	private async fetchTranscript(): Promise<any> {
+		const videoId = getCurrentVideoId();
 		return (await this.youtubeTranscriptApi.fetch(videoId)).snippets;
 	}
 
@@ -58,8 +55,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		_obj: YoutubeBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		const currentVideoId = getCurrentVideoId();
-		this.params.videoId = currentVideoId;
 		return { kind: 'Ok', data: null };
 	}
 
@@ -80,7 +75,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.error('Error generating YouTube report:', {
 				url: window.location.href,
-				videoId: this.params.videoId,
+				videoId: getCurrentVideoId(),
 				error: errorMessage,
 				stack: error instanceof Error ? error.stack : undefined,
 			});
@@ -172,7 +167,6 @@ export function main() {
 	initialized = true;
 
 	const watcher = new YoutubeWatcher({
-		videoId: getCurrentVideoId(),
 		canvas: document.createElement('canvas'),
 		context: document.createElement('canvas').getContext('2d'),
 		youtubePlayer: null,

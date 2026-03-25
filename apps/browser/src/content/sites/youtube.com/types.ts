@@ -4,7 +4,6 @@ type CustomMessageType = 'PLAY';
 export type YoutubeMessageType = MessageType | CustomMessageType;
 
 export interface WatcherParams {
-	videoId?: string;
 	canvas: HTMLCanvasElement;
 	context: CanvasRenderingContext2D;
 	youtubePlayer: HTMLVideoElement | null;
