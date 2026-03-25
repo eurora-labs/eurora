@@ -19,7 +19,6 @@
 		try {
 			const settings: APISettings = {
 				endpoint: overrideEnabled ? endpoint : defaultEndpoint,
-				provider: null,
 			};
 			const result = await taurpc.settings.set_api_settings(settings);
 			endpoint = result.endpoint;

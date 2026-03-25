@@ -54,12 +54,16 @@ impl ActivityStorage {
         let channel = self.channel_rx.borrow().clone();
         let authed = build_authed_channel(channel, self.auth_manager.clone());
         ProtoActivityServiceClient::new(authed)
+            .max_decoding_message_size(1024 * 1024 * 1024)
+            .max_encoding_message_size(1024 * 1024 * 1024)
     }
 
     fn asset_client(&self) -> ProtoAssetServiceClient<AuthedChannel> {
         let channel = self.channel_rx.borrow().clone();
         let authed = build_authed_channel(channel, self.auth_manager.clone());
         ProtoAssetServiceClient::new(authed)
+            .max_decoding_message_size(1024 * 1024 * 1024)
+            .max_encoding_message_size(1024 * 1024 * 1024)
     }
 
     pub async fn save_activity_to_service(

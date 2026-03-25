@@ -276,7 +276,7 @@ extension NativeMessagingBridge {
         if isComplete { logger.debug("Connection closed by server"); isConnected = false; return }
         guard let lengthData = data, lengthData.count == 4 else { receiveNextMessage(); return }
         let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
-        guard length > 0 && length < 8 * 1024 * 1024 else {
+        guard length > 0 && length < 1024 * 1024 * 1024 else {
             logger.error("Invalid message length: \(length)"); receiveNextMessage(); return
         }
         receiveMessageBody(length: Int(length))

@@ -13,6 +13,13 @@ use crate::{
 pub(crate) static DEFAULTS: &str = include_str!("../assets/defaults.jsonc");
 
 impl AppSettings {
+    pub fn defaults() -> Self {
+        let settings: serde_json::Value =
+            serde_json_lenient::from_str(DEFAULTS).expect("embedded defaults.jsonc is invalid");
+        serde_json::from_value(settings)
+            .expect("embedded defaults.jsonc does not match AppSettings")
+    }
+
     pub fn load(config_path: &Path) -> Result<Self> {
         if !config_path.exists() {
             create_dirs_then_write(config_path, "{}\n")?;
@@ -42,7 +49,19 @@ impl AppSettings {
             .expect("missing config dir")
             .join("eurora");
         std::fs::create_dir_all(&config_dir).expect("failed to create config dir");
-        AppSettings::load(config_dir.join(SETTINGS_FILE).as_path())
+        let config_path = config_dir.join(SETTINGS_FILE);
+
+        match AppSettings::load(config_path.as_path()) {
+            Ok(settings) => Ok(settings),
+            Err(e) => {
+                tracing::warn!("Failed to load settings, resetting to defaults: {e}");
+                let defaults = AppSettings::defaults();
+                if let Err(write_err) = create_dirs_then_write(&config_path, "{}\n") {
+                    tracing::warn!("Failed to reset settings file: {write_err}");
+                }
+                Ok(defaults)
+            }
+        }
     }
 
     pub fn save(&self, config_path: &Path) -> Result<()> {

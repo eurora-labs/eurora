@@ -2,14 +2,13 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 mod api_settings;
-mod error;
 mod general_settings;
 mod json;
 mod persistence;
 mod telemetry_settings;
 mod watch;
 
-pub use api_settings::{APISettings, OpenAISettings, ProviderSettings};
+pub use api_settings::APISettings;
 pub use general_settings::GeneralSettings;
 pub use telemetry_settings::TelemetrySettings;
 

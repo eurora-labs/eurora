@@ -31,7 +31,6 @@
 
 			const settings: APISettings = {
 				endpoint,
-				provider: null,
 			};
 			await taurpc.settings.set_api_settings(settings);
 			goto('/onboarding/login/local/auth');

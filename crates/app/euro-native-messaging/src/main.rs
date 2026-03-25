@@ -35,6 +35,10 @@ async fn connect_with_retry(server_addr: &str) -> BrowserBridgeClient<Channel> {
             tracing::info!("Attempting to connect to euro-activity server");
             BrowserBridgeClient::connect(addr)
                 .await
+                .map(|c| {
+                    c.max_decoding_message_size(1024 * 1024 * 1024)
+                        .max_encoding_message_size(1024 * 1024 * 1024)
+                })
                 .map_err(|e| e.to_string())
         }
     })
