@@ -76,18 +76,7 @@ export type MessageView = {
 	assets: MessageAssetChip[] | null,
 };
 
-export type OllamaSettings = {
-	base_url: string,
-	model: string,
-};
-
-export type OpenAISettings = {
-	base_url: string,
-	model: string,
-	title_model: string | null,
-};
-
-export type ProviderSettings = { OllamaSettings: OllamaSettings } | { OpenAISettings: OpenAISettings };
+export type ProviderSettings = "OllamaSettings" | "OpenAISettings";
 
 export type Query = {
 	text: string,
