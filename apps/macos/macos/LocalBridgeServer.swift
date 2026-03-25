@@ -209,7 +209,7 @@ class LocalBridgeServer {
 
             let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
 
-            guard length > 0 && length < 8 * 1024 * 1024 else {
+            guard length > 0 && length < 1024 * 1024 * 1024 else {
                 self.logger.error("Invalid message length: \(length)")
                 self.receiveMessage(from: connection, connId: connId)
                 return

@@ -443,8 +443,6 @@ impl SystemApi for SystemApiImpl {
             .set_global_backend_url(&local_url)
             .ctx("Failed to switch API endpoint")?;
 
-        send_encryption_key(&local_url).await?;
-
         Ok(LocalBackendInfo {
             grpc_port,
             http_port,
@@ -470,45 +468,4 @@ impl SystemApi for SystemApiImpl {
         window.set_focus().map_err(|e| e.to_string())?;
         Ok(())
     }
-}
-
-async fn send_encryption_key(backend_url: &str) -> Result<(), String> {
-    use backon::{ConstantBuilder, Retryable};
-    use base64::prelude::*;
-    use proto_gen::local_settings::SetEncryptionKeyRequest;
-    use proto_gen::local_settings::proto_local_settings_service_client::ProtoLocalSettingsServiceClient;
-
-    let main_key =
-        euro_encrypt::MainKey::new().ctx("Failed to retrieve encryption key from keyring")?;
-
-    let encoded = BASE64_STANDARD.encode(main_key.as_bytes());
-    let url = backend_url.to_string();
-
-    (|| {
-        let encoded = encoded.clone();
-        let url = url.clone();
-        async move {
-            let mut client = ProtoLocalSettingsServiceClient::connect(url).await?;
-            client
-                .set_encryption_key(SetEncryptionKeyRequest {
-                    encryption_key: encoded,
-                })
-                .await?;
-            Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-        }
-    })
-    .retry(
-        ConstantBuilder::default()
-            .with_delay(std::time::Duration::from_secs(2))
-            .with_max_times(30),
-    )
-    .sleep(tokio::time::sleep)
-    .notify(|err, dur| {
-        tracing::info!("Waiting for backend to be ready (retrying in {dur:?}): {err}");
-    })
-    .await
-    .map_err(|e| format!("Backend did not become ready: {e}"))?;
-
-    tracing::info!("Encryption key sent to local backend");
-    Ok(())
 }
