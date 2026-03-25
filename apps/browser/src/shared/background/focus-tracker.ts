@@ -40,9 +40,9 @@ async function onTabUpdated(
 	changeInfo: browser.Tabs.OnUpdatedChangeInfoType,
 	tab: browser.Tabs.Tab,
 ): Promise<void> {
-	if (changeInfo.status !== 'complete') return;
 	if (!activeNativePort) return;
 	if (!tab.active) return;
+	if (changeInfo.status !== 'complete' && !changeInfo.title) return;
 	await sendMetadataForActiveTab();
 }
 
