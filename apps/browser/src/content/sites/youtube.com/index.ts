@@ -22,13 +22,12 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
 	}
 
-	private async ensureTranscript(videoId?: string): Promise<any> {
+	private async fetchTranscript(videoId?: string): Promise<any> {
 		if (!videoId) {
 			videoId = this.params.videoId;
 		}
 
-		this.params.videoTranscript = (await this.youtubeTranscriptApi.fetch(videoId)).snippets;
-		return this.params.videoTranscript;
+		return (await this.youtubeTranscriptApi.fetch(videoId)).snippets;
 	}
 
 	public listen(
@@ -60,59 +59,25 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		const currentVideoId = getCurrentVideoId();
-		if (!currentVideoId) {
-			this.params.videoId = undefined;
-			this.params.videoTranscript = undefined;
-			return { kind: 'Ok', data: null };
-		}
 		this.params.videoId = currentVideoId;
-
-		try {
-			const transcript = await this.ensureTranscript(currentVideoId);
-			this.params.videoTranscript = transcript;
-		} catch (error) {
-			console.error('Failed to get transcript:', error);
-			browser.runtime.sendMessage({
-				type: 'SEND_TO_NATIVE',
-				payload: {
-					videoId: this.params.videoId,
-					error: error.message || 'Unknown error',
-					transcript: null,
-				},
-			});
-		}
 		return { kind: 'Ok', data: null };
 	}
 
 	private async generateVideoAsset(): Promise<any> {
 		try {
 			const currentTime = this.getCurrentVideoTime();
+			const transcript = await this.fetchTranscript();
+
 			const reportData: NativeYoutubeAsset = {
 				url: window.location.href,
 				title: document.title,
-				transcript: this.params.videoTranscript
-					? JSON.stringify(this.params.videoTranscript)
-					: '',
+				transcript: JSON.stringify(transcript),
 				current_time: Math.round(currentTime),
 			};
 
-			if (reportData.transcript === '') {
-				try {
-					const transcript = await this.ensureTranscript();
-					reportData.transcript = JSON.stringify(transcript);
-					return { kind: 'NativeYoutubeAsset', data: reportData };
-				} catch (error) {
-					return {
-						kind: 'Error',
-						data: `Failed to get transcript: ${error.message}`,
-					};
-				}
-			} else {
-				return { kind: 'NativeYoutubeAsset', data: reportData };
-			}
+			return { kind: 'NativeYoutubeAsset', data: reportData };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			const contextualError = `Failed to generate YouTube assets for ${window.location.href}: ${errorMessage}`;
 			console.error('Error generating YouTube report:', {
 				url: window.location.href,
 				videoId: this.params.videoId,
@@ -122,7 +87,7 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 
 			return {
 				kind: 'Error',
-				data: `Failed to generate YouTube assets: ${contextualError}`,
+				data: `Failed to generate YouTube assets for ${window.location.href}: ${errorMessage}`,
 			};
 		}
 	}
@@ -208,7 +173,6 @@ export function main() {
 
 	const watcher = new YoutubeWatcher({
 		videoId: getCurrentVideoId(),
-		videoTranscript: null,
 		canvas: document.createElement('canvas'),
 		context: document.createElement('canvas').getContext('2d'),
 		youtubePlayer: null,
