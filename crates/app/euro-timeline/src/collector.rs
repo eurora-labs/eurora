@@ -148,6 +148,17 @@ impl CollectorService {
                         let mut storage = storage_for_reports.lock().await;
                         storage.add_activity(activity);
                     }
+                    ActivityReport::TitleUpdated { title, url } => {
+                        tracing::debug!("Received title update: {} ({})", title, url);
+                        last_activity_name = Some(url.clone());
+                        let mut storage = storage_for_reports.lock().await;
+                        if let Some(activity) = storage.get_all_activities_mut().back_mut() {
+                            activity.title = Some(title);
+                            activity.name = url;
+                            let chip = activity.get_context_chip();
+                            let _ = assets_event_tx_for_reports.send(vec![chip]);
+                        }
+                    }
                     ActivityReport::Stopping => {
                         tracing::debug!("Strategy reported stopping");
                     }

@@ -33,6 +33,7 @@ pub struct StrategyMetadata {
 #[derive(Debug, Clone)]
 pub enum ActivityReport {
     NewActivity(Activity),
+    TitleUpdated { title: String, url: String },
     Stopping,
 }
 
