@@ -1065,7 +1065,11 @@ impl ProtoThreadService for ThreadService {
                     id: n.id.to_string(),
                     parent_message_id: n.parent_message_id.map(|id| id.to_string()),
                     message_type: n.message_type.to_string(),
-                    content: serde_json::to_string(&n.content).unwrap_or_default(),
+                    content: serde_json::from_value::<Vec<ContentBlock>>(n.content)
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(ProtoContentBlock::from)
+                        .collect(),
                     level: n.level as u32,
                     sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
                     sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),

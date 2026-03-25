@@ -1,5 +1,6 @@
 use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
+use agent_chain_core::messages::content::{ContentBlock, ContentBlocks};
 use agent_chain_core::messages::prelude::*;
 use euro_thread::{ListThreadsRequest, Thread};
 use proto_gen::thread::{CreateThreadRequest, GetMessagesResponse};
@@ -289,11 +290,18 @@ impl ThreadApi for ThreadApiImpl {
                 let assets = parse_asset_chips_from_json(&n.additional_kwargs);
                 let reasoning_blocks = parse_reasoning_blocks_from_json(&n.reasoning_blocks);
 
+                let content_blocks: ContentBlocks = n
+                    .content
+                    .into_iter()
+                    .map(ContentBlock::from)
+                    .collect::<Vec<_>>()
+                    .into();
+
                 MessageTreeNodeView {
                     id: n.id,
                     parent_message_id: n.parent_message_id,
                     message_type: n.message_type,
-                    content: n.content,
+                    content: content_blocks.to_string(),
                     level: n.level,
                     sibling_count: n.sibling_count,
                     sibling_index: n.sibling_index,
