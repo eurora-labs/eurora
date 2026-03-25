@@ -76,8 +76,7 @@ pub struct Brave;
 
 impl ProcessFunctionality for Brave {
     fn get_name(&self) -> &str {
-        // TODO: Confirm the proper names on Linux and macOS
-        os_pick("brave.exe", "brave", "Brave")
+        os_pick("brave.exe", "brave", "Brave Browser")
     }
 }
 
