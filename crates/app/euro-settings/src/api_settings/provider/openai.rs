@@ -13,9 +13,9 @@ pub struct OpenAISettings {
 }
 
 impl OpenAISettings {
-    fn api_key() -> Result<Option<SecretString>> {
-        secret::retrieve(OPENAI_API_KEY_HANDLE).map_err(|e| Error::Secret(e.to_string()))
-    }
+    // fn api_key() -> Result<Option<SecretString>> {
+    //     secret::retrieve(OPENAI_API_KEY_HANDLE).map_err(|e| Error::Secret(e.to_string()))
+    // }
 
     pub fn set_api_key(api_key: &str) -> Result<()> {
         secret::persist(

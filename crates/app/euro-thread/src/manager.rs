@@ -38,6 +38,8 @@ impl ThreadManager {
         let channel = self.channel_rx.borrow().clone();
         let authed = build_authed_channel(channel, self.auth_manager.clone());
         ProtoThreadServiceClient::new(authed)
+            .max_decoding_message_size(1024 * 1024 * 1024)
+            .max_encoding_message_size(1024 * 1024 * 1024)
     }
 
     pub async fn create(&self, request: CreateThreadRequest) -> Result<Thread> {

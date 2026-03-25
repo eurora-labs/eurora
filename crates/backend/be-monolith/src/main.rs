@@ -23,7 +23,7 @@ use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-const GRPC_MAX_DECODE_SIZE: usize = 8 * 1024 * 1024; // 8 MB
+const GRPC_MAX_DECODE_SIZE: usize = 1024 * 1024 * 1024; // 1 GB
 const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
 fn build_cors() -> CorsLayer {
@@ -233,19 +233,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_service(health_service)
         .add_service(
             ProtoAuthServiceServer::new(auth_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
+                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
         )
         .add_service(
             ProtoActivityServiceServer::new(activity_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
+                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
         )
         .add_service(
             ProtoAssetServiceServer::new(assets_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
+                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
         )
         .add_service(
             ProtoThreadServiceServer::new(thread_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
+                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
+                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
         );
 
     let authz_state = Arc::new(AuthzState::new(
