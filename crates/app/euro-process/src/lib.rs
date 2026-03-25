@@ -71,6 +71,25 @@ impl ProcessFunctionality for Safari {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Brave;
+
+impl ProcessFunctionality for Brave {
+    fn get_name(&self) -> &str {
+        // TODO: Confirm the proper names on Linux and macOS
+        os_pick("brave.exe", "brave", "Brave")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Edge;
+
+impl ProcessFunctionality for Edge {
+    fn get_name(&self) -> &str {
+        os_pick("msedge.exe", "msedge", "Microsoft Edge")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
