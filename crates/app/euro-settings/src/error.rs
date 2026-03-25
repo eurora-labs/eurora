@@ -29,7 +29,4 @@ pub enum Error {
 
     #[error("secret storage error: {0}")]
     Secret(String),
-
-    #[error("failed to sync provider settings: {0}")]
-    Sync(String),
 }

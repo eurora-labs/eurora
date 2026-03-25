@@ -180,9 +180,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     let activity_service = ActivityService::new(db_manager.clone(), core_asset.clone());
     let assets_service = AssetService::new(db_manager.clone(), storage.clone());
-    let (settings_tx, settings_rx) = be_local_settings::settings_channel();
-
-    let thread_service = ThreadService::new(db_manager.clone(), core_asset.clone(), settings_rx);
+    let thread_service = ThreadService::new(db_manager.clone(), core_asset.clone());
 
     tracing::info!("Starting gRPC server at {}", grpc_addr);
     tracing::info!("Starting HTTP server at {}", http_addr);
@@ -227,7 +225,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         trusted_proxies.clone(),
     );
 
-    let mut grpc_server = Server::builder()
+    let grpc_server = Server::builder()
         .accept_http1(true)
         .layer(build_cors())
         .layer(GrpcWebLayer::new())
@@ -249,15 +247,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ProtoThreadServiceServer::new(thread_service)
                 .max_decoding_message_size(GRPC_MAX_DECODE_SIZE),
         );
-
-    if local_mode {
-        let local_settings =
-            be_local_settings_service::LocalSettingsService::new(storage.clone(), settings_tx);
-        grpc_server = grpc_server.add_service(local_settings.into_server());
-        tracing::info!(
-            "Local mode: registered LocalSettingsService (encryption key will be set by client)"
-        );
-    }
 
     let authz_state = Arc::new(AuthzState::new(
         authz,

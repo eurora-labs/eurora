@@ -126,12 +126,6 @@ impl SettingsApi for SettingsApiImpl {
         settings.api = api_settings;
 
         settings
-            .api
-            .sync()
-            .await
-            .ctx("Failed to sync provider settings")?;
-
-        settings
             .save_to_default_path()
             .ctx("Failed to persist api settings")?;
 

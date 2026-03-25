@@ -1,13 +1,11 @@
 use agent_chain::SystemMessage;
 use agent_chain::messages::{ContentBlock, ImageContentBlock, PlainTextContentBlock};
-use agent_chain::openai::BuiltinTool;
 use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
 use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
-use be_local_settings::{OllamaConfig, OpenAIConfig, ProviderSettings, SettingsReceiver};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
@@ -27,10 +25,9 @@ use proto_gen::thread::{
     SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
     SearchThreadsResponse, SwitchBranchRequest, Thread,
 };
-use secrecy::ExposeSecret;
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -41,72 +38,10 @@ use crate::tools::firecrawl_tools;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 
-fn resolve_host_url(url: &str) -> String {
-    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
-        .map(|v| v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-    if local_mode {
-        url.replace("://localhost", "://host.docker.internal")
-            .replace("://127.0.0.1", "://host.docker.internal")
-    } else {
-        url.to_string()
-    }
-}
-
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
     title: Arc<dyn BaseChatModel + Send + Sync>,
     tools: HashMap<String, Arc<dyn BaseTool>>,
-}
-
-fn build_ollama(
-    config: &OllamaConfig,
-    model_override: Option<&str>,
-) -> Box<dyn BaseChatModel + Send + Sync> {
-    let model = model_override.unwrap_or(&config.model);
-    let base_url = resolve_host_url(config.base_url.as_str());
-    Box::new(
-        ChatOllama::builder()
-            .model(model)
-            .base_url(&base_url)
-            .build(),
-    )
-}
-
-fn build_openai(
-    config: &OpenAIConfig,
-    model_override: Option<&str>,
-    web_search: bool,
-) -> Box<dyn BaseChatModel + Send + Sync> {
-    let model = model_override.unwrap_or(&config.model);
-    let is_openai_native = config.base_url.as_str().contains("openai.com");
-    let mut provider = ChatOpenAI::builder()
-        .model(model)
-        .api_key(config.api_key.expose_secret())
-        .api_base(config.base_url.as_str())
-        .use_responses_api(is_openai_native)
-        .build();
-    if web_search && is_openai_native {
-        provider = provider.with_builtin_tools(vec![BuiltinTool::WebSearch]);
-    }
-    Box::new(provider)
-}
-
-fn build_chat_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatModel + Send + Sync> {
-    match settings {
-        ProviderSettings::Ollama(c) => build_ollama(c, None),
-        ProviderSettings::OpenAI(c) => build_openai(c, None, true),
-    }
-}
-
-fn build_title_provider_from(settings: &ProviderSettings) -> Box<dyn BaseChatModel + Send + Sync> {
-    match settings {
-        ProviderSettings::Ollama(c) => build_ollama(c, None),
-        ProviderSettings::OpenAI(c) => {
-            let title_model = c.title_model.as_deref();
-            build_openai(c, title_model, false)
-        }
-    }
 }
 
 fn build_tool_map() -> HashMap<String, Arc<dyn BaseTool>> {
@@ -116,7 +51,7 @@ fn build_tool_map() -> HashMap<String, Arc<dyn BaseTool>> {
         .collect()
 }
 
-fn build_env_fallback() -> Option<Providers> {
+fn build_providers() -> Providers {
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
@@ -129,11 +64,11 @@ fn build_env_fallback() -> Option<Providers> {
             Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
         let title: Arc<dyn BaseChatModel + Send + Sync> =
             Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
-        Some(Providers {
+        Providers {
             chat,
             title,
             tools: HashMap::new(),
-        })
+        }
     } else {
         let chat_model = ChatOpenAI::builder()
             .model(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
@@ -162,63 +97,23 @@ fn build_env_fallback() -> Option<Providers> {
                 .build(),
         );
 
-        Some(Providers {
+        Providers {
             chat,
             title,
             tools: build_tool_map(),
-        })
+        }
     }
 }
 
 pub struct ThreadService {
     db: Arc<DatabaseManager>,
     asset_service: Arc<AssetService>,
-    providers: Arc<RwLock<Option<Providers>>>,
+    providers: Providers,
 }
 
 impl ThreadService {
-    pub fn new(
-        db: Arc<DatabaseManager>,
-        asset_service: Arc<AssetService>,
-        mut settings_rx: SettingsReceiver,
-    ) -> Self {
-        let env_fallback = build_env_fallback();
-        tracing::info!(
-            "Creating new ThreadService instance (env fallback: {})",
-            env_fallback.is_some()
-        );
-
-        let initial = settings_rx.borrow_and_update().clone();
-        let initial_providers = initial
-            .map(|s| Providers {
-                chat: build_chat_provider_from(&s).into(),
-                title: build_title_provider_from(&s).into(),
-                tools: build_tool_map(),
-            })
-            .or(env_fallback);
-
-        let providers = Arc::new(RwLock::new(initial_providers));
-
-        let providers_handle = providers.clone();
-        tokio::spawn(async move {
-            loop {
-                if settings_rx.changed().await.is_err() {
-                    tracing::info!("Settings channel closed, stopping provider watcher");
-                    break;
-                }
-                let new_settings = settings_rx.borrow_and_update().clone();
-                let new_providers = new_settings.map(|s| {
-                    tracing::info!("Provider settings changed, rebuilding providers");
-                    Providers {
-                        chat: build_chat_provider_from(&s).into(),
-                        title: build_title_provider_from(&s).into(),
-                        tools: build_tool_map(),
-                    }
-                });
-                let mut lock = providers_handle.write().unwrap_or_else(|e| e.into_inner());
-                *lock = new_providers;
-            }
-        });
+    pub fn new(db: Arc<DatabaseManager>, asset_service: Arc<AssetService>) -> Self {
+        let providers = build_providers();
 
         Self {
             db,
@@ -227,27 +122,16 @@ impl ThreadService {
         }
     }
 
-    fn get_chat_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
-        let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
-        lock.as_ref().map(|p| p.chat.clone()).ok_or_else(|| {
-            Status::failed_precondition(
-                "No provider settings configured and no environment fallback available",
-            )
-        })
+    fn get_chat_provider(&self) -> Arc<dyn BaseChatModel + Send + Sync> {
+        self.providers.chat.clone()
     }
 
-    fn get_title_provider(&self) -> Result<Arc<dyn BaseChatModel + Send + Sync>, Status> {
-        let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
-        lock.as_ref().map(|p| p.title.clone()).ok_or_else(|| {
-            Status::failed_precondition(
-                "No provider settings configured and no environment fallback available",
-            )
-        })
+    fn get_title_provider(&self) -> Arc<dyn BaseChatModel + Send + Sync> {
+        self.providers.title.clone()
     }
 
     fn get_tools(&self) -> HashMap<String, Arc<dyn BaseTool>> {
-        let lock = self.providers.read().unwrap_or_else(|e| e.into_inner());
-        lock.as_ref().map(|p| p.tools.clone()).unwrap_or_default()
+        self.providers.tools.clone()
     }
 
     async fn upload_block_content(
@@ -684,7 +568,7 @@ impl ProtoThreadService for ThreadService {
 
         self.resolve_blocks(&mut messages).await;
 
-        let chat_provider = self.get_chat_provider()?;
+        let chat_provider = self.get_chat_provider();
         let tools = self.get_tools();
 
         let db = self.db.clone();
@@ -987,7 +871,7 @@ impl ProtoThreadService for ThreadService {
 
         messages.push(HumanMessage::builder().content(req.content).build().into());
 
-        let title_provider = self.get_title_provider()?;
+        let title_provider = self.get_title_provider();
         let mut title = match title_provider.invoke(messages, None).await {
             Ok(message) => message.content.to_string(),
             Err(_) => "New Chat".to_string(),
