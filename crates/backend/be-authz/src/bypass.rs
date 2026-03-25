@@ -1,10 +1,7 @@
 pub(crate) const REST_BYPASS_PREFIXES: &[&str] = &["/releases/", "/extensions/", "/download/"];
 pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook", "/health"];
-pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &[
-    "auth_service.ProtoAuthService",
-    "grpc.health.v1.Health",
-    "local_settings_service.ProtoLocalSettingsService",
-];
+pub(crate) const GRPC_BYPASS_SERVICES: &[&str] =
+    &["auth_service.ProtoAuthService", "grpc.health.v1.Health"];
 
 fn normalize_path(path: &str) -> String {
     use percent_encoding::percent_decode_str;
@@ -108,9 +105,6 @@ mod tests {
     fn grpc_bypass_known_services() {
         assert!(is_grpc_bypass("auth_service.ProtoAuthService"));
         assert!(is_grpc_bypass("grpc.health.v1.Health"));
-        assert!(is_grpc_bypass(
-            "local_settings_service.ProtoLocalSettingsService"
-        ));
     }
 
     #[test]
