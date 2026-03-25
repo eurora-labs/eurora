@@ -86,8 +86,7 @@ pub struct Edge;
 
 impl ProcessFunctionality for Edge {
     fn get_name(&self) -> &str {
-        // TODO: Confirm the proper names on Linux and macOS
-        os_pick("msedge.exe", "edge", "Edge")
+        os_pick("msedge.exe", "msedge", "Microsoft Edge")
     }
 }
 
