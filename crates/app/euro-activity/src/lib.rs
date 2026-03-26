@@ -9,7 +9,6 @@ mod utils;
 
 pub use strategies::processes;
 
-pub use assets::twitter::{TwitterContextType, TwitterTweet};
 pub use assets::youtube::TranscriptLine;
 pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
 pub use config::{
