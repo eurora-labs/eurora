@@ -139,7 +139,7 @@ jobs:
 
             - name: Login to Amazon ECR
               id: ecr-login
-              uses: aws-actions/amazon-ecr-login@c962da2960ed15f492addc26fffa274485265950 # v2
+              uses: aws-actions/amazon-ecr-login@183a1442edf41672e66566b7fc560e297a290896 # v2
 
             - name: Push to ECR
               working-directory: /tmp/digests
