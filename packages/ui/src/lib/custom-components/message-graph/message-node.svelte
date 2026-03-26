@@ -33,9 +33,6 @@
 		<FlowNode.Header>
 			<div class="flex items-center justify-between">
 				<FlowNode.Title>{roleLabel}</FlowNode.Title>
-				{#if data.siblingLabel}
-					<span class="text-muted-foreground text-xs">{data.siblingLabel}</span>
-				{/if}
 			</div>
 		</FlowNode.Header>
 		<FlowNode.Content>
