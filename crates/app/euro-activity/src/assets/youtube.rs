@@ -85,7 +85,37 @@ impl AssetFunctionality for YoutubeAsset {
             .extras(extras)
             .build();
 
-        vec![block.into()].into()
+        let recent_text: String = self
+            .transcript
+            .iter()
+            .filter(|line| line.start + line.duration <= self.current_time)
+            .map(|line| line.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let last_words: String = recent_text
+            .split_whitespace()
+            .rev()
+            .take(50)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let mut blocks = vec![block.into()];
+
+        if !last_words.is_empty() {
+            let text_block = PlainTextContentBlock::builder()
+                .text(format!(
+                    "The person in the video just said: \"{}\"",
+                    last_words
+                ))
+                .build();
+            blocks.push(text_block.into());
+        }
+
+        blocks.into()
     }
 
     fn get_id(&self) -> &str {
