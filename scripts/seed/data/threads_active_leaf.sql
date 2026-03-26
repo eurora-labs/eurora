@@ -8,3 +8,4 @@ UPDATE threads SET active_leaf_id = '019cfb63-dfe3-7c43-81de-db8b19e49c08' WHERE
 UPDATE threads SET active_leaf_id = '019cfb66-8963-71d3-bb06-e6229ccb7587' WHERE id = '019cfb66-4ac7-7890-8a14-decd62bed09c';
 UPDATE threads SET active_leaf_id = '019cfb6b-d695-7e01-a957-b8869a0905ef' WHERE id = '019cfb6b-a51f-7423-868c-8f9290d7d3ba';
 UPDATE threads SET active_leaf_id = '019cfb6d-40f9-7461-8ae4-c2b4934d9389' WHERE id = '019cfb6d-1307-78d1-aaa7-d85b43f0f148';
+UPDATE threads SET active_leaf_id = '019d0a00-0006-7000-8000-000000000000' WHERE id = '019d0a00-0000-7000-8000-000000000000';

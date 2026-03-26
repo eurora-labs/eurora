@@ -4,7 +4,6 @@
 
 	const { Story } = defineMeta({
 		title: 'Components / Button',
-		component: Button,
 		parameters: {
 			docs: {
 				description: {

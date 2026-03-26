@@ -2,9 +2,11 @@
 	import { Canvas } from '$lib/components/ai-elements/canvas/index';
 	import { EdgeAnimated, EdgeTemporary } from '$lib/components/ai-elements/edge/index';
 	import FitViewOnChange from '$lib/custom-components/message-graph/fit-view-on-change.svelte';
+	import LoadMoreNode from '$lib/custom-components/message-graph/load-more-node.svelte';
 	import MessageNode from '$lib/custom-components/message-graph/message-node.svelte';
 	import SkeletonNode from '$lib/custom-components/message-graph/skeleton-node.svelte';
 	import StartNode from '$lib/custom-components/message-graph/start-node.svelte';
+	import type { LoadMoreNodeData } from '$lib/custom-components/message-graph/load-more-node.svelte';
 	import type { MessageNodeData } from '$lib/custom-components/message-graph/message-node.svelte';
 	import type { SkeletonNodeData } from '$lib/custom-components/message-graph/skeleton-node.svelte';
 	import type { StartNodeData } from '$lib/custom-components/message-graph/start-node.svelte';
@@ -47,14 +49,19 @@
 	const NODE_X_GAP = 450;
 	const NODE_Y_GAP = 250;
 
-	const nodeTypes = { message: MessageNode, start: StartNode, skeleton: SkeletonNode };
+	const nodeTypes = {
+		message: MessageNode,
+		start: StartNode,
+		skeleton: SkeletonNode,
+		loadMore: LoadMoreNode,
+	};
 	const edgeTypes = { animated: EdgeAnimated, temporary: EdgeTemporary };
 
 	type Node = {
 		id: string;
 		type: string;
 		position: { x: number; y: number };
-		data: MessageNodeData | StartNodeData | SkeletonNodeData;
+		data: MessageNodeData | StartNodeData | SkeletonNodeData | LoadMoreNodeData;
 	};
 	type Edge = { id: string; source: string; target: string; type: string };
 
@@ -191,17 +198,15 @@
 			const loadMoreId = '__load_more__';
 			nodes.push({
 				id: loadMoreId,
-				type: 'message',
+				type: 'loadMore',
 				position: {
 					x: (maxLevel + 2) * NODE_X_GAP,
 					y: avgY,
 				},
 				data: {
-					role: 'assistant',
-					label: loadingMoreLevels ? 'Loading...' : 'Load more',
-					content: '',
+					loading: loadingMoreLevels,
 					handles: { target: true, source: false },
-					ondblclick: onloadmorelevels,
+					onclick: onloadmorelevels,
 				},
 			});
 
@@ -220,7 +225,7 @@
 </script>
 
 <div class="h-full w-full {className ?? ''}">
-	<Canvas nodes={graphData.nodes} edges={graphData.edges} {nodeTypes} {edgeTypes}>
+	<Canvas nodes={graphData.nodes} edges={graphData.edges} {nodeTypes} {edgeTypes} minZoom={0.01}>
 		<FitViewOnChange nodeCount={graphData.nodes.length} />
 	</Canvas>
 </div>
