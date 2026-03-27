@@ -501,6 +501,82 @@ importers:
         specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.4.0)(jiti@2.6.1)(jsdom@25.0.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.0)
 
+  apps/mobile:
+    dependencies:
+      '@tauri-apps/plugin-opener':
+        specifier: ^2.5.3
+        version: 2.5.3
+    devDependencies:
+      '@eurora/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@eurora/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@gitbutler/svelte-comment-injector':
+        specifier: ^1.0.0
+        version: 1.0.0
+      '@lucide/svelte':
+        specifier: 'catalog:'
+        version: 0.577.0(svelte@5.53.7)
+      '@sveltejs/adapter-static':
+        specifier: catalog:svelte
+        version: 3.0.10(@sveltejs/kit@2.55.0(@opentelemetry/api@1.9.0)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.53.7)(vite@6.4.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.0)))(svelte@5.53.7)(typescript@5.9.3)(vite@6.4.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.0)))
+      '@sveltejs/kit':
+        specifier: catalog:svelte
+        version: 2.55.0(@opentelemetry/api@1.9.0)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.53.7)(vite@6.4.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.0)))(svelte@5.53.7)(typescript@5.9.3)(vite@6.4.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.0))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: catalog:svelte
+        version: 5.1.1(svelte@5.53.7)(vite@6.4.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.0))
+      '@tailwindcss/postcss':
+        specifier: 'catalog:'
+        version: 4.2.1
+      '@tauri-apps/api':
+        specifier: ^2.10.1
+        version: 2.10.1
+      '@tauri-apps/plugin-http':
+        specifier: ^2.5.7
+        version: 2.5.7
+      '@tauri-apps/plugin-log':
+        specifier: ^2.8.0
+        version: 2.8.0
+      '@tauri-apps/plugin-os':
+        specifier: ^2.3.2
+        version: 2.3.2
+      '@tauri-apps/plugin-process':
+        specifier: ^2.3.1
+        version: 2.3.1
+      '@tauri-apps/plugin-store':
+        specifier: ^2.4.2
+        version: 2.4.2
+      mode-watcher:
+        specifier: ^1.1.0
+        version: 1.1.0(svelte@5.53.7)
+      postcss:
+        specifier: 'catalog:'
+        version: 8.5.8
+      svelte:
+        specifier: catalog:svelte
+        version: 5.53.7
+      svelte-check:
+        specifier: catalog:svelte
+        version: 4.4.4(picomatch@4.0.3)(svelte@5.53.7)(typescript@5.9.3)
+      svelte-sonner:
+        specifier: ^1.0.8
+        version: 1.0.8(svelte@5.53.7)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.2.1
+      taurpc:
+        specifier: ^1.8.1
+        version: 1.8.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 'catalog:'
+        version: 6.4.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.0)
+
   apps/web:
     devDependencies:
       '@eurora/shared':
