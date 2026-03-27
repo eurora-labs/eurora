@@ -352,7 +352,12 @@ jobs:
             - name: Install Swift protoc plugins
               if: runner.os == 'macOS'
               run: |
-                  brew install protobuf swift-protobuf protoc-gen-grpc-swift
+                  brew install protobuf swift-protobuf
+                  # Build protoc-gen-grpc-swift from source at the version matching Package.resolved
+                  # to prevent brew version drift from breaking the build.
+                  git clone --depth 1 --branch 2.2.1 https://github.com/grpc/grpc-swift-protobuf.git /tmp/grpc-swift-protobuf
+                  swift build -c release --package-path /tmp/grpc-swift-protobuf --product protoc-gen-grpc-swift-2
+                  sudo cp /tmp/grpc-swift-protobuf/.build/release/protoc-gen-grpc-swift-2 /usr/local/bin/protoc-gen-grpc-swift-2
 
             - name: Compile Swift Protobuf
               if: runner.os == 'macOS'
