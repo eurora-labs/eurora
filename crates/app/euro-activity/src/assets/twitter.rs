@@ -17,26 +17,11 @@ pub struct TwitterTweet {
     pub text: String,
     pub timestamp: Option<String>,
     pub author: Option<String>,
-    pub likes: Option<u32>,
-    pub retweets: Option<u32>,
-    pub replies: Option<u32>,
     #[serde(default)]
     pub images: Vec<String>,
 }
 
 impl TwitterTweet {
-    pub fn new(text: String, author: Option<String>, timestamp: Option<String>) -> Self {
-        Self {
-            text,
-            timestamp,
-            author,
-            likes: None,
-            retweets: None,
-            replies: None,
-            images: Vec::new(),
-        }
-    }
-
     pub fn get_formatted_text(&self) -> String {
         let mut text = if let Some(author) = &self.author {
             format!("@{}: {}", author, self.text)
@@ -48,32 +33,16 @@ impl TwitterTweet {
         }
         text
     }
+}
 
-    pub fn contains_hashtag(&self, hashtag: &str) -> bool {
-        let hashtag_with_hash = if hashtag.starts_with('#') {
-            hashtag.to_string()
-        } else {
-            format!("#{}", hashtag)
-        };
-        self.text
-            .to_lowercase()
-            .contains(&hashtag_with_hash.to_lowercase())
-    }
-
-    pub fn extract_hashtags(&self) -> Vec<String> {
-        self.text
-            .split_whitespace()
-            .filter(|word| word.starts_with('#'))
-            .map(|hashtag| hashtag.to_string())
-            .collect()
-    }
-
-    pub fn extract_mentions(&self) -> Vec<String> {
-        self.text
-            .split_whitespace()
-            .filter(|word| word.starts_with('@'))
-            .map(|mention| mention.trim_start_matches('@').to_string())
-            .collect()
+impl From<NativeTwitterTweet> for TwitterTweet {
+    fn from(tweet: NativeTwitterTweet) -> Self {
+        TwitterTweet {
+            text: tweet.text,
+            timestamp: tweet.timestamp,
+            author: tweet.author,
+            images: tweet.images,
+        }
     }
 }
 
@@ -87,67 +56,14 @@ impl AssetFunctionality for TwitterAsset {
     }
 
     fn construct_messages(&self) -> ContentBlocks {
-        let asset_json = serde_json::to_string(&self).unwrap_or_default();
-
-        let context_description = match self.context_type {
-            TwitterContextType::Timeline => "timeline",
-            TwitterContextType::Profile => "profile",
-            TwitterContextType::Thread => "thread",
-            TwitterContextType::Search => "search results",
-            TwitterContextType::Hashtag => "hashtag feed",
-            TwitterContextType::Other => "other",
-        };
-
-        let extras = HashMap::from([(
-            "asset_id".to_string(),
-            serde_json::json!(TWITTER_EXTENSION_ID),
-        )]);
-
-        let block = PlainTextContentBlock::builder()
-            .context(format!(
-                "Twitter {} content titled: '{}'",
-                context_description, self.title
-            ))
-            .title(format!("{}.json", self.title))
-            .mime_type("application/json".to_string())
-            .text(asset_json)
-            .extras(extras)
-            .build();
-
-        let mut blocks: Vec<ContentBlock> = vec![block.into()];
-
-        let main_tweet_images: Vec<&String> = self
-            .tweets
-            .first()
-            .map(|t| t.images.iter().collect())
-            .unwrap_or_default();
-
-        for image in main_tweet_images {
-            match ImageContentBlock::builder().url(image.to_string()).build() {
-                Ok(img) => blocks.push(ContentBlock::Image(img)),
-                Err(e) => tracing::warn!("Failed to create image block: {e}"),
-            }
+        match self.context_type {
+            TwitterContextType::Thread => self.construct_thread_messages(),
+            _ => self.construct_default_messages(),
         }
-
-        blocks.into()
     }
 
     fn get_id(&self) -> &str {
         &self.id
-    }
-}
-
-impl From<NativeTwitterTweet> for TwitterTweet {
-    fn from(tweet: NativeTwitterTweet) -> Self {
-        TwitterTweet {
-            text: tweet.text,
-            timestamp: tweet.timestamp,
-            author: tweet.author,
-            likes: None,
-            retweets: None,
-            replies: None,
-            images: tweet.images,
-        }
     }
 }
 
@@ -167,7 +83,6 @@ pub enum TwitterContextType {
     Profile,
     Thread,
     Search,
-    Hashtag,
     #[default]
     Other,
 }
@@ -188,6 +103,101 @@ impl TwitterAsset {
             timestamp: chrono::Utc::now().to_rfc3339(),
             context_type,
         }
+    }
+
+    fn asset_extras() -> HashMap<String, serde_json::Value> {
+        HashMap::from([(
+            "asset_id".to_string(),
+            serde_json::json!(TWITTER_EXTENSION_ID),
+        )])
+    }
+
+    fn construct_thread_messages(&self) -> ContentBlocks {
+        let mut blocks: Vec<ContentBlock> = Vec::new();
+
+        let (main_tweet, replies) = match self.tweets.split_first() {
+            Some((first, rest)) => (Some(first), rest),
+            None => (None, [].as_slice()),
+        };
+
+        if let Some(tweet) = main_tweet {
+            let author = tweet.author.as_deref().unwrap_or("unknown");
+            let tweet_json = serde_json::json!({
+                "text": tweet.text,
+                "author": tweet.author,
+                "timestamp": tweet.timestamp,
+            });
+
+            let block = PlainTextContentBlock::builder()
+                .context(format!("Twitter thread by @{}", author))
+                .title("main_tweet.json".to_string())
+                .mime_type("application/json".to_string())
+                .text(tweet_json.to_string())
+                .extras(Self::asset_extras())
+                .build();
+            blocks.push(block.into());
+
+            for image in &tweet.images {
+                if image.is_empty() {
+                    continue;
+                }
+                match ImageContentBlock::builder()
+                    .base64(image.to_string())
+                    .mime_type("image/png".to_string())
+                    .build()
+                {
+                    Ok(block) => blocks.push(ContentBlock::Image(block)),
+                    Err(e) => tracing::warn!("Failed to create image block: {e}"),
+                }
+            }
+        }
+
+        if !replies.is_empty() {
+            let replies_json: Vec<serde_json::Value> = replies
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "text": r.text,
+                        "author": r.author,
+                        "timestamp": r.timestamp,
+                    })
+                })
+                .collect();
+
+            let block = PlainTextContentBlock::builder()
+                .context(format!("Replies ({} total)", replies.len()))
+                .title("replies.json".to_string())
+                .mime_type("application/json".to_string())
+                .text(serde_json::to_string(&replies_json).unwrap_or_default())
+                .build();
+            blocks.push(block.into());
+        }
+
+        blocks.into()
+    }
+
+    fn construct_default_messages(&self) -> ContentBlocks {
+        let asset_json = serde_json::to_string(&self).unwrap_or_default();
+
+        let context_description = match self.context_type {
+            TwitterContextType::Timeline => "timeline",
+            TwitterContextType::Profile => "profile",
+            TwitterContextType::Search => "search results",
+            _ => "other",
+        };
+
+        let block = PlainTextContentBlock::builder()
+            .context(format!(
+                "Twitter {} content titled: '{}'",
+                context_description, self.title
+            ))
+            .title(format!("{}.json", self.title))
+            .mime_type("application/json".to_string())
+            .text(asset_json)
+            .extras(Self::asset_extras())
+            .build();
+
+        vec![ContentBlock::from(block)].into()
     }
 
     pub fn try_from(asset: NativeTwitterAsset) -> Result<Self, ActivityError> {
@@ -217,50 +227,6 @@ impl TwitterAsset {
             timestamp: asset.timestamp,
             context_type,
         })
-    }
-
-    pub fn get_all_hashtags(&self) -> Vec<String> {
-        let mut hashtags = Vec::new();
-        for tweet in &self.tweets {
-            hashtags.extend(tweet.extract_hashtags());
-        }
-        hashtags.sort();
-        hashtags.dedup();
-        hashtags
-    }
-
-    pub fn get_all_mentions(&self) -> Vec<String> {
-        let mut mentions = Vec::new();
-        for tweet in &self.tweets {
-            mentions.extend(tweet.extract_mentions());
-        }
-        mentions.sort();
-        mentions.dedup();
-        mentions
-    }
-
-    pub fn get_tweets_by_author(&self, author: &str) -> Vec<&TwitterTweet> {
-        self.tweets
-            .iter()
-            .filter(|tweet| {
-                tweet
-                    .author
-                    .as_ref()
-                    .is_some_and(|a| a.eq_ignore_ascii_case(author))
-            })
-            .collect()
-    }
-
-    pub fn search_tweets(&self, query: &str) -> Vec<&TwitterTweet> {
-        let query_lower = query.to_lowercase();
-        self.tweets
-            .iter()
-            .filter(|tweet| tweet.text.to_lowercase().contains(&query_lower))
-            .collect()
-    }
-
-    pub fn get_tweet_count(&self) -> usize {
-        self.tweets.len()
     }
 }
 
@@ -295,58 +261,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_twitter_tweet_creation() {
-        let tweet = TwitterTweet::new(
-            "Hello #world from @rust_lang!".to_string(),
-            Some("testuser".to_string()),
-            Some("2024-01-01T00:00:00Z".to_string()),
-        );
+    fn test_twitter_tweet_formatted_text() {
+        let tweet = TwitterTweet {
+            text: "Hello world!".to_string(),
+            author: Some("testuser".to_string()),
+            timestamp: Some("2024-01-01T00:00:00Z".to_string()),
+            images: Vec::new(),
+        };
 
-        assert_eq!(tweet.text, "Hello #world from @rust_lang!");
-        assert_eq!(tweet.author, Some("testuser".to_string()));
+        assert_eq!(tweet.get_formatted_text(), "@testuser: Hello world!");
+    }
+
+    #[test]
+    fn test_twitter_tweet_formatted_text_with_images() {
+        let tweet = TwitterTweet {
+            text: "Check this out".to_string(),
+            author: None,
+            timestamp: None,
+            images: vec!["img1".to_string(), "img2".to_string()],
+        };
+
         assert_eq!(
             tweet.get_formatted_text(),
-            "@testuser: Hello #world from @rust_lang!"
+            "Check this out\n[2 image(s) attached]"
         );
-    }
-
-    #[test]
-    fn test_hashtag_extraction() {
-        let tweet = TwitterTweet::new(
-            "Learning #rust and #programming today! #coding".to_string(),
-            None,
-            None,
-        );
-
-        let hashtags = tweet.extract_hashtags();
-        assert_eq!(hashtags, vec!["#rust", "#programming", "#coding"]);
-
-        assert!(tweet.contains_hashtag("rust"));
-        assert!(tweet.contains_hashtag("#programming"));
-        assert!(!tweet.contains_hashtag("python"));
-    }
-
-    #[test]
-    fn test_mention_extraction() {
-        let tweet = TwitterTweet::new(
-            "Thanks @rust_lang and @github for the great tools!".to_string(),
-            None,
-            None,
-        );
-
-        let mentions = tweet.extract_mentions();
-        assert_eq!(mentions, vec!["rust_lang", "github"]);
     }
 
     #[test]
     fn test_twitter_asset_creation() {
         let tweets = vec![
-            TwitterTweet::new("First tweet".to_string(), Some("user1".to_string()), None),
-            TwitterTweet::new(
-                "Second tweet #test".to_string(),
-                Some("user2".to_string()),
-                None,
-            ),
+            TwitterTweet {
+                text: "First tweet".to_string(),
+                author: Some("user1".to_string()),
+                timestamp: None,
+                images: Vec::new(),
+            },
+            TwitterTweet {
+                text: "Second tweet".to_string(),
+                author: Some("user2".to_string()),
+                timestamp: None,
+                images: Vec::new(),
+            },
         ];
 
         let asset = TwitterAsset::new(
@@ -359,65 +314,7 @@ mod tests {
 
         assert_eq!(asset.id, "test-id");
         assert_eq!(asset.title, "My Timeline");
-        assert_eq!(asset.get_tweet_count(), 2);
-    }
-
-    #[test]
-    fn test_hashtag_aggregation() {
-        let tweets = vec![
-            TwitterTweet::new(
-                "Learning #rust today".to_string(),
-                Some("user1".to_string()),
-                None,
-            ),
-            TwitterTweet::new(
-                "More #rust and #programming".to_string(),
-                Some("user2".to_string()),
-                None,
-            ),
-        ];
-
-        let asset = TwitterAsset::new(
-            "test-id".to_string(),
-            "https://twitter.com/timeline".to_string(),
-            "Timeline".to_string(),
-            tweets,
-            TwitterContextType::Timeline,
-        );
-
-        let hashtags = asset.get_all_hashtags();
-        assert_eq!(hashtags, vec!["#programming", "#rust"]);
-    }
-
-    #[test]
-    fn test_tweet_search() {
-        let tweets = vec![
-            TwitterTweet::new(
-                "Learning Rust programming".to_string(),
-                Some("user1".to_string()),
-                None,
-            ),
-            TwitterTweet::new(
-                "Python is also great".to_string(),
-                Some("user2".to_string()),
-                None,
-            ),
-        ];
-
-        let asset = TwitterAsset::new(
-            "test-id".to_string(),
-            "https://twitter.com/timeline".to_string(),
-            "Timeline".to_string(),
-            tweets,
-            TwitterContextType::Timeline,
-        );
-
-        let rust_tweets = asset.search_tweets("rust");
-        assert_eq!(rust_tweets.len(), 1);
-        assert!(rust_tweets[0].text.contains("Rust"));
-
-        let programming_tweets = asset.search_tweets("programming");
-        assert_eq!(programming_tweets.len(), 1);
+        assert_eq!(asset.tweets.len(), 2);
     }
 
     #[test]
@@ -429,6 +326,56 @@ mod tests {
             "title".into(),
             vec![],
             TwitterContextType::Timeline,
+        );
+        let blocks = AssetFunctionality::construct_messages(&asset);
+        assert_eq!(blocks.len(), 1);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
+    }
+
+    #[test]
+    fn thread_produces_separate_blocks() {
+        use crate::types::AssetFunctionality;
+        let main_tweet = TwitterTweet {
+            text: "Main tweet".to_string(),
+            author: Some("author".to_string()),
+            timestamp: None,
+            images: vec!["aW1hZ2VkYXRh".to_string()],
+        };
+        let reply = TwitterTweet {
+            text: "A reply".to_string(),
+            author: Some("replier".to_string()),
+            timestamp: None,
+            images: vec![],
+        };
+        let asset = TwitterAsset::new(
+            "id".into(),
+            "url".into(),
+            "Thread title".into(),
+            vec![main_tweet, reply],
+            TwitterContextType::Thread,
+        );
+        let blocks = AssetFunctionality::construct_messages(&asset);
+        assert_eq!(blocks.len(), 3);
+        assert!(matches!(blocks[0], ContentBlock::PlainText(_)));
+        assert!(matches!(blocks[1], ContentBlock::Image(_)));
+        assert!(matches!(blocks[2], ContentBlock::PlainText(_)));
+    }
+
+    #[test]
+    fn thread_no_replies() {
+        use crate::types::AssetFunctionality;
+        let main_tweet = TwitterTweet {
+            text: "Solo tweet".to_string(),
+            author: Some("author".to_string()),
+            timestamp: None,
+            images: vec![],
+        };
+        let asset = TwitterAsset::new(
+            "id".into(),
+            "url".into(),
+            "title".into(),
+            vec![main_tweet],
+            TwitterContextType::Thread,
         );
         let blocks = AssetFunctionality::construct_messages(&asset);
         assert_eq!(blocks.len(), 1);
