@@ -2,7 +2,7 @@
 
 Welcome to Eurora, a context aware, cross-platform, fully private and open source AI assistant.
 
-Eurora provides seamless OS integration and makes asking questions much easier. The cloud servers run in The Netherlands and all the data is stored in European Sovereign Data Centers, ensuring full privacy for users all around the world via the highest standards set by the European Union. We have first-party support for local deployment and with extensive documentation for running this on your own home server.
+Eurora provides seamless OS integration and makes asking questions much easier. The cloud servers run in The Netherlands and all the data is stored in European Sovereign Data Centers, ensuring full privacy for users all around the world via the highest standards set by the European Union. We have first-party support for local deployment and extensive documentation for running this on your own home server.
 
 ![Eurora](./assets/eurora-preview.gif)
 
