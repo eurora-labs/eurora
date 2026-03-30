@@ -115,6 +115,14 @@ impl AuthApi for AuthApiImpl {
 
         let mut controller = user_state.lock().await;
 
+        if controller.get_or_refresh_access_token().await.is_ok() {
+            let _ = secret::delete(LOGIN_CODE_VERIFIER);
+            if let Ok(claims) = controller.get_access_token_payload() {
+                emit_auth_state(&app_handle, Some(claims));
+            }
+            return Ok(true);
+        }
+
         let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
             .ctx("Failed to retrieve login token")?
             .ok_or_else(|| "Login token not found".to_string())?;
