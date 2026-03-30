@@ -31,7 +31,8 @@
 		"svelte": "^5.0.0"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^7.0.0",
+		"@eurora/shared": "workspace:*",
+		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
