@@ -1,0 +1,52 @@
+[package]
+name = "euro-mobile"
+version = "0.0.0"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib", "staticlib"]
+doctest = false
+
+[[bin]]
+name = "euro-mobile"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+anyhow = { workspace = true }
+dotenv = { workspace = true }
+euro-auth = { workspace = true }
+euro-encrypt = { workspace = true }
+euro-endpoint = { workspace = true }
+euro-secret = { workspace = true }
+euro-settings = { workspace = true }
+euro-thread = { workspace = true }
+euro-user = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
+specta = { workspace = true, features = ["derive", "function"] }
+specta-typescript = { version = "0.0.10" }
+tauri = { version = "2.10.2", features = [] }
+tauri-plugin-http = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-os = "2"
+tauri-plugin-process = "2"
+tauri-plugin-store = "2"
+taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
+tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
+tracing = { workspace = true }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol", "devtools"]
+custom-protocol = ["tauri/custom-protocol"]
+devtools = ["tauri/devtools"]
+
+[lints.clippy]
+all = "deny"
+correctness = "deny"
+perf = "deny"
