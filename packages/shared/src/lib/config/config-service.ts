@@ -4,9 +4,14 @@ export class ConfigService {
 	readonly grpcApiUrl: string;
 	readonly restApiUrl: string;
 
-	constructor(config: AppConfig) {
-		this.grpcApiUrl = config.grpcApiUrl;
-		this.restApiUrl = config.restApiUrl;
+	constructor(grpcApiUrl: string, restApiUrl: string | undefined) {
+		this.grpcApiUrl = grpcApiUrl;
+
+		if (restApiUrl) {
+			this.restApiUrl = restApiUrl;
+		} else {
+			this.restApiUrl = grpcApiUrl;
+		}
 	}
 }
 
