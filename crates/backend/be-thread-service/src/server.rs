@@ -4,13 +4,13 @@ use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use agent_chain_core::proto::ProtoAiMessageChunk;
+use agent_chain_core::proto::ProtoContentBlock;
 use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
-use proto_gen::agent_chain::ProtoAiMessageChunk;
-use proto_gen::agent_chain::ProtoContentBlock;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
 };

@@ -1,5 +1,4 @@
-use crate::agent_chain::*;
-use agent_chain_core::messages::{
+use crate::messages::{
     AIMessage, AIMessageChunk, Annotation, AnyMessage, AnyMessageChunk, AudioContentBlock,
     BlockIndex, ChatMessage, ChatMessageChunk, ChunkPosition, ContentBlock, ContentBlocks,
     FileContentBlock, HumanMessage, HumanMessageChunk, ImageContentBlock, InputTokenDetails,
@@ -9,6 +8,7 @@ use agent_chain_core::messages::{
     TextContentBlock, ToolCall, ToolCallBlock, ToolCallChunk, ToolCallChunkBlock, ToolMessage,
     ToolMessageChunk, ToolStatus, UsageMetadata, VideoContentBlock,
 };
+use crate::proto::*;
 use std::collections::HashMap;
 
 fn hashmap_to_json_string(map: &HashMap<String, serde_json::Value>) -> Option<String> {
@@ -556,7 +556,7 @@ impl From<ToolMessageChunk> for ProtoToolMessageChunk {
             id: chunk.id,
             name: chunk.name,
             status: i32::from(ProtoToolStatus::from(chunk.status)),
-            artifact: chunk.artifact.as_ref().map(|a| value_to_json_string(a)),
+            artifact: chunk.artifact.as_ref().map(value_to_json_string),
             additional_kwargs: hashmap_to_json_string(&chunk.additional_kwargs),
             response_metadata: hashmap_to_json_string(&chunk.response_metadata),
         }

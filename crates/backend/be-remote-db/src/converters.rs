@@ -1,12 +1,12 @@
 use crate::error::DbError;
 use crate::types::{Message, MessageType, Thread};
 use agent_chain_core::messages::ContentBlock;
-use chrono::DateTime;
-use prost_types::Timestamp;
-use proto_gen::agent_chain::{
+use agent_chain_core::proto::{
     ProtoAiMessage, ProtoBaseMessage, ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage,
     ProtoToolCall, ProtoToolMessage, ProtoToolStatus, proto_base_message,
 };
+use chrono::DateTime;
+use prost_types::Timestamp;
 
 use uuid::Uuid;
 
