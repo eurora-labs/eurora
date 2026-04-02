@@ -18,6 +18,10 @@ fn main() -> Result<()> {
             tonic_prost_build::configure()
                 .build_server(build_server)
                 .build_client(true)
+                .type_attribute(
+                    ".",
+                    "#[derive(serde::Serialize, serde::Deserialize, specta::Type)]",
+                )
                 .protoc_arg("--experimental_allow_proto3_optional")
                 .compile_protos(&[&proto_file], &[&proto_dir, &common_dir])?;
         }
@@ -27,6 +31,10 @@ fn main() -> Result<()> {
             tonic_prost_build::configure()
                 .build_server(build_server)
                 .build_client(true)
+                .type_attribute(
+                    ".",
+                    "#[derive(serde::Serialize, serde::Deserialize, specta::Type)]",
+                )
                 .protoc_arg("--experimental_allow_proto3_optional")
                 .compile_protos(&[&proto_file], &[&proto_dir])?;
         }

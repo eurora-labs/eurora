@@ -3,6 +3,7 @@ use crate::shared_types::SharedThreadManager;
 use agent_chain_core::messages::content::{ContentBlock, ContentBlocks};
 use agent_chain_core::messages::prelude::*;
 use euro_thread::{ListThreadsRequest, Thread};
+use proto_gen::agent_chain::ProtoBaseMessage;
 use proto_gen::thread::{CreateThreadRequest, GetMessagesResponse};
 use std::collections::HashMap;
 use tauri::{Manager, Runtime};
@@ -102,7 +103,7 @@ pub trait ThreadApi {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<MessageView>, String>;
+    ) -> Result<Vec<ProtoBaseMessage>, String>;
 
     async fn switch_branch<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -240,15 +241,16 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<MessageView>, String> {
+    ) -> Result<Vec<ProtoBaseMessage>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let response = thread_manager
             .get_messages(thread_id, limit, offset)
             .await
             .ctx("Failed to get messages")?;
+        Ok(response.messages)
 
-        Ok(convert_response(response))
+        // Ok(convert_response(response))
     }
 
     async fn switch_branch<R: Runtime>(
