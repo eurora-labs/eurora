@@ -1,9 +1,8 @@
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
-import { type ConfigService } from '@eurora/shared/config/config-service';
-import { InjectionToken } from '@eurora/shared/context';
+import { inject, InjectionToken } from '@eurora/shared/context';
+import type { Thread } from '$lib/models/thread.model.js';
 import {
-	type Thread,
 	type MessageTreeNode,
 	ProtoThreadService,
 	type ListThreadsRequest,
@@ -44,36 +43,22 @@ export class ChatService {
 	loadingMore = $state(false);
 	hasMore = $state(true);
 	activeThreadId: string | null = $state(null);
-	threadClient: IThreadService | null = null;
+	threadClient: IThreadService;
 
 	private offset = 0;
 	private loadRetries = 0;
 	private _client: Client<typeof ProtoThreadService> | null = null;
-	private readonly config: ConfigService;
 	private readonly unlisteners: ((() => void) | Promise<() => void>)[] = [];
 
-	private get client(): Client<typeof ProtoThreadService> {
-		if (!this._client) {
-			this._client = createClient(
-				ProtoThreadService,
-				createGrpcWebTransport({
-					baseUrl: this.config.grpcApiUrl,
-					useBinaryFormat: true,
-				}),
-			);
-		}
-		return this._client;
-	}
-
-	constructor(config: ConfigService) {
-		this.config = config;
+	constructor(threadClient: IThreadService) {
+		this.threadClient = threadClient;
 	}
 
 	async loadThreads(limit: number, offset: number) {
 		try {
 			this.threads = (
-				await this.client.listThreads({ limit, offset } as ListThreadsRequest)
-			).threads.map((thread) => new ThreadMessages(thread));
+				await this.threadClient.listThreads({ limit, offset } as ListThreadsRequest)
+			).map((thread) => new ThreadMessages(thread));
 			this.offset = this.threads.length;
 			this.hasMore = this.threads.length === PAGE_SIZE;
 		} catch (error) {
@@ -84,31 +69,31 @@ export class ChatService {
 	}
 
 	async loadMore() {
-		if (this.loadingMore || !this.hasMore) return;
-		this.loadingMore = true;
-		try {
-			const res = await this.client.listThreads({
-				limit: PAGE_SIZE,
-				offset: this.offset,
-			} as ListThreadsRequest);
-			const newThreads = res.threads.map((thread) => new ThreadMessages(thread));
-			this.threads = [...this.threads, ...newThreads];
-			this.offset += newThreads.length;
-			this.hasMore = newThreads.length === PAGE_SIZE;
-			this.loadRetries = 0;
-		} catch (error) {
-			console.error('Failed to load more threads:', error);
-			this.loadRetries += 1;
-			if (this.loadRetries >= MAX_LOAD_RETRIES) {
-				this.hasMore = false;
-			}
-		} finally {
-			this.loadingMore = false;
-		}
+		// if (this.loadingMore || !this.hasMore) return;
+		// this.loadingMore = true;
+		// try {
+		// 	const res = await this.client.listThreads({
+		// 		limit: PAGE_SIZE,
+		// 		offset: this.offset,
+		// 	} as ListThreadsRequest);
+		// 	const newThreads = res.threads.map((thread) => new ThreadMessages(thread));
+		// 	this.threads = [...this.threads, ...newThreads];
+		// 	this.offset += newThreads.length;
+		// 	this.hasMore = newThreads.length === PAGE_SIZE;
+		// 	this.loadRetries = 0;
+		// } catch (error) {
+		// 	console.error('Failed to load more threads:', error);
+		// 	this.loadRetries += 1;
+		// 	if (this.loadRetries >= MAX_LOAD_RETRIES) {
+		// 		this.hasMore = false;
+		// 	}
+		// } finally {
+		// 	this.loadingMore = false;
+		// }
 	}
 
 	async deleteThread(threadId: string) {
-		await this.client.deleteThread({ threadId } as DeleteThreadRequest);
+		await this.threadClient.deleteThread({ threadId } as DeleteThreadRequest);
 		this.threads = this.threads.filter((t) => t.thread.id !== threadId);
 		this.offset = Math.max(0, this.offset - 1);
 		if (this.activeThreadId === threadId) {

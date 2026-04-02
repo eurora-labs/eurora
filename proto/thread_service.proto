@@ -31,7 +31,7 @@ message CreateThreadRequest {
   string title = 1;
 }
 
-message Thread {
+message ProtoThread {
   string id = 1;
   string user_id = 2;
   string title = 3;
@@ -41,7 +41,7 @@ message Thread {
 }
 
 message CreateThreadResponse {
-  Thread thread = 1;
+  ProtoThread thread = 1;
 }
 
 message ListThreadsRequest {
@@ -50,7 +50,7 @@ message ListThreadsRequest {
 }
 
 message ListThreadsResponse {
-  repeated Thread threads = 1;
+  repeated ProtoThread threads = 1;
 }
 
 message ChatStreamRequest {
@@ -106,7 +106,7 @@ message GetThreadRequest {
 }
 
 message GetThreadResponse {
-  Thread thread = 1;
+  ProtoThread thread = 1;
 }
 
 message DeleteThreadRequest {
@@ -130,7 +130,7 @@ message GenerateThreadTitleRequest {
 }
 
 message GenerateThreadTitleResponse {
-  Thread thread = 1;
+  ProtoThread thread = 1;
 }
 
 message GetMessageTreeRequest {

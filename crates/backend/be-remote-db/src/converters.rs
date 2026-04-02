@@ -10,10 +10,10 @@ use prost_types::Timestamp;
 
 use uuid::Uuid;
 
-impl TryFrom<proto_gen::thread::Thread> for Thread {
+impl TryFrom<proto_gen::thread::ProtoThread> for Thread {
     type Error = DbError;
 
-    fn try_from(value: proto_gen::thread::Thread) -> Result<Self, Self::Error> {
+    fn try_from(value: proto_gen::thread::ProtoThread) -> Result<Self, Self::Error> {
         let id = Uuid::parse_str(&value.id).map_err(|e| DbError::Internal(e.to_string()))?;
         let user_id =
             Uuid::parse_str(&value.user_id).map_err(|e| DbError::Internal(e.to_string()))?;
@@ -46,15 +46,15 @@ impl TryFrom<proto_gen::thread::Thread> for Thread {
     }
 }
 
-impl TryInto<proto_gen::thread::Thread> for Thread {
+impl TryInto<proto_gen::thread::ProtoThread> for Thread {
     type Error = DbError;
 
-    fn try_into(self) -> Result<proto_gen::thread::Thread, Self::Error> {
+    fn try_into(self) -> Result<proto_gen::thread::ProtoThread, Self::Error> {
         let id = self.id.to_string();
         let user_id = self.user_id.to_string();
         let title = self.title.unwrap_or_default();
 
-        Ok(proto_gen::thread::Thread {
+        Ok(proto_gen::thread::ProtoThread {
             id,
             user_id,
             title,

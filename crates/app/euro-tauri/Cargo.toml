@@ -29,6 +29,7 @@ auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 backon = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
+chrono = { workspace = true, features = ["serde"] }
 color-thief = "0.2.2"
 dirs = { workspace = true }
 dotenv = { workspace = true }

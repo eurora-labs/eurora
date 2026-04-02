@@ -61,13 +61,13 @@
 
 	function selectThread(id: string) {
 		open = false;
-		threadService.activeThreadId = id;
+		// threadService.activeThreadId = id;
 		goto(`/${id}`);
 	}
 
 	function selectMessage(threadId: string) {
 		open = false;
-		threadService.activeThreadId = threadId;
+		// threadService.activeThreadId = threadId;
 		goto(`/${threadId}`);
 	}
 

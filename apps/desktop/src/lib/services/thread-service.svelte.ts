@@ -1,12 +1,11 @@
 import { type IThreadService } from '@eurora/chat/services/thread/thread-service';
 import { InjectionToken } from '@eurora/shared/context';
-import type { ThreadView } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
+import type { Thread } from '@eurora/chat/models/thread.model';
 import type { ProtoBaseMessage } from '@eurora/shared/proto/agent_chain_pb.js';
 import type {
 	DeleteThreadRequest,
 	ListThreadsRequest,
-	Thread,
 } from '@eurora/shared/proto/thread_service_pb.js';
 
 const PAGE_SIZE = 20;
@@ -19,8 +18,15 @@ export class ThreadService implements IThreadService {
 	}
 
 	async listThreads(request: ListThreadsRequest): Promise<Thread[]> {
-		return [];
-		// return await this.taurpc.thread.list(request.limit, request.offset);
+		return (await this.taurpc.thread.list(request.limit, request.offset)).map(
+			(thread) =>
+				({
+					id: thread.id,
+					title: thread.title,
+					createdAt: thread.created_at,
+					updatedAt: thread.updated_at,
+				}) as Thread,
+		);
 	}
 
 	loadMoreMessages(): Promise<ProtoBaseMessage[]> {
@@ -33,7 +39,7 @@ export class ThreadService implements IThreadService {
 }
 
 // export class ThreadService {
-// 	threads: ThreadView[] = $state([]);
+// 	threads: Thread[] = $state([]);
 // 	loading = $state(true);
 // 	loadingMore = $state(false);
 // 	hasMore = $state(true);
@@ -79,7 +85,7 @@ export class ThreadService implements IThreadService {
 // 		);
 // 	}
 
-// 	addThread(thread: ThreadView) {
+// 	addThread(thread: Thread) {
 // 		if (!this.threads.some((t) => t.id === thread.id)) {
 // 			this.threads = [thread, ...this.threads];
 // 			this.offset += 1;
@@ -87,7 +93,7 @@ export class ThreadService implements IThreadService {
 // 		this.activeThreadId = thread.id;
 // 	}
 
-// 	updateThread(thread: ThreadView) {
+// 	updateThread(thread: Thread) {
 // 		this.threads = this.threads.map((t) =>
 // 			t.id === thread.id ? { ...t, title: thread.title } : t,
 // 		);

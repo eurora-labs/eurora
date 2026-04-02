@@ -1,5 +1,5 @@
+import type { Thread } from '$lib/models/thread.model.js';
 import {
-	type Thread,
 	type MessageTreeNode,
 	ProtoThreadService,
 	type ListThreadsRequest,

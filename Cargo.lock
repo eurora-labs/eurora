@@ -3701,6 +3701,7 @@ dependencies = [
  "auth-core",
  "backon",
  "backtrace",
+ "chrono",
  "color-thief",
  "core-foundation 0.10.1",
  "dirs 6.0.0",

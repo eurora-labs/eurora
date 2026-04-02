@@ -21,10 +21,10 @@ use proto_gen::thread::{
     CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest, DeleteThreadResponse,
     GenerateThreadTitleRequest, GenerateThreadTitleResponse, GetMessageTreeRequest,
     GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, MessageTreeNode, SavePreliminaryContentBlocksRequest,
-    SavePreliminaryContentBlocksResponse, SearchMessageResult, SearchMessagesRequest,
-    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
-    SwitchBranchRequest, Thread,
+    ListThreadsRequest, ListThreadsResponse, MessageTreeNode, ProtoThread,
+    SavePreliminaryContentBlocksRequest, SavePreliminaryContentBlocksResponse, SearchMessageResult,
+    SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
+    SearchThreadsResponse, SwitchBranchRequest,
 };
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -239,8 +239,8 @@ impl ThreadService {
         }
     }
 
-    fn db_thread_to_proto(thread: be_remote_db::Thread) -> Thread {
-        Thread {
+    fn db_thread_to_proto(thread: be_remote_db::Thread) -> ProtoThread {
+        ProtoThread {
             id: thread.id.to_string(),
             user_id: thread.user_id.to_string(),
             title: thread.title.clone().unwrap_or_default(),

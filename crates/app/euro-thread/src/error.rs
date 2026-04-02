@@ -1,8 +1,5 @@
 use thiserror::Error;
-use tokio::sync::broadcast::error::SendError;
 use tonic::Status;
-
-use crate::types::ThreadEvent;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -11,9 +8,6 @@ pub enum Error {
 
     #[error("Failed to update thread: {0}")]
     UpdateThread(String),
-
-    #[error("Could not send event: {0}")]
-    SendEvent(#[source] SendError<ThreadEvent>),
 
     #[error("Transport error: {0}")]
     Transport(#[source] Status),
@@ -26,12 +20,6 @@ pub enum Error {
 
     #[error("Invalid thread id")]
     InvalidThreadId,
-}
-
-impl From<SendError<ThreadEvent>> for Error {
-    fn from(err: SendError<ThreadEvent>) -> Self {
-        Error::SendEvent(err)
-    }
 }
 
 impl From<Status> for Error {

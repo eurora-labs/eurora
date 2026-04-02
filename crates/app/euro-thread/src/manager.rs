@@ -1,7 +1,4 @@
-use crate::{
-    Thread,
-    error::{Error, Result},
-};
+use crate::error::{Error, Result};
 use agent_chain::messages::{ContentBlock, ContentBlocks};
 use agent_chain::{HumanMessage, SystemMessage, messages::AIMessageChunk};
 use agent_chain_core::proto::{
@@ -12,7 +9,7 @@ use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
     ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,
     GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
-    GetThreadRequest, ListThreadsRequest, SavePreliminaryContentBlocksRequest,
+    GetThreadRequest, ListThreadsRequest, ProtoThread, SavePreliminaryContentBlocksRequest,
     SearchMessagesRequest, SearchMessagesResponse, SearchThreadsRequest, SearchThreadsResponse,
     SwitchBranchRequest, proto_thread_service_client::ProtoThreadServiceClient,
 };
@@ -44,11 +41,11 @@ impl ThreadManager {
             .max_encoding_message_size(1024 * 1024 * 1024)
     }
 
-    pub async fn create(&self, request: CreateThreadRequest) -> Result<Thread> {
+    pub async fn create(&self, request: CreateThreadRequest) -> Result<ProtoThread> {
         let mut client = self.client();
         let response = client.create_thread(request).await?.into_inner();
         if let Some(thread) = response.thread {
-            Ok(thread.into())
+            Ok(thread)
         } else {
             Err(Error::CreateThread(
                 "Server did not return the saved thread".to_string(),
@@ -56,11 +53,11 @@ impl ThreadManager {
         }
     }
 
-    pub async fn list_threads(&self, request: ListThreadsRequest) -> Result<Vec<Thread>> {
+    pub async fn list_threads(&self, request: ListThreadsRequest) -> Result<Vec<ProtoThread>> {
         let mut client = self.client();
         let response = client.list_threads(request).await?.into_inner();
 
-        Ok(response.threads.into_iter().map(Thread::from).collect())
+        Ok(response.threads.into_iter().collect())
     }
 
     pub async fn get_current_messages(
@@ -87,7 +84,7 @@ impl ThreadManager {
         Ok(())
     }
 
-    pub async fn get_thread(&self, thread_id: String) -> Result<Thread> {
+    pub async fn get_thread(&self, thread_id: String) -> Result<ProtoThread> {
         let mut client = self.client();
         let response = client
             .get_thread(GetThreadRequest { thread_id })
@@ -95,7 +92,7 @@ impl ThreadManager {
             .into_inner();
 
         if let Some(thread) = response.thread {
-            Ok(thread.into())
+            Ok(thread)
         } else {
             Err(Error::ThreadNotFound)
         }
@@ -164,7 +161,7 @@ impl ThreadManager {
         &self,
         thread_id: String,
         content: String,
-    ) -> Result<Thread> {
+    ) -> Result<ProtoThread> {
         let mut client = self.client();
         let response = client
             .generate_thread_title(GenerateThreadTitleRequest { thread_id, content })
@@ -172,7 +169,7 @@ impl ThreadManager {
             .into_inner();
 
         match response.thread {
-            Some(thread) => Ok(thread.into()),
+            Some(thread) => Ok(thread),
             None => Err(Error::UpdateThread(
                 "Thread title could not be generated".to_string(),
             )),
