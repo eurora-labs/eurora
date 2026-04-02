@@ -250,48 +250,68 @@ impl ThreadService {
         }
     }
 
-    async fn build_messages_with_siblings(
+    fn build_tree_from_rows(
+        rows: Vec<be_remote_db::BranchMessageRow>,
+    ) -> Vec<BaseMessageWithSibling> {
+        let mut result: Vec<BaseMessageWithSibling> = Vec::new();
+        let mut current_branch_id: Option<Uuid> = None;
+
+        for row in rows {
+            let is_active = row.message.id == row.branch_message_id;
+            let parent_id = row
+                .message
+                .parent_message_id
+                .map(|id| id.to_string())
+                .unwrap_or_default();
+            let proto_message = row.message.into();
+            let sibling = BaseMessageWithSibling {
+                parent_id: parent_id.clone(),
+                message: Some(proto_message),
+                children: vec![],
+                sibling_index: row.sibling_index as i32,
+                depth: row.branch_depth,
+            };
+
+            let is_new_group = current_branch_id != Some(row.branch_message_id);
+            if is_new_group {
+                current_branch_id = Some(row.branch_message_id);
+                result.push(BaseMessageWithSibling {
+                    parent_id,
+                    message: None,
+                    children: vec![],
+                    sibling_index: 0,
+                    depth: row.branch_depth,
+                });
+            }
+
+            let group = result.last_mut().expect("group always exists");
+            if is_active {
+                group.sibling_index = group.children.len() as i32;
+                group.message = sibling.message.clone();
+            }
+            group.children.push(sibling);
+        }
+
+        result
+    }
+
+    async fn fetch_branch_with_siblings(
         &self,
         thread_id: Uuid,
         user_id: Uuid,
-        messages: Vec<be_remote_db::Message>,
+        params: PaginationParams,
     ) -> Result<Vec<BaseMessageWithSibling>, Status> {
-        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
-        let sibling_rows = self
+        let rows = self
             .db
-            .get_sibling_info()
+            .list_branch_with_siblings()
             .thread_id(thread_id)
             .user_id(user_id)
-            .message_ids(&message_ids)
+            .params(params)
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let sibling_map: HashMap<String, (i64, i64)> = sibling_rows
-            .into_iter()
-            .map(|s| (s.message_id.to_string(), (s.sibling_index, s.sibling_count)))
-            .collect();
-
-        Ok(messages
-            .into_iter()
-            .enumerate()
-            .map(|(i, m)| {
-                let msg_id = m.id.to_string();
-                let parent_id = m
-                    .parent_message_id
-                    .map(|id| id.to_string())
-                    .unwrap_or_default();
-                let (sibling_index, _sibling_count) =
-                    sibling_map.get(&msg_id).copied().unwrap_or((0, 1));
-                BaseMessageWithSibling {
-                    parent_id,
-                    message: Some(m.into()),
-                    children: vec![],
-                    sibling_index: sibling_index as i32,
-                    depth: i as i32,
-                }
-            })
-            .collect())
+        Ok(Self::build_tree_from_rows(rows))
     }
 }
 
@@ -795,23 +815,14 @@ impl ProtoThreadService for ThreadService {
             })?;
 
         let messages = self
-            .db
-            .list_messages()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(req.offset, req.limit, "ASC"))
-            .include_hidden(false)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        let result_messages = self
-            .build_messages_with_siblings(thread_id, user_id, messages)
+            .fetch_branch_with_siblings(
+                thread_id,
+                user_id,
+                PaginationParams::new(req.offset, req.limit, "ASC"),
+            )
             .await?;
 
-        Ok(Response::new(GetMessagesResponse {
-            messages: result_messages,
-        }))
+        Ok(Response::new(GetMessagesResponse { messages }))
     }
 
     async fn get_thread(
@@ -1010,23 +1021,10 @@ impl ProtoThreadService for ThreadService {
             .map_err(ThreadServiceError::from)?;
 
         let messages = self
-            .db
-            .list_messages()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(0, 100, "ASC"))
-            .include_hidden(false)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        let result_messages = self
-            .build_messages_with_siblings(thread_id, user_id, messages)
+            .fetch_branch_with_siblings(thread_id, user_id, PaginationParams::new(0, 100, "ASC"))
             .await?;
 
-        Ok(Response::new(GetMessagesResponse {
-            messages: result_messages,
-        }))
+        Ok(Response::new(GetMessagesResponse { messages }))
     }
 
     async fn get_message_tree(
