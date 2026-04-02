@@ -10,6 +10,7 @@ import {
 	type DeleteThreadRequest,
 } from '@eurora/shared/proto/thread_service_pb.js';
 import type { ProtoBaseMessage } from '@eurora/shared/proto/agent_chain_pb.js';
+import type { IThreadService } from '$lib/services/thread/thread-service.js';
 
 const PAGE_SIZE = 20;
 const MAX_LOAD_RETRIES = 3;
@@ -43,6 +44,7 @@ export class ChatService {
 	loadingMore = $state(false);
 	hasMore = $state(true);
 	activeThreadId: string | null = $state(null);
+	threadClient: IThreadService | null = null;
 
 	private offset = 0;
 	private loadRetries = 0;
