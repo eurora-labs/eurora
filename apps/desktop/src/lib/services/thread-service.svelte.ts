@@ -2,7 +2,7 @@ import { type IThreadService } from '@eurora/chat/services/thread/thread-service
 import { InjectionToken } from '@eurora/shared/context';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { Thread } from '@eurora/chat/models/thread.model';
-import type { ProtoBaseMessage } from '@eurora/shared/proto/agent_chain_pb.js';
+import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
 import type {
 	DeleteThreadRequest,
 	ListThreadsRequest,
@@ -29,8 +29,27 @@ export class ThreadService implements IThreadService {
 		);
 	}
 
-	loadMoreMessages(): Promise<ProtoBaseMessage[]> {
-		throw new Error('Method not implemented.');
+	async loadMoreMessages(threadId: string): Promise<void> {
+		const entry = this.cache.get(threadId);
+		if (!entry || entry.loading || !entry.hasMore) return;
+
+		entry.loading = true;
+		try {
+			const messages = await this.taurpc.thread.get_messages(
+				threadId,
+				PAGE_SIZE,
+				entry.offset,
+			);
+			const insertOffset = entry.messages.length;
+			entry.messages = [...entry.messages, ...messages];
+			entry.offset += messages.length;
+			entry.hasMore = messages.length === PAGE_SIZE;
+			this.extractReasoning(entry, messages, insertOffset);
+		} catch (error) {
+			console.error(`Failed to load more messages for thread ${threadId}:`, error);
+		} finally {
+			entry.loading = false;
+		}
 	}
 
 	deleteThread(request: DeleteThreadRequest): Promise<void> {
