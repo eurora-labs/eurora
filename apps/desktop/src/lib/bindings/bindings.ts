@@ -3,11 +3,15 @@ export type APISettings = {
 	endpoint: string,
 };
 
+export type Annotation = { Citation: ProtoCitation } | { NonStandard: ProtoNonStandardAnnotation };
+
 export type AppSettings = {
 	general: GeneralSettings,
 	telemetry: TelemetrySettings,
 	api: APISettings,
 };
+
+export type Block = { Text: ProtoTextContentBlock } | { InvalidToolCall: ProtoInvalidToolCallBlock } | { Reasoning: ProtoReasoningContentBlock } | { NonStandard: ProtoNonStandardContentBlock } | { Image: ProtoImageContentBlock } | { Video: ProtoVideoContentBlock } | { Audio: ProtoAudioContentBlock } | { PlainText: ProtoPlainTextContentBlock } | { File: ProtoFileContentBlock } | { ToolCall: ProtoToolCallBlock } | { ToolCallChunk: ProtoToolCallChunkBlock } | { ServerToolCall: ProtoServerToolCall } | { ServerToolCallChunk: ProtoServerToolCallChunk } | { ServerToolResult: ProtoServerToolResult };
 
 export type Claims = {
 	sub: string,
@@ -30,6 +34,8 @@ export type GeneralSettings = {
 	autostart: boolean,
 };
 
+export type Index = { IntIndex: bigint } | { StrIndex: string };
+
 export type LocalBackendInfo = {
 	grpc_port: number,
 	http_port: number,
@@ -41,6 +47,8 @@ export type LoginToken = {
 	expires_in: bigint,
 	url: string,
 };
+
+export type Message = { Human: ProtoHumanMessage } | { System: ProtoSystemMessage } | { Ai: ProtoAiMessage } | { Tool: ProtoToolMessage } | { Chat: ProtoChatMessage } | { Remove: ProtoRemoveMessage };
 
 export type MessageAssetChip = {
 	id: string,
@@ -73,6 +81,251 @@ export type MessageView = {
 	sibling_count: number,
 	sibling_index: number,
 	assets: MessageAssetChip[] | null,
+};
+
+export type ProtoAiMessage = {
+	content: ProtoContentBlock[],
+	id: string | null,
+	name: string | null,
+	tool_calls: ProtoToolCall[],
+	invalid_tool_calls: ProtoInvalidToolCall[],
+	usage_metadata: ProtoUsageMetadata | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoAnnotation = {
+	annotation: Annotation | null,
+};
+
+export type ProtoAudioContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
+};
+
+export type ProtoBaseMessage = {
+	message: Message | null,
+};
+
+export type ProtoBlockIndex = {
+	index: Index | null,
+};
+
+export type ProtoChatMessage = {
+	content: ProtoContentBlock[],
+	role: string,
+	id: string | null,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoCitation = {
+	id: string | null,
+	url: string | null,
+	title: string | null,
+	start_index: bigint | null,
+	end_index: bigint | null,
+	cited_text: string | null,
+	extras: string | null,
+};
+
+export type ProtoContentBlock = {
+	block: Block | null,
+};
+
+export type ProtoFileContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
+};
+
+export type ProtoHumanMessage = {
+	content: ProtoContentBlock[],
+	id: string | null,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoImageContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
+};
+
+export type ProtoInputTokenDetails = {
+	audio: bigint | null,
+	cache_creation: bigint | null,
+	cache_read: bigint | null,
+	extra: string | null,
+};
+
+export type ProtoInvalidToolCall = {
+	name: string | null,
+	args: string | null,
+	id: string | null,
+	error: string | null,
+	call_type: string | null,
+};
+
+export type ProtoInvalidToolCallBlock = {
+	id: string | null,
+	name: string | null,
+	args: string | null,
+	error: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoNonStandardAnnotation = {
+	id: string | null,
+	value: string,
+};
+
+export type ProtoNonStandardContentBlock = {
+	id: string | null,
+	value: string,
+	index: ProtoBlockIndex | null,
+};
+
+export type ProtoOutputTokenDetails = {
+	audio: bigint | null,
+	reasoning: bigint | null,
+	extra: string | null,
+};
+
+export type ProtoPlainTextContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	text: string | null,
+	title: string | null,
+	context: string | null,
+	extras: string | null,
+};
+
+export type ProtoReasoningContentBlock = {
+	id: string | null,
+	reasoning: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoRemoveMessage = {
+	id: string,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoServerToolCall = {
+	id: string,
+	name: string,
+	args: string,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoServerToolCallChunk = {
+	name: string | null,
+	args: string | null,
+	id: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoServerToolResult = {
+	id: string | null,
+	tool_call_id: string,
+	status: number,
+	output: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoSystemMessage = {
+	content: ProtoContentBlock[],
+	id: string | null,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoTextContentBlock = {
+	id: string | null,
+	text: string,
+	annotations: ProtoAnnotation[],
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoToolCall = {
+	id: string | null,
+	name: string,
+	args: string,
+	call_type: string | null,
+};
+
+export type ProtoToolCallBlock = {
+	id: string | null,
+	name: string,
+	args: string,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoToolCallChunkBlock = {
+	id: string | null,
+	name: string | null,
+	args: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoToolMessage = {
+	content: ProtoContentBlock[],
+	tool_call_id: string,
+	id: string | null,
+	name: string | null,
+	status: number,
+	artifact: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoUsageMetadata = {
+	input_tokens: bigint,
+	output_tokens: bigint,
+	total_tokens: bigint,
+	input_token_details: ProtoInputTokenDetails | null,
+	output_token_details: ProtoOutputTokenDetails | null,
+};
+
+export type ProtoVideoContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
 };
 
 export type Query = {
@@ -194,7 +447,7 @@ current_thread_changed: (thread: ThreadView) => Promise<void>,
 delete: (threadId: string) => Promise<null>, 
 generate_title: (threadId: string, content: string) => Promise<ThreadView>, 
 get_message_tree: (threadId: string, startLevel: number, endLevel: number, parentNodeIds: string[]) => Promise<MessageTreeResponse>, 
-get_messages: (threadId: string, limit: number, offset: number) => Promise<MessageView[]>, 
+get_messages: (threadId: string, limit: number, offset: number) => Promise<ProtoBaseMessage[]>, 
 list: (limit: number, offset: number) => Promise<ThreadView[]>, 
 new_thread_added: (thread: ThreadView) => Promise<void>, 
 search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 

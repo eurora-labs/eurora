@@ -275,6 +275,7 @@ dependencies = [
  "sha1",
  "sha2",
  "simsimd",
+ "specta",
  "tempfile",
  "thiserror 2.0.18",
  "tiktoken-rs",
