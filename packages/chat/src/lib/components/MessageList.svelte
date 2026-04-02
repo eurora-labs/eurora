@@ -3,6 +3,7 @@
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
 	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import { Skeleton } from '@eurora/ui/components/skeleton/index';
 	import CheckIcon from '@lucide/svelte/icons/check';
@@ -39,29 +40,32 @@
 	let editText = $state('');
 	let editTextarea = $state<HTMLTextAreaElement | null>(null);
 
-	function unwrapOneof(obj: any): { key: string; value: any } | null {
-		if (!obj) return null;
-		if ('case' in obj && obj.case !== undefined) {
-			return { key: obj.case, value: obj.value };
+	type OneofResult = { key: string; value: Record<string, unknown> } | null;
+
+	function unwrapOneof(obj: unknown): OneofResult {
+		if (!obj || typeof obj !== 'object') return null;
+		const record = obj as Record<string, unknown>;
+		if ('case' in record && record.case !== undefined) {
+			return { key: record.case as string, value: record.value as Record<string, unknown> };
 		}
-		for (const k of Object.keys(obj)) {
+		for (const k of Object.keys(record)) {
 			if (k.startsWith('$') || k.startsWith('_')) continue;
-			return { key: k.toLowerCase(), value: obj[k] };
+			return { key: k.toLowerCase(), value: record[k] as Record<string, unknown> };
 		}
 		return null;
 	}
 
-	function getContentBlocks(node: BaseMessageWithSibling): any[] {
-		const inner = unwrapOneof(node.message?.message);
+	function getContentBlocks(node: BaseMessageWithSibling): Record<string, unknown>[] {
+		const inner = unwrapOneof((node.message as Record<string, unknown>)?.message);
 		if (!inner || inner.key === 'remove') return [];
-		return inner.value?.content ?? [];
+		return (inner.value?.content as Record<string, unknown>[]) ?? [];
 	}
 
 	function getTextContent(node: BaseMessageWithSibling): string {
 		return getContentBlocks(node)
 			.map((b) => {
 				const block = unwrapOneof(b.block ?? b);
-				if (block?.key === 'text') return block.value?.text ?? '';
+				if (block?.key === 'text') return (block.value?.text as string) ?? '';
 				return '';
 			})
 			.join('');
@@ -71,20 +75,25 @@
 		return getContentBlocks(node)
 			.map((b) => {
 				const block = unwrapOneof(b.block ?? b);
-				if (block?.key === 'reasoning') return block.value?.reasoning ?? '';
+				if (block?.key === 'reasoning') return (block.value?.reasoning as string) ?? '';
 				return '';
 			})
 			.join('');
 	}
 
 	function isUser(node: BaseMessageWithSibling): boolean {
-		const inner = unwrapOneof(node.message?.message);
+		const inner = unwrapOneof((node.message as Record<string, unknown>)?.message);
 		return inner?.key === 'human';
 	}
 
 	function getMessageId(node: BaseMessageWithSibling): string | undefined {
-		const inner = unwrapOneof(node.message?.message);
-		return inner?.value?.id ?? undefined;
+		const inner = unwrapOneof((node.message as Record<string, unknown>)?.message);
+		return (inner?.value?.id as string) ?? undefined;
+	}
+
+	function getSiblingIndex(node: BaseMessageWithSibling): number {
+		const record = node as Record<string, unknown>;
+		return (record.siblingIndex ?? record.sibling_index ?? 0) as number;
 	}
 
 	function handleCopy(content: string, index: number) {
@@ -128,7 +137,7 @@
 	}
 </script>
 
-{#snippet siblingNav(node: BaseMessageWithSibling, index: number)}
+{#snippet siblingNav(node: BaseMessageWithSibling)}
 	{#if node.children.length > 1}
 		{@const activeId = getMessageId(node)}
 		<Message.Action
@@ -140,8 +149,7 @@
 			<ChevronLeftIcon />
 		</Message.Action>
 		<span class="text-muted-foreground flex items-center text-xs">
-			{((node as any).siblingIndex ?? (node as any).sibling_index ?? 0) + 1} / {node.children
-				.length}
+			{getSiblingIndex(node) + 1} / {node.children.length}
 		</span>
 		<Message.Action
 			tooltip="Next"
@@ -216,18 +224,10 @@
 								rows={3}
 							></textarea>
 							<div class="flex justify-end gap-2">
-								<button
-									class="text-muted-foreground hover:text-foreground text-sm"
-									onclick={cancelEdit}
-								>
+								<Button variant="ghost" size="sm" onclick={cancelEdit}>
 									Cancel
-								</button>
-								<button
-									class="bg-primary text-primary-foreground rounded-md px-3 py-1 text-sm"
-									onclick={submitEdit}
-								>
-									Send
-								</button>
+								</Button>
+								<Button size="sm" onclick={submitEdit}>Send</Button>
 							</div>
 						</div>
 					{:else}
@@ -241,7 +241,7 @@
 					{/if}
 					{#if user && editingIndex !== i && !streaming}
 						<Message.Actions class="self-end">
-							{@render siblingNav(node, i)}
+							{@render siblingNav(node)}
 							{#if onCopy}
 								<Message.Action
 									tooltip="Copy"
@@ -266,7 +266,7 @@
 					{/if}
 					{#if !user && content.trim().length > 0 && !isStreaming}
 						<Message.Actions>
-							{@render siblingNav(node, i)}
+							{@render siblingNav(node)}
 							{#if onCopy}
 								<Message.Action
 									tooltip="Copy"

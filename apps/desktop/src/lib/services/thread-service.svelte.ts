@@ -37,6 +37,18 @@ export class ThreadService implements IThreadService {
 		>;
 	}
 
+	async switchBranch(
+		threadId: string,
+		messageId: string,
+		direction: number,
+	): Promise<BaseMessageWithSibling[]> {
+		return this.taurpc.thread.switch_branch(
+			threadId,
+			messageId,
+			direction,
+		) as unknown as Promise<BaseMessageWithSibling[]>;
+	}
+
 	async deleteThread(request: DeleteThreadRequest): Promise<void> {
 		await this.taurpc.thread.delete(request.threadId);
 	}

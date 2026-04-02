@@ -17,12 +17,7 @@ export class ThreadMessages {
 	hasMore = $state(true);
 	offset = 0;
 	streaming = $state(false);
-
-	treeLoadedEndLevel = 0;
-	treeLoading = $state(false);
-	treeHasMore = $state(false);
-	treeLoadId = 0;
-	treeInitialLoaded = false;
+	loaded = false;
 
 	constructor(thread: Thread) {
 		this.thread = thread;
@@ -38,7 +33,7 @@ export class ChatService {
 	loadingMore = $state(false);
 	hasMore = $state(true);
 	activeThreadId: string | null = $state(null);
-	threadClient: IThreadService;
+	private readonly threadClient: IThreadService;
 
 	private offset = 0;
 	private loadRetries = 0;
@@ -63,27 +58,24 @@ export class ChatService {
 	}
 
 	async loadMore() {
-		// if (this.loadingMore || !this.hasMore) return;
-		// this.loadingMore = true;
-		// try {
-		// 	const res = await this.client.listThreads({
-		// 		limit: PAGE_SIZE,
-		// 		offset: this.offset,
-		// 	} as ListThreadsRequest);
-		// 	const newThreads = res.threads.map((thread) => new ThreadMessages(thread));
-		// 	this.threads = [...this.threads, ...newThreads];
-		// 	this.offset += newThreads.length;
-		// 	this.hasMore = newThreads.length === PAGE_SIZE;
-		// 	this.loadRetries = 0;
-		// } catch (error) {
-		// 	console.error('Failed to load more threads:', error);
-		// 	this.loadRetries += 1;
-		// 	if (this.loadRetries >= MAX_LOAD_RETRIES) {
-		// 		this.hasMore = false;
-		// 	}
-		// } finally {
-		// 	this.loadingMore = false;
-		// }
+		if (this.loadingMore || !this.hasMore) return;
+		this.loadingMore = true;
+		try {
+			const res = await this.threadClient.listThreads({
+				limit: PAGE_SIZE,
+				offset: this.offset,
+			} as ListThreadsRequest);
+			const newThreads = res.map((thread) => new ThreadMessages(thread));
+			this.threads = [...this.threads, ...newThreads];
+			this.offset += newThreads.length;
+			this.hasMore = newThreads.length === PAGE_SIZE;
+			this.loadRetries = 0;
+		} catch (error) {
+			console.error('Failed to load more threads:', error);
+			this.loadRetries += 1;
+		} finally {
+			this.loadingMore = false;
+		}
 	}
 
 	async deleteThread(threadId: string) {
@@ -96,9 +88,10 @@ export class ChatService {
 	}
 
 	updateThread(thread: Thread) {
-		this.threads = this.threads.map((t) =>
-			t.thread.id === thread.id ? { ...t, title: thread.title } : t,
-		);
+		const entry = this.threads.find((t) => t.thread.id === thread.id);
+		if (entry) {
+			entry.thread = { ...entry.thread, ...thread };
+		}
 	}
 
 	getThreadData(threadId: string): ThreadMessages | undefined {
@@ -107,7 +100,7 @@ export class ChatService {
 
 	async loadMessages(threadId: string): Promise<void> {
 		const entry = this.threads.find((t) => t.thread.id === threadId);
-		if (!entry || entry.loading) return;
+		if (!entry || entry.loading || entry.loaded) return;
 
 		entry.loading = true;
 		try {
@@ -115,11 +108,20 @@ export class ChatService {
 			entry.messages = messages;
 			entry.offset = messages.length;
 			entry.hasMore = messages.length === MESSAGE_PAGE_SIZE;
+			entry.loaded = true;
 		} catch (error) {
 			console.error(`Failed to load messages for thread ${threadId}:`, error);
 		} finally {
 			entry.loading = false;
 		}
+	}
+
+	async switchBranch(threadId: string, messageId: string, direction: number): Promise<void> {
+		const entry = this.threads.find((t) => t.thread.id === threadId);
+		if (!entry) return;
+
+		const messages = await this.threadClient.switchBranch(threadId, messageId, direction);
+		entry.messages = messages;
 	}
 
 	destroy() {
