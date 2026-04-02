@@ -34,6 +34,10 @@ export class ThreadMessages {
 }
 
 export class ChatService {
+	newThread: Thread | undefined = $state();
+	titleChanged: Thread | undefined = $state();
+	currentThreadChanged: Thread | undefined = $state();
+
 	threads: ThreadMessages[] = $state([]);
 	loading = $state(true);
 	loadingMore = $state(false);
