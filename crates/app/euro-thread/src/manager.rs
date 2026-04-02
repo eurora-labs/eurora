@@ -3,8 +3,10 @@ use crate::{
     error::{Error, Result},
 };
 use agent_chain::messages::{ContentBlock, ContentBlocks};
-use agent_chain::{AnyMessage, HumanMessage, SystemMessage, messages::AIMessageChunk};
-use agent_chain_core::proto::{ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage};
+use agent_chain::{HumanMessage, SystemMessage, messages::AIMessageChunk};
+use agent_chain_core::proto::{
+    BaseMessageWithSibling, ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage,
+};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
@@ -64,16 +66,17 @@ impl ThreadManager {
     pub async fn get_current_messages(
         &self,
         request: GetMessagesRequest,
-    ) -> Result<Vec<AnyMessage>> {
+    ) -> Result<Vec<BaseMessageWithSibling>> {
         let mut client = self.client();
 
         let response = client.get_messages(request).await?.into_inner();
+        Ok(response.messages)
 
-        Ok(response
-            .messages
-            .into_iter()
-            .map(AnyMessage::from)
-            .collect())
+        // Ok(response
+        //     .messages
+        //     .into_iter()
+        //     .map(AnyMessage::from)
+        //     .collect())
     }
 
     pub async fn delete_thread(&self, thread_id: String) -> Result<()> {

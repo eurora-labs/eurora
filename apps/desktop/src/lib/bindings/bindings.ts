@@ -11,6 +11,14 @@ export type AppSettings = {
 	api: APISettings,
 };
 
+export type BaseMessageWithSibling = {
+	parent_id: string,
+	message: ProtoBaseMessage | null,
+	children: BaseMessageWithSibling[],
+	sibling_index: number,
+	depth: number,
+};
+
 export type Block = { Text: ProtoTextContentBlock } | { InvalidToolCall: ProtoInvalidToolCallBlock } | { Reasoning: ProtoReasoningContentBlock } | { NonStandard: ProtoNonStandardContentBlock } | { Image: ProtoImageContentBlock } | { Video: ProtoVideoContentBlock } | { Audio: ProtoAudioContentBlock } | { PlainText: ProtoPlainTextContentBlock } | { File: ProtoFileContentBlock } | { ToolCall: ProtoToolCallBlock } | { ToolCallChunk: ProtoToolCallChunkBlock } | { ServerToolCall: ProtoServerToolCall } | { ServerToolCallChunk: ProtoServerToolCallChunk } | { ServerToolResult: ProtoServerToolResult };
 
 export type Claims = {
@@ -71,16 +79,6 @@ export type MessageTreeNodeView = {
 export type MessageTreeResponse = {
 	nodes: MessageTreeNodeView[],
 	has_more: boolean,
-};
-
-export type MessageView = {
-	id: string | null,
-	role: string,
-	content: string,
-	reasoning_blocks: ReasoningBlock[] | null,
-	sibling_count: number,
-	sibling_index: number,
-	assets: MessageAssetChip[] | null,
 };
 
 export type ProtoAiMessage = {
@@ -447,12 +445,12 @@ current_thread_changed: (thread: ThreadView) => Promise<void>,
 delete: (threadId: string) => Promise<null>, 
 generate_title: (threadId: string, content: string) => Promise<ThreadView>, 
 get_message_tree: (threadId: string, startLevel: number, endLevel: number, parentNodeIds: string[]) => Promise<MessageTreeResponse>, 
-get_messages: (threadId: string, limit: number, offset: number) => Promise<ProtoBaseMessage[]>, 
+get_messages: (threadId: string, limit: number, offset: number) => Promise<BaseMessageWithSibling[]>, 
 list: (limit: number, offset: number) => Promise<ThreadView[]>, 
 new_thread_added: (thread: ThreadView) => Promise<void>, 
 search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 
 search_threads: (query: string, limit: number, offset: number) => Promise<SearchThreadResultView[]>, 
-switch_branch: (threadId: string, messageId: string, direction: number) => Promise<MessageView[]>, 
+switch_branch: (threadId: string, messageId: string, direction: number) => Promise<BaseMessageWithSibling[]>, 
 thread_title_changed: (thread: ThreadView) => Promise<void>},
 "timeline": {list: () => Promise<string[]>, 
 new_app_event: (event: TimelineAppEvent) => Promise<void>, 
