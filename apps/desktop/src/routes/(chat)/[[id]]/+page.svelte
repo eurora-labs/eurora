@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { MessageList } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
@@ -8,7 +7,6 @@
 
 	let { data } = $props();
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
 
 	const threadId = $derived(data.threadId);
@@ -30,13 +28,8 @@
 
 	function handleSwitchBranch(messageId: string, direction: number) {
 		if (!threadId) return;
-		taurpc.thread
-			.switch_branch(threadId, messageId, direction)
-			.then((updated) => {
-				if (threadData) {
-					threadData.messages = updated as unknown as typeof threadData.messages;
-				}
-			})
+		chatService
+			.switchBranch(threadId, messageId, direction)
 			.catch((e) => toast.error(`Failed to switch branch: ${e}`));
 	}
 </script>
