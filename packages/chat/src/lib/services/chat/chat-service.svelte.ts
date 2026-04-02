@@ -1,18 +1,14 @@
-import { createClient, type Client } from '@connectrpc/connect';
-import { createGrpcWebTransport } from '@connectrpc/connect-web';
-import { inject, InjectionToken } from '@eurora/shared/context';
+import { InjectionToken } from '@eurora/shared/context';
 import type { Thread } from '$lib/models/thread.model.js';
-import {
-	type MessageTreeNode,
-	ProtoThreadService,
-	type ListThreadsRequest,
-	type DeleteThreadRequest,
-} from '@eurora/shared/proto/thread_service_pb.js';
-import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
 import type { IThreadService } from '$lib/services/thread/thread-service.js';
+import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
+import type {
+	ListThreadsRequest,
+	DeleteThreadRequest,
+} from '@eurora/shared/proto/thread_service_pb.js';
 
 const PAGE_SIZE = 20;
-const MAX_LOAD_RETRIES = 3;
+const MESSAGE_PAGE_SIZE = 50;
 
 export class ThreadMessages {
 	thread: Thread;
@@ -46,7 +42,6 @@ export class ChatService {
 
 	private offset = 0;
 	private loadRetries = 0;
-	private _client: Client<typeof ProtoThreadService> | null = null;
 	private readonly unlisteners: ((() => void) | Promise<() => void>)[] = [];
 
 	constructor(threadClient: IThreadService) {
@@ -104,6 +99,27 @@ export class ChatService {
 		this.threads = this.threads.map((t) =>
 			t.thread.id === thread.id ? { ...t, title: thread.title } : t,
 		);
+	}
+
+	getThreadData(threadId: string): ThreadMessages | undefined {
+		return this.threads.find((t) => t.thread.id === threadId);
+	}
+
+	async loadMessages(threadId: string): Promise<void> {
+		const entry = this.threads.find((t) => t.thread.id === threadId);
+		if (!entry || entry.loading) return;
+
+		entry.loading = true;
+		try {
+			const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0);
+			entry.messages = messages;
+			entry.offset = messages.length;
+			entry.hasMore = messages.length === MESSAGE_PAGE_SIZE;
+		} catch (error) {
+			console.error(`Failed to load messages for thread ${threadId}:`, error);
+		} finally {
+			entry.loading = false;
+		}
 	}
 
 	destroy() {
