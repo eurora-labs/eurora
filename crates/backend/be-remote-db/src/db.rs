@@ -1306,6 +1306,92 @@ impl DatabaseManager {
         Ok(messages)
     }
 
+    #[builder]
+    pub async fn list_branch_with_siblings(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+        params: Option<PaginationParams>,
+    ) -> DbResult<Vec<crate::types::BranchMessageRow>> {
+        let params = params.unwrap_or_default();
+
+        let query = format!(
+            r#"
+            WITH RECURSIVE branch AS (
+                SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
+                       m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
+                       m.reasoning_blocks, m.hidden_from_ui, m.created_at, m.updated_at
+                FROM messages m
+                JOIN threads t ON t.active_leaf_id = m.id
+                WHERE t.id = $1 AND t.user_id = $2
+
+                UNION ALL
+
+                SELECT parent.id, parent.thread_id, parent.user_id, parent.parent_message_id,
+                       parent.message_type, parent.content, parent.tool_call_id, parent.tool_calls,
+                       parent.additional_kwargs, parent.reasoning_blocks, parent.hidden_from_ui,
+                       parent.created_at, parent.updated_at
+                FROM messages parent
+                JOIN branch child ON child.parent_message_id = parent.id
+                    AND parent.thread_id = $1 AND parent.user_id = $2
+            ),
+            active_branch AS (
+                SELECT id, parent_message_id,
+                       ROW_NUMBER() OVER (ORDER BY created_at {order}) AS rn
+                FROM branch
+                WHERE hidden_from_ui = false
+            ),
+            paginated AS (
+                SELECT id, parent_message_id
+                FROM active_branch
+                WHERE rn > $4 AND rn <= $3 + $4
+            ),
+            numbered_branch AS (
+                SELECT id,
+                       ROW_NUMBER() OVER (ORDER BY created_at ASC) - 1 AS depth
+                FROM paginated
+            ),
+            siblings AS (
+                SELECT
+                    nb.id AS branch_message_id,
+                    nb.depth AS branch_depth,
+                    s.id, s.thread_id, s.user_id, s.parent_message_id, s.message_type,
+                    s.content, s.tool_call_id, s.tool_calls, s.additional_kwargs,
+                    s.reasoning_blocks, s.created_at, s.updated_at,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY nb.id ORDER BY s.created_at, s.id
+                    ) - 1 AS sibling_index
+                FROM numbered_branch nb
+                JOIN paginated p ON p.id = nb.id
+                JOIN messages s ON s.thread_id = $1 AND s.user_id = $2
+                    AND s.hidden_from_ui = false
+                    AND (
+                        (p.parent_message_id IS NOT NULL AND s.parent_message_id = p.parent_message_id)
+                        OR (p.parent_message_id IS NULL AND s.parent_message_id IS NULL)
+                    )
+            )
+            SELECT branch_message_id, branch_depth::int4,
+                   id, thread_id, user_id, parent_message_id, message_type,
+                   content, tool_call_id, tool_calls, additional_kwargs,
+                   reasoning_blocks, created_at, updated_at,
+                   sibling_index
+            FROM siblings
+            ORDER BY branch_depth ASC, sibling_index ASC
+            "#,
+            order = params.order()
+        );
+
+        let rows = sqlx::query_as::<_, crate::types::BranchMessageRow>(&query)
+            .bind(thread_id)
+            .bind(user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(rows)
+    }
+
     pub async fn list_messages_by_level(
         &self,
         thread_id: Uuid,

@@ -275,6 +275,15 @@ pub struct SiblingInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct BranchMessageRow {
+    pub branch_message_id: Uuid,
+    pub branch_depth: i32,
+    #[sqlx(flatten)]
+    pub message: Message,
+    pub sibling_index: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct MessageTreeNode {
     pub id: Uuid,
     pub parent_message_id: Option<Uuid>,
