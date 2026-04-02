@@ -3,9 +3,8 @@ use crate::shared_types::SharedThreadManager;
 use agent_chain_core::messages::content::{ContentBlock, ContentBlocks};
 use agent_chain_core::messages::prelude::*;
 use euro_thread::{ListThreadsRequest, Thread};
-use proto_gen::agent_chain::ProtoBaseMessage;
-use proto_gen::thread::{CreateThreadRequest, GetMessagesResponse};
-use std::collections::HashMap;
+use proto_gen::agent_chain::BaseMessageWithSibling;
+use proto_gen::thread::CreateThreadRequest;
 use tauri::{Manager, Runtime};
 
 #[taurpc::ipc_type]
@@ -103,14 +102,14 @@ pub trait ThreadApi {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<ProtoBaseMessage>, String>;
+    ) -> Result<Vec<BaseMessageWithSibling>, String>;
 
     async fn switch_branch<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         message_id: String,
         direction: i32,
-    ) -> Result<Vec<MessageView>, String>;
+    ) -> Result<Vec<BaseMessageWithSibling>, String>;
 
     async fn get_message_tree<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -149,41 +148,41 @@ fn thread_manager<R: Runtime>(
         .ok_or_else(|| "Thread manager not available".to_string())
 }
 
-fn convert_response(response: GetMessagesResponse) -> Vec<MessageView> {
-    let sibling_map: HashMap<String, (u32, u32)> = response
-        .sibling_info
-        .into_iter()
-        .map(|s| (s.message_id, (s.sibling_count, s.sibling_index)))
-        .collect();
+// fn convert_response(response: GetMessagesResponse) -> Vec<MessageView> {
+//     let sibling_map: HashMap<String, (u32, u32)> = response
+//         .sibling_info
+//         .into_iter()
+//         .map(|s| (s.message_id, (s.sibling_count, s.sibling_index)))
+//         .collect();
 
-    response
-        .messages
-        .into_iter()
-        .map(AnyMessage::from)
-        .filter_map(|message| match message {
-            AnyMessage::SystemMessage(_) => None,
-            _ => {
-                let id = message.id();
-                let (sibling_count, sibling_index) = id
-                    .as_ref()
-                    .and_then(|id| sibling_map.get(id))
-                    .copied()
-                    .unwrap_or((1, 0));
-                let reasoning_blocks = extract_reasoning_blocks(&message);
-                let assets = extract_asset_chips(&message);
-                Some(MessageView {
-                    id,
-                    role: message.message_type().to_string(),
-                    content: message.content().to_string(),
-                    reasoning_blocks,
-                    sibling_count,
-                    sibling_index,
-                    assets,
-                })
-            }
-        })
-        .collect()
-}
+//     response
+//         .messages
+//         .into_iter()
+//         .map(AnyMessage::from)
+//         .filter_map(|message| match message {
+//             AnyMessage::SystemMessage(_) => None,
+//             _ => {
+//                 let id = message.id();
+//                 let (sibling_count, sibling_index) = id
+//                     .as_ref()
+//                     .and_then(|id| sibling_map.get(id))
+//                     .copied()
+//                     .unwrap_or((1, 0));
+//                 let reasoning_blocks = extract_reasoning_blocks(&message);
+//                 let assets = extract_asset_chips(&message);
+//                 Some(MessageView {
+//                     id,
+//                     role: message.message_type().to_string(),
+//                     content: message.content().to_string(),
+//                     reasoning_blocks,
+//                     sibling_count,
+//                     sibling_index,
+//                     assets,
+//                 })
+//             }
+//         })
+//         .collect()
+// }
 
 #[derive(Clone)]
 pub struct ThreadApiImpl;
@@ -241,7 +240,7 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<ProtoBaseMessage>, String> {
+    ) -> Result<Vec<BaseMessageWithSibling>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let response = thread_manager
@@ -259,7 +258,7 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         message_id: String,
         direction: i32,
-    ) -> Result<Vec<MessageView>, String> {
+    ) -> Result<Vec<BaseMessageWithSibling>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let response = thread_manager
@@ -267,7 +266,7 @@ impl ThreadApi for ThreadApiImpl {
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(convert_response(response))
+        Ok(response.messages)
     }
 
     async fn get_message_tree<R: Runtime>(

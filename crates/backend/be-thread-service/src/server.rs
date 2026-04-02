@@ -4,6 +4,7 @@ use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use agent_chain_core::proto::BaseMessageWithSibling;
 use agent_chain_core::proto::ProtoAiMessageChunk;
 use agent_chain_core::proto::ProtoContentBlock;
 use be_asset::AssetService;
@@ -20,10 +21,10 @@ use proto_gen::thread::{
     CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest, DeleteThreadResponse,
     GenerateThreadTitleRequest, GenerateThreadTitleResponse, GetMessageTreeRequest,
     GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, MessageTreeNode,
-    SavePreliminaryContentBlocksRequest, SavePreliminaryContentBlocksResponse, SearchMessageResult,
-    SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
-    SearchThreadsResponse, SwitchBranchRequest, Thread,
+    ListThreadsRequest, ListThreadsResponse, MessageTreeNode, SavePreliminaryContentBlocksRequest,
+    SavePreliminaryContentBlocksResponse, SearchMessageResult, SearchMessagesRequest,
+    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
+    SwitchBranchRequest, Thread,
 };
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -247,6 +248,50 @@ impl ThreadService {
             updated_at: Some(datetime_to_timestamp(thread.updated_at)),
             active_leaf_id: thread.active_leaf_id.map(|id| id.to_string()),
         }
+    }
+
+    async fn build_messages_with_siblings(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+        messages: Vec<be_remote_db::Message>,
+    ) -> Result<Vec<BaseMessageWithSibling>, Status> {
+        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+        let sibling_rows = self
+            .db
+            .get_sibling_info()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .message_ids(&message_ids)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        let sibling_map: HashMap<String, (i64, i64)> = sibling_rows
+            .into_iter()
+            .map(|s| (s.message_id.to_string(), (s.sibling_index, s.sibling_count)))
+            .collect();
+
+        Ok(messages
+            .into_iter()
+            .enumerate()
+            .map(|(i, m)| {
+                let msg_id = m.id.to_string();
+                let parent_id = m
+                    .parent_message_id
+                    .map(|id| id.to_string())
+                    .unwrap_or_default();
+                let (sibling_index, _sibling_count) =
+                    sibling_map.get(&msg_id).copied().unwrap_or((0, 1));
+                BaseMessageWithSibling {
+                    parent_id,
+                    message: Some(m.into()),
+                    children: vec![],
+                    sibling_index: sibling_index as i32,
+                    depth: i as i32,
+                }
+            })
+            .collect())
     }
 }
 
@@ -760,29 +805,12 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
-        let sibling_rows = self
-            .db
-            .get_sibling_info()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_ids(&message_ids)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        let sibling_info = sibling_rows
-            .into_iter()
-            .map(|s| MessageSiblingInfo {
-                message_id: s.message_id.to_string(),
-                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
-                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
-            })
-            .collect();
+        let result_messages = self
+            .build_messages_with_siblings(thread_id, user_id, messages)
+            .await?;
 
         Ok(Response::new(GetMessagesResponse {
-            messages: messages.into_iter().map(|m| m.into()).collect(),
-            sibling_info,
+            messages: result_messages,
         }))
     }
 
@@ -992,29 +1020,12 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
-        let sibling_rows = self
-            .db
-            .get_sibling_info()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_ids(&message_ids)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        let sibling_info = sibling_rows
-            .into_iter()
-            .map(|s| MessageSiblingInfo {
-                message_id: s.message_id.to_string(),
-                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
-                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
-            })
-            .collect();
+        let result_messages = self
+            .build_messages_with_siblings(thread_id, user_id, messages)
+            .await?;
 
         Ok(Response::new(GetMessagesResponse {
-            messages: messages.into_iter().map(|m| m.into()).collect(),
-            sibling_info,
+            messages: result_messages,
         }))
     }
 
