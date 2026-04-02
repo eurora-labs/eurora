@@ -7,6 +7,7 @@ import {
 	type MessageTreeNode,
 	ProtoThreadService,
 	type ListThreadsRequest,
+	type DeleteThreadRequest,
 } from '@eurora/shared/proto/thread_service_pb.js';
 import type { ProtoBaseMessage } from '@eurora/shared/proto/agent_chain_pb.js';
 
@@ -36,7 +37,6 @@ export class ThreadMessages {
 export class ChatService {
 	newThread: Thread | undefined = $state();
 	titleChanged: Thread | undefined = $state();
-	currentThreadChanged: Thread | undefined = $state();
 
 	threads: ThreadMessages[] = $state([]);
 	loading = $state(true);
@@ -78,6 +78,39 @@ export class ChatService {
 			console.error('Failed to load threads:', error);
 		} finally {
 			this.loading = false;
+		}
+	}
+
+	async loadMore() {
+		if (this.loadingMore || !this.hasMore) return;
+		this.loadingMore = true;
+		try {
+			const res = await this.client.listThreads({
+				limit: PAGE_SIZE,
+				offset: this.offset,
+			} as ListThreadsRequest);
+			const newThreads = res.threads.map((thread) => new ThreadMessages(thread));
+			this.threads = [...this.threads, ...newThreads];
+			this.offset += newThreads.length;
+			this.hasMore = newThreads.length === PAGE_SIZE;
+			this.loadRetries = 0;
+		} catch (error) {
+			console.error('Failed to load more threads:', error);
+			this.loadRetries += 1;
+			if (this.loadRetries >= MAX_LOAD_RETRIES) {
+				this.hasMore = false;
+			}
+		} finally {
+			this.loadingMore = false;
+		}
+	}
+
+	async deleteThread(threadId: string) {
+		await this.client.deleteThread({ threadId } as DeleteThreadRequest);
+		this.threads = this.threads.filter((t) => t.thread.id !== threadId);
+		this.offset = Math.max(0, this.offset - 1);
+		if (this.activeThreadId === threadId) {
+			this.activeThreadId = null;
 		}
 	}
 
