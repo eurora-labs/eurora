@@ -64,20 +64,20 @@ fn build_providers() -> Providers {
             ChatOllama::builder()
                 .model(&model)
                 .base_url(&host)
-                .temperature(1.0)
-                .top_p(0.95)
-                .top_k(20)
-                .repeat_penalty(1.5)
+                // .temperature(1.0)
+                // .top_p(0.95)
+                // .top_k(20)
+                // .repeat_penalty(1.5)
                 .build(),
         );
         let title: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
             ChatOllama::builder()
                 .model(&model)
                 .base_url(&host)
-                .temperature(1.0)
-                .top_p(1.0)
-                .top_k(20)
-                .repeat_penalty(2.0)
+                // .temperature(1.0)
+                // .top_p(1.0)
+                // .top_k(20)
+                // .repeat_penalty(2.0)
                 .build(),
         );
         Providers {
@@ -92,10 +92,10 @@ fn build_providers() -> Providers {
             .api_base(BASE_NEBUL_URL)
             .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
             .use_responses_api(false)
-            .temperature(1.0)
-            .top_p(0.95)
-            .presence_penalty(1.5)
-            .extra_body(HashMap::from([("top_k".into(), serde_json::json!(20))]))
+            // .temperature(1.0)
+            // .top_p(0.95)
+            // .presence_penalty(1.5)
+            // .extra_body(HashMap::from([("top_k".into(), serde_json::json!(20))]))
             .build();
         let bound = chat_model
             .bind_tools(
@@ -114,9 +114,9 @@ fn build_providers() -> Providers {
                 .model(std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"))
                 .api_base(BASE_NEBUL_URL)
                 .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-                .temperature(1.0)
-                .top_p(1.0)
-                .presence_penalty(2.0)
+                // .temperature(1.0)
+                // .top_p(1.0)
+                // .presence_penalty(2.0)
                 .build(),
         );
 
