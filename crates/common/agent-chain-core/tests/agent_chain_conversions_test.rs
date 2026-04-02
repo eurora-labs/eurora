@@ -3,10 +3,10 @@
 //! These tests verify that conversions between proto types and agent_chain_core types
 //! are lossless and work correctly in both directions.
 
-#[cfg(feature = "agent-chain")]
+#[cfg(feature = "prost")]
 mod tests {
     use agent_chain_core::messages::*;
-    use proto_gen::agent_chain::*;
+    use agent_chain_core::proto::*;
     use std::collections::HashMap;
 
     #[test]

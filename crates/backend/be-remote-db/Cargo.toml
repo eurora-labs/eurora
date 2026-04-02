@@ -6,12 +6,12 @@ description = "Eurora Remote DB"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
-agent-chain-core = { workspace = true }
+agent-chain-core = { workspace = true, features = ["prost"] }
 bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 ipnet = { version = "2", features = ["serde"] }
 prost-types = { workspace = true }
-proto-gen = { workspace = true, features = ["agent-chain"] }
+proto-gen = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sqlx = { version = "0.8.6", features = [

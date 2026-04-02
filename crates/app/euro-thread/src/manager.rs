@@ -4,8 +4,8 @@ use crate::{
 };
 use agent_chain::messages::{ContentBlock, ContentBlocks};
 use agent_chain::{AnyMessage, HumanMessage, SystemMessage, messages::AIMessageChunk};
+use agent_chain_core::proto::{ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
-use proto_gen::agent_chain::{ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
     AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
     ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,

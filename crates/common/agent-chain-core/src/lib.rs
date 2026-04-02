@@ -1,5 +1,14 @@
 #![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
+#[cfg(feature = "prost")]
+mod prost_conversions;
+
+#[cfg(feature = "prost")]
+pub mod proto {
+    tonic::include_proto!("agent_chain");
+    pub use crate::prost_conversions::*;
+}
+
 pub mod load;
 
 #[macro_export]
