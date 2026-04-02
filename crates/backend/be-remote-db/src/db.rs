@@ -1342,9 +1342,10 @@ impl DatabaseManager {
                 WHERE hidden_from_ui = false
             ),
             paginated AS (
-                SELECT id, parent_message_id
-                FROM active_branch
-                WHERE rn > $4 AND rn <= $3 + $4
+                SELECT ab.id, ab.parent_message_id, b.created_at
+                FROM active_branch ab
+                JOIN branch b ON b.id = ab.id
+                WHERE ab.rn > $4 AND ab.rn <= $3 + $4
             ),
             numbered_branch AS (
                 SELECT id,

@@ -1,0 +1,288 @@
+<script lang="ts">
+	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
+	import * as Message from '@eurora/ui/components/ai-elements/message/index';
+	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
+	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
+	import * as Empty from '@eurora/ui/components/empty/index';
+	import { Skeleton } from '@eurora/ui/components/skeleton/index';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import CopyIcon from '@lucide/svelte/icons/copy';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import { tick } from 'svelte';
+	import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
+	import type { Snippet } from 'svelte';
+
+	interface Props {
+		messages: BaseMessageWithSibling[];
+		loading?: boolean;
+		streaming?: boolean;
+		emptyState?: Snippet;
+		onCopy?: (content: string) => void;
+		onEdit?: (index: number, newText: string) => void;
+		onSwitchBranch?: (messageId: string, direction: number) => void;
+	}
+
+	let {
+		messages,
+		loading = false,
+		streaming = false,
+		emptyState,
+		onCopy,
+		onEdit,
+		onSwitchBranch,
+	}: Props = $props();
+
+	let copiedIndex = $state<number | null>(null);
+	let editingIndex = $state<number | null>(null);
+	let editText = $state('');
+	let editTextarea = $state<HTMLTextAreaElement | null>(null);
+
+	function unwrapOneof(obj: any): { key: string; value: any } | null {
+		if (!obj) return null;
+		if ('case' in obj && obj.case !== undefined) {
+			return { key: obj.case, value: obj.value };
+		}
+		for (const k of Object.keys(obj)) {
+			if (k.startsWith('$') || k.startsWith('_')) continue;
+			return { key: k.toLowerCase(), value: obj[k] };
+		}
+		return null;
+	}
+
+	function getContentBlocks(node: BaseMessageWithSibling): any[] {
+		const inner = unwrapOneof(node.message?.message);
+		if (!inner || inner.key === 'remove') return [];
+		return inner.value?.content ?? [];
+	}
+
+	function getTextContent(node: BaseMessageWithSibling): string {
+		return getContentBlocks(node)
+			.map((b) => {
+				const block = unwrapOneof(b.block ?? b);
+				if (block?.key === 'text') return block.value?.text ?? '';
+				return '';
+			})
+			.join('');
+	}
+
+	function getReasoningContent(node: BaseMessageWithSibling): string {
+		return getContentBlocks(node)
+			.map((b) => {
+				const block = unwrapOneof(b.block ?? b);
+				if (block?.key === 'reasoning') return block.value?.reasoning ?? '';
+				return '';
+			})
+			.join('');
+	}
+
+	function isUser(node: BaseMessageWithSibling): boolean {
+		const inner = unwrapOneof(node.message?.message);
+		return inner?.key === 'human';
+	}
+
+	function getMessageId(node: BaseMessageWithSibling): string | undefined {
+		const inner = unwrapOneof(node.message?.message);
+		return inner?.value?.id ?? undefined;
+	}
+
+	function handleCopy(content: string, index: number) {
+		onCopy?.(content);
+		copiedIndex = index;
+		setTimeout(() => {
+			if (copiedIndex === index) copiedIndex = null;
+		}, 2000);
+	}
+
+	async function startEdit(index: number, content: string) {
+		editingIndex = index;
+		editText = content;
+		await tick();
+		editTextarea?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		editTextarea?.focus();
+	}
+
+	function cancelEdit() {
+		editingIndex = null;
+		editText = '';
+	}
+
+	function submitEdit() {
+		if (editingIndex === null) return;
+		const text = editText.trim();
+		if (!text) return;
+		const idx = editingIndex;
+		editingIndex = null;
+		editText = '';
+		onEdit?.(idx, text);
+	}
+
+	function handleEditKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && !e.shiftKey) {
+			e.preventDefault();
+			submitEdit();
+		} else if (e.key === 'Escape') {
+			cancelEdit();
+		}
+	}
+</script>
+
+{#snippet siblingNav(node: BaseMessageWithSibling, index: number)}
+	{#if node.children.length > 1}
+		{@const activeId = getMessageId(node)}
+		<Message.Action
+			tooltip="Previous"
+			onclick={() => {
+				if (activeId) onSwitchBranch?.(activeId, -1);
+			}}
+		>
+			<ChevronLeftIcon />
+		</Message.Action>
+		<span class="text-muted-foreground flex items-center text-xs">
+			{((node as any).siblingIndex ?? (node as any).sibling_index ?? 0) + 1} / {node.children
+				.length}
+		</span>
+		<Message.Action
+			tooltip="Next"
+			onclick={() => {
+				if (activeId) onSwitchBranch?.(activeId, 1);
+			}}
+		>
+			<ChevronRightIcon />
+		</Message.Action>
+	{/if}
+{/snippet}
+
+<Conversation.Root class="min-h-0 flex-1">
+	<Conversation.Content>
+		{#if messages.length === 0 && loading}
+			{#each Array(4) as _, i}
+				<div
+					class="flex w-full max-w-[95%] flex-col gap-2 {i % 2 === 0
+						? 'ml-auto items-end'
+						: 'items-start'}"
+				>
+					<div class="flex flex-col gap-2 rounded-lg px-4 py-3">
+						<Skeleton
+							class="bg-muted h-4 w-48"
+							style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
+						/>
+						<Skeleton
+							class="bg-muted h-4 w-36"
+							style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
+						/>
+						{#if i % 2 === 1}
+							<Skeleton
+								class="bg-muted h-4 w-56"
+								style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
+							/>
+						{/if}
+					</div>
+				</div>
+			{/each}
+		{:else if messages.length === 0}
+			{#if emptyState}
+				{@render emptyState()}
+			{:else}
+				<Empty.Root>
+					<Empty.Header>
+						<Empty.Title>No messages yet</Empty.Title>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
+		{/if}
+		{#each messages as node, i}
+			{@const content = getTextContent(node)}
+			{@const user = isUser(node)}
+			{@const reasoning = getReasoningContent(node)}
+			{@const messageId = getMessageId(node)}
+			{@const isStreaming = !user && i === messages.length - 1 && streaming}
+			{#if content.length > 0 || !user}
+				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
+					{#if reasoning}
+						<Reasoning.Root>
+							<Reasoning.Trigger />
+							<Reasoning.Content children={reasoning} />
+						</Reasoning.Root>
+					{/if}
+					{#if user && editingIndex === i}
+						<div class="flex w-full flex-col gap-2">
+							<textarea
+								bind:this={editTextarea}
+								class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 focus:outline-none"
+								bind:value={editText}
+								onkeydown={handleEditKeydown}
+								rows={3}
+							></textarea>
+							<div class="flex justify-end gap-2">
+								<button
+									class="text-muted-foreground hover:text-foreground text-sm"
+									onclick={cancelEdit}
+								>
+									Cancel
+								</button>
+								<button
+									class="bg-primary text-primary-foreground rounded-md px-3 py-1 text-sm"
+									onclick={submitEdit}
+								>
+									Send
+								</button>
+							</div>
+						</div>
+					{:else}
+						<Message.Content>
+							{#if content.trim().length > 0}
+								<Message.Response {content} />
+							{:else if !reasoning}
+								<Shimmer>Thinking</Shimmer>
+							{/if}
+						</Message.Content>
+					{/if}
+					{#if user && editingIndex !== i && !streaming}
+						<Message.Actions class="self-end">
+							{@render siblingNav(node, i)}
+							{#if onCopy}
+								<Message.Action
+									tooltip="Copy"
+									onclick={() => handleCopy(content, i)}
+								>
+									{#if copiedIndex === i}
+										<CheckIcon />
+									{:else}
+										<CopyIcon />
+									{/if}
+								</Message.Action>
+							{/if}
+							{#if onEdit}
+								<Message.Action
+									tooltip="Edit"
+									onclick={() => startEdit(i, content)}
+								>
+									<PencilIcon />
+								</Message.Action>
+							{/if}
+						</Message.Actions>
+					{/if}
+					{#if !user && content.trim().length > 0 && !isStreaming}
+						<Message.Actions>
+							{@render siblingNav(node, i)}
+							{#if onCopy}
+								<Message.Action
+									tooltip="Copy"
+									onclick={() => handleCopy(content, i)}
+								>
+									{#if copiedIndex === i}
+										<CheckIcon />
+									{:else}
+										<CopyIcon />
+									{/if}
+								</Message.Action>
+							{/if}
+						</Message.Actions>
+					{/if}
+				</Message.Root>
+			{/if}
+		{/each}
+	</Conversation.Content>
+</Conversation.Root>
