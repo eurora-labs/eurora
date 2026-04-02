@@ -728,12 +728,6 @@ importers:
       '@bufbuild/protoc-gen-es':
         specifier: ^2.11.0
         version: 2.11.0(@bufbuild/protobuf@2.11.0)
-      '@connectrpc/connect':
-        specifier: ^2.1.1
-        version: 2.1.1(@bufbuild/protobuf@2.11.0)
-      '@connectrpc/connect-web':
-        specifier: ^2.1.1
-        version: 2.1.1(@bufbuild/protobuf@2.11.0)(@connectrpc/connect@2.1.1(@bufbuild/protobuf@2.11.0))
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
