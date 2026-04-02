@@ -570,8 +570,7 @@
 					<PromptInput.Textarea placeholder="What can I help you with?" />
 				</PromptInput.Body>
 				<PromptInput.Footer class="justify-end">
-					<!-- <PromptInput.Tools>
-						<PromptInput.Button
+					<!-- <PromptInput.Tools> <PromptInput.Button
 							size="sm"
 							onclick={() => (useWebSearch = !useWebSearch)}
 							variant={useWebSearch ? 'default' : 'ghost'}

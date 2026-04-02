@@ -2,15 +2,18 @@ use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
 use agent_chain_core::messages::content::{ContentBlock, ContentBlocks};
 use agent_chain_core::messages::prelude::*;
-use euro_thread::{ListThreadsRequest, Thread};
+use chrono::{TimeZone, Utc};
+use euro_thread::ListThreadsRequest;
 use proto_gen::agent_chain::BaseMessageWithSibling;
 use proto_gen::thread::CreateThreadRequest;
 use tauri::{Manager, Runtime};
 
 #[taurpc::ipc_type]
-pub struct ThreadView {
+pub struct Thread {
     pub id: Option<String>,
     pub title: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[taurpc::ipc_type]
@@ -76,21 +79,21 @@ pub struct SearchMessageResultView {
 #[taurpc::procedures(path = "thread")]
 pub trait ThreadApi {
     #[taurpc(event)]
-    async fn new_thread_added(thread: ThreadView);
+    async fn new_thread_added(thread: Thread);
 
     #[taurpc(event)]
-    async fn thread_title_changed(thread: ThreadView);
+    async fn thread_title_changed(thread: Thread);
 
     #[taurpc(event)]
-    async fn current_thread_changed(thread: ThreadView);
+    async fn current_thread_changed(thread: Thread);
 
     async fn list<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<ThreadView>, String>;
+    ) -> Result<Vec<Thread>, String>;
 
-    async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<ThreadView, String>;
+    async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Thread, String>;
 
     async fn delete<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -123,7 +126,7 @@ pub trait ThreadApi {
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         content: String,
-    ) -> Result<ThreadView, String>;
+    ) -> Result<Thread, String>;
 
     async fn search_threads<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -194,7 +197,7 @@ impl ThreadApi for ThreadApiImpl {
         app_handle: tauri::AppHandle<R>,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<ThreadView>, String> {
+    ) -> Result<Vec<Thread>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
 
@@ -206,10 +209,7 @@ impl ThreadApi for ThreadApiImpl {
         Ok(threads.into_iter().map(|thread| thread.into()).collect())
     }
 
-    async fn create<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<ThreadView, String> {
+    async fn create<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<Thread, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let thread = thread_manager
@@ -323,7 +323,7 @@ impl ThreadApi for ThreadApiImpl {
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         content: String,
-    ) -> Result<ThreadView, String> {
+    ) -> Result<Thread, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let thread = thread_manager
@@ -386,20 +386,31 @@ impl ThreadApi for ThreadApiImpl {
     }
 }
 
-impl From<Thread> for ThreadView {
-    fn from(thread: Thread) -> Self {
-        ThreadView {
-            id: thread.id().map(|id| id.to_string()),
-            title: thread.title().to_string(),
-        }
-    }
-}
-
-impl From<&Thread> for ThreadView {
-    fn from(thread: &Thread) -> Self {
-        ThreadView {
-            id: thread.id().map(|id| id.to_string()),
-            title: thread.title().to_string(),
+impl From<proto_gen::thread::ProtoThread> for Thread {
+    fn from(thread: proto_gen::thread::ProtoThread) -> Self {
+        let created_at = thread
+            .created_at
+            .map(|ts| {
+                Utc.timestamp_opt(ts.seconds, ts.nanos as u32)
+                    .single()
+                    .unwrap_or_default()
+                    .to_rfc3339()
+            })
+            .unwrap_or_default();
+        let updated_at = thread
+            .updated_at
+            .map(|ts| {
+                Utc.timestamp_opt(ts.seconds, ts.nanos as u32)
+                    .single()
+                    .unwrap_or_default()
+                    .to_rfc3339()
+            })
+            .unwrap_or_default();
+        Thread {
+            id: thread.id.into(),
+            title: thread.title,
+            created_at,
+            updated_at,
         }
     }
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { MESSAGE_SERVICE } from '$lib/services/message-service.svelte.js';
-	import { type ViewMode } from '$lib/services/message-service.svelte.js';
+	// import { MESSAGE_SERVICE } from '$lib/services/message-service.svelte.js';
+	// import { type ViewMode } from '$lib/services/message-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
@@ -17,7 +17,7 @@
 	import { onMount } from 'svelte';
 
 	const user = inject(USER_SERVICE);
-	const messageService = inject(MESSAGE_SERVICE);
+	// const messageService = inject(MESSAGE_SERVICE);
 
 	let maximized = $state(false);
 	let isMac = platform() === 'macos';
@@ -52,7 +52,7 @@
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
 	<div class="flex-1" data-tauri-drag-region></div>
 	<div class="pointer-events-auto flex items-center gap-2 h-full px-2">
-		{#if messageService.viewModeVisible}
+		<!-- {#if messageService.viewModeVisible}
 			<Tabs.Root
 				value={messageService.viewMode}
 				onValueChange={(v) => (messageService.viewMode = v as ViewMode)}
@@ -68,7 +68,7 @@
 					</Tabs.Trigger>
 				</Tabs.List>
 			</Tabs.Root>
-		{/if}
+		{/if} -->
 		{#if user.authenticated}
 			<Badge
 				variant={user.planLabel === 'Pro' ? 'outline' : 'secondary'}

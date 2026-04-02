@@ -367,9 +367,11 @@ export type TelemetrySettings = {
 	distinctId: string | null,
 };
 
-export type ThreadView = {
+export type Thread = {
 	id: string | null,
 	title: string,
+	created_at: string,
+	updated_at: string,
 };
 
 export type TimelineAppEvent = {
@@ -440,18 +442,18 @@ request_accessibility_permission: () => Promise<null>,
 start_local_backend: (ollamaModel: string) => Promise<LocalBackendInfo>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
-"thread": {create: () => Promise<ThreadView>, 
-current_thread_changed: (thread: ThreadView) => Promise<void>, 
+"thread": {create: () => Promise<Thread>, 
+current_thread_changed: (thread: Thread) => Promise<void>, 
 delete: (threadId: string) => Promise<null>, 
-generate_title: (threadId: string, content: string) => Promise<ThreadView>, 
+generate_title: (threadId: string, content: string) => Promise<Thread>, 
 get_message_tree: (threadId: string, startLevel: number, endLevel: number, parentNodeIds: string[]) => Promise<MessageTreeResponse>, 
 get_messages: (threadId: string, limit: number, offset: number) => Promise<BaseMessageWithSibling[]>, 
-list: (limit: number, offset: number) => Promise<ThreadView[]>, 
-new_thread_added: (thread: ThreadView) => Promise<void>, 
+list: (limit: number, offset: number) => Promise<Thread[]>, 
+new_thread_added: (thread: Thread) => Promise<void>, 
 search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 
 search_threads: (query: string, limit: number, offset: number) => Promise<SearchThreadResultView[]>, 
 switch_branch: (threadId: string, messageId: string, direction: number) => Promise<BaseMessageWithSibling[]>, 
-thread_title_changed: (thread: ThreadView) => Promise<void>},
+thread_title_changed: (thread: Thread) => Promise<void>},
 "timeline": {list: () => Promise<string[]>, 
 new_app_event: (event: TimelineAppEvent) => Promise<void>, 
 new_assets_event: (chips: ContextChip[]) => Promise<void>} };
