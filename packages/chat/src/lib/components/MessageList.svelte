@@ -2,7 +2,7 @@
 	interface Props {
 		emptyState?: Snippet;
 		onCopy?: (content: string) => void;
-		onEdit?: (index: number, newText: string) => void;
+		onEdit?: (messageId: string, newText: string) => void;
 	}
 </script>
 
@@ -27,8 +27,8 @@
 
 	let { emptyState, onCopy, onEdit }: Props = $props();
 
-	let copiedIndex = $state<number | null>(null);
-	let editingIndex = $state<number | null>(null);
+	let copiedId = $state<string | null>(null);
+	let editingId = $state<string | null>(null);
 	let editText = $state('');
 	let editTextarea = $state<HTMLTextAreaElement | null>(null);
 	const chatService = inject(CHAT_SERVICE);
@@ -89,16 +89,16 @@
 		return (record.siblingIndex ?? record.sibling_index ?? 0) as number;
 	}
 
-	function handleCopy(content: string, index: number) {
+	function handleCopy(content: string, messageId: string) {
 		onCopy?.(content);
-		copiedIndex = index;
+		copiedId = messageId;
 		setTimeout(() => {
-			if (copiedIndex === index) copiedIndex = null;
+			if (copiedId === messageId) copiedId = null;
 		}, 2000);
 	}
 
-	async function startEdit(index: number, content: string) {
-		editingIndex = index;
+	async function startEdit(messageId: string, content: string) {
+		editingId = messageId;
 		editText = content;
 		await tick();
 		editTextarea?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -106,18 +106,18 @@
 	}
 
 	function cancelEdit() {
-		editingIndex = null;
+		editingId = null;
 		editText = '';
 	}
 
 	function submitEdit() {
-		if (editingIndex === null) return;
+		if (editingId === null) return;
 		const text = editText.trim();
 		if (!text) return;
-		const idx = editingIndex;
-		editingIndex = null;
+		const id = editingId;
+		editingId = null;
 		editText = '';
-		onEdit?.(idx, text);
+		onEdit?.(id, text);
 	}
 
 	function handleEditKeydown(e: KeyboardEvent) {
@@ -212,7 +212,7 @@
 							<Reasoning.Content children={reasoning} />
 						</Reasoning.Root>
 					{/if}
-					{#if user && editingIndex === i}
+					{#if user && editingId === messageId}
 						<div class="flex w-full flex-col gap-2">
 							<textarea
 								bind:this={editTextarea}
@@ -237,15 +237,15 @@
 							{/if}
 						</Message.Content>
 					{/if}
-					{#if user && editingIndex !== i && !chatService.streaming}
+					{#if user && editingId !== messageId && !chatService.streaming}
 						<Message.Actions class="self-end">
 							{@render siblingNav(node)}
 							{#if onCopy}
 								<Message.Action
 									tooltip="Copy"
-									onclick={() => handleCopy(content, i)}
+									onclick={() => handleCopy(content, messageId!)}
 								>
-									{#if copiedIndex === i}
+									{#if copiedId === messageId}
 										<CheckIcon />
 									{:else}
 										<CopyIcon />
@@ -255,7 +255,7 @@
 							{#if onEdit}
 								<Message.Action
 									tooltip="Edit"
-									onclick={() => startEdit(i, content)}
+									onclick={() => startEdit(messageId!, content)}
 								>
 									<PencilIcon />
 								</Message.Action>
@@ -268,9 +268,9 @@
 							{#if onCopy}
 								<Message.Action
 									tooltip="Copy"
-									onclick={() => handleCopy(content, i)}
+									onclick={() => handleCopy(content, messageId!)}
 								>
-									{#if copiedIndex === i}
+									{#if copiedId === messageId}
 										<CheckIcon />
 									{:else}
 										<CopyIcon />
