@@ -1,4 +1,14 @@
+<script lang="ts" module>
+	interface Props {
+		emptyState?: Snippet;
+		onCopy?: (content: string) => void;
+		onEdit?: (index: number, newText: string) => void;
+	}
+</script>
+
 <script lang="ts">
+	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
+	import { inject } from '@eurora/shared/context';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
 	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
@@ -15,30 +25,13 @@
 	import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
 	import type { Snippet } from 'svelte';
 
-	interface Props {
-		messages: BaseMessageWithSibling[];
-		loading?: boolean;
-		streaming?: boolean;
-		emptyState?: Snippet;
-		onCopy?: (content: string) => void;
-		onEdit?: (index: number, newText: string) => void;
-		onSwitchBranch?: (messageId: string, direction: number) => void;
-	}
-
-	let {
-		messages,
-		loading = false,
-		streaming = false,
-		emptyState,
-		onCopy,
-		onEdit,
-		onSwitchBranch,
-	}: Props = $props();
+	let { emptyState, onCopy, onEdit }: Props = $props();
 
 	let copiedIndex = $state<number | null>(null);
 	let editingIndex = $state<number | null>(null);
 	let editText = $state('');
 	let editTextarea = $state<HTMLTextAreaElement | null>(null);
+	const chatService = inject(CHAT_SERVICE);
 
 	type OneofResult = { key: string; value: Record<string, unknown> } | null;
 
@@ -143,7 +136,8 @@
 		<Message.Action
 			tooltip="Previous"
 			onclick={() => {
-				if (activeId) onSwitchBranch?.(activeId, -1);
+				if (activeId && chatService.activeThreadId)
+					chatService.switchBranch(chatService.activeThreadId, activeId, -1);
 			}}
 		>
 			<ChevronLeftIcon />
@@ -154,7 +148,8 @@
 		<Message.Action
 			tooltip="Next"
 			onclick={() => {
-				if (activeId) onSwitchBranch?.(activeId, 1);
+				if (activeId && chatService.activeThreadId)
+					chatService.switchBranch(chatService.activeThreadId, activeId, 1);
 			}}
 		>
 			<ChevronRightIcon />
@@ -164,7 +159,7 @@
 
 <Conversation.Root class="min-h-0 flex-1">
 	<Conversation.Content>
-		{#if messages.length === 0 && loading}
+		{#if chatService.activeThread?.messages.length === 0 && chatService.loading}
 			{#each Array(4) as _, i}
 				<div
 					class="flex w-full max-w-[95%] flex-col gap-2 {i % 2 === 0
@@ -189,7 +184,7 @@
 					</div>
 				</div>
 			{/each}
-		{:else if messages.length === 0}
+		{:else if chatService.activeThread?.messages.length === 0}
 			{#if emptyState}
 				{@render emptyState()}
 			{:else}
@@ -200,12 +195,15 @@
 				</Empty.Root>
 			{/if}
 		{/if}
-		{#each messages as node, i}
+		{#each chatService.activeThread?.messages as node, i}
 			{@const content = getTextContent(node)}
 			{@const user = isUser(node)}
 			{@const reasoning = getReasoningContent(node)}
 			{@const messageId = getMessageId(node)}
-			{@const isStreaming = !user && i === messages.length - 1 && streaming}
+			{@const isStreaming =
+				!user &&
+				i === (chatService.activeThread?.messages.length ?? 0) - 1 &&
+				chatService.streaming}
 			{#if content.length > 0 || !user}
 				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
 					{#if reasoning}
@@ -239,7 +237,7 @@
 							{/if}
 						</Message.Content>
 					{/if}
-					{#if user && editingIndex !== i && !streaming}
+					{#if user && editingIndex !== i && !chatService.streaming}
 						<Message.Actions class="self-end">
 							{@render siblingNav(node)}
 							{#if onCopy}

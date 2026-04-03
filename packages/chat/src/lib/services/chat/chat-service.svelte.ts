@@ -29,10 +29,15 @@ export class ChatService {
 	titleChanged: Thread | undefined = $state();
 
 	threads: ThreadMessages[] = $state([]);
-	loading = $state(true);
-	loadingMore = $state(false);
-	hasMore = $state(true);
 	activeThreadId: string | null = $state(null);
+	activeThread = $derived(
+		this.activeThreadId ? this.getThreadData(this.activeThreadId) : undefined,
+	);
+	loading = $derived(this.activeThread ? this.activeThread.loading : false);
+	loadingThreads = $state(false);
+	hasMoreThreads = $derived(this.activeThread ? this.activeThread.hasMore : false);
+	streaming = $derived(this.activeThread ? this.activeThread.streaming : false);
+
 	private readonly threadClient: IThreadService;
 
 	private offset = 0;
@@ -49,7 +54,7 @@ export class ChatService {
 				await this.threadClient.listThreads({ limit, offset } as ListThreadsRequest)
 			).map((thread) => new ThreadMessages(thread));
 			this.offset = this.threads.length;
-			this.hasMore = this.threads.length === PAGE_SIZE;
+			this.hasMoreThreads = this.threads.length === PAGE_SIZE;
 		} catch (error) {
 			console.error('Failed to load threads:', error);
 		} finally {
@@ -57,9 +62,9 @@ export class ChatService {
 		}
 	}
 
-	async loadMore() {
-		if (this.loadingMore || !this.hasMore) return;
-		this.loadingMore = true;
+	async loadMoreThreads() {
+		if (this.loadingThreads || !this.hasMoreThreads) return;
+		this.loadingThreads = true;
 		try {
 			const res = await this.threadClient.listThreads({
 				limit: PAGE_SIZE,
@@ -68,13 +73,13 @@ export class ChatService {
 			const newThreads = res.map((thread) => new ThreadMessages(thread));
 			this.threads = [...this.threads, ...newThreads];
 			this.offset += newThreads.length;
-			this.hasMore = newThreads.length === PAGE_SIZE;
+			this.hasMoreThreads = newThreads.length === PAGE_SIZE;
 			this.loadRetries = 0;
 		} catch (error) {
 			console.error('Failed to load more threads:', error);
 			this.loadRetries += 1;
 		} finally {
-			this.loadingMore = false;
+			this.loadingThreads = false;
 		}
 	}
 
@@ -136,9 +141,9 @@ export class ChatService {
 		this.threads = [];
 		this.offset = 0;
 		this.loadRetries = 0;
-		this.hasMore = true;
+		this.hasMoreThreads = true;
 		this.loading = true;
-		this.loadingMore = false;
+		this.loadingThreads = false;
 		this.activeThreadId = null;
 	}
 }
