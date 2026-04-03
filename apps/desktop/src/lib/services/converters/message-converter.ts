@@ -18,9 +18,12 @@ export function toMessageNodes(raw: BaseMessageWithSibling[]): MessageNode[] {
 }
 
 function toMessageNode(raw: BaseMessageWithSibling): MessageNode {
+	if (!raw.message?.message) {
+		throw new Error(`MessageNode missing message (parent_id: ${raw.parent_id})`);
+	}
 	return {
 		parentId: raw.parent_id,
-		message: raw.message?.message ? toMessage(raw.message.message) : null,
+		message: toMessage(raw.message.message),
 		children: raw.children.map(toMessageNode),
 		siblingIndex: raw.sibling_index,
 		depth: raw.depth,
@@ -32,7 +35,7 @@ function toMessage(raw: Message): DomainMessage {
 		return {
 			type: 'human',
 			content: raw.Human.content.map(toContentBlock),
-			id: raw.Human.id,
+			id: raw.Human.id ?? '',
 			name: raw.Human.name,
 			additionalKwargs: raw.Human.additional_kwargs,
 			responseMetadata: raw.Human.response_metadata,
@@ -42,7 +45,7 @@ function toMessage(raw: Message): DomainMessage {
 		return {
 			type: 'system',
 			content: raw.System.content.map(toContentBlock),
-			id: raw.System.id,
+			id: raw.System.id ?? '',
 			name: raw.System.name,
 			additionalKwargs: raw.System.additional_kwargs,
 			responseMetadata: raw.System.response_metadata,
@@ -52,7 +55,7 @@ function toMessage(raw: Message): DomainMessage {
 		return {
 			type: 'ai',
 			content: raw.Ai.content.map(toContentBlock),
-			id: raw.Ai.id,
+			id: raw.Ai.id ?? '',
 			name: raw.Ai.name,
 			toolCalls: raw.Ai.tool_calls.map((tc) => ({
 				id: tc.id,
@@ -99,7 +102,7 @@ function toMessage(raw: Message): DomainMessage {
 			type: 'tool',
 			content: raw.Tool.content.map(toContentBlock),
 			toolCallId: raw.Tool.tool_call_id,
-			id: raw.Tool.id,
+			id: raw.Tool.id ?? '',
 			name: raw.Tool.name,
 			status: raw.Tool.status,
 			artifact: raw.Tool.artifact,
@@ -112,7 +115,7 @@ function toMessage(raw: Message): DomainMessage {
 			type: 'chat',
 			content: raw.Chat.content.map(toContentBlock),
 			role: raw.Chat.role,
-			id: raw.Chat.id,
+			id: raw.Chat.id ?? '',
 			name: raw.Chat.name,
 			additionalKwargs: raw.Chat.additional_kwargs,
 			responseMetadata: raw.Chat.response_metadata,

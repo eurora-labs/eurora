@@ -1,7 +1,7 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type { MessageNode } from '$lib/models/messages/index.js';
 import type { Thread } from '$lib/models/thread.model.js';
-import type { IThreadService } from '$lib/services/thread/thread-service.js';
+import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
@@ -11,9 +11,9 @@ export class ThreadMessages {
 	messages: MessageNode[] = $state([]);
 	loading = $state(false);
 	hasMore = $state(true);
-	offset = 0;
+	offset = $state(0);
 	streamingMessageId: string | null = $state(null);
-	loaded = false;
+	loaded = $state(false);
 
 	constructor(thread: Thread) {
 		this.thread = thread;
@@ -30,7 +30,8 @@ export class ChatService {
 		this.activeThreadId ? this.getThreadData(this.activeThreadId) : undefined,
 	);
 	loadingThreads = $state(false);
-	hasMoreThreads = $derived(true);
+	loadingMoreThreads = $state(false);
+	hasMoreThreads = $state(true);
 
 	private readonly threadClient: IThreadService;
 
@@ -43,8 +44,10 @@ export class ChatService {
 
 	async loadThreads(limit: number, offset: number) {
 		try {
-			this.threads = (await this.threadClient.listThreads(limit, offset)).map(
-				(thread) => new ThreadMessages(thread),
+			const fresh = await this.threadClient.listThreads(limit, offset);
+			const existing = new Map(this.threads.map((t) => [t.thread.id, t]));
+			this.threads = fresh.map(
+				(thread) => existing.get(thread.id) ?? new ThreadMessages(thread),
 			);
 			this.offset = this.threads.length;
 			this.hasMoreThreads = this.threads.length === PAGE_SIZE;
@@ -56,8 +59,8 @@ export class ChatService {
 	}
 
 	async loadMoreThreads() {
-		if (this.loadingThreads || !this.hasMoreThreads) return;
-		this.loadingThreads = true;
+		if (this.loadingMoreThreads || !this.hasMoreThreads) return;
+		this.loadingMoreThreads = true;
 		try {
 			const res = await this.threadClient.listThreads(PAGE_SIZE, this.offset);
 			const newThreads = res.map((thread) => new ThreadMessages(thread));
@@ -67,7 +70,7 @@ export class ChatService {
 		} catch (error) {
 			console.error('Failed to load more threads:', error);
 		} finally {
-			this.loadingThreads = false;
+			this.loadingMoreThreads = false;
 		}
 	}
 
@@ -109,7 +112,11 @@ export class ChatService {
 		}
 	}
 
-	async switchBranch(threadId: string, messageId: string, direction: number): Promise<void> {
+	async switchBranch(
+		threadId: string,
+		messageId: string,
+		direction: BranchDirection,
+	): Promise<void> {
 		const entry = this.threads.find((t) => t.thread.id === threadId);
 		if (!entry) return;
 
