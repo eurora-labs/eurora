@@ -12,7 +12,7 @@ export class ThreadMessages {
 	loading = $state(false);
 	hasMore = $state(true);
 	offset = 0;
-	streaming = $state(false);
+	streamingMessageId: string | null = $state(null);
 	loaded = false;
 
 	constructor(thread: Thread) {
