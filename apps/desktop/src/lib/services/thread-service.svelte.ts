@@ -1,9 +1,11 @@
-import { type IThreadService } from '@eurora/chat/services/thread/thread-service';
-import { InjectionToken } from '@eurora/shared/context';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-import type { Thread } from '@eurora/chat/models/thread.model';
-import type { MessageNode } from '@eurora/chat/models/messages/index';
 import { toMessageNodes } from '$lib/services/converters/message-converter.js';
+import { InjectionToken } from '@eurora/shared/context';
+import type { Query, ResponseChunk } from '$lib/bindings/bindings.js';
+import type { TaurpcService } from '$lib/bindings/taurpcService.js';
+import type { MessageNode } from '@eurora/chat/models/messages/index';
+import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
+import type { Thread } from '@eurora/chat/models/thread.model';
+import type { IThreadService } from '@eurora/chat/services/thread/thread-service';
 
 export class ThreadService implements IThreadService {
 	private readonly taurpc: TaurpcService;
@@ -40,6 +42,67 @@ export class ThreadService implements IThreadService {
 
 	async deleteThread(threadId: string): Promise<void> {
 		await this.taurpc.thread.delete(threadId);
+	}
+
+	async createThread(): Promise<Thread> {
+		const raw = await this.taurpc.thread.create();
+		return {
+			id: raw.id,
+			title: raw.title,
+			createdAt: raw.created_at,
+			updatedAt: raw.updated_at,
+		};
+	}
+
+	async *sendMessage(
+		threadId: string,
+		text: string,
+		parentMessageId?: string | null,
+	): AsyncIterable<ChatStreamEvent> {
+		const query: Query = {
+			text,
+			assets: [],
+			parent_message_id: parentMessageId ?? null,
+		};
+
+		const buffer: ChatStreamEvent[] = [];
+		let resolve: (() => void) | null = null;
+
+		function onEvent(response: ResponseChunk) {
+			if (response.reasoning) {
+				buffer.push({ type: 'reasoning', content: response.reasoning });
+			}
+			if (response.chunk) {
+				buffer.push({ type: 'chunk', content: response.chunk });
+			}
+			resolve?.();
+		}
+
+		const done = this.taurpc.chat.send_query(threadId, onEvent, query).then(() => true);
+
+		while (true) {
+			if (buffer.length > 0) {
+				yield buffer.shift()!;
+				continue;
+			}
+
+			const finished = await Promise.race([
+				done,
+				new Promise<false>((r) => {
+					resolve = () => r(false);
+				}),
+			]);
+
+			if (finished) {
+				while (buffer.length > 0) {
+					yield buffer.shift()!;
+				}
+				break;
+			}
+		}
+
+		const raw = await this.taurpc.thread.get_messages(threadId, 50, 0);
+		yield { type: 'done', messages: toMessageNodes(raw) };
 	}
 }
 

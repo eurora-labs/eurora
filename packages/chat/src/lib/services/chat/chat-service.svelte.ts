@@ -25,7 +25,7 @@ export class ChatService {
 	titleChanged: Thread | undefined = $state();
 
 	threads: ThreadMessages[] = $state([]);
-	activeThreadId: string | null = $state(null);
+	activeThreadId: string | undefined = $state(undefined);
 	activeThread = $derived(
 		this.activeThreadId ? this.getThreadData(this.activeThreadId) : undefined,
 	);
@@ -79,7 +79,7 @@ export class ChatService {
 		this.threads = this.threads.filter((t) => t.thread.id !== threadId);
 		this.offset = Math.max(0, this.offset - 1);
 		if (this.activeThreadId === threadId) {
-			this.activeThreadId = null;
+			this.activeThreadId = undefined;
 		}
 	}
 
@@ -90,7 +90,8 @@ export class ChatService {
 		}
 	}
 
-	getThreadData(threadId: string): ThreadMessages | undefined {
+	getThreadData(threadId: string | undefined): ThreadMessages | undefined {
+		if (!threadId) return undefined;
 		return this.threads.find((t) => t.thread.id === threadId);
 	}
 
@@ -124,6 +125,157 @@ export class ChatService {
 		entry.messages = messages;
 	}
 
+	async sendMessage(text: string): Promise<void> {
+		if (!text.trim()) return;
+
+		let threadId = this.activeThreadId;
+
+		if (!threadId) {
+			const thread = await this.threadClient.createThread();
+			const entry = new ThreadMessages(thread);
+			this.threads = [entry, ...this.threads];
+			this.activeThreadId = thread.id;
+			threadId = thread.id;
+			this.newThread = thread;
+		}
+
+		const entry = this.getThreadData(threadId);
+		if (!entry) return;
+
+		this.appendPlaceholders(entry, text);
+		await this.consumeStream(entry, threadId, text);
+	}
+
+	async editMessage(messageId: string, text: string): Promise<void> {
+		const threadId = this.activeThreadId;
+		if (!threadId) return;
+
+		const entry = this.getThreadData(threadId);
+		if (!entry) return;
+
+		const nodeIndex = entry.messages.findIndex((n) => n.message.id === messageId);
+		if (nodeIndex < 0) return;
+
+		const parentId = entry.messages[nodeIndex].parentId || null;
+
+		entry.messages = entry.messages.slice(0, nodeIndex);
+		this.appendPlaceholders(entry, text);
+		await this.consumeStream(entry, threadId, text, parentId);
+	}
+
+	private async consumeStream(
+		entry: ThreadMessages,
+		threadId: string,
+		text: string,
+		parentMessageId?: string | null,
+	): Promise<void> {
+		const aiNode = entry.messages.at(-1)!;
+		const aiMessage = aiNode.message;
+		if (aiMessage.type === 'remove') return;
+
+		try {
+			for await (const event of this.threadClient.sendMessage(
+				threadId,
+				text,
+				parentMessageId,
+			)) {
+				switch (event.type) {
+					case 'chunk': {
+						const textBlock = aiMessage.content.find((b) => b.type === 'text');
+						if (textBlock && textBlock.type === 'text') {
+							textBlock.text += event.content;
+						} else {
+							aiMessage.content.push({
+								type: 'text',
+								id: null,
+								text: event.content,
+								annotations: [],
+								index: null,
+								extras: null,
+							});
+						}
+						break;
+					}
+					case 'reasoning': {
+						const reasoningBlock = aiMessage.content.find(
+							(b) => b.type === 'reasoning',
+						);
+						if (reasoningBlock && reasoningBlock.type === 'reasoning') {
+							reasoningBlock.reasoning =
+								(reasoningBlock.reasoning ?? '') + event.content;
+						} else {
+							aiMessage.content.push({
+								type: 'reasoning',
+								id: null,
+								reasoning: event.content,
+								index: null,
+								extras: null,
+							});
+						}
+						break;
+					}
+					case 'done':
+						entry.messages = event.messages;
+						entry.loaded = true;
+						break;
+				}
+			}
+		} finally {
+			entry.streamingMessageId = null;
+		}
+	}
+
+	private appendPlaceholders(entry: ThreadMessages, text: string): void {
+		const now = Date.now();
+		const humanId = `temp-${now}-human`;
+		const aiId = `temp-${now}-ai`;
+
+		entry.messages = [
+			...entry.messages,
+			{
+				parentId: '',
+				message: {
+					type: 'human',
+					content: [
+						{
+							type: 'text',
+							id: null,
+							text,
+							annotations: [],
+							index: null,
+							extras: null,
+						},
+					],
+					id: humanId,
+					name: null,
+					additionalKwargs: null,
+					responseMetadata: null,
+				},
+				children: [],
+				siblingIndex: 0,
+				depth: 0,
+			},
+			{
+				parentId: humanId,
+				message: {
+					type: 'ai',
+					content: [],
+					id: aiId,
+					name: null,
+					toolCalls: [],
+					invalidToolCalls: [],
+					usageMetadata: null,
+					additionalKwargs: null,
+					responseMetadata: null,
+				},
+				children: [],
+				siblingIndex: 0,
+				depth: 0,
+			},
+		];
+		entry.streamingMessageId = aiId;
+	}
+
 	destroy() {
 		for (const p of this.unlisteners) {
 			if (p instanceof Promise) {
@@ -137,7 +289,7 @@ export class ChatService {
 		this.offset = 0;
 		this.hasMoreThreads = true;
 		this.loadingThreads = false;
-		this.activeThreadId = null;
+		this.activeThreadId = undefined;
 	}
 }
 
