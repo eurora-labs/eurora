@@ -92,6 +92,19 @@ export type ProtoAiMessage = {
 	response_metadata: string | null,
 };
 
+export type ProtoAiMessageChunk = {
+	content: ProtoContentBlock[],
+	id: string | null,
+	name: string | null,
+	tool_calls: ProtoToolCall[],
+	invalid_tool_calls: ProtoInvalidToolCall[],
+	tool_call_chunks: ProtoToolCallChunk[],
+	usage_metadata: ProtoUsageMetadata | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+	chunk_position: number | null,
+};
+
 export type ProtoAnnotation = {
 	annotation: Annotation | null,
 };
@@ -289,6 +302,14 @@ export type ProtoToolCallBlock = {
 	extras: string | null,
 };
 
+export type ProtoToolCallChunk = {
+	name: string | null,
+	args: string | null,
+	id: string | null,
+	index: number | null,
+	chunk_type: string | null,
+};
+
 export type ProtoToolCallChunkBlock = {
 	id: string | null,
 	name: string | null,
@@ -336,11 +357,6 @@ export type ReasoningBlock = {
 	type: string,
 	content: string | null,
 	signature: string | null,
-};
-
-export type ResponseChunk = {
-	chunk: string,
-	reasoning: string | null,
 };
 
 export type Role = "Free" | "Tier1";
@@ -408,7 +424,7 @@ logout: () => Promise<null>,
 poll_for_login: () => Promise<boolean>, 
 refresh_session: () => Promise<null>, 
 register: (email: string, password: string) => Promise<null>},
-"chat": {send_query: (threadId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
+"chat": {send_query: (threadId: string, channel: TAURI_CHANNEL<ProtoAiMessageChunk>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "onboarding": {get_browser_extension_download_url: () => Promise<string>},

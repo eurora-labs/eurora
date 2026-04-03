@@ -1,9 +1,9 @@
-import { toMessageNodes } from '$lib/services/converters/message-converter.js';
+import { toAiMessageChunk, toMessageNodes } from '$lib/services/converters/message-converter.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { Query, ResponseChunk } from '$lib/bindings/bindings.js';
+import type { ProtoAiMessageChunk, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { MessageNode } from '@eurora/chat/models/messages/index';
-import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
+import type { AiMessageChunk } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type { IThreadService } from '@eurora/chat/services/thread/thread-service';
 
@@ -58,25 +58,20 @@ export class ThreadService implements IThreadService {
 		threadId: string,
 		text: string,
 		parentMessageId?: string | null,
-	): AsyncIterable<ChatStreamEvent> {
+	): AsyncIterable<AiMessageChunk> {
 		const query: Query = {
 			text,
 			assets: [],
 			parent_message_id: parentMessageId ?? null,
 		};
 
-		const buffer: ChatStreamEvent[] = [];
+		const buffer: AiMessageChunk[] = [];
 		let resolve: (() => void) | null = null;
 
-		function onEvent(response: ResponseChunk) {
-			if (response.reasoning) {
-				buffer.push({ type: 'reasoning', content: response.reasoning });
-			}
-			if (response.chunk) {
-				buffer.push({ type: 'chunk', content: response.chunk });
-			}
+		const onEvent = (response: ProtoAiMessageChunk) => {
+			buffer.push(toAiMessageChunk(response));
 			resolve?.();
-		}
+		};
 
 		const done = this.taurpc.chat.send_query(threadId, onEvent, query).then(() => true);
 
@@ -100,9 +95,6 @@ export class ThreadService implements IThreadService {
 				break;
 			}
 		}
-
-		const raw = await this.taurpc.thread.get_messages(threadId, 50, 0);
-		yield { type: 'done', messages: toMessageNodes(raw) };
 	}
 }
 

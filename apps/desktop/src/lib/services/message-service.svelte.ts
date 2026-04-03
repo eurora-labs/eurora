@@ -3,7 +3,7 @@ import type {
 	MessageAssetChip,
 	MessageTreeNodeView,
 	MessageView,
-	ResponseChunk,
+	ProtoAiMessageChunk,
 	Query,
 } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
@@ -145,42 +145,50 @@ export class MessageService {
 
 		let pendingWhitespace = '';
 
-		function onEvent(response: ResponseChunk) {
+		function onEvent(response: ProtoAiMessageChunk) {
 			if (!agentMessage) {
 				agentMessage = entry.messages.at(-1);
 			}
 
-			if (response.reasoning) {
-				if (!entry.reasoningData[messageIndex]) {
-					reasoningStartTime = Date.now();
-					entry.reasoningData[messageIndex] = {
-						content: response.reasoning,
-						isStreaming: true,
-					};
-				} else {
-					entry.reasoningData[messageIndex].content += response.reasoning;
-				}
-			}
+			for (const block of response.content) {
+				if (!block.block) continue;
 
-			if (agentMessage && agentMessage.role === 'ai' && response.chunk) {
-				if (!hasReceivedContent) {
-					if (response.chunk.trim().length === 0) {
-						pendingWhitespace += response.chunk;
-						return;
+				if ('Reasoning' in block.block) {
+					const reasoning = block.block.Reasoning.reasoning;
+					if (reasoning) {
+						if (!entry.reasoningData[messageIndex]) {
+							reasoningStartTime = Date.now();
+							entry.reasoningData[messageIndex] = {
+								content: reasoning,
+								isStreaming: true,
+							};
+						} else {
+							entry.reasoningData[messageIndex].content += reasoning;
+						}
 					}
-					hasReceivedContent = true;
-					if (pendingWhitespace) {
-						agentMessage.content += pendingWhitespace;
-						pendingWhitespace = '';
-					}
-					if (entry.reasoningData[messageIndex]?.isStreaming) {
-						entry.reasoningData[messageIndex].isStreaming = false;
-						entry.reasoningData[messageIndex].duration = reasoningStartTime
-							? Math.ceil((Date.now() - reasoningStartTime) / 1000)
-							: undefined;
+				} else if ('Text' in block.block) {
+					const text = block.block.Text.text;
+					if (agentMessage && agentMessage.role === 'ai' && text) {
+						if (!hasReceivedContent) {
+							if (text.trim().length === 0) {
+								pendingWhitespace += text;
+								continue;
+							}
+							hasReceivedContent = true;
+							if (pendingWhitespace) {
+								agentMessage.content += pendingWhitespace;
+								pendingWhitespace = '';
+							}
+							if (entry.reasoningData[messageIndex]?.isStreaming) {
+								entry.reasoningData[messageIndex].isStreaming = false;
+								entry.reasoningData[messageIndex].duration = reasoningStartTime
+									? Math.ceil((Date.now() - reasoningStartTime) / 1000)
+									: undefined;
+							}
+						}
+						agentMessage.content += text;
 					}
 				}
-				agentMessage.content += response.chunk;
 			}
 		}
 

@@ -1,6 +1,6 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type { MessageNode } from '$lib/models/messages/index.js';
-import type { ChatStreamEvent } from '$lib/models/streaming.js';
+import type { AiMessageChunk } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 
 export type BranchDirection = -1 | 0 | 1;
@@ -19,7 +19,7 @@ export interface IThreadService {
 		threadId: string,
 		text: string,
 		parentMessageId?: string | null,
-	): AsyncIterable<ChatStreamEvent>;
+	): AsyncIterable<AiMessageChunk>;
 }
 
 export const THREAD_SERVICE = new InjectionToken<IThreadService>('ThreadService');

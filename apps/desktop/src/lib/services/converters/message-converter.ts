@@ -2,6 +2,7 @@ import type {
 	BaseMessageWithSibling,
 	Block,
 	Message,
+	ProtoAiMessageChunk as RawAiMessageChunk,
 	ProtoAnnotation,
 	ProtoBlockIndex,
 	ProtoContentBlock,
@@ -12,6 +13,7 @@ import type {
 	ContentBlock,
 } from '@eurora/chat/models/content-blocks/index';
 import type { MessageNode, Message as DomainMessage } from '@eurora/chat/models/messages/index';
+import type { AiMessageChunk } from '@eurora/chat/models/streaming';
 
 export function toMessageNodes(raw: BaseMessageWithSibling[]): MessageNode[] {
 	return raw.map(toMessageNode);
@@ -320,5 +322,61 @@ function toAnnotation(raw: ProtoAnnotation): Annotation {
 			id: raw.annotation.NonStandard.id,
 			value: raw.annotation.NonStandard.value,
 		},
+	};
+}
+
+const CHUNK_POSITION_LAST = 1;
+
+export function toAiMessageChunk(raw: RawAiMessageChunk): AiMessageChunk {
+	return {
+		content: raw.content.map(toContentBlock),
+		id: raw.id,
+		name: raw.name,
+		toolCalls: raw.tool_calls.map((tc) => ({
+			id: tc.id,
+			name: tc.name,
+			args: tc.args,
+			callType: tc.call_type,
+		})),
+		invalidToolCalls: raw.invalid_tool_calls.map((tc) => ({
+			id: tc.id,
+			name: tc.name,
+			args: tc.args,
+			error: tc.error,
+			callType: tc.call_type,
+		})),
+		toolCallChunks: raw.tool_call_chunks.map((tc) => ({
+			name: tc.name,
+			args: tc.args,
+			id: tc.id,
+			index: tc.index,
+			chunkType: tc.chunk_type,
+		})),
+		usageMetadata: raw.usage_metadata
+			? {
+					inputTokens: raw.usage_metadata.input_tokens,
+					outputTokens: raw.usage_metadata.output_tokens,
+					totalTokens: raw.usage_metadata.total_tokens,
+					inputTokenDetails: raw.usage_metadata.input_token_details
+						? {
+								audio: raw.usage_metadata.input_token_details.audio,
+								cacheCreation:
+									raw.usage_metadata.input_token_details.cache_creation,
+								cacheRead: raw.usage_metadata.input_token_details.cache_read,
+								extra: raw.usage_metadata.input_token_details.extra,
+							}
+						: null,
+					outputTokenDetails: raw.usage_metadata.output_token_details
+						? {
+								audio: raw.usage_metadata.output_token_details.audio,
+								reasoning: raw.usage_metadata.output_token_details.reasoning,
+								extra: raw.usage_metadata.output_token_details.extra,
+							}
+						: null,
+				}
+			: null,
+		additionalKwargs: raw.additional_kwargs,
+		responseMetadata: raw.response_metadata,
+		chunkPosition: raw.chunk_position === CHUNK_POSITION_LAST ? 'last' : null,
 	};
 }

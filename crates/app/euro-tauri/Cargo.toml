@@ -24,7 +24,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-chain-core = { workspace = true }
+agent-chain-core = { workspace = true, features = ["prost"] }
 auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 backon = { workspace = true }
