@@ -22,7 +22,8 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { tick } from 'svelte';
-	import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
+	import type { ContentBlock } from '$lib/models/content-blocks/index.js';
+	import type { MessageNode } from '$lib/models/messages/index.js';
 	import type { Snippet } from 'svelte';
 
 	let { emptyState, onCopy, onEdit }: Props = $props();
@@ -33,60 +34,30 @@
 	let editTextarea = $state<HTMLTextAreaElement | null>(null);
 	const chatService = inject(CHAT_SERVICE);
 
-	type OneofResult = { key: string; value: Record<string, unknown> } | null;
-
-	function unwrapOneof(obj: unknown): OneofResult {
-		if (!obj || typeof obj !== 'object') return null;
-		const record = obj as Record<string, unknown>;
-		if ('case' in record && record.case !== undefined) {
-			return { key: record.case as string, value: record.value as Record<string, unknown> };
-		}
-		for (const k of Object.keys(record)) {
-			if (k.startsWith('$') || k.startsWith('_')) continue;
-			return { key: k.toLowerCase(), value: record[k] as Record<string, unknown> };
-		}
-		return null;
+	function getContentBlocks(node: MessageNode): ContentBlock[] {
+		const msg = node.message;
+		if (!msg || msg.type === 'remove') return [];
+		return msg.content;
 	}
 
-	function getContentBlocks(node: BaseMessageWithSibling): Record<string, unknown>[] {
-		const inner = unwrapOneof((node.message as Record<string, unknown>)?.message);
-		if (!inner || inner.key === 'remove') return [];
-		return (inner.value?.content as Record<string, unknown>[]) ?? [];
-	}
-
-	function getTextContent(node: BaseMessageWithSibling): string {
+	function getTextContent(node: MessageNode): string {
 		return getContentBlocks(node)
-			.map((b) => {
-				const block = unwrapOneof(b.block ?? b);
-				if (block?.key === 'text') return (block.value?.text as string) ?? '';
-				return '';
-			})
+			.map((b) => (b.type === 'text' ? b.text : ''))
 			.join('');
 	}
 
-	function getReasoningContent(node: BaseMessageWithSibling): string {
+	function getReasoningContent(node: MessageNode): string {
 		return getContentBlocks(node)
-			.map((b) => {
-				const block = unwrapOneof(b.block ?? b);
-				if (block?.key === 'reasoning') return (block.value?.reasoning as string) ?? '';
-				return '';
-			})
+			.map((b) => (b.type === 'reasoning' ? (b.reasoning ?? '') : ''))
 			.join('');
 	}
 
-	function isUser(node: BaseMessageWithSibling): boolean {
-		const inner = unwrapOneof((node.message as Record<string, unknown>)?.message);
-		return inner?.key === 'human';
+	function isUser(node: MessageNode): boolean {
+		return node.message?.type === 'human';
 	}
 
-	function getMessageId(node: BaseMessageWithSibling): string | undefined {
-		const inner = unwrapOneof((node.message as Record<string, unknown>)?.message);
-		return (inner?.value?.id as string) ?? undefined;
-	}
-
-	function getSiblingIndex(node: BaseMessageWithSibling): number {
-		const record = node as Record<string, unknown>;
-		return (record.siblingIndex ?? record.sibling_index ?? 0) as number;
+	function getMessageId(node: MessageNode): string | undefined {
+		return node.message?.id ?? undefined;
 	}
 
 	function handleCopy(content: string, messageId: string) {
@@ -130,7 +101,7 @@
 	}
 </script>
 
-{#snippet siblingNav(node: BaseMessageWithSibling)}
+{#snippet siblingNav(node: MessageNode)}
 	{#if node.children.length > 1}
 		{@const activeId = getMessageId(node)}
 		<Message.Action
@@ -143,7 +114,7 @@
 			<ChevronLeftIcon />
 		</Message.Action>
 		<span class="text-muted-foreground flex items-center text-xs">
-			{getSiblingIndex(node) + 1} / {node.children.length}
+			{node.siblingIndex + 1} / {node.children.length}
 		</span>
 		<Message.Action
 			tooltip="Next"

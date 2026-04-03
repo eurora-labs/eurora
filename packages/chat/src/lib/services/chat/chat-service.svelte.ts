@@ -1,18 +1,14 @@
 import { InjectionToken } from '@eurora/shared/context';
+import type { MessageNode } from '$lib/models/messages/index.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type { IThreadService } from '$lib/services/thread/thread-service.js';
-import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
-import type {
-	ListThreadsRequest,
-	DeleteThreadRequest,
-} from '@eurora/shared/proto/thread_service_pb.js';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
 
 export class ThreadMessages {
 	thread: Thread;
-	messages: BaseMessageWithSibling[] = $state([]);
+	messages: MessageNode[] = $state([]);
 	loading = $state(false);
 	hasMore = $state(true);
 	offset = 0;
@@ -48,9 +44,9 @@ export class ChatService {
 
 	async loadThreads(limit: number, offset: number) {
 		try {
-			this.threads = (
-				await this.threadClient.listThreads({ limit, offset } as ListThreadsRequest)
-			).map((thread) => new ThreadMessages(thread));
+			this.threads = (await this.threadClient.listThreads(limit, offset)).map(
+				(thread) => new ThreadMessages(thread),
+			);
 			this.offset = this.threads.length;
 			this.hasMoreThreads = this.threads.length === PAGE_SIZE;
 		} catch (error) {
@@ -64,10 +60,7 @@ export class ChatService {
 		if (this.loadingThreads || !this.hasMoreThreads) return;
 		this.loadingThreads = true;
 		try {
-			const res = await this.threadClient.listThreads({
-				limit: PAGE_SIZE,
-				offset: this.offset,
-			} as ListThreadsRequest);
+			const res = await this.threadClient.listThreads(PAGE_SIZE, this.offset);
 			const newThreads = res.map((thread) => new ThreadMessages(thread));
 			this.threads = [...this.threads, ...newThreads];
 			this.offset += newThreads.length;
@@ -82,7 +75,7 @@ export class ChatService {
 	}
 
 	async deleteThread(threadId: string) {
-		await this.threadClient.deleteThread({ threadId } as DeleteThreadRequest);
+		await this.threadClient.deleteThread(threadId);
 		this.threads = this.threads.filter((t) => t.thread.id !== threadId);
 		this.offset = Math.max(0, this.offset - 1);
 		if (this.activeThreadId === threadId) {
