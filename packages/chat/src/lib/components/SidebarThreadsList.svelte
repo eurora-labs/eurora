@@ -44,12 +44,11 @@
 	}
 </script>
 
-<!-- TODO: review if loading and loadingMore should be the same or stay separate -->
 <InfiniteList.Root
 	items={chatService.threads}
 	label="Chats"
 	loading={chatService.loadingThreads}
-	loadingMore={chatService.loadingThreads}
+	loadingMore={chatService.loadingMoreThreads}
 	hasMore={chatService.hasMoreThreads}
 	onLoadMore={() => chatService.loadMoreThreads()}
 >
@@ -65,10 +64,6 @@
 			<Sidebar.MenuButton
 				isActive={item.thread.id === chatService.activeThreadId}
 				onclick={() => {
-					if (!item.thread.id) {
-						toast.error("Something went wrong: this thread doesn't exist.");
-						return;
-					}
 					chatService.activeThreadId = item.thread.id;
 					onThreadSelect?.(item.thread.id);
 				}}
@@ -91,7 +86,7 @@
 				<DropdownMenu.Content side="right" align="start">
 					<DropdownMenu.Item
 						onclick={() => {
-							deleteThreadId = item.thread.id ?? null;
+							deleteThreadId = item.thread.id;
 						}}
 					>
 						<Trash2Icon />
