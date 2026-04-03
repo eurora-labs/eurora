@@ -44,10 +44,11 @@
 	}
 </script>
 
+<!-- TODO: review if loading and loadingMore should be the same or stay separate -->
 <InfiniteList.Root
 	items={chatService.threads}
 	label="Chats"
-	loading={chatService.loading}
+	loading={chatService.loadingThreads}
 	loadingMore={chatService.loadingThreads}
 	hasMore={chatService.hasMoreThreads}
 	onLoadMore={() => chatService.loadMoreThreads()}

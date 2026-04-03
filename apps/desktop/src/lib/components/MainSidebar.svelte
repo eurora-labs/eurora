@@ -58,7 +58,7 @@
 		} else if (!user.authenticated && threadInitialized) {
 			threadInitialized = false;
 			chatService.destroy();
-			chatService.loading = false;
+			chatService.loadingThreads = false;
 		}
 	});
 
@@ -75,7 +75,7 @@
 		);
 
 		if (!user.authenticated) {
-			chatService.loading = false;
+			chatService.loadingThreads = false;
 		}
 
 		return () => {

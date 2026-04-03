@@ -33,10 +33,8 @@ export class ChatService {
 	activeThread = $derived(
 		this.activeThreadId ? this.getThreadData(this.activeThreadId) : undefined,
 	);
-	loading = $derived(this.activeThread ? this.activeThread.loading : false);
 	loadingThreads = $state(false);
 	hasMoreThreads = $derived(this.activeThread ? this.activeThread.hasMore : false);
-	streaming = $derived(this.activeThread ? this.activeThread.streaming : false);
 
 	private readonly threadClient: IThreadService;
 
@@ -58,7 +56,7 @@ export class ChatService {
 		} catch (error) {
 			console.error('Failed to load threads:', error);
 		} finally {
-			this.loading = false;
+			this.loadingThreads = false;
 		}
 	}
 
@@ -142,7 +140,6 @@ export class ChatService {
 		this.offset = 0;
 		this.loadRetries = 0;
 		this.hasMoreThreads = true;
-		this.loading = true;
 		this.loadingThreads = false;
 		this.activeThreadId = null;
 	}

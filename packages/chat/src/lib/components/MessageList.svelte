@@ -159,7 +159,7 @@
 
 <Conversation.Root class="min-h-0 flex-1">
 	<Conversation.Content>
-		{#if chatService.activeThread?.messages.length === 0 && chatService.loading}
+		{#if chatService.activeThread?.messages.length === 0 && chatService.activeThread?.loading}
 			{#each Array(4) as _, i}
 				<div
 					class="flex w-full max-w-[95%] flex-col gap-2 {i % 2 === 0
@@ -203,7 +203,7 @@
 			{@const isStreaming =
 				!user &&
 				i === (chatService.activeThread?.messages.length ?? 0) - 1 &&
-				chatService.streaming}
+				chatService.activeThread?.streaming}
 			{#if content.length > 0 || !user}
 				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
 					{#if reasoning}
@@ -237,7 +237,7 @@
 							{/if}
 						</Message.Content>
 					{/if}
-					{#if user && editingId !== messageId && !chatService.streaming}
+					{#if user && editingId !== messageId && !chatService.activeThread?.streaming}
 						<Message.Actions class="self-end">
 							{@render siblingNav(node)}
 							{#if onCopy}
