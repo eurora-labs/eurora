@@ -4,7 +4,7 @@ export interface ChatMessage {
 	type: 'chat';
 	content: ContentBlock[];
 	role: string;
-	id: string | null;
+	id: string;
 	name: string | null;
 	additionalKwargs: string | null;
 	responseMetadata: string | null;

@@ -39,7 +39,7 @@ export interface UsageMetadata {
 export interface AiMessage {
 	type: 'ai';
 	content: ContentBlock[];
-	id: string | null;
+	id: string;
 	name: string | null;
 	toolCalls: ToolCall[];
 	invalidToolCalls: InvalidToolCall[];
