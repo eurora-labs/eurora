@@ -56,8 +56,8 @@
 		return node.message?.type === 'human';
 	}
 
-	function getMessageId(node: MessageNode): string | undefined {
-		return node.message?.id ?? undefined;
+	function getMessageId(node: MessageNode): string {
+		return node.message.id;
 	}
 
 	function handleCopy(content: string, messageId: string) {
@@ -214,7 +214,7 @@
 							{#if onCopy}
 								<Message.Action
 									tooltip="Copy"
-									onclick={() => handleCopy(content, messageId!)}
+									onclick={() => handleCopy(content, messageId)}
 								>
 									{#if copiedId === messageId}
 										<CheckIcon />
@@ -226,7 +226,7 @@
 							{#if onEdit}
 								<Message.Action
 									tooltip="Edit"
-									onclick={() => startEdit(messageId!, content)}
+									onclick={() => startEdit(messageId, content)}
 								>
 									<PencilIcon />
 								</Message.Action>
@@ -239,7 +239,7 @@
 							{#if onCopy}
 								<Message.Action
 									tooltip="Copy"
-									onclick={() => handleCopy(content, messageId!)}
+									onclick={() => handleCopy(content, messageId)}
 								>
 									{#if copiedId === messageId}
 										<CheckIcon />

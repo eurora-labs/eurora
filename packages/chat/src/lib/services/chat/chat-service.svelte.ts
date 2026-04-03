@@ -30,12 +30,11 @@ export class ChatService {
 		this.activeThreadId ? this.getThreadData(this.activeThreadId) : undefined,
 	);
 	loadingThreads = $state(false);
-	hasMoreThreads = $derived(this.activeThread ? this.activeThread.hasMore : false);
+	hasMoreThreads = $derived(true);
 
 	private readonly threadClient: IThreadService;
 
 	private offset = 0;
-	private loadRetries = 0;
 	private readonly unlisteners: ((() => void) | Promise<() => void>)[] = [];
 
 	constructor(threadClient: IThreadService) {
@@ -65,10 +64,8 @@ export class ChatService {
 			this.threads = [...this.threads, ...newThreads];
 			this.offset += newThreads.length;
 			this.hasMoreThreads = newThreads.length === PAGE_SIZE;
-			this.loadRetries = 0;
 		} catch (error) {
 			console.error('Failed to load more threads:', error);
-			this.loadRetries += 1;
 		} finally {
 			this.loadingThreads = false;
 		}
@@ -131,7 +128,6 @@ export class ChatService {
 		this.unlisteners.length = 0;
 		this.threads = [];
 		this.offset = 0;
-		this.loadRetries = 0;
 		this.hasMoreThreads = true;
 		this.loadingThreads = false;
 		this.activeThreadId = null;

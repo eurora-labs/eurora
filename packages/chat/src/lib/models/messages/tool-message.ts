@@ -4,7 +4,7 @@ export interface ToolMessage {
 	type: 'tool';
 	content: ContentBlock[];
 	toolCallId: string;
-	id: string | null;
+	id: string;
 	name: string | null;
 	status: number;
 	artifact: string | null;

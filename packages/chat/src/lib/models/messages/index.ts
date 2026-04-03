@@ -29,7 +29,7 @@ export type Message =
 
 export interface MessageNode {
 	parentId: string;
-	message: Message | null;
+	message: Message;
 	children: MessageNode[];
 	siblingIndex: number;
 	depth: number;
