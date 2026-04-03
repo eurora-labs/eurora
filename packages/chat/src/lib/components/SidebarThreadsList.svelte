@@ -48,9 +48,9 @@
 	items={chatService.threads}
 	label="Chats"
 	loading={chatService.loading}
-	loadingMore={chatService.loadingMore}
-	hasMore={chatService.hasMore}
-	onLoadMore={() => chatService.loadMore()}
+	loadingMore={chatService.loadingThreads}
+	hasMore={chatService.hasMoreThreads}
+	onLoadMore={() => chatService.loadMoreThreads()}
 >
 	{#snippet empty()}
 		<Empty.Root>
