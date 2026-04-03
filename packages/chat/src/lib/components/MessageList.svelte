@@ -106,6 +106,7 @@
 		{@const activeId = getMessageId(node)}
 		<Message.Action
 			tooltip="Previous"
+			disabled={node.siblingIndex === 0}
 			onclick={() => {
 				if (activeId && chatService.activeThreadId)
 					chatService.switchBranch(chatService.activeThreadId, activeId, -1);
@@ -118,6 +119,7 @@
 		</span>
 		<Message.Action
 			tooltip="Next"
+			disabled={node.siblingIndex === node.children.length - 1}
 			onclick={() => {
 				if (activeId && chatService.activeThreadId)
 					chatService.switchBranch(chatService.activeThreadId, activeId, 1);
@@ -138,19 +140,10 @@
 						: 'items-start'}"
 				>
 					<div class="flex flex-col gap-2 rounded-lg px-4 py-3">
-						<Skeleton
-							class="bg-muted h-4 w-48"
-							style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
-						/>
-						<Skeleton
-							class="bg-muted h-4 w-36"
-							style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
-						/>
+						<Skeleton class="shimmer bg-muted h-4 w-48" />
+						<Skeleton class="shimmer bg-muted h-4 w-36" />
 						{#if i % 2 === 1}
-							<Skeleton
-								class="bg-muted h-4 w-56"
-								style="background-image: linear-gradient(110deg, transparent 25%, var(--muted-foreground) 37%, transparent 63%);"
-							/>
+							<Skeleton class="shimmer bg-muted h-4 w-56" />
 						{/if}
 					</div>
 				</div>
@@ -166,15 +159,12 @@
 				</Empty.Root>
 			{/if}
 		{/if}
-		{#each chatService.activeThread?.messages as node, i}
+		{#each chatService.activeThread?.messages as node}
 			{@const content = getTextContent(node)}
 			{@const user = isUser(node)}
 			{@const reasoning = getReasoningContent(node)}
 			{@const messageId = getMessageId(node)}
-			{@const isStreaming =
-				!user &&
-				i === (chatService.activeThread?.messages.length ?? 0) - 1 &&
-				chatService.activeThread?.streaming}
+			{@const isStreaming = chatService.activeThread?.streamingMessageId === messageId}
 			{#if content.length > 0 || !user}
 				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
 					{#if reasoning}
@@ -208,50 +198,49 @@
 							{/if}
 						</Message.Content>
 					{/if}
-					{#if user && editingId !== messageId && !chatService.activeThread?.streaming}
-						<Message.Actions class="self-end">
-							{@render siblingNav(node)}
-							{#if onCopy}
-								<Message.Action
-									tooltip="Copy"
-									onclick={() => handleCopy(content, messageId)}
-								>
-									{#if copiedId === messageId}
-										<CheckIcon />
-									{:else}
-										<CopyIcon />
-									{/if}
-								</Message.Action>
-							{/if}
-							{#if onEdit}
-								<Message.Action
-									tooltip="Edit"
-									onclick={() => startEdit(messageId, content)}
-								>
-									<PencilIcon />
-								</Message.Action>
-							{/if}
-						</Message.Actions>
-					{/if}
-					{#if !user && content.trim().length > 0 && !isStreaming}
-						<Message.Actions>
-							{@render siblingNav(node)}
-							{#if onCopy}
-								<Message.Action
-									tooltip="Copy"
-									onclick={() => handleCopy(content, messageId)}
-								>
-									{#if copiedId === messageId}
-										<CheckIcon />
-									{:else}
-										<CopyIcon />
-									{/if}
-								</Message.Action>
-							{/if}
-						</Message.Actions>
+					{#if !isStreaming && editingId !== messageId}
+						{@const showActions = user
+							? !chatService.activeThread?.streamingMessageId
+							: content.trim().length > 0}
+						{#if showActions}
+							<Message.Actions class={user ? 'self-end' : ''}>
+								{@render siblingNav(node)}
+								{#if onCopy}
+									<Message.Action
+										tooltip="Copy"
+										onclick={() => handleCopy(content, messageId)}
+									>
+										{#if copiedId === messageId}
+											<CheckIcon />
+										{:else}
+											<CopyIcon />
+										{/if}
+									</Message.Action>
+								{/if}
+								{#if user && onEdit}
+									<Message.Action
+										tooltip="Edit"
+										onclick={() => startEdit(messageId, content)}
+									>
+										<PencilIcon />
+									</Message.Action>
+								{/if}
+							</Message.Actions>
+						{/if}
 					{/if}
 				</Message.Root>
 			{/if}
 		{/each}
 	</Conversation.Content>
 </Conversation.Root>
+
+<style>
+	:global(.shimmer) {
+		background-image: linear-gradient(
+			110deg,
+			transparent 25%,
+			var(--muted-foreground) 37%,
+			transparent 63%
+		);
+	}
+</style>
