@@ -4,9 +4,9 @@ use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
-use agent_chain_core::proto::BaseMessageWithSibling;
-use agent_chain_core::proto::ProtoAiMessageChunk;
-use agent_chain_core::proto::ProtoContentBlock;
+use agent_chain_core::proto::{
+    BaseMessageWithSibling, ProtoAiMessageChunk, ProtoChunkPosition, ProtoContentBlock,
+};
 use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
@@ -642,7 +642,7 @@ impl ProtoThreadService for ThreadService {
                 ))
             })?;
 
-        let _message = self
+        let human_db_message = self
             .db
             .create_message()
             .thread_id(thread_id)
@@ -659,6 +659,7 @@ impl ProtoThreadService for ThreadService {
         let chat_provider = self.get_chat_provider();
         let tools = self.get_tools();
 
+        let human_message_id = human_db_message.id.to_string();
         let db = self.db.clone();
         let output_stream = async_stream::try_stream! {
             let mut full_content = String::new();
@@ -786,6 +787,16 @@ impl ProtoThreadService for ThreadService {
                             {
                                 tracing::error!("Failed to record token usage: {}", e);
                             }
+
+                        let kwargs = serde_json::json!({
+                            "human_message_id": human_message_id,
+                            "ai_message_id": ai_message.id.to_string(),
+                        });
+                        yield ProtoAiMessageChunk {
+                            additional_kwargs: Some(kwargs.to_string()),
+                            chunk_position: Some(ProtoChunkPosition::ChunkPositionLast.into()),
+                            ..Default::default()
+                        };
                     }
                     Err(e) => {
                         tracing::error!("Failed to save AI message to database: {}", e);

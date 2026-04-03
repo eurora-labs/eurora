@@ -97,7 +97,7 @@ export class ChatService {
 
 	async loadMessages(threadId: string): Promise<void> {
 		const entry = this.threads.find((t) => t.thread.id === threadId);
-		if (!entry || entry.loading || entry.loaded) return;
+		if (!entry || entry.loading || entry.loaded || entry.streamingMessageId) return;
 
 		entry.loading = true;
 		try {
@@ -169,55 +169,63 @@ export class ChatService {
 		text: string,
 		parentMessageId?: string | null,
 	): Promise<void> {
+		const humanNode = entry.messages.at(-2)!;
 		const aiNode = entry.messages.at(-1)!;
 		const aiMessage = aiNode.message;
 		if (aiMessage.type === 'remove') return;
 
+		let hasReceivedContent = false;
+		let pendingWhitespace = '';
+
 		try {
-			for await (const event of this.threadClient.sendMessage(
+			for await (const chunk of this.threadClient.sendMessage(
 				threadId,
 				text,
 				parentMessageId,
 			)) {
-				switch (event.type) {
-					case 'chunk': {
-						const textBlock = aiMessage.content.find((b) => b.type === 'text');
-						if (textBlock && textBlock.type === 'text') {
-							textBlock.text += event.content;
-						} else {
-							aiMessage.content.push({
-								type: 'text',
-								id: null,
-								text: event.content,
-								annotations: [],
-								index: null,
-								extras: null,
-							});
-						}
-						break;
+				if (chunk.chunkPosition === 'last') {
+					const kwargs = chunk.additionalKwargs
+						? JSON.parse(chunk.additionalKwargs)
+						: null;
+					if (kwargs?.human_message_id) {
+						humanNode.message.id = kwargs.human_message_id;
 					}
-					case 'reasoning': {
-						const reasoningBlock = aiMessage.content.find(
-							(b) => b.type === 'reasoning',
-						);
-						if (reasoningBlock && reasoningBlock.type === 'reasoning') {
-							reasoningBlock.reasoning =
-								(reasoningBlock.reasoning ?? '') + event.content;
-						} else {
-							aiMessage.content.push({
-								type: 'reasoning',
-								id: null,
-								reasoning: event.content,
-								index: null,
-								extras: null,
-							});
-						}
-						break;
+					if (kwargs?.ai_message_id) {
+						aiMessage.id = kwargs.ai_message_id;
 					}
-					case 'done':
-						entry.messages = event.messages;
-						entry.loaded = true;
-						break;
+					entry.loaded = true;
+					break;
+				}
+
+				for (const block of chunk.content) {
+					if (block.type === 'text') {
+						let textContent = block.text;
+						if (!hasReceivedContent) {
+							if (textContent.trim().length === 0) {
+								pendingWhitespace += textContent;
+								continue;
+							}
+							hasReceivedContent = true;
+							textContent = pendingWhitespace + textContent;
+							pendingWhitespace = '';
+						}
+						const existing = aiMessage.content.find((b) => b.type === 'text');
+						if (existing && existing.type === 'text') {
+							existing.text += textContent;
+						} else {
+							aiMessage.content.push({ ...block, text: textContent });
+						}
+					} else if (block.type === 'reasoning') {
+						const existing = aiMessage.content.find((b) => b.type === 'reasoning');
+						if (existing && existing.type === 'reasoning') {
+							existing.reasoning =
+								(existing.reasoning ?? '') + (block.reasoning ?? '');
+						} else {
+							aiMessage.content.push({ ...block });
+						}
+					} else {
+						aiMessage.content.push(block);
+					}
 				}
 			}
 		} finally {

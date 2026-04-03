@@ -1,17 +1,11 @@
 use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
-use agent_chain_core::{AIMessage, AnyMessage};
+use agent_chain_core::proto::ProtoAiMessageChunk;
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
 
 use crate::shared_types::SharedThreadManager;
-
-#[taurpc::ipc_type]
-pub struct ResponseChunk {
-    chunk: String,
-    reasoning: Option<String>,
-}
 
 #[taurpc::ipc_type]
 pub struct Query {
@@ -25,7 +19,7 @@ pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ResponseChunk>,
+        channel: Channel<ProtoAiMessageChunk>,
         query: Query,
     ) -> Result<String, String>;
 }
@@ -39,7 +33,7 @@ impl ChatApi for ChatApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ResponseChunk>,
+        channel: Channel<ProtoAiMessageChunk>,
         query: Query,
     ) -> Result<String, String> {
         let thread_state: tauri::State<SharedThreadManager> = app_handle
@@ -88,8 +82,6 @@ impl ChatApi for ChatApiImpl {
             TextContentBlock::builder().text(&query.text).build().into();
         context_blocks.push(user_text_block);
 
-        let mut complete_response = String::new();
-
         tracing::debug!("Sending chat stream");
         let stream_result = {
             let mut thread_manager = thread_state.lock().await;
@@ -112,23 +104,8 @@ impl ChatApi for ChatApiImpl {
                     while let Some(result) = stream.next().await {
                         match result {
                             Ok(chunk) => {
-                                let content = chunk.content.to_string();
-                                let reasoning = chunk
-                                    .additional_kwargs
-                                    .get("reasoning_content")
-                                    .and_then(|v| v.as_str())
-                                    .map(String::from);
-
-                                if content.is_empty() && reasoning.is_none() {
-                                    continue;
-                                }
-
-                                complete_response.push_str(&content);
-
-                                if let Err(e) = channel.send(ResponseChunk {
-                                    chunk: content,
-                                    reasoning,
-                                }) {
+                                let proto_chunk: ProtoAiMessageChunk = chunk.into();
+                                if let Err(e) = channel.send(proto_chunk) {
                                     return Err(format!("Failed to send response chunk: {e}"));
                                 }
                             }
@@ -157,10 +134,6 @@ impl ChatApi for ChatApiImpl {
             }
         }
 
-        let _ai_message: AnyMessage = AIMessage::builder()
-            .content(complete_response.clone())
-            .build()
-            .into();
-        Ok(complete_response)
+        Ok(String::new())
     }
 }
