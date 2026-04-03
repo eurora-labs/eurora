@@ -2,11 +2,8 @@ import { type IThreadService } from '@eurora/chat/services/thread/thread-service
 import { InjectionToken } from '@eurora/shared/context';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { Thread } from '@eurora/chat/models/thread.model';
-import type { BaseMessageWithSibling } from '@eurora/shared/proto/agent_chain_pb.js';
-import type {
-	DeleteThreadRequest,
-	ListThreadsRequest,
-} from '@eurora/shared/proto/thread_service_pb.js';
+import type { MessageNode } from '@eurora/chat/models/messages/index';
+import { toMessageNodes } from '$lib/services/converters/message-converter.js';
 
 export class ThreadService implements IThreadService {
 	private readonly taurpc: TaurpcService;
@@ -15,8 +12,8 @@ export class ThreadService implements IThreadService {
 		this.taurpc = taurpc;
 	}
 
-	async listThreads(request: ListThreadsRequest): Promise<Thread[]> {
-		return (await this.taurpc.thread.list(request.limit, request.offset)).map(
+	async listThreads(limit: number, offset: number): Promise<Thread[]> {
+		return (await this.taurpc.thread.list(limit, offset)).map(
 			(thread) =>
 				({
 					id: thread.id,
@@ -27,30 +24,22 @@ export class ThreadService implements IThreadService {
 		);
 	}
 
-	async getMessages(
-		threadId: string,
-		limit: number,
-		offset: number,
-	): Promise<BaseMessageWithSibling[]> {
-		return this.taurpc.thread.get_messages(threadId, limit, offset) as unknown as Promise<
-			BaseMessageWithSibling[]
-		>;
+	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
+		const raw = await this.taurpc.thread.get_messages(threadId, limit, offset);
+		return toMessageNodes(raw);
 	}
 
 	async switchBranch(
 		threadId: string,
 		messageId: string,
 		direction: number,
-	): Promise<BaseMessageWithSibling[]> {
-		return this.taurpc.thread.switch_branch(
-			threadId,
-			messageId,
-			direction,
-		) as unknown as Promise<BaseMessageWithSibling[]>;
+	): Promise<MessageNode[]> {
+		const raw = await this.taurpc.thread.switch_branch(threadId, messageId, direction);
+		return toMessageNodes(raw);
 	}
 
-	async deleteThread(request: DeleteThreadRequest): Promise<void> {
-		await this.taurpc.thread.delete(request.threadId);
+	async deleteThread(threadId: string): Promise<void> {
+		await this.taurpc.thread.delete(threadId);
 	}
 }
 
