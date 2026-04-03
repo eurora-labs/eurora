@@ -3615,6 +3615,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-mobile"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "dotenv",
+ "euro-auth",
+ "euro-encrypt",
+ "euro-endpoint",
+ "euro-secret",
+ "euro-settings",
+ "euro-thread",
+ "euro-user",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-http",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-process",
+ "tauri-plugin-store",
+ "taurpc",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "euro-native-messaging"
 version = "0.0.0"
 dependencies = [

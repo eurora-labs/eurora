@@ -1,0 +1,27 @@
+{
+	"$schema": "../gen/schemas/mobile-schema.json",
+	"identifier": "main",
+	"description": "permissions for Eurora mobile",
+	"windows": ["*"],
+	"local": true,
+	"permissions": [
+		"core:default",
+		"core:window:default",
+		"opener:allow-open-url",
+		"opener:allow-default-urls",
+		"process:default",
+		"store:default",
+		"http:allow-fetch",
+		{
+			"identifier": "http:default",
+			"allow": [
+				{
+					"url": "http://0.0.0.0:*/**"
+				},
+				{
+					"url": "http://localhost:*/**"
+				}
+			]
+		}
+	]
+}
