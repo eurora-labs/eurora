@@ -68,10 +68,10 @@ export class ThreadService implements IThreadService {
 		const buffer: ChatStreamEvent[] = [];
 		let resolve: (() => void) | null = null;
 
-		const onEvent = (response: ChatStreamResponse) => {
+		function onEvent(response: ChatStreamResponse) {
 			buffer.push(toChatStreamEvent(response));
 			resolve?.();
-		};
+		}
 
 		const done = this.taurpc.chat.send_query(threadId, onEvent, query).then(() => true);
 
