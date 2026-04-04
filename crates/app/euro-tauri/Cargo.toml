@@ -71,6 +71,7 @@ tauri-plugin-window-state = "2"
 taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
+tokio-util = "0.7"
 tracing = { workspace = true }
 url = { workspace = true }
 
