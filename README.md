@@ -8,14 +8,15 @@ Eurora provides seamless OS integration and makes asking questions much easier. 
 
 We're a community driven project, and we welcome contributions from anyone who is interested in helping us build a better future for AI.
 
-
 ## Use cases
+
 - **General LLM usage**: Eurora is a fully open source equivalent to proprietary companies like OpenAI, Antropic and others. We securely run state-of-the-art models in the cloud so you do not need to compromise on privacy or LLM quality when using AI.
 - **Asking without copy pasting**: The app connects to your browser and provides full and seamless integration with every single website in the world, allowing the AI to have full context whenever you ask a question.
 - **A single AI that runs everywhere**: Eurora runs on MacOS, Linux and Windows. It works on every browser, and supports every single website. You can use the same AI assistant everywhere without having to pay for different subscriptions and managing your memory.
 - **Local dedicated servers**: Our vision for the future is fully local AI server. Eurora server component is meant to run on a separate instance in order to match the proprietary cloud offerings in terms of features while also giving you the benefit of fully local open source AI.
 
 ## How it works
+
 Eurora connects directly to your browser. When you ask a question, the AI can pull context from your browser page to instantly give you the correct answer.
 
 ```mermaid
@@ -26,8 +27,8 @@ flowchart LR
 
 The browser extension captures page content (articles, videos, tweets) through content scripts and sends it to the desktop app via a native messaging host. All data stays on your local machine - nothing is sent to external servers passively. You're in full control of what is processed and when.
 
-
 ## Features
+
 - **New way to use AI**: Eurora uses a custom network layer to enable 2-way communication with the browser. Allowing the AI agent to retrieve perfect context any time you ask a question. You never have to explain yourself again.
 - **Graph view**: Eurora is made for real work. Graph feature gives you the ability to view the edited messages in your conversation as different paths that can easily be navigated.
 - **No compromises**: Eurora is made to match every single proprietary AI 1 to 1 and deliver it to you locally. No drawbacks, no complex setup. Easy to use and user-first, forever.

@@ -258,6 +258,7 @@ dependencies = [
  "moka",
  "mustache",
  "owo-colors",
+ "prost",
  "quick-xml 0.39.2",
  "rand 0.10.0",
  "rand_distr",
@@ -274,10 +275,14 @@ dependencies = [
  "sha1",
  "sha2",
  "simsimd",
+ "specta",
  "tempfile",
  "thiserror 2.0.18",
  "tiktoken-rs",
  "tokio",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
  "tracing",
  "url",
  "uuid",
@@ -1700,6 +1705,7 @@ name = "be-thread-service"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
+ "agent-chain-core",
  "async-stream",
  "base64 0.22.1",
  "be-asset",
@@ -3695,6 +3701,7 @@ dependencies = [
  "auth-core",
  "backon",
  "backtrace",
+ "chrono",
  "color-thief",
  "core-foundation 0.10.1",
  "dirs 6.0.0",
@@ -3738,6 +3745,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "taurpc",
  "tokio",
+ "tokio-util",
  "tracing",
  "url",
 ]
@@ -3747,6 +3755,7 @@ name = "euro-thread"
 version = "0.0.0"
 dependencies = [
  "agent-chain",
+ "agent-chain-core",
  "chrono",
  "euro-auth",
  "prost",

@@ -12,11 +12,7 @@ service ProtoThreadService {
   rpc DeleteThread(DeleteThreadRequest) returns (DeleteThreadResponse);
 
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
-  rpc AddHiddenHumanMessage(AddHiddenHumanMessageRequest) returns (AddHiddenHumanMessageResponse);
-  rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
-  rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
-
-  rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ProtoAIMessageChunk);
+  rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ChatStreamResponse);
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
   rpc SwitchBranch(SwitchBranchRequest) returns (GetMessagesResponse);
   rpc GetMessageTree(GetMessageTreeRequest) returns (GetMessageTreeResponse);
@@ -31,7 +27,7 @@ message CreateThreadRequest {
   string title = 1;
 }
 
-message Thread {
+message ProtoThread {
   string id = 1;
   string user_id = 2;
   string title = 3;
@@ -41,7 +37,7 @@ message Thread {
 }
 
 message CreateThreadResponse {
-  Thread thread = 1;
+  ProtoThread thread = 1;
 }
 
 message ListThreadsRequest {
@@ -50,7 +46,7 @@ message ListThreadsRequest {
 }
 
 message ListThreadsResponse {
-  repeated Thread threads = 1;
+  repeated ProtoThread threads = 1;
 }
 
 message ChatStreamRequest {
@@ -60,39 +56,21 @@ message ChatStreamRequest {
   optional string asset_chips_json = 4;
 }
 
-message AddHumanMessageRequest {
-  string thread_id = 1;
-  agent_chain.ProtoHumanMessage message = 2;
-}
-
-message AddHumanMessageResponse {
-  agent_chain.ProtoBaseMessage message = 1;
-}
-
-message AddHiddenHumanMessageRequest {
-  string thread_id = 1;
-  agent_chain.ProtoHumanMessage message = 2;
-}
-
-message AddHiddenHumanMessageResponse {
-  agent_chain.ProtoBaseMessage message = 1;
-}
-
 message GetMessagesRequest {
   string thread_id = 1;
   uint32 limit = 2;
   uint32 offset = 3;
 }
 
-message MessageSiblingInfo {
-  string message_id = 1;
-  uint32 sibling_count = 2;
-  uint32 sibling_index = 3;
-}
+// message MessageSiblingInfo {
+//   string message_id = 1;
+//   uint32 sibling_count = 2;
+//   uint32 sibling_index = 3;
+// }
 
 message GetMessagesResponse {
-  repeated agent_chain.ProtoBaseMessage messages = 1;
-  repeated MessageSiblingInfo sibling_info = 2;
+  repeated agent_chain.BaseMessageWithSibling messages = 1;
+  // repeated MessageSiblingInfo sibling_info = 2;
 }
 
 message SwitchBranchRequest {
@@ -106,7 +84,7 @@ message GetThreadRequest {
 }
 
 message GetThreadResponse {
-  Thread thread = 1;
+  ProtoThread thread = 1;
 }
 
 message DeleteThreadRequest {
@@ -115,22 +93,13 @@ message DeleteThreadRequest {
 
 message DeleteThreadResponse {}
 
-message AddSystemMessageRequest {
-  string thread_id = 1;
-  agent_chain.ProtoSystemMessage message = 2;
-}
-
-message AddSystemMessageResponse {
-  agent_chain.ProtoBaseMessage message = 1;
-}
-
 message GenerateThreadTitleRequest {
   string thread_id = 1;
   string content = 2;
 }
 
 message GenerateThreadTitleResponse {
-  Thread thread = 1;
+  ProtoThread thread = 1;
 }
 
 message GetMessageTreeRequest {
@@ -149,7 +118,6 @@ message MessageTreeNode {
   uint32 sibling_count = 6;
   uint32 sibling_index = 7;
   optional string additional_kwargs = 8;
-  optional string reasoning_blocks = 9;
 }
 
 message GetMessageTreeResponse {

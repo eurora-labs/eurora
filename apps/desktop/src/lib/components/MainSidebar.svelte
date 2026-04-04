@@ -3,32 +3,29 @@
 	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import SearchDialog from '$lib/components/SearchDialog.svelte';
-	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
+	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
-	import * as Empty from '@eurora/ui/components/empty/index';
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import * as InfiniteList from '@eurora/ui/custom-components/infinite-list/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
-	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
 	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
 	import PowerIcon from '@lucide/svelte/icons/power';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
-	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	const taurpc = inject(TAURPC_SERVICE);
-	const threadService = inject(THREAD_SERVICE);
+	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
 	const sidebarState = useSidebar();
 	let timelineItems: TimelineAppEvent[] = $state([]);
@@ -36,15 +33,6 @@
 	let logoHovered = $state(false);
 	let quitDialogOpen = $state(false);
 	let searchOpen = $state(false);
-	let deleteThreadId: string | null = $state(null);
-	let deleteThreadTitle = $state('');
-
-	$effect(() => {
-		if (deleteThreadId) {
-			deleteThreadTitle =
-				threadService.threads.find((t) => t.id === deleteThreadId)?.title ?? 'New Thread';
-		}
-	});
 
 	function handleKeydown(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -66,11 +54,11 @@
 	$effect(() => {
 		if (user.authenticated && !threadInitialized) {
 			threadInitialized = true;
-			threadService.init();
+			chatService.loadThreads(20, 0);
 		} else if (!user.authenticated && threadInitialized) {
 			threadInitialized = false;
-			threadService.destroy();
-			threadService.loading = false;
+			chatService.destroy();
+			chatService.loadingThreads = false;
 		}
 	});
 
@@ -87,11 +75,11 @@
 		);
 
 		if (!user.authenticated) {
-			threadService.loading = false;
+			chatService.loadingThreads = false;
 		}
 
 		return () => {
-			threadService.destroy();
+			chatService.destroy();
 			threadInitialized = false;
 			for (const p of unlistenPromises) {
 				p.then((unlisten) => unlisten());
@@ -100,7 +88,7 @@
 	});
 
 	async function createChat() {
-		threadService.activeThreadId = null;
+		chatService.activeThreadId = null;
 		goto('/');
 	}
 
@@ -120,18 +108,11 @@
 		});
 	}
 
-	async function deleteThread() {
-		if (!deleteThreadId) return;
-		const id = deleteThreadId;
-		deleteThreadId = null;
-		try {
-			await threadService.deleteThread(id);
-			if (threadService.activeThreadId === null) {
-				goto('/');
-			}
-		} catch (error) {
-			console.error('Failed to delete thread:', error);
-			toast.error('Failed to delete chat');
+	function handleThreadSelect(threadId: string) {
+		if (threadId) {
+			goto(`/${threadId}`);
+		} else {
+			goto('/');
 		}
 	}
 </script>
@@ -183,63 +164,7 @@
 			</Sidebar.GroupContent>
 		</Sidebar.Group>
 		{#if sidebarState.open}
-			<InfiniteList.Root
-				items={threadService.threads}
-				label="Chats"
-				loading={threadService.loading}
-				loadingMore={threadService.loadingMore}
-				hasMore={threadService.hasMore}
-				onLoadMore={() => threadService.loadMore()}
-			>
-				{#snippet empty()}
-					<Empty.Root>
-						<Empty.Header>
-							<Empty.Title>No chats yet</Empty.Title>
-						</Empty.Header>
-					</Empty.Root>
-				{/snippet}
-				{#snippet children(item)}
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton
-							isActive={item.id === threadService.activeThreadId}
-							onclick={() => {
-								if (!item.id) {
-									toast.error("Something went wrong: this thread doesn't exist.");
-									return;
-								}
-								threadService.activeThreadId = item.id;
-								goto(`/${item.id}`);
-							}}
-						>
-							{#snippet child({ props })}
-								<a {...props}>
-									<span>{item.title ?? 'New Thread'}</span>
-								</a>
-							{/snippet}
-						</Sidebar.MenuButton>
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger>
-								{#snippet child({ props })}
-									<Sidebar.MenuAction {...props} showOnHover>
-										<EllipsisIcon />
-										<span class="sr-only">More</span>
-									</Sidebar.MenuAction>
-								{/snippet}
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content side="right" align="start">
-								<DropdownMenu.Item
-									onclick={() => {
-										deleteThreadId = item.id ?? null;
-									}}
-								>
-									<Trash2Icon />
-									<span>Delete</span>
-								</DropdownMenu.Item>
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
-					</Sidebar.MenuItem>
-				{/snippet}
-			</InfiniteList.Root>
+			<SidebarThreadsList onThreadSelect={handleThreadSelect} />
 		{/if}
 	</Sidebar.Content>
 	{#if visibleTimelineItems.length > 0}
@@ -339,27 +264,6 @@
 		<Dialog.Footer class="gap-2 sm:gap-0">
 			<Dialog.Close class={buttonVariants({ variant: 'outline' })}>Cancel</Dialog.Close>
 			<Button variant="destructive" onclick={quit}>Quit</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
-
-<Dialog.Root
-	open={deleteThreadId !== null}
-	onOpenChange={(open) => {
-		if (!open) deleteThreadId = null;
-	}}
->
-	<Dialog.Content class="sm:max-w-100">
-		<Dialog.Header>
-			<Dialog.Title>Delete Chat</Dialog.Title>
-			<Dialog.Description>
-				Chat <span class="font-bold text-foreground">"{deleteThreadTitle}"</span> will be permanently
-				deleted along with all its messages. This action cannot be undone.
-			</Dialog.Description>
-		</Dialog.Header>
-		<Dialog.Footer class="gap-2">
-			<Dialog.Close class={buttonVariants({ variant: 'outline' })}>Cancel</Dialog.Close>
-			<Button variant="destructive" onclick={deleteThread}>Delete</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

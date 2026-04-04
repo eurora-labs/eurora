@@ -24,3 +24,5 @@ catalogs:
         '@sveltejs/vite-plugin-svelte': 5.1.1
         svelte: 5.53.7
         svelte-check: 4.4.4
+onlyBuiltDependencies:
+    - esbuild

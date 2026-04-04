@@ -3,10 +3,30 @@ export type APISettings = {
 	endpoint: string,
 };
 
+export type Annotation = { Citation: ProtoCitation } | { NonStandard: ProtoNonStandardAnnotation };
+
 export type AppSettings = {
 	general: GeneralSettings,
 	telemetry: TelemetrySettings,
 	api: APISettings,
+};
+
+export type BaseMessageWithSibling = {
+	parent_id: string,
+	message: ProtoBaseMessage | null,
+	children: BaseMessageWithSibling[],
+	sibling_index: number,
+	depth: number,
+};
+
+export type Block = { Text: ProtoTextContentBlock } | { InvalidToolCall: ProtoInvalidToolCallBlock } | { Reasoning: ProtoReasoningContentBlock } | { NonStandard: ProtoNonStandardContentBlock } | { Image: ProtoImageContentBlock } | { Video: ProtoVideoContentBlock } | { Audio: ProtoAudioContentBlock } | { PlainText: ProtoPlainTextContentBlock } | { File: ProtoFileContentBlock } | { ToolCall: ProtoToolCallBlock } | { ToolCallChunk: ProtoToolCallChunkBlock } | { ServerToolCall: ProtoServerToolCall } | { ServerToolCallChunk: ProtoServerToolCallChunk } | { ServerToolResult: ProtoServerToolResult };
+
+export type ChatStreamFinalMessage = {
+	messages: BaseMessageWithSibling[],
+};
+
+export type ChatStreamResponse = {
+	payload: Payload | null,
 };
 
 export type Claims = {
@@ -30,6 +50,8 @@ export type GeneralSettings = {
 	autostart: boolean,
 };
 
+export type Index = { IntIndex: bigint } | { StrIndex: string };
+
 export type LocalBackendInfo = {
 	grpc_port: number,
 	http_port: number,
@@ -41,6 +63,8 @@ export type LoginToken = {
 	expires_in: bigint,
 	url: string,
 };
+
+export type Message = { Human: ProtoHumanMessage } | { System: ProtoSystemMessage } | { Ai: ProtoAiMessage } | { Tool: ProtoToolMessage } | { Chat: ProtoChatMessage } | { Remove: ProtoRemoveMessage };
 
 export type MessageAssetChip = {
 	id: string,
@@ -57,7 +81,6 @@ export type MessageTreeNodeView = {
 	sibling_count: number,
 	sibling_index: number,
 	assets: MessageAssetChip[] | null,
-	reasoning_blocks: ReasoningBlock[] | null,
 };
 
 export type MessageTreeResponse = {
@@ -65,31 +88,278 @@ export type MessageTreeResponse = {
 	has_more: boolean,
 };
 
-export type MessageView = {
+export type Payload = { Chunk: ProtoAiMessageChunk } | { FinalMessage: ChatStreamFinalMessage };
+
+export type ProtoAiMessage = {
+	content: ProtoContentBlock[],
 	id: string | null,
+	name: string | null,
+	tool_calls: ProtoToolCall[],
+	invalid_tool_calls: ProtoInvalidToolCall[],
+	usage_metadata: ProtoUsageMetadata | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoAiMessageChunk = {
+	content: ProtoContentBlock[],
+	id: string | null,
+	name: string | null,
+	tool_calls: ProtoToolCall[],
+	invalid_tool_calls: ProtoInvalidToolCall[],
+	tool_call_chunks: ProtoToolCallChunk[],
+	usage_metadata: ProtoUsageMetadata | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+	chunk_position: number | null,
+};
+
+export type ProtoAnnotation = {
+	annotation: Annotation | null,
+};
+
+export type ProtoAudioContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
+};
+
+export type ProtoBaseMessage = {
+	message: Message | null,
+};
+
+export type ProtoBlockIndex = {
+	index: Index | null,
+};
+
+export type ProtoChatMessage = {
+	content: ProtoContentBlock[],
 	role: string,
-	content: string,
-	reasoning_blocks: ReasoningBlock[] | null,
-	sibling_count: number,
-	sibling_index: number,
-	assets: MessageAssetChip[] | null,
+	id: string | null,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoCitation = {
+	id: string | null,
+	url: string | null,
+	title: string | null,
+	start_index: bigint | null,
+	end_index: bigint | null,
+	cited_text: string | null,
+	extras: string | null,
+};
+
+export type ProtoContentBlock = {
+	block: Block | null,
+};
+
+export type ProtoFileContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
+};
+
+export type ProtoHumanMessage = {
+	content: ProtoContentBlock[],
+	id: string | null,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoImageContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
+};
+
+export type ProtoInputTokenDetails = {
+	audio: bigint | null,
+	cache_creation: bigint | null,
+	cache_read: bigint | null,
+	extra: string | null,
+};
+
+export type ProtoInvalidToolCall = {
+	name: string | null,
+	args: string | null,
+	id: string | null,
+	error: string | null,
+	call_type: string | null,
+};
+
+export type ProtoInvalidToolCallBlock = {
+	id: string | null,
+	name: string | null,
+	args: string | null,
+	error: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoNonStandardAnnotation = {
+	id: string | null,
+	value: string,
+};
+
+export type ProtoNonStandardContentBlock = {
+	id: string | null,
+	value: string,
+	index: ProtoBlockIndex | null,
+};
+
+export type ProtoOutputTokenDetails = {
+	audio: bigint | null,
+	reasoning: bigint | null,
+	extra: string | null,
+};
+
+export type ProtoPlainTextContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	text: string | null,
+	title: string | null,
+	context: string | null,
+	extras: string | null,
+};
+
+export type ProtoReasoningContentBlock = {
+	id: string | null,
+	reasoning: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoRemoveMessage = {
+	id: string,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoServerToolCall = {
+	id: string,
+	name: string,
+	args: string,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoServerToolCallChunk = {
+	name: string | null,
+	args: string | null,
+	id: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoServerToolResult = {
+	id: string | null,
+	tool_call_id: string,
+	status: number,
+	output: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoSystemMessage = {
+	content: ProtoContentBlock[],
+	id: string | null,
+	name: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoTextContentBlock = {
+	id: string | null,
+	text: string,
+	annotations: ProtoAnnotation[],
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoToolCall = {
+	id: string | null,
+	name: string,
+	args: string,
+	call_type: string | null,
+};
+
+export type ProtoToolCallBlock = {
+	id: string | null,
+	name: string,
+	args: string,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoToolCallChunk = {
+	name: string | null,
+	args: string | null,
+	id: string | null,
+	index: number | null,
+	chunk_type: string | null,
+};
+
+export type ProtoToolCallChunkBlock = {
+	id: string | null,
+	name: string | null,
+	args: string | null,
+	index: ProtoBlockIndex | null,
+	extras: string | null,
+};
+
+export type ProtoToolMessage = {
+	content: ProtoContentBlock[],
+	tool_call_id: string,
+	id: string | null,
+	name: string | null,
+	status: number,
+	artifact: string | null,
+	additional_kwargs: string | null,
+	response_metadata: string | null,
+};
+
+export type ProtoUsageMetadata = {
+	input_tokens: bigint,
+	output_tokens: bigint,
+	total_tokens: bigint,
+	input_token_details: ProtoInputTokenDetails | null,
+	output_token_details: ProtoOutputTokenDetails | null,
+};
+
+export type ProtoVideoContentBlock = {
+	id: string | null,
+	file_id: string | null,
+	mime_type: string | null,
+	index: ProtoBlockIndex | null,
+	url: string | null,
+	base64: string | null,
+	extras: string | null,
 };
 
 export type Query = {
 	text: string,
 	assets: string[],
 	parent_message_id: string | null,
-};
-
-export type ReasoningBlock = {
-	type: string,
-	content: string | null,
-	signature: string | null,
-};
-
-export type ResponseChunk = {
-	chunk: string,
-	reasoning: string | null,
 };
 
 export type Role = "Free" | "Tier1";
@@ -116,9 +386,11 @@ export type TelemetrySettings = {
 	distinctId: string | null,
 };
 
-export type ThreadView = {
+export type Thread = {
 	id: string | null,
 	title: string,
+	created_at: string,
+	updated_at: string,
 };
 
 export type TimelineAppEvent = {
@@ -134,7 +406,7 @@ export type UpdateInfo = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_display_name":[],"get_email":[],"get_login_token":[],"get_role":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"]}', 'chat':'{"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_message_tree":["thread_id","start_level","end_level","parent_node_ids"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_display_name":[],"get_email":[],"get_login_token":[],"get_role":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_message_tree":["thread_id","start_level","end_level","parent_node_ids"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -155,7 +427,8 @@ logout: () => Promise<null>,
 poll_for_login: () => Promise<boolean>, 
 refresh_session: () => Promise<null>, 
 register: (email: string, password: string) => Promise<null>},
-"chat": {send_query: (threadId: string, channel: TAURI_CHANNEL<ResponseChunk>, query: Query) => Promise<string>},
+"chat": {cancel_query: (threadId: string) => Promise<null>, 
+send_query: (threadId: string, channel: TAURI_CHANNEL<ChatStreamResponse>, query: Query) => Promise<null>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "onboarding": {get_browser_extension_download_url: () => Promise<string>},
@@ -189,18 +462,18 @@ request_accessibility_permission: () => Promise<null>,
 start_local_backend: (ollamaModel: string) => Promise<LocalBackendInfo>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
-"thread": {create: () => Promise<ThreadView>, 
-current_thread_changed: (thread: ThreadView) => Promise<void>, 
+"thread": {create: () => Promise<Thread>, 
+current_thread_changed: (thread: Thread) => Promise<void>, 
 delete: (threadId: string) => Promise<null>, 
-generate_title: (threadId: string, content: string) => Promise<ThreadView>, 
+generate_title: (threadId: string, content: string) => Promise<Thread>, 
 get_message_tree: (threadId: string, startLevel: number, endLevel: number, parentNodeIds: string[]) => Promise<MessageTreeResponse>, 
-get_messages: (threadId: string, limit: number, offset: number) => Promise<MessageView[]>, 
-list: (limit: number, offset: number) => Promise<ThreadView[]>, 
-new_thread_added: (thread: ThreadView) => Promise<void>, 
+get_messages: (threadId: string, limit: number, offset: number) => Promise<BaseMessageWithSibling[]>, 
+list: (limit: number, offset: number) => Promise<Thread[]>, 
+new_thread_added: (thread: Thread) => Promise<void>, 
 search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 
 search_threads: (query: string, limit: number, offset: number) => Promise<SearchThreadResultView[]>, 
-switch_branch: (threadId: string, messageId: string, direction: number) => Promise<MessageView[]>, 
-thread_title_changed: (thread: ThreadView) => Promise<void>},
+switch_branch: (threadId: string, messageId: string, direction: number) => Promise<BaseMessageWithSibling[]>, 
+thread_title_changed: (thread: Thread) => Promise<void>},
 "timeline": {list: () => Promise<string[]>, 
 new_app_event: (event: TimelineAppEvent) => Promise<void>, 
 new_assets_event: (chips: ContextChip[]) => Promise<void>} };
