@@ -1,7 +1,7 @@
 use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
 use agent_chain_core::messages::content::{ContentBlock, ContentBlocks};
-use agent_chain_core::messages::prelude::*;
+// use agent_chain_core::messages::prelude::*;
 use chrono::{TimeZone, Utc};
 use euro_thread::ListThreadsRequest;
 use proto_gen::agent_chain::BaseMessageWithSibling;
@@ -421,21 +421,21 @@ fn parse_asset_chips_from_json(json_str: &Option<String>) -> Option<Vec<MessageA
     }
 }
 
-fn extract_asset_chips(message: &AnyMessage) -> Option<Vec<MessageAssetChip>> {
-    let kwargs = message.additional_kwargs();
-    let chips = kwargs.get("asset_chips")?.as_array()?;
-    let result: Vec<MessageAssetChip> = chips
-        .iter()
-        .filter_map(|chip| {
-            let id = chip.get("id")?.as_str()?.to_string();
-            let name = chip.get("name")?.as_str()?.to_string();
-            let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
-            Some(MessageAssetChip { id, name, icon })
-        })
-        .collect();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
-}
+// fn extract_asset_chips(message: &AnyMessage) -> Option<Vec<MessageAssetChip>> {
+//     let kwargs = message.additional_kwargs();
+//     let chips = kwargs.get("asset_chips")?.as_array()?;
+//     let result: Vec<MessageAssetChip> = chips
+//         .iter()
+//         .filter_map(|chip| {
+//             let id = chip.get("id")?.as_str()?.to_string();
+//             let name = chip.get("name")?.as_str()?.to_string();
+//             let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
+//             Some(MessageAssetChip { id, name, icon })
+//         })
+//         .collect();
+//     if result.is_empty() {
+//         None
+//     } else {
+//         Some(result)
+//     }
+// }
