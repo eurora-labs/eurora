@@ -12,7 +12,6 @@ service ProtoThreadService {
   rpc DeleteThread(DeleteThreadRequest) returns (DeleteThreadResponse);
 
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
-  rpc AddHiddenHumanMessage(AddHiddenHumanMessageRequest) returns (AddHiddenHumanMessageResponse);
   rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
   rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
 
@@ -66,15 +65,6 @@ message AddHumanMessageRequest {
 }
 
 message AddHumanMessageResponse {
-  agent_chain.ProtoBaseMessage message = 1;
-}
-
-message AddHiddenHumanMessageRequest {
-  string thread_id = 1;
-  agent_chain.ProtoHumanMessage message = 2;
-}
-
-message AddHiddenHumanMessageResponse {
   agent_chain.ProtoBaseMessage message = 1;
 }
 
