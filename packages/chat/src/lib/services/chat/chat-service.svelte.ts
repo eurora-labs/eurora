@@ -157,11 +157,14 @@ export class ChatService {
 		const nodeIndex = entry.messages.findIndex((n) => n.message.id === messageId);
 		if (nodeIndex < 0) return;
 
-		const parentId = entry.messages[nodeIndex].parentId || null;
+		const parentId = entry.messages[nodeIndex].parentId;
 
 		entry.messages = entry.messages.slice(0, nodeIndex);
 		this.appendPlaceholders(entry, text);
 		await this.consumeStream(entry, threadId, text, parentId);
+
+		const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0);
+		entry.messages = messages;
 	}
 
 	private async consumeStream(
