@@ -58,6 +58,7 @@ export class ThreadService implements IThreadService {
 		threadId: string,
 		text: string,
 		parentMessageId?: string | null,
+		signal?: AbortSignal,
 	): AsyncIterable<ChatStreamEvent> {
 		const query: Query = {
 			text,
@@ -66,35 +67,52 @@ export class ThreadService implements IThreadService {
 		};
 
 		const buffer: ChatStreamEvent[] = [];
-		let resolve: (() => void) | null = null;
+		let resolve: ((value: void) => void) | null = null;
+		let finished = false;
+		let error: unknown = null;
+
+		function notify() {
+			resolve?.();
+			resolve = null;
+		}
 
 		function onEvent(response: ChatStreamResponse) {
 			buffer.push(toChatStreamEvent(response));
-			resolve?.();
+			notify();
 		}
 
-		const done = this.taurpc.chat.send_query(threadId, onEvent, query).then(() => true);
+		this.taurpc.chat.send_query(threadId, onEvent, query).then(
+			() => {
+				finished = true;
+				notify();
+			},
+			(e: unknown) => {
+				error = e;
+				finished = true;
+				notify();
+			},
+		);
 
 		while (true) {
-			if (buffer.length > 0) {
+			while (buffer.length > 0) {
+				if (signal?.aborted) return;
 				yield buffer.shift()!;
-				continue;
 			}
 
-			const finished = await Promise.race([
-				done,
-				new Promise<false>((r) => {
-					resolve = () => r(false);
-				}),
-			]);
+			if (finished) break;
+			if (signal?.aborted) return;
 
-			if (finished) {
-				while (buffer.length > 0) {
-					yield buffer.shift()!;
-				}
-				break;
-			}
+			await new Promise<void>((r) => {
+				resolve = r;
+				signal?.addEventListener('abort', () => notify(), { once: true });
+			});
 		}
+
+		while (buffer.length > 0) {
+			yield buffer.shift()!;
+		}
+
+		if (error) throw error;
 	}
 }
 

@@ -12,6 +12,7 @@ use proto_gen::thread::{
 use std::pin::Pin;
 use tokio::sync::watch;
 use tokio_stream::{Stream, StreamExt};
+use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 pub struct ThreadManager {
@@ -64,12 +65,6 @@ impl ThreadManager {
 
         let response = client.get_messages(request).await?.into_inner();
         Ok(response.messages)
-
-        // Ok(response
-        //     .messages
-        //     .into_iter()
-        //     .map(AnyMessage::from)
-        //     .collect())
     }
 
     pub async fn delete_thread(&self, thread_id: String) -> Result<()> {
@@ -246,6 +241,7 @@ impl ThreadManager {
         content_blocks: ContentBlocks,
         parent_message_id: Option<String>,
         asset_chips_json: Option<String>,
+        cancel: CancellationToken,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<ChatStreamResponse>> + Send>>> {
         let mut client = self.client();
         let proto_blocks: Vec<ProtoContentBlock> = content_blocks
@@ -263,7 +259,9 @@ impl ThreadManager {
             .await?
             .into_inner();
 
-        let mapped_stream = stream.map(|result| result.map_err(Error::from));
+        let mapped_stream = stream
+            .map(|result| result.map_err(Error::from))
+            .take_while(move |_| !cancel.is_cancelled());
 
         Ok(Box::pin(mapped_stream))
     }

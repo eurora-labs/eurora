@@ -36,6 +36,7 @@ export class ChatService {
 	private readonly threadClient: IThreadService;
 
 	private offset = 0;
+	private abortController: AbortController | null = null;
 	private readonly unlisteners: ((() => void) | Promise<() => void>)[] = [];
 
 	constructor(threadClient: IThreadService) {
@@ -50,7 +51,7 @@ export class ChatService {
 				(thread) => existing.get(thread.id) ?? new ThreadMessages(thread),
 			);
 			this.offset = this.threads.length;
-			this.hasMoreThreads = this.threads.length === PAGE_SIZE;
+			this.hasMoreThreads = fresh.length === PAGE_SIZE;
 		} catch (error) {
 			console.error('Failed to load threads:', error);
 		} finally {
@@ -169,6 +170,10 @@ export class ChatService {
 		text: string,
 		parentMessageId?: string | null,
 	): Promise<void> {
+		this.abortController?.abort();
+		this.abortController = new AbortController();
+		const { signal } = this.abortController;
+
 		const aiNode = entry.messages.at(-1)!;
 		const aiMessage = aiNode.message;
 		if (aiMessage.type === 'remove') return;
@@ -181,6 +186,7 @@ export class ChatService {
 				threadId,
 				text,
 				parentMessageId,
+				signal,
 			)) {
 				if (event.type === 'final') {
 					entry.messages = event.messages;
@@ -209,7 +215,7 @@ export class ChatService {
 							}
 						}
 					} catch {
-						// Ignore
+						// Ignore malformed additional_kwargs JSON
 					}
 				}
 
@@ -244,15 +250,19 @@ export class ChatService {
 					}
 				}
 			}
+		} catch (e) {
+			console.error(`Stream error for thread ${threadId}:`, e);
 		} finally {
 			entry.streamingMessageId = null;
+			if (!entry.loaded) {
+				entry.loaded = true;
+			}
 		}
 	}
 
 	private appendPlaceholders(entry: ThreadMessages, text: string): void {
-		const now = Date.now();
-		const humanId = `temp-${now}-human`;
-		const aiId = `temp-${now}-ai`;
+		const humanId = `temp-${crypto.randomUUID()}`;
+		const aiId = `temp-${crypto.randomUUID()}`;
 
 		entry.messages = [
 			...entry.messages,
@@ -301,6 +311,8 @@ export class ChatService {
 	}
 
 	destroy() {
+		this.abortController?.abort();
+		this.abortController = null;
 		for (const p of this.unlisteners) {
 			if (p instanceof Promise) {
 				p.then((unlisten) => unlisten());

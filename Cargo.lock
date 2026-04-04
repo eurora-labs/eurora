@@ -3745,6 +3745,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "taurpc",
  "tokio",
+ "tokio-util",
  "tracing",
  "url",
 ]
@@ -3764,6 +3765,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tonic",
  "tonic-prost",
  "tonic-prost-build",

@@ -37,6 +37,7 @@ use crate::error::ThreadServiceError;
 use crate::tools::firecrawl_tools;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
+const CONTEXT_MESSAGE_LIMIT: u32 = 5;
 
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
@@ -447,7 +448,7 @@ impl ProtoThreadService for ThreadService {
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .params(PaginationParams::new(0, 5, "DESC"))
+            .params(PaginationParams::new(0, CONTEXT_MESSAGE_LIMIT, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -601,13 +602,14 @@ impl ProtoThreadService for ThreadService {
 
                 for tc in tool_calls {
                     let tool_name = tc.name.clone();
+                    let tool_call_id = tc.id.clone().unwrap_or_default();
                     let result_msg = if let Some(tool) = tools.get(&tool_name) {
                         tool.invoke_tool_call(tc).await
                     } else {
                         tracing::error!("Unknown tool: {}", tool_name);
                         agent_chain::messages::ToolMessage::builder()
                             .content(format!("Error: unknown tool '{}'", tool_name))
-                            .tool_call_id("")
+                            .tool_call_id(tool_call_id)
                             .status(agent_chain::messages::ToolStatus::Error)
                             .build()
                             .into()
@@ -616,61 +618,66 @@ impl ProtoThreadService for ThreadService {
                 }
             }
 
-            if !full_content.is_empty() {
+            let has_content = !full_content.is_empty() || !full_reasoning.is_empty();
+
+            if has_content {
                 let mut content_blocks = Vec::new();
                 if !full_reasoning.is_empty() {
                     content_blocks.push(serde_json::json!({"type": "reasoning", "reasoning": full_reasoning}));
                 }
-                content_blocks.push(serde_json::json!({"type": "text", "text": full_content}));
+                if !full_content.is_empty() {
+                    content_blocks.push(serde_json::json!({"type": "text", "text": full_content}));
+                }
                 let content_value = serde_json::Value::Array(content_blocks);
 
-                let save_result = db.create_message()
+                let ai_message = db.create_message()
                     .thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
                     .content(content_value)
                     .call()
-                    .await;
-
-                match save_result
-                {
-                    Ok(ai_message) => {
-                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = {
-                                db
-                                .record_token_usage()
-                                .user_id(user_id)
-                                .thread_id(thread_id)
-                                .message_id(ai_message.id)
-                                .input_tokens(total_input_tokens)
-                                .output_tokens(total_output_tokens)
-                                .reasoning_tokens(total_reasoning_tokens)
-                                .cache_creation_tokens(total_cache_creation_tokens)
-                                .cache_read_tokens(total_cache_read_tokens)
-                                .call()
-                                .await
-                            }
-                            {
-                                tracing::error!("Failed to record token usage: {}", e);
-                            }
-
-                        let ai_proto = BaseMessageWithSibling {
-                            parent_id: human_message_id.to_string(),
-                            message: Some(ai_message.into()),
-                            children: vec![],
-                            sibling_index: 0,
-                            depth: 0,
-                        };
-
-                        yield ChatStreamResponse {
-                            payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
-                                messages: vec![human_proto, ai_proto],
-                            })),
-                        };
-                    }
-                    Err(e) => {
+                    .await
+                    .map_err(|e| {
                         tracing::error!("Failed to save AI message to database: {}", e);
+                        Status::internal("Failed to save AI message")
+                    })?;
+
+                if (total_input_tokens > 0 || total_output_tokens > 0)
+                    && let Err(e) = db
+                        .record_token_usage()
+                        .user_id(user_id)
+                        .thread_id(thread_id)
+                        .message_id(ai_message.id)
+                        .input_tokens(total_input_tokens)
+                        .output_tokens(total_output_tokens)
+                        .reasoning_tokens(total_reasoning_tokens)
+                        .cache_creation_tokens(total_cache_creation_tokens)
+                        .cache_read_tokens(total_cache_read_tokens)
+                        .call()
+                        .await
+                    {
+                        tracing::error!("Failed to record token usage: {}", e);
                     }
-                }
+
+                let ai_proto = BaseMessageWithSibling {
+                    parent_id: human_message_id.to_string(),
+                    message: Some(ai_message.into()),
+                    children: vec![],
+                    sibling_index: 0,
+                    depth: 0,
+                };
+
+                yield ChatStreamResponse {
+                    payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
+                        messages: vec![human_proto, ai_proto],
+                    })),
+                };
+            } else {
+                yield ChatStreamResponse {
+                    payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
+                        messages: vec![human_proto],
+                    })),
+                };
             }
         };
 
