@@ -7,7 +7,7 @@ use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use crate::error::AppError;
-use crate::shared_types::SharedThreadManager;
+use crate::shared_types::{ActiveStreamTokens, SharedThreadManager};
 
 #[taurpc::ipc_type]
 pub struct Query {
@@ -23,6 +23,11 @@ pub trait ChatApi {
         thread_id: String,
         channel: Channel<ChatStreamResponse>,
         query: Query,
+    ) -> Result<(), String>;
+
+    async fn cancel_query<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
     ) -> Result<(), String>;
 }
 
@@ -44,6 +49,9 @@ impl ChatApi for ChatApiImpl {
         let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
             .try_state()
             .ok_or(AppError::Unavailable("Timeline"))?;
+        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
+            .try_state()
+            .ok_or(AppError::Unavailable("Active stream tokens"))?;
 
         let (chip, asset_blocks, snapshot_blocks) = {
             let timeline = timeline_state.lock().await;
@@ -64,7 +72,7 @@ impl ChatApi for ChatApiImpl {
         let mut context_blocks = ContentBlocks::new();
 
         if let Some(chip) = chip {
-            asset_chips_json = serde_json::to_string(&vec![chip]).ok();
+            asset_chips_json = serde_json::to_string(&[chip]).ok();
         }
 
         let mut all_blocks = ContentBlocks::new();
@@ -87,6 +95,10 @@ impl ChatApi for ChatApiImpl {
         context_blocks.push(user_text_block);
 
         let cancel = CancellationToken::new();
+        tokens_state
+            .lock()
+            .await
+            .insert(thread_id.clone(), cancel.clone());
 
         tracing::debug!("Sending chat stream");
         let mut stream = {
@@ -97,7 +109,6 @@ impl ChatApi for ChatApiImpl {
                     context_blocks,
                     query.parent_message_id.clone(),
                     asset_chips_json,
-                    cancel.clone(),
                 )
                 .await
                 .map_err(|e| format!("Failed to create chat stream: {e}"))?
@@ -106,25 +117,33 @@ impl ChatApi for ChatApiImpl {
         tracing::debug!("Starting to consume stream...");
 
         let stream_future = async {
-            while let Some(result) = stream.next().await {
-                match result {
-                    Ok(response) => {
-                        if let Err(e) = channel.send(response) {
-                            cancel.cancel();
-                            return Err(format!("Failed to send response chunk: {e}"));
-                        }
+            loop {
+                tokio::select! {
+                    biased;
+                    () = cancel.cancelled() => {
+                        tracing::debug!("Stream cancelled for thread {thread_id}");
+                        break;
                     }
-                    Err(e) => {
-                        cancel.cancel();
-                        return Err(format!("Stream error: {e}"));
+                    item = stream.next() => {
+                        match item {
+                            Some(Ok(response)) => {
+                                if let Err(e) = channel.send(response) {
+                                    return Err(format!("Failed to send response chunk: {e}"));
+                                }
+                            }
+                            Some(Err(e)) => {
+                                return Err(format!("Stream error: {e}"));
+                            }
+                            None => break,
+                        }
                     }
                 }
             }
             Ok(())
         };
 
-        let timeout_duration = std::time::Duration::from_secs(300);
-        match tokio::time::timeout(timeout_duration, stream_future).await {
+        let timeout = std::time::Duration::from_secs(300);
+        let result = match tokio::time::timeout(timeout, stream_future).await {
             Ok(Ok(())) => {
                 tracing::debug!("Stream completed successfully");
                 Ok(())
@@ -137,6 +156,26 @@ impl ChatApi for ChatApiImpl {
                 cancel.cancel();
                 Err("Stream processing timed out after 5 minutes".to_string())
             }
+        };
+
+        tokens_state.lock().await.remove(&thread_id);
+        result
+    }
+
+    async fn cancel_query<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+    ) -> Result<(), String> {
+        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
+            .try_state()
+            .ok_or(AppError::Unavailable("Active stream tokens"))?;
+
+        if let Some(token) = tokens_state.lock().await.remove(&thread_id) {
+            token.cancel();
+            tracing::debug!("Cancelled stream for thread {thread_id}");
         }
+
+        Ok(())
     }
 }
