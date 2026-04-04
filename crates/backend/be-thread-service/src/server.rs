@@ -5,7 +5,8 @@ use agent_chain::{
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
 use agent_chain_core::proto::{
-    BaseMessageWithSibling, ProtoAiMessageChunk, ProtoChunkPosition, ProtoContentBlock,
+    BaseMessageWithSibling, ChatStreamFinalMessage, ChatStreamResponse, ProtoContentBlock,
+    chat_stream_response::Payload,
 };
 use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
@@ -323,7 +324,7 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
 }
 
 type ChatResult<T> = Result<Response<T>, Status>;
-type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ProtoAiMessageChunk, Status>> + Send>>;
+type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ChatStreamResponse, Status>> + Send>>;
 
 #[tonic::async_trait]
 impl ProtoThreadService for ThreadService {
@@ -659,8 +660,22 @@ impl ProtoThreadService for ThreadService {
         let chat_provider = self.get_chat_provider();
         let tools = self.get_tools();
 
-        let human_message_id = human_db_message.id.to_string();
         let db = self.db.clone();
+        let human_parent_id = human_db_message
+            .parent_message_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+        let human_message_id = human_db_message.id;
+        let human_proto: BaseMessageWithSibling = {
+            let proto_msg = human_db_message.into();
+            BaseMessageWithSibling {
+                parent_id: human_parent_id,
+                message: Some(proto_msg),
+                children: vec![],
+                sibling_index: 0,
+                depth: 0,
+            }
+        };
         let output_stream = async_stream::try_stream! {
             let mut full_content = String::new();
             let mut full_reasoning = String::new();
@@ -708,7 +723,9 @@ impl ProtoThreadService for ThreadService {
                                     total_cache_read_tokens += details.cache_read.unwrap_or(0);
                                 }
                             }
-                            yield chunk.into();
+                            yield ChatStreamResponse {
+                                payload: Some(Payload::Chunk(chunk.into())),
+                            };
                         }
                         Err(e) => {
                             Err(Status::internal(e.to_string()))?;
@@ -788,14 +805,18 @@ impl ProtoThreadService for ThreadService {
                                 tracing::error!("Failed to record token usage: {}", e);
                             }
 
-                        let kwargs = serde_json::json!({
-                            "human_message_id": human_message_id,
-                            "ai_message_id": ai_message.id.to_string(),
-                        });
-                        yield ProtoAiMessageChunk {
-                            additional_kwargs: Some(kwargs.to_string()),
-                            chunk_position: Some(ProtoChunkPosition::ChunkPositionLast.into()),
-                            ..Default::default()
+                        let ai_proto = BaseMessageWithSibling {
+                            parent_id: human_message_id.to_string(),
+                            message: Some(ai_message.into()),
+                            children: vec![],
+                            sibling_index: 0,
+                            depth: 0,
+                        };
+
+                        yield ChatStreamResponse {
+                            payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
+                                messages: vec![human_proto, ai_proto],
+                            })),
                         };
                     }
                     Err(e) => {

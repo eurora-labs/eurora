@@ -1,5 +1,5 @@
 use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
-use agent_chain_core::proto::ProtoAiMessageChunk;
+use agent_chain_core::proto::ChatStreamResponse;
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
@@ -19,7 +19,7 @@ pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ProtoAiMessageChunk>,
+        channel: Channel<ChatStreamResponse>,
         query: Query,
     ) -> Result<String, String>;
 }
@@ -33,7 +33,7 @@ impl ChatApi for ChatApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ProtoAiMessageChunk>,
+        channel: Channel<ChatStreamResponse>,
         query: Query,
     ) -> Result<String, String> {
         let thread_state: tauri::State<SharedThreadManager> = app_handle
@@ -103,9 +103,8 @@ impl ChatApi for ChatApiImpl {
                 let stream_future = async {
                     while let Some(result) = stream.next().await {
                         match result {
-                            Ok(chunk) => {
-                                let proto_chunk: ProtoAiMessageChunk = chunk.into();
-                                if let Err(e) = channel.send(proto_chunk) {
+                            Ok(response) => {
+                                if let Err(e) = channel.send(response) {
                                     return Err(format!("Failed to send response chunk: {e}"));
                                 }
                             }

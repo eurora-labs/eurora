@@ -92,6 +92,17 @@ enum ProtoChunkPosition {
   CHUNK_POSITION_LAST = 1;
 }
 
+message ChatStreamResponse {
+  oneof payload {
+    ProtoAIMessageChunk chunk = 1;
+    ChatStreamFinalMessage final_message = 2;
+  }
+}
+
+message ChatStreamFinalMessage {
+  repeated BaseMessageWithSibling messages = 1;
+}
+
 message ProtoToolMessage {
   repeated ProtoContentBlock content = 1;
   string tool_call_id = 2;
