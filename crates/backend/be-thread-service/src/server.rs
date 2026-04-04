@@ -17,15 +17,13 @@ pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
 };
 use proto_gen::thread::{
-    AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
-    AddSystemMessageResponse, ChatStreamRequest, CreateThreadRequest, CreateThreadResponse,
-    DeleteThreadRequest, DeleteThreadResponse, GenerateThreadTitleRequest,
-    GenerateThreadTitleResponse, GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest,
-    GetMessagesResponse, GetThreadResponse, ListThreadsRequest, ListThreadsResponse,
-    MessageTreeNode, ProtoThread, SavePreliminaryContentBlocksRequest,
-    SavePreliminaryContentBlocksResponse, SearchMessageResult, SearchMessagesRequest,
-    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
-    SwitchBranchRequest,
+    ChatStreamRequest, CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest,
+    DeleteThreadResponse, GenerateThreadTitleRequest, GenerateThreadTitleResponse,
+    GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
+    GetThreadResponse, ListThreadsRequest, ListThreadsResponse, MessageTreeNode, ProtoThread,
+    SavePreliminaryContentBlocksRequest, SavePreliminaryContentBlocksResponse, SearchMessageResult,
+    SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
+    SearchThreadsResponse, SwitchBranchRequest,
 };
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -387,92 +385,6 @@ impl ProtoThreadService for ThreadService {
 
         Ok(Response::new(ListThreadsResponse {
             threads: threads.into_iter().map(Self::db_thread_to_proto).collect(),
-        }))
-    }
-
-    async fn add_human_message(
-        &self,
-        request: Request<AddHumanMessageRequest>,
-    ) -> Result<Response<AddHumanMessageResponse>, Status> {
-        tracing::info!("AddHumanMessage request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        let proto_message = req
-            .message
-            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
-
-        let human_message: HumanMessage = proto_message.into();
-        let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
-        })?;
-
-        let message = self
-            .db
-            .create_message()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_type(MessageType::Human)
-            .content(content)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        tracing::info!("Added human message to thread {}", thread_id);
-
-        Ok(Response::new(AddHumanMessageResponse {
-            message: Some(message.into()),
-        }))
-    }
-
-    async fn add_system_message(
-        &self,
-        request: Request<AddSystemMessageRequest>,
-    ) -> Result<Response<AddSystemMessageResponse>, Status> {
-        tracing::info!("AddSystemMessage request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        let proto_message = req
-            .message
-            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
-
-        let system_message: SystemMessage = proto_message.into();
-        let content = serde_json::to_value(&system_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
-        })?;
-
-        let message = self
-            .db
-            .create_message()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_type(MessageType::System)
-            .content(content)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        tracing::info!("Added system message to thread {}", thread_id);
-
-        Ok(Response::new(AddSystemMessageResponse {
-            message: Some(message.into()),
         }))
     }
 

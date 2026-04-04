@@ -12,9 +12,6 @@ service ProtoThreadService {
   rpc DeleteThread(DeleteThreadRequest) returns (DeleteThreadResponse);
 
   rpc GetMessages(GetMessagesRequest) returns (GetMessagesResponse);
-  rpc AddHumanMessage(AddHumanMessageRequest) returns (AddHumanMessageResponse);
-  rpc AddSystemMessage(AddSystemMessageRequest) returns (AddSystemMessageResponse);
-
   rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ChatStreamResponse);
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
   rpc SwitchBranch(SwitchBranchRequest) returns (GetMessagesResponse);
@@ -59,15 +56,6 @@ message ChatStreamRequest {
   optional string asset_chips_json = 4;
 }
 
-message AddHumanMessageRequest {
-  string thread_id = 1;
-  agent_chain.ProtoHumanMessage message = 2;
-}
-
-message AddHumanMessageResponse {
-  agent_chain.ProtoBaseMessage message = 1;
-}
-
 message GetMessagesRequest {
   string thread_id = 1;
   uint32 limit = 2;
@@ -104,15 +92,6 @@ message DeleteThreadRequest {
 }
 
 message DeleteThreadResponse {}
-
-message AddSystemMessageRequest {
-  string thread_id = 1;
-  agent_chain.ProtoSystemMessage message = 2;
-}
-
-message AddSystemMessageResponse {
-  agent_chain.ProtoBaseMessage message = 1;
-}
 
 message GenerateThreadTitleRequest {
   string thread_id = 1;

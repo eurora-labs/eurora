@@ -1,18 +1,13 @@
 use crate::error::{Error, Result};
 use agent_chain::messages::{ContentBlock, ContentBlocks};
-use agent_chain::{HumanMessage, SystemMessage};
-use agent_chain_core::proto::{
-    BaseMessageWithSibling, ChatStreamResponse, ProtoContentBlock, ProtoHumanMessage,
-    ProtoSystemMessage,
-};
+use agent_chain_core::proto::{BaseMessageWithSibling, ChatStreamResponse, ProtoContentBlock};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::thread::{
-    AddHumanMessageRequest, AddSystemMessageRequest, ChatStreamRequest, CreateThreadRequest,
-    DeleteThreadRequest, GenerateThreadTitleRequest, GetMessageTreeRequest, GetMessageTreeResponse,
-    GetMessagesRequest, GetMessagesResponse, GetThreadRequest, ListThreadsRequest, ProtoThread,
-    SavePreliminaryContentBlocksRequest, SearchMessagesRequest, SearchMessagesResponse,
-    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest,
-    proto_thread_service_client::ProtoThreadServiceClient,
+    ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,
+    GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
+    GetThreadRequest, ListThreadsRequest, ProtoThread, SavePreliminaryContentBlocksRequest,
+    SearchMessagesRequest, SearchMessagesResponse, SearchThreadsRequest, SearchThreadsResponse,
+    SwitchBranchRequest, proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::watch;
@@ -217,39 +212,6 @@ impl ThreadManager {
 }
 
 impl ThreadManager {
-    pub async fn add_human_message(
-        &mut self,
-        thread_id: String,
-        message: &HumanMessage,
-    ) -> Result<()> {
-        let mut client = self.client();
-        let proto_message: ProtoHumanMessage = message.clone().into();
-
-        client
-            .add_human_message(AddHumanMessageRequest {
-                thread_id,
-                message: Some(proto_message),
-            })
-            .await?;
-        Ok(())
-    }
-
-    pub async fn add_system_message(
-        &mut self,
-        thread_id: String,
-        message: &SystemMessage,
-    ) -> Result<()> {
-        let mut client = self.client();
-        let proto_message: ProtoSystemMessage = message.clone().into();
-        client
-            .add_system_message(AddSystemMessageRequest {
-                thread_id,
-                message: Some(proto_message),
-            })
-            .await?;
-        Ok(())
-    }
-
     pub async fn save_preliminary_content_blocks(
         &mut self,
         thread_id: String,
