@@ -1,8 +1,9 @@
 use crate::error::{Error, Result};
 use agent_chain::messages::{ContentBlock, ContentBlocks};
-use agent_chain::{HumanMessage, SystemMessage, messages::AIMessageChunk};
+use agent_chain::{HumanMessage, SystemMessage};
 use agent_chain_core::proto::{
-    BaseMessageWithSibling, ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage,
+    BaseMessageWithSibling, ChatStreamResponse, ProtoContentBlock, ProtoHumanMessage,
+    ProtoSystemMessage,
 };
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::thread::{
@@ -299,7 +300,7 @@ impl ThreadManager {
         content_blocks: ContentBlocks,
         parent_message_id: Option<String>,
         asset_chips_json: Option<String>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<ChatStreamResponse>> + Send>>> {
         let mut client = self.client();
         let proto_blocks: Vec<ProtoContentBlock> = content_blocks
             .into_inner()
@@ -316,10 +317,7 @@ impl ThreadManager {
             .await?
             .into_inner();
 
-        let mapped_stream = stream.map(|result| match result {
-            Ok(chunk) => Ok(AIMessageChunk::from(chunk)),
-            Err(e) => Err(Error::from(e)),
-        });
+        let mapped_stream = stream.map(|result| result.map_err(Error::from));
 
         Ok(Box::pin(mapped_stream))
     }

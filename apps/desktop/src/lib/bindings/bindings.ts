@@ -21,6 +21,14 @@ export type BaseMessageWithSibling = {
 
 export type Block = { Text: ProtoTextContentBlock } | { InvalidToolCall: ProtoInvalidToolCallBlock } | { Reasoning: ProtoReasoningContentBlock } | { NonStandard: ProtoNonStandardContentBlock } | { Image: ProtoImageContentBlock } | { Video: ProtoVideoContentBlock } | { Audio: ProtoAudioContentBlock } | { PlainText: ProtoPlainTextContentBlock } | { File: ProtoFileContentBlock } | { ToolCall: ProtoToolCallBlock } | { ToolCallChunk: ProtoToolCallChunkBlock } | { ServerToolCall: ProtoServerToolCall } | { ServerToolCallChunk: ProtoServerToolCallChunk } | { ServerToolResult: ProtoServerToolResult };
 
+export type ChatStreamFinalMessage = {
+	messages: BaseMessageWithSibling[],
+};
+
+export type ChatStreamResponse = {
+	payload: Payload | null,
+};
+
 export type Claims = {
 	sub: string,
 	email: string,
@@ -80,6 +88,8 @@ export type MessageTreeResponse = {
 	nodes: MessageTreeNodeView[],
 	has_more: boolean,
 };
+
+export type Payload = { Chunk: ProtoAiMessageChunk } | { FinalMessage: ChatStreamFinalMessage };
 
 export type ProtoAiMessage = {
 	content: ProtoContentBlock[],
@@ -424,7 +434,7 @@ logout: () => Promise<null>,
 poll_for_login: () => Promise<boolean>, 
 refresh_session: () => Promise<null>, 
 register: (email: string, password: string) => Promise<null>},
-"chat": {send_query: (threadId: string, channel: TAURI_CHANNEL<ProtoAiMessageChunk>, query: Query) => Promise<string>},
+"chat": {send_query: (threadId: string, channel: TAURI_CHANNEL<ChatStreamResponse>, query: Query) => Promise<string>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "onboarding": {get_browser_extension_download_url: () => Promise<string>},

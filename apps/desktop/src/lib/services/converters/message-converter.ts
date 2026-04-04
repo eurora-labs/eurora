@@ -1,6 +1,7 @@
 import type {
 	BaseMessageWithSibling,
 	Block,
+	ChatStreamResponse,
 	Message,
 	ProtoAiMessageChunk as RawAiMessageChunk,
 	ProtoAnnotation,
@@ -13,7 +14,7 @@ import type {
 	ContentBlock,
 } from '@eurora/chat/models/content-blocks/index';
 import type { MessageNode, Message as DomainMessage } from '@eurora/chat/models/messages/index';
-import type { AiMessageChunk } from '@eurora/chat/models/streaming';
+import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 
 export function toMessageNodes(raw: BaseMessageWithSibling[]): MessageNode[] {
 	return raw.map(toMessageNode);
@@ -325,9 +326,23 @@ function toAnnotation(raw: ProtoAnnotation): Annotation {
 	};
 }
 
-const CHUNK_POSITION_LAST = 1;
+export function toChatStreamEvent(raw: ChatStreamResponse): ChatStreamEvent {
+	if (!raw.payload) {
+		throw new Error('ChatStreamResponse missing payload');
+	}
+	if ('FinalMessage' in raw.payload) {
+		return {
+			type: 'final',
+			messages: toMessageNodes(raw.payload.FinalMessage.messages),
+		};
+	}
+	return {
+		type: 'chunk',
+		chunk: toAiMessageChunk(raw.payload.Chunk),
+	};
+}
 
-export function toAiMessageChunk(raw: RawAiMessageChunk): AiMessageChunk {
+function toAiMessageChunk(raw: RawAiMessageChunk): AiMessageChunk {
 	return {
 		content: raw.content.map(toContentBlock),
 		id: raw.id,
@@ -377,6 +392,5 @@ export function toAiMessageChunk(raw: RawAiMessageChunk): AiMessageChunk {
 			: null,
 		additionalKwargs: raw.additional_kwargs,
 		responseMetadata: raw.response_metadata,
-		chunkPosition: raw.chunk_position === CHUNK_POSITION_LAST ? 'last' : null,
 	};
 }

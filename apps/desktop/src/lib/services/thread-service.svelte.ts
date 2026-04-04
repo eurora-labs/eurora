@@ -1,9 +1,9 @@
-import { toAiMessageChunk, toMessageNodes } from '$lib/services/converters/message-converter.js';
+import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { ProtoAiMessageChunk, Query } from '$lib/bindings/bindings.js';
+import type { ChatStreamResponse, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { MessageNode } from '@eurora/chat/models/messages/index';
-import type { AiMessageChunk } from '@eurora/chat/models/streaming';
+import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type { IThreadService } from '@eurora/chat/services/thread/thread-service';
 
@@ -58,18 +58,18 @@ export class ThreadService implements IThreadService {
 		threadId: string,
 		text: string,
 		parentMessageId?: string | null,
-	): AsyncIterable<AiMessageChunk> {
+	): AsyncIterable<ChatStreamEvent> {
 		const query: Query = {
 			text,
 			assets: [],
 			parent_message_id: parentMessageId ?? null,
 		};
 
-		const buffer: AiMessageChunk[] = [];
+		const buffer: ChatStreamEvent[] = [];
 		let resolve: (() => void) | null = null;
 
-		const onEvent = (response: ProtoAiMessageChunk) => {
-			buffer.push(toAiMessageChunk(response));
+		const onEvent = (response: ChatStreamResponse) => {
+			buffer.push(toChatStreamEvent(response));
 			resolve?.();
 		};
 

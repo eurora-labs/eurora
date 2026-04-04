@@ -169,7 +169,6 @@ export class ChatService {
 		text: string,
 		parentMessageId?: string | null,
 	): Promise<void> {
-		const humanNode = entry.messages.at(-2)!;
 		const aiNode = entry.messages.at(-1)!;
 		const aiMessage = aiNode.message;
 		if (aiMessage.type === 'remove') return;
@@ -178,25 +177,18 @@ export class ChatService {
 		let pendingWhitespace = '';
 
 		try {
-			for await (const chunk of this.threadClient.sendMessage(
+			for await (const event of this.threadClient.sendMessage(
 				threadId,
 				text,
 				parentMessageId,
 			)) {
-				if (chunk.chunkPosition === 'last') {
-					const kwargs = chunk.additionalKwargs
-						? JSON.parse(chunk.additionalKwargs)
-						: null;
-					if (kwargs?.human_message_id) {
-						humanNode.message.id = kwargs.human_message_id;
-					}
-					if (kwargs?.ai_message_id) {
-						aiMessage.id = kwargs.ai_message_id;
-					}
+				if (event.type === 'final') {
+					entry.messages = event.messages;
 					entry.loaded = true;
 					break;
 				}
 
+				const chunk = event.chunk;
 				for (const block of chunk.content) {
 					if (block.type === 'text') {
 						let textContent = block.text;
