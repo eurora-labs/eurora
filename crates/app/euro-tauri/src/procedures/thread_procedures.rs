@@ -17,13 +17,6 @@ pub struct Thread {
 }
 
 #[taurpc::ipc_type]
-pub struct ReasoningBlock {
-    pub r#type: String,
-    pub content: Option<String>,
-    pub signature: Option<String>,
-}
-
-#[taurpc::ipc_type]
 pub struct MessageAssetChip {
     pub id: String,
     pub name: String,
@@ -35,7 +28,6 @@ pub struct MessageView {
     pub id: Option<String>,
     pub role: String,
     pub content: String,
-    pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
     pub sibling_count: u32,
     pub sibling_index: u32,
     pub assets: Option<Vec<MessageAssetChip>>,
@@ -51,7 +43,6 @@ pub struct MessageTreeNodeView {
     pub sibling_count: u32,
     pub sibling_index: u32,
     pub assets: Option<Vec<MessageAssetChip>>,
-    pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
 }
 
 #[taurpc::ipc_type]
@@ -171,13 +162,11 @@ fn thread_manager<R: Runtime>(
 //                     .and_then(|id| sibling_map.get(id))
 //                     .copied()
 //                     .unwrap_or((1, 0));
-//                 let reasoning_blocks = extract_reasoning_blocks(&message);
 //                 let assets = extract_asset_chips(&message);
 //                 Some(MessageView {
 //                     id,
 //                     role: message.message_type().to_string(),
 //                     content: message.content().to_string(),
-//                     reasoning_blocks,
 //                     sibling_count,
 //                     sibling_index,
 //                     assets,
@@ -289,7 +278,6 @@ impl ThreadApi for ThreadApiImpl {
             .into_iter()
             .map(|n| {
                 let assets = parse_asset_chips_from_json(&n.additional_kwargs);
-                let reasoning_blocks = parse_reasoning_blocks_from_json(&n.reasoning_blocks);
 
                 let content_blocks: ContentBlocks = n
                     .content
@@ -307,7 +295,6 @@ impl ThreadApi for ThreadApiImpl {
                     sibling_count: n.sibling_count,
                     sibling_index: n.sibling_index,
                     assets,
-                    reasoning_blocks,
                 }
             })
             .collect();
@@ -434,35 +421,6 @@ fn parse_asset_chips_from_json(json_str: &Option<String>) -> Option<Vec<MessageA
     }
 }
 
-fn parse_reasoning_blocks_from_json(json_str: &Option<String>) -> Option<Vec<ReasoningBlock>> {
-    let v = serde_json::from_str::<serde_json::Value>(json_str.as_ref()?).ok()?;
-    let blocks = v.as_array()?;
-    let result: Vec<ReasoningBlock> = blocks
-        .iter()
-        .filter_map(|block| {
-            let block_type = block.get("type")?.as_str()?.to_string();
-            let content = block
-                .get("content")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let signature = block
-                .get("signature")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            Some(ReasoningBlock {
-                r#type: block_type,
-                content,
-                signature,
-            })
-        })
-        .collect();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
 fn extract_asset_chips(message: &AnyMessage) -> Option<Vec<MessageAssetChip>> {
     let kwargs = message.additional_kwargs();
     let chips = kwargs.get("asset_chips")?.as_array()?;
@@ -473,35 +431,6 @@ fn extract_asset_chips(message: &AnyMessage) -> Option<Vec<MessageAssetChip>> {
             let name = chip.get("name")?.as_str()?.to_string();
             let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
             Some(MessageAssetChip { id, name, icon })
-        })
-        .collect();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-fn extract_reasoning_blocks(message: &AnyMessage) -> Option<Vec<ReasoningBlock>> {
-    let kwargs = message.additional_kwargs();
-    let blocks = kwargs.get("reasoning_blocks")?.as_array()?;
-    let result: Vec<ReasoningBlock> = blocks
-        .iter()
-        .filter_map(|block| {
-            let block_type = block.get("type")?.as_str()?.to_string();
-            let content = block
-                .get("content")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let signature = block
-                .get("signature")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            Some(ReasoningBlock {
-                r#type: block_type,
-                content,
-                signature,
-            })
         })
         .collect();
     if result.is_empty() {

@@ -262,7 +262,6 @@ pub struct Message {
     pub tool_call_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
     pub additional_kwargs: serde_json::Value,
-    pub reasoning_blocks: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -290,7 +289,6 @@ pub struct MessageTreeNode {
     pub message_type: MessageType,
     pub content: serde_json::Value,
     pub additional_kwargs: serde_json::Value,
-    pub reasoning_blocks: Option<serde_json::Value>,
     pub level: i32,
     pub sibling_count: i64,
     pub sibling_index: i64,

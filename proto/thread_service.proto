@@ -149,7 +149,6 @@ message MessageTreeNode {
   uint32 sibling_count = 6;
   uint32 sibling_index = 7;
   optional string additional_kwargs = 8;
-  optional string reasoning_blocks = 9;
 }
 
 message GetMessageTreeResponse {

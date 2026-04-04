@@ -81,7 +81,6 @@ export type MessageTreeNodeView = {
 	sibling_count: number,
 	sibling_index: number,
 	assets: MessageAssetChip[] | null,
-	reasoning_blocks: ReasoningBlock[] | null,
 };
 
 export type MessageTreeResponse = {
@@ -361,12 +360,6 @@ export type Query = {
 	text: string,
 	assets: string[],
 	parent_message_id: string | null,
-};
-
-export type ReasoningBlock = {
-	type: string,
-	content: string | null,
-	signature: string | null,
 };
 
 export type Role = "Free" | "Tier1";
