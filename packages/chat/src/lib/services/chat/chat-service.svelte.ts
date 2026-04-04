@@ -189,6 +189,30 @@ export class ChatService {
 				}
 
 				const chunk = event.chunk;
+
+				if (chunk.additionalKwargs) {
+					try {
+						const kwargs = JSON.parse(chunk.additionalKwargs);
+						if (kwargs.reasoning_content) {
+							const existing = aiMessage.content.find((b) => b.type === 'reasoning');
+							if (existing && existing.type === 'reasoning') {
+								existing.reasoning =
+									(existing.reasoning ?? '') + kwargs.reasoning_content;
+							} else {
+								aiMessage.content.push({
+									type: 'reasoning',
+									id: null,
+									reasoning: kwargs.reasoning_content,
+									index: null,
+									extras: null,
+								});
+							}
+						}
+					} catch {
+						// Ignore
+					}
+				}
+
 				for (const block of chunk.content) {
 					if (block.type === 'text') {
 						let textContent = block.text;

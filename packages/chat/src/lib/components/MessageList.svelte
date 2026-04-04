@@ -168,7 +168,7 @@
 			{#if content.length > 0 || !user}
 				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
 					{#if reasoning}
-						<Reasoning.Root>
+						<Reasoning.Root {isStreaming}>
 							<Reasoning.Trigger />
 							<Reasoning.Content children={reasoning} />
 						</Reasoning.Root>
