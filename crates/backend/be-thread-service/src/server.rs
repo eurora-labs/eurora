@@ -765,22 +765,18 @@ impl ProtoThreadService for ThreadService {
             }
 
             if !full_content.is_empty() {
-                let reasoning_blocks = match full_reasoning.is_empty() {
-                    true => None,
-                    false => Some(serde_json::json!([{
-                        "type": "thinking",
-                        "content": full_reasoning,
-                    }])),
-                };
-
-                let content_value = serde_json::json!([{"type": "text", "text": full_content}]);
+                let mut content_blocks = Vec::new();
+                if !full_reasoning.is_empty() {
+                    content_blocks.push(serde_json::json!({"type": "reasoning", "reasoning": full_reasoning}));
+                }
+                content_blocks.push(serde_json::json!({"type": "text", "text": full_content}));
+                let content_value = serde_json::Value::Array(content_blocks);
 
                 let save_result = db.create_message()
                     .thread_id(thread_id)
                     .user_id(user_id)
                     .message_type(MessageType::Ai)
                     .content(content_value)
-                    .maybe_reasoning_blocks(reasoning_blocks)
                     .call()
                     .await;
 
@@ -1120,11 +1116,6 @@ impl ProtoThreadService for ThreadService {
                     Some(serde_json::to_string(&n.additional_kwargs).unwrap_or_default())
                 };
 
-                let reasoning_blocks = n
-                    .reasoning_blocks
-                    .filter(|v| !v.is_null())
-                    .map(|v| serde_json::to_string(&v).unwrap_or_default());
-
                 MessageTreeNode {
                     id: n.id.to_string(),
                     parent_message_id: n.parent_message_id.map(|id| id.to_string()),
@@ -1138,7 +1129,6 @@ impl ProtoThreadService for ThreadService {
                     sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
                     sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
                     additional_kwargs,
-                    reasoning_blocks,
                 }
             })
             .collect();

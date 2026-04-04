@@ -75,13 +75,7 @@ impl From<Message> for ProtoBaseMessage {
     fn from(msg: Message) -> Self {
         let id = Some(msg.id.to_string());
 
-        let additional_kwargs = {
-            let mut kwargs = msg.additional_kwargs.clone();
-            if let Some(reasoning) = &msg.reasoning_blocks {
-                kwargs["reasoning_blocks"] = reasoning.clone();
-            }
-            serde_json::to_string(&kwargs).ok()
-        };
+        let additional_kwargs = serde_json::to_string(&msg.additional_kwargs).ok();
 
         let content: Vec<ProtoContentBlock> =
             serde_json::from_value::<Vec<ContentBlock>>(msg.content)
