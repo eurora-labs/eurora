@@ -602,7 +602,10 @@ impl ProtoThreadService for ThreadService {
 
                 for tc in tool_calls {
                     let tool_name = tc.name.clone();
-                    let tool_call_id = tc.id.clone().unwrap_or_default();
+                    let tool_call_id = tc.id.clone().unwrap_or_else(|| {
+                        tracing::warn!("Tool call '{}' has no id", tool_name);
+                        String::new()
+                    });
                     let result_msg = if let Some(tool) = tools.get(&tool_name) {
                         tool.invoke_tool_call(tc).await
                     } else {

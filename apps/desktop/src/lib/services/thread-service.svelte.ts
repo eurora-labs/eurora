@@ -81,6 +81,12 @@ export class ThreadService implements IThreadService {
 			notify();
 		}
 
+		const onAbort = () => {
+			this.taurpc.chat.cancel_query(threadId).catch(() => {});
+			notify();
+		};
+		signal?.addEventListener('abort', onAbort, { once: true });
+
 		this.taurpc.chat.send_query(threadId, onEvent, query).then(
 			() => {
 				finished = true;
@@ -93,26 +99,29 @@ export class ThreadService implements IThreadService {
 			},
 		);
 
-		while (true) {
-			while (buffer.length > 0) {
+		try {
+			while (true) {
+				while (buffer.length > 0) {
+					if (signal?.aborted) return;
+					yield buffer.shift()!;
+				}
+
+				if (finished) break;
 				if (signal?.aborted) return;
+
+				await new Promise<void>((r) => {
+					resolve = r;
+				});
+			}
+
+			while (buffer.length > 0) {
 				yield buffer.shift()!;
 			}
 
-			if (finished) break;
-			if (signal?.aborted) return;
-
-			await new Promise<void>((r) => {
-				resolve = r;
-				signal?.addEventListener('abort', () => notify(), { once: true });
-			});
+			if (error) throw error;
+		} finally {
+			signal?.removeEventListener('abort', onAbort);
 		}
-
-		while (buffer.length > 0) {
-			yield buffer.shift()!;
-		}
-
-		if (error) throw error;
 	}
 }
 
