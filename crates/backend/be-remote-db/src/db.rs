@@ -1195,12 +1195,10 @@ impl DatabaseManager {
         tool_call_id: Option<String>,
         tool_calls: Option<serde_json::Value>,
         additional_kwargs: Option<serde_json::Value>,
-        hidden_from_ui: Option<bool>,
     ) -> DbResult<Message> {
         let id = id.unwrap_or_else(Uuid::now_v7);
         let now = Utc::now();
         let additional_kwargs = additional_kwargs.unwrap_or_else(|| serde_json::json!({}));
-        let hidden_from_ui = hidden_from_ui.unwrap_or(false);
 
         let message = sqlx::query_as::<_, Message>(
             r#"
@@ -1210,13 +1208,13 @@ impl DatabaseManager {
             ),
             updated_thread AS (
                 UPDATE threads
-                SET updated_at = $11, active_leaf_id = $1
+                SET updated_at = $10, active_leaf_id = $1
                 WHERE id = (SELECT id FROM verified_thread)
                 RETURNING id
             ),
             inserted_message AS (
-                INSERT INTO messages (id, thread_id, user_id, parent_message_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, created_at, updated_at)
-                SELECT $1, vc.id, $3, COALESCE($4, t.active_leaf_id), $5, $6, $7, $8, $9, $10, $11, $11
+                INSERT INTO messages (id, thread_id, user_id, parent_message_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at)
+                SELECT $1, vc.id, $3, COALESCE($4, t.active_leaf_id), $5, $6, $7, $8, $9, $10, $10
                 FROM verified_thread vc
                 JOIN threads t ON t.id = vc.id
                 RETURNING id, thread_id, user_id, parent_message_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at
@@ -1233,7 +1231,6 @@ impl DatabaseManager {
         .bind(&tool_call_id)
         .bind(&tool_calls)
         .bind(&additional_kwargs)
-        .bind(hidden_from_ui)
         .bind(now)
         .fetch_one(&self.pool)
         .await?;
@@ -1247,26 +1244,15 @@ impl DatabaseManager {
         thread_id: Uuid,
         user_id: Uuid,
         params: Option<PaginationParams>,
-        include_visible: Option<bool>,
-        include_hidden: Option<bool>,
     ) -> DbResult<Vec<Message>> {
         let params = params.unwrap_or_default();
-        let include_visible = include_visible.unwrap_or(true);
-        let include_hidden = include_hidden.unwrap_or(true);
-
-        let visibility_filter = match (include_visible, include_hidden) {
-            (true, true) => String::new(),
-            (true, false) => " AND m.hidden_from_ui = false".to_string(),
-            (false, true) => " AND m.hidden_from_ui = true".to_string(),
-            (false, false) => " AND false".to_string(),
-        };
 
         let query = format!(
             r#"
             WITH RECURSIVE branch AS (
                 SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
                        m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
-                       m.hidden_from_ui, m.created_at, m.updated_at
+                       m.created_at, m.updated_at
                 FROM messages m
                 JOIN threads t ON t.active_leaf_id = m.id
                 WHERE t.id = $1 AND t.user_id = $2
@@ -1275,7 +1261,7 @@ impl DatabaseManager {
 
                 SELECT parent.id, parent.thread_id, parent.user_id, parent.parent_message_id,
                        parent.message_type, parent.content, parent.tool_call_id, parent.tool_calls,
-                       parent.additional_kwargs, parent.hidden_from_ui,
+                       parent.additional_kwargs,
                        parent.created_at, parent.updated_at
                 FROM messages parent
                 JOIN branch child ON child.parent_message_id = parent.id
@@ -1285,11 +1271,9 @@ impl DatabaseManager {
                    m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
                    m.created_at, m.updated_at
             FROM branch m
-            WHERE true{}
             ORDER BY m.created_at {}
             LIMIT $3 OFFSET $4
             "#,
-            visibility_filter,
             params.order()
         );
 
@@ -1318,7 +1302,7 @@ impl DatabaseManager {
             WITH RECURSIVE branch AS (
                 SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
                        m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
-                       m.hidden_from_ui, m.created_at, m.updated_at
+                       m.created_at, m.updated_at
                 FROM messages m
                 JOIN threads t ON t.active_leaf_id = m.id
                 WHERE t.id = $1 AND t.user_id = $2
@@ -1327,7 +1311,7 @@ impl DatabaseManager {
 
                 SELECT parent.id, parent.thread_id, parent.user_id, parent.parent_message_id,
                        parent.message_type, parent.content, parent.tool_call_id, parent.tool_calls,
-                       parent.additional_kwargs, parent.hidden_from_ui,
+                       parent.additional_kwargs,
                        parent.created_at, parent.updated_at
                 FROM messages parent
                 JOIN branch child ON child.parent_message_id = parent.id
@@ -1337,7 +1321,6 @@ impl DatabaseManager {
                 SELECT id, parent_message_id,
                        ROW_NUMBER() OVER (ORDER BY created_at {order}) AS rn
                 FROM branch
-                WHERE hidden_from_ui = false
             ),
             paginated AS (
                 SELECT ab.id, ab.parent_message_id, b.created_at
@@ -1363,7 +1346,6 @@ impl DatabaseManager {
                 FROM numbered_branch nb
                 JOIN paginated p ON p.id = nb.id
                 JOIN messages s ON s.thread_id = $1 AND s.user_id = $2
-                    AND s.hidden_from_ui = false
                     AND (
                         (p.parent_message_id IS NOT NULL AND s.parent_message_id = p.parent_message_id)
                         OR (p.parent_message_id IS NULL AND s.parent_message_id IS NULL)
@@ -1403,7 +1385,7 @@ impl DatabaseManager {
             r#"
             WITH RECURSIVE tree AS (
                 SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs, m.hidden_from_ui,
+                       m.additional_kwargs,
                        m.created_at,
                        0 AS depth
                 FROM messages m
@@ -1414,7 +1396,7 @@ impl DatabaseManager {
                 UNION ALL
 
                 SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs, m.hidden_from_ui,
+                       m.additional_kwargs,
                        m.created_at,
                        t.depth + 1
                 FROM messages m
@@ -1422,7 +1404,7 @@ impl DatabaseManager {
                 WHERE m.thread_id = $1
                   AND t.depth + 1 <= $5
             ),
-            visible AS (
+            deduped AS (
                 SELECT id, parent_message_id, message_type, content,
                        additional_kwargs, created_at,
                        ROW_NUMBER() OVER (
@@ -1430,14 +1412,13 @@ impl DatabaseManager {
                        ) AS rn,
                        depth
                 FROM tree
-                WHERE hidden_from_ui = false
             ),
             numbered AS (
                 SELECT v.id, v.parent_message_id, v.message_type, v.content,
                        v.additional_kwargs, v.created_at,
                        v.depth,
                        DENSE_RANK() OVER (ORDER BY v.depth) - 1 AS level
-                FROM visible v
+                FROM deduped v
                 WHERE v.rn = 1
             ),
             with_siblings AS (
@@ -1494,7 +1475,7 @@ impl DatabaseManager {
             r#"
             WITH RECURSIVE tree AS (
                 SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs, m.hidden_from_ui,
+                       m.additional_kwargs,
                        m.created_at,
                        0 AS depth
                 FROM messages m
@@ -1505,7 +1486,7 @@ impl DatabaseManager {
                 UNION ALL
 
                 SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs, m.hidden_from_ui,
+                       m.additional_kwargs,
                        m.created_at,
                        t.depth + 1
                 FROM messages m
@@ -1513,7 +1494,7 @@ impl DatabaseManager {
                 WHERE m.thread_id = $1
                   AND t.depth + 1 <= $4
             ),
-            visible AS (
+            deduped AS (
                 SELECT id, parent_message_id, message_type, content,
                        additional_kwargs, created_at,
                        ROW_NUMBER() OVER (
@@ -1521,13 +1502,12 @@ impl DatabaseManager {
                        ) AS rn,
                        depth
                 FROM tree
-                WHERE hidden_from_ui = false
             ),
             numbered AS (
                 SELECT v.id, v.parent_message_id, v.message_type, v.content,
                        v.additional_kwargs, v.created_at,
                        $5 + DENSE_RANK() OVER (ORDER BY v.depth) - 1 AS level
-                FROM visible v
+                FROM deduped v
                 WHERE v.rn = 1
             ),
             with_siblings AS (
@@ -2143,7 +2123,6 @@ impl DatabaseManager {
                        created_at
                 FROM messages
                 WHERE user_id = $2
-                  AND hidden_from_ui = false
                   AND (search_tsv @@ to_tsquery('english', $1) OR extract_content_text(content) ILIKE $5)
                 ORDER BY rank DESC, created_at DESC
                 LIMIT $3 OFFSET $4

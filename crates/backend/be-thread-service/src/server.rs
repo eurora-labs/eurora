@@ -17,15 +17,15 @@ pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
 };
 use proto_gen::thread::{
-    AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
-    AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
-    CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest, DeleteThreadResponse,
-    GenerateThreadTitleRequest, GenerateThreadTitleResponse, GetMessageTreeRequest,
-    GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, MessageTreeNode, ProtoThread,
-    SavePreliminaryContentBlocksRequest, SavePreliminaryContentBlocksResponse, SearchMessageResult,
-    SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
-    SearchThreadsResponse, SwitchBranchRequest,
+    AddHumanMessageRequest, AddHumanMessageResponse, AddSystemMessageRequest,
+    AddSystemMessageResponse, ChatStreamRequest, CreateThreadRequest, CreateThreadResponse,
+    DeleteThreadRequest, DeleteThreadResponse, GenerateThreadTitleRequest,
+    GenerateThreadTitleResponse, GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest,
+    GetMessagesResponse, GetThreadResponse, ListThreadsRequest, ListThreadsResponse,
+    MessageTreeNode, ProtoThread, SavePreliminaryContentBlocksRequest,
+    SavePreliminaryContentBlocksResponse, SearchMessageResult, SearchMessagesRequest,
+    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
+    SwitchBranchRequest,
 };
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -433,50 +433,6 @@ impl ProtoThreadService for ThreadService {
         }))
     }
 
-    async fn add_hidden_human_message(
-        &self,
-        request: Request<AddHiddenHumanMessageRequest>,
-    ) -> Result<Response<AddHiddenHumanMessageResponse>, Status> {
-        tracing::info!("AddHiddenHumanMessage request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        let proto_message = req
-            .message
-            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
-
-        let human_message: HumanMessage = proto_message.into();
-        let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
-        })?;
-
-        let message = self
-            .db
-            .create_message()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_type(MessageType::Human)
-            .content(content)
-            .hidden_from_ui(true)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        tracing::info!("Added hidden human message to thread {}", thread_id);
-
-        Ok(Response::new(AddHiddenHumanMessageResponse {
-            message: Some(message.into()),
-        }))
-    }
-
     async fn add_system_message(
         &self,
         request: Request<AddSystemMessageRequest>,
@@ -551,17 +507,16 @@ impl ProtoThreadService for ThreadService {
             let effective_parent = if parent_id.is_some() {
                 parent_id
             } else {
-                let first_visible = self
+                let first_message = self
                     .db
                     .list_messages()
                     .thread_id(thread_id)
                     .user_id(user_id)
-                    .include_hidden(false)
                     .params(PaginationParams::new(0, 1, "ASC"))
                     .call()
                     .await
                     .map_err(ThreadServiceError::from)?;
-                first_visible.first().and_then(|msg| msg.parent_message_id)
+                first_message.first().and_then(|msg| msg.parent_message_id)
             };
             self.db
                 .set_active_leaf()
@@ -575,34 +530,19 @@ impl ProtoThreadService for ThreadService {
 
         tracing::debug!("ChatStream: thread_id = {}", thread_id);
 
-        let mut hidden_messages = self
+        let mut recent_messages = self
             .db
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .include_visible(false)
-            .params(PaginationParams::new(0, 2, "DESC"))
+            .params(PaginationParams::new(0, 5, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
-        hidden_messages.reverse();
+        recent_messages.reverse();
 
-        let mut visible_messages = self
-            .db
-            .list_messages()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .include_hidden(false)
-            .params(PaginationParams::new(0, 3, "DESC"))
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-        visible_messages.reverse();
-
-        hidden_messages.extend(visible_messages);
-
-        let mut messages: Vec<AnyMessage> = hidden_messages
+        let mut messages: Vec<AnyMessage> = recent_messages
             .into_iter()
             .filter_map(|msg| {
                 convert_db_message_to_base_message(msg)
@@ -924,13 +864,11 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        let hidden_messages = self
+        let recent_messages = self
             .db
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .include_hidden(true)
-            .include_visible(false)
             .params(PaginationParams::new(0, 2, "DESC"))
             .call()
             .await
@@ -953,7 +891,7 @@ impl ProtoThreadService for ThreadService {
                 .into(),
         ];
 
-        messages.extend(hidden_messages.into_iter().filter_map(|msg| {
+        messages.extend(recent_messages.into_iter().filter_map(|msg| {
             convert_db_message_to_base_message(msg)
                 .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
                 .ok()
