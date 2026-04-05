@@ -66,28 +66,6 @@ export type LoginToken = {
 
 export type Message = { Human: ProtoHumanMessage } | { System: ProtoSystemMessage } | { Ai: ProtoAiMessage } | { Tool: ProtoToolMessage } | { Chat: ProtoChatMessage } | { Remove: ProtoRemoveMessage };
 
-export type MessageAssetChip = {
-	id: string,
-	name: string,
-	icon: string | null,
-};
-
-export type MessageTreeNodeView = {
-	id: string,
-	parent_message_id: string | null,
-	message_type: string,
-	content: string,
-	level: number,
-	sibling_count: number,
-	sibling_index: number,
-	assets: MessageAssetChip[] | null,
-};
-
-export type MessageTreeResponse = {
-	nodes: MessageTreeNodeView[],
-	has_more: boolean,
-};
-
 export type Payload = { Chunk: ProtoAiMessageChunk } | { FinalMessage: ChatStreamFinalMessage };
 
 export type ProtoAiMessage = {
@@ -406,7 +384,7 @@ export type UpdateInfo = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_display_name":[],"get_email":[],"get_login_token":[],"get_role":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_message_tree":["thread_id","start_level","end_level","parent_node_ids"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_display_name":[],"get_email":[],"get_login_token":[],"get_role":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -466,8 +444,7 @@ save_api_key: (apiKey: string) => Promise<null>},
 current_thread_changed: (thread: Thread) => Promise<void>, 
 delete: (threadId: string) => Promise<null>, 
 generate_title: (threadId: string, content: string) => Promise<Thread>, 
-get_message_tree: (threadId: string, startLevel: number, endLevel: number, parentNodeIds: string[]) => Promise<MessageTreeResponse>, 
-get_messages: (threadId: string, limit: number, offset: number) => Promise<BaseMessageWithSibling[]>, 
+get_messages: (threadId: string, limit: number, offset: number, allVariants: boolean) => Promise<BaseMessageWithSibling[]>, 
 list: (limit: number, offset: number) => Promise<Thread[]>, 
 new_thread_added: (thread: Thread) => Promise<void>, 
 search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 

@@ -5,20 +5,14 @@ import type { Thread } from '$lib/models/thread.model.js';
 
 export type BranchDirection = -1 | 0 | 1;
 
-export interface MessageTreeResult {
-	roots: MessageNode[];
-	hasMore: boolean;
-}
-
 export interface IThreadService {
 	listThreads(limit: number, offset: number): Promise<Thread[]>;
-	getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]>;
-	getMessageTree(
+	getMessages(
 		threadId: string,
-		startLevel: number,
-		endLevel: number,
-		parentNodeIds: string[],
-	): Promise<MessageTreeResult>;
+		limit: number,
+		offset: number,
+		allVariants: boolean,
+	): Promise<MessageNode[]>;
 	switchBranch(
 		threadId: string,
 		messageId: string,

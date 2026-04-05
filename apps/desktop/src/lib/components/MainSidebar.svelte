@@ -88,7 +88,7 @@
 	});
 
 	async function createChat() {
-		chatService.activeThreadId = null;
+		chatService.activeThreadId = undefined;
 		goto('/');
 	}
 

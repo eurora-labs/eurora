@@ -1,15 +1,11 @@
 import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { ChatStreamResponse, MessageTreeNodeView, Query } from '$lib/bindings/bindings.js';
+import type { ChatStreamResponse, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-import type { ContentBlock } from '@eurora/chat/models/content-blocks/index';
-import type { Message, MessageNode } from '@eurora/chat/models/messages/index';
+import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
-import type {
-	IThreadService,
-	MessageTreeResult,
-} from '@eurora/chat/services/thread/thread-service';
+import type { IThreadService } from '@eurora/chat/services/thread/thread-service';
 
 export class ThreadService implements IThreadService {
 	private readonly taurpc: TaurpcService;
@@ -30,27 +26,14 @@ export class ThreadService implements IThreadService {
 		);
 	}
 
-	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
-		const raw = await this.taurpc.thread.get_messages(threadId, limit, offset);
-		return toMessageNodes(raw);
-	}
-
-	async getMessageTree(
+	async getMessages(
 		threadId: string,
-		startLevel: number,
-		endLevel: number,
-		parentNodeIds: string[],
-	): Promise<MessageTreeResult> {
-		const raw = await this.taurpc.thread.get_message_tree(
-			threadId,
-			startLevel,
-			endLevel,
-			parentNodeIds,
-		);
-		return {
-			roots: buildMessageTree(raw.nodes),
-			hasMore: raw.has_more,
-		};
+		limit: number,
+		offset: number,
+		allVariants: boolean,
+	): Promise<MessageNode[]> {
+		const raw = await this.taurpc.thread.get_messages(threadId, limit, offset, allVariants);
+		return toMessageNodes(raw);
 	}
 
 	async switchBranch(
@@ -69,7 +52,7 @@ export class ThreadService implements IThreadService {
 	async createThread(): Promise<Thread> {
 		const raw = await this.taurpc.thread.create();
 		return {
-			id: raw.id,
+			id: raw.id!,
 			title: raw.title,
 			createdAt: raw.created_at,
 			updatedAt: raw.updated_at,
@@ -144,82 +127,6 @@ export class ThreadService implements IThreadService {
 		} finally {
 			signal?.removeEventListener('abort', onAbort);
 		}
-	}
-}
-
-function buildMessageTree(flatNodes: MessageTreeNodeView[]): MessageNode[] {
-	const nodeMap = new Map<string, MessageNode>();
-
-	for (const raw of flatNodes) {
-		nodeMap.set(raw.id, {
-			parentId: raw.parent_message_id,
-			message: toTreeMessage(raw),
-			children: [],
-			siblingIndex: raw.sibling_index,
-			depth: raw.level,
-		});
-	}
-
-	const roots: MessageNode[] = [];
-	for (const raw of flatNodes) {
-		const node = nodeMap.get(raw.id)!;
-		const parent = raw.parent_message_id ? nodeMap.get(raw.parent_message_id) : undefined;
-		if (parent) {
-			parent.children.push(node);
-		} else {
-			roots.push(node);
-		}
-	}
-
-	return roots;
-}
-
-function toTreeMessage(raw: MessageTreeNodeView): Message {
-	const content: ContentBlock[] = raw.content
-		? [
-				{
-					type: 'text',
-					id: null,
-					text: raw.content,
-					annotations: [],
-					index: null,
-					extras: null,
-				},
-			]
-		: [];
-
-	switch (raw.message_type) {
-		case 'human':
-			return {
-				type: 'human',
-				content,
-				id: raw.id,
-				name: null,
-				additionalKwargs: null,
-				responseMetadata: null,
-			};
-		case 'ai':
-			return {
-				type: 'ai',
-				content,
-				id: raw.id,
-				name: null,
-				toolCalls: [],
-				invalidToolCalls: [],
-				usageMetadata: null,
-				additionalKwargs: null,
-				responseMetadata: null,
-			};
-		default:
-			return {
-				type: 'chat',
-				role: raw.message_type,
-				content,
-				id: raw.id,
-				name: null,
-				additionalKwargs: null,
-				responseMetadata: null,
-			};
 	}
 }
 

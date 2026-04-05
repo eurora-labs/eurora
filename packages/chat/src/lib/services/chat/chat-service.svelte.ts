@@ -7,8 +7,6 @@ export type ViewMode = 'list' | 'graph';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
-const TREE_INITIAL_DEPTH = 5;
-const TREE_LEVEL_PAGE_SIZE = 5;
 
 export class ThreadMessages {
 	thread: Thread;
@@ -19,21 +17,17 @@ export class ThreadMessages {
 	streamingMessageId: string | null = $state(null);
 	loaded = $state(false);
 
-	treeRoots: MessageNode[] = $state([]);
-	treeLoading = $state(false);
-	treeLoaded = $state(false);
-	treeHasMore = $state(false);
-	treeLoadedEndLevel = 0;
+	allVariants: MessageNode[] | null = $state(null);
+	allVariantsLoading = $state(false);
+
+	treeRoots: MessageNode[] = $derived(this.allVariants ?? buildTreeFromBranch(this.messages));
 
 	constructor(thread: Thread) {
 		this.thread = thread;
 	}
 
-	invalidateTree(): void {
-		this.treeLoaded = false;
-		this.treeRoots = [];
-		this.treeLoadedEndLevel = 0;
-		this.treeHasMore = false;
+	invalidateAllVariants(): void {
+		this.allVariants = null;
 	}
 }
 
@@ -120,7 +114,12 @@ export class ChatService {
 
 		entry.loading = true;
 		try {
-			const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0);
+			const messages = await this.threadClient.getMessages(
+				threadId,
+				MESSAGE_PAGE_SIZE,
+				0,
+				false,
+			);
 			entry.messages = messages;
 			entry.offset = messages.length;
 			entry.hasMore = messages.length === MESSAGE_PAGE_SIZE;
@@ -142,59 +141,26 @@ export class ChatService {
 
 		const messages = await this.threadClient.switchBranch(threadId, messageId, direction);
 		entry.messages = messages;
-		entry.invalidateTree();
+		entry.invalidateAllVariants();
 	}
 
-	async loadTree(threadId: string): Promise<void> {
+	async loadAllVariants(threadId: string): Promise<void> {
 		const entry = this.threads.find((t) => t.thread.id === threadId);
-		if (!entry || entry.treeLoading || entry.treeLoaded) return;
+		if (!entry || entry.allVariantsLoading || entry.allVariants) return;
 
-		entry.treeLoading = true;
+		entry.allVariantsLoading = true;
 		try {
-			const res = await this.threadClient.getMessageTree(
+			const roots = await this.threadClient.getMessages(
 				threadId,
+				entry.messages.length,
 				0,
-				TREE_INITIAL_DEPTH - 1,
-				[],
+				true,
 			);
-			entry.treeRoots = res.roots;
-			entry.treeHasMore = res.hasMore;
-			entry.treeLoadedEndLevel = TREE_INITIAL_DEPTH - 1;
-			entry.treeLoaded = true;
+			entry.allVariants = roots;
 		} catch (error) {
-			console.error(`Failed to load tree for thread ${threadId}:`, error);
+			console.error(`Failed to load all variants for thread ${threadId}:`, error);
 		} finally {
-			entry.treeLoading = false;
-		}
-	}
-
-	async loadMoreTreeLevels(threadId: string): Promise<void> {
-		const entry = this.threads.find((t) => t.thread.id === threadId);
-		if (!entry || entry.treeLoading || !entry.treeHasMore || entry.treeRoots.length === 0)
-			return;
-
-		const maxLevel = entry.treeLoadedEndLevel;
-		const boundaryIds = collectNodeIdsAtDepth(entry.treeRoots, maxLevel);
-
-		const startLevel = maxLevel + 1;
-		const endLevel = startLevel + TREE_LEVEL_PAGE_SIZE - 1;
-
-		entry.treeLoading = true;
-		try {
-			const res = await this.threadClient.getMessageTree(
-				threadId,
-				startLevel,
-				endLevel,
-				boundaryIds,
-			);
-			graftSubtrees(entry.treeRoots, res.roots);
-			entry.treeRoots = [...entry.treeRoots];
-			entry.treeHasMore = res.hasMore;
-			entry.treeLoadedEndLevel = endLevel;
-		} catch (error) {
-			console.error(`Failed to load more tree levels for thread ${threadId}:`, error);
-		} finally {
-			entry.treeLoading = false;
+			entry.allVariantsLoading = false;
 		}
 	}
 
@@ -235,9 +201,9 @@ export class ChatService {
 		this.appendPlaceholders(entry, text);
 		await this.consumeStream(entry, threadId, text, parentId);
 
-		const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0);
+		const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0, false);
 		entry.messages = messages;
-		entry.invalidateTree();
+		entry.invalidateAllVariants();
 	}
 
 	private async consumeStream(
@@ -267,7 +233,7 @@ export class ChatService {
 				if (event.type === 'final') {
 					entry.messages = event.messages;
 					entry.loaded = true;
-					entry.invalidateTree();
+					entry.invalidateAllVariants();
 					break;
 				}
 
@@ -406,39 +372,26 @@ export class ChatService {
 	}
 }
 
-function collectNodeIdsAtDepth(roots: MessageNode[], depth: number): string[] {
-	const ids: string[] = [];
-	function walk(nodes: MessageNode[]): void {
-		for (const node of nodes) {
-			if (node.depth === depth) {
-				ids.push(node.message.id);
-			} else if (node.depth < depth) {
-				walk(node.children);
-			}
-		}
-	}
-	walk(roots);
-	return ids;
-}
+function buildTreeFromBranch(messages: MessageNode[]): MessageNode[] {
+	if (messages.length === 0) return [];
 
-function graftSubtrees(existingRoots: MessageNode[], newRoots: MessageNode[]): void {
-	const parentIndex = new Map<string, MessageNode>();
-	function index(nodes: MessageNode[]): void {
-		for (const node of nodes) {
-			parentIndex.set(node.message.id, node);
-			index(node.children);
-		}
+	const nodeMap = new Map<string, MessageNode>();
+	for (const msg of messages) {
+		nodeMap.set(msg.message.id, { ...msg, children: [] });
 	}
-	index(existingRoots);
 
-	for (const newRoot of newRoots) {
-		if (newRoot.parentId) {
-			const parent = parentIndex.get(newRoot.parentId);
-			if (parent) {
-				parent.children.push(newRoot);
-			}
+	const roots: MessageNode[] = [];
+	for (const msg of messages) {
+		const node = nodeMap.get(msg.message.id)!;
+		const parent = msg.parentId ? nodeMap.get(msg.parentId) : undefined;
+		if (parent) {
+			parent.children.push(node);
+		} else {
+			roots.push(node);
 		}
 	}
+
+	return roots;
 }
 
 export const CHAT_SERVICE = new InjectionToken<ChatService>('ChatService');
