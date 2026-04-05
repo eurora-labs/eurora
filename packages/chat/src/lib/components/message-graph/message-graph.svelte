@@ -1,6 +1,5 @@
 <script lang="ts">
 	import FitViewOnChange from '$lib/components/message-graph/fit-view-on-change.svelte';
-	import LoadMoreNode from '$lib/components/message-graph/load-more-node.svelte';
 	import MessageGraphNode from '$lib/components/message-graph/message-node.svelte';
 	import SkeletonNode from '$lib/components/message-graph/skeleton-node.svelte';
 	import StartNode from '$lib/components/message-graph/start-node.svelte';
@@ -8,7 +7,6 @@
 	import { inject } from '@eurora/shared/context';
 	import { Canvas } from '@eurora/ui/components/ai-elements/canvas/index';
 	import { EdgeAnimated, EdgeTemporary } from '@eurora/ui/components/ai-elements/edge/index';
-	import type { LoadMoreNodeData } from '$lib/components/message-graph/load-more-node.svelte';
 	import type { MessageNodeData } from '$lib/components/message-graph/message-node.svelte';
 	import type { SkeletonNodeData } from '$lib/components/message-graph/skeleton-node.svelte';
 	import type { StartNodeData } from '$lib/components/message-graph/start-node.svelte';
@@ -29,8 +27,8 @@
 	const activeMessageIds = $derived(new Set(thread?.messages.map((n) => n.message.id) ?? []));
 
 	$effect(() => {
-		if (threadId && !thread?.treeLoaded && !thread?.treeLoading) {
-			chatService.loadTree(threadId);
+		if (threadId && !thread?.allVariants && !thread?.allVariantsLoading) {
+			chatService.loadAllVariants(threadId);
 		}
 	});
 
@@ -41,7 +39,6 @@
 		message: MessageGraphNode,
 		start: StartNode,
 		skeleton: SkeletonNode,
-		loadMore: LoadMoreNode,
 	};
 	const edgeTypes = { animated: EdgeAnimated, temporary: EdgeTemporary };
 
@@ -49,7 +46,7 @@
 		id: string;
 		type: string;
 		position: { x: number; y: number };
-		data: MessageNodeData | StartNodeData | SkeletonNodeData | LoadMoreNodeData;
+		data: MessageNodeData | StartNodeData | SkeletonNodeData;
 	};
 	type FlowEdge = { id: string; source: string; target: string; type: string };
 
@@ -101,18 +98,13 @@
 		});
 
 		if (treeRoots.length === 0) {
-			if (thread?.treeLoading) {
+			if (thread?.loading) {
 				addSkeletonPath(nodes, edges, startId, 2);
 			}
 			return { nodes, edges };
 		}
 
-		const maxLevel = thread?.treeLoadedEndLevel ?? 0;
-		const hasMoreLevels = thread?.treeHasMore ?? false;
-		const loadingMore = thread?.treeLoading ?? false;
-
 		const yPositions = new Map<string, number>();
-		const boundaryLeaves: MessageNode[] = [];
 
 		function layoutSubtree(siblings: MessageNode[], parentY: number): void {
 			const totalHeight = (siblings.length - 1) * NODE_Y_GAP;
@@ -133,7 +125,6 @@
 				const id = node.message.id;
 				const hasChildren = node.children.length > 0;
 				const hasSiblings = siblings.length > 1;
-				const isAtBoundary = hasMoreLevels && node.depth === maxLevel && !hasChildren;
 
 				nodes.push({
 					id,
@@ -148,12 +139,10 @@
 						siblingLabel: hasSiblings
 							? `${node.siblingIndex + 1} / ${siblings.length}`
 							: undefined,
-						handles: { target: true, source: hasChildren || isAtBoundary },
+						handles: { target: true, source: hasChildren },
 						ondblclick: onMessageDblClick ? () => onMessageDblClick(id) : undefined,
 					},
 				});
-
-				if (isAtBoundary) boundaryLeaves.push(node);
 
 				const sourceId = parentId ?? startId;
 				const active = activeMessageIds.has(id);
@@ -169,35 +158,6 @@
 		}
 
 		addNodes(treeRoots, null);
-
-		if (hasMoreLevels && boundaryLeaves.length > 0) {
-			const avgY =
-				boundaryLeaves.reduce((sum, n) => sum + (yPositions.get(n.message.id) ?? 0), 0) /
-				boundaryLeaves.length;
-
-			const loadMoreId = '__load_more__';
-			nodes.push({
-				id: loadMoreId,
-				type: 'loadMore',
-				position: { x: (maxLevel + 2) * NODE_X_GAP, y: avgY },
-				data: {
-					loading: loadingMore,
-					handles: { target: true, source: false },
-					onclick: () => {
-						if (threadId) chatService.loadMoreTreeLevels(threadId);
-					},
-				},
-			});
-
-			for (const leaf of boundaryLeaves) {
-				edges.push({
-					id: `e-${leaf.message.id}-${loadMoreId}`,
-					source: leaf.message.id,
-					target: loadMoreId,
-					type: 'temporary',
-				});
-			}
-		}
 
 		return { nodes, edges };
 	}

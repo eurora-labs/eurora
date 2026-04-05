@@ -14,7 +14,7 @@ import type {
 	ContentBlock,
 } from '@eurora/chat/models/content-blocks/index';
 import type { MessageNode, Message as DomainMessage } from '@eurora/chat/models/messages/index';
-import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
+import type { AiMessageChunk, ChatStreamEvent } from '@eurora/chat/models/streaming';
 
 export function toMessageNodes(raw: BaseMessageWithSibling[]): MessageNode[] {
 	return raw.map(toMessageNode);

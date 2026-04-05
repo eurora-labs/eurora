@@ -314,50 +314,54 @@ impl ThreadService {
         Ok(Self::build_tree_from_rows(rows))
     }
 
-    const MAX_TREE_DEPTH: i32 = 10;
+    fn build_sibling_tree(
+        rows: Vec<be_remote_db::BranchMessageRow>,
+    ) -> Vec<BaseMessageWithSibling> {
+        let mut depth_groups: Vec<Vec<be_remote_db::BranchMessageRow>> = Vec::new();
+        let mut current_depth: Option<i32> = None;
 
-    fn build_full_tree(messages: Vec<be_remote_db::Message>) -> Vec<BaseMessageWithSibling> {
-        let mut children_by_parent: HashMap<Option<Uuid>, Vec<be_remote_db::Message>> =
-            HashMap::new();
-        for msg in messages {
-            children_by_parent
-                .entry(msg.parent_message_id)
-                .or_default()
-                .push(msg);
+        for row in rows {
+            if current_depth != Some(row.branch_depth) {
+                current_depth = Some(row.branch_depth);
+                depth_groups.push(Vec::new());
+            }
+            depth_groups.last_mut().unwrap().push(row);
         }
 
-        Self::build_subtree(&mut children_by_parent, None, 0)
+        Self::build_sibling_subtree(&depth_groups, 0)
     }
 
-    fn build_subtree(
-        children_by_parent: &mut HashMap<Option<Uuid>, Vec<be_remote_db::Message>>,
-        parent_id: Option<Uuid>,
-        depth: i32,
+    fn build_sibling_subtree(
+        depth_groups: &[Vec<be_remote_db::BranchMessageRow>],
+        group_index: usize,
     ) -> Vec<BaseMessageWithSibling> {
-        if depth >= Self::MAX_TREE_DEPTH {
-            return vec![];
-        }
-
-        let Some(siblings) = children_by_parent.remove(&parent_id) else {
+        let Some(group) = depth_groups.get(group_index) else {
             return vec![];
         };
 
-        siblings
-            .into_iter()
+        let next_children = Self::build_sibling_subtree(depth_groups, group_index + 1);
+
+        group
+            .iter()
             .enumerate()
-            .map(|(idx, msg)| {
-                let id = msg.id;
-                let parent_id = msg
+            .map(|(idx, row)| {
+                let parent_id = row
+                    .message
                     .parent_message_id
                     .map(|id| id.to_string())
                     .unwrap_or_default();
-                let children = Self::build_subtree(children_by_parent, Some(id), depth + 1);
+                let is_active = row.message.id == row.branch_message_id;
+                let children = if is_active {
+                    next_children.clone()
+                } else {
+                    vec![]
+                };
                 BaseMessageWithSibling {
                     parent_id,
-                    message: Some(msg.into()),
+                    message: Some(row.message.clone().into()),
                     children,
                     sibling_index: idx as i32,
-                    depth,
+                    depth: row.branch_depth,
                 }
             })
             .collect()
@@ -370,13 +374,17 @@ impl ThreadService {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<BaseMessageWithSibling>, Status> {
-        let messages = self
+        let rows = self
             .db
-            .list_all_thread_messages(thread_id, user_id, limit as i64, offset as i64)
+            .list_branch_with_siblings()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .params(PaginationParams::new(offset, limit, "ASC"))
+            .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
-        Ok(Self::build_full_tree(messages))
+        Ok(Self::build_sibling_tree(rows))
     }
 }
 

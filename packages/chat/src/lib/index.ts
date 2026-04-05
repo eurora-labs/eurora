@@ -15,4 +15,3 @@ export type {
 	StreamFinalMessage,
 	ToolCallChunk,
 } from './models/streaming.js';
-export type { MessageTreeResult } from './services/thread/thread-service.js';
