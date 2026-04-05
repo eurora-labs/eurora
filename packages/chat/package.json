@@ -43,6 +43,7 @@
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@lucide/svelte": "catalog:",
+		"@xyflow/svelte": "^1.5.1",
 		"svelte-sonner": "^1.0.8",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "^2.50.2",

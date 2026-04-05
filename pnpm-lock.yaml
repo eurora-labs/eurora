@@ -698,6 +698,9 @@ importers:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.4
         version: 6.2.4(svelte@5.55.1)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.3))
+      '@xyflow/svelte':
+        specifier: ^1.5.1
+        version: 1.5.1(svelte@5.55.1)
       publint:
         specifier: ^0.3.17
         version: 0.3.18
@@ -10330,6 +10333,10 @@ snapshots:
     dependencies:
       svelte: 5.53.7
 
+  '@svelte-put/shortcut@4.1.0(svelte@5.55.1)':
+    dependencies:
+      svelte: 5.55.1
+
   '@sveltejs/acorn-typescript@1.0.5(acorn@8.16.0)':
     dependencies:
       acorn: 8.16.0
@@ -11522,6 +11529,12 @@ snapshots:
       '@svelte-put/shortcut': 4.1.0(svelte@5.53.7)
       '@xyflow/system': 0.0.75
       svelte: 5.53.7
+
+  '@xyflow/svelte@1.5.1(svelte@5.55.1)':
+    dependencies:
+      '@svelte-put/shortcut': 4.1.0(svelte@5.55.1)
+      '@xyflow/system': 0.0.75
+      svelte: 5.55.1
 
   '@xyflow/system@0.0.75':
     dependencies:

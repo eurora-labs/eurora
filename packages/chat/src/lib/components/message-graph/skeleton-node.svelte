@@ -1,6 +1,6 @@
 <script lang="ts">
-	import * as FlowNode from '$lib/components/ai-elements/flow-node/index';
-	import { Skeleton } from '$lib/components/skeleton/index';
+	import * as FlowNode from '@eurora/ui/components/ai-elements/flow-node/index';
+	import { Skeleton } from '@eurora/ui/components/skeleton/index';
 
 	export interface SkeletonNodeData {
 		role: 'user' | 'assistant';
