@@ -17,17 +17,17 @@ export class ThreadMessages {
 	streamingMessageId: string | null = $state(null);
 	loaded = $state(false);
 
-	allVariants: MessageNode[] | null = $state(null);
-	allVariantsLoading = $state(false);
+	fullTree: MessageNode[] | null = $state(null);
+	fullTreeLoading = $state(false);
 
-	treeRoots: MessageNode[] = $derived(this.allVariants ?? buildTreeFromBranch(this.messages));
+	treeRoots: MessageNode[] = $derived(this.fullTree ?? buildTreeFromBranch(this.messages));
 
 	constructor(thread: Thread) {
 		this.thread = thread;
 	}
 
-	invalidateAllVariants(): void {
-		this.allVariants = null;
+	invalidateFullTree(): void {
+		this.fullTree = null;
 	}
 }
 
@@ -141,26 +141,21 @@ export class ChatService {
 
 		const messages = await this.threadClient.switchBranch(threadId, messageId, direction);
 		entry.messages = messages;
-		entry.invalidateAllVariants();
+		entry.invalidateFullTree();
 	}
 
-	async loadAllVariants(threadId: string): Promise<void> {
+	async loadFullTree(threadId: string): Promise<void> {
 		const entry = this.threads.find((t) => t.thread.id === threadId);
-		if (!entry || entry.allVariantsLoading || entry.allVariants) return;
+		if (!entry || entry.fullTreeLoading || entry.fullTree) return;
 
-		entry.allVariantsLoading = true;
+		entry.fullTreeLoading = true;
 		try {
-			const roots = await this.threadClient.getMessages(
-				threadId,
-				entry.messages.length,
-				0,
-				true,
-			);
-			entry.allVariants = roots;
+			const roots = await this.threadClient.getMessages(threadId, 0, 0, true);
+			entry.fullTree = roots;
 		} catch (error) {
-			console.error(`Failed to load all variants for thread ${threadId}:`, error);
+			console.error(`Failed to load full tree for thread ${threadId}:`, error);
 		} finally {
-			entry.allVariantsLoading = false;
+			entry.fullTreeLoading = false;
 		}
 	}
 
@@ -203,7 +198,7 @@ export class ChatService {
 
 		const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0, false);
 		entry.messages = messages;
-		entry.invalidateAllVariants();
+		entry.invalidateFullTree();
 	}
 
 	private async consumeStream(
@@ -233,7 +228,7 @@ export class ChatService {
 				if (event.type === 'final') {
 					entry.messages = event.messages;
 					entry.loaded = true;
-					entry.invalidateAllVariants();
+					entry.invalidateFullTree();
 					break;
 				}
 
