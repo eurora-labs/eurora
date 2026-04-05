@@ -20,6 +20,9 @@ pub enum Error {
 
     #[error("Invalid thread id")]
     InvalidThreadId,
+
+    #[error("Request cancelled")]
+    Cancelled,
 }
 
 impl From<Status> for Error {

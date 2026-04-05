@@ -86,10 +86,9 @@ export class ThreadService implements IThreadService {
 			notify();
 		}
 
-		const onAbort = () => {
-			this.taurpc.chat.cancel_query(threadId).catch(() => {});
+		function onAbort() {
 			notify();
-		};
+		}
 		signal?.addEventListener('abort', onAbort, { once: true });
 
 		this.taurpc.chat.send_query(threadId, onEvent, query).then(
@@ -126,6 +125,9 @@ export class ThreadService implements IThreadService {
 			if (error) throw error;
 		} finally {
 			signal?.removeEventListener('abort', onAbort);
+			if (!finished) {
+				this.taurpc.chat.cancel_query(threadId).catch(() => {});
+			}
 		}
 	}
 }

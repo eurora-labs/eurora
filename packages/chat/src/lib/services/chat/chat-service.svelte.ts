@@ -7,6 +7,8 @@ export type ViewMode = 'list' | 'graph';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
+const RECONCILE_RETRIES = 3;
+const RECONCILE_DELAY_MS = 1000;
 
 export class ThreadMessages {
 	thread: Thread;
@@ -48,7 +50,7 @@ export class ChatService {
 	private readonly threadClient: IThreadService;
 
 	private offset = 0;
-	private abortController: AbortController | null = null;
+	abortController: AbortController | null = null;
 
 	constructor(threadClient: IThreadService) {
 		this.threadClient = threadClient;
@@ -177,7 +179,11 @@ export class ChatService {
 		if (!entry) return;
 
 		this.appendPlaceholders(entry, text);
-		await this.consumeStream(entry, threadId, text, undefined, assetIds);
+		const receivedFinal = await this.consumeStream(entry, threadId, text, undefined, assetIds);
+
+		if (!receivedFinal) {
+			await this.reconcileMessages(entry, threadId);
+		}
 	}
 
 	async editMessage(messageId: string, text: string): Promise<void> {
@@ -197,15 +203,29 @@ export class ChatService {
 		const receivedFinal = await this.consumeStream(entry, threadId, text, parentId);
 
 		if (!receivedFinal) {
+			await this.reconcileMessages(entry, threadId);
+		}
+		entry.invalidateFullTree();
+	}
+
+	private async reconcileMessages(entry: ThreadMessages, threadId: string): Promise<void> {
+		const expectedCount = entry.messages.length;
+
+		for (let attempt = 0; attempt < RECONCILE_RETRIES; attempt++) {
+			await new Promise((resolve) => setTimeout(resolve, RECONCILE_DELAY_MS));
+
 			const messages = await this.threadClient.getMessages(
 				threadId,
 				MESSAGE_PAGE_SIZE,
 				0,
 				false,
 			);
-			entry.messages = messages;
+
+			if (messages.length >= expectedCount) {
+				entry.messages = messages;
+				return;
+			}
 		}
-		entry.invalidateFullTree();
 	}
 
 	private async consumeStream(
