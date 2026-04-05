@@ -159,7 +159,7 @@ export class ChatService {
 		}
 	}
 
-	async sendMessage(text: string): Promise<void> {
+	async sendMessage(text: string, assetIds?: string[]): Promise<void> {
 		if (!text.trim()) return;
 
 		let threadId = this.activeThreadId;
@@ -177,7 +177,7 @@ export class ChatService {
 		if (!entry) return;
 
 		this.appendPlaceholders(entry, text);
-		await this.consumeStream(entry, threadId, text);
+		await this.consumeStream(entry, threadId, text, undefined, assetIds);
 	}
 
 	async editMessage(messageId: string, text: string): Promise<void> {
@@ -213,6 +213,7 @@ export class ChatService {
 		threadId: string,
 		text: string,
 		parentMessageId?: string | null,
+		assetIds?: string[],
 	): Promise<boolean> {
 		this.abortController?.abort();
 		this.abortController = new AbortController();
@@ -232,6 +233,7 @@ export class ChatService {
 				text,
 				parentMessageId,
 				signal,
+				assetIds,
 			)) {
 				if (event.type === 'final') {
 					entry.messages = event.messages;

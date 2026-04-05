@@ -25,6 +25,7 @@ export interface IThreadService {
 		text: string,
 		parentMessageId?: string | null,
 		signal?: AbortSignal,
+		assetIds?: string[],
 	): AsyncIterable<ChatStreamEvent>;
 }
 
