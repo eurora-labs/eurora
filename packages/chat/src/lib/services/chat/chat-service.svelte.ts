@@ -48,7 +48,7 @@ export class ChatService {
 	private readonly threadClient: IThreadService;
 
 	private offset = 0;
-	private abortController: AbortController | null = null;
+	abortController: AbortController | null = null;
 
 	constructor(threadClient: IThreadService) {
 		this.threadClient = threadClient;
@@ -177,7 +177,17 @@ export class ChatService {
 		if (!entry) return;
 
 		this.appendPlaceholders(entry, text);
-		await this.consumeStream(entry, threadId, text, undefined, assetIds);
+		const receivedFinal = await this.consumeStream(entry, threadId, text, undefined, assetIds);
+
+		if (!receivedFinal) {
+			const messages = await this.threadClient.getMessages(
+				threadId,
+				MESSAGE_PAGE_SIZE,
+				0,
+				false,
+			);
+			entry.messages = messages;
+		}
 	}
 
 	async editMessage(messageId: string, text: string): Promise<void> {

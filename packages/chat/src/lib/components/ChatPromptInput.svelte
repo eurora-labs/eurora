@@ -5,7 +5,6 @@
 		header?: Snippet;
 		footer?: Snippet;
 		onSubmit: (text: string) => void;
-		onStop?: () => void;
 	}
 </script>
 
@@ -23,7 +22,6 @@
 		header,
 		footer,
 		onSubmit,
-		onStop,
 	}: Props = $props();
 
 	const chatService = inject(CHAT_SERVICE);
@@ -79,7 +77,10 @@
 				{#if footer}
 					{@render footer()}
 				{/if}
-				<PromptInput.Submit status={streaming ? 'streaming' : 'ready'} {onStop} />
+				<PromptInput.Submit
+					status={streaming ? 'streaming' : 'ready'}
+					onStop={() => chatService.abortController?.abort()}
+				/>
 			</PromptInput.Footer>
 		</PromptInput.Root>
 	</div>

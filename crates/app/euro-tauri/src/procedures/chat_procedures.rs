@@ -60,14 +60,21 @@ impl ChatApi for ChatApiImpl {
             let _ = timeline.refresh_current_activity().await;
 
             let save_ok = timeline.save_current_activity_to_service().await.is_ok();
-            tracing::debug!("send_query: save_ok={save_ok}, assets_empty={}", query.assets.is_empty());
+            tracing::debug!(
+                "send_query: save_ok={save_ok}, assets_empty={}",
+                query.assets.is_empty()
+            );
 
-            if save_ok && !query.assets.is_empty()
-            {
+            if save_ok && !query.assets.is_empty() {
                 let chip = timeline.get_context_chip().await;
                 let asset_blocks = timeline.construct_messages_from_last_asset().await;
                 let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
-                tracing::debug!("send_query: chip={:?}, asset_blocks={}, snapshot_blocks={}", chip.is_some(), asset_blocks.len(), snapshot_blocks.len());
+                tracing::debug!(
+                    "send_query: chip={:?}, asset_blocks={}, snapshot_blocks={}",
+                    chip.is_some(),
+                    asset_blocks.len(),
+                    snapshot_blocks.len()
+                );
                 (chip, asset_blocks, snapshot_blocks)
             } else {
                 (None, ContentBlocks::new(), ContentBlocks::new())
