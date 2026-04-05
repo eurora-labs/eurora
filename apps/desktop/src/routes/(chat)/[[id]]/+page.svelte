@@ -1,17 +1,23 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { MessageList, MessageGraph, ChatPromptInput } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
+	import * as Empty from '@eurora/ui/components/empty/index';
 	import ListIcon from '@lucide/svelte/icons/list';
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import type { TimelineAppEvent } from '$lib/bindings/bindings.js';
 
 	let { data } = $props();
 
+	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
+	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
 
 	const threadId = $derived(data.threadId);
 	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
@@ -49,6 +55,12 @@
 		chatService.viewMode = 'list';
 	}
 
+	onMount(() => {
+		taurpc.timeline.new_app_event.on((e) => {
+			latestTimelineItem = e;
+		});
+	});
+
 	const suggestions = [
 		'What are the latest trends in AI?',
 		'How does machine learning work?',
@@ -60,6 +72,21 @@
 		'Explain cloud computing basics',
 	];
 </script>
+
+{#snippet emptyState()}
+	<Empty.Root>
+		<Empty.Header>
+			{#if latestTimelineItem?.icon_base64}
+				<Empty.Title>Currently on</Empty.Title>
+				<Empty.Media variant="icon" class="bg-transparent">
+					<img src={latestTimelineItem.icon_base64} alt="" class="size-full" />
+				</Empty.Media>
+			{:else}
+				<Empty.Title>No messages yet</Empty.Title>
+			{/if}
+		</Empty.Header>
+	</Empty.Root>
+{/snippet}
 
 <div class="flex h-full flex-col overflow-hidden">
 	{#if hasMessages}
@@ -86,7 +113,7 @@
 	{#if chatService.viewMode === 'graph' && hasMessages}
 		<MessageGraph onMessageDblClick={handleGraphNavigate} class="min-h-0 flex-1" />
 	{:else}
-		<MessageList onCopy={handleCopy} onEdit={handleEdit} />
+		<MessageList onCopy={handleCopy} onEdit={handleEdit} {emptyState} />
 		<ChatPromptInput onSubmit={handleSubmit} {suggestions} />
 	{/if}
 </div>
