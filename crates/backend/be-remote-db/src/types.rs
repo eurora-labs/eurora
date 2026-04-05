@@ -283,23 +283,6 @@ pub struct BranchMessageRow {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct MessageTreeNode {
-    pub id: Uuid,
-    pub parent_message_id: Option<Uuid>,
-    pub message_type: MessageType,
-    pub content: serde_json::Value,
-    pub additional_kwargs: serde_json::Value,
-    pub level: i32,
-    pub sibling_count: i64,
-    pub sibling_index: i64,
-}
-
-pub struct MessageTreeResult {
-    pub nodes: Vec<MessageTreeNode>,
-    pub has_more: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct ActivityThread {
     pub activity_id: Uuid,
     pub thread_id: Uuid,

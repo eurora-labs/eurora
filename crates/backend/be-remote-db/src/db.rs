@@ -1373,182 +1373,33 @@ impl DatabaseManager {
         Ok(rows)
     }
 
-    pub async fn list_messages_by_level(
+    pub async fn list_all_thread_messages(
         &self,
         thread_id: Uuid,
         user_id: Uuid,
-        start_level: i32,
-        end_level: i32,
-    ) -> DbResult<crate::types::MessageTreeResult> {
-        let peek_level = end_level + 1;
-        let rows = sqlx::query_as::<_, crate::types::MessageTreeNode>(
+        limit: i64,
+        offset: i64,
+    ) -> DbResult<Vec<crate::types::Message>> {
+        let rows = sqlx::query_as::<_, crate::types::Message>(
             r#"
-            WITH RECURSIVE tree AS (
-                SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs,
-                       m.created_at,
-                       0 AS depth
-                FROM messages m
-                JOIN threads t ON t.id = m.thread_id
-                WHERE m.thread_id = $1 AND t.user_id = $2
-                  AND m.parent_message_id IS NULL
-
-                UNION ALL
-
-                SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs,
-                       m.created_at,
-                       t.depth + 1
-                FROM messages m
-                JOIN tree t ON m.parent_message_id = t.id
-                WHERE m.thread_id = $1
-                  AND t.depth + 1 <= $5
-            ),
-            deduped AS (
-                SELECT id, parent_message_id, message_type, content,
-                       additional_kwargs, created_at,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY id ORDER BY depth
-                       ) AS rn,
-                       depth
-                FROM tree
-            ),
-            numbered AS (
-                SELECT v.id, v.parent_message_id, v.message_type, v.content,
-                       v.additional_kwargs, v.created_at,
-                       v.depth,
-                       DENSE_RANK() OVER (ORDER BY v.depth) - 1 AS level
-                FROM deduped v
-                WHERE v.rn = 1
-            ),
-            with_siblings AS (
-                SELECT
-                    n.id,
-                    CASE WHEN p.id IS NOT NULL THEN n.parent_message_id ELSE NULL END AS parent_message_id,
-                    n.message_type,
-                    n.content,
-                    n.additional_kwargs,
-                    n.level,
-                    COUNT(*) OVER (
-                        PARTITION BY CASE WHEN p.id IS NOT NULL THEN n.parent_message_id ELSE NULL END
-                    ) AS sibling_count,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY CASE WHEN p.id IS NOT NULL THEN n.parent_message_id ELSE NULL END
-                        ORDER BY n.created_at, n.id
-                    ) - 1 AS sibling_index
-                FROM numbered n
-                LEFT JOIN numbered p ON p.id = n.parent_message_id
-            )
-            SELECT id, parent_message_id, message_type, content,
-                   additional_kwargs,
-                   level::int4 AS level,
-                   sibling_count, sibling_index
-            FROM with_siblings
-            WHERE level >= $3 AND level <= $4
-            ORDER BY level, sibling_index
+            SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
+                   m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
+                   m.created_at, m.updated_at
+            FROM messages m
+            JOIN threads t ON t.id = m.thread_id
+            WHERE m.thread_id = $1 AND t.user_id = $2
+            ORDER BY m.created_at ASC, m.id ASC
+            LIMIT $3 OFFSET $4
             "#,
         )
         .bind(thread_id)
         .bind(user_id)
-        .bind(start_level)
-        .bind(peek_level)
-        .bind(peek_level)
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await?;
 
-        let has_more = rows.iter().any(|r| r.level > end_level);
-        let nodes = rows.into_iter().filter(|r| r.level <= end_level).collect();
-
-        Ok(crate::types::MessageTreeResult { nodes, has_more })
-    }
-
-    pub async fn list_messages_by_level_from_parents(
-        &self,
-        thread_id: Uuid,
-        user_id: Uuid,
-        parent_ids: &[Uuid],
-        start_level: i32,
-        depth_limit: i32,
-    ) -> DbResult<crate::types::MessageTreeResult> {
-        let peek_depth = depth_limit + 1;
-        let rows = sqlx::query_as::<_, crate::types::MessageTreeNode>(
-            r#"
-            WITH RECURSIVE tree AS (
-                SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs,
-                       m.created_at,
-                       0 AS depth
-                FROM messages m
-                JOIN threads t ON t.id = m.thread_id
-                WHERE m.thread_id = $1 AND t.user_id = $2
-                  AND m.parent_message_id = ANY($3)
-
-                UNION ALL
-
-                SELECT m.id, m.parent_message_id, m.message_type, m.content,
-                       m.additional_kwargs,
-                       m.created_at,
-                       t.depth + 1
-                FROM messages m
-                JOIN tree t ON m.parent_message_id = t.id
-                WHERE m.thread_id = $1
-                  AND t.depth + 1 <= $4
-            ),
-            deduped AS (
-                SELECT id, parent_message_id, message_type, content,
-                       additional_kwargs, created_at,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY id ORDER BY depth
-                       ) AS rn,
-                       depth
-                FROM tree
-            ),
-            numbered AS (
-                SELECT v.id, v.parent_message_id, v.message_type, v.content,
-                       v.additional_kwargs, v.created_at,
-                       $5 + DENSE_RANK() OVER (ORDER BY v.depth) - 1 AS level
-                FROM deduped v
-                WHERE v.rn = 1
-            ),
-            with_siblings AS (
-                SELECT
-                    n.id,
-                    n.parent_message_id,
-                    n.message_type,
-                    n.content,
-                    n.additional_kwargs,
-                    n.level,
-                    COUNT(*) OVER (PARTITION BY n.parent_message_id) AS sibling_count,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY n.parent_message_id
-                        ORDER BY n.created_at, n.id
-                    ) - 1 AS sibling_index
-                FROM numbered n
-            )
-            SELECT id, parent_message_id, message_type, content,
-                   additional_kwargs,
-                   level::int4 AS level,
-                   sibling_count, sibling_index
-            FROM with_siblings
-            ORDER BY level, sibling_index
-            "#,
-        )
-        .bind(thread_id)
-        .bind(user_id)
-        .bind(parent_ids)
-        .bind(peek_depth)
-        .bind(start_level)
-        .fetch_all(&self.pool)
-        .await?;
-
-        let max_requested_level = start_level + depth_limit - 1;
-        let has_more = rows.iter().any(|r| r.level > max_requested_level);
-        let nodes = rows
-            .into_iter()
-            .filter(|r| r.level <= max_requested_level)
-            .collect();
-
-        Ok(crate::types::MessageTreeResult { nodes, has_more })
+        Ok(rows)
     }
 
     #[builder]
