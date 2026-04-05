@@ -1,50 +1,38 @@
 <script lang="ts">
-	import { Canvas } from '$lib/components/ai-elements/canvas/index';
-	import { EdgeAnimated, EdgeTemporary } from '$lib/components/ai-elements/edge/index';
-	import FitViewOnChange from '$lib/custom-components/message-graph/fit-view-on-change.svelte';
-	import LoadMoreNode from '$lib/custom-components/message-graph/load-more-node.svelte';
-	import MessageNode from '$lib/custom-components/message-graph/message-node.svelte';
-	import SkeletonNode from '$lib/custom-components/message-graph/skeleton-node.svelte';
-	import StartNode from '$lib/custom-components/message-graph/start-node.svelte';
-	import type { LoadMoreNodeData } from '$lib/custom-components/message-graph/load-more-node.svelte';
-	import type { MessageNodeData } from '$lib/custom-components/message-graph/message-node.svelte';
-	import type { SkeletonNodeData } from '$lib/custom-components/message-graph/skeleton-node.svelte';
-	import type { StartNodeData } from '$lib/custom-components/message-graph/start-node.svelte';
-
-	export interface TreeNodeData {
-		id: string;
-		parent_message_id: string | null;
-		message_type: string;
-		content: string;
-		level: number;
-		sibling_count: number;
-		sibling_index: number;
-		assets?: { id: string; name: string }[] | null;
-	}
+	import FitViewOnChange from '$lib/components/message-graph/fit-view-on-change.svelte';
+	import LoadMoreNode from '$lib/components/message-graph/load-more-node.svelte';
+	import MessageNode from '$lib/components/message-graph/message-node.svelte';
+	import SkeletonNode from '$lib/components/message-graph/skeleton-node.svelte';
+	import StartNode from '$lib/components/message-graph/start-node.svelte';
+	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
+	import { inject } from '@eurora/shared/context';
+	import { Canvas } from '@eurora/ui/components/ai-elements/canvas/index';
+	import { EdgeAnimated, EdgeTemporary } from '@eurora/ui/components/ai-elements/edge/index';
+	import type { LoadMoreNodeData } from '$lib/components/message-graph/load-more-node.svelte';
+	import type { MessageNodeData } from '$lib/components/message-graph/message-node.svelte';
+	import type { SkeletonNodeData } from '$lib/components/message-graph/skeleton-node.svelte';
+	import type { StartNodeData } from '$lib/components/message-graph/start-node.svelte';
+	import type { MessageTreeNode } from '$lib/models/tree.js';
 
 	interface Props {
-		treeNodes: TreeNodeData[];
-		activeMessageIds?: Set<string>;
 		startLabel?: string;
-		loading?: boolean;
-		hasMoreLevels?: boolean;
-		loadingMoreLevels?: boolean;
-		onmessagedblclick?: (messageId: string) => void;
-		onloadmorelevels?: () => void;
+		onMessageDblClick?: (messageId: string) => void;
 		class?: string;
 	}
 
-	let {
-		treeNodes,
-		activeMessageIds,
-		startLabel = 'Start',
-		loading = false,
-		hasMoreLevels = false,
-		loadingMoreLevels = false,
-		onmessagedblclick,
-		onloadmorelevels,
-		class: className,
-	}: Props = $props();
+	let { startLabel = 'Start', onMessageDblClick, class: className }: Props = $props();
+
+	const chatService = inject(CHAT_SERVICE);
+
+	const threadId = $derived(chatService.activeThreadId);
+	const thread = $derived(chatService.activeThread);
+	const activeMessageIds = $derived(new Set(thread?.messages.map((n) => n.message.id) ?? []));
+
+	$effect(() => {
+		if (threadId && !thread?.treeLoaded && !thread?.treeLoading) {
+			chatService.loadTree(threadId);
+		}
+	});
 
 	const NODE_X_GAP = 450;
 	const NODE_Y_GAP = 250;
@@ -87,7 +75,7 @@
 		}
 	}
 
-	const graphData = $derived.by(() => {
+	function buildGraph(treeNodes: MessageTreeNode[]) {
 		const nodes: Node[] = [];
 		const edges: Edge[] = [];
 
@@ -96,24 +84,23 @@
 			id: startId,
 			type: 'start',
 			position: { x: 0, y: 0 },
-			data: {
-				label: startLabel,
-				handles: { target: false, source: true },
-			},
+			data: { label: startLabel, handles: { target: false, source: true } },
 		});
 
 		if (treeNodes.length === 0) {
-			if (loading) {
+			if (thread?.treeLoading) {
 				addSkeletonPath(nodes, edges, startId, 2);
 			}
 			return { nodes, edges };
 		}
 
-		const maxLevel = Math.max(...treeNodes.map((n) => n.level));
+		const maxLevel = Math.max(...treeNodes.map((n) => n.depth));
+		const hasMoreLevels = thread?.treeHasMore ?? false;
+		const loadingMore = thread?.treeLoading ?? false;
 
-		const childrenMap = new Map<string, TreeNodeData[]>();
+		const childrenMap = new Map<string, MessageTreeNode[]>();
 		for (const node of treeNodes) {
-			const parentKey = node.parent_message_id ?? '__root__';
+			const parentKey = node.parentId ?? '__root__';
 			const list = childrenMap.get(parentKey);
 			if (list) {
 				list.push(node);
@@ -142,37 +129,28 @@
 
 		layoutChildren(null, 0);
 
-		const isActive = activeMessageIds ?? new Set<string>();
-		const leafNodesAtBoundary: TreeNodeData[] = [];
+		const leafNodesAtBoundary: MessageTreeNode[] = [];
 
 		for (const node of treeNodes) {
-			const content =
-				typeof node.content === 'string' ? node.content : JSON.stringify(node.content);
-
-			const assets = node.assets?.map((a) => ({ id: a.id, name: a.name }));
 			const hasChildren = childrenMap.has(node.id);
-			const hasSiblings = node.sibling_count > 1;
-			const isAtBoundary = hasMoreLevels && node.level === maxLevel && !hasChildren;
+			const hasSiblings = node.siblingCount > 1;
+			const isAtBoundary = hasMoreLevels && node.depth === maxLevel && !hasChildren;
 
 			nodes.push({
 				id: node.id,
 				type: 'message',
 				position: {
-					x: (node.level + 1) * NODE_X_GAP,
+					x: (node.depth + 1) * NODE_X_GAP,
 					y: nodeYPositions.get(node.id) ?? 0,
 				},
 				data: {
-					role: node.message_type === 'human' ? 'user' : 'assistant',
-					content,
+					role: node.messageType === 'human' ? 'user' : 'assistant',
+					content: node.content,
 					siblingLabel: hasSiblings
-						? `${node.sibling_index + 1} / ${node.sibling_count}`
+						? `${node.siblingIndex + 1} / ${node.siblingCount}`
 						: undefined,
-					assets,
-					handles: {
-						target: true,
-						source: hasChildren || isAtBoundary,
-					},
-					ondblclick: onmessagedblclick ? () => onmessagedblclick(node.id) : undefined,
+					handles: { target: true, source: hasChildren || isAtBoundary },
+					ondblclick: onMessageDblClick ? () => onMessageDblClick(node.id) : undefined,
 				},
 			});
 
@@ -180,8 +158,8 @@
 				leafNodesAtBoundary.push(node);
 			}
 
-			const sourceId = node.parent_message_id ?? startId;
-			const active = isActive.size === 0 || isActive.has(node.id);
+			const sourceId = node.parentId ?? startId;
+			const active = activeMessageIds.has(node.id);
 			edges.push({
 				id: `e-${sourceId}-${node.id}`,
 				source: sourceId,
@@ -199,14 +177,13 @@
 			nodes.push({
 				id: loadMoreId,
 				type: 'loadMore',
-				position: {
-					x: (maxLevel + 2) * NODE_X_GAP,
-					y: avgY,
-				},
+				position: { x: (maxLevel + 2) * NODE_X_GAP, y: avgY },
 				data: {
-					loading: loadingMoreLevels,
+					loading: loadingMore,
 					handles: { target: true, source: false },
-					onclick: onloadmorelevels,
+					onclick: () => {
+						if (threadId) chatService.loadMoreTreeLevels(threadId);
+					},
 				},
 			});
 
@@ -221,7 +198,9 @@
 		}
 
 		return { nodes, edges };
-	});
+	}
+
+	const graphData = $derived(buildGraph(thread?.treeNodes ?? []));
 </script>
 
 <div class="h-full w-full {className ?? ''}">

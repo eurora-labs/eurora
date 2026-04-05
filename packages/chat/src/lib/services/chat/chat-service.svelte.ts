@@ -1,10 +1,15 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type { MessageNode } from '$lib/models/messages/index.js';
 import type { Thread } from '$lib/models/thread.model.js';
+import type { MessageTreeNode } from '$lib/models/tree.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
+
+export type ViewMode = 'list' | 'graph';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
+const TREE_INITIAL_DEPTH = 5;
+const TREE_LEVEL_PAGE_SIZE = 5;
 
 export class ThreadMessages {
 	thread: Thread;
@@ -15,8 +20,21 @@ export class ThreadMessages {
 	streamingMessageId: string | null = $state(null);
 	loaded = $state(false);
 
+	treeNodes: MessageTreeNode[] = $state([]);
+	treeLoading = $state(false);
+	treeLoaded = $state(false);
+	treeHasMore = $state(false);
+	treeLoadedEndLevel = 0;
+
 	constructor(thread: Thread) {
 		this.thread = thread;
+	}
+
+	invalidateTree(): void {
+		this.treeLoaded = false;
+		this.treeNodes = [];
+		this.treeLoadedEndLevel = 0;
+		this.treeHasMore = false;
 	}
 }
 
@@ -32,6 +50,7 @@ export class ChatService {
 	loadingThreads = $state(false);
 	loadingMoreThreads = $state(false);
 	hasMoreThreads = $state(true);
+	viewMode: ViewMode = $state('list');
 
 	private readonly threadClient: IThreadService;
 
@@ -124,6 +143,61 @@ export class ChatService {
 
 		const messages = await this.threadClient.switchBranch(threadId, messageId, direction);
 		entry.messages = messages;
+		entry.invalidateTree();
+	}
+
+	async loadTree(threadId: string): Promise<void> {
+		const entry = this.threads.find((t) => t.thread.id === threadId);
+		if (!entry || entry.treeLoading || entry.treeLoaded) return;
+
+		entry.treeLoading = true;
+		try {
+			const res = await this.threadClient.getMessageTree(
+				threadId,
+				0,
+				TREE_INITIAL_DEPTH - 1,
+				[],
+			);
+			entry.treeNodes = res.nodes;
+			entry.treeHasMore = res.hasMore;
+			entry.treeLoadedEndLevel = TREE_INITIAL_DEPTH - 1;
+			entry.treeLoaded = true;
+		} catch (error) {
+			console.error(`Failed to load tree for thread ${threadId}:`, error);
+		} finally {
+			entry.treeLoading = false;
+		}
+	}
+
+	async loadMoreTreeLevels(threadId: string): Promise<void> {
+		const entry = this.threads.find((t) => t.thread.id === threadId);
+		if (!entry || entry.treeLoading || !entry.treeHasMore || entry.treeNodes.length === 0)
+			return;
+
+		const maxLevel = entry.treeLoadedEndLevel;
+		const boundaryIds = entry.treeNodes.filter((n) => n.depth === maxLevel).map((n) => n.id);
+
+		const startLevel = maxLevel + 1;
+		const endLevel = startLevel + TREE_LEVEL_PAGE_SIZE - 1;
+
+		entry.treeLoading = true;
+		try {
+			const res = await this.threadClient.getMessageTree(
+				threadId,
+				startLevel,
+				endLevel,
+				boundaryIds,
+			);
+			const existingIds = new Set(entry.treeNodes.map((n) => n.id));
+			const newNodes = res.nodes.filter((n) => !existingIds.has(n.id));
+			entry.treeNodes = [...entry.treeNodes, ...newNodes];
+			entry.treeHasMore = res.hasMore;
+			entry.treeLoadedEndLevel = endLevel;
+		} catch (error) {
+			console.error(`Failed to load more tree levels for thread ${threadId}:`, error);
+		} finally {
+			entry.treeLoading = false;
+		}
 	}
 
 	async sendMessage(text: string): Promise<void> {
@@ -165,6 +239,7 @@ export class ChatService {
 
 		const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0);
 		entry.messages = messages;
+		entry.invalidateTree();
 	}
 
 	private async consumeStream(
@@ -194,6 +269,7 @@ export class ChatService {
 				if (event.type === 'final') {
 					entry.messages = event.messages;
 					entry.loaded = true;
+					entry.invalidateTree();
 					break;
 				}
 

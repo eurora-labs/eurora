@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Button } from '$lib/components/button/index';
-	import { Spinner } from '$lib/components/spinner/index';
-	import { Handle, Position } from '@xyflow/svelte';
+	import * as FlowNode from '@eurora/ui/components/ai-elements/flow-node/index';
+	import { Button } from '@eurora/ui/components/button/index';
+	import { Spinner } from '@eurora/ui/components/spinner/index';
 
 	export interface LoadMoreNodeData {
 		loading: boolean;
@@ -13,13 +13,7 @@
 </script>
 
 <div class="flex flex-col items-center gap-2">
-	<div class="relative">
-		{#if data.handles.target}
-			<Handle position={Position.Left} type="target" />
-		{/if}
-		{#if data.handles.source}
-			<Handle position={Position.Right} type="source" />
-		{/if}
+	<FlowNode.Root handles={data.handles} class="border-none bg-transparent shadow-none">
 		<Button
 			variant="outline"
 			size="lg"
@@ -33,5 +27,5 @@
 				Load more
 			{/if}
 		</Button>
-	</div>
+	</FlowNode.Root>
 </div>
