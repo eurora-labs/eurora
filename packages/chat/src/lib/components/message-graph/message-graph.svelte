@@ -27,8 +27,8 @@
 	const activeMessageIds = $derived(new Set(thread?.messages.map((n) => n.message.id) ?? []));
 
 	$effect(() => {
-		if (threadId && !thread?.allVariants && !thread?.allVariantsLoading) {
-			chatService.loadAllVariants(threadId);
+		if (threadId && !thread?.fullTree && !thread?.fullTreeLoading) {
+			chatService.loadFullTree(threadId);
 		}
 	});
 

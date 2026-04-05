@@ -314,77 +314,58 @@ impl ThreadService {
         Ok(Self::build_tree_from_rows(rows))
     }
 
-    fn build_sibling_tree(
-        rows: Vec<be_remote_db::BranchMessageRow>,
-    ) -> Vec<BaseMessageWithSibling> {
-        let mut depth_groups: Vec<Vec<be_remote_db::BranchMessageRow>> = Vec::new();
-        let mut current_depth: Option<i32> = None;
-
-        for row in rows {
-            if current_depth != Some(row.branch_depth) {
-                current_depth = Some(row.branch_depth);
-                depth_groups.push(Vec::new());
-            }
-            depth_groups.last_mut().unwrap().push(row);
+    fn build_full_tree(messages: Vec<be_remote_db::Message>) -> Vec<BaseMessageWithSibling> {
+        let mut children_by_parent: HashMap<Option<Uuid>, Vec<be_remote_db::Message>> =
+            HashMap::new();
+        for msg in messages {
+            children_by_parent
+                .entry(msg.parent_message_id)
+                .or_default()
+                .push(msg);
         }
 
-        Self::build_sibling_subtree(&depth_groups, 0)
+        fn build_subtree(
+            parent_id: Option<Uuid>,
+            children_by_parent: &HashMap<Option<Uuid>, Vec<be_remote_db::Message>>,
+            depth: i32,
+        ) -> Vec<BaseMessageWithSibling> {
+            let Some(siblings) = children_by_parent.get(&parent_id) else {
+                return vec![];
+            };
+            siblings
+                .iter()
+                .enumerate()
+                .map(|(idx, msg)| {
+                    let children = build_subtree(Some(msg.id), children_by_parent, depth + 1);
+                    BaseMessageWithSibling {
+                        parent_id: msg
+                            .parent_message_id
+                            .map(|id| id.to_string())
+                            .unwrap_or_default(),
+                        message: Some(msg.clone().into()),
+                        children,
+                        sibling_index: idx as i32,
+                        depth,
+                    }
+                })
+                .collect()
+        }
+
+        build_subtree(None, &children_by_parent, 0)
     }
 
-    fn build_sibling_subtree(
-        depth_groups: &[Vec<be_remote_db::BranchMessageRow>],
-        group_index: usize,
-    ) -> Vec<BaseMessageWithSibling> {
-        let Some(group) = depth_groups.get(group_index) else {
-            return vec![];
-        };
-
-        let next_children = Self::build_sibling_subtree(depth_groups, group_index + 1);
-
-        group
-            .iter()
-            .enumerate()
-            .map(|(idx, row)| {
-                let parent_id = row
-                    .message
-                    .parent_message_id
-                    .map(|id| id.to_string())
-                    .unwrap_or_default();
-                let is_active = row.message.id == row.branch_message_id;
-                let children = if is_active {
-                    next_children.clone()
-                } else {
-                    vec![]
-                };
-                BaseMessageWithSibling {
-                    parent_id,
-                    message: Some(row.message.clone().into()),
-                    children,
-                    sibling_index: idx as i32,
-                    depth: row.branch_depth,
-                }
-            })
-            .collect()
-    }
-
-    async fn fetch_all_variants(
+    async fn fetch_full_tree(
         &self,
         thread_id: Uuid,
         user_id: Uuid,
-        limit: u32,
-        offset: u32,
     ) -> Result<Vec<BaseMessageWithSibling>, Status> {
-        let rows = self
+        let messages = self
             .db
-            .list_branch_with_siblings()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(offset, limit, "ASC"))
-            .call()
+            .list_all_thread_messages(thread_id, user_id, 1000, 0)
             .await
             .map_err(ThreadServiceError::from)?;
 
-        Ok(Self::build_sibling_tree(rows))
+        Ok(Self::build_full_tree(messages))
     }
 }
 
@@ -778,8 +759,7 @@ impl ProtoThreadService for ThreadService {
             })?;
 
         let messages = if req.all_variants {
-            self.fetch_all_variants(thread_id, user_id, req.limit, req.offset)
-                .await?
+            self.fetch_full_tree(thread_id, user_id).await?
         } else {
             self.fetch_branch_with_siblings(
                 thread_id,
