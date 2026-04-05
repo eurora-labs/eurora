@@ -15,8 +15,6 @@ service ProtoThreadService {
   rpc ChatStream(ChatStreamRequest) returns (stream agent_chain.ChatStreamResponse);
   rpc GenerateThreadTitle(GenerateThreadTitleRequest) returns (GenerateThreadTitleResponse);
   rpc SwitchBranch(SwitchBranchRequest) returns (GetMessagesResponse);
-  rpc GetMessageTree(GetMessageTreeRequest) returns (GetMessageTreeResponse);
-
   rpc SearchThreads(SearchThreadsRequest) returns (SearchThreadsResponse);
   rpc SearchMessages(SearchMessagesRequest) returns (SearchMessagesResponse);
 
@@ -60,6 +58,7 @@ message GetMessagesRequest {
   string thread_id = 1;
   uint32 limit = 2;
   uint32 offset = 3;
+  bool all_variants = 4;
 }
 
 // message MessageSiblingInfo {
@@ -100,29 +99,6 @@ message GenerateThreadTitleRequest {
 
 message GenerateThreadTitleResponse {
   ProtoThread thread = 1;
-}
-
-message GetMessageTreeRequest {
-  string thread_id = 1;
-  uint32 start_level = 2;
-  uint32 end_level = 3;
-  repeated string parent_node_ids = 4;
-}
-
-message MessageTreeNode {
-  string id = 1;
-  optional string parent_message_id = 2;
-  string message_type = 3;
-  repeated agent_chain.ProtoContentBlock content = 4;
-  uint32 level = 5;
-  uint32 sibling_count = 6;
-  uint32 sibling_index = 7;
-  optional string additional_kwargs = 8;
-}
-
-message GetMessageTreeResponse {
-  repeated MessageTreeNode nodes = 1;
-  bool has_more = 2;
 }
 
 message SearchThreadsRequest {
