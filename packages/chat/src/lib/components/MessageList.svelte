@@ -145,7 +145,7 @@
 					</div>
 				{/each}
 			</div>
-		{:else if chatService.activeThread?.messages.length === 0}
+		{:else if !chatService.activeThread?.messages.length}
 			{#if emptyState}
 				{@render emptyState()}
 			{:else}
