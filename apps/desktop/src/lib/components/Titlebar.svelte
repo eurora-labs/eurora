@@ -1,7 +1,6 @@
 <script lang="ts">
-	// import { MESSAGE_SERVICE } from '$lib/services/message-service.svelte.js';
-	// import { type ViewMode } from '$lib/services/message-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import { CHAT_SERVICE, type ViewMode } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -16,8 +15,10 @@
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
 
+	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
-	// const messageService = inject(MESSAGE_SERVICE);
+
+	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
 
 	let maximized = $state(false);
 	let isMac = platform() === 'macos';
@@ -52,10 +53,10 @@
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
 	<div class="flex-1" data-tauri-drag-region></div>
 	<div class="pointer-events-auto flex items-center gap-2 h-full px-2">
-		<!-- {#if messageService.viewModeVisible}
+		{#if hasMessages}
 			<Tabs.Root
-				value={messageService.viewMode}
-				onValueChange={(v) => (messageService.viewMode = v as ViewMode)}
+				value={chatService.viewMode}
+				onValueChange={(v) => (chatService.viewMode = v as ViewMode)}
 			>
 				<Tabs.List class="h-7">
 					<Tabs.Trigger value="list" class="h-5 gap-1 px-2 text-xs">
@@ -68,7 +69,7 @@
 					</Tabs.Trigger>
 				</Tabs.List>
 			</Tabs.Root>
-		{/if} -->
+		{/if}
 		{#if user.authenticated}
 			<Badge
 				variant={user.planLabel === 'Pro' ? 'outline' : 'secondary'}
