@@ -1,11 +1,10 @@
 import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { ChatStreamResponse, MessageTreeNodeView, Query } from '$lib/bindings/bindings.js';
+import type { ChatStreamResponse, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
-import type { MessageTreeNode, MessageTreeResponse } from '@eurora/chat/models/tree';
 import type { IThreadService } from '@eurora/chat/services/thread/thread-service';
 
 export class ThreadService implements IThreadService {
@@ -27,27 +26,14 @@ export class ThreadService implements IThreadService {
 		);
 	}
 
-	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
-		const raw = await this.taurpc.thread.get_messages(threadId, limit, offset);
-		return toMessageNodes(raw);
-	}
-
-	async getMessageTree(
+	async getMessages(
 		threadId: string,
-		startLevel: number,
-		endLevel: number,
-		parentNodeIds: string[],
-	): Promise<MessageTreeResponse> {
-		const raw = await this.taurpc.thread.get_message_tree(
-			threadId,
-			startLevel,
-			endLevel,
-			parentNodeIds,
-		);
-		return {
-			nodes: raw.nodes.map(toTreeNode),
-			hasMore: raw.has_more,
-		};
+		limit: number,
+		offset: number,
+		allVariants: boolean,
+	): Promise<MessageNode[]> {
+		const raw = await this.taurpc.thread.get_messages(threadId, limit, offset, allVariants);
+		return toMessageNodes(raw);
 	}
 
 	async switchBranch(
@@ -66,7 +52,7 @@ export class ThreadService implements IThreadService {
 	async createThread(): Promise<Thread> {
 		const raw = await this.taurpc.thread.create();
 		return {
-			id: raw.id,
+			id: raw.id!,
 			title: raw.title,
 			createdAt: raw.created_at,
 			updatedAt: raw.updated_at,
@@ -78,13 +64,13 @@ export class ThreadService implements IThreadService {
 		text: string,
 		parentMessageId?: string | null,
 		signal?: AbortSignal,
+		assetIds?: string[],
 	): AsyncIterable<ChatStreamEvent> {
 		const query: Query = {
 			text,
-			assets: [],
+			assets: assetIds ?? [],
 			parent_message_id: parentMessageId ?? null,
 		};
-
 		const buffer: ChatStreamEvent[] = [];
 		let resolve: ((value: void) => void) | null = null;
 		let finished = false;
@@ -142,18 +128,6 @@ export class ThreadService implements IThreadService {
 			signal?.removeEventListener('abort', onAbort);
 		}
 	}
-}
-
-function toTreeNode(raw: MessageTreeNodeView): MessageTreeNode {
-	return {
-		id: raw.id,
-		parentId: raw.parent_message_id,
-		messageType: raw.message_type,
-		content: raw.content,
-		depth: raw.level,
-		siblingCount: raw.sibling_count,
-		siblingIndex: raw.sibling_index,
-	};
 }
 
 export const THREAD_SERVICE = new InjectionToken<ThreadService>('ThreadService');

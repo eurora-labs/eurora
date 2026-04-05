@@ -1,13 +1,13 @@
 use crate::error::{Error, Result};
 use agent_chain::messages::{ContentBlock, ContentBlocks};
-use agent_chain_core::proto::{BaseMessageWithSibling, ChatStreamResponse, ProtoContentBlock};
+use agent_chain_core::proto::{ChatStreamResponse, ProtoContentBlock};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
 use proto_gen::thread::{
     ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,
-    GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
-    GetThreadRequest, ListThreadsRequest, ProtoThread, SavePreliminaryContentBlocksRequest,
-    SearchMessagesRequest, SearchMessagesResponse, SearchThreadsRequest, SearchThreadsResponse,
-    SwitchBranchRequest, proto_thread_service_client::ProtoThreadServiceClient,
+    GetMessagesRequest, GetMessagesResponse, GetThreadRequest, ListThreadsRequest, ProtoThread,
+    SavePreliminaryContentBlocksRequest, SearchMessagesRequest, SearchMessagesResponse,
+    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest,
+    proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::watch;
@@ -56,16 +56,6 @@ impl ThreadManager {
         Ok(response.threads.into_iter().collect())
     }
 
-    pub async fn get_current_messages(
-        &self,
-        request: GetMessagesRequest,
-    ) -> Result<Vec<BaseMessageWithSibling>> {
-        let mut client = self.client();
-
-        let response = client.get_messages(request).await?.into_inner();
-        Ok(response.messages)
-    }
-
     pub async fn delete_thread(&self, thread_id: String) -> Result<()> {
         let mut client = self.client();
         client
@@ -93,6 +83,7 @@ impl ThreadManager {
         thread_id: String,
         limit: u32,
         offset: u32,
+        all_variants: bool,
     ) -> Result<GetMessagesResponse> {
         let mut client = self.client();
         let response = client
@@ -100,6 +91,7 @@ impl ThreadManager {
                 thread_id,
                 limit,
                 offset,
+                all_variants,
             })
             .await?
             .into_inner();
@@ -119,27 +111,6 @@ impl ThreadManager {
                 thread_id,
                 message_id,
                 direction,
-            })
-            .await?
-            .into_inner();
-
-        Ok(response)
-    }
-
-    pub async fn get_message_tree(
-        &self,
-        thread_id: String,
-        start_level: u32,
-        end_level: u32,
-        parent_node_ids: Vec<String>,
-    ) -> Result<GetMessageTreeResponse> {
-        let mut client = self.client();
-        let response = client
-            .get_message_tree(GetMessageTreeRequest {
-                thread_id,
-                start_level,
-                end_level,
-                parent_node_ids,
             })
             .await?
             .into_inner();
