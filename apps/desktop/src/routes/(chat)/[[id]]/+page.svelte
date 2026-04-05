@@ -5,10 +5,7 @@
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
-	import { Button } from '@eurora/ui/components/button/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
-	import ListIcon from '@lucide/svelte/icons/list';
-	import NetworkIcon from '@lucide/svelte/icons/network';
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -124,27 +121,6 @@
 {/snippet}
 
 <div class="flex h-full flex-col overflow-hidden">
-	{#if hasMessages}
-		<div class="flex justify-end px-4 py-2">
-			<div class="bg-muted inline-flex rounded-md p-0.5">
-				<Button
-					variant={chatService.viewMode === 'list' ? 'secondary' : 'ghost'}
-					size="sm"
-					onclick={() => (chatService.viewMode = 'list')}
-				>
-					<ListIcon class="size-4" />
-				</Button>
-				<Button
-					variant={chatService.viewMode === 'graph' ? 'secondary' : 'ghost'}
-					size="sm"
-					onclick={() => (chatService.viewMode = 'graph')}
-				>
-					<NetworkIcon class="size-4" />
-				</Button>
-			</div>
-		</div>
-	{/if}
-
 	{#if chatService.viewMode === 'graph' && hasMessages}
 		<MessageGraph onMessageDblClick={handleGraphNavigate} class="min-h-0 flex-1" />
 	{:else}
