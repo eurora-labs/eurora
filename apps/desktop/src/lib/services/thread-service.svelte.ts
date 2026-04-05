@@ -64,13 +64,13 @@ export class ThreadService implements IThreadService {
 		text: string,
 		parentMessageId?: string | null,
 		signal?: AbortSignal,
+		assetIds?: string[],
 	): AsyncIterable<ChatStreamEvent> {
 		const query: Query = {
 			text,
-			assets: [],
+			assets: assetIds ?? [],
 			parent_message_id: parentMessageId ?? null,
 		};
-
 		const buffer: ChatStreamEvent[] = [];
 		let resolve: ((value: void) => void) | null = null;
 		let finished = false;
