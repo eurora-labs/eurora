@@ -41,6 +41,7 @@ use crate::tools::firecrawl_tools;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 const CONTEXT_MESSAGE_LIMIT: u32 = 5;
+const MAX_CONTENT_BLOCKS: usize = 50;
 
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
@@ -403,7 +404,19 @@ impl Drop for CancellableStream {
 
 const MAX_TOOL_ROUNDS: usize = 5;
 
-async fn save_partial_ai_message(
+fn build_content_value(content: &str, reasoning: &str) -> serde_json::Value {
+    let mut blocks = Vec::new();
+    if !reasoning.is_empty() {
+        blocks.push(serde_json::json!({"type": "reasoning", "reasoning": reasoning}));
+    }
+    if !content.is_empty() {
+        blocks.push(serde_json::json!({"type": "text", "text": content}));
+    }
+    serde_json::Value::Array(blocks)
+}
+
+#[bon::builder]
+async fn save_ai_message(
     db: &Arc<DatabaseManager>,
     thread_id: Uuid,
     user_id: Uuid,
@@ -414,15 +427,8 @@ async fn save_partial_ai_message(
     total_reasoning_tokens: i64,
     total_cache_creation_tokens: i64,
     total_cache_read_tokens: i64,
-) {
-    let mut content_blocks = Vec::new();
-    if !full_reasoning.is_empty() {
-        content_blocks.push(serde_json::json!({"type": "reasoning", "reasoning": full_reasoning}));
-    }
-    if !full_content.is_empty() {
-        content_blocks.push(serde_json::json!({"type": "text", "text": full_content}));
-    }
-    let content_value = serde_json::Value::Array(content_blocks);
+) -> Option<be_remote_db::Message> {
+    let content_value = build_content_value(full_content, full_reasoning);
 
     let ai_message = match db
         .create_message()
@@ -436,7 +442,7 @@ async fn save_partial_ai_message(
         Ok(msg) => msg,
         Err(e) => {
             tracing::error!("Failed to save AI message to database: {e}");
-            return;
+            return None;
         }
     };
 
@@ -456,6 +462,8 @@ async fn save_partial_ai_message(
     {
         tracing::error!("Failed to record token usage: {e}");
     }
+
+    Some(ai_message)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -611,69 +619,46 @@ async fn run_chat_stream(
 
     if cancelled {
         if has_content {
-            save_partial_ai_message(
-                &db,
-                thread_id,
-                user_id,
-                &full_content,
-                &full_reasoning,
-                total_input_tokens,
-                total_output_tokens,
-                total_reasoning_tokens,
-                total_cache_creation_tokens,
-                total_cache_read_tokens,
-            )
-            .await;
+            save_ai_message()
+                .db(&db)
+                .thread_id(thread_id)
+                .user_id(user_id)
+                .full_content(&full_content)
+                .full_reasoning(&full_reasoning)
+                .total_input_tokens(total_input_tokens)
+                .total_output_tokens(total_output_tokens)
+                .total_reasoning_tokens(total_reasoning_tokens)
+                .total_cache_creation_tokens(total_cache_creation_tokens)
+                .total_cache_read_tokens(total_cache_read_tokens)
+                .call()
+                .await;
         }
         return;
     }
 
     if has_content {
-        let mut content_blocks = Vec::new();
-        if !full_reasoning.is_empty() {
-            content_blocks
-                .push(serde_json::json!({"type": "reasoning", "reasoning": full_reasoning}));
-        }
-        if !full_content.is_empty() {
-            content_blocks.push(serde_json::json!({"type": "text", "text": full_content}));
-        }
-        let content_value = serde_json::Value::Array(content_blocks);
-
-        let ai_message = match db
-            .create_message()
+        let ai_message = match save_ai_message()
+            .db(&db)
             .thread_id(thread_id)
             .user_id(user_id)
-            .message_type(MessageType::Ai)
-            .content(content_value)
+            .full_content(&full_content)
+            .full_reasoning(&full_reasoning)
+            .total_input_tokens(total_input_tokens)
+            .total_output_tokens(total_output_tokens)
+            .total_reasoning_tokens(total_reasoning_tokens)
+            .total_cache_creation_tokens(total_cache_creation_tokens)
+            .total_cache_read_tokens(total_cache_read_tokens)
             .call()
             .await
         {
-            Ok(msg) => msg,
-            Err(e) => {
-                tracing::error!("Failed to save AI message to database: {e}");
+            Some(msg) => msg,
+            None => {
                 let _ = tx
                     .send(Err(Status::internal("Failed to save AI message")))
                     .await;
                 return;
             }
         };
-
-        if (total_input_tokens > 0 || total_output_tokens > 0)
-            && let Err(e) = db
-                .record_token_usage()
-                .user_id(user_id)
-                .thread_id(thread_id)
-                .message_id(ai_message.id)
-                .input_tokens(total_input_tokens)
-                .output_tokens(total_output_tokens)
-                .reasoning_tokens(total_reasoning_tokens)
-                .cache_creation_tokens(total_cache_creation_tokens)
-                .cache_read_tokens(total_cache_read_tokens)
-                .call()
-                .await
-        {
-            tracing::error!("Failed to record token usage: {e}");
-        }
 
         let ai_proto = BaseMessageWithSibling {
             parent_id: human_message_id.to_string(),
@@ -1068,13 +1053,10 @@ impl ProtoThreadService for ThreadService {
         };
         let title_words: Vec<&str> = title.split_whitespace().collect();
         title = title_words[..title_words.len().min(6)].join(" ");
-        title = match title.is_empty() {
-            true => {
-                tracing::warn!("Failed to generate title");
-                "New Chat".to_string()
-            }
-            false => title,
-        };
+        if title.is_empty() {
+            tracing::warn!("Failed to generate title");
+            title = "New Chat".to_string();
+        }
 
         if let Some(first) = title.chars().next() {
             let rest = &title[first.len_utf8()..];
@@ -1243,6 +1225,12 @@ impl ProtoThreadService for ThreadService {
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
+
+        if req.content_blocks.len() > MAX_CONTENT_BLOCKS {
+            return Err(ThreadServiceError::invalid_argument(format!(
+                "Too many content blocks (max {MAX_CONTENT_BLOCKS})"
+            )))?;
+        }
 
         let blocks: Vec<ContentBlock> = req
             .content_blocks
