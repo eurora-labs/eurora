@@ -28,7 +28,7 @@
 
 	const chatService = inject(CHAT_SERVICE);
 
-	const streaming = $derived(chatService.activeThread?.streamingMessageId !== null);
+	const streaming = $derived(!!chatService.activeThread?.streamingMessageId);
 	const showSuggestions = $derived(
 		suggestions.length > 0 && chatService.activeThread?.messages.length === 0,
 	);

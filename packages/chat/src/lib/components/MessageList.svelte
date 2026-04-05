@@ -8,6 +8,7 @@
 
 <script lang="ts">
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
+	import { getTextContent } from '$lib/utils/message-content.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
@@ -38,12 +39,6 @@
 		const msg = node.message;
 		if (!msg || msg.type === 'remove') return [];
 		return msg.content;
-	}
-
-	function getTextContent(node: MessageNode): string {
-		return getContentBlocks(node)
-			.map((b) => (b.type === 'text' ? b.text : ''))
-			.join('');
 	}
 
 	function getReasoningContent(node: MessageNode): string {
@@ -133,21 +128,23 @@
 <Conversation.Root class="min-h-0 flex-1">
 	<Conversation.Content>
 		{#if chatService.activeThread?.messages.length === 0 && chatService.activeThread?.loading}
-			{#each Array(4) as _, i}
-				<div
-					class="flex w-full max-w-[95%] flex-col gap-2 {i % 2 === 0
-						? 'ml-auto items-end'
-						: 'items-start'}"
-				>
-					<div class="flex flex-col gap-2 rounded-lg px-4 py-3">
-						<Skeleton class="shimmer bg-muted h-4 w-48" />
-						<Skeleton class="shimmer bg-muted h-4 w-36" />
-						{#if i % 2 === 1}
-							<Skeleton class="shimmer bg-muted h-4 w-56" />
-						{/if}
+			<div class="loading-skeletons">
+				{#each Array(4) as _, i}
+					<div
+						class="flex w-full max-w-[95%] flex-col gap-2 {i % 2 === 0
+							? 'ml-auto items-end'
+							: 'items-start'}"
+					>
+						<div class="flex flex-col gap-2 rounded-lg px-4 py-3">
+							<Skeleton class="shimmer bg-muted h-4 w-48" />
+							<Skeleton class="shimmer bg-muted h-4 w-36" />
+							{#if i % 2 === 1}
+								<Skeleton class="shimmer bg-muted h-4 w-56" />
+							{/if}
+						</div>
 					</div>
-				</div>
-			{/each}
+				{/each}
+			</div>
 		{:else if chatService.activeThread?.messages.length === 0}
 			{#if emptyState}
 				{@render emptyState()}
@@ -235,7 +232,7 @@
 </Conversation.Root>
 
 <style>
-	:global(.shimmer) {
+	.loading-skeletons :global(.shimmer) {
 		background-image: linear-gradient(
 			110deg,
 			transparent 25%,
