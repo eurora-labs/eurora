@@ -122,6 +122,7 @@ impl ChatApi for ChatApiImpl {
                     context_blocks,
                     query.parent_message_id.clone(),
                     asset_chips_json,
+                    cancel.clone(),
                 )
                 .await
                 .map_err(|e| format!("Failed to create chat stream: {e}"))?
@@ -135,7 +136,8 @@ impl ChatApi for ChatApiImpl {
                     biased;
                     () = cancel.cancelled() => {
                         tracing::debug!("Stream cancelled for thread {thread_id}");
-                        break;
+                        drop(stream);
+                        return Ok(());
                     }
                     item = stream.next() => {
                         match item {
@@ -147,12 +149,11 @@ impl ChatApi for ChatApiImpl {
                             Some(Err(e)) => {
                                 return Err(format!("Stream error: {e}"));
                             }
-                            None => break,
+                            None => return Ok(()),
                         }
                     }
                 }
             }
-            Ok(())
         };
 
         let timeout = std::time::Duration::from_secs(300);
