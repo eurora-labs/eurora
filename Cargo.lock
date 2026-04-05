@@ -1711,6 +1711,7 @@ dependencies = [
  "be-authz",
  "be-remote-db",
  "be-storage",
+ "bon",
  "chrono",
  "prost",
  "prost-types",
