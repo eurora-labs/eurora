@@ -34,7 +34,7 @@
 		deleteThreadId = null;
 		try {
 			await chatService.deleteThread(id);
-			if (chatService.activeThreadId === null) {
+			if (chatService.activeThreadId === undefined) {
 				onThreadSelect?.('');
 			}
 		} catch (error) {

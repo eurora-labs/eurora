@@ -49,13 +49,13 @@ export class ChatService {
 
 	private offset = 0;
 	private abortController: AbortController | null = null;
-	private readonly unlisteners: ((() => void) | Promise<() => void>)[] = [];
 
 	constructor(threadClient: IThreadService) {
 		this.threadClient = threadClient;
 	}
 
 	async loadThreads(limit: number, offset: number) {
+		this.loadingThreads = true;
 		try {
 			const fresh = await this.threadClient.listThreads(limit, offset);
 			const existing = new Map(this.threads.map((t) => [t.thread.id, t]));
@@ -194,10 +194,17 @@ export class ChatService {
 
 		entry.messages = entry.messages.slice(0, nodeIndex);
 		this.appendPlaceholders(entry, text);
-		await this.consumeStream(entry, threadId, text, parentId);
+		const receivedFinal = await this.consumeStream(entry, threadId, text, parentId);
 
-		const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0, false);
-		entry.messages = messages;
+		if (!receivedFinal) {
+			const messages = await this.threadClient.getMessages(
+				threadId,
+				MESSAGE_PAGE_SIZE,
+				0,
+				false,
+			);
+			entry.messages = messages;
+		}
 		entry.invalidateFullTree();
 	}
 
@@ -206,17 +213,18 @@ export class ChatService {
 		threadId: string,
 		text: string,
 		parentMessageId?: string | null,
-	): Promise<void> {
+	): Promise<boolean> {
 		this.abortController?.abort();
 		this.abortController = new AbortController();
 		const { signal } = this.abortController;
 
 		const aiNode = entry.messages.at(-1)!;
 		const aiMessage = aiNode.message;
-		if (aiMessage.type === 'remove') return;
+		if (aiMessage.type === 'remove') return false;
 
 		let hasReceivedContent = false;
 		let pendingWhitespace = '';
+		let receivedFinal = false;
 
 		try {
 			for await (const event of this.threadClient.sendMessage(
@@ -229,6 +237,7 @@ export class ChatService {
 					entry.messages = event.messages;
 					entry.loaded = true;
 					entry.invalidateFullTree();
+					receivedFinal = true;
 					break;
 				}
 
@@ -290,12 +299,17 @@ export class ChatService {
 			}
 		} catch (e) {
 			console.error(`Stream error for thread ${threadId}:`, e);
+			if ('content' in aiMessage && aiMessage.content.length === 0) {
+				entry.messages = entry.messages.filter((n) => n.message.id !== aiMessage.id);
+			}
 		} finally {
 			entry.streamingMessageId = null;
 			if (!entry.loaded) {
 				entry.loaded = true;
 			}
 		}
+
+		return receivedFinal;
 	}
 
 	private appendPlaceholders(entry: ThreadMessages, text: string): void {
@@ -305,7 +319,7 @@ export class ChatService {
 		entry.messages = [
 			...entry.messages,
 			{
-				parentId: '',
+				parentId: null,
 				message: {
 					type: 'human',
 					content: [
@@ -351,14 +365,6 @@ export class ChatService {
 	destroy() {
 		this.abortController?.abort();
 		this.abortController = null;
-		for (const p of this.unlisteners) {
-			if (p instanceof Promise) {
-				p.then((unlisten) => unlisten());
-			} else {
-				p();
-			}
-		}
-		this.unlisteners.length = 0;
 		this.threads = [];
 		this.offset = 0;
 		this.hasMoreThreads = true;

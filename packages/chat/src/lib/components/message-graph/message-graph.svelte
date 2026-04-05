@@ -4,6 +4,7 @@
 	import SkeletonNode from '$lib/components/message-graph/skeleton-node.svelte';
 	import StartNode from '$lib/components/message-graph/start-node.svelte';
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
+	import { getTextContent } from '$lib/utils/message-content.js';
 	import { inject } from '@eurora/shared/context';
 	import { Canvas } from '@eurora/ui/components/ai-elements/canvas/index';
 	import { EdgeAnimated, EdgeTemporary } from '@eurora/ui/components/ai-elements/edge/index';
@@ -75,14 +76,6 @@
 			});
 			prevId = id;
 		}
-	}
-
-	function getTextContent(node: MessageNode): string {
-		if (!('content' in node.message)) return '';
-		for (const block of node.message.content) {
-			if (block.type === 'text') return block.text;
-		}
-		return '';
 	}
 
 	function buildGraph(treeRoots: MessageNode[]) {

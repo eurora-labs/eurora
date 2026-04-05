@@ -8,6 +8,11 @@ export {
 	ThreadMessages,
 	type ViewMode,
 } from './services/chat/chat-service.svelte.js';
+export {
+	THREAD_SERVICE,
+	type BranchDirection,
+	type IThreadService,
+} from './services/thread/thread-service.js';
 export type {
 	AiMessageChunk,
 	ChatStreamEvent,
