@@ -1,7 +1,6 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type { MessageNode } from '$lib/models/messages/index.js';
 import type { Thread } from '$lib/models/thread.model.js';
-import type { MessageTreeNode } from '$lib/models/tree.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
 
 export type ViewMode = 'list' | 'graph';
@@ -20,7 +19,7 @@ export class ThreadMessages {
 	streamingMessageId: string | null = $state(null);
 	loaded = $state(false);
 
-	treeNodes: MessageTreeNode[] = $state([]);
+	treeRoots: MessageNode[] = $state([]);
 	treeLoading = $state(false);
 	treeLoaded = $state(false);
 	treeHasMore = $state(false);
@@ -32,7 +31,7 @@ export class ThreadMessages {
 
 	invalidateTree(): void {
 		this.treeLoaded = false;
-		this.treeNodes = [];
+		this.treeRoots = [];
 		this.treeLoadedEndLevel = 0;
 		this.treeHasMore = false;
 	}
@@ -158,7 +157,7 @@ export class ChatService {
 				TREE_INITIAL_DEPTH - 1,
 				[],
 			);
-			entry.treeNodes = res.nodes;
+			entry.treeRoots = res.roots;
 			entry.treeHasMore = res.hasMore;
 			entry.treeLoadedEndLevel = TREE_INITIAL_DEPTH - 1;
 			entry.treeLoaded = true;
@@ -171,11 +170,11 @@ export class ChatService {
 
 	async loadMoreTreeLevels(threadId: string): Promise<void> {
 		const entry = this.threads.find((t) => t.thread.id === threadId);
-		if (!entry || entry.treeLoading || !entry.treeHasMore || entry.treeNodes.length === 0)
+		if (!entry || entry.treeLoading || !entry.treeHasMore || entry.treeRoots.length === 0)
 			return;
 
 		const maxLevel = entry.treeLoadedEndLevel;
-		const boundaryIds = entry.treeNodes.filter((n) => n.depth === maxLevel).map((n) => n.id);
+		const boundaryIds = collectNodeIdsAtDepth(entry.treeRoots, maxLevel);
 
 		const startLevel = maxLevel + 1;
 		const endLevel = startLevel + TREE_LEVEL_PAGE_SIZE - 1;
@@ -188,9 +187,8 @@ export class ChatService {
 				endLevel,
 				boundaryIds,
 			);
-			const existingIds = new Set(entry.treeNodes.map((n) => n.id));
-			const newNodes = res.nodes.filter((n) => !existingIds.has(n.id));
-			entry.treeNodes = [...entry.treeNodes, ...newNodes];
+			graftSubtrees(entry.treeRoots, res.roots);
+			entry.treeRoots = [...entry.treeRoots];
 			entry.treeHasMore = res.hasMore;
 			entry.treeLoadedEndLevel = endLevel;
 		} catch (error) {
@@ -405,6 +403,41 @@ export class ChatService {
 		this.hasMoreThreads = true;
 		this.loadingThreads = false;
 		this.activeThreadId = undefined;
+	}
+}
+
+function collectNodeIdsAtDepth(roots: MessageNode[], depth: number): string[] {
+	const ids: string[] = [];
+	function walk(nodes: MessageNode[]): void {
+		for (const node of nodes) {
+			if (node.depth === depth) {
+				ids.push(node.message.id);
+			} else if (node.depth < depth) {
+				walk(node.children);
+			}
+		}
+	}
+	walk(roots);
+	return ids;
+}
+
+function graftSubtrees(existingRoots: MessageNode[], newRoots: MessageNode[]): void {
+	const parentIndex = new Map<string, MessageNode>();
+	function index(nodes: MessageNode[]): void {
+		for (const node of nodes) {
+			parentIndex.set(node.message.id, node);
+			index(node.children);
+		}
+	}
+	index(existingRoots);
+
+	for (const newRoot of newRoots) {
+		if (newRoot.parentId) {
+			const parent = parentIndex.get(newRoot.parentId);
+			if (parent) {
+				parent.children.push(newRoot);
+			}
+		}
 	}
 }
 

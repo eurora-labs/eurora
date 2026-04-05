@@ -28,7 +28,7 @@ export type Message =
 	| RemoveMessage;
 
 export interface MessageNode {
-	parentId: string;
+	parentId: string | null;
 	message: Message;
 	children: MessageNode[];
 	siblingIndex: number;

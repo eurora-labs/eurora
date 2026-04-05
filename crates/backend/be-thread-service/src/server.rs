@@ -19,11 +19,11 @@ pub use proto_gen::thread::proto_thread_service_server::{
 use proto_gen::thread::{
     ChatStreamRequest, CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest,
     DeleteThreadResponse, GenerateThreadTitleRequest, GenerateThreadTitleResponse,
-    GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
-    GetThreadResponse, ListThreadsRequest, ListThreadsResponse, MessageTreeNode, ProtoThread,
-    SavePreliminaryContentBlocksRequest, SavePreliminaryContentBlocksResponse, SearchMessageResult,
-    SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
-    SearchThreadsResponse, SwitchBranchRequest,
+    GetMessagesRequest, GetMessagesResponse, GetThreadResponse, ListThreadsRequest,
+    ListThreadsResponse, ProtoThread, SavePreliminaryContentBlocksRequest,
+    SavePreliminaryContentBlocksResponse, SearchMessageResult, SearchMessagesRequest,
+    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
+    SwitchBranchRequest,
 };
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -154,8 +154,8 @@ impl ThreadService {
         self.providers.title.clone()
     }
 
-    fn get_tools(&self) -> HashMap<String, Arc<dyn BaseTool>> {
-        self.providers.tools.clone()
+    fn get_tools(&self) -> &HashMap<String, Arc<dyn BaseTool>> {
+        &self.providers.tools
     }
 
     async fn upload_block_content(
@@ -312,6 +312,71 @@ impl ThreadService {
             .map_err(ThreadServiceError::from)?;
 
         Ok(Self::build_tree_from_rows(rows))
+    }
+
+    const MAX_TREE_DEPTH: i32 = 10;
+
+    fn build_full_tree(messages: Vec<be_remote_db::Message>) -> Vec<BaseMessageWithSibling> {
+        let mut children_by_parent: HashMap<Option<Uuid>, Vec<be_remote_db::Message>> =
+            HashMap::new();
+        for msg in messages {
+            children_by_parent
+                .entry(msg.parent_message_id)
+                .or_default()
+                .push(msg);
+        }
+
+        Self::build_subtree(&mut children_by_parent, None, 0)
+    }
+
+    fn build_subtree(
+        children_by_parent: &mut HashMap<Option<Uuid>, Vec<be_remote_db::Message>>,
+        parent_id: Option<Uuid>,
+        depth: i32,
+    ) -> Vec<BaseMessageWithSibling> {
+        if depth >= Self::MAX_TREE_DEPTH {
+            return vec![];
+        }
+
+        let Some(siblings) = children_by_parent.remove(&parent_id) else {
+            return vec![];
+        };
+
+        siblings
+            .into_iter()
+            .enumerate()
+            .map(|(idx, msg)| {
+                let id = msg.id;
+                let parent_id = msg
+                    .parent_message_id
+                    .map(|id| id.to_string())
+                    .unwrap_or_default();
+                let children = Self::build_subtree(children_by_parent, Some(id), depth + 1);
+                BaseMessageWithSibling {
+                    parent_id,
+                    message: Some(msg.into()),
+                    children,
+                    sibling_index: idx as i32,
+                    depth,
+                }
+            })
+            .collect()
+    }
+
+    async fn fetch_all_variants(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<BaseMessageWithSibling>, Status> {
+        let messages = self
+            .db
+            .list_all_thread_messages(thread_id, user_id, limit as i64, offset as i64)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        Ok(Self::build_full_tree(messages))
     }
 }
 
@@ -511,7 +576,7 @@ impl ProtoThreadService for ThreadService {
         self.resolve_blocks(&mut messages).await;
 
         let chat_provider = self.get_chat_provider();
-        let tools = self.get_tools();
+        let tools = self.get_tools().clone();
 
         let db = self.db.clone();
         let human_parent_id = human_db_message
@@ -704,13 +769,17 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        let messages = self
-            .fetch_branch_with_siblings(
+        let messages = if req.all_variants {
+            self.fetch_all_variants(thread_id, user_id, req.limit, req.offset)
+                .await?
+        } else {
+            self.fetch_branch_with_siblings(
                 thread_id,
                 user_id,
                 PaginationParams::new(req.offset, req.limit, "ASC"),
             )
-            .await?;
+            .await?
+        };
 
         Ok(Response::new(GetMessagesResponse { messages }))
     }
@@ -813,13 +882,11 @@ impl ProtoThreadService for ThreadService {
                 .into(),
         ];
 
-        messages.extend(recent_messages.into_iter().filter_map(|msg| {
+        messages.extend(recent_messages.into_iter().rev().filter_map(|msg| {
             convert_db_message_to_base_message(msg)
                 .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
                 .ok()
         }));
-
-        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         let title_provider = self.get_title_provider();
         let mut title = match title_provider.invoke(messages, None).await {
@@ -915,90 +982,6 @@ impl ProtoThreadService for ThreadService {
         Ok(Response::new(GetMessagesResponse { messages }))
     }
 
-    async fn get_message_tree(
-        &self,
-        request: Request<GetMessageTreeRequest>,
-    ) -> Result<Response<GetMessageTreeResponse>, Status> {
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        const MAX_TREE_DEPTH: u32 = 100;
-        let start_level = req.start_level.min(MAX_TREE_DEPTH);
-        let end_level = req.end_level.min(MAX_TREE_DEPTH);
-
-        let result = if req.parent_node_ids.is_empty() {
-            self.db
-                .list_messages_by_level(thread_id, user_id, start_level as i32, end_level as i32)
-                .await
-                .map_err(ThreadServiceError::from)?
-        } else {
-            let parent_ids: Vec<Uuid> = req
-                .parent_node_ids
-                .iter()
-                .map(|id| Uuid::parse_str(id))
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| ThreadServiceError::InvalidUuid {
-                    field: "parent_node_ids",
-                    source: e,
-                })?;
-            let depth = end_level.saturating_sub(start_level) + 1;
-            self.db
-                .list_messages_by_level_from_parents(
-                    thread_id,
-                    user_id,
-                    &parent_ids,
-                    start_level as i32,
-                    depth as i32,
-                )
-                .await
-                .map_err(ThreadServiceError::from)?
-        };
-
-        let has_more = result.has_more;
-        let tree_nodes = result
-            .nodes
-            .into_iter()
-            .map(|n| {
-                let additional_kwargs = if n.additional_kwargs.is_null()
-                    || n.additional_kwargs
-                        .as_object()
-                        .is_some_and(|o| o.is_empty())
-                {
-                    None
-                } else {
-                    Some(serde_json::to_string(&n.additional_kwargs).unwrap_or_default())
-                };
-
-                MessageTreeNode {
-                    id: n.id.to_string(),
-                    parent_message_id: n.parent_message_id.map(|id| id.to_string()),
-                    message_type: n.message_type.to_string(),
-                    content: serde_json::from_value::<Vec<ContentBlock>>(n.content)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(ProtoContentBlock::from)
-                        .collect(),
-                    level: n.level as u32,
-                    sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
-                    sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
-                    additional_kwargs,
-                }
-            })
-            .collect();
-
-        Ok(Response::new(GetMessageTreeResponse {
-            nodes: tree_nodes,
-            has_more,
-        }))
-    }
-
     async fn search_threads(
         &self,
         request: Request<SearchThreadsRequest>,
@@ -1023,10 +1006,7 @@ impl ProtoThreadService for ThreadService {
                 id: r.id.to_string(),
                 title: r.title.unwrap_or_default(),
                 rank: r.rank,
-                updated_at: Some(Timestamp {
-                    seconds: r.updated_at.timestamp(),
-                    nanos: r.updated_at.timestamp_subsec_nanos() as i32,
-                }),
+                updated_at: Some(datetime_to_timestamp(r.updated_at)),
             })
             .collect();
 
@@ -1059,10 +1039,7 @@ impl ProtoThreadService for ThreadService {
                 message_type: r.message_type.to_string(),
                 content: String::new(),
                 rank: r.rank,
-                created_at: Some(Timestamp {
-                    seconds: r.created_at.timestamp(),
-                    nanos: r.created_at.timestamp_subsec_nanos() as i32,
-                }),
+                created_at: Some(datetime_to_timestamp(r.created_at)),
                 snippet: r.snippet,
             })
             .collect();
@@ -1080,11 +1057,19 @@ impl ProtoThreadService for ThreadService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let _thread_id =
+        let thread_id =
             Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
                 field: "thread_id",
                 source: e,
             })?;
+
+        self.db
+            .get_thread()
+            .id(thread_id)
+            .user_id(user_id)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
 
         let blocks: Vec<ContentBlock> = req
             .content_blocks
