@@ -1018,7 +1018,7 @@ impl ProtoThreadService for ThreadService {
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .params(PaginationParams::new(0, 2, "DESC"))
+            .params(PaginationParams::new(0, 5, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
