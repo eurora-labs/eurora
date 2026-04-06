@@ -1,4 +1,4 @@
-import { InjectionToken } from '@eurora/shared/context';
+import { InjectionToken } from '$lib/context.js';
 
 export class ConfigService {
 	readonly grpcApiUrl: string;
