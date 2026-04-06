@@ -18,8 +18,6 @@
 	"sideEffects": [
 		"**/*.css"
 	],
-	"svelte": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"type": "module",
 	"exports": {
 		".": {
@@ -46,14 +44,15 @@
 		"@xyflow/svelte": "^1.5.1",
 		"svelte-sonner": "^1.0.8",
 		"@sveltejs/adapter-static": "catalog:svelte",
-		"@sveltejs/kit": "^2.50.2",
+		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"publint": "^0.3.17",
 		"svelte": "catalog:svelte",
-		"svelte-check": "^4.4.2",
+		"svelte-check": "catalog:svelte",
 		"typescript": "^5.9.3",
-		"vite": "^7.3.1"
+		"vite": "catalog:",
+		"vitest": "catalog:"
 	},
 	"keywords": [
 		"svelte"
