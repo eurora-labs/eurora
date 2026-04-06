@@ -11,7 +11,8 @@ const RECONCILE_RETRIES = 3;
 const RECONCILE_DELAY_MS = 1000;
 
 export class ThreadMessages {
-	thread: Thread;
+	// Explicit casting is fine because it's initialized in the constructor
+	thread: Thread = $state() as Thread;
 	messages: MessageNode[] = $state([]);
 	loading = $state(false);
 	hasMore = $state(true);
@@ -35,7 +36,6 @@ export class ThreadMessages {
 
 export class ChatService {
 	newThread: Thread | undefined = $state();
-	titleChanged: Thread | undefined = $state();
 
 	threads: ThreadMessages[] = $state([]);
 	activeThreadId: string | undefined = $state(undefined);
@@ -165,6 +165,7 @@ export class ChatService {
 		if (!text.trim()) return;
 
 		let threadId = this.activeThreadId;
+		let isNewThread = false;
 
 		if (!threadId) {
 			const thread = await this.threadClient.createThread();
@@ -173,13 +174,30 @@ export class ChatService {
 			this.activeThreadId = thread.id;
 			threadId = thread.id;
 			this.newThread = thread;
+			isNewThread = true;
 		}
 
 		const entry = this.getThreadData(threadId);
 		if (!entry) return;
 
 		this.appendPlaceholders(entry, text);
-		const receivedFinal = await this.consumeStream(entry, threadId, text, undefined, assetIds);
+
+		const onFirstChunk = isNewThread
+			? () => {
+					this.threadClient.generateTitle(threadId!, text).then((updated) => {
+						this.updateThread(updated);
+					});
+				}
+			: undefined;
+
+		const receivedFinal = await this.consumeStream(
+			entry,
+			threadId,
+			text,
+			undefined,
+			assetIds,
+			onFirstChunk,
+		);
 
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
@@ -234,6 +252,7 @@ export class ChatService {
 		text: string,
 		parentMessageId?: string | null,
 		assetIds?: string[],
+		onFirstChunk?: () => void,
 	): Promise<boolean> {
 		this.abortController?.abort();
 		this.abortController = new AbortController();
@@ -264,6 +283,11 @@ export class ChatService {
 				}
 
 				const chunk = event.chunk;
+
+				if (onFirstChunk) {
+					onFirstChunk();
+					onFirstChunk = undefined;
+				}
 
 				if (chunk.additionalKwargs) {
 					try {

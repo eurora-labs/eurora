@@ -59,6 +59,16 @@ export class ThreadService implements IThreadService {
 		};
 	}
 
+	async generateTitle(threadId: string, content: string): Promise<Thread> {
+		const raw = await this.taurpc.thread.generate_title(threadId, content);
+		return {
+			id: raw.id!,
+			title: raw.title,
+			createdAt: raw.created_at,
+			updatedAt: raw.updated_at,
+		};
+	}
+
 	async *sendMessage(
 		threadId: string,
 		text: string,
