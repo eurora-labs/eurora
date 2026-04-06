@@ -1,4 +1,6 @@
 <script lang="ts" module>
+	import type { Snippet } from 'svelte';
+
 	interface Props {
 		emptyState?: Snippet;
 		onCopy?: (content: string) => void;
@@ -25,7 +27,6 @@
 	import { tick } from 'svelte';
 	import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 	import type { MessageNode } from '$lib/models/messages/index.js';
-	import type { Snippet } from 'svelte';
 
 	let { emptyState, onCopy, onEdit }: Props = $props();
 
