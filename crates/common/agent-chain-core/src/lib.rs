@@ -4,6 +4,7 @@
 mod prost_conversions;
 
 #[cfg(feature = "prost")]
+#[allow(clippy::all)]
 pub mod proto {
     tonic::include_proto!("agent_chain");
     pub use crate::prost_conversions::*;
