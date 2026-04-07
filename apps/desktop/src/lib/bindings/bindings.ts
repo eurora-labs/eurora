@@ -66,7 +66,7 @@ export type LoginToken = {
 
 export type Message = { Human: ProtoHumanMessage } | { System: ProtoSystemMessage } | { Ai: ProtoAiMessage } | { Tool: ProtoToolMessage } | { Chat: ProtoChatMessage } | { Remove: ProtoRemoveMessage };
 
-export type Payload = { Chunk: ProtoAiMessageChunk } | { FinalMessage: ChatStreamFinalMessage };
+export type Payload = { Chunk: ProtoAiMessageChunk } | { FinalMessage: ChatStreamFinalMessage } | { ConfirmedHumanMessage: BaseMessageWithSibling };
 
 export type ProtoAiMessage = {
 	content: ProtoContentBlock[],

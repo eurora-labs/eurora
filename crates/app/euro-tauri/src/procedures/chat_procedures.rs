@@ -131,6 +131,16 @@ impl ChatApi for ChatApiImpl {
         tracing::debug!("Starting to consume stream...");
 
         let stream_future = async {
+            match stream.next().await {
+                Some(Ok(first)) => {
+                    if let Err(e) = channel.send(first) {
+                        return Err(format!("Failed to send confirmed human message: {e}"));
+                    }
+                }
+                Some(Err(e)) => return Err(format!("Stream error: {e}")),
+                None => return Ok(()),
+            }
+
             loop {
                 tokio::select! {
                     biased;

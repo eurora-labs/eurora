@@ -191,7 +191,7 @@
 						<Message.Content>
 							{#if content.trim().length > 0}
 								<Message.Response {content} />
-							{:else if !reasoning}
+							{:else if isStreaming && !reasoning}
 								<Shimmer>Thinking</Shimmer>
 							{/if}
 						</Message.Content>

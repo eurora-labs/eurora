@@ -114,8 +114,12 @@ export class ChatService {
 	}
 
 	async loadMessages(threadId: string): Promise<void> {
-		const entry = this.threadIndex.get(threadId);
-		if (!entry || entry.loading || entry.loaded || entry.streamingMessageId) return;
+		let entry = this.threadIndex.get(threadId);
+		if (!entry) {
+			entry = new ThreadMessages({ id: threadId, title: '' });
+			this.threadIndex.set(threadId, entry);
+		}
+		if (entry.loading || entry.loaded || entry.streamingMessageId) return;
 
 		entry.loading = true;
 		try {
@@ -166,6 +170,7 @@ export class ChatService {
 
 	async sendMessage(text: string, assetIds?: string[]): Promise<void> {
 		if (!text.trim()) return;
+		this.viewMode = 'list';
 
 		let threadId = this.activeThreadId;
 		let isNewThread = false;
@@ -211,6 +216,7 @@ export class ChatService {
 	async editMessage(messageId: string, text: string): Promise<void> {
 		const threadId = this.activeThreadId;
 		if (!threadId) return;
+		this.viewMode = 'list';
 
 		const entry = this.getThreadData(threadId);
 		if (!entry) return;
@@ -236,12 +242,16 @@ export class ChatService {
 		for (let attempt = 0; attempt < RECONCILE_RETRIES; attempt++) {
 			await new Promise((resolve) => setTimeout(resolve, RECONCILE_DELAY_MS));
 
+			if (entry.streamingMessageId) return;
+
 			const messages = await this.threadClient.getMessages(
 				threadId,
 				MESSAGE_PAGE_SIZE,
 				0,
 				false,
 			);
+
+			if (entry.streamingMessageId) return;
 
 			if (messages.length >= expectedCount) {
 				entry.messages = messages;
@@ -259,27 +269,48 @@ export class ChatService {
 		onFirstChunk?: () => void,
 	): Promise<boolean> {
 		this.abortController?.abort();
-		this.abortController = new AbortController();
-		const { signal } = this.abortController;
 
 		const aiNode = entry.messages.at(-1)!;
 		const aiMessage = aiNode.message;
 		if (aiMessage.type === 'remove') return false;
 
+		const tempHumanId = entry.messages.at(-2)?.message.id;
+		const tempAiId = aiMessage.id;
+
 		let hasReceivedContent = false;
 		let pendingWhitespace = '';
 		let receivedFinal = false;
 
+		const abortController = new AbortController();
+		const stream = this.threadClient.sendMessage(
+			threadId,
+			text,
+			parentMessageId,
+			abortController.signal,
+			assetIds,
+		);
+
 		try {
-			for await (const event of this.threadClient.sendMessage(
-				threadId,
-				text,
-				parentMessageId,
-				signal,
-				assetIds,
-			)) {
+			for await (const event of stream) {
+				if (event.type === 'confirmed_human') {
+					const confirmed = event.message;
+					entry.messages = entry.messages.map((node) => {
+						if (node.message.id === tempHumanId) return confirmed;
+						if (node.parentId === tempHumanId)
+							return { ...node, parentId: confirmed.message.id };
+						return node;
+					});
+					this.abortController = abortController;
+					continue;
+				}
+
 				if (event.type === 'final') {
-					entry.messages = event.messages;
+					const aiMsg = event.messages[0];
+					if (aiMsg) {
+						entry.messages = entry.messages.map((node) =>
+							node.message.id === tempAiId ? aiMsg : node,
+						);
+					}
 					entry.loaded = true;
 					entry.invalidateFullTree();
 					receivedFinal = true;
