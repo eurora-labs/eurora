@@ -12,8 +12,6 @@
 		"@bufbuild/buf": "^1.66.0",
 		"@bufbuild/protobuf": "^2.11.0",
 		"@bufbuild/protoc-gen-es": "^2.11.0",
-		"@connectrpc/connect": "^2.1.1",
-		"@connectrpc/connect-web": "^2.1.1",
 		"typescript": "^5.9.3",
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.4",

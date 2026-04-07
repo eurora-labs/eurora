@@ -92,6 +92,7 @@ jobs:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Compile Protobuf
               run: pnpm proto:typescript
+            - run: pnpm build
             - run: pnpm check
             - run: pnpm test
 

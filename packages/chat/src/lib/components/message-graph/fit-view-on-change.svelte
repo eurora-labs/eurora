@@ -6,7 +6,7 @@
 
 	const { fitView } = useSvelteFlow();
 
-	let prevNodeCount = 0;
+	let prevNodeCount = $state(0);
 
 	$effect(() => {
 		if (nodeCount > 1 && nodeCount !== prevNodeCount) {

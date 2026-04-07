@@ -4,31 +4,34 @@ use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
     messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
 };
+use agent_chain_core::proto::{
+    BaseMessageWithSibling, ChatStreamFinalMessage, ChatStreamResponse, ProtoContentBlock,
+    chat_stream_response::Payload,
+};
 use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
 use be_remote_db::{DatabaseManager, MessageType, PaginationParams};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
-use proto_gen::agent_chain::ProtoAiMessageChunk;
-use proto_gen::agent_chain::ProtoContentBlock;
 pub use proto_gen::thread::proto_thread_service_server::{
     ProtoThreadService, ProtoThreadServiceServer,
 };
 use proto_gen::thread::{
-    AddHiddenHumanMessageRequest, AddHiddenHumanMessageResponse, AddHumanMessageRequest,
-    AddHumanMessageResponse, AddSystemMessageRequest, AddSystemMessageResponse, ChatStreamRequest,
-    CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest, DeleteThreadResponse,
-    GenerateThreadTitleRequest, GenerateThreadTitleResponse, GetMessageTreeRequest,
-    GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse, GetThreadResponse,
-    ListThreadsRequest, ListThreadsResponse, MessageSiblingInfo, MessageTreeNode,
-    SavePreliminaryContentBlocksRequest, SavePreliminaryContentBlocksResponse, SearchMessageResult,
-    SearchMessagesRequest, SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest,
-    SearchThreadsResponse, SwitchBranchRequest, Thread,
+    ChatStreamRequest, CreateThreadRequest, CreateThreadResponse, DeleteThreadRequest,
+    DeleteThreadResponse, GenerateThreadTitleRequest, GenerateThreadTitleResponse,
+    GetMessagesRequest, GetMessagesResponse, GetThreadResponse, ListThreadsRequest,
+    ListThreadsResponse, ProtoThread, SavePreliminaryContentBlocksRequest,
+    SavePreliminaryContentBlocksResponse, SearchMessageResult, SearchMessagesRequest,
+    SearchMessagesResponse, SearchThreadResult, SearchThreadsRequest, SearchThreadsResponse,
+    SwitchBranchRequest,
 };
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
+use tokio::sync::mpsc;
 use tokio_stream::{Stream, StreamExt};
+use tokio_util::sync::CancellationToken;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -37,6 +40,8 @@ use crate::error::ThreadServiceError;
 use crate::tools::firecrawl_tools;
 
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
+const CONTEXT_MESSAGE_LIMIT: u32 = 5;
+const MAX_CONTENT_BLOCKS: usize = 50;
 
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
@@ -153,8 +158,8 @@ impl ThreadService {
         self.providers.title.clone()
     }
 
-    fn get_tools(&self) -> HashMap<String, Arc<dyn BaseTool>> {
-        self.providers.tools.clone()
+    fn get_tools(&self) -> &HashMap<String, Arc<dyn BaseTool>> {
+        &self.providers.tools
     }
 
     async fn upload_block_content(
@@ -238,8 +243,8 @@ impl ThreadService {
         }
     }
 
-    fn db_thread_to_proto(thread: be_remote_db::Thread) -> Thread {
-        Thread {
+    fn db_thread_to_proto(thread: be_remote_db::Thread) -> ProtoThread {
+        ProtoThread {
             id: thread.id.to_string(),
             user_id: thread.user_id.to_string(),
             title: thread.title.clone().unwrap_or_default(),
@@ -247,6 +252,124 @@ impl ThreadService {
             updated_at: Some(datetime_to_timestamp(thread.updated_at)),
             active_leaf_id: thread.active_leaf_id.map(|id| id.to_string()),
         }
+    }
+
+    fn build_tree_from_rows(
+        rows: Vec<be_remote_db::BranchMessageRow>,
+    ) -> Vec<BaseMessageWithSibling> {
+        let mut result: Vec<BaseMessageWithSibling> = Vec::new();
+        let mut current_branch_id: Option<Uuid> = None;
+
+        for row in rows {
+            let is_active = row.message.id == row.branch_message_id;
+            let parent_id = row
+                .message
+                .parent_message_id
+                .map(|id| id.to_string())
+                .unwrap_or_default();
+            let proto_message = row.message.into();
+            let sibling = BaseMessageWithSibling {
+                parent_id: parent_id.clone(),
+                message: Some(proto_message),
+                children: vec![],
+                sibling_index: row.sibling_index as i32,
+                depth: row.branch_depth,
+            };
+
+            let is_new_group = current_branch_id != Some(row.branch_message_id);
+            if is_new_group {
+                current_branch_id = Some(row.branch_message_id);
+                result.push(BaseMessageWithSibling {
+                    parent_id,
+                    message: None,
+                    children: vec![],
+                    sibling_index: 0,
+                    depth: row.branch_depth,
+                });
+            }
+
+            let group = result.last_mut().expect("group always exists");
+            if is_active {
+                group.sibling_index = group.children.len() as i32;
+                group.message = sibling.message.clone();
+            }
+            group.children.push(sibling);
+        }
+
+        result
+    }
+
+    async fn fetch_branch_with_siblings(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+        params: PaginationParams,
+    ) -> Result<Vec<BaseMessageWithSibling>, Status> {
+        let rows = self
+            .db
+            .list_branch_with_siblings()
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .params(params)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        Ok(Self::build_tree_from_rows(rows))
+    }
+
+    fn build_full_tree(messages: Vec<be_remote_db::Message>) -> Vec<BaseMessageWithSibling> {
+        let mut children_by_parent: HashMap<Option<Uuid>, Vec<be_remote_db::Message>> =
+            HashMap::new();
+        for msg in messages {
+            children_by_parent
+                .entry(msg.parent_message_id)
+                .or_default()
+                .push(msg);
+        }
+
+        fn build_subtree(
+            parent_id: Option<Uuid>,
+            children_by_parent: &HashMap<Option<Uuid>, Vec<be_remote_db::Message>>,
+            depth: i32,
+        ) -> Vec<BaseMessageWithSibling> {
+            let Some(siblings) = children_by_parent.get(&parent_id) else {
+                return vec![];
+            };
+            siblings
+                .iter()
+                .enumerate()
+                .map(|(idx, msg)| {
+                    let children = build_subtree(Some(msg.id), children_by_parent, depth + 1);
+                    BaseMessageWithSibling {
+                        parent_id: msg
+                            .parent_message_id
+                            .map(|id| id.to_string())
+                            .unwrap_or_default(),
+                        message: Some(msg.clone().into()),
+                        children,
+                        sibling_index: idx as i32,
+                        depth,
+                    }
+                })
+                .collect()
+        }
+
+        build_subtree(None, &children_by_parent, 0)
+    }
+
+    async fn fetch_full_tree(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Vec<BaseMessageWithSibling>, Status> {
+        let messages = self
+            .db
+            .list_all_thread_messages(thread_id, user_id, 1000, 0)
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        Ok(Self::build_full_tree(messages))
     }
 }
 
@@ -258,7 +381,310 @@ fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
 }
 
 type ChatResult<T> = Result<Response<T>, Status>;
-type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ProtoAiMessageChunk, Status>> + Send>>;
+type ChatStreamResult = Pin<Box<dyn Stream<Item = Result<ChatStreamResponse, Status>> + Send>>;
+
+struct CancellableStream {
+    rx: mpsc::Receiver<Result<ChatStreamResponse, Status>>,
+    token: CancellationToken,
+}
+
+impl Stream for CancellableStream {
+    type Item = Result<ChatStreamResponse, Status>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.rx.poll_recv(cx)
+    }
+}
+
+impl Drop for CancellableStream {
+    fn drop(&mut self) {
+        self.token.cancel();
+    }
+}
+
+const MAX_TOOL_ROUNDS: usize = 5;
+
+fn build_content_value(content: &str, reasoning: &str) -> serde_json::Value {
+    let mut blocks = Vec::new();
+    if !reasoning.is_empty() {
+        blocks.push(serde_json::json!({"type": "reasoning", "reasoning": reasoning}));
+    }
+    if !content.is_empty() {
+        blocks.push(serde_json::json!({"type": "text", "text": content}));
+    }
+    serde_json::Value::Array(blocks)
+}
+
+#[bon::builder]
+async fn save_ai_message(
+    db: &Arc<DatabaseManager>,
+    thread_id: Uuid,
+    user_id: Uuid,
+    full_content: &str,
+    full_reasoning: &str,
+    total_input_tokens: i64,
+    total_output_tokens: i64,
+    total_reasoning_tokens: i64,
+    total_cache_creation_tokens: i64,
+    total_cache_read_tokens: i64,
+) -> Option<be_remote_db::Message> {
+    let content_value = build_content_value(full_content, full_reasoning);
+
+    let ai_message = match db
+        .create_message()
+        .thread_id(thread_id)
+        .user_id(user_id)
+        .message_type(MessageType::Ai)
+        .content(content_value)
+        .call()
+        .await
+    {
+        Ok(msg) => msg,
+        Err(e) => {
+            tracing::error!("Failed to save AI message to database: {e}");
+            return None;
+        }
+    };
+
+    if (total_input_tokens > 0 || total_output_tokens > 0)
+        && let Err(e) = db
+            .record_token_usage()
+            .user_id(user_id)
+            .thread_id(thread_id)
+            .message_id(ai_message.id)
+            .input_tokens(total_input_tokens)
+            .output_tokens(total_output_tokens)
+            .reasoning_tokens(total_reasoning_tokens)
+            .cache_creation_tokens(total_cache_creation_tokens)
+            .cache_read_tokens(total_cache_read_tokens)
+            .call()
+            .await
+    {
+        tracing::error!("Failed to record token usage: {e}");
+    }
+
+    Some(ai_message)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_chat_stream(
+    tx: mpsc::Sender<Result<ChatStreamResponse, Status>>,
+    token: CancellationToken,
+    db: Arc<DatabaseManager>,
+    chat_provider: Arc<dyn BaseChatModel + Send + Sync>,
+    tools: HashMap<String, Arc<dyn BaseTool>>,
+    mut messages: Vec<AnyMessage>,
+    thread_id: Uuid,
+    user_id: Uuid,
+    human_message_id: Uuid,
+    human_proto: BaseMessageWithSibling,
+) {
+    let mut full_content = String::new();
+    let mut full_reasoning = String::new();
+    let mut total_input_tokens: i64 = 0;
+    let mut total_output_tokens: i64 = 0;
+    let mut total_reasoning_tokens: i64 = 0;
+    let mut total_cache_creation_tokens: i64 = 0;
+    let mut total_cache_read_tokens: i64 = 0;
+    let mut cancelled = false;
+
+    'outer: for round in 0..=MAX_TOOL_ROUNDS {
+        let provider_stream = tokio::select! {
+            result = chat_provider.stream(messages.clone(), None, None) => {
+                match result {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        tracing::error!("Error starting chat stream: {e}");
+                        let _ = tx.send(Err(Status::internal(e.to_string()))).await;
+                        return;
+                    }
+                }
+            }
+            () = token.cancelled() => {
+                tracing::info!("Chat stream cancelled before provider stream started");
+                cancelled = true;
+                break;
+            }
+        };
+
+        tokio::pin!(provider_stream);
+        let mut round_content = String::new();
+        let mut tool_calls: Vec<ToolCall> = Vec::new();
+
+        loop {
+            let chunk = tokio::select! {
+                item = provider_stream.next() => item,
+                () = token.cancelled() => {
+                    tracing::info!("Chat stream cancelled during provider streaming");
+                    cancelled = true;
+                    full_content.push_str(&round_content);
+                    break 'outer;
+                }
+            };
+
+            let Some(result) = chunk else { break };
+
+            match result {
+                Ok(chunk) => {
+                    let content = chunk.content.to_string();
+                    if !content.is_empty() {
+                        round_content.push_str(&content);
+                    }
+                    if let Some(reasoning) = chunk
+                        .additional_kwargs
+                        .get("reasoning_content")
+                        .and_then(|v| v.as_str())
+                    {
+                        full_reasoning.push_str(reasoning);
+                    }
+                    if !chunk.tool_calls.is_empty() {
+                        tool_calls.extend(chunk.tool_calls.clone());
+                    }
+                    if let Some(ref usage) = chunk.usage_metadata {
+                        total_input_tokens += usage.input_tokens;
+                        total_output_tokens += usage.output_tokens;
+                        if let Some(ref details) = usage.output_token_details {
+                            total_reasoning_tokens += details.reasoning.unwrap_or(0);
+                        }
+                        if let Some(ref details) = usage.input_token_details {
+                            total_cache_creation_tokens += details.cache_creation.unwrap_or(0);
+                            total_cache_read_tokens += details.cache_read.unwrap_or(0);
+                        }
+                    }
+
+                    if tx
+                        .send(Ok(ChatStreamResponse {
+                            payload: Some(Payload::Chunk(chunk.into())),
+                        }))
+                        .await
+                        .is_err()
+                    {
+                        tracing::info!("Chat stream receiver dropped, client disconnected");
+                        cancelled = true;
+                        full_content.push_str(&round_content);
+                        break 'outer;
+                    }
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(Status::internal(e.to_string()))).await;
+                    return;
+                }
+            }
+        }
+
+        full_content.push_str(&round_content);
+
+        if tool_calls.is_empty() || round == MAX_TOOL_ROUNDS {
+            break;
+        }
+
+        messages.push(
+            AIMessage::builder()
+                .content(&round_content)
+                .tool_calls(tool_calls.clone())
+                .build()
+                .into(),
+        );
+
+        for tc in tool_calls {
+            let tool_name = tc.name.clone();
+            let tool_call_id = tc.id.clone().unwrap_or_else(|| {
+                tracing::warn!("Tool call '{tool_name}' has no id");
+                String::new()
+            });
+
+            let result_msg = if let Some(tool) = tools.get(&tool_name) {
+                tokio::select! {
+                    result = tool.invoke_tool_call(tc) => result,
+                    () = token.cancelled() => {
+                        tracing::info!("Chat stream cancelled during tool invocation");
+                        cancelled = true;
+                        break 'outer;
+                    }
+                }
+            } else {
+                tracing::error!("Unknown tool: {tool_name}");
+                agent_chain::messages::ToolMessage::builder()
+                    .content(format!("Error: unknown tool '{tool_name}'"))
+                    .tool_call_id(tool_call_id)
+                    .status(agent_chain::messages::ToolStatus::Error)
+                    .build()
+                    .into()
+            };
+            messages.push(result_msg);
+        }
+    }
+
+    let has_content = !full_content.is_empty() || !full_reasoning.is_empty();
+
+    if cancelled {
+        if has_content {
+            save_ai_message()
+                .db(&db)
+                .thread_id(thread_id)
+                .user_id(user_id)
+                .full_content(&full_content)
+                .full_reasoning(&full_reasoning)
+                .total_input_tokens(total_input_tokens)
+                .total_output_tokens(total_output_tokens)
+                .total_reasoning_tokens(total_reasoning_tokens)
+                .total_cache_creation_tokens(total_cache_creation_tokens)
+                .total_cache_read_tokens(total_cache_read_tokens)
+                .call()
+                .await;
+        }
+        return;
+    }
+
+    if has_content {
+        let ai_message = match save_ai_message()
+            .db(&db)
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .full_content(&full_content)
+            .full_reasoning(&full_reasoning)
+            .total_input_tokens(total_input_tokens)
+            .total_output_tokens(total_output_tokens)
+            .total_reasoning_tokens(total_reasoning_tokens)
+            .total_cache_creation_tokens(total_cache_creation_tokens)
+            .total_cache_read_tokens(total_cache_read_tokens)
+            .call()
+            .await
+        {
+            Some(msg) => msg,
+            None => {
+                let _ = tx
+                    .send(Err(Status::internal("Failed to save AI message")))
+                    .await;
+                return;
+            }
+        };
+
+        let ai_proto = BaseMessageWithSibling {
+            parent_id: human_message_id.to_string(),
+            message: Some(ai_message.into()),
+            children: vec![],
+            sibling_index: 0,
+            depth: 0,
+        };
+
+        let _ = tx
+            .send(Ok(ChatStreamResponse {
+                payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
+                    messages: vec![human_proto, ai_proto],
+                })),
+            }))
+            .await;
+    } else {
+        let _ = tx
+            .send(Ok(ChatStreamResponse {
+                payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
+                    messages: vec![human_proto],
+                })),
+            }))
+            .await;
+    }
+}
 
 #[tonic::async_trait]
 impl ProtoThreadService for ThreadService {
@@ -324,136 +750,6 @@ impl ProtoThreadService for ThreadService {
         }))
     }
 
-    async fn add_human_message(
-        &self,
-        request: Request<AddHumanMessageRequest>,
-    ) -> Result<Response<AddHumanMessageResponse>, Status> {
-        tracing::info!("AddHumanMessage request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        let proto_message = req
-            .message
-            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
-
-        let human_message: HumanMessage = proto_message.into();
-        let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
-        })?;
-
-        let message = self
-            .db
-            .create_message()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_type(MessageType::Human)
-            .content(content)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        tracing::info!("Added human message to thread {}", thread_id);
-
-        Ok(Response::new(AddHumanMessageResponse {
-            message: Some(message.into()),
-        }))
-    }
-
-    async fn add_hidden_human_message(
-        &self,
-        request: Request<AddHiddenHumanMessageRequest>,
-    ) -> Result<Response<AddHiddenHumanMessageResponse>, Status> {
-        tracing::info!("AddHiddenHumanMessage request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        let proto_message = req
-            .message
-            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
-
-        let human_message: HumanMessage = proto_message.into();
-        let content = serde_json::to_value(&human_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
-        })?;
-
-        let message = self
-            .db
-            .create_message()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_type(MessageType::Human)
-            .content(content)
-            .hidden_from_ui(true)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        tracing::info!("Added hidden human message to thread {}", thread_id);
-
-        Ok(Response::new(AddHiddenHumanMessageResponse {
-            message: Some(message.into()),
-        }))
-    }
-
-    async fn add_system_message(
-        &self,
-        request: Request<AddSystemMessageRequest>,
-    ) -> Result<Response<AddSystemMessageResponse>, Status> {
-        tracing::info!("AddSystemMessage request received");
-
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        let proto_message = req
-            .message
-            .ok_or_else(|| Status::invalid_argument("message field is required"))?;
-
-        let system_message: SystemMessage = proto_message.into();
-        let content = serde_json::to_value(&system_message.content).map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize content: {}", e))
-        })?;
-
-        let message = self
-            .db
-            .create_message()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_type(MessageType::System)
-            .content(content)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        tracing::info!("Added system message to thread {}", thread_id);
-
-        Ok(Response::new(AddSystemMessageResponse {
-            message: Some(message.into()),
-        }))
-    }
-
     async fn chat_stream(
         &self,
         request: Request<ChatStreamRequest>,
@@ -485,17 +781,16 @@ impl ProtoThreadService for ThreadService {
             let effective_parent = if parent_id.is_some() {
                 parent_id
             } else {
-                let first_visible = self
+                let first_message = self
                     .db
                     .list_messages()
                     .thread_id(thread_id)
                     .user_id(user_id)
-                    .include_hidden(false)
                     .params(PaginationParams::new(0, 1, "ASC"))
                     .call()
                     .await
                     .map_err(ThreadServiceError::from)?;
-                first_visible.first().and_then(|msg| msg.parent_message_id)
+                first_message.first().and_then(|msg| msg.parent_message_id)
             };
             self.db
                 .set_active_leaf()
@@ -509,34 +804,19 @@ impl ProtoThreadService for ThreadService {
 
         tracing::debug!("ChatStream: thread_id = {}", thread_id);
 
-        let mut hidden_messages = self
+        let mut recent_messages = self
             .db
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .include_visible(false)
-            .params(PaginationParams::new(0, 2, "DESC"))
+            .params(PaginationParams::new(0, CONTEXT_MESSAGE_LIMIT, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
 
-        hidden_messages.reverse();
+        recent_messages.reverse();
 
-        let mut visible_messages = self
-            .db
-            .list_messages()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .include_hidden(false)
-            .params(PaginationParams::new(0, 3, "DESC"))
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-        visible_messages.reverse();
-
-        hidden_messages.extend(visible_messages);
-
-        let mut messages: Vec<AnyMessage> = hidden_messages
+        let mut messages: Vec<AnyMessage> = recent_messages
             .into_iter()
             .filter_map(|msg| {
                 convert_db_message_to_base_message(msg)
@@ -577,7 +857,7 @@ impl ProtoThreadService for ThreadService {
                 ))
             })?;
 
-        let _message = self
+        let human_db_message = self
             .db
             .create_message()
             .thread_id(thread_id)
@@ -592,146 +872,45 @@ impl ProtoThreadService for ThreadService {
         self.resolve_blocks(&mut messages).await;
 
         let chat_provider = self.get_chat_provider();
-        let tools = self.get_tools();
+        let tools = self.get_tools().clone();
 
         let db = self.db.clone();
-        let output_stream = async_stream::try_stream! {
-            let mut full_content = String::new();
-            let mut full_reasoning = String::new();
-            let mut total_input_tokens: i64 = 0;
-            let mut total_output_tokens: i64 = 0;
-            let mut total_reasoning_tokens: i64 = 0;
-            let mut total_cache_creation_tokens: i64 = 0;
-            let mut total_cache_read_tokens: i64 = 0;
-            const MAX_TOOL_ROUNDS: usize = 5;
-
-            for round in 0..=MAX_TOOL_ROUNDS {
-                let provider_stream = chat_provider
-                    .stream(messages.clone(), None, None)
-                    .await
-                    .map_err(|e| {
-                        tracing::error!("Error in chat_stream: {}", e);
-                        Status::internal(e.to_string())
-                    })?;
-
-                tokio::pin!(provider_stream);
-                let mut round_content = String::new();
-                let mut tool_calls: Vec<ToolCall> = Vec::new();
-
-                while let Some(result) = provider_stream.next().await {
-                    match result {
-                        Ok(chunk) => {
-                            let content = chunk.content.to_string();
-                            if !content.is_empty() {
-                                round_content.push_str(&content);
-                            }
-                            if let Some(reasoning) = chunk.additional_kwargs.get("reasoning_content").and_then(|v| v.as_str()) {
-                                full_reasoning.push_str(reasoning);
-                            }
-                            if !chunk.tool_calls.is_empty() {
-                                tool_calls.extend(chunk.tool_calls.clone());
-                            }
-                            if let Some(ref usage) = chunk.usage_metadata {
-                                total_input_tokens += usage.input_tokens;
-                                total_output_tokens += usage.output_tokens;
-                                if let Some(ref details) = usage.output_token_details {
-                                    total_reasoning_tokens += details.reasoning.unwrap_or(0);
-                                }
-                                if let Some(ref details) = usage.input_token_details {
-                                    total_cache_creation_tokens += details.cache_creation.unwrap_or(0);
-                                    total_cache_read_tokens += details.cache_read.unwrap_or(0);
-                                }
-                            }
-                            yield chunk.into();
-                        }
-                        Err(e) => {
-                            Err(Status::internal(e.to_string()))?;
-                        }
-                    }
-                }
-
-                full_content.push_str(&round_content);
-
-                if tool_calls.is_empty() || round == MAX_TOOL_ROUNDS {
-                    break;
-                }
-
-                messages.push(
-                    AIMessage::builder()
-                        .content(&round_content)
-                        .tool_calls(tool_calls.clone())
-                        .build()
-                        .into(),
-                );
-
-                for tc in tool_calls {
-                    let tool_name = tc.name.clone();
-                    let result_msg = if let Some(tool) = tools.get(&tool_name) {
-                        tool.invoke_tool_call(tc).await
-                    } else {
-                        tracing::error!("Unknown tool: {}", tool_name);
-                        agent_chain::messages::ToolMessage::builder()
-                            .content(format!("Error: unknown tool '{}'", tool_name))
-                            .tool_call_id("")
-                            .status(agent_chain::messages::ToolStatus::Error)
-                            .build()
-                            .into()
-                    };
-                    messages.push(result_msg);
-                }
-            }
-
-            if !full_content.is_empty() {
-                let reasoning_blocks = match full_reasoning.is_empty() {
-                    true => None,
-                    false => Some(serde_json::json!([{
-                        "type": "thinking",
-                        "content": full_reasoning,
-                    }])),
-                };
-
-                let content_value = serde_json::json!([{"type": "text", "text": full_content}]);
-
-                let save_result = db.create_message()
-                    .thread_id(thread_id)
-                    .user_id(user_id)
-                    .message_type(MessageType::Ai)
-                    .content(content_value)
-                    .maybe_reasoning_blocks(reasoning_blocks)
-                    .call()
-                    .await;
-
-                match save_result
-                {
-                    Ok(ai_message) => {
-                        if (total_input_tokens > 0 || total_output_tokens > 0) && let Err(e) = {
-                                db
-                                .record_token_usage()
-                                .user_id(user_id)
-                                .thread_id(thread_id)
-                                .message_id(ai_message.id)
-                                .input_tokens(total_input_tokens)
-                                .output_tokens(total_output_tokens)
-                                .reasoning_tokens(total_reasoning_tokens)
-                                .cache_creation_tokens(total_cache_creation_tokens)
-                                .cache_read_tokens(total_cache_read_tokens)
-                                .call()
-                                .await
-                            }
-                            {
-                                tracing::error!("Failed to record token usage: {}", e);
-                            }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to save AI message to database: {}", e);
-                    }
-                }
+        let human_parent_id = human_db_message
+            .parent_message_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+        let human_message_id = human_db_message.id;
+        let human_proto: BaseMessageWithSibling = {
+            let proto_msg = human_db_message.into();
+            BaseMessageWithSibling {
+                parent_id: human_parent_id,
+                message: Some(proto_msg),
+                children: vec![],
+                sibling_index: 0,
+                depth: 0,
             }
         };
+        let (tx, rx) = mpsc::channel(32);
+        let token = CancellationToken::new();
+        let stream = CancellableStream {
+            rx,
+            token: token.clone(),
+        };
 
-        Ok(Response::new(
-            Box::pin(output_stream) as Self::ChatStreamStream
-        ))
+        tokio::spawn(run_chat_stream(
+            tx,
+            token,
+            db,
+            chat_provider,
+            tools,
+            messages,
+            thread_id,
+            user_id,
+            human_message_id,
+            human_proto,
+        ));
+
+        Ok(Response::new(Box::pin(stream) as Self::ChatStreamStream))
     }
 
     async fn get_messages(
@@ -749,41 +928,18 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        let messages = self
-            .db
-            .list_messages()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(req.offset, req.limit, "ASC"))
-            .include_hidden(false)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
+        let messages = if req.all_variants {
+            self.fetch_full_tree(thread_id, user_id).await?
+        } else {
+            self.fetch_branch_with_siblings(
+                thread_id,
+                user_id,
+                PaginationParams::new(req.offset, req.limit, "ASC"),
+            )
+            .await?
+        };
 
-        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
-        let sibling_rows = self
-            .db
-            .get_sibling_info()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_ids(&message_ids)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        let sibling_info = sibling_rows
-            .into_iter()
-            .map(|s| MessageSiblingInfo {
-                message_id: s.message_id.to_string(),
-                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
-                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
-            })
-            .collect();
-
-        Ok(Response::new(GetMessagesResponse {
-            messages: messages.into_iter().map(|m| m.into()).collect(),
-            sibling_info,
-        }))
+        Ok(Response::new(GetMessagesResponse { messages }))
     }
 
     async fn get_thread(
@@ -857,14 +1013,12 @@ impl ProtoThreadService for ThreadService {
                 source: e,
             })?;
 
-        let hidden_messages = self
+        let recent_messages = self
             .db
             .list_messages()
             .thread_id(thread_id)
             .user_id(user_id)
-            .include_hidden(true)
-            .include_visible(false)
-            .params(PaginationParams::new(0, 2, "DESC"))
+            .params(PaginationParams::new(0, 5, "DESC"))
             .call()
             .await
             .map_err(ThreadServiceError::from)?;
@@ -886,13 +1040,11 @@ impl ProtoThreadService for ThreadService {
                 .into(),
         ];
 
-        messages.extend(hidden_messages.into_iter().filter_map(|msg| {
+        messages.extend(recent_messages.into_iter().rev().filter_map(|msg| {
             convert_db_message_to_base_message(msg)
                 .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
                 .ok()
         }));
-
-        messages.push(HumanMessage::builder().content(req.content).build().into());
 
         let title_provider = self.get_title_provider();
         let mut title = match title_provider.invoke(messages, None).await {
@@ -901,13 +1053,10 @@ impl ProtoThreadService for ThreadService {
         };
         let title_words: Vec<&str> = title.split_whitespace().collect();
         title = title_words[..title_words.len().min(6)].join(" ");
-        title = match title.is_empty() {
-            true => {
-                tracing::warn!("Failed to generate title");
-                "New Chat".to_string()
-            }
-            false => title,
-        };
+        if title.is_empty() {
+            tracing::warn!("Failed to generate title");
+            title = "New Chat".to_string();
+        }
 
         if let Some(first) = title.chars().next() {
             let rest = &title[first.len_utf8()..];
@@ -982,130 +1131,10 @@ impl ProtoThreadService for ThreadService {
             .map_err(ThreadServiceError::from)?;
 
         let messages = self
-            .db
-            .list_messages()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(0, 100, "ASC"))
-            .include_hidden(false)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
+            .fetch_branch_with_siblings(thread_id, user_id, PaginationParams::new(0, 100, "ASC"))
+            .await?;
 
-        let message_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
-        let sibling_rows = self
-            .db
-            .get_sibling_info()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .message_ids(&message_ids)
-            .call()
-            .await
-            .map_err(ThreadServiceError::from)?;
-
-        let sibling_info = sibling_rows
-            .into_iter()
-            .map(|s| MessageSiblingInfo {
-                message_id: s.message_id.to_string(),
-                sibling_count: u32::try_from(s.sibling_count).unwrap_or(0),
-                sibling_index: u32::try_from(s.sibling_index).unwrap_or(0),
-            })
-            .collect();
-
-        Ok(Response::new(GetMessagesResponse {
-            messages: messages.into_iter().map(|m| m.into()).collect(),
-            sibling_info,
-        }))
-    }
-
-    async fn get_message_tree(
-        &self,
-        request: Request<GetMessageTreeRequest>,
-    ) -> Result<Response<GetMessageTreeResponse>, Status> {
-        let claims = extract_claims(&request)?;
-        let user_id = parse_user_id(claims)?;
-        let req = request.into_inner();
-
-        let thread_id =
-            Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
-                field: "thread_id",
-                source: e,
-            })?;
-
-        const MAX_TREE_DEPTH: u32 = 100;
-        let start_level = req.start_level.min(MAX_TREE_DEPTH);
-        let end_level = req.end_level.min(MAX_TREE_DEPTH);
-
-        let result = if req.parent_node_ids.is_empty() {
-            self.db
-                .list_messages_by_level(thread_id, user_id, start_level as i32, end_level as i32)
-                .await
-                .map_err(ThreadServiceError::from)?
-        } else {
-            let parent_ids: Vec<Uuid> = req
-                .parent_node_ids
-                .iter()
-                .map(|id| Uuid::parse_str(id))
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| ThreadServiceError::InvalidUuid {
-                    field: "parent_node_ids",
-                    source: e,
-                })?;
-            let depth = end_level.saturating_sub(start_level) + 1;
-            self.db
-                .list_messages_by_level_from_parents(
-                    thread_id,
-                    user_id,
-                    &parent_ids,
-                    start_level as i32,
-                    depth as i32,
-                )
-                .await
-                .map_err(ThreadServiceError::from)?
-        };
-
-        let has_more = result.has_more;
-        let tree_nodes = result
-            .nodes
-            .into_iter()
-            .map(|n| {
-                let additional_kwargs = if n.additional_kwargs.is_null()
-                    || n.additional_kwargs
-                        .as_object()
-                        .is_some_and(|o| o.is_empty())
-                {
-                    None
-                } else {
-                    Some(serde_json::to_string(&n.additional_kwargs).unwrap_or_default())
-                };
-
-                let reasoning_blocks = n
-                    .reasoning_blocks
-                    .filter(|v| !v.is_null())
-                    .map(|v| serde_json::to_string(&v).unwrap_or_default());
-
-                MessageTreeNode {
-                    id: n.id.to_string(),
-                    parent_message_id: n.parent_message_id.map(|id| id.to_string()),
-                    message_type: n.message_type.to_string(),
-                    content: serde_json::from_value::<Vec<ContentBlock>>(n.content)
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(ProtoContentBlock::from)
-                        .collect(),
-                    level: n.level as u32,
-                    sibling_count: u32::try_from(n.sibling_count).unwrap_or(0),
-                    sibling_index: u32::try_from(n.sibling_index).unwrap_or(0),
-                    additional_kwargs,
-                    reasoning_blocks,
-                }
-            })
-            .collect();
-
-        Ok(Response::new(GetMessageTreeResponse {
-            nodes: tree_nodes,
-            has_more,
-        }))
+        Ok(Response::new(GetMessagesResponse { messages }))
     }
 
     async fn search_threads(
@@ -1132,10 +1161,7 @@ impl ProtoThreadService for ThreadService {
                 id: r.id.to_string(),
                 title: r.title.unwrap_or_default(),
                 rank: r.rank,
-                updated_at: Some(Timestamp {
-                    seconds: r.updated_at.timestamp(),
-                    nanos: r.updated_at.timestamp_subsec_nanos() as i32,
-                }),
+                updated_at: Some(datetime_to_timestamp(r.updated_at)),
             })
             .collect();
 
@@ -1168,10 +1194,7 @@ impl ProtoThreadService for ThreadService {
                 message_type: r.message_type.to_string(),
                 content: String::new(),
                 rank: r.rank,
-                created_at: Some(Timestamp {
-                    seconds: r.created_at.timestamp(),
-                    nanos: r.created_at.timestamp_subsec_nanos() as i32,
-                }),
+                created_at: Some(datetime_to_timestamp(r.created_at)),
                 snippet: r.snippet,
             })
             .collect();
@@ -1189,11 +1212,25 @@ impl ProtoThreadService for ThreadService {
         let user_id = parse_user_id(claims)?;
         let req = request.into_inner();
 
-        let _thread_id =
+        let thread_id =
             Uuid::parse_str(&req.thread_id).map_err(|e| ThreadServiceError::InvalidUuid {
                 field: "thread_id",
                 source: e,
             })?;
+
+        self.db
+            .get_thread()
+            .id(thread_id)
+            .user_id(user_id)
+            .call()
+            .await
+            .map_err(ThreadServiceError::from)?;
+
+        if req.content_blocks.len() > MAX_CONTENT_BLOCKS {
+            return Err(ThreadServiceError::invalid_argument(format!(
+                "Too many content blocks (max {MAX_CONTENT_BLOCKS})"
+            )))?;
+        }
 
         let blocks: Vec<ContentBlock> = req
             .content_blocks

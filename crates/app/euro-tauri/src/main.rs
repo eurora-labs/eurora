@@ -24,7 +24,7 @@ use euro_tauri::{
         thread_procedures::{ThreadApi, ThreadApiImpl},
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
-    shared_types::SharedThreadManager,
+    shared_types::{ActiveStreamTokens, SharedThreadManager},
 };
 use euro_timeline::TimelineManager;
 use tauri::{
@@ -330,6 +330,7 @@ fn init_state(
     let user_channel_rx = endpoint_manager.subscribe();
     let user_controller = euro_user::Controller::new(path, user_channel_rx)?;
     app_handle.manage(SharedUserController::new(user_controller));
+    app_handle.manage(ActiveStreamTokens::default());
 
     Ok(())
 }

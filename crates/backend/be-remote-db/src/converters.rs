@@ -1,19 +1,19 @@
 use crate::error::DbError;
 use crate::types::{Message, MessageType, Thread};
 use agent_chain_core::messages::ContentBlock;
-use chrono::DateTime;
-use prost_types::Timestamp;
-use proto_gen::agent_chain::{
+use agent_chain_core::proto::{
     ProtoAiMessage, ProtoBaseMessage, ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage,
     ProtoToolCall, ProtoToolMessage, ProtoToolStatus, proto_base_message,
 };
+use chrono::DateTime;
+use prost_types::Timestamp;
 
 use uuid::Uuid;
 
-impl TryFrom<proto_gen::thread::Thread> for Thread {
+impl TryFrom<proto_gen::thread::ProtoThread> for Thread {
     type Error = DbError;
 
-    fn try_from(value: proto_gen::thread::Thread) -> Result<Self, Self::Error> {
+    fn try_from(value: proto_gen::thread::ProtoThread) -> Result<Self, Self::Error> {
         let id = Uuid::parse_str(&value.id).map_err(|e| DbError::Internal(e.to_string()))?;
         let user_id =
             Uuid::parse_str(&value.user_id).map_err(|e| DbError::Internal(e.to_string()))?;
@@ -46,15 +46,15 @@ impl TryFrom<proto_gen::thread::Thread> for Thread {
     }
 }
 
-impl TryInto<proto_gen::thread::Thread> for Thread {
+impl TryInto<proto_gen::thread::ProtoThread> for Thread {
     type Error = DbError;
 
-    fn try_into(self) -> Result<proto_gen::thread::Thread, Self::Error> {
+    fn try_into(self) -> Result<proto_gen::thread::ProtoThread, Self::Error> {
         let id = self.id.to_string();
         let user_id = self.user_id.to_string();
         let title = self.title.unwrap_or_default();
 
-        Ok(proto_gen::thread::Thread {
+        Ok(proto_gen::thread::ProtoThread {
             id,
             user_id,
             title,
@@ -75,13 +75,7 @@ impl From<Message> for ProtoBaseMessage {
     fn from(msg: Message) -> Self {
         let id = Some(msg.id.to_string());
 
-        let additional_kwargs = {
-            let mut kwargs = msg.additional_kwargs.clone();
-            if let Some(reasoning) = &msg.reasoning_blocks {
-                kwargs["reasoning_blocks"] = reasoning.clone();
-            }
-            serde_json::to_string(&kwargs).ok()
-        };
+        let additional_kwargs = serde_json::to_string(&msg.additional_kwargs).ok();
 
         let content: Vec<ProtoContentBlock> =
             serde_json::from_value::<Vec<ContentBlock>>(msg.content)
