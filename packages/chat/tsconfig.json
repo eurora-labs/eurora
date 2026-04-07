@@ -18,7 +18,7 @@
 		"declaration": true,
 		"composite": true,
 		"declarationMap": true,
-		"mapRoot": "../../dist",
+		"mapRoot": "../../dist"
 	},
 	"include": [
 		".svelte-kit/ambient.d.ts",
@@ -28,12 +28,15 @@
 		"svelte.config.js",
 		"vite.config.ts",
 		"vitest.workspace.ts",
+		"playwright.config.ts",
 		"src/**/*.js",
 		"src/**/*.ts",
+		"e2e/**/*.js",
+		"e2e/**/*.ts",
 		"src/**/*.svelte",
 		"tests/**/*.js",
 		"tests/**/*.ts",
-		"tests/**/*.svelte",
+		"tests/**/*.svelte"
 	],
-	"exclude": ["node_modules/**"],
+	"exclude": ["node_modules/**"]
 }
