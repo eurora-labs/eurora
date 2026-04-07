@@ -41,7 +41,7 @@ jobs:
                       ~/.cache/ms-playwright
                   key: ${{ runner.os }}-playwright-${{ steps.get_playwright_version.outputs.playwright-version }}
             - if: steps.playwright-cache.outputs.cache-hit != 'true'
-              run: cd apps/web && pnpm exec playwright install --with-deps
+              run: cd apps/web && pnpm exec playwright install --with-deps && cd ../../packages/chat && pnpm exec playwright install --with-deps
 
             - name: Run Playwright tests
               run: pnpm exec turbo run test:e2e:web
