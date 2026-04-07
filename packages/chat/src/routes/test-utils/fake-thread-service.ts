@@ -1,3 +1,4 @@
+import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { MessageNode } from '$lib/models/messages/index.js';
 import type { ChatStreamEvent } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
@@ -16,12 +17,83 @@ function makeThread(overrides?: Partial<Thread>): Thread {
 	};
 }
 
+export function makeMessageNode(
+	id: string,
+	type: 'human' | 'ai',
+	text: string,
+	overrides?: Partial<MessageNode>,
+): MessageNode {
+	const content: ContentBlock[] =
+		text.length > 0
+			? [{ type: 'text', id: null, text, annotations: [], index: null, extras: null }]
+			: [];
+
+	const base: MessageNode = {
+		parentId: null,
+		message:
+			type === 'human'
+				? {
+						type: 'human',
+						content,
+						id,
+						name: null,
+						additionalKwargs: null,
+						responseMetadata: null,
+					}
+				: {
+						type: 'ai',
+						content,
+						id,
+						name: null,
+						toolCalls: [],
+						invalidToolCalls: [],
+						usageMetadata: null,
+						additionalKwargs: null,
+						responseMetadata: null,
+					},
+		children: [],
+		siblingIndex: 0,
+		depth: 0,
+	};
+	return { ...base, ...overrides };
+}
+
+export function makeReasoningNode(id: string, reasoning: string, text: string): MessageNode {
+	const content: ContentBlock[] = [
+		{ type: 'reasoning', id: null, reasoning, index: null, extras: null },
+	];
+	if (text) {
+		content.push({ type: 'text', id: null, text, annotations: [], index: null, extras: null });
+	}
+	return {
+		parentId: null,
+		message: {
+			type: 'ai',
+			content,
+			id,
+			name: null,
+			toolCalls: [],
+			invalidToolCalls: [],
+			usageMetadata: null,
+			additionalKwargs: null,
+			responseMetadata: null,
+		},
+		children: [],
+		siblingIndex: 0,
+		depth: 0,
+	};
+}
+
 export class FakeThreadService implements IThreadService {
 	threads: Thread[] = [];
 	messagesByThread = new Map<string, MessageNode[]>();
+	branchResults = new Map<string, MessageNode[]>();
 
 	deleteDelay = 0;
 	shouldFailDelete = false;
+
+	streamChunks: ChatStreamEvent[] = [];
+	streamDelay = 0;
 
 	seed(count: number): void {
 		this.threads = Array.from({ length: count }, (_, i) =>
@@ -43,11 +115,11 @@ export class FakeThreadService implements IThreadService {
 	}
 
 	async switchBranch(
-		_threadId: string,
+		threadId: string,
 		_messageId: string,
 		_direction: BranchDirection,
 	): Promise<MessageNode[]> {
-		return [];
+		return this.branchResults.get(threadId) ?? this.messagesByThread.get(threadId) ?? [];
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
@@ -79,6 +151,11 @@ export class FakeThreadService implements IThreadService {
 		_signal?: AbortSignal,
 		_assetIds?: string[],
 	): AsyncIterable<ChatStreamEvent> {
-		// no-op for sidebar tests
+		for (const chunk of this.streamChunks) {
+			if (this.streamDelay > 0) {
+				await new Promise((r) => setTimeout(r, this.streamDelay));
+			}
+			yield chunk;
+		}
 	}
 }
