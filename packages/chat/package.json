@@ -9,7 +9,8 @@
 		"package": "svelte-kit sync && svelte-package",
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test:e2e:web": "playwright test --config playwright.config.ts"
 	},
 	"files": [
 		"./dist/*.svelte",
@@ -47,15 +48,16 @@
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@lucide/svelte": "catalog:",
-		"@xyflow/svelte": "^1.5.1",
-		"svelte-sonner": "^1.0.8",
+		"@playwright/test": "^1.58.2",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@xyflow/svelte": "^1.5.1",
 		"publint": "^0.3.17",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
+		"svelte-sonner": "^1.0.8",
 		"typescript": "^5.9.3",
 		"vite": "catalog:",
 		"vitest": "catalog:"

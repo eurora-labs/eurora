@@ -13,6 +13,10 @@ concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
+env:
+    PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+    VITE_GRPC_API_URL: http://localhost:50051
+
 jobs:
     test:
         name: Run Tests
@@ -31,6 +35,11 @@ jobs:
             - name: Setup node environment
               uses: ./.github/actions/init-env-node
 
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
+
             - id: get_playwright_version
               uses: eviden-actions/get-playwright-version@f36cedaf26859aa0773ddbdd554c1e5cbf1ad4d5 # v1
             - name: Cache playwright binaries
@@ -41,7 +50,7 @@ jobs:
                       ~/.cache/ms-playwright
                   key: ${{ runner.os }}-playwright-${{ steps.get_playwright_version.outputs.playwright-version }}
             - if: steps.playwright-cache.outputs.cache-hit != 'true'
-              run: cd apps/web && pnpm exec playwright install --with-deps
+              run: cd apps/web && pnpm exec playwright install --with-deps && cd ../../packages/chat && pnpm exec playwright install --with-deps
 
             - name: Run Playwright tests
               run: pnpm exec turbo run test:e2e:web
