@@ -1,7 +1,7 @@
-import type { IThreadService, BranchDirection } from '$lib/services/thread/thread-service.js';
-import type { Thread } from '$lib/models/thread.model.js';
 import type { MessageNode } from '$lib/models/messages/index.js';
 import type { ChatStreamEvent } from '$lib/models/streaming.js';
+import type { Thread } from '$lib/models/thread.model.js';
+import type { IThreadService, BranchDirection } from '$lib/services/thread/thread-service.js';
 
 let nextId = 1;
 
