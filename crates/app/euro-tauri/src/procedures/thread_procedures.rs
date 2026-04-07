@@ -1,23 +1,17 @@
 use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
-use agent_chain_core::messages::content::{ContentBlock, ContentBlocks};
-use agent_chain_core::messages::prelude::*;
-use euro_thread::{ListThreadsRequest, Thread};
-use proto_gen::thread::{CreateThreadRequest, GetMessagesResponse};
-use std::collections::HashMap;
+use chrono::{TimeZone, Utc};
+use euro_thread::ListThreadsRequest;
+use proto_gen::agent_chain::BaseMessageWithSibling;
+use proto_gen::thread::CreateThreadRequest;
 use tauri::{Manager, Runtime};
 
 #[taurpc::ipc_type]
-pub struct ThreadView {
+pub struct Thread {
     pub id: Option<String>,
     pub title: String,
-}
-
-#[taurpc::ipc_type]
-pub struct ReasoningBlock {
-    pub r#type: String,
-    pub content: Option<String>,
-    pub signature: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[taurpc::ipc_type]
@@ -32,29 +26,9 @@ pub struct MessageView {
     pub id: Option<String>,
     pub role: String,
     pub content: String,
-    pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
     pub sibling_count: u32,
     pub sibling_index: u32,
     pub assets: Option<Vec<MessageAssetChip>>,
-}
-
-#[taurpc::ipc_type]
-pub struct MessageTreeNodeView {
-    pub id: String,
-    pub parent_message_id: Option<String>,
-    pub message_type: String,
-    pub content: String,
-    pub level: u32,
-    pub sibling_count: u32,
-    pub sibling_index: u32,
-    pub assets: Option<Vec<MessageAssetChip>>,
-    pub reasoning_blocks: Option<Vec<ReasoningBlock>>,
-}
-
-#[taurpc::ipc_type]
-pub struct MessageTreeResponse {
-    pub nodes: Vec<MessageTreeNodeView>,
-    pub has_more: bool,
 }
 
 #[taurpc::ipc_type]
@@ -76,21 +50,21 @@ pub struct SearchMessageResultView {
 #[taurpc::procedures(path = "thread")]
 pub trait ThreadApi {
     #[taurpc(event)]
-    async fn new_thread_added(thread: ThreadView);
+    async fn new_thread_added(thread: Thread);
 
     #[taurpc(event)]
-    async fn thread_title_changed(thread: ThreadView);
+    async fn thread_title_changed(thread: Thread);
 
     #[taurpc(event)]
-    async fn current_thread_changed(thread: ThreadView);
+    async fn current_thread_changed(thread: Thread);
 
     async fn list<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<ThreadView>, String>;
+    ) -> Result<Vec<Thread>, String>;
 
-    async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<ThreadView, String>;
+    async fn create<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Thread, String>;
 
     async fn delete<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -102,28 +76,21 @@ pub trait ThreadApi {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<MessageView>, String>;
+        all_variants: bool,
+    ) -> Result<Vec<BaseMessageWithSibling>, String>;
 
     async fn switch_branch<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         message_id: String,
         direction: i32,
-    ) -> Result<Vec<MessageView>, String>;
-
-    async fn get_message_tree<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-        start_level: u32,
-        end_level: u32,
-        parent_node_ids: Vec<String>,
-    ) -> Result<MessageTreeResponse, String>;
+    ) -> Result<Vec<BaseMessageWithSibling>, String>;
 
     async fn generate_title<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         content: String,
-    ) -> Result<ThreadView, String>;
+    ) -> Result<Thread, String>;
 
     async fn search_threads<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -148,42 +115,6 @@ fn thread_manager<R: Runtime>(
         .ok_or_else(|| "Thread manager not available".to_string())
 }
 
-fn convert_response(response: GetMessagesResponse) -> Vec<MessageView> {
-    let sibling_map: HashMap<String, (u32, u32)> = response
-        .sibling_info
-        .into_iter()
-        .map(|s| (s.message_id, (s.sibling_count, s.sibling_index)))
-        .collect();
-
-    response
-        .messages
-        .into_iter()
-        .map(AnyMessage::from)
-        .filter_map(|message| match message {
-            AnyMessage::SystemMessage(_) => None,
-            _ => {
-                let id = message.id();
-                let (sibling_count, sibling_index) = id
-                    .as_ref()
-                    .and_then(|id| sibling_map.get(id))
-                    .copied()
-                    .unwrap_or((1, 0));
-                let reasoning_blocks = extract_reasoning_blocks(&message);
-                let assets = extract_asset_chips(&message);
-                Some(MessageView {
-                    id,
-                    role: message.message_type().to_string(),
-                    content: message.content().to_string(),
-                    reasoning_blocks,
-                    sibling_count,
-                    sibling_index,
-                    assets,
-                })
-            }
-        })
-        .collect()
-}
-
 #[derive(Clone)]
 pub struct ThreadApiImpl;
 
@@ -194,7 +125,7 @@ impl ThreadApi for ThreadApiImpl {
         app_handle: tauri::AppHandle<R>,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<ThreadView>, String> {
+    ) -> Result<Vec<Thread>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
 
@@ -206,10 +137,7 @@ impl ThreadApi for ThreadApiImpl {
         Ok(threads.into_iter().map(|thread| thread.into()).collect())
     }
 
-    async fn create<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<ThreadView, String> {
+    async fn create<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<Thread, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let thread = thread_manager
@@ -240,15 +168,15 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         limit: u32,
         offset: u32,
-    ) -> Result<Vec<MessageView>, String> {
+        all_variants: bool,
+    ) -> Result<Vec<BaseMessageWithSibling>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let response = thread_manager
-            .get_messages(thread_id, limit, offset)
+            .get_messages(thread_id, limit, offset, all_variants)
             .await
             .ctx("Failed to get messages")?;
-
-        Ok(convert_response(response))
+        Ok(response.messages)
     }
 
     async fn switch_branch<R: Runtime>(
@@ -257,7 +185,7 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         message_id: String,
         direction: i32,
-    ) -> Result<Vec<MessageView>, String> {
+    ) -> Result<Vec<BaseMessageWithSibling>, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let response = thread_manager
@@ -265,56 +193,7 @@ impl ThreadApi for ThreadApiImpl {
             .await
             .map_err(|e| e.to_string())?;
 
-        Ok(convert_response(response))
-    }
-
-    async fn get_message_tree<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-        start_level: u32,
-        end_level: u32,
-        parent_node_ids: Vec<String>,
-    ) -> Result<MessageTreeResponse, String> {
-        let thread_state = thread_manager(&app_handle)?;
-        let thread_manager = thread_state.lock().await;
-        let response = thread_manager
-            .get_message_tree(thread_id, start_level, end_level, parent_node_ids)
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let nodes = response
-            .nodes
-            .into_iter()
-            .map(|n| {
-                let assets = parse_asset_chips_from_json(&n.additional_kwargs);
-                let reasoning_blocks = parse_reasoning_blocks_from_json(&n.reasoning_blocks);
-
-                let content_blocks: ContentBlocks = n
-                    .content
-                    .into_iter()
-                    .map(ContentBlock::from)
-                    .collect::<Vec<_>>()
-                    .into();
-
-                MessageTreeNodeView {
-                    id: n.id,
-                    parent_message_id: n.parent_message_id,
-                    message_type: n.message_type,
-                    content: content_blocks.to_string(),
-                    level: n.level,
-                    sibling_count: n.sibling_count,
-                    sibling_index: n.sibling_index,
-                    assets,
-                    reasoning_blocks,
-                }
-            })
-            .collect();
-
-        Ok(MessageTreeResponse {
-            nodes,
-            has_more: response.has_more,
-        })
+        Ok(response.messages)
     }
 
     async fn generate_title<R: Runtime>(
@@ -322,7 +201,7 @@ impl ThreadApi for ThreadApiImpl {
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         content: String,
-    ) -> Result<ThreadView, String> {
+    ) -> Result<Thread, String> {
         let thread_state = thread_manager(&app_handle)?;
         let thread_manager = thread_state.lock().await;
         let thread = thread_manager
@@ -385,116 +264,31 @@ impl ThreadApi for ThreadApiImpl {
     }
 }
 
-impl From<Thread> for ThreadView {
-    fn from(thread: Thread) -> Self {
-        ThreadView {
-            id: thread.id().map(|id| id.to_string()),
-            title: thread.title().to_string(),
-        }
-    }
-}
-
-impl From<&Thread> for ThreadView {
-    fn from(thread: &Thread) -> Self {
-        ThreadView {
-            id: thread.id().map(|id| id.to_string()),
-            title: thread.title().to_string(),
-        }
-    }
-}
-
-fn parse_asset_chips_from_json(json_str: &Option<String>) -> Option<Vec<MessageAssetChip>> {
-    let v = serde_json::from_str::<serde_json::Value>(json_str.as_ref()?).ok()?;
-    let chips = v.get("asset_chips")?.as_array()?;
-    let result: Vec<MessageAssetChip> = chips
-        .iter()
-        .filter_map(|chip| {
-            let id = chip.get("id")?.as_str()?.to_string();
-            let name = chip.get("name")?.as_str()?.to_string();
-            let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
-            Some(MessageAssetChip { id, name, icon })
-        })
-        .collect();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-fn parse_reasoning_blocks_from_json(json_str: &Option<String>) -> Option<Vec<ReasoningBlock>> {
-    let v = serde_json::from_str::<serde_json::Value>(json_str.as_ref()?).ok()?;
-    let blocks = v.as_array()?;
-    let result: Vec<ReasoningBlock> = blocks
-        .iter()
-        .filter_map(|block| {
-            let block_type = block.get("type")?.as_str()?.to_string();
-            let content = block
-                .get("content")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let signature = block
-                .get("signature")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            Some(ReasoningBlock {
-                r#type: block_type,
-                content,
-                signature,
+impl From<proto_gen::thread::ProtoThread> for Thread {
+    fn from(thread: proto_gen::thread::ProtoThread) -> Self {
+        let created_at = thread
+            .created_at
+            .map(|ts| {
+                Utc.timestamp_opt(ts.seconds, ts.nanos as u32)
+                    .single()
+                    .unwrap_or_default()
+                    .to_rfc3339()
             })
-        })
-        .collect();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-fn extract_asset_chips(message: &AnyMessage) -> Option<Vec<MessageAssetChip>> {
-    let kwargs = message.additional_kwargs();
-    let chips = kwargs.get("asset_chips")?.as_array()?;
-    let result: Vec<MessageAssetChip> = chips
-        .iter()
-        .filter_map(|chip| {
-            let id = chip.get("id")?.as_str()?.to_string();
-            let name = chip.get("name")?.as_str()?.to_string();
-            let icon = chip.get("icon").and_then(|v| v.as_str()).map(String::from);
-            Some(MessageAssetChip { id, name, icon })
-        })
-        .collect();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-fn extract_reasoning_blocks(message: &AnyMessage) -> Option<Vec<ReasoningBlock>> {
-    let kwargs = message.additional_kwargs();
-    let blocks = kwargs.get("reasoning_blocks")?.as_array()?;
-    let result: Vec<ReasoningBlock> = blocks
-        .iter()
-        .filter_map(|block| {
-            let block_type = block.get("type")?.as_str()?.to_string();
-            let content = block
-                .get("content")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            let signature = block
-                .get("signature")
-                .and_then(|v| v.as_str())
-                .map(String::from);
-            Some(ReasoningBlock {
-                r#type: block_type,
-                content,
-                signature,
+            .unwrap_or_default();
+        let updated_at = thread
+            .updated_at
+            .map(|ts| {
+                Utc.timestamp_opt(ts.seconds, ts.nanos as u32)
+                    .single()
+                    .unwrap_or_default()
+                    .to_rfc3339()
             })
-        })
-        .collect();
-    if result.is_empty() {
-        None
-    } else {
-        Some(result)
+            .unwrap_or_default();
+        Thread {
+            id: thread.id.into(),
+            title: thread.title,
+            created_at,
+            updated_at,
+        }
     }
 }

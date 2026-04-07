@@ -1,5 +1,5 @@
-import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 import { auth, accessToken } from '$lib/stores/auth.js';
+import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 import { inject } from '@eurora/shared/context';
 import { writable, derived, get } from 'svelte/store';
 

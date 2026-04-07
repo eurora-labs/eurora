@@ -14,7 +14,7 @@ import {
 	type LoginByLoginTokenRequest,
 	type AssociateLoginTokenRequest,
 } from '@eurora/shared/proto/auth_service_pb.js';
-import type { ConfigService } from '$lib/services/config-service.js';
+import type { ConfigService } from '@eurora/shared/config/config-service';
 
 export class AuthService {
 	private _client: Client<typeof ProtoAuthService> | null = null;

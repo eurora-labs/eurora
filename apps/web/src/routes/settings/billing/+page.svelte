@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { CONFIG_SERVICE } from '$lib/services/config-service.js';
 	import { auth, accessToken } from '$lib/stores/auth.js';
 	import {
 		subscriptionStore,
 		subscription,
 		subscriptionError,
 	} from '$lib/stores/subscription.js';
+	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';

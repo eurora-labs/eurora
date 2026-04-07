@@ -2,6 +2,14 @@ syntax = "proto3";
 
 package agent_chain;
 
+message BaseMessageWithSibling {
+  string parent_id = 1;
+  ProtoBaseMessage message = 2;
+  repeated BaseMessageWithSibling children = 3;
+  int32 sibling_index = 4;
+  int32 depth = 5;
+}
+
 message ProtoBaseMessage {
   oneof message {
     ProtoHumanMessage human = 1;
@@ -82,6 +90,17 @@ message ProtoAIMessageChunk {
 enum ProtoChunkPosition {
   CHUNK_POSITION_UNSPECIFIED = 0;
   CHUNK_POSITION_LAST = 1;
+}
+
+message ChatStreamResponse {
+  oneof payload {
+    ProtoAIMessageChunk chunk = 1;
+    ChatStreamFinalMessage final_message = 2;
+  }
+}
+
+message ChatStreamFinalMessage {
+  repeated BaseMessageWithSibling messages = 1;
 }
 
 message ProtoToolMessage {

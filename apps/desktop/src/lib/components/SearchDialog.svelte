@@ -5,7 +5,6 @@
 		type SearchThreadResultView,
 	} from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { THREAD_SERVICE } from '$lib/services/thread-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Command from '@eurora/ui/components/command/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
@@ -14,7 +13,6 @@
 	let { open = $bindable(false) }: { open?: boolean } = $props();
 
 	const taurpc = inject(TAURPC_SERVICE);
-	const threadService = inject(THREAD_SERVICE);
 
 	let query = $state('');
 	let threadResults: SearchThreadResultView[] = $state([]);
@@ -61,13 +59,13 @@
 
 	function selectThread(id: string) {
 		open = false;
-		threadService.activeThreadId = id;
+		// threadService.activeThreadId = id;
 		goto(`/${id}`);
 	}
 
 	function selectMessage(threadId: string) {
 		open = false;
-		threadService.activeThreadId = threadId;
+		// threadService.activeThreadId = threadId;
 		goto(`/${threadId}`);
 	}
 

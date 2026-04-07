@@ -68,7 +68,7 @@ echo "  Loading threads (without active_leaf_id)..."
 $PSQL -c "\COPY threads (id, user_id, title, created_at, updated_at) FROM '$DATA_DIR/threads.csv' WITH (FORMAT csv, HEADER true);"
 
 echo "  Loading messages ($(( $(wc -l < "$DATA_DIR/messages.csv") - 1 )) rows)..."
-$PSQL -c "\COPY messages (id, thread_id, user_id, parent_message_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, hidden_from_ui, reasoning_blocks, created_at, updated_at) FROM '$DATA_DIR/messages.csv' WITH (FORMAT csv, HEADER true);"
+$PSQL -c "\COPY messages (id, thread_id, user_id, parent_message_id, message_type, content, tool_call_id, tool_calls, additional_kwargs, created_at, updated_at) FROM '$DATA_DIR/messages.csv' WITH (FORMAT csv, HEADER true);"
 
 echo "  Setting threads.active_leaf_id..."
 $PSQL -f "$DATA_DIR/threads_active_leaf.sql"
