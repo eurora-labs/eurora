@@ -337,4 +337,107 @@ test.describe('MessageList', () => {
 			await expect(page.locator('[data-slot="reasoning-content"]')).not.toBeVisible();
 		});
 	});
+
+	test.describe('auto-scroll', () => {
+		test.use({ viewport: { width: 800, height: 600 } });
+
+		async function setupStreamingConversation(page: Page) {
+			await page.evaluate(() => {
+				const t = (window as any).__test;
+				const nodes = [];
+				for (let i = 0; i < 30; i++) {
+					nodes.push(
+						t.makeMessageNode(
+							'msg-' + i,
+							i % 2 === 0 ? 'human' : 'ai',
+							('Message ' + (i + 1) + '. ').repeat(20),
+							i > 0 ? { parentId: 'msg-' + (i - 1) } : {},
+						),
+					);
+				}
+				nodes.push(t.makeMessageNode('streaming-ai', 'ai', '', { parentId: 'msg-29' }));
+				return t.setupThread('thread-1', nodes);
+			});
+			await page.evaluate(() =>
+				(window as any).__test.simulateStreaming('thread-1', 'streaming-ai'),
+			);
+			// Ensure at bottom
+			await page.evaluate(() => {
+				const el = document.querySelector('[data-slot="conversation-content"]')!;
+				el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+			});
+			await page.waitForTimeout(100);
+		}
+
+		async function getScrollInfo(page: Page) {
+			return await page.evaluate(() => {
+				const el = document.querySelector('[data-slot="conversation-content"]');
+				if (!el) return { scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
+				return {
+					scrollTop: el.scrollTop,
+					scrollHeight: el.scrollHeight,
+					clientHeight: el.clientHeight,
+				};
+			});
+		}
+
+		test('auto-scrolls to bottom as streaming content arrives', async ({ page }) => {
+			await setupStreamingConversation(page);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'Hello world! '.repeat(50),
+				),
+			);
+			await page.waitForTimeout(500);
+
+			const info = await getScrollInfo(page);
+			const distFromBottom = info.scrollHeight - info.scrollTop - info.clientHeight;
+			expect(distFromBottom).toBeLessThan(250);
+		});
+
+		test('mouse wheel scroll up stops auto-scroll during streaming', async ({ page }) => {
+			await setupStreamingConversation(page);
+
+			// Add streaming content so auto-scroll is active
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'Initial chunk. '.repeat(50),
+				),
+			);
+			await page.waitForTimeout(500);
+
+			// User scrolls up with mouse wheel
+			const content = page.locator('[data-slot="conversation-content"]');
+			await content.hover();
+			await page.mouse.wheel(0, -800);
+			await page.waitForTimeout(300);
+
+			const scrollAfterWheel = await getScrollInfo(page);
+
+			// Append more streaming content
+			for (let i = 0; i < 5; i++) {
+				await page.evaluate(
+					(i) =>
+						(window as any).__test.appendStreamChunk(
+							'thread-1',
+							'streaming-ai',
+							`Chunk ${i}. `.repeat(30),
+						),
+					i,
+				);
+				await page.waitForTimeout(200);
+			}
+			await page.waitForTimeout(300);
+
+			// Scroll position should NOT have jumped to bottom
+			const scrollAfterChunks = await getScrollInfo(page);
+			const scrollDelta = Math.abs(scrollAfterChunks.scrollTop - scrollAfterWheel.scrollTop);
+			expect(scrollDelta).toBeLessThan(50);
+		});
+	});
 });
