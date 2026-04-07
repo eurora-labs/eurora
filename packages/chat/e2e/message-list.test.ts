@@ -2,13 +2,15 @@ import { test, expect, type Page } from '@playwright/test';
 
 const TEST_PATH = '/message-list';
 
-const messages = (page: Page) => page.locator('[data-slot="message"]');
-const userMessages = (page: Page) => page.locator('[data-slot="message"].is-user');
-const assistantMessages = (page: Page) => page.locator('[data-slot="message"].is-assistant');
-const messageActions = (page: Page, messageId: string) =>
-	page.locator(`[data-message-id="${messageId}"] [data-slot="message-actions"]`);
-const actionButton = (page: Page, messageId: string, name: string) =>
-	page.locator(`[data-message-id="${messageId}"]`).getByRole('button', { name });
+function messages(page: Page) {
+	return page.locator('[data-slot="message"]');
+}
+function userMessages(page: Page) {
+	return page.locator('[data-slot="message"].is-user');
+}
+function assistantMessages(page: Page) {
+	return page.locator('[data-slot="message"].is-assistant');
+}
 
 async function setupConversation(page: Page) {
 	await page.evaluate(() => {

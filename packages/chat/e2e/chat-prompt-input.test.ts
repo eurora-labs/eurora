@@ -2,9 +2,15 @@ import { test, expect, type Page } from '@playwright/test';
 
 const TEST_PATH = '/chat-prompt-input';
 
-const textarea = (page: Page) => page.locator('textarea[name="message"]');
-const submitBtn = (page: Page) => page.locator('[data-slot="prompt-input-submit"]');
-const suggestions = (page: Page) => page.locator('[data-slot="suggestion"]');
+function textarea(page: Page) {
+	return page.locator('textarea[name="message"]');
+}
+function submitBtn(page: Page) {
+	return page.locator('[data-slot="prompt-input-submit"]');
+}
+function suggestions(page: Page) {
+	return page.locator('[data-slot="suggestion"]');
+}
 
 test.describe('ChatPromptInput', () => {
 	test.beforeEach(async ({ page }) => {
