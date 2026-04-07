@@ -166,6 +166,7 @@ export class ChatService {
 
 	async sendMessage(text: string, assetIds?: string[]): Promise<void> {
 		if (!text.trim()) return;
+		this.viewMode = 'list';
 
 		let threadId = this.activeThreadId;
 		let isNewThread = false;
@@ -211,6 +212,7 @@ export class ChatService {
 	async editMessage(messageId: string, text: string): Promise<void> {
 		const threadId = this.activeThreadId;
 		if (!threadId) return;
+		this.viewMode = 'list';
 
 		const entry = this.getThreadData(threadId);
 		if (!entry) return;
