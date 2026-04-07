@@ -49,6 +49,7 @@ export class ChatService {
 
 	private readonly threadClient: IThreadService;
 
+	private threadIndex = new Map<string, ThreadMessages>();
 	private offset = 0;
 	abortController: AbortController | null = null;
 
@@ -60,10 +61,10 @@ export class ChatService {
 		this.loadingThreads = true;
 		try {
 			const fresh = await this.threadClient.listThreads(limit, offset);
-			const existing = new Map(this.threads.map((t) => [t.thread.id, t]));
 			this.threads = fresh.map(
-				(thread) => existing.get(thread.id) ?? new ThreadMessages(thread),
+				(thread) => this.threadIndex.get(thread.id) ?? new ThreadMessages(thread),
 			);
+			this.rebuildIndex();
 			this.offset = this.threads.length;
 			this.hasMoreThreads = fresh.length === PAGE_SIZE;
 		} catch (error) {
@@ -80,6 +81,7 @@ export class ChatService {
 			const res = await this.threadClient.listThreads(PAGE_SIZE, this.offset);
 			const newThreads = res.map((thread) => new ThreadMessages(thread));
 			this.threads = [...this.threads, ...newThreads];
+			this.rebuildIndex();
 			this.offset += newThreads.length;
 			this.hasMoreThreads = newThreads.length === PAGE_SIZE;
 		} catch (error) {
@@ -92,6 +94,7 @@ export class ChatService {
 	async deleteThread(threadId: string) {
 		await this.threadClient.deleteThread(threadId);
 		this.threads = this.threads.filter((t) => t.thread.id !== threadId);
+		this.threadIndex.delete(threadId);
 		this.offset = Math.max(0, this.offset - 1);
 		if (this.activeThreadId === threadId) {
 			this.activeThreadId = undefined;
@@ -99,7 +102,7 @@ export class ChatService {
 	}
 
 	updateThread(thread: Thread) {
-		const entry = this.threads.find((t) => t.thread.id === thread.id);
+		const entry = this.threadIndex.get(thread.id);
 		if (entry) {
 			entry.thread = { ...entry.thread, ...thread };
 		}
@@ -107,11 +110,11 @@ export class ChatService {
 
 	getThreadData(threadId: string | undefined): ThreadMessages | undefined {
 		if (!threadId) return undefined;
-		return this.threads.find((t) => t.thread.id === threadId);
+		return this.threadIndex.get(threadId);
 	}
 
 	async loadMessages(threadId: string): Promise<void> {
-		const entry = this.threads.find((t) => t.thread.id === threadId);
+		const entry = this.threadIndex.get(threadId);
 		if (!entry || entry.loading || entry.loaded || entry.streamingMessageId) return;
 
 		entry.loading = true;
@@ -138,7 +141,7 @@ export class ChatService {
 		messageId: string,
 		direction: BranchDirection,
 	): Promise<void> {
-		const entry = this.threads.find((t) => t.thread.id === threadId);
+		const entry = this.threadIndex.get(threadId);
 		if (!entry) return;
 
 		const messages = await this.threadClient.switchBranch(threadId, messageId, direction);
@@ -147,7 +150,7 @@ export class ChatService {
 	}
 
 	async loadFullTree(threadId: string): Promise<void> {
-		const entry = this.threads.find((t) => t.thread.id === threadId);
+		const entry = this.threadIndex.get(threadId);
 		if (!entry || entry.fullTreeLoading || entry.fullTree) return;
 
 		entry.fullTreeLoading = true;
@@ -171,6 +174,7 @@ export class ChatService {
 			const thread = await this.threadClient.createThread();
 			const entry = new ThreadMessages(thread);
 			this.threads = [entry, ...this.threads];
+			this.threadIndex.set(thread.id, entry);
 			this.activeThreadId = thread.id;
 			threadId = thread.id;
 			this.newThread = thread;
@@ -412,10 +416,15 @@ export class ChatService {
 		this.abortController?.abort();
 		this.abortController = null;
 		this.threads = [];
+		this.threadIndex.clear();
 		this.offset = 0;
 		this.hasMoreThreads = true;
 		this.loadingThreads = false;
 		this.activeThreadId = undefined;
+	}
+
+	private rebuildIndex(): void {
+		this.threadIndex = new Map(this.threads.map((t) => [t.thread.id, t]));
 	}
 }
 
