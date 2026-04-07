@@ -477,7 +477,6 @@ async fn run_chat_stream(
     thread_id: Uuid,
     user_id: Uuid,
     human_message_id: Uuid,
-    human_proto: BaseMessageWithSibling,
 ) {
     let mut full_content = String::new();
     let mut full_reasoning = String::new();
@@ -671,15 +670,7 @@ async fn run_chat_stream(
         let _ = tx
             .send(Ok(ChatStreamResponse {
                 payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
-                    messages: vec![human_proto, ai_proto],
-                })),
-            }))
-            .await;
-    } else {
-        let _ = tx
-            .send(Ok(ChatStreamResponse {
-                payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
-                    messages: vec![human_proto],
+                    messages: vec![ai_proto],
                 })),
             }))
             .await;
@@ -897,6 +888,12 @@ impl ProtoThreadService for ThreadService {
             token: token.clone(),
         };
 
+        let _ = tx
+            .send(Ok(ChatStreamResponse {
+                payload: Some(Payload::ConfirmedHumanMessage(human_proto)),
+            }))
+            .await;
+
         tokio::spawn(run_chat_stream(
             tx,
             token,
@@ -907,7 +904,6 @@ impl ProtoThreadService for ThreadService {
             thread_id,
             user_id,
             human_message_id,
-            human_proto,
         ));
 
         Ok(Response::new(Box::pin(stream) as Self::ChatStreamStream))
