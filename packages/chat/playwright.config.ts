@@ -1,16 +1,18 @@
 import { defineConfig } from '@playwright/test';
 
+const ci = !!process.env.CI;
+
 export default defineConfig({
 	webServer: {
-		command: 'pnpm dev --port 4399',
+		command: ci ? 'pnpm preview --port 4399' : 'pnpm dev --port 4399',
 		port: 4399,
-		reuseExistingServer: !process.env.CI,
+		reuseExistingServer: !ci,
 	},
 	testDir: 'e2e',
 	fullyParallel: true,
-	forbidOnly: !!process.env.CI,
-	retries: process.env.CI ? 2 : 0,
-	workers: process.env.CI ? 1 : undefined,
+	forbidOnly: ci,
+	retries: ci ? 2 : 0,
+	workers: ci ? 1 : undefined,
 	reporter: 'html',
 	use: {
 		baseURL: 'http://localhost:4399',
