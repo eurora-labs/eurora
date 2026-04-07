@@ -125,27 +125,27 @@
 		<MessageGraph onMessageDblClick={handleGraphNavigate} class="min-h-0 flex-1" />
 	{:else}
 		<MessageList onCopy={handleCopy} onEdit={handleEdit} {emptyState} />
-		<ChatPromptInput onSubmit={handleSubmit} {suggestions}>
-			{#snippet header()}
-				{#if assets.length > 0}
-					<Attachment.Root variant="inline">
-						{#each assets as asset (asset.id)}
-							<Attachment.Item
-								data={{
-									type: 'file',
-									id: asset.id,
-									filename: middleTruncate(asset.name),
-								}}
-								onRemove={() => removeAsset(asset.id)}
-							>
-								<Attachment.Preview />
-								<Attachment.Info />
-								<Attachment.Remove />
-							</Attachment.Item>
-						{/each}
-					</Attachment.Root>
-				{/if}
-			{/snippet}
-		</ChatPromptInput>
 	{/if}
+	<ChatPromptInput onSubmit={handleSubmit} {suggestions}>
+		{#snippet header()}
+			{#if assets.length > 0}
+				<Attachment.Root variant="inline">
+					{#each assets as asset (asset.id)}
+						<Attachment.Item
+							data={{
+								type: 'file',
+								id: asset.id,
+								filename: middleTruncate(asset.name),
+							}}
+							onRemove={() => removeAsset(asset.id)}
+						>
+							<Attachment.Preview />
+							<Attachment.Info />
+							<Attachment.Remove />
+						</Attachment.Item>
+					{/each}
+				</Attachment.Root>
+			{/if}
+		{/snippet}
+	</ChatPromptInput>
 </div>

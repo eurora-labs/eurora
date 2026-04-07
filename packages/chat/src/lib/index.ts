@@ -17,6 +17,7 @@ export type {
 	AiMessageChunk,
 	ChatStreamEvent,
 	StreamChunk,
+	StreamConfirmedHumanMessage,
 	StreamFinalMessage,
 	ToolCallChunk,
 } from './models/streaming.js';

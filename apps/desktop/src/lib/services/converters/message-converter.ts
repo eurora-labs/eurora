@@ -330,6 +330,12 @@ export function toChatStreamEvent(raw: ChatStreamResponse): ChatStreamEvent {
 	if (!raw.payload) {
 		throw new Error('ChatStreamResponse missing payload');
 	}
+	if ('ConfirmedHumanMessage' in raw.payload) {
+		return {
+			type: 'confirmed_human',
+			message: toMessageNode(raw.payload.ConfirmedHumanMessage),
+		};
+	}
 	if ('FinalMessage' in raw.payload) {
 		return {
 			type: 'final',

@@ -96,6 +96,7 @@ message ChatStreamResponse {
   oneof payload {
     ProtoAIMessageChunk chunk = 1;
     ChatStreamFinalMessage final_message = 2;
+    BaseMessageWithSibling confirmed_human_message = 3;
   }
 }
 
