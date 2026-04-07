@@ -13,6 +13,10 @@ concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
+env:
+    PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+    VITE_GRPC_API_URL: http://localhost:50051
+
 jobs:
     test:
         name: Run Tests
