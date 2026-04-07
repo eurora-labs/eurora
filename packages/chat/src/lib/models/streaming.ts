@@ -32,4 +32,9 @@ export interface StreamFinalMessage {
 	messages: MessageNode[];
 }
 
-export type ChatStreamEvent = StreamChunk | StreamFinalMessage;
+export interface StreamConfirmedHumanMessage {
+	type: 'confirmed_human';
+	message: MessageNode;
+}
+
+export type ChatStreamEvent = StreamChunk | StreamFinalMessage | StreamConfirmedHumanMessage;
