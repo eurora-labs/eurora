@@ -1,9 +1,9 @@
 <script lang="ts">
+	import { FakeThreadService } from '../test-utils/fake-thread-service.js';
+	import { SidebarThreadsList } from '$lib/index.js';
 	import { ChatService, CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
 	import { provide } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import { SidebarThreadsList } from '$lib/index.js';
-	import { FakeThreadService } from '../test-utils/fake-thread-service.js';
 	import { Toaster } from 'svelte-sonner';
 
 	const fakeService = new FakeThreadService();
@@ -27,12 +27,22 @@
 			},
 			async addThread(title: string) {
 				const id = `thread-${Date.now()}`;
-				fakeService.threads.unshift({ id, title, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+				fakeService.threads.unshift({
+					id,
+					title,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				});
 				await chatService.loadThreads(20, 0);
 			},
 			async addUntitledThread() {
 				const id = `thread-${Date.now()}`;
-				fakeService.threads.unshift({ id, title: null as any, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+				fakeService.threads.unshift({
+					id,
+					title: null as any,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				});
 				await chatService.loadThreads(20, 0);
 			},
 			setDeleteDelay(ms: number) {
