@@ -28,7 +28,7 @@
 
 	const streaming = $derived(!!chatService.activeThread?.streamingMessageId);
 	const showSuggestions = $derived(
-		suggestions.length > 0 && chatService.activeThread?.messages.length === 0,
+		suggestions.length > 0 && (chatService.activeThread?.messages.length ?? 0) === 0,
 	);
 
 	function handleSubmit(message: PromptInputMessage) {
