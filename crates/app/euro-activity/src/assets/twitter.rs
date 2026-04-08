@@ -2,7 +2,7 @@ use agent_chain_core::messages::{
     ContentBlock, ContentBlocks, ImageContentBlock, PlainTextContentBlock,
 };
 use async_trait::async_trait;
-use euro_native_messaging::{NativeTwitterAsset, NativeTwitterTweet, ParseResult};
+use euro_native_messaging::{NativeImage, NativeTwitterAsset, NativeTwitterTweet, ParseResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -18,7 +18,7 @@ pub struct TwitterTweet {
     pub timestamp: Option<String>,
     pub author: Option<String>,
     #[serde(default)]
-    pub images: Vec<String>,
+    pub images: Vec<NativeImage>,
 }
 
 impl TwitterTweet {
@@ -138,12 +138,12 @@ impl TwitterAsset {
             blocks.push(block.into());
 
             for image in &tweet.images {
-                if image.is_empty() {
+                if image.base64.is_empty() {
                     continue;
                 }
                 match ImageContentBlock::builder()
-                    .base64(image.to_string())
-                    .mime_type("image/png".to_string())
+                    .base64(image.base64.clone())
+                    .mime_type(image.mime_type.clone())
                     .build()
                 {
                     Ok(block) => blocks.push(ContentBlock::Image(block)),
@@ -278,7 +278,16 @@ mod tests {
             text: "Check this out".to_string(),
             author: None,
             timestamp: None,
-            images: vec!["img1".to_string(), "img2".to_string()],
+            images: vec![
+                NativeImage {
+                    base64: "aW1n".to_string(),
+                    mime_type: "image/jpeg".to_string(),
+                },
+                NativeImage {
+                    base64: "aW1n".to_string(),
+                    mime_type: "image/png".to_string(),
+                },
+            ],
         };
 
         assert_eq!(
@@ -339,7 +348,10 @@ mod tests {
             text: "Main tweet".to_string(),
             author: Some("author".to_string()),
             timestamp: None,
-            images: vec!["aW1hZ2VkYXRh".to_string()],
+            images: vec![NativeImage {
+                base64: "aW1hZ2VkYXRh".to_string(),
+                mime_type: "image/png".to_string(),
+            }],
         };
         let reply = TwitterTweet {
             text: "A reply".to_string(),
