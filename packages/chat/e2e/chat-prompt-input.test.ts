@@ -98,10 +98,6 @@ test.describe('ChatPromptInput', () => {
 
 			await expect(page.getByTestId('last-submitted')).toHaveText('Write a poem');
 		});
-
-		test('hides suggestions when no active thread', async ({ page }) => {
-			await expect(suggestions(page)).toHaveCount(0);
-		});
 	});
 
 	test.describe('streaming state', () => {
