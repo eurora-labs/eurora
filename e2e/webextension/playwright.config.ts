@@ -11,7 +11,7 @@ export default defineConfig({
 
 	workers: process.env['CI'] ? 1 : undefined,
 
-	grepInvert: process.env['CI'] ? /@youtube/ : undefined,
+	grepInvert: process.env['CI'] ? /@youtube|@x/ : undefined,
 
 	reporter: 'html',
 
