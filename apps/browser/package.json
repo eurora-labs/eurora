@@ -3,6 +3,11 @@
 	"private": true,
 	"version": "0.4.0",
 	"type": "module",
+	"exports": {
+		"./types": "./src/shared/content/bindings.ts",
+		"./watcher": "./src/shared/content/extensions/watchers/watcher.ts",
+		"./transcript": "./src/content/sites/youtube.com/transcript/transcript-parser.ts"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",

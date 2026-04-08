@@ -25,8 +25,7 @@ export abstract class BasePageParser {
 
 		for (const article of Array.from(tweetArticles)) {
 			const tweetTextEl = article.querySelector('[data-testid="tweetText"]');
-			const spanElement = tweetTextEl?.querySelector('span');
-			if (!spanElement || !spanElement.textContent) continue;
+			if (!tweetTextEl?.textContent) continue;
 
 			const images: string[] = [];
 			const imgElements = Array.from(
@@ -39,10 +38,15 @@ export abstract class BasePageParser {
 				if (base64) images.push(base64);
 			}
 
+			const timestamp = article.querySelector('time')?.getAttribute('datetime') ?? null;
+			const author =
+				article.querySelector('a[tabindex="-1"][role="link"] span')?.textContent?.trim() ??
+				null;
+
 			tweets.push({
-				text: spanElement.textContent.trim(),
-				timestamp: null,
-				author: null,
+				text: tweetTextEl.textContent.trim(),
+				timestamp,
+				author,
 				images,
 			});
 		}

@@ -1,22 +1,23 @@
-import { expect, Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+import type { WatcherResponse } from './types.ts';
+import type { Worker } from '@playwright/test';
 
-/**
- * Wait for the content script bootstrap to complete
- *
- * The content script sets eurora-ext-ready="1" on the html element when ready
- */
 export async function waitForBootstrap(page: Page) {
-	await expect(page.locator('html[eurora-ext-ready="1"]')).toBeVisible();
+	await expect(page.locator('html')).toHaveAttribute('eurora-ext-ready', '1');
 }
 
-/**
- * Wait for a specific site handler to be mounted
- *
- * @param page - The Playwright page object
- * @param siteId - The site identifier (e.g., 'default', 'youtube.com')
- */
 export async function waitForSiteMounted(page: Page, siteId: string) {
-	await expect(
-		page.locator(`html[eurora-ext-mounted="1"][eurora-ext-site="${siteId}"]`),
-	).toBeVisible();
+	await expect(page.locator('html')).toHaveAttribute('eurora-ext-mounted', '1');
+	await expect(page.locator('html')).toHaveAttribute('eurora-ext-site', siteId);
+}
+
+export async function sendToActiveTab(
+	sw: Worker,
+	message: { type: string },
+): Promise<WatcherResponse> {
+	return await sw.evaluate(async (msg) => {
+		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+		const response = await chrome.tabs.sendMessage(tab.id!, msg);
+		return response;
+	}, message);
 }
