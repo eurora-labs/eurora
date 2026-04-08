@@ -51,7 +51,6 @@
 		"eslint-plugin-svelte": "^2.46.1",
 		"globals": "^15.15.0",
 		"jsdom": "^25.0.1",
-		"katex": "^0.16.33",
 		"keyboard-event-to-string": "^2.1.0",
 		"mode-watcher": "^1.1.0",
 		"postcss": "catalog:",
@@ -61,13 +60,6 @@
 		"prettier": "^3.8.1",
 		"prettier-plugin-svelte": "^3.5.1",
 		"prettier-plugin-tailwindcss": "^0.7.2",
-		"rehype-katex": "^7.0.1",
-		"rehype-raw": "^7.0.0",
-		"rehype-stringify": "^10.0.1",
-		"remark-gfm": "^4.0.1",
-		"remark-math": "^6.0.0",
-		"remark-parse": "^11.0.0",
-		"remark-rehype": "^11.1.2",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"svelte-sonner": "^1.0.8",
@@ -82,7 +74,6 @@
 		"vitest": "catalog:"
 	},
 	"dependencies": {
-		"@tauri-apps/plugin-opener": "^2.5.3",
-		"rehype-sanitize": "^6.0.0"
+		"@tauri-apps/plugin-opener": "^2.5.3"
 	}
 }

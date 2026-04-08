@@ -1,55 +1,72 @@
 import { test, expect } from '../utils/fixtures.ts';
-import { waitForBootstrap, waitForSiteMounted } from '../utils/helpers.ts';
-import { WatcherResponse } from '../utils/types.ts';
+import { waitForBootstrap, waitForSiteMounted, sendToActiveTab } from '../utils/helpers.ts';
+import type { TranscriptSnippet } from '../utils/types.ts';
+
+const VIDEO_URL = 'https://www.youtube.com/watch?v=CXKoCMVqM9s&t=1289s';
 
 test.describe('Youtube Watcher Tests', { tag: '@youtube' }, () => {
-	test('should extract English subtitles from a video', async ({ page, sw }) => {
-		await page.goto('https://www.youtube.com/watch?v=CXKoCMVqM9s&t=1289s');
-		await waitForBootstrap(page);
-		await waitForSiteMounted(page, 'youtube.com');
-
-		const response: WatcherResponse = await sw.evaluate(async () => {
-			const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-			return await new Promise((resolve) => {
-				chrome.tabs.sendMessage(tab.id!, { type: 'GENERATE_ASSETS' }, (response) =>
-					resolve(response),
-				);
-			});
+	test.describe('watch page', () => {
+		test.beforeEach(async ({ page }) => {
+			await page.goto(VIDEO_URL);
+			await waitForBootstrap(page);
+			await waitForSiteMounted(page, 'youtube.com');
 		});
 
-		expect(response).toBeDefined();
-		if (response === undefined) {
-			throw new Error('Response is undefined');
-		}
+		test('should extract video asset with all fields', async ({ sw }) => {
+			const response = await sendToActiveTab(sw, { type: 'GENERATE_ASSETS' });
 
-		expect(response.kind).toEqual('NativeYoutubeAsset');
-		expect(response.data).toBeDefined();
-		expect(Array.isArray(JSON.parse(response.data.transcript))).toEqual(true);
-		expect(response.data.current_time).toEqual(1289);
+			if (!response) {
+				throw new Error('Expected a response from GENERATE_ASSETS');
+			}
+
+			expect(response.kind).toEqual('NativeYoutubeAsset');
+
+			expect(response.data.url).toContain('youtube.com/watch');
+			expect(response.data.title).toBeTruthy();
+			expect(response.data.current_time).toEqual(1289);
+
+			const snippets: TranscriptSnippet[] = JSON.parse(response.data.transcript);
+			expect(snippets.length).toBeGreaterThan(0);
+			expect(snippets[0]).toEqual(
+				expect.objectContaining({
+					text: expect.any(String),
+					start: expect.any(Number),
+					duration: expect.any(Number),
+				}),
+			);
+		});
+
+		test('should extract video snapshot with all fields', async ({ sw }) => {
+			const response = await sendToActiveTab(sw, { type: 'GENERATE_SNAPSHOT' });
+
+			if (!response) {
+				throw new Error('Expected a response from GENERATE_SNAPSHOT');
+			}
+
+			expect(response.kind).toEqual('NativeYoutubeSnapshot');
+
+			expect(response.data.current_time).toBeGreaterThanOrEqual(0);
+			expect(response.data.video_frame_base64.length).toBeGreaterThan(0);
+			expect(response.data.video_frame_width).toBeGreaterThan(0);
+			expect(response.data.video_frame_height).toBeGreaterThan(0);
+		});
 	});
 
-	test('should extract video frame from a video', async ({ page, sw }) => {
-		await page.goto('https://www.youtube.com/watch?v=CXKoCMVqM9s&t=1289s');
-		await waitForBootstrap(page);
-		await waitForSiteMounted(page, 'youtube.com');
+	test.describe('non-watch page', () => {
+		test('should fall back to article extraction', async ({ page, sw }) => {
+			await page.goto('https://www.youtube.com');
+			await waitForBootstrap(page);
+			await waitForSiteMounted(page, 'youtube.com');
 
-		const response: WatcherResponse = await sw.evaluate(async () => {
-			const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-			return await new Promise((resolve) => {
-				chrome.tabs.sendMessage(tab.id!, { type: 'GENERATE_SNAPSHOT' }, (response) =>
-					resolve(response),
-				);
-			});
+			const response = await sendToActiveTab(sw, { type: 'GENERATE_ASSETS' });
+
+			if (!response) {
+				throw new Error('Expected a response from GENERATE_ASSETS');
+			}
+
+			expect(response.kind).toEqual('NativeArticleAsset');
+			expect(response.data.title).toBeTruthy();
+			expect(response.data.text_content).toBeDefined();
 		});
-
-		expect(response).toBeDefined();
-		if (response === undefined) {
-			throw new Error('Response is undefined');
-		}
-
-		expect(response.kind).toEqual('NativeYoutubeSnapshot');
-		expect(response.data).toBeDefined();
-		expect(response.data.video_frame_base64).toBeDefined();
-		expect(response.data.video_frame_base64.length).toBeGreaterThan(0);
 	});
 });
