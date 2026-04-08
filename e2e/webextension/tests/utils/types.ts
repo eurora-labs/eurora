@@ -1,7 +1,8 @@
-/** Mirrors the NativeResponse type from the browser extension. */
-export interface NativeResponse {
-	kind: string;
-	data: any;
-}
-
-export type WatcherResponse = NativeResponse | void;
+export type { WatcherResponse } from '@eurora/browser/watcher';
+export type {
+	NativeArticleAsset,
+	NativeArticleSnapshot,
+	NativeYoutubeAsset,
+	NativeYoutubeSnapshot,
+} from '@eurora/browser/types';
+export type { TranscriptSnippet } from '@eurora/browser/transcript';
