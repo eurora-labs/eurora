@@ -43,6 +43,11 @@ export type NativeArticleSnapshot = {
 	highlighted_text: string | null;
 };
 
+export type NativeImage = {
+	base64: string;
+	mime_type: string;
+};
+
 export type NativeMetadata = {
 	url: string | null;
 	icon_base64: string | null;
@@ -60,7 +65,7 @@ export type NativeTwitterTweet = {
 	text: string;
 	timestamp: string | null;
 	author: string | null;
-	images?: string[];
+	images?: NativeImage[];
 };
 
 export type NativeYoutubeAsset = {

@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use super::NativeImage;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
 pub struct NativeTwitterTweet {
     pub text: String,
     pub timestamp: Option<String>,
     pub author: Option<String>,
     #[serde(default)]
-    pub images: Vec<String>,
+    pub images: Vec<NativeImage>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
