@@ -11,23 +11,26 @@
 			label: 'Context recognition',
 			description: 'Instant context from your browser that you can ask about',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4',
+			loop: false,
 		},
 		{
 			id: 'second',
 			label: 'Instantly works on every website',
 			description: 'Eurora instantly answers your questions.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/multiple_websites_demo.mp4',
+			loop: true,
 		},
 		{
 			id: 'third',
 			label: 'The last AI assistant you will ever need',
 			description: 'A single AI assistant that works everywhere',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/twitter_demo.mp4',
+			loop: false,
 		},
 	] as const;
 
 	let activeTab = $state<(typeof tabs)[number]['id']>('first');
-	let activeVideo = $derived(tabs.find((t) => t.id === activeTab)!.src);
+	let active = $derived(tabs.find((t) => t.id === activeTab)!);
 </script>
 
 <svelte:head>
@@ -55,7 +58,7 @@
 	</div>
 
 	{#key activeTab}
-		<AutoplayVideo src={activeVideo} class="rounded-xl mt-8" />
+		<AutoplayVideo src={active.src} loop={active.loop} class="rounded-xl mt-8" />
 	{/key}
 
 	<div class="grid grid-cols-3 gap-3 mt-4">
