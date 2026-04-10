@@ -8,22 +8,21 @@
 	const tabs = [
 		{
 			id: 'first',
-			label: 'Context Recognition',
+			label: 'Context recognition',
 			description: 'Instant context from your browser that you can ask about',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4',
 		},
 		{
 			id: 'second',
-			label: 'Works on every website and integrates in any browser',
-			description:
-				'Eurora can handle context from any website and instantly answer your questions.',
+			label: 'Instantly works on every website',
+			description: 'Eurora instantly answers your questions.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/multiple_websites_demo.mp4',
 		},
 		{
 			id: 'third',
-			label: 'Cross Platform',
-			description: 'Native on macOS, Windows, and Linux',
-			src: 'https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4',
+			label: 'The last AI assistant you will ever need',
+			description: 'A single AI assistant that works everywhere',
+			src: 'https://d26xptavrz5c8t.cloudfront.net/video/twitter_demo.mp4',
 		},
 	] as const;
 
