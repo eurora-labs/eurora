@@ -7,23 +7,28 @@
 
 	const tabs = [
 		{
-			id: 'assistant',
+			id: 'first',
 			label: 'Context Recognition',
 			description: 'Instant context from your browser that you can ask about',
+			src: 'https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4',
 		},
 		{
-			id: 'browser',
-			label: 'Browser Integration',
-			description: 'Works with every browser you use',
+			id: 'second',
+			label: 'Works on every website and integrates in any browser',
+			description:
+				'Eurora can handle context from any website and instantly answer your questions.',
+			src: 'https://d26xptavrz5c8t.cloudfront.net/video/multiple_websites_demo.mp4',
 		},
 		{
-			id: 'cross-platform',
+			id: 'third',
 			label: 'Cross Platform',
 			description: 'Native on macOS, Windows, and Linux',
+			src: 'https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4',
 		},
 	] as const;
 
-	let activeTab = $state<(typeof tabs)[number]['id']>('assistant');
+	let activeTab = $state<(typeof tabs)[number]['id']>('first');
+	let activeVideo = $derived(tabs.find((t) => t.id === activeTab)!.src);
 </script>
 
 <svelte:head>
@@ -50,10 +55,9 @@
 		</div>
 	</div>
 
-	<AutoplayVideo
-		src="https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4"
-		class="rounded-xl mt-8"
-	/>
+	{#key activeTab}
+		<AutoplayVideo src={activeVideo} class="rounded-xl mt-8" />
+	{/key}
 
 	<div class="grid grid-cols-3 gap-3 mt-4">
 		{#each tabs as tab}
