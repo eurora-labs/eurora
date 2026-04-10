@@ -20,7 +20,7 @@ catalogs:
         '@reduxjs/toolkit': ^2.5.0
     svelte:
         '@sveltejs/adapter-static': 3.0.10
-        '@sveltejs/kit': 2.55.0
+        '@sveltejs/kit': 2.57.1
         '@sveltejs/vite-plugin-svelte': 5.1.1
         svelte: 5.55.1
         svelte-check: 4.4.6
