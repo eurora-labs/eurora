@@ -7,9 +7,10 @@
 	export interface AutoplayVideoProps {
 		src: string;
 		class?: string;
+		loop?: boolean;
 	}
 
-	let { src, class: className }: AutoplayVideoProps = $props();
+	let { src, class: className, loop = false }: AutoplayVideoProps = $props();
 
 	let paused = $state(true);
 	let ended = $state(false);
@@ -63,6 +64,7 @@
 		{src}
 		autoplay
 		muted
+		{loop}
 		playsinline
 		preload="auto"
 	></video>
