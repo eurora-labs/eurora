@@ -243,22 +243,21 @@
 			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Open source, always</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
-					Every line of Eurora's code is public. You don't have to take our word for
-					anything — read the source, audit it, run it yourself.
+					Every line of Eurora's code is public. You don't have to take our word for it.
+					Read the source, audit it and run it yourself.
 				</p>
 			</div>
 			<div class="rounded-2xl bg-card p-8">
-				<h3 class="font-semibold text-lg mb-2">No hidden motives</h3>
+				<h3 class="font-semibold text-lg mb-2">One assistant, everywhere</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
-					We're self-funded. No investors pushing for growth-at-all-costs. Our only
-					incentive is to build something you genuinely want to use.
+					A single AI that works across every platform and browser. Eurora is a single
+					unified assistant that has all the context.
 				</p>
 			</div>
 			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Built for people</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
-					We design for how people actually work — across platforms, across browsers,
-					without friction. Technology should adapt to you, never the reverse.
+					We built it for you. That means you stay in control of everything Eurora does.
 				</p>
 			</div>
 		</div>
