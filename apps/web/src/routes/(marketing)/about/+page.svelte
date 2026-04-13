@@ -3,21 +3,13 @@
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
-	import CopyIcon from '@lucide/svelte/icons/copy';
 	import GithubIcon from '@lucide/svelte/icons/github';
 	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	import MailIcon from '@lucide/svelte/icons/mail';
 
 	const email = 'contact@eurora-labs.com';
-	let copied = $state(false);
 	let copiedLaura = $state(false);
 	let copiedAndre = $state(false);
-
-	async function copyEmail() {
-		await navigator.clipboard.writeText(email);
-		copied = true;
-		setTimeout(() => (copied = false), 2000);
-	}
 
 	async function copyLauraEmail() {
 		await navigator.clipboard.writeText('laura@eurora-labs.com');
@@ -30,18 +22,6 @@
 		copiedAndre = true;
 		setTimeout(() => (copiedAndre = false), 2000);
 	}
-
-	const socials = [
-		{ name: 'GitHub', href: 'https://github.com/eurora-labs/eurora', icon: SiGithub },
-		{ name: 'Discord', href: 'https://discord.gg/xRT9EpBEwc', icon: SiDiscord },
-		{ name: 'Reddit', href: 'https://reddit.com/r/eurora', icon: SiReddit },
-		{
-			name: 'Bluesky',
-			href: 'https://bsky.app/profile/euroralabs.bsky.social',
-			icon: SiBluesky,
-		},
-		{ name: 'X', href: 'https://x.com/euroralabs', icon: SiX },
-	];
 
 	const laura_thommen_img = 'https://d26xptavrz5c8t.cloudfront.net/image/laura.png';
 	const andre_roelofs_img = 'https://d26xptavrz5c8t.cloudfront.net/image/andre.png';
@@ -84,9 +64,7 @@
 				<div
 					class="absolute -inset-px rounded-2xl bg-linear-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
 				></div>
-				<div
-					class="relative rounded-2xl border border-border bg-card p-6 sm:p-8 h-full flex flex-col"
-				>
+				<div class="relative rounded-2xl bg-card p-6 sm:p-8 h-full flex flex-col">
 					<div class="flex items-center gap-4 mb-5">
 						<img
 							src={laura_thommen_img}
@@ -162,9 +140,7 @@
 				<div
 					class="absolute -inset-px rounded-2xl bg-linear-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
 				></div>
-				<div
-					class="relative rounded-2xl border border-border bg-card p-6 sm:p-8 h-full flex flex-col"
-				>
+				<div class="relative rounded-2xl bg-card p-6 sm:p-8 h-full flex flex-col">
 					<div class="flex items-center gap-4 mb-5">
 						<img
 							src={andre_roelofs_img}
@@ -256,29 +232,29 @@
 			for your data. Here's what drives every decision we make.
 		</p>
 
-		<div class="grid grid-cols-1 gap-px bg-border rounded-2xl overflow-hidden md:grid-cols-2">
-			<div class="bg-card p-8">
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Your data stays yours</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					All data lives in sovereign European infrastructure. We can't read it, we can't
 					sell it, and we architected the system so we never could.
 				</p>
 			</div>
-			<div class="bg-card p-8">
+			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Open source, always</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					Every line of Eurora's code is public. You don't have to take our word for
 					anything — read the source, audit it, run it yourself.
 				</p>
 			</div>
-			<div class="bg-card p-8">
+			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">No hidden motives</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					We're self-funded. No investors pushing for growth-at-all-costs. Our only
 					incentive is to build something you genuinely want to use.
 				</p>
 			</div>
-			<div class="bg-card p-8">
+			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Built for people</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					We design for how people actually work — across platforms, across browsers,
@@ -291,7 +267,7 @@
 	<div class="mb-16">
 		<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
 			{#each stats as stat}
-				<div class="rounded-2xl border border-border bg-card p-6 text-center">
+				<div class="rounded-2xl bg-card p-6 text-center">
 					<p class="text-3xl font-bold text-primary mb-1">{stat.value}</p>
 					<p class="text-sm text-muted-foreground">{stat.label}</p>
 				</div>
