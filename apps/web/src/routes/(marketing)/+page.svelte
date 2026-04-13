@@ -1,7 +1,7 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
-	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
+	import ReadyToStart from '$lib/components/marketing/ReadyToStart.svelte';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
 	import * as FeatureSection from '@eurora/ui/custom-components/feature-section/index';
 
@@ -37,7 +37,7 @@
 	<title>Eurora — AI Assistant for Your Browser</title>
 	<meta
 		name="description"
-		content="Free, open-source AI assistant that reads what you read. Ask about any YouTube video, article, or tweet without copy-pasting. Private and built in Europe."
+		content="Free, open-source AI assistant that reads what you read. Ask about any YouTube video, article, or tweet without copy and paste. Private and built in Europe."
 	/>
 </svelte:head>
 
@@ -114,27 +114,7 @@
 		</FeatureSection.Root>
 	</div>
 
-	<section
-		class="relative mt-32 mb-16 flex flex-col items-center text-center overflow-hidden rounded-3xl border border-primary/10 bg-linear-to-b from-primary/5 via-primary/10 to-primary/5 px-6 py-24 sm:px-12 sm:py-32"
-	>
-		<div
-			class="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/15 via-transparent to-transparent"
-		></div>
-
-		<h2 class="relative text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-			Ready to get started?
-		</h2>
-		<p
-			class="relative mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl lg:text-2xl leading-relaxed"
-		>
-			Download Eurora and experience AI on your own terms. Free, private, and open source.
-		</p>
-		<Button
-			size="lg"
-			class="relative mt-10 rounded-full px-12 py-7 text-xl font-semibold shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-shadow"
-			href="/download"
-		>
-			Download
-		</Button>
-	</section>
+	<div class="mt-24">
+		<ReadyToStart />
+	</div>
 </div>
