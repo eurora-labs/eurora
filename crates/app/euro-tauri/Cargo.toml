@@ -24,11 +24,12 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-chain-core = { workspace = true }
+agent-chain-core = { workspace = true, features = ["prost"] }
 auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 backon = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
+chrono = { workspace = true, features = ["serde"] }
 color-thief = "0.2.2"
 dirs = { workspace = true }
 dotenv = { workspace = true }
@@ -70,6 +71,7 @@ tauri-plugin-window-state = "2"
 taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
+tokio-util = "0.7"
 tracing = { workspace = true }
 url = { workspace = true }
 

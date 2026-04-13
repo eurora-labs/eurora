@@ -1,22 +1,18 @@
-use crate::{
-    Thread,
-    error::{Error, Result},
-};
+use crate::error::{Error, Result};
 use agent_chain::messages::{ContentBlock, ContentBlocks};
-use agent_chain::{AnyMessage, HumanMessage, SystemMessage, messages::AIMessageChunk};
+use agent_chain_core::proto::{ChatStreamResponse, ProtoContentBlock};
 use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
-use proto_gen::agent_chain::{ProtoContentBlock, ProtoHumanMessage, ProtoSystemMessage};
 use proto_gen::thread::{
-    AddHiddenHumanMessageRequest, AddHumanMessageRequest, AddSystemMessageRequest,
     ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,
-    GetMessageTreeRequest, GetMessageTreeResponse, GetMessagesRequest, GetMessagesResponse,
-    GetThreadRequest, ListThreadsRequest, SavePreliminaryContentBlocksRequest,
-    SearchMessagesRequest, SearchMessagesResponse, SearchThreadsRequest, SearchThreadsResponse,
-    SwitchBranchRequest, proto_thread_service_client::ProtoThreadServiceClient,
+    GetMessagesRequest, GetMessagesResponse, GetThreadRequest, ListThreadsRequest, ProtoThread,
+    SavePreliminaryContentBlocksRequest, SearchMessagesRequest, SearchMessagesResponse,
+    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest,
+    proto_thread_service_client::ProtoThreadServiceClient,
 };
 use std::pin::Pin;
 use tokio::sync::watch;
 use tokio_stream::{Stream, StreamExt};
+use tokio_util::sync::CancellationToken;
 use tonic::transport::Channel;
 
 pub struct ThreadManager {
@@ -42,11 +38,11 @@ impl ThreadManager {
             .max_encoding_message_size(1024 * 1024 * 1024)
     }
 
-    pub async fn create(&self, request: CreateThreadRequest) -> Result<Thread> {
+    pub async fn create(&self, request: CreateThreadRequest) -> Result<ProtoThread> {
         let mut client = self.client();
         let response = client.create_thread(request).await?.into_inner();
         if let Some(thread) = response.thread {
-            Ok(thread.into())
+            Ok(thread)
         } else {
             Err(Error::CreateThread(
                 "Server did not return the saved thread".to_string(),
@@ -54,26 +50,11 @@ impl ThreadManager {
         }
     }
 
-    pub async fn list_threads(&self, request: ListThreadsRequest) -> Result<Vec<Thread>> {
+    pub async fn list_threads(&self, request: ListThreadsRequest) -> Result<Vec<ProtoThread>> {
         let mut client = self.client();
         let response = client.list_threads(request).await?.into_inner();
 
-        Ok(response.threads.into_iter().map(Thread::from).collect())
-    }
-
-    pub async fn get_current_messages(
-        &self,
-        request: GetMessagesRequest,
-    ) -> Result<Vec<AnyMessage>> {
-        let mut client = self.client();
-
-        let response = client.get_messages(request).await?.into_inner();
-
-        Ok(response
-            .messages
-            .into_iter()
-            .map(AnyMessage::from)
-            .collect())
+        Ok(response.threads.into_iter().collect())
     }
 
     pub async fn delete_thread(&self, thread_id: String) -> Result<()> {
@@ -84,7 +65,7 @@ impl ThreadManager {
         Ok(())
     }
 
-    pub async fn get_thread(&self, thread_id: String) -> Result<Thread> {
+    pub async fn get_thread(&self, thread_id: String) -> Result<ProtoThread> {
         let mut client = self.client();
         let response = client
             .get_thread(GetThreadRequest { thread_id })
@@ -92,7 +73,7 @@ impl ThreadManager {
             .into_inner();
 
         if let Some(thread) = response.thread {
-            Ok(thread.into())
+            Ok(thread)
         } else {
             Err(Error::ThreadNotFound)
         }
@@ -103,6 +84,7 @@ impl ThreadManager {
         thread_id: String,
         limit: u32,
         offset: u32,
+        all_variants: bool,
     ) -> Result<GetMessagesResponse> {
         let mut client = self.client();
         let response = client
@@ -110,6 +92,7 @@ impl ThreadManager {
                 thread_id,
                 limit,
                 offset,
+                all_variants,
             })
             .await?
             .into_inner();
@@ -136,32 +119,11 @@ impl ThreadManager {
         Ok(response)
     }
 
-    pub async fn get_message_tree(
-        &self,
-        thread_id: String,
-        start_level: u32,
-        end_level: u32,
-        parent_node_ids: Vec<String>,
-    ) -> Result<GetMessageTreeResponse> {
-        let mut client = self.client();
-        let response = client
-            .get_message_tree(GetMessageTreeRequest {
-                thread_id,
-                start_level,
-                end_level,
-                parent_node_ids,
-            })
-            .await?
-            .into_inner();
-
-        Ok(response)
-    }
-
     pub async fn generate_thread_title(
         &self,
         thread_id: String,
         content: String,
-    ) -> Result<Thread> {
+    ) -> Result<ProtoThread> {
         let mut client = self.client();
         let response = client
             .generate_thread_title(GenerateThreadTitleRequest { thread_id, content })
@@ -169,7 +131,7 @@ impl ThreadManager {
             .into_inner();
 
         match response.thread {
-            Some(thread) => Ok(thread.into()),
+            Some(thread) => Ok(thread),
             None => Err(Error::UpdateThread(
                 "Thread title could not be generated".to_string(),
             )),
@@ -216,55 +178,6 @@ impl ThreadManager {
 }
 
 impl ThreadManager {
-    pub async fn add_human_message(
-        &mut self,
-        thread_id: String,
-        message: &HumanMessage,
-    ) -> Result<()> {
-        let mut client = self.client();
-        let proto_message: ProtoHumanMessage = message.clone().into();
-
-        client
-            .add_human_message(AddHumanMessageRequest {
-                thread_id,
-                message: Some(proto_message),
-            })
-            .await?;
-        Ok(())
-    }
-
-    pub async fn add_hidden_human_message(
-        &mut self,
-        thread_id: String,
-        message: &HumanMessage,
-    ) -> Result<()> {
-        let mut client = self.client();
-        let proto_message: ProtoHumanMessage = message.clone().into();
-        client
-            .add_hidden_human_message(AddHiddenHumanMessageRequest {
-                thread_id,
-                message: Some(proto_message),
-            })
-            .await?;
-        Ok(())
-    }
-
-    pub async fn add_system_message(
-        &mut self,
-        thread_id: String,
-        message: &SystemMessage,
-    ) -> Result<()> {
-        let mut client = self.client();
-        let proto_message: ProtoSystemMessage = message.clone().into();
-        client
-            .add_system_message(AddSystemMessageRequest {
-                thread_id,
-                message: Some(proto_message),
-            })
-            .await?;
-        Ok(())
-    }
-
     pub async fn save_preliminary_content_blocks(
         &mut self,
         thread_id: String,
@@ -299,27 +212,27 @@ impl ThreadManager {
         content_blocks: ContentBlocks,
         parent_message_id: Option<String>,
         asset_chips_json: Option<String>,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<AIMessageChunk>> + Send>>> {
+        cancel: CancellationToken,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<ChatStreamResponse>> + Send>>> {
         let mut client = self.client();
         let proto_blocks: Vec<ProtoContentBlock> = content_blocks
             .into_inner()
             .into_iter()
             .map(|b| b.into())
             .collect();
-        let stream = client
-            .chat_stream(ChatStreamRequest {
+
+        let response = tokio::select! {
+            result = client.chat_stream(ChatStreamRequest {
                 thread_id,
                 content_blocks: proto_blocks,
                 parent_message_id,
                 asset_chips_json,
-            })
-            .await?
-            .into_inner();
+            }) => result?,
+            () = cancel.cancelled() => return Err(Error::Cancelled),
+        };
 
-        let mapped_stream = stream.map(|result| match result {
-            Ok(chunk) => Ok(AIMessageChunk::from(chunk)),
-            Err(e) => Err(Error::from(e)),
-        });
+        let stream = response.into_inner();
+        let mapped_stream = stream.map(|result| result.map_err(Error::from));
 
         Ok(Box::pin(mapped_stream))
     }

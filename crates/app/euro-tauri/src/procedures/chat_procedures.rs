@@ -1,17 +1,13 @@
 use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
-use agent_chain_core::{AIMessage, AnyMessage};
+use agent_chain_core::proto::ChatStreamResponse;
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 
-use crate::shared_types::SharedThreadManager;
-
-#[taurpc::ipc_type]
-pub struct ResponseChunk {
-    chunk: String,
-    reasoning: Option<String>,
-}
+use crate::error::AppError;
+use crate::shared_types::{ActiveStreamTokens, SharedThreadManager};
 
 #[taurpc::ipc_type]
 pub struct Query {
@@ -25,9 +21,14 @@ pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ResponseChunk>,
+        channel: Channel<ChatStreamResponse>,
         query: Query,
-    ) -> Result<String, String>;
+    ) -> Result<(), String>;
+
+    async fn cancel_query<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+    ) -> Result<(), String>;
 }
 
 #[derive(Clone)]
@@ -39,48 +40,66 @@ impl ChatApi for ChatApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ResponseChunk>,
+        channel: Channel<ChatStreamResponse>,
         query: Query,
-    ) -> Result<String, String> {
+    ) -> Result<(), String> {
         let thread_state: tauri::State<SharedThreadManager> = app_handle
             .try_state()
-            .ok_or_else(|| "Thread manager not available".to_string())?;
+            .ok_or(AppError::Unavailable("Thread manager"))?;
         let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
             .try_state()
-            .ok_or_else(|| "Timeline not available".to_string())?;
+            .ok_or(AppError::Unavailable("Timeline"))?;
+        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
+            .try_state()
+            .ok_or(AppError::Unavailable("Active stream tokens"))?;
+
+        tracing::debug!("send_query: assets={:?}", query.assets);
+
+        let (chip, asset_blocks, snapshot_blocks) = {
+            let timeline = timeline_state.lock().await;
+            let _ = timeline.refresh_current_activity().await;
+
+            let save_ok = timeline.save_current_activity_to_service().await.is_ok();
+            tracing::debug!(
+                "send_query: save_ok={save_ok}, assets_empty={}",
+                query.assets.is_empty()
+            );
+
+            if save_ok && !query.assets.is_empty() {
+                let chip = timeline.get_context_chip().await;
+                let asset_blocks = timeline.construct_messages_from_last_asset().await;
+                let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
+                tracing::debug!(
+                    "send_query: chip={:?}, asset_blocks={}, snapshot_blocks={}",
+                    chip.is_some(),
+                    asset_blocks.len(),
+                    snapshot_blocks.len()
+                );
+                (chip, asset_blocks, snapshot_blocks)
+            } else {
+                (None, ContentBlocks::new(), ContentBlocks::new())
+            }
+        };
 
         let mut asset_chips_json: Option<String> = None;
         let mut context_blocks = ContentBlocks::new();
 
-        {
-            let timeline = timeline_state.lock().await;
+        if let Some(chip) = chip {
+            asset_chips_json = serde_json::to_string(&[chip]).ok();
+        }
+
+        let mut all_blocks = ContentBlocks::new();
+        all_blocks.extend(asset_blocks.into_inner());
+        all_blocks.extend(snapshot_blocks.into_inner());
+
+        if !all_blocks.is_empty() {
             let mut thread_manager = thread_state.lock().await;
-
-            let _ = timeline.refresh_current_activity().await;
-
-            if timeline.save_current_activity_to_service().await.is_ok() && !query.assets.is_empty()
+            match thread_manager
+                .save_preliminary_content_blocks(thread_id.clone(), all_blocks)
+                .await
             {
-                if let Some(chip) = timeline.get_context_chip().await {
-                    asset_chips_json = serde_json::to_string(&vec![chip]).ok();
-                }
-
-                let mut all_blocks = ContentBlocks::new();
-
-                let asset_blocks = timeline.construct_messages_from_last_asset().await;
-                all_blocks.extend(asset_blocks.into_inner());
-
-                let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
-                all_blocks.extend(snapshot_blocks.into_inner());
-
-                if !all_blocks.is_empty() {
-                    match thread_manager
-                        .save_preliminary_content_blocks(thread_id.clone(), all_blocks)
-                        .await
-                    {
-                        Ok(returned) => context_blocks = returned,
-                        Err(e) => tracing::warn!("Failed to save preliminary blocks: {e}"),
-                    }
-                }
+                Ok(returned) => context_blocks = returned,
+                Err(e) => tracing::warn!("Failed to save preliminary blocks: {e}"),
             }
         }
 
@@ -88,10 +107,14 @@ impl ChatApi for ChatApiImpl {
             TextContentBlock::builder().text(&query.text).build().into();
         context_blocks.push(user_text_block);
 
-        let mut complete_response = String::new();
+        let cancel = CancellationToken::new();
+        tokens_state
+            .lock()
+            .await
+            .insert(thread_id.clone(), cancel.clone());
 
         tracing::debug!("Sending chat stream");
-        let stream_result = {
+        let mut stream = {
             let mut thread_manager = thread_state.lock().await;
             thread_manager
                 .chat_stream(
@@ -99,68 +122,84 @@ impl ChatApi for ChatApiImpl {
                     context_blocks,
                     query.parent_message_id.clone(),
                     asset_chips_json,
+                    cancel.clone(),
                 )
                 .await
+                .map_err(|e| format!("Failed to create chat stream: {e}"))?
         };
 
-        match stream_result {
-            Ok(mut stream) => {
-                tracing::debug!("Starting to consume stream...");
+        tracing::debug!("Starting to consume stream...");
 
-                let timeout_duration = std::time::Duration::from_secs(300);
-                let stream_future = async {
-                    while let Some(result) = stream.next().await {
-                        match result {
-                            Ok(chunk) => {
-                                let content = chunk.content.to_string();
-                                let reasoning = chunk
-                                    .additional_kwargs
-                                    .get("reasoning_content")
-                                    .and_then(|v| v.as_str())
-                                    .map(String::from);
+        let stream_future = async {
+            match stream.next().await {
+                Some(Ok(first)) => {
+                    if let Err(e) = channel.send(first) {
+                        return Err(format!("Failed to send confirmed human message: {e}"));
+                    }
+                }
+                Some(Err(e)) => return Err(format!("Stream error: {e}")),
+                None => return Ok(()),
+            }
 
-                                if content.is_empty() && reasoning.is_none() {
-                                    continue;
-                                }
-
-                                complete_response.push_str(&content);
-
-                                if let Err(e) = channel.send(ResponseChunk {
-                                    chunk: content,
-                                    reasoning,
-                                }) {
+            loop {
+                tokio::select! {
+                    biased;
+                    () = cancel.cancelled() => {
+                        tracing::debug!("Stream cancelled for thread {thread_id}");
+                        drop(stream);
+                        return Ok(());
+                    }
+                    item = stream.next() => {
+                        match item {
+                            Some(Ok(response)) => {
+                                if let Err(e) = channel.send(response) {
                                     return Err(format!("Failed to send response chunk: {e}"));
                                 }
                             }
-                            Err(e) => {
+                            Some(Err(e)) => {
                                 return Err(format!("Stream error: {e}"));
                             }
+                            None => return Ok(()),
                         }
-                    }
-                    Ok(())
-                };
-
-                match tokio::time::timeout(timeout_duration, stream_future).await {
-                    Ok(Ok(())) => {
-                        tracing::debug!("Stream completed successfully");
-                    }
-                    Ok(Err(e)) => {
-                        return Err(e);
-                    }
-                    Err(_) => {
-                        return Err("Stream processing timed out after 5 minutes".to_string());
                     }
                 }
             }
-            Err(e) => {
-                return Err(format!("Failed to create chat stream: {e}"));
+        };
+
+        let timeout = std::time::Duration::from_secs(300);
+        let result = match tokio::time::timeout(timeout, stream_future).await {
+            Ok(Ok(())) => {
+                tracing::debug!("Stream completed successfully");
+                Ok(())
             }
+            Ok(Err(e)) => {
+                cancel.cancel();
+                Err(e)
+            }
+            Err(_) => {
+                cancel.cancel();
+                Err("Stream processing timed out after 5 minutes".to_string())
+            }
+        };
+
+        tokens_state.lock().await.remove(&thread_id);
+        result
+    }
+
+    async fn cancel_query<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+    ) -> Result<(), String> {
+        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
+            .try_state()
+            .ok_or(AppError::Unavailable("Active stream tokens"))?;
+
+        if let Some(token) = tokens_state.lock().await.remove(&thread_id) {
+            token.cancel();
+            tracing::debug!("Cancelled stream for thread {thread_id}");
         }
 
-        let _ai_message: AnyMessage = AIMessage::builder()
-            .content(complete_response.clone())
-            .build()
-            .into();
-        Ok(complete_response)
+        Ok(())
     }
 }

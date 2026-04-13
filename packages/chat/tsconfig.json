@@ -1,21 +1,42 @@
 {
+	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
+		"rewriteRelativeImportExtensions": true,
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
 		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"lib": ["dom", "dom.iterable", "ES2021"],
+		"lib": ["dom", "dom.iterable", "ES2022"],
+		"allowJs": true,
+		"checkJs": false,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
 		"skipLibCheck": true,
+		"sourceMap": true,
 		"strict": true,
 		"experimentalDecorators": true,
-		"resolveJsonModule": true,
-		"isolatedModules": true,
-		"baseUrl": ".",
-		"paths": {
-			"$lib/*": ["src/lib/*"]
-		}
+		"declaration": true,
+		"composite": true,
+		"declarationMap": true,
+		"mapRoot": "../../dist"
 	},
-	"include": ["src/**/*.ts"],
-	"exclude": ["node_modules", "dist"]
+	"include": [
+		".svelte-kit/ambient.d.ts",
+		".svelte-kit/non-ambient.d.ts",
+		".svelte-kit/types/**/$types.d.ts",
+		"vite.config.js",
+		"svelte.config.js",
+		"vite.config.ts",
+		"vitest.workspace.ts",
+		"playwright.config.ts",
+		"src/**/*.js",
+		"src/**/*.ts",
+		"e2e/**/*.js",
+		"e2e/**/*.ts",
+		"src/**/*.svelte",
+		"tests/**/*.js",
+		"tests/**/*.ts",
+		"tests/**/*.svelte"
+	],
+	"exclude": ["node_modules/**"]
 }

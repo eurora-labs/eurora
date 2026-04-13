@@ -49,6 +49,13 @@ tokio = { version = "1", features = ["sync"] }
 tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4", "v5", "v7"] }
+specta = { workspace = true, optional = true, features = ["derive"] }
+prost = { workspace = true, optional = true }
+tonic = { workspace = true, optional = true }
+tonic-prost = { workspace = true, optional = true }
+
+[build-dependencies]
+tonic-prost-build = { workspace = true, optional = true }
 
 [dev-dependencies]
 serial_test = "3"
@@ -59,3 +66,5 @@ tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] 
 default = []
 graphviz = ["graphviz-rust"]
 tiktoken = ["tiktoken-rs"]
+prost = ["dep:prost", "dep:tonic", "dep:tonic-prost", "dep:tonic-prost-build", "dep:specta"]
+server = []
