@@ -1,42 +1,28 @@
 import { test, expect } from '../utils/fixtures.ts';
-import { waitForBootstrap, waitForSiteMounted } from '../utils/helpers.ts';
-import { WatcherResponse } from '../utils/types.ts';
+import { waitForBootstrap, waitForSiteMounted, sendToActiveTab } from '../utils/helpers.ts';
 
 test.describe('Default Site Watcher Tests', () => {
-	test('should extract article from page', async ({ page, sw }) => {
+	test.beforeEach(async ({ page }) => {
 		await page.goto('https://example.com');
 		await waitForBootstrap(page);
 		await waitForSiteMounted(page, 'default');
+	});
 
-		const response: WatcherResponse = await sw.evaluate(async () => {
-			const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-			return await new Promise((resolve) => {
-				chrome.tabs.sendMessage(tab.id!, { type: 'GENERATE_ASSETS' }, (response) =>
-					resolve(response),
-				);
-			});
-		});
+	test('should extract article from page', async ({ sw }) => {
+		const response = await sendToActiveTab(sw, { type: 'GENERATE_ASSETS' });
 
-		if (response === undefined) {
-			throw new Error('Response is undefined');
+		if (!response) {
+			throw new Error('Expected a response from GENERATE_ASSETS');
 		}
 
-		expect(response).toBeDefined();
 		expect(response.kind).toEqual('NativeArticleAsset');
 		expect(response.data.title).toBeDefined();
-		expect(response.data.text_content).toBeDefined();
 		expect(response.data.text_content).toContain('This domain is for use in');
 	});
 
 	test('should extract selected text from page', async ({ page, sw }) => {
-		await page.goto('https://example.com');
-		await waitForBootstrap(page);
-		await waitForSiteMounted(page, 'default');
-
-		// Initialize selection and range
 		const selectedText = await page.evaluate(() => {
 			const p = document.querySelector('p');
-
 			if (!p) return undefined;
 
 			const selection = window.getSelection();
@@ -50,23 +36,13 @@ test.describe('Default Site Watcher Tests', () => {
 
 		expect(selectedText).toBeDefined();
 
-		const response: WatcherResponse = await sw.evaluate(async () => {
-			const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-			return await new Promise((resolve) => {
-				chrome.tabs.sendMessage(tab.id!, { type: 'GENERATE_SNAPSHOT' }, (response) =>
-					resolve(response),
-				);
-			});
-		});
+		const response = await sendToActiveTab(sw, { type: 'GENERATE_SNAPSHOT' });
 
-		expect(response).toBeDefined();
-
-		if (response === undefined) {
-			throw new Error('Response is undefined');
+		if (!response) {
+			throw new Error('Expected a response from GENERATE_SNAPSHOT');
 		}
 
 		expect(response.kind).toEqual('NativeArticleSnapshot');
-		expect(response.data).toBeDefined();
 		expect(response.data.highlighted_text).toEqual(selectedText);
 	});
 });

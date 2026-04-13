@@ -1,22 +1,15 @@
 <script lang="ts">
+	import ReadyToStart from '$lib/components/marketing/ReadyToStart.svelte';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
-	import CopyIcon from '@lucide/svelte/icons/copy';
 	import GithubIcon from '@lucide/svelte/icons/github';
 	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	import MailIcon from '@lucide/svelte/icons/mail';
 
 	const email = 'contact@eurora-labs.com';
-	let copied = $state(false);
 	let copiedLaura = $state(false);
 	let copiedAndre = $state(false);
-
-	async function copyEmail() {
-		await navigator.clipboard.writeText(email);
-		copied = true;
-		setTimeout(() => (copied = false), 2000);
-	}
 
 	async function copyLauraEmail() {
 		await navigator.clipboard.writeText('laura@eurora-labs.com');
@@ -30,18 +23,6 @@
 		setTimeout(() => (copiedAndre = false), 2000);
 	}
 
-	const socials = [
-		{ name: 'GitHub', href: 'https://github.com/eurora-labs/eurora', icon: SiGithub },
-		{ name: 'Discord', href: 'https://discord.gg/xRT9EpBEwc', icon: SiDiscord },
-		{ name: 'Reddit', href: 'https://reddit.com/r/eurora', icon: SiReddit },
-		{
-			name: 'Bluesky',
-			href: 'https://bsky.app/profile/euroralabs.bsky.social',
-			icon: SiBluesky,
-		},
-		{ name: 'X', href: 'https://x.com/euroralabs', icon: SiX },
-	];
-
 	const laura_thommen_img = 'https://d26xptavrz5c8t.cloudfront.net/image/laura.png';
 	const andre_roelofs_img = 'https://d26xptavrz5c8t.cloudfront.net/image/andre.png';
 
@@ -49,7 +30,6 @@
 		{ value: '2025', label: 'Founded' },
 		{ value: '100%', label: 'Open Source' },
 		{ value: 'EU', label: 'Data Residency' },
-		{ value: '$0', label: 'VC Funding' },
 	];
 </script>
 
@@ -61,9 +41,9 @@
 	/>
 </svelte:head>
 
-<div class="container mx-auto max-w-5xl px-4 pt-16 pb-24">
+<div class="container mx-auto max-w-5xl px-4 pt-16 pb-16">
 	<!-- Hero -->
-	<div class="text-center mb-20">
+	<div class="text-center mb-16">
 		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-4">Who we are</p>
 		<h1 class="text-4xl font-bold mb-6 sm:text-5xl lg:text-6xl leading-tight">
 			Two people, one belief:<br />
@@ -77,16 +57,14 @@
 	</div>
 
 	<!-- Founders -->
-	<div class="mb-24">
+	<div class="mb-16">
 		<div class="flex flex-col gap-6 sm:flex-row sm:gap-8 items-stretch">
 			<!-- Laura -->
 			<div class="group flex-1 relative">
 				<div
 					class="absolute -inset-px rounded-2xl bg-linear-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
 				></div>
-				<div
-					class="relative rounded-2xl border border-border bg-card p-6 sm:p-8 h-full flex flex-col"
-				>
+				<div class="relative rounded-2xl bg-card p-6 sm:p-8 h-full flex flex-col">
 					<div class="flex items-center gap-4 mb-5">
 						<img
 							src={laura_thommen_img}
@@ -99,7 +77,7 @@
 								<Badge variant="secondary">CEO</Badge>
 							</div>
 							<p class="text-sm text-muted-foreground mt-0.5">
-								30+ years in tech leadership
+								30+ years in Executive Leadership
 							</p>
 						</div>
 					</div>
@@ -162,9 +140,7 @@
 				<div
 					class="absolute -inset-px rounded-2xl bg-linear-to-b from-primary/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
 				></div>
-				<div
-					class="relative rounded-2xl border border-border bg-card p-6 sm:p-8 h-full flex flex-col"
-				>
+				<div class="relative rounded-2xl bg-card p-6 sm:p-8 h-full flex flex-col">
 					<div class="flex items-center gap-4 mb-5">
 						<img
 							src={andre_roelofs_img}
@@ -248,60 +224,49 @@
 		</div>
 	</div>
 
-	<!-- Values -->
-	<div class="mb-20">
+	<div class="mb-16">
 		<h2 class="text-3xl font-bold mb-3">Why we built this</h2>
 		<p class="text-muted-foreground max-w-2xl mb-10 leading-relaxed">
 			Every AI assistant we tried had the same trade-off: convenience in exchange for your
-			data. We started Eurora to prove that's a false choice. Here's what drives every
-			decision we make.
+			data. Eurora Labs has proven that you do not need to compromise convenience in exchange
+			for your data. Here's what drives every decision we make.
 		</p>
 
-		<div class="grid grid-cols-1 gap-px bg-border rounded-2xl overflow-hidden md:grid-cols-2">
-			<div class="bg-card p-8">
+		<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Your data stays yours</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
 					All data lives in sovereign European infrastructure. We can't read it, we can't
 					sell it, and we architected the system so we never could.
 				</p>
 			</div>
-			<div class="bg-card p-8">
+			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Open source, always</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
-					Every line of Eurora's code is public. You don't have to take our word for
-					anything — read the source, audit it, run it yourself.
+					Every line of Eurora's code is public. You don't have to take our word for it.
+					Read the source, audit it and run it yourself.
 				</p>
 			</div>
-			<div class="bg-card p-8">
-				<h3 class="font-semibold text-lg mb-2">No hidden motives</h3>
+			<div class="rounded-2xl bg-card p-8">
+				<h3 class="font-semibold text-lg mb-2">One assistant, everywhere</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
-					We're self-funded. No investors pushing for growth-at-all-costs. Our only
-					incentive is to build something you genuinely want to use.
+					A single AI that works across every platform and browser. Eurora is a single
+					unified assistant that has all the context.
 				</p>
 			</div>
-			<div class="bg-card p-8">
+			<div class="rounded-2xl bg-card p-8">
 				<h3 class="font-semibold text-lg mb-2">Built for people</h3>
 				<p class="text-sm text-muted-foreground leading-relaxed">
-					We design for how people actually work — across platforms, across browsers,
-					without friction. Technology should adapt to you, never the reverse.
+					We built it for you. That means you stay in control of everything Eurora does.
 				</p>
 			</div>
 		</div>
 	</div>
 
-	<!-- Stats -->
-	<div class="mb-24">
-		<div class="text-center mb-12">
-			<h2 class="text-3xl font-bold mb-3">Where we stand</h2>
-			<p class="text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-				Eurora is young, self-funded, and growing. We're transparent about where we are
-				because trust is built on honesty, not marketing.
-			</p>
-		</div>
-
-		<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+	<div class="mb-16">
+		<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
 			{#each stats as stat}
-				<div class="rounded-2xl border border-border bg-card p-6 text-center">
+				<div class="rounded-2xl bg-card p-6 text-center">
 					<p class="text-3xl font-bold text-primary mb-1">{stat.value}</p>
 					<p class="text-sm text-muted-foreground">{stat.label}</p>
 				</div>
@@ -309,34 +274,5 @@
 		</div>
 	</div>
 
-	<!-- Contact -->
-	<div class="rounded-2xl border border-border bg-card p-8 sm:p-12 text-center">
-		<h2 class="text-2xl font-bold mb-3">Want to talk?</h2>
-		<p class="text-muted-foreground max-w-lg mx-auto mb-6">
-			Whether you have questions, feedback, or just want to say hello — we read every message.
-		</p>
-
-		<Button variant="outline" onclick={copyEmail} class="font-mono text-sm mb-6">
-			{email}
-			<CopyIcon class="h-3.5 w-3.5 text-muted-foreground" />
-			{#if copied}
-				<span class="text-xs text-primary">Copied!</span>
-			{/if}
-		</Button>
-
-		<div class="flex items-center justify-center gap-2 flex-wrap">
-			{#each socials as social}
-				<Button
-					variant="outline"
-					href={social.href}
-					target="_blank"
-					rel="noopener noreferrer"
-					aria-label={social.name}
-					class="size-10"
-				>
-					<social.icon size={18} />
-				</Button>
-			{/each}
-		</div>
-	</div>
+	<ReadyToStart />
 </div>

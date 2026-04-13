@@ -9,8 +9,8 @@ ignored = ["tonic-prost"]
 
 [dependencies]
 agent-chain = { workspace = true, features = ["ollama", "openai"] }
-async-stream = { workspace = true }
 base64 = { workspace = true }
+bon = { workspace = true }
 be-asset = { workspace = true }
 be-authz = { workspace = true }
 be-storage = { workspace = true }
@@ -18,12 +18,14 @@ be-remote-db = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 prost = { workspace = true }
 prost-types = { workspace = true }
-proto-gen = { workspace = true, features = ["agent-chain", "server"] }
+agent-chain-core = { workspace = true, features = ["prost"] }
+proto-gen = { workspace = true, features = ["server"] }
 reqwest = { workspace = true, features = ["json"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
 tonic = { workspace = true }
 tonic-prost = { workspace = true }
 tracing = { workspace = true }

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import ChartStyle from '$lib/components/chart/chart-style.svelte';
-	import { setChartContext, type ChartConfig } from '$lib/components/chart/chart-utils.js';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 	import type { HTMLAttributes } from 'svelte/elements';
+	import ChartStyle from './chart-style.svelte';
+	import { setChartContext, type ChartConfig } from './chart-utils.js';
 
 	const uid = $props.id();
 
@@ -17,7 +17,7 @@
 		config: ChartConfig;
 	} = $props();
 
-	const chartId = `chart-${id || uid.replace(/:/g, '')}`;
+	const chartId = $derived(`chart-${id || uid.replace(/:/g, '')}`);
 
 	setChartContext({
 		get config() {
@@ -31,12 +31,11 @@
 	data-chart={chartId}
 	data-slot="chart"
 	class={cn(
-		// "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
 		'flex aspect-video justify-center overflow-visible text-xs',
 		// Overrides
 		//
 		// Stroke around dots/marks when hovering
-		'[&_.stroke-white]:stroke-transparent',
+		'[&_.lc-highlight-point]:stroke-transparent',
 		// override the default stroke color of lines
 		'[&_.lc-line]:stroke-border/50',
 
@@ -45,7 +44,7 @@
 
 		// by default, when you hover a point on a stacked series chart, it will drop the opacity
 		// of the other series, this overrides that
-		'[&_.lc-area-path]:opacity-100 [&_.lc-highlight-line]:opacity-100 [&_.lc-highlight-point]:opacity-100 [&_.lc-spline-path]:opacity-100 [&_.lc-text]:text-xs',
+		'[&_.lc-area-path]:opacity-100 [&_.lc-highlight-line]:opacity-100 [&_.lc-highlight-point]:opacity-100 [&_.lc-spline-path]:opacity-100 [&_.lc-text]:text-xs [&_.lc-text-svg]:overflow-visible',
 
 		// We don't want the little tick lines between the axis labels and the chart, so we remove
 		// the stroke. The alternative is to manually disable `tickMarks` on the x/y axis of every

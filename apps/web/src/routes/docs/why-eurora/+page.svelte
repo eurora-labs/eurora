@@ -19,7 +19,7 @@
 
 	<div class="flex flex-col gap-12">
 		<section>
-			<h2 class="mb-2 text-2xl font-semibold">The problem</h2>
+			<h2 class="mb-2 text-2xl font-semibold">The Challenge</h2>
 			<p class="text-muted-foreground">
 				Most AI tools start every conversation from scratch. You paste a snippet, explain
 				the context, and hope the model understands. If you want privacy, the tradeoff is
@@ -63,19 +63,13 @@
 				machine, you can always migrate your data from Eurora Cloud to a self-hosted
 				instance. No lock-in, no partial exports. Everything moves with you.
 			</p>
-			<br />
-			<p class="text-muted-foreground">
-				There are no venture capital investors pushing for growth at the expense of privacy.
-				The only revenue comes from subscriptions, which means the only incentive is to
-				build something people genuinely want to use.
-			</p>
 		</section>
 
 		<section>
 			<h2 class="mb-2 text-2xl font-semibold">Flexible by design</h2>
 			<p class="text-muted-foreground">
-				Not everyone has the same requirements. Eurora supports multiple deployment models
-				and AI providers so you can pick what works for you.
+				Eurora supports multiple deployment models and AI providers so you can pick what
+				works for you.
 			</p>
 			<div
 				class="mt-4 grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border md:grid-cols-2"
@@ -95,9 +89,10 @@
 					</p>
 				</div>
 				<div class="bg-card p-6">
-					<h3 class="mb-1 font-medium">Remote providers</h3>
+					<h3 class="mb-1 font-medium">Vendor-agnostic</h3>
 					<p class="text-sm text-muted-foreground">
-						Connect to OpenAI or any compatible API endpoint with your own API key.
+						Connect to any AI provider with your own API key. We're allergic to vendor
+						lock-in.
 					</p>
 				</div>
 				<div class="bg-card p-6">

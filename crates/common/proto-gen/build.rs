@@ -7,7 +7,11 @@ fn main() -> Result<()> {
     let proto_dir = PathBuf::from("../../../proto");
     let proto_files = std::fs::read_dir(&proto_dir)?
         .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "proto"))
+        .filter(|entry| {
+            let path = entry.path();
+            path.extension().is_some_and(|ext| ext == "proto")
+                && path.file_name() != Some("agent_chain.proto".as_ref())
+        })
         .map(|entry| entry.path())
         .collect::<Vec<_>>();
     watch_protos_recursively(&proto_dir);
@@ -20,6 +24,7 @@ fn main() -> Result<()> {
         tonic_prost_build::configure()
             .build_server(build_server)
             .build_client(true)
+            .extern_path(".agent_chain", "::agent_chain_core::proto")
             .protoc_arg("--experimental_allow_proto3_optional")
             .compile_protos(&proto_files, &[proto_dir, common_dir])?;
     }
@@ -29,6 +34,7 @@ fn main() -> Result<()> {
         tonic_prost_build::configure()
             .build_server(build_server)
             .build_client(true)
+            .extern_path(".agent_chain", "::agent_chain_core::proto")
             .protoc_arg("--experimental_allow_proto3_optional")
             .compile_protos(&proto_files, &[proto_dir])?;
     }

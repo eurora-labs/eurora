@@ -16,7 +16,7 @@
 <section
 	bind:this={ref}
 	data-slot="feature-section"
-	class={cn('w-full rounded-2xl bg-foreground/5 p-4 sm:p-6 lg:p-8', className)}
+	class={cn('w-full rounded-2xl bg-card p-4 sm:p-6 lg:p-8', className)}
 	{...restProps}
 >
 	<div

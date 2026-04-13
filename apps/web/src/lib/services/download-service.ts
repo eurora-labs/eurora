@@ -1,5 +1,5 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { ConfigService } from '$lib/services/config-service.js';
+import type { ConfigService } from '@eurora/shared/config/config-service';
 
 export type OSType = 'windows' | 'macos' | 'linux' | 'unknown';
 export type ArchType = 'x86_64' | 'aarch64' | 'unknown';

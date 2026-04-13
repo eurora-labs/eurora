@@ -40,6 +40,13 @@ export class StickToBottomContext {
 		});
 	};
 
+	#handleWheel = () => {
+		this.#userHasScrolled = true;
+		if (this.#element) {
+			this.#element.scrollTo({ top: this.#element.scrollTop });
+		}
+	};
+
 	#handleScroll = () => {
 		if (!this.#element) return;
 
@@ -51,8 +58,6 @@ export class StickToBottomContext {
 
 		if (!isAtBottom) {
 			this.#userHasScrolled = true;
-		} else if (isAtBottom && this.#userHasScrolled) {
-			this.#userHasScrolled = false;
 		}
 	};
 
@@ -66,7 +71,6 @@ export class StickToBottomContext {
 				const entry = entries[0];
 				if (entry.isIntersecting) {
 					this.#isAtBottom = true;
-					this.#userHasScrolled = false;
 				}
 			},
 			{
@@ -80,6 +84,10 @@ export class StickToBottomContext {
 		}
 
 		this.#element.addEventListener('scroll', this.#handleScroll, {
+			passive: true,
+		});
+
+		this.#element.addEventListener('wheel', this.#handleWheel, {
 			passive: true,
 		});
 
@@ -142,6 +150,7 @@ export class StickToBottomContext {
 
 		if (this.#element) {
 			this.#element.removeEventListener('scroll', this.#handleScroll);
+			this.#element.removeEventListener('wheel', this.#handleWheel);
 		}
 
 		if (this.#sentinel && this.#element?.contains(this.#sentinel)) {
