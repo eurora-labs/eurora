@@ -1,7 +1,7 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
-	import * as Card from '@eurora/ui/components/card/index';
 	import ReadyToStart from '$lib/components/marketing/ReadyToStart.svelte';
+	import * as Card from '@eurora/ui/components/card/index';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
 	import * as FeatureSection from '@eurora/ui/custom-components/feature-section/index';
 
@@ -41,8 +41,8 @@
 	/>
 </svelte:head>
 
-<div class="mx-auto w-full max-w-7xl px-4">
-	<div class="flex flex-col items-start py-12 max-w-3xl mx-auto">
+<div class="mx-auto w-full max-w-7xl px-4 pt-16 pb-16 flex flex-col gap-24">
+	<div class="flex flex-col items-start max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
 			Your AI Assistant fully integrated into your browser
 		</h1>
@@ -57,30 +57,32 @@
 		</div>
 	</div>
 
-	{#key activeTab}
-		<AutoplayVideo src={active.src} loop={active.loop} class="rounded-xl mt-8" />
-	{/key}
+	<div class="flex flex-col gap-4">
+		{#key activeTab}
+			<AutoplayVideo src={active.src} loop={active.loop} class="rounded-xl" />
+		{/key}
 
-	<div class="grid grid-cols-3 gap-3 mt-4">
-		{#each tabs as tab}
-			<button type="button" class="text-left" onclick={() => (activeTab = tab.id)}>
-				<Card.Root
-					class="h-full cursor-pointer transition-colors py-3 {activeTab === tab.id
-						? 'border-primary bg-primary/5'
-						: 'hover:border-muted-foreground/25'}"
-				>
-					<Card.Header class="px-3 py-0 sm:px-4 gap-0.5">
-						<Card.Title class="text-xs sm:text-sm">{tab.label}</Card.Title>
-						<Card.Description class="text-xs hidden sm:block"
-							>{tab.description}</Card.Description
-						>
-					</Card.Header>
-				</Card.Root>
-			</button>
-		{/each}
+		<div class="grid grid-cols-3 gap-3">
+			{#each tabs as tab}
+				<button type="button" class="text-left" onclick={() => (activeTab = tab.id)}>
+					<Card.Root
+						class="h-full cursor-pointer transition-colors py-3 {activeTab === tab.id
+							? 'border-primary bg-primary/5'
+							: 'hover:border-muted-foreground/25'}"
+					>
+						<Card.Header class="px-3 py-0 sm:px-4 gap-0.5">
+							<Card.Title class="text-xs sm:text-sm">{tab.label}</Card.Title>
+							<Card.Description class="text-xs hidden sm:block"
+								>{tab.description}</Card.Description
+							>
+						</Card.Header>
+					</Card.Root>
+				</button>
+			{/each}
+		</div>
 	</div>
 
-	<div class="flex flex-col gap-24 mt-24">
+	<div class="flex flex-col gap-24">
 		<FeatureSection.Root>
 			<FeatureSection.Header>
 				<FeatureSection.Title>AI On Your Own Terms</FeatureSection.Title>
@@ -114,7 +116,5 @@
 		</FeatureSection.Root>
 	</div>
 
-	<div class="mt-24">
-		<ReadyToStart />
-	</div>
+	<ReadyToStart />
 </div>
