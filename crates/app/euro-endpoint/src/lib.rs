@@ -1,3 +1,10 @@
+#[cfg(not(any(feature = "tls-native-roots", feature = "tls-webpki-roots")))]
+compile_error!(
+    "euro-endpoint requires a TLS root provider. \
+     Enable either the `tls-native-roots` feature (desktop) \
+     or the `tls-webpki-roots` feature (mobile)."
+);
+
 mod error;
 
 pub use error::{EndpointError, Result};
@@ -56,7 +63,7 @@ fn build_channel(url: &str) -> Result<Channel> {
         .map_err(|e| EndpointError::InvalidUrl(e.to_string()))?;
 
     if url.starts_with("https://") {
-        let tls = ClientTlsConfig::new().with_native_roots();
+        let tls = ClientTlsConfig::new().with_enabled_roots();
         endpoint = endpoint.tls_config(tls).map_err(EndpointError::Tls)?;
     }
 
