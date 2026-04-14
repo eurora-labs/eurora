@@ -36,7 +36,7 @@ dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-browser = { workspace = true }
 euro-encrypt = { workspace = true }
-euro-endpoint = { workspace = true }
+euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-thread = { workspace = true }

@@ -7,7 +7,16 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
     init_encryption(data_dir)?;
 
-    let app_settings = AppSettings::load_from_default_path_creating()?;
+    let config_dir = app.path().app_config_dir()?;
+    std::fs::create_dir_all(&config_dir)?;
+    let config_path = config_dir.join("settings.json");
+    let app_settings = match AppSettings::load(&config_path) {
+        Ok(settings) => settings,
+        Err(e) => {
+            tracing::warn!("Failed to load settings, resetting to defaults: {e}");
+            AppSettings::defaults()
+        }
+    };
     let endpoint_url = &app_settings.api.endpoint;
     let endpoint_manager = if endpoint_url.is_empty() {
         EndpointManager::from_env()

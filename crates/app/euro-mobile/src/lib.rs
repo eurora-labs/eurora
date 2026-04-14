@@ -15,6 +15,12 @@ pub fn build_router() -> Router<tauri::Wry> {
     )
 }
 
+#[cfg(mobile)]
+#[tauri::mobile_entry_point]
+fn mobile_entry_point() {
+    run();
+}
+
 pub fn run() {
     dotenv::dotenv().ok();
 
