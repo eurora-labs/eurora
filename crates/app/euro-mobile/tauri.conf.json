@@ -26,6 +26,12 @@
 	},
 	"app": {
 		"withGlobalTauri": false,
+		"windows": [
+			{
+				"label": "main",
+				"fullscreen": true
+			}
+		],
 		"security": {
 			"csp": {
 				"default-src": "'self'",
