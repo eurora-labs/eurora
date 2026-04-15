@@ -10,7 +10,7 @@ catalog:
     '@tailwindcss/postcss': ^4.2.2
     '@vitest/ui': 3.2.4
     '@lucide/svelte': ^0.577.0
-    postcss: ^8.5.8
+    postcss: ^8.5.9
     tailwindcss: ^4.2.2
     vite: 6.4.2
     vitest: 3.2.4
@@ -22,7 +22,7 @@ catalogs:
         '@sveltejs/adapter-static': 3.0.10
         '@sveltejs/kit': 2.57.1
         '@sveltejs/vite-plugin-svelte': 5.1.1
-        svelte: 5.55.1
+        svelte: 5.55.2
         svelte-check: 4.4.6
 onlyBuiltDependencies:
     - esbuild
