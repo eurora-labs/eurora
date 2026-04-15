@@ -95,10 +95,7 @@ impl AuthApi for AuthApiImpl {
         })
     }
 
-    async fn poll_for_login<R: Runtime>(
-        self,
-        app_handle: AppHandle<R>,
-    ) -> Result<bool, String> {
+    async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
         let user_state = match app_handle.try_state::<SharedUserController>() {
             Some(s) => s,
             None => return Ok(false),
@@ -206,10 +203,7 @@ impl AuthApi for AuthApiImpl {
         Ok(())
     }
 
-    async fn is_authenticated<R: Runtime>(
-        self,
-        app_handle: AppHandle<R>,
-    ) -> Result<bool, String> {
+    async fn is_authenticated<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
         use backon::{ConstantBuilder, Retryable};
 
         let result = (|| async {
@@ -278,10 +272,7 @@ impl AuthApi for AuthApiImpl {
         Ok(claims.display_name)
     }
 
-    async fn refresh_session<R: Runtime>(
-        self,
-        app_handle: AppHandle<R>,
-    ) -> Result<(), String> {
+    async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
         let mut controller = user_state.lock().await;
         controller
