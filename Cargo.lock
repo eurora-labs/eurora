@@ -3625,7 +3625,9 @@ dependencies = [
 name = "euro-mobile"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-core",
  "anyhow",
+ "chrono",
  "dotenv",
  "euro-auth",
  "euro-encrypt",
@@ -3634,6 +3636,8 @@ dependencies = [
  "euro-settings",
  "euro-thread",
  "euro-user",
+ "futures",
+ "proto-gen",
  "serde",
  "serde_json",
  "specta",
@@ -3647,6 +3651,7 @@ dependencies = [
  "tauri-plugin-store",
  "taurpc",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 

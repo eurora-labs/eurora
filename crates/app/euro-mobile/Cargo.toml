@@ -15,7 +15,9 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
+agent-chain-core = { workspace = true, features = ["prost"] }
 anyhow = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 dotenv = { workspace = true }
 euro-auth = { workspace = true }
 euro-encrypt = { workspace = true }
@@ -24,6 +26,8 @@ euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-thread = { workspace = true }
 euro-user = { workspace = true }
+futures = { workspace = true }
+proto-gen = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
@@ -36,6 +40,7 @@ tauri-plugin-process = "2"
 tauri-plugin-store = "2"
 taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
+tokio-util = "0.7"
 tracing = { workspace = true }
 
 [build-dependencies]

@@ -1,6 +1,7 @@
 @import '@eurora/ui/main.css';
 @import 'tailwindcss';
 @source "../../../../packages/ui/src";
+@source "../../../../packages/chat/src";
 
 *,
 ::after,

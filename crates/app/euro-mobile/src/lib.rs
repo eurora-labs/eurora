@@ -1,18 +1,27 @@
 #![allow(
     clippy::used_underscore_binding,
     clippy::module_name_repetitions,
+    clippy::struct_field_names,
     clippy::too_many_lines
 )]
 
+use procedures::chat_procedures::{ChatApi, ChatApiImpl};
+use procedures::thread_procedures::{ThreadApi, ThreadApiImpl};
 use taurpc::Router;
 
+pub mod error;
+pub mod procedures;
 mod setup;
+pub mod shared_types;
 
 pub fn build_router() -> Router<tauri::Wry> {
-    Router::new().export_config(
-        specta_typescript::Typescript::default()
-            .bigint(specta_typescript::BigIntExportBehavior::BigInt),
-    )
+    Router::new()
+        .export_config(
+            specta_typescript::Typescript::default()
+                .bigint(specta_typescript::BigIntExportBehavior::BigInt),
+        )
+        .merge(ThreadApiImpl.into_handler())
+        .merge(ChatApiImpl.into_handler())
 }
 
 #[cfg(mobile)]

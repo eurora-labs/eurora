@@ -1,3 +1,4 @@
+use crate::shared_types::SharedThreadManager;
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
 use tauri::Manager;
@@ -55,12 +56,14 @@ fn init_state(
 
     let thread_channel_rx = endpoint_manager.subscribe();
     let thread_manager = euro_thread::ThreadManager::new(thread_channel_rx);
-    app_handle.manage(std::sync::Arc::new(Mutex::new(thread_manager)));
+    app_handle.manage(SharedThreadManager::new(thread_manager));
 
     let path = app.path().app_data_dir()?;
     let user_channel_rx = endpoint_manager.subscribe();
     let user_controller = euro_user::Controller::new(path, user_channel_rx)?;
     app_handle.manage(std::sync::Arc::new(Mutex::new(user_controller)));
+
+    app_handle.manage(crate::shared_types::ActiveStreamTokens::default());
 
     Ok(())
 }
