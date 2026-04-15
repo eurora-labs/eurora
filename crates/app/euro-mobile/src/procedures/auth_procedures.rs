@@ -84,7 +84,7 @@ impl AuthApi for AuthApiImpl {
         url.query_pairs_mut()
             .append_pair("code_challenge", &code_challenge)
             .append_pair("code_challenge_method", "S256")
-            .append_pair("redirect_uri", "eurora://auth/callback");
+            .append_pair("redirect_uri", &format!("{base_url}/mobile/callback"));
 
         secret::persist(LOGIN_CODE_VERIFIER, &SecretString::from(code_verifier))
             .ctx("Failed to persist code verifier")?;

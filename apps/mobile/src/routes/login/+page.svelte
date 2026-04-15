@@ -10,12 +10,18 @@
 
 	const user = inject(USER_SERVICE);
 
+	const CALLBACK_HOST = 'www.eurora-labs.com';
+	const CALLBACK_PATH = '/mobile/callback';
+
 	let loading = $state(false);
 	let error = $state('');
+	let handlingCallback = false;
 	let intervalId: ReturnType<typeof setInterval> | null = null;
 	let unlistenDeepLink: (() => void) | null = null;
 
 	async function handleAuthCallback() {
+		if (handlingCallback) return;
+		handlingCallback = true;
 		try {
 			const success = await user.pollForLogin();
 			if (success) {
@@ -26,6 +32,8 @@
 			stopPolling();
 			error = 'Login failed. Please try again.';
 			loading = false;
+		} finally {
+			handlingCallback = false;
 		}
 	}
 
@@ -35,7 +43,18 @@
 
 		try {
 			unlistenDeepLink = await onOpenUrl((urls) => {
-				if (urls.some((url) => url.startsWith('eurora://auth/callback'))) {
+				const isCallback = urls.some((url) => {
+					try {
+						const parsed = new URL(url);
+						return (
+							parsed.hostname === CALLBACK_HOST &&
+							parsed.pathname.startsWith(CALLBACK_PATH)
+						);
+					} catch {
+						return false;
+					}
+				});
+				if (isCallback) {
 					handleAuthCallback();
 				}
 			});

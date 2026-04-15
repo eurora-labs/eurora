@@ -25,6 +25,16 @@
 			"developmentTeam": "FKLH326P9A"
 		}
 	},
+	"plugins": {
+		"deep-link": {
+			"mobile": [
+				{ "host": "www.eurora-labs.com", "pathPrefix": ["/mobile/callback"] }
+			],
+			"desktop": {
+				"schemes": ["eurora"]
+			}
+		}
+	},
 	"app": {
 		"withGlobalTauri": false,
 		"windows": [
