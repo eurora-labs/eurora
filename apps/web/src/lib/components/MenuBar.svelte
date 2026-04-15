@@ -20,7 +20,7 @@
 	}
 
 	const navLinks = [
-		{ href: '/docs/why-eurora', label: 'Why Eurora' },
+		{ href: '/why-eurora', label: 'Why Eurora' },
 		{ href: '/docs', label: 'Docs' },
 		{ href: '/pricing', label: 'Pricing' },
 		{ href: '/about', label: 'About us' },
