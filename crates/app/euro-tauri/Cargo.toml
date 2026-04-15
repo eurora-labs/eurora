@@ -36,7 +36,7 @@ dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-browser = { workspace = true }
 euro-encrypt = { workspace = true }
-euro-endpoint = { workspace = true }
+euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-thread = { workspace = true }
@@ -68,7 +68,8 @@ tauri-plugin-store = "2"
 tauri-plugin-tracing = { version = "0.3.2", features = ["colored"] }
 tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
-taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
+# taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
+taurpc = { workspace = true }
 # The features here optimize for performance.
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"

@@ -3622,6 +3622,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-mobile"
+version = "0.0.0"
+dependencies = [
+ "agent-chain-core",
+ "anyhow",
+ "auth-core",
+ "backon",
+ "chrono",
+ "dotenv",
+ "euro-auth",
+ "euro-encrypt",
+ "euro-endpoint",
+ "euro-secret",
+ "euro-settings",
+ "euro-thread",
+ "euro-user",
+ "futures",
+ "proto-gen",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-http",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-process",
+ "tauri-plugin-store",
+ "taurpc",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "euro-native-messaging"
 version = "0.0.0"
 dependencies = [
@@ -5116,7 +5154,7 @@ dependencies = [
  "tokio",
  "tower-service",
  "tracing",
- "windows-registry",
+ "windows-registry 0.6.1",
 ]
 
 [[package]]
@@ -10782,6 +10820,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-deep-link"
+version = "2.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3db49816aee496a9b200d55b55ab6ae73fd50847c79f2fabc7ee20871fa75c95"
+dependencies = [
+ "dunce",
+ "plist",
+ "rust-ini",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "tauri-utils",
+ "thiserror 2.0.18",
+ "tracing",
+ "url",
+ "windows-registry 0.5.3",
+ "windows-result 0.3.4",
+]
+
+[[package]]
 name = "tauri-plugin-dialog"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11135,7 +11194,7 @@ dependencies = [
 [[package]]
 name = "taurpc"
 version = "0.8.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=chore%2Fspecta-bump#359bfbb8d522176b920b676495dc647c1265dfbc"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=fix%2Fmobile-compilation#b90893ef5f2a7f36559ccfca26376635257f145e"
 dependencies = [
  "anyhow",
  "heck 0.5.0",
@@ -11154,7 +11213,7 @@ dependencies = [
 [[package]]
 name = "taurpc-macros"
 version = "0.8.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=chore%2Fspecta-bump#359bfbb8d522176b920b676495dc647c1265dfbc"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=fix%2Fmobile-compilation#b90893ef5f2a7f36559ccfca26376635257f145e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -11633,6 +11692,7 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+ "webpki-roots 1.0.6",
 ]
 
 [[package]]
@@ -12889,6 +12949,17 @@ checksum = "9150af68066c4c5c07ddc0ce30421554771e528bde427614c61038bc2c92c2b1"
 dependencies = [
  "windows-core 0.61.2",
  "windows-link 0.1.3",
+]
+
+[[package]]
+name = "windows-registry"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b8a9ed28765efc97bbc954883f4e6796c33a06546ebafacbabee9696967499e"
+dependencies = [
+ "windows-link 0.1.3",
+ "windows-result 0.3.4",
+ "windows-strings 0.4.2",
 ]
 
 [[package]]

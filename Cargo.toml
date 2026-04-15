@@ -35,6 +35,8 @@ auth-core = { path = "crates/common/auth-core" }
 axum = "0.8.8"
 backon = "1.6"
 base64 = "0.22.1"
+# taurpc = { path = "../TauRPC/taurpc" }
+taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "fix/mobile-compilation" }
 be-activity-service = { path = "crates/backend/be-activity-service" }
 be-asset = { path = "crates/backend/be-asset" }
 be-asset-service = { path = "crates/backend/be-asset-service" }
@@ -67,7 +69,7 @@ euro-auth = { path = "crates/app/euro-auth" }
 euro-browser = { path = "crates/app/euro-browser" }
 euro-debug = { path = "crates/app/euro-debug" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
-euro-endpoint = { path = "crates/app/euro-endpoint" }
+euro-endpoint = { path = "crates/app/euro-endpoint", default-features = false }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-process = { path = "crates/app/euro-process" }

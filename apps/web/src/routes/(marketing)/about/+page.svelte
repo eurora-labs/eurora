@@ -2,12 +2,10 @@
 	import ReadyToStart from '$lib/components/marketing/ReadyToStart.svelte';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
 	import GithubIcon from '@lucide/svelte/icons/github';
 	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	import MailIcon from '@lucide/svelte/icons/mail';
 
-	const email = 'contact@eurora-labs.com';
 	let copiedLaura = $state(false);
 	let copiedAndre = $state(false);
 
