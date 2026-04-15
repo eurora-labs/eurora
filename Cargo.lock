@@ -11169,11 +11169,11 @@ dependencies = [
 [[package]]
 name = "taurpc"
 version = "0.8.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=chore%2Fspecta-bump#359bfbb8d522176b920b676495dc647c1265dfbc"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=fix%2Fmobile-compilation#b90893ef5f2a7f36559ccfca26376635257f145e"
 dependencies = [
  "anyhow",
- "heck 0.5.0",
- "itertools 0.14.0",
+ "heck 0.4.1",
+ "itertools 0.10.5",
  "serde",
  "serde_json",
  "specta",
@@ -11188,7 +11188,7 @@ dependencies = [
 [[package]]
 name = "taurpc-macros"
 version = "0.8.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=chore%2Fspecta-bump#359bfbb8d522176b920b676495dc647c1265dfbc"
+source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=fix%2Fmobile-compilation#b90893ef5f2a7f36559ccfca26376635257f145e"
 dependencies = [
  "proc-macro2",
  "quote",

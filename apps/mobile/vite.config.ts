@@ -9,7 +9,7 @@ export default defineConfig({
 	server: {
 		host: host || false,
 		port: 1421,
-		strictPort: false,
+		strictPort: true,
 		fs: {
 			strict: false,
 		},
