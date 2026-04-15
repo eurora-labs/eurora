@@ -12,6 +12,7 @@
 		"prepare": "svelte-kit sync"
 	},
 	"devDependencies": {
+		"@eurora/chat": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@gitbutler/svelte-comment-injector": "^1.0.0",

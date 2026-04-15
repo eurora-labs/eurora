@@ -1,11 +1,16 @@
 <script lang="ts">
 	import '$styles/styles.css';
+	import { initDependencies } from '$lib/bootstrap/deps.js';
+	import MobileSidebar from '$lib/components/MobileSidebar.svelte';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
 
 	let { children } = $props();
+
+	initDependencies();
 
 	onMount(() => {
 		setMode('dark');
@@ -45,9 +50,18 @@
 	class="app-shell relative flex flex-col h-screen overflow-hidden"
 	style="padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom);"
 >
-	<main class="flex-1 min-h-0 bg-background">
-		{@render children?.()}
-	</main>
+	<Sidebar.Provider>
+		<MobileSidebar />
+		<Sidebar.Inset>
+			<header class="flex items-center gap-2 px-3 py-2 border-b border-border">
+				<Sidebar.Trigger />
+				<h1 class="text-sm font-semibold text-foreground">Eurora</h1>
+			</header>
+			<main class="flex-1 min-h-0 bg-background">
+				{@render children?.()}
+			</main>
+		</Sidebar.Inset>
+	</Sidebar.Provider>
 </div>
 
 <Toaster />
