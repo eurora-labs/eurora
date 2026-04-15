@@ -15,3 +15,4 @@ pnpm-lock.yaml
 package-lock.json
 
 apps/desktop/src/lib/bindings/bindings.ts
+apps/mobile/src/lib/bindings/bindings.ts

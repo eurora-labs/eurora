@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
+	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';

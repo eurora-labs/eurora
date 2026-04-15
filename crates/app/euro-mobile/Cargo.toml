@@ -19,6 +19,8 @@ agent-chain-core = { workspace = true, features = ["prost"] }
 anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dotenv = { workspace = true }
+auth-core = { workspace = true, features = ["specta"] }
+backon = { workspace = true }
 euro-auth = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-webpki-roots"] }
@@ -43,6 +45,7 @@ taurpc = { workspace = true }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"
 tracing = { workspace = true }
+url = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

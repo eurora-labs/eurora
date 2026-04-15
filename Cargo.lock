@@ -3627,6 +3627,8 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
+ "auth-core",
+ "backon",
  "chrono",
  "dotenv",
  "euro-auth",
@@ -3653,6 +3655,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "url",
 ]
 
 [[package]]
