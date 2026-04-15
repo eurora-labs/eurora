@@ -23,6 +23,19 @@
 	const authService = inject(AUTH_SERVICE);
 	let pendingDesktopLogin = $state<string | null>(null);
 
+	function storeDeviceRedirectUri() {
+		const redirectUri = page.url.searchParams.get('redirect_uri');
+		if (redirectUri && redirectUri.startsWith('eurora://')) {
+			sessionStorage.setItem('deviceRedirectUri', redirectUri);
+		}
+	}
+
+	function consumeDeviceRedirectUri(): string | null {
+		const uri = sessionStorage.getItem('deviceRedirectUri');
+		if (uri) sessionStorage.removeItem('deviceRedirectUri');
+		return uri;
+	}
+
 	onMount(async () => {
 		try {
 			let loginToken = page.url.searchParams.get('code_challenge');
@@ -35,6 +48,7 @@
 				}
 				sessionStorage.setItem('loginToken', loginToken);
 				sessionStorage.setItem('challengeMethod', challengeMethod);
+				storeDeviceRedirectUri();
 
 				const isValid = await auth.ensureValidToken();
 				if (isValid && get(accessToken)) {
@@ -74,6 +88,12 @@
 			sessionStorage.removeItem('challengeMethod');
 			desktopLoginDone = true;
 			pendingDesktopLogin = null;
+
+			const redirectUri = consumeDeviceRedirectUri();
+			if (redirectUri) {
+				window.location.href = redirectUri;
+				return;
+			}
 		} catch (err) {
 			console.error('Failed to associate login token:', err);
 			submitError = 'Failed to authorize desktop app. Please try again.';
@@ -212,9 +232,9 @@
 	<div class="w-full max-w-md space-y-8">
 		{#if desktopLoginDone}
 			<div class="text-center">
-				<h1 class="text-3xl font-bold tracking-tight">Desktop app connected</h1>
+				<h1 class="text-3xl font-bold tracking-tight">App connected</h1>
 				<p class="text-muted-foreground mt-2">
-					You can close this tab and return to the desktop app.
+					You can close this tab and return to the app.
 				</p>
 			</div>
 		{:else if pendingDesktopLogin}
