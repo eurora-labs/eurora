@@ -9,7 +9,7 @@
 	/>
 </svelte:head>
 
-<div>
+<div class="container">
 	<h1 class="mb-4 text-4xl font-bold">Why Eurora</h1>
 	<p class="mb-12 text-lg text-muted-foreground">
 		There are dozens of AI clients already. None of them satisfied my needs.
