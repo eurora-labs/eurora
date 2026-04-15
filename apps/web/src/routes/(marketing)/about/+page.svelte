@@ -41,13 +41,12 @@
 
 <div class="container mx-auto max-w-5xl px-4 pt-16 pb-16">
 	<!-- Hero -->
-	<div class="text-center mb-16">
+	<div class="mb-12">
 		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-4">Who we are</p>
-		<h1 class="text-4xl font-bold mb-6 sm:text-5xl lg:text-6xl leading-tight">
-			Two people, one belief:<br />
-			<span class="text-primary">European AI should work for you.</span>
+		<h1 class="text-4xl font-bold mb-4 sm:text-5xl">
+			We believe that European AI should work for you.
 		</h1>
-		<p class="max-w-2xl mx-auto text-lg text-muted-foreground leading-relaxed">
+		<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
 			Eurora is a company based in The Netherlands, founded by two people who got tired of AI
 			tools that treat your data as the product. We decided to build something better, rooted
 			in Europe's strong tradition of privacy and user rights.

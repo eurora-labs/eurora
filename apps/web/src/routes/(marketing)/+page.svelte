@@ -49,8 +49,8 @@
 		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
 			<span class="text-foreground font-semibold">Less typing, more answers.</span>
 			A private, open-source AI assistant that reads what you read. Ask questions about any YouTube
-			video, article, or tweet — Eurora captures the transcript, content, and metadata so you don't
-			have to copy-paste a thing.
+			video, article, or tweet. Eurora captures the transcript, content, and metadata so you don't
+			have to copy and paste a thing.
 		</p>
 		<div class="flex flex-col items-center gap-4 w-full md:flex-row md:items-start mt-16">
 			<DownloadButton class="h-24 w-full max-w-md" />
