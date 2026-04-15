@@ -41,7 +41,7 @@ jobs:
               run: pnpm proto:typescript
 
             - id: get_playwright_version
-              uses: eviden-actions/get-playwright-version@f36cedaf26859aa0773ddbdd554c1e5cbf1ad4d5 # v1
+              uses: eviden-actions/get-playwright-version@c83e8a285b395cc1e3d99df43d4ddaa0c889d8ff # v1
             - name: Cache playwright binaries
               uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5
               id: playwright-cache
