@@ -52,6 +52,15 @@
 			const tokens = await authService.login(loginData);
 			auth.login(tokens);
 
+			if (loginToken) {
+				const deviceRedirectUri = sessionStorage.getItem('deviceRedirectUri');
+				if (deviceRedirectUri) {
+					sessionStorage.removeItem('deviceRedirectUri');
+					window.location.href = deviceRedirectUri;
+					return;
+				}
+			}
+
 			const redirect = sessionStorage.getItem('postLoginRedirect') || '/';
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect);
