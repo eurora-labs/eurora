@@ -83,7 +83,8 @@ impl AuthApi for AuthApiImpl {
         let mut url = Url::parse(&format!("{base_url}/login")).ctx("Invalid AUTH_SERVICE_URL")?;
         url.query_pairs_mut()
             .append_pair("code_challenge", &code_challenge)
-            .append_pair("code_challenge_method", "S256");
+            .append_pair("code_challenge_method", "S256")
+            .append_pair("redirect_uri", "eurora://auth/callback");
 
         secret::persist(LOGIN_CODE_VERIFIER, &SecretString::from(code_verifier))
             .ctx("Failed to persist code verifier")?;

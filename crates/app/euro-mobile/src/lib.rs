@@ -47,6 +47,7 @@ pub fn run() {
             let router = build_router();
 
             tauri::Builder::default()
+                .plugin(tauri_plugin_deep_link::init())
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_http::init())
                 .plugin(tauri_plugin_opener::init())

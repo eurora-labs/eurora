@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { MessageList, ChatPromptInput } from '@eurora/chat';
+	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import { toast } from 'svelte-sonner';

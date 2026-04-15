@@ -4,6 +4,7 @@
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
+	import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { onDestroy } from 'svelte';
 
@@ -12,12 +13,33 @@
 	let loading = $state(false);
 	let error = $state('');
 	let intervalId: ReturnType<typeof setInterval> | null = null;
+	let unlistenDeepLink: (() => void) | null = null;
+
+	async function handleAuthCallback() {
+		try {
+			const success = await user.pollForLogin();
+			if (success) {
+				stopPolling();
+				goto('/');
+			}
+		} catch {
+			stopPolling();
+			error = 'Login failed. Please try again.';
+			loading = false;
+		}
+	}
 
 	async function startLogin() {
 		loading = true;
 		error = '';
 
 		try {
+			unlistenDeepLink = await onOpenUrl((urls) => {
+				if (urls.some((url) => url.startsWith('eurora://auth/callback'))) {
+					handleAuthCallback();
+				}
+			});
+
 			const loginToken = await user.getLoginToken();
 			await openUrl(loginToken.url);
 
@@ -44,6 +66,10 @@
 		if (intervalId) {
 			clearInterval(intervalId);
 			intervalId = null;
+		}
+		if (unlistenDeepLink) {
+			unlistenDeepLink();
+			unlistenDeepLink = null;
 		}
 	}
 
