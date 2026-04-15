@@ -9,13 +9,16 @@
 	/>
 </svelte:head>
 
-<div class="container">
-	<h1 class="mb-4 text-4xl font-bold">Why Eurora</h1>
-	<p class="mb-12 text-lg text-muted-foreground">
-		There are dozens of AI clients already. None of them satisfied my needs.
-	</p>
+<div class="container mx-auto max-w-5xl px-4 pt-16 pb-16">
+	<div class="mb-12">
+		<p class="text-sm font-medium tracking-widest uppercase text-primary mb-4">Our story</p>
+		<h1 class="text-4xl font-bold mb-4 sm:text-5xl">Why Eurora</h1>
+		<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+			There are dozens of AI clients already. None of them satisfied my needs.
+		</p>
+	</div>
 
-	<div class="flex flex-col gap-12">
+	<div class="flex flex-col gap-12 mb-12">
 		<section>
 			<h2 class="mb-2 text-2xl font-semibold">The Problem</h2>
 			<p class="text-muted-foreground">
@@ -23,6 +26,9 @@
 				in the past, but they do not know what you are doing at the moment. If you ask AI
 				"What's this?", you first need to explain what "this" is.
 			</p>
+
+			<br />
+
 			<p class="text-muted-foreground">
 				Asking a question about anything you do becomes an annoying chore instead of an
 				opportunity to learn more. If you have a question about a video on YouTube for
