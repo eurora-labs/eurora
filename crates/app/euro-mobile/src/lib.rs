@@ -5,6 +5,7 @@
     clippy::too_many_lines
 )]
 
+use procedures::auth_procedures::{AuthApi, AuthApiImpl};
 use procedures::chat_procedures::{ChatApi, ChatApiImpl};
 use procedures::thread_procedures::{ThreadApi, ThreadApiImpl};
 use taurpc::Router;
@@ -20,6 +21,7 @@ pub fn build_router() -> Router<tauri::Wry> {
             specta_typescript::Typescript::default()
                 .bigint(specta_typescript::BigIntExportBehavior::BigInt),
         )
+        .merge(AuthApiImpl.into_handler())
         .merge(ThreadApiImpl.into_handler())
         .merge(ChatApiImpl.into_handler())
 }

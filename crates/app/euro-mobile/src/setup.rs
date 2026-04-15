@@ -1,8 +1,7 @@
-use crate::shared_types::SharedThreadManager;
+use crate::shared_types::{SharedAppSettings, SharedThreadManager, SharedUserController};
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
 use tauri::Manager;
-use tokio::sync::Mutex;
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let data_dir = app.path().app_data_dir()?;
@@ -27,7 +26,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let endpoint_manager = std::sync::Arc::new(endpoint_manager);
 
     app.manage(endpoint_manager.clone());
-    app.manage(Mutex::new(app_settings));
+    app.manage(SharedAppSettings::new(app_settings));
 
     init_state(app, &endpoint_manager)?;
 
@@ -61,7 +60,7 @@ fn init_state(
     let path = app.path().app_data_dir()?;
     let user_channel_rx = endpoint_manager.subscribe();
     let user_controller = euro_user::Controller::new(path, user_channel_rx)?;
-    app_handle.manage(std::sync::Arc::new(Mutex::new(user_controller)));
+    app_handle.manage(SharedUserController::new(user_controller));
 
     app_handle.manage(crate::shared_types::ActiveStreamTokens::default());
 
