@@ -1,18 +1,17 @@
 import { watch } from 'runed';
-import { setContext, getContext } from 'svelte';
+import { getContext, hasContext, setContext } from 'svelte';
 
 const STICK_TO_BOTTOM_CONTEXT_KEY = Symbol.for('stick-to-bottom-context');
 
 export class StickToBottomContext {
 	#element: HTMLElement | null = $state(null);
-	#isAtBottom = $state(true);
+	#userScrolledAway = $state(false);
 	#resizeObserver: ResizeObserver | null = null;
 	#mutationObserver: MutationObserver | null = null;
-	#intersectionObserver: IntersectionObserver | null = null;
-	#sentinel: HTMLElement | null = null;
-	#userHasScrolled = $state(false);
+	#rafScheduled = false;
+	#touchStartY: number | null = null;
 
-	isAtBottom = $derived(this.#isAtBottom);
+	isAtBottom = $derived(!this.#userScrolledAway);
 
 	constructor() {
 		watch(
@@ -32,139 +31,113 @@ export class StickToBottomContext {
 
 	scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
 		if (!this.#element) return;
-
-		this.#userHasScrolled = false;
+		this.#userScrolledAway = false;
 		this.#element.scrollTo({
 			top: this.#element.scrollHeight,
 			behavior,
 		});
 	};
 
-	#handleWheel = () => {
-		this.#userHasScrolled = true;
+	reengageAutoScroll = () => {
+		this.#userScrolledAway = false;
 		if (this.#element) {
-			this.#element.scrollTo({ top: this.#element.scrollTop });
+			this.#element.scrollTop = this.#element.scrollHeight;
+		}
+	};
+
+	#handleWheel = (e: WheelEvent) => {
+		if (e.deltaY < 0) {
+			this.#userScrolledAway = true;
+		}
+	};
+
+	#handleTouchStart = (e: TouchEvent) => {
+		this.#touchStartY = e.touches[0].clientY;
+	};
+
+	#handleTouchMove = (e: TouchEvent) => {
+		if (this.#touchStartY === null) return;
+		if (e.touches[0].clientY > this.#touchStartY) {
+			this.#userScrolledAway = true;
+		}
+	};
+
+	#handleTouchEnd = () => {
+		this.#touchStartY = null;
+	};
+
+	#handleKeyDown = (e: KeyboardEvent) => {
+		if (e.key === 'PageUp' || e.key === 'ArrowUp' || e.key === 'Home') {
+			this.#userScrolledAway = true;
 		}
 	};
 
 	#handleScroll = () => {
-		if (!this.#element) return;
-
+		if (!this.#element || !this.#userScrolledAway) return;
 		const { scrollTop, scrollHeight, clientHeight } = this.#element;
-		const threshold = 200;
-		const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
-
-		this.#isAtBottom = isAtBottom;
-
-		if (!isAtBottom) {
-			this.#userHasScrolled = true;
+		if (scrollTop + clientHeight >= scrollHeight - 20) {
+			this.#userScrolledAway = false;
 		}
+	};
+
+	#pinToBottom = () => {
+		this.#rafScheduled = false;
+		if (!this.#userScrolledAway && this.#element) {
+			this.#element.scrollTop = this.#element.scrollHeight;
+		}
+	};
+
+	#schedulePin = () => {
+		if (this.#rafScheduled) return;
+		this.#rafScheduled = true;
+		requestAnimationFrame(this.#pinToBottom);
 	};
 
 	#setupObservers() {
 		if (!this.#element) return;
 
-		this.#createSentinel();
+		this.#element.addEventListener('wheel', this.#handleWheel, { passive: true });
+		this.#element.addEventListener('touchstart', this.#handleTouchStart, { passive: true });
+		this.#element.addEventListener('touchmove', this.#handleTouchMove, { passive: true });
+		this.#element.addEventListener('touchend', this.#handleTouchEnd);
+		this.#element.addEventListener('keydown', this.#handleKeyDown);
+		this.#element.addEventListener('scroll', this.#handleScroll, { passive: true });
 
-		this.#intersectionObserver = new IntersectionObserver(
-			(entries) => {
-				const entry = entries[0];
-				if (entry.isIntersecting) {
-					this.#isAtBottom = true;
-				}
-			},
-			{
-				threshold: 0,
-				root: this.#element,
-			},
-		);
-
-		if (this.#sentinel) {
-			this.#intersectionObserver.observe(this.#sentinel);
-		}
-
-		this.#element.addEventListener('scroll', this.#handleScroll, {
-			passive: true,
-		});
-
-		this.#element.addEventListener('wheel', this.#handleWheel, {
-			passive: true,
-		});
-
-		this.#resizeObserver = new ResizeObserver(() => {
-			this.#checkScrollPosition();
-			if (this.#isAtBottom && !this.#userHasScrolled) {
-				this.scrollToBottom('auto');
-			}
-		});
-
+		this.#resizeObserver = new ResizeObserver(this.#schedulePin);
 		this.#resizeObserver.observe(this.#element);
 
-		this.#mutationObserver = new MutationObserver(() => {
-			requestAnimationFrame(() => {
-				const shouldAutoScroll = this.#isAtBottom && !this.#userHasScrolled;
-				this.#checkScrollPosition();
-
-				if (shouldAutoScroll) {
-					this.scrollToBottom('smooth');
-				}
-			});
-		});
-
+		this.#mutationObserver = new MutationObserver(this.#schedulePin);
 		this.#mutationObserver.observe(this.#element, {
 			childList: true,
 			subtree: true,
 			characterData: true,
 		});
-
-		this.#checkScrollPosition();
-	}
-
-	#createSentinel() {
-		if (!this.#element) return;
-
-		this.#sentinel = document.createElement('div');
-		this.#sentinel.style.height = '1px';
-		this.#sentinel.style.width = '100%';
-		this.#sentinel.style.pointerEvents = 'none';
-		this.#sentinel.style.opacity = '0';
-		this.#sentinel.setAttribute('data-stick-to-bottom-sentinel', '');
-
-		this.#element.appendChild(this.#sentinel);
-	}
-
-	#checkScrollPosition() {
-		if (!this.#element) return;
-
-		const { scrollTop, scrollHeight, clientHeight } = this.#element;
-		const threshold = 200;
-		const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
-
-		this.#isAtBottom = isAtBottom;
 	}
 
 	#cleanup() {
 		this.#resizeObserver?.disconnect();
 		this.#mutationObserver?.disconnect();
-		this.#intersectionObserver?.disconnect();
 
 		if (this.#element) {
-			this.#element.removeEventListener('scroll', this.#handleScroll);
 			this.#element.removeEventListener('wheel', this.#handleWheel);
-		}
-
-		if (this.#sentinel && this.#element?.contains(this.#sentinel)) {
-			this.#element.removeChild(this.#sentinel);
+			this.#element.removeEventListener('touchstart', this.#handleTouchStart);
+			this.#element.removeEventListener('touchmove', this.#handleTouchMove);
+			this.#element.removeEventListener('touchend', this.#handleTouchEnd);
+			this.#element.removeEventListener('keydown', this.#handleKeyDown);
+			this.#element.removeEventListener('scroll', this.#handleScroll);
 		}
 
 		this.#resizeObserver = null;
 		this.#mutationObserver = null;
-		this.#intersectionObserver = null;
-		this.#sentinel = null;
+		this.#touchStartY = null;
+		this.#rafScheduled = false;
 	}
 }
 
 export function setStickToBottomContext(): StickToBottomContext {
+	if (hasContext(STICK_TO_BOTTOM_CONTEXT_KEY)) {
+		return getContext<StickToBottomContext>(STICK_TO_BOTTOM_CONTEXT_KEY);
+	}
 	const context = new StickToBottomContext();
 	setContext(STICK_TO_BOTTOM_CONTEXT_KEY, context);
 	return context;
