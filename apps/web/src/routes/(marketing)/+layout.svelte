@@ -7,6 +7,8 @@
 
 <MenuBar />
 
-{@render children?.()}
+<div class="container mx-auto max-w-5xl px-4 pt-16 pb-16">
+	{@render children?.()}
+</div>
 
 <Footer />
