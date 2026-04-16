@@ -104,6 +104,40 @@
 			setBranchResults(threadId: string, messages: MessageNode[]) {
 				fakeService.branchResults.set(threadId, messages);
 			},
+
+			async switchThread(threadId: string, messages: MessageNode[]) {
+				if (!fakeService.threads.find((t) => t.id === threadId)) {
+					fakeService.threads.push({
+						id: threadId,
+						title: `Thread ${threadId}`,
+						createdAt: new Date().toISOString(),
+						updatedAt: new Date().toISOString(),
+					});
+				}
+				fakeService.messagesByThread.set(threadId, messages);
+				await chatService.loadThreads(20, 0);
+				chatService.activeThreadId = threadId;
+				await chatService.loadMessages(threadId);
+				await tick();
+			},
+
+			async sendFakeMessage(threadId: string, text: string) {
+				const entry = chatService.getThreadData(threadId);
+				if (!entry) return null;
+				const humanId = `sent-human-${Date.now()}`;
+				const aiId = `sent-ai-${Date.now()}`;
+				const lastMsg = entry.messages.at(-1);
+				entry.messages = [
+					...entry.messages,
+					makeMessageNode(humanId, 'human', text, {
+						parentId: lastMsg?.message.id ?? null,
+					}),
+					makeMessageNode(aiId, 'ai', '', { parentId: humanId }),
+				];
+				entry.streamingMessageId = aiId;
+				await tick();
+				return aiId;
+			},
 		};
 	}
 </script>

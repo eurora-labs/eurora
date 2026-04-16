@@ -363,7 +363,6 @@ test.describe('MessageList', () => {
 			await page.evaluate(() =>
 				(window as any).__test.simulateStreaming('thread-1', 'streaming-ai'),
 			);
-			// Ensure at bottom
 			await page.evaluate(() => {
 				const el = document.querySelector('[data-slot="conversation-content"]')!;
 				el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
@@ -383,6 +382,23 @@ test.describe('MessageList', () => {
 			});
 		}
 
+		async function assertAtBottom(page: Page) {
+			await page.waitForTimeout(300);
+			const info = await getScrollInfo(page);
+			const dist = info.scrollHeight - info.scrollTop - info.clientHeight;
+			expect(dist).toBeLessThan(5);
+		}
+
+		async function scrollUpAndDisengage(page: Page) {
+			const content = page.locator('[data-slot="conversation-content"]');
+			await content.hover();
+			await page.mouse.wheel(0, -800);
+			await page.waitForTimeout(200);
+			const info = await getScrollInfo(page);
+			const dist = info.scrollHeight - info.scrollTop - info.clientHeight;
+			expect(dist).toBeGreaterThan(100);
+		}
+
 		test('auto-scrolls to bottom as streaming content arrives', async ({ page }) => {
 			await setupStreamingConversation(page);
 
@@ -393,17 +409,13 @@ test.describe('MessageList', () => {
 					'Hello world! '.repeat(50),
 				),
 			);
-			await page.waitForTimeout(500);
 
-			const info = await getScrollInfo(page);
-			const distFromBottom = info.scrollHeight - info.scrollTop - info.clientHeight;
-			expect(distFromBottom).toBeLessThan(250);
+			await assertAtBottom(page);
 		});
 
-		test('mouse wheel scroll up stops auto-scroll during streaming', async ({ page }) => {
+		test('mouse wheel up stops auto-scroll during streaming', async ({ page }) => {
 			await setupStreamingConversation(page);
 
-			// Add streaming content so auto-scroll is active
 			await page.evaluate(() =>
 				(window as any).__test.appendStreamChunk(
 					'thread-1',
@@ -411,17 +423,15 @@ test.describe('MessageList', () => {
 					'Initial chunk. '.repeat(50),
 				),
 			);
-			await page.waitForTimeout(500);
+			await page.waitForTimeout(300);
 
-			// User scrolls up with mouse wheel
 			const content = page.locator('[data-slot="conversation-content"]');
 			await content.hover();
 			await page.mouse.wheel(0, -800);
-			await page.waitForTimeout(300);
+			await page.waitForTimeout(200);
 
 			const scrollAfterWheel = await getScrollInfo(page);
 
-			// Append more streaming content
 			for (let i = 0; i < 5; i++) {
 				await page.evaluate(
 					(i) =>
@@ -432,14 +442,205 @@ test.describe('MessageList', () => {
 						),
 					i,
 				);
-				await page.waitForTimeout(200);
+				await page.waitForTimeout(100);
 			}
-			await page.waitForTimeout(300);
+			await page.waitForTimeout(200);
 
-			// Scroll position should NOT have jumped to bottom
 			const scrollAfterChunks = await getScrollInfo(page);
 			const scrollDelta = Math.abs(scrollAfterChunks.scrollTop - scrollAfterWheel.scrollTop);
 			expect(scrollDelta).toBeLessThan(50);
+		});
+
+		test('scrolling down does not disengage auto-scroll', async ({ page }) => {
+			await setupStreamingConversation(page);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'Content. '.repeat(50),
+				),
+			);
+			await page.waitForTimeout(300);
+
+			const content = page.locator('[data-slot="conversation-content"]');
+			await content.hover();
+			await page.mouse.wheel(0, 200);
+			await page.waitForTimeout(100);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'More content. '.repeat(50),
+				),
+			);
+
+			await assertAtBottom(page);
+		});
+
+		test('sending a new message re-engages auto-scroll', async ({ page }) => {
+			await setupStreamingConversation(page);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'Content. '.repeat(50),
+				),
+			);
+			await page.waitForTimeout(300);
+
+			await scrollUpAndDisengage(page);
+
+			await page.evaluate(() => (window as any).__test.stopStreaming('thread-1'));
+
+			const aiId = await page.evaluate(() =>
+				(window as any).__test.sendFakeMessage('thread-1', 'New question'),
+			);
+			await assertAtBottom(page);
+
+			await page.evaluate(
+				(id: string) =>
+					(window as any).__test.appendStreamChunk(
+						'thread-1',
+						id,
+						'New response. '.repeat(50),
+					),
+				aiId,
+			);
+
+			await assertAtBottom(page);
+		});
+
+		test('scrolling to bottom programmatically re-engages auto-scroll', async ({ page }) => {
+			await setupStreamingConversation(page);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'Content. '.repeat(50),
+				),
+			);
+			await page.waitForTimeout(300);
+
+			await scrollUpAndDisengage(page);
+
+			await page.evaluate(() => {
+				const el = document.querySelector('[data-slot="conversation-content"]')!;
+				el.scrollTo({ top: el.scrollHeight, behavior: 'instant' as ScrollBehavior });
+			});
+			await page.waitForTimeout(200);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'After re-engage. '.repeat(50),
+				),
+			);
+
+			await assertAtBottom(page);
+		});
+
+		test('scrolling back to bottom manually re-engages auto-scroll', async ({ page }) => {
+			await setupStreamingConversation(page);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'Content. '.repeat(50),
+				),
+			);
+			await page.waitForTimeout(300);
+
+			await scrollUpAndDisengage(page);
+
+			const content = page.locator('[data-slot="conversation-content"]');
+			await page.mouse.wheel(0, 10000);
+			await page.waitForTimeout(200);
+
+			await page.evaluate(() =>
+				(window as any).__test.appendStreamChunk(
+					'thread-1',
+					'streaming-ai',
+					'After manual scroll back. '.repeat(50),
+				),
+			);
+
+			await assertAtBottom(page);
+		});
+
+		test('switching threads scrolls to bottom', async ({ page }) => {
+			await setupStreamingConversation(page);
+			await page.evaluate(() => (window as any).__test.stopStreaming('thread-1'));
+
+			await scrollUpAndDisengage(page);
+
+			await page.evaluate(() => {
+				const t = (window as any).__test;
+				const nodes = [];
+				for (let i = 0; i < 30; i++) {
+					nodes.push(
+						t.makeMessageNode(
+							't2-msg-' + i,
+							i % 2 === 0 ? 'human' : 'ai',
+							('Thread 2 Message ' + (i + 1) + '. ').repeat(20),
+							i > 0 ? { parentId: 't2-msg-' + (i - 1) } : {},
+						),
+					);
+				}
+				return t.switchThread('thread-2', nodes);
+			});
+
+			await assertAtBottom(page);
+		});
+
+		test('rapid streaming chunks stay pinned to bottom', async ({ page }) => {
+			await setupStreamingConversation(page);
+
+			await page.evaluate(async () => {
+				const t = (window as any).__test;
+				for (let i = 0; i < 20; i++) {
+					await t.appendStreamChunk(
+						'thread-1',
+						'streaming-ai',
+						`Rapid chunk ${i}. `.repeat(10),
+					);
+				}
+			});
+
+			await assertAtBottom(page);
+		});
+
+		test('auto-scroll works after content grows to fill viewport', async ({ page }) => {
+			await page.evaluate(() => {
+				const t = (window as any).__test;
+				return t.setupThread('thread-1', [
+					t.makeMessageNode('h1', 'human', 'Short message'),
+					t.makeMessageNode('streaming-ai', 'ai', '', { parentId: 'h1' }),
+				]);
+			});
+			await page.evaluate(() =>
+				(window as any).__test.simulateStreaming('thread-1', 'streaming-ai'),
+			);
+			await page.waitForTimeout(100);
+
+			for (let i = 0; i < 15; i++) {
+				await page.evaluate(
+					(i) =>
+						(window as any).__test.appendStreamChunk(
+							'thread-1',
+							'streaming-ai',
+							`Growing content block ${i}. `.repeat(30),
+						),
+					i,
+				);
+			}
+
+			await assertAtBottom(page);
 		});
 	});
 });
