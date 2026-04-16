@@ -3,7 +3,6 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn, type WithElementRef } from '$lib/utils.js';
 	import { getStickToBottomContext } from './conversation-context.svelte.js';
-	import { watch } from 'runed';
 
 	let {
 		class: className,
@@ -15,15 +14,12 @@
 	const context = getStickToBottomContext();
 	let element: HTMLDivElement;
 
-	watch(
-		() => element,
-		() => {
-			if (element) {
-				context.setElement(element);
-				context.scrollToBottom('auto');
-			}
-		},
-	);
+	$effect(() => {
+		if (element) {
+			context.setElement(element);
+			context.scrollToBottom('auto');
+		}
+	});
 </script>
 
 <div

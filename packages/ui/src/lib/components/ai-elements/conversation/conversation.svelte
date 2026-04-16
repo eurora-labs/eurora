@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn, type WithElementRef } from '$lib/utils.js';
-	import { setStickToBottomContext } from './conversation-context.svelte.js';
+	import { initStickToBottomContext } from './conversation-context.svelte.js';
 
 	let {
 		class: className,
@@ -11,7 +11,7 @@
 		...restProps
 	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & { children?: Snippet } = $props();
 
-	setStickToBottomContext();
+	initStickToBottomContext();
 </script>
 
 <div
