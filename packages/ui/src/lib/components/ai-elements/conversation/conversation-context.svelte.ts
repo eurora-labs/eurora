@@ -2,6 +2,8 @@ import { watch } from 'runed';
 import { getContext, hasContext, setContext } from 'svelte';
 
 const STICK_TO_BOTTOM_CONTEXT_KEY = Symbol.for('stick-to-bottom-context');
+const TOUCH_DEAD_ZONE_PX = 10;
+const RE_ENGAGE_THRESHOLD_PX = 20;
 
 export class StickToBottomContext {
 	#element: HTMLElement | null = $state(null);
@@ -41,7 +43,7 @@ export class StickToBottomContext {
 	reengageAutoScroll = () => {
 		this.#userScrolledAway = false;
 		if (this.#element) {
-			this.#element.scrollTop = this.#element.scrollHeight;
+			this.#element.scrollTo({ top: this.#element.scrollHeight, behavior: 'auto' });
 		}
 	};
 
@@ -57,7 +59,7 @@ export class StickToBottomContext {
 
 	#handleTouchMove = (e: TouchEvent) => {
 		if (this.#touchStartY === null) return;
-		if (e.touches[0].clientY > this.#touchStartY) {
+		if (e.touches[0].clientY - this.#touchStartY > TOUCH_DEAD_ZONE_PX) {
 			this.#userScrolledAway = true;
 		}
 	};
@@ -75,7 +77,7 @@ export class StickToBottomContext {
 	#handleScroll = () => {
 		if (!this.#element || !this.#userScrolledAway) return;
 		const { scrollTop, scrollHeight, clientHeight } = this.#element;
-		if (scrollTop + clientHeight >= scrollHeight - 20) {
+		if (scrollTop + clientHeight >= scrollHeight - RE_ENGAGE_THRESHOLD_PX) {
 			this.#userScrolledAway = false;
 		}
 	};
@@ -83,7 +85,7 @@ export class StickToBottomContext {
 	#pinToBottom = () => {
 		this.#rafScheduled = false;
 		if (!this.#userScrolledAway && this.#element) {
-			this.#element.scrollTop = this.#element.scrollHeight;
+			this.#element.scrollTo({ top: this.#element.scrollHeight, behavior: 'auto' });
 		}
 	};
 
@@ -134,7 +136,7 @@ export class StickToBottomContext {
 	}
 }
 
-export function setStickToBottomContext(): StickToBottomContext {
+export function initStickToBottomContext(): StickToBottomContext {
 	if (hasContext(STICK_TO_BOTTOM_CONTEXT_KEY)) {
 		return getContext<StickToBottomContext>(STICK_TO_BOTTOM_CONTEXT_KEY);
 	}
