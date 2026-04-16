@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Alert, AlertDescription } from '@eurora/ui/components/alert/index';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -12,6 +13,15 @@
 
 	const isMacos = platform() === 'macos';
 	const taurpc = inject(TAURPC_SERVICE);
+	const user = inject(USER_SERVICE);
+
+	function navigateAfterExtension() {
+		if (!user.emailVerified) {
+			goto('/onboarding/login/verify-email?redirect=/');
+		} else {
+			goto('/');
+		}
+	}
 
 	let downloaded = $state(false);
 	let connected = $state(false);
@@ -38,7 +48,7 @@
 		try {
 			const count = await taurpc.system.get_browser_connection_count();
 			if (count > 0) {
-				goto('/');
+				navigateAfterExtension();
 				return;
 			}
 		} catch (_) {
@@ -109,7 +119,8 @@
 				integration and more relevant assistance as you work.
 			</p>
 			{#if connected}
-				<Button class="px-10 py-6 text-lg" onclick={() => goto('/')}>Continue</Button>
+				<Button class="px-10 py-6 text-lg" onclick={navigateAfterExtension}>Continue</Button
+				>
 			{/if}
 		</div>
 	</div>

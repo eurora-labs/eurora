@@ -143,6 +143,13 @@ impl AuthManager {
         Ok((code_verifier, code_challenge))
     }
 
+    pub async fn resend_verification_email(&mut self) -> Result<()> {
+        let access_token = self.get_access_token()?;
+        self.auth_client
+            .resend_verification_email(access_token.expose_secret())
+            .await
+    }
+
     pub async fn login_by_login_token(&mut self, login_token: String) -> Result<SecretString> {
         let response = self.auth_client.login_by_login_token(login_token).await?;
 

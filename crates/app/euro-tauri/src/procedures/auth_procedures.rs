@@ -42,6 +42,8 @@ pub trait AuthApi {
         app_handle: AppHandle<R>,
     ) -> Result<Option<String>, String>;
     async fn refresh_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
+    async fn is_email_verified<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
+    async fn resend_verification_email<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
 }
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
@@ -297,5 +299,30 @@ impl AuthApi for AuthApiImpl {
             .get_access_token_payload()
             .ctx("Failed to get access token payload")?;
         Ok(claims.display_name)
+    }
+
+    async fn is_email_verified<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
+        let user_state = user_controller(&app_handle)?;
+        let mut controller = user_state.lock().await;
+        controller
+            .get_or_refresh_access_token()
+            .await
+            .ctx("Failed to get access token")?;
+        let claims = controller
+            .get_access_token_payload()
+            .ctx("Failed to get access token payload")?;
+        Ok(claims.email_verified)
+    }
+
+    async fn resend_verification_email<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+    ) -> Result<(), String> {
+        let user_state = user_controller(&app_handle)?;
+        let mut controller = user_state.lock().await;
+        controller
+            .resend_verification_email()
+            .await
+            .ctx("Failed to resend verification email")
     }
 }

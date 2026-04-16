@@ -86,6 +86,10 @@ impl Controller {
         self.auth_manager.get_login_tokens().await
     }
 
+    pub async fn resend_verification_email(&mut self) -> Result<()> {
+        self.auth_manager.resend_verification_email().await
+    }
+
     pub async fn login_by_login_token(
         &mut self,
         login_token: impl Into<String>,
