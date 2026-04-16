@@ -20,7 +20,7 @@ export {
 
 export {
 	getStickToBottomContext,
-	setStickToBottomContext,
+	initStickToBottomContext,
 	StickToBottomContext,
 } from './conversation-context.svelte.js';
 
