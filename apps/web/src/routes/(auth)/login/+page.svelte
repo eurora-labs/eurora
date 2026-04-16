@@ -102,6 +102,30 @@
 		}
 	}
 
+	async function associateDesktopLoginIfPending(tokenValue: string): Promise<boolean> {
+		const loginToken = sessionStorage.getItem('loginToken');
+		if (!loginToken) return false;
+
+		try {
+			const request = create(AssociateLoginTokenRequestSchema, {
+				codeChallenge: loginToken,
+			});
+			await authService.associateLoginToken(request, tokenValue);
+			sessionStorage.removeItem('loginToken');
+			sessionStorage.removeItem('challengeMethod');
+			desktopLoginDone = true;
+
+			const redirectUri = consumeDeviceRedirectUri();
+			if (redirectUri) {
+				window.location.href = redirectUri;
+			}
+			return true;
+		} catch (err) {
+			console.error('Failed to associate login token:', err);
+			return false;
+		}
+	}
+
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
 	let email = $state('');
@@ -159,6 +183,7 @@
 			});
 			const tokens = await authService.login(request);
 			auth.login(tokens);
+			if (await associateDesktopLoginIfPending(tokens.accessToken)) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -180,6 +205,7 @@
 			});
 			const tokens = await authService.register(request);
 			auth.login(tokens);
+			if (await associateDesktopLoginIfPending(tokens.accessToken)) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
