@@ -52,7 +52,7 @@
 	/>
 </svelte:head>
 
-<div class="mx-auto flex w-full max-w-5xl flex-col items-center gap-16 px-4 py-24">
+<div class="flex flex-col items-center gap-16 px-4 py-24">
 	<section class="flex flex-col items-center gap-6 text-center">
 		<p class="text-sm font-medium uppercase tracking-widest text-primary">Free & Open Source</p>
 		<p class="max-w-xl text-lg text-muted-foreground sm:text-xl leading-relaxed">
