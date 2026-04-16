@@ -24,6 +24,7 @@
 		{ href: '/docs', label: 'Docs' },
 		{ href: '/pricing', label: 'Pricing' },
 		{ href: '/about', label: 'About us' },
+		{ href: '/partners', label: 'Partners' },
 	];
 </script>
 
