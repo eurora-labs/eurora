@@ -9,6 +9,7 @@
 		Provider,
 		RegisterRequestSchema,
 		CheckEmailRequestSchema,
+		AssociateLoginTokenRequestSchema,
 	} from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
@@ -47,6 +48,22 @@
 		}
 	}
 
+	async function associateDesktopLoginIfPending(tokenValue: string): Promise<void> {
+		const loginToken = sessionStorage.getItem('loginToken');
+		if (!loginToken) return;
+
+		try {
+			const request = create(AssociateLoginTokenRequestSchema, {
+				codeChallenge: loginToken,
+			});
+			await authService.associateLoginToken(request, tokenValue);
+			sessionStorage.removeItem('loginToken');
+			sessionStorage.removeItem('challengeMethod');
+		} catch (err) {
+			console.error('Failed to associate login token:', err);
+		}
+	}
+
 	async function handleRegister() {
 		if (!email.trim() || !password) return;
 		loading = true;
@@ -58,6 +75,7 @@
 			});
 			const tokens = await authService.register(request);
 			auth.login(tokens);
+			await associateDesktopLoginIfPending(tokens.accessToken);
 			goto('/');
 		} catch (err) {
 			console.error('Registration error:', err);
