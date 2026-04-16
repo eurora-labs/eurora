@@ -92,7 +92,8 @@ OS="$(os)"
 DIST="release"
 
 function tauri() {
-	(cd "$PWD/.." && pnpm tauri "$@")
+	local root="$PWD/.."
+	(cd "$root/crates/app/euro-tauri" && "$root/node_modules/.bin/tauri" "$@")
 }
 
 while [[ $# -gt 0 ]]; do
