@@ -1,0 +1,11 @@
+[package]
+name = "be-email-service"
+version = "0.0.0"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+publish = false
+
+[dependencies]
+lettermint-rs = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

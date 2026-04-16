@@ -156,6 +156,14 @@ where
                 }
             };
 
+            if !claims.email_verified {
+                tracing::warn!(user = %claims.sub, service = %service_full, "Blocked unverified email");
+                return Ok(Status::permission_denied(
+                    "Email verification required. Please check your inbox.",
+                )
+                .into_http());
+            }
+
             let service_name = extract_service_name(&service_full);
             let role = claims.role.to_string();
 

@@ -41,6 +41,7 @@ be-activity-service = { path = "crates/backend/be-activity-service" }
 be-asset = { path = "crates/backend/be-asset" }
 be-asset-service = { path = "crates/backend/be-asset-service" }
 be-auth-core = { path = "crates/backend/be-auth-core" }
+be-email-service = { path = "crates/backend/be-email-service" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
 be-authz = { path = "crates/backend/be-authz" }
 be-encrypt = { path = "crates/backend/be-encrypt" }
@@ -92,6 +93,7 @@ image = "0.25.9"
 indexmap = "2.13"  # collapse 2.10, 1.9
 insta = "1.41.1"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
+lettermint-rs = { version = "0.3", features = ["reqwest-rustls"] }
 keyring = "3.6.3"
 once_cell = "1.21"
 openidconnect = "4"

@@ -11,9 +11,9 @@ use crate::{
     MessageType, PaginationParams,
     error::{DbError, DbResult},
     types::{
-        Activity, ActivityAsset, Asset, AssetStatus, LoginToken, Message, OAuthCredentials,
-        OAuthProvider, OAuthState, PasswordCredentials, RefreshToken, SearchResultMessage,
-        SearchResultThread, Thread, TokenUsage, User,
+        Activity, ActivityAsset, Asset, AssetStatus, EmailVerificationToken, LoginToken, Message,
+        OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials, RefreshToken,
+        SearchResultMessage, SearchResultThread, Thread, TokenUsage, User,
     },
 };
 
@@ -585,6 +585,110 @@ impl DatabaseManager {
     }
 
     #[builder]
+    pub async fn create_email_verification_token(
+        &self,
+        user_id: Uuid,
+        token_hash: Vec<u8>,
+        expires_at: DateTime<Utc>,
+    ) -> DbResult<EmailVerificationToken> {
+        let id = Uuid::now_v7();
+        let now = Utc::now();
+
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query(
+            "UPDATE email_verification_tokens SET consumed = true, updated_at = now() \
+             WHERE user_id = $1 AND consumed = false",
+        )
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        let token = sqlx::query_as::<_, EmailVerificationToken>(
+            r#"
+            INSERT INTO email_verification_tokens (id, user_id, token_hash, expires_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, user_id, token_hash, expires_at, consumed, created_at, updated_at
+            "#,
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(&token_hash)
+        .bind(expires_at)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(token)
+    }
+
+    #[builder]
+    pub async fn consume_email_verification_token(&self, token_hash: &[u8]) -> DbResult<User> {
+        let mut tx = self.pool.begin().await?;
+
+        let token = sqlx::query_as::<_, EmailVerificationToken>(
+            r#"
+            UPDATE email_verification_tokens
+            SET consumed = true, updated_at = now()
+            WHERE token_hash = $1 AND consumed = false AND expires_at > now()
+            RETURNING id, user_id, token_hash, expires_at, consumed, created_at, updated_at
+            "#,
+        )
+        .bind(token_hash)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            UPDATE users SET email_verified = true, updated_at = now()
+            WHERE id = $1
+            RETURNING id, email, display_name, email_verified, created_at, updated_at
+            "#,
+        )
+        .bind(token.user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(user)
+    }
+
+    #[builder]
+    pub async fn set_email_verified(&self, user_id: Uuid) -> DbResult<()> {
+        sqlx::query("UPDATE users SET email_verified = true, updated_at = now() WHERE id = $1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
+    #[builder]
+    pub async fn get_latest_verification_token_for_user(
+        &self,
+        user_id: Uuid,
+    ) -> DbResult<EmailVerificationToken> {
+        let token = sqlx::query_as::<_, EmailVerificationToken>(
+            r#"
+            SELECT id, user_id, token_hash, expires_at, consumed, created_at, updated_at
+            FROM email_verification_tokens
+            WHERE user_id = $1 AND consumed = false
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(token)
+    }
+
+    #[builder]
     pub async fn cleanup_expired_auth_data(&self) -> DbResult<()> {
         let deleted_states = sqlx::query_scalar::<_, i64>(
             "WITH deleted AS (DELETE FROM oauth_state WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
@@ -604,12 +708,23 @@ impl DatabaseManager {
         .fetch_one(&self.pool)
         .await?;
 
-        if deleted_states > 0 || deleted_login_tokens > 0 || deleted_refresh_tokens > 0 {
+        let deleted_verification_tokens = sqlx::query_scalar::<_, i64>(
+            "WITH deleted AS (DELETE FROM email_verification_tokens WHERE (consumed = true AND created_at < now() - interval '2 days') OR expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        if deleted_states > 0
+            || deleted_login_tokens > 0
+            || deleted_refresh_tokens > 0
+            || deleted_verification_tokens > 0
+        {
             tracing::info!(
-                "Cleaned up expired auth data: {} oauth_states, {} login_tokens, {} refresh_tokens",
+                "Cleaned up expired auth data: {} oauth_states, {} login_tokens, {} refresh_tokens, {} verification_tokens",
                 deleted_states,
                 deleted_login_tokens,
                 deleted_refresh_tokens,
+                deleted_verification_tokens,
             );
         }
 
