@@ -33,8 +33,8 @@
 	function findScrollableAncestor(node: HTMLElement): HTMLElement | null {
 		let el: HTMLElement | null = node.parentElement;
 		while (el) {
-			const { overflow, overflowY } = getComputedStyle(el);
-			if (['auto', 'scroll'].some((v) => overflow.includes(v) || overflowY.includes(v))) {
+			const { overflowY } = getComputedStyle(el);
+			if (overflowY === 'auto' || overflowY === 'scroll') {
 				return el;
 			}
 			el = el.parentElement;

@@ -13,6 +13,7 @@
 	import { getTextContent } from '$lib/utils/message-content.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
+	import { initStickToBottomContext } from '@eurora/ui/components/ai-elements/conversation/index';
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
 	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
 	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
@@ -35,6 +36,25 @@
 	let editText = $state('');
 	let editTextarea = $state<HTMLTextAreaElement | null>(null);
 	const chatService = inject(CHAT_SERVICE);
+	const scrollContext = initStickToBottomContext();
+
+	let prevThreadId: string | undefined;
+	let prevStreamingId: string | null | undefined;
+
+	$effect(() => {
+		const threadId = chatService.activeThreadId;
+		const streamingId = chatService.activeThread?.streamingMessageId ?? null;
+
+		const threadChanged = threadId !== prevThreadId;
+		const streamingStarted = streamingId !== null && streamingId !== prevStreamingId;
+
+		if (threadChanged || streamingStarted) {
+			scrollContext.reengageAutoScroll();
+		}
+
+		prevThreadId = threadId;
+		prevStreamingId = streamingId;
+	});
 
 	function getContentBlocks(node: MessageNode): ContentBlock[] {
 		const msg = node.message;
