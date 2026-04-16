@@ -558,7 +558,6 @@ test.describe('MessageList', () => {
 
 			await scrollUpAndDisengage(page);
 
-			const content = page.locator('[data-slot="conversation-content"]');
 			await page.mouse.wheel(0, 10000);
 			await page.waitForTimeout(200);
 
