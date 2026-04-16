@@ -150,6 +150,18 @@ pub struct LoginToken {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EmailVerificationToken {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    #[serde(skip_serializing)]
+    pub token_hash: Vec<u8>,
+    pub expires_at: DateTime<Utc>,
+    pub consumed: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type, Default)]
 #[sqlx(type_name = "asset_status", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
