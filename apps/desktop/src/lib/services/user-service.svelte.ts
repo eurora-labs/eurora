@@ -4,6 +4,7 @@ import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
 	authenticated = $state(false);
+	emailVerified = $state(false);
 	email = $state('');
 	displayName = $state<string | null>(null);
 	role = $state('');
@@ -18,15 +19,17 @@ export class UserService {
 	}
 
 	private async fetchProfile() {
-		const [e, d, r] = await Promise.all([
+		const [e, d, r, ev] = await Promise.all([
 			this.taurpc.auth.get_email(),
 			this.taurpc.auth.get_display_name(),
 			this.taurpc.auth.get_role(),
+			this.taurpc.auth.is_email_verified(),
 		]);
 		this.authenticated = true;
 		this.email = e;
 		this.displayName = d;
 		this.role = r;
+		this.emailVerified = ev;
 	}
 
 	async init() {
@@ -43,8 +46,10 @@ export class UserService {
 					this.email = claims.email;
 					this.displayName = claims.display_name;
 					this.role = claims.role;
+					this.emailVerified = claims.email_verified ?? false;
 				} else {
 					this.authenticated = false;
+					this.emailVerified = false;
 					this.email = '';
 					this.displayName = null;
 					this.role = '';
@@ -77,6 +82,15 @@ export class UserService {
 			await this.fetchProfile();
 		}
 		return success;
+	}
+
+	async resendVerificationEmail(): Promise<void> {
+		await this.taurpc.auth.resend_verification_email();
+	}
+
+	async checkVerification(): Promise<boolean> {
+		await this.taurpc.auth.refresh_session();
+		return this.emailVerified;
 	}
 
 	async refreshSession(): Promise<void> {

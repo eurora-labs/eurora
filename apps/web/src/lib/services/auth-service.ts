@@ -13,6 +13,7 @@ import {
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
 	type AssociateLoginTokenRequest,
+	type VerifyEmailRequest,
 } from '@eurora/shared/proto/auth_service_pb.js';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
@@ -61,6 +62,10 @@ export class AuthService {
 		return await this.client.loginByLoginToken(data);
 	}
 
+	public async verifyEmail(data: VerifyEmailRequest): Promise<TokenResponse> {
+		return await this.client.verifyEmail(data);
+	}
+
 	public async associateLoginToken(
 		data: AssociateLoginTokenRequest,
 		accessToken: string,
@@ -83,4 +88,5 @@ export type {
 	ThirdPartyAuthUrlResponse,
 	LoginByLoginTokenRequest,
 	AssociateLoginTokenRequest,
+	VerifyEmailRequest,
 };
