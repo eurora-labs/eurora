@@ -41,7 +41,7 @@
 	/>
 </svelte:head>
 
-<div class="mx-auto w-full max-w-7xl px-4 pt-16 pb-16 flex flex-col gap-24">
+<div class="px-4 pt-16 pb-16 flex flex-col gap-24">
 	<div class="flex flex-col items-start max-w-3xl mx-auto">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
 			Your AI Assistant fully integrated into your browser
