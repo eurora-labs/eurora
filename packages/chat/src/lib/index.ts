@@ -13,6 +13,7 @@ export {
 	type BranchDirection,
 	type IThreadService,
 } from './services/thread/thread-service.js';
+export type { Suggestion } from './models/suggestion.js';
 export type {
 	AiMessageChunk,
 	ChatStreamEvent,
