@@ -16,6 +16,6 @@
 	bind:ref
 	bind:value
 	data-slot="model-selector-input"
-	class={cn('h-auto py-3.5', className)}
+	class={cn('h-auto border-0 py-3.5 focus:ring-0', className)}
 	{...restProps}
 />

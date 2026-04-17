@@ -11,8 +11,10 @@
 <script lang="ts">
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
+	import * as ModelSelector from '@eurora/ui/components/ai-elements/model-selector/index';
 	import * as PromptInput from '@eurora/ui/components/ai-elements/prompt-input/index';
 	import * as SuggestionUI from '@eurora/ui/components/ai-elements/suggestion/index';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import type { Suggestion } from '$lib/models/suggestion.js';
 	import type { PromptInputMessage } from '@eurora/ui/components/ai-elements/prompt-input/index';
 	import type { Snippet } from 'svelte';
@@ -31,6 +33,18 @@
 	const showSuggestions = $derived(
 		suggestions.length > 0 && (chatService.activeThread?.messages.length ?? 0) === 0,
 	);
+
+	const models = [{ id: 'glm-5.1', name: 'GLM-5.1', provider: 'zai' }];
+
+	let selectedModelId = $state(models[0].id);
+	let modelSelectorOpen = $state(false);
+
+	const selectedModel = $derived(models.find((m) => m.id === selectedModelId) ?? models[0]);
+
+	function handleModelSelect(id: string) {
+		selectedModelId = id;
+		modelSelectorOpen = false;
+	}
 
 	function handleSubmit(message: PromptInputMessage) {
 		const text = message.text.trim();
@@ -70,14 +84,48 @@
 			<PromptInput.Body>
 				<PromptInput.Textarea {placeholder} />
 			</PromptInput.Body>
-			<PromptInput.Footer class="justify-end">
-				{#if footer}
-					{@render footer()}
-				{/if}
-				<PromptInput.Submit
-					status={streaming ? 'streaming' : 'ready'}
-					onStop={() => chatService.abortController?.abort()}
-				/>
+			<PromptInput.Footer>
+				<PromptInput.Tools>
+					<ModelSelector.Root bind:open={modelSelectorOpen}>
+						<ModelSelector.Trigger>
+							<PromptInput.Button size="sm">
+								<ModelSelector.Logo provider={selectedModel.provider} />
+								<ModelSelector.Name>{selectedModel.name}</ModelSelector.Name>
+							</PromptInput.Button>
+						</ModelSelector.Trigger>
+						<ModelSelector.Content>
+							<ModelSelector.Input placeholder="Search models..." />
+							<ModelSelector.List>
+								<ModelSelector.Empty>No models found.</ModelSelector.Empty>
+								<ModelSelector.Group heading="Z.AI">
+									{#each models as m (m.id)}
+										<ModelSelector.Item
+											value={m.id}
+											onSelect={() => handleModelSelect(m.id)}
+										>
+											<ModelSelector.Logo provider={m.provider} />
+											<ModelSelector.Name>{m.name}</ModelSelector.Name>
+											{#if selectedModelId === m.id}
+												<CheckIcon class="ml-auto size-4" />
+											{:else}
+												<div class="ml-auto size-4"></div>
+											{/if}
+										</ModelSelector.Item>
+									{/each}
+								</ModelSelector.Group>
+							</ModelSelector.List>
+						</ModelSelector.Content>
+					</ModelSelector.Root>
+				</PromptInput.Tools>
+				<div class="flex items-center gap-1">
+					{#if footer}
+						{@render footer()}
+					{/if}
+					<PromptInput.Submit
+						status={streaming ? 'streaming' : 'ready'}
+						onStop={() => chatService.abortController?.abort()}
+					/>
+				</div>
 			</PromptInput.Footer>
 		</PromptInput.Root>
 	</div>
