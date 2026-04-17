@@ -1,13 +1,14 @@
-pub fn verification_email(
-    verification_url: &str,
-    display_name: Option<&str>,
-) -> (&'static str, String, String) {
+pub struct VerificationEmail {
+    pub subject: &'static str,
+    pub html: String,
+    pub text: String,
+}
+
+pub fn verification_email(verification_url: &str, display_name: Option<&str>) -> VerificationEmail {
     let greeting = match display_name {
         Some(name) => format!("Hi {name},"),
         None => "Hi,".to_string(),
     };
-
-    let subject = "Verify your email address";
 
     let html = format!(
         r#"<!DOCTYPE html>
@@ -36,5 +37,9 @@ pub fn verification_email(
          This link expires in 24 hours. If you didn't create an account, you can ignore this email."
     );
 
-    (subject, html, text)
+    VerificationEmail {
+        subject: "Verify your email address",
+        html,
+        text,
+    }
 }
