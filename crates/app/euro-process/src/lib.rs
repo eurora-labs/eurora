@@ -63,6 +63,15 @@ impl ProcessFunctionality for Chrome {
 }
 
 #[derive(Debug, Clone)]
+pub struct Opera;
+
+impl ProcessFunctionality for Opera {
+    fn get_name(&self) -> &str {
+        os_pick("opera.exe", "opera", "Opera")
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Safari;
 
 impl ProcessFunctionality for Safari {
