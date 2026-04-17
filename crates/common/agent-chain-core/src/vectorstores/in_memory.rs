@@ -155,7 +155,7 @@ impl InMemoryVectorStore {
         let mut store = self.lock_write()?;
         let mut result_ids = Vec::with_capacity(documents.len());
 
-        for (doc, vector) in documents.iter().zip(vectors.into_iter()) {
+        for (doc, vector) in documents.iter().zip(vectors) {
             let doc_id = id_iter
                 .next()
                 .flatten()
