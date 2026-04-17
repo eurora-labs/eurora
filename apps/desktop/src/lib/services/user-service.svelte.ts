@@ -19,17 +19,12 @@ export class UserService {
 	}
 
 	private async fetchProfile() {
-		const [e, d, r, ev] = await Promise.all([
-			this.taurpc.auth.get_email(),
-			this.taurpc.auth.get_display_name(),
-			this.taurpc.auth.get_role(),
-			this.taurpc.auth.is_email_verified(),
-		]);
+		const claims = await this.taurpc.auth.get_access_token_payload();
 		this.authenticated = true;
-		this.email = e;
-		this.displayName = d;
-		this.role = r;
-		this.emailVerified = ev;
+		this.email = claims.email;
+		this.displayName = claims.display_name ?? null;
+		this.role = claims.role;
+		this.emailVerified = claims.email_verified ?? false;
 	}
 
 	async init() {
@@ -90,6 +85,8 @@ export class UserService {
 
 	async checkVerification(): Promise<boolean> {
 		await this.taurpc.auth.refresh_session();
+		const claims = await this.taurpc.auth.get_access_token_payload();
+		this.emailVerified = claims.email_verified ?? false;
 		return this.emailVerified;
 	}
 

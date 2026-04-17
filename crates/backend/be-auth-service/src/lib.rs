@@ -501,7 +501,7 @@ impl AuthService {
 
         let password_hash = self.hash_password(password)?;
 
-        let user = self
+        let mut user = self
             .db
             .create_user()
             .email(email.to_string())
@@ -510,8 +510,13 @@ impl AuthService {
             .call()
             .await?;
 
-        if let Err(e) = self.send_verification_email(&user).await {
-            tracing::error!(user_id = %user.id, "Failed to send verification email: {e}");
+        if self.email_service.is_some() {
+            if let Err(e) = self.send_verification_email(&user).await {
+                tracing::error!(user_id = %user.id, "Failed to send verification email: {e}");
+            }
+        } else {
+            self.db.set_email_verified().user_id(user.id).call().await?;
+            user.email_verified = true;
         }
 
         let role = self

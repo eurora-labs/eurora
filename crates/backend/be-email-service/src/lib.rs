@@ -17,7 +17,7 @@ impl EmailService {
         let api_token = std::env::var("LETTERMINT_API_TOKEN")
             .map_err(|_| EmailError::Config("LETTERMINT_API_TOKEN must be set".into()))?;
 
-        let from_address = std::env::var("LETTERMINT_FROM_ADDRESS")
+        let from_address = std::env::var("LETTERMINT_SENDER")
             .unwrap_or_else(|_| "Eurora <noreply@eurora-labs.com>".into());
 
         let frontend_url =
