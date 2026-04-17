@@ -1,5 +1,7 @@
 mod converters;
+mod describe_image_tool;
 mod error;
+mod message_projection;
 mod server;
 mod tools;
 
