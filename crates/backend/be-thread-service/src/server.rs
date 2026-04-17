@@ -1,3 +1,5 @@
+use crate::describe_image_tool::{self, DescribeImageTool};
+use crate::message_projection::{collect_thread_images, project_for_text_llm};
 use agent_chain::SystemMessage;
 use agent_chain::messages::{ContentBlock, ImageContentBlock, PlainTextContentBlock};
 use agent_chain::{
@@ -46,14 +48,18 @@ const MAX_CONTENT_BLOCKS: usize = 50;
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
     title: Arc<dyn BaseChatModel + Send + Sync>,
-    tools: HashMap<String, Arc<dyn BaseTool>>,
+    vision: Option<VisionConfig>,
 }
 
-fn build_tool_map() -> HashMap<String, Arc<dyn BaseTool>> {
-    firecrawl_tools()
-        .into_iter()
-        .map(|tool| (tool.name().to_string(), tool))
-        .collect()
+struct VisionConfig {
+    model: Arc<dyn BaseChatModel + Send + Sync>,
+    default_tools: Vec<Arc<dyn BaseTool>>,
+}
+
+struct LlmContext {
+    messages: Vec<AnyMessage>,
+    chat_model: Arc<dyn BaseChatModel + Send + Sync>,
+    tools: HashMap<String, Arc<dyn BaseTool>>,
 }
 
 fn build_providers() -> Providers {
@@ -65,70 +71,53 @@ fn build_providers() -> Providers {
         let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
         let host = std::env::var("OLLAMA_HOST")
             .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
-        let chat: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
-            ChatOllama::builder()
-                .model(&model)
-                .base_url(&host)
-                // .temperature(1.0)
-                // .top_p(0.95)
-                // .top_k(20)
-                // .repeat_penalty(1.5)
-                .build(),
-        );
-        let title: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
-            ChatOllama::builder()
-                .model(&model)
-                .base_url(&host)
-                // .temperature(1.0)
-                // .top_p(1.0)
-                // .top_k(20)
-                // .repeat_penalty(2.0)
-                .build(),
-        );
+        let chat: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
+        let title: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
         Providers {
             chat,
             title,
-            tools: HashMap::new(),
+            vision: None,
         }
     } else {
-        let chat_model = ChatOpenAI::builder()
-            .model(std::env::var("NEBUL_MODEL").expect("Nebul model should be set"))
-            .reasoning_effort("medium")
-            .api_base(BASE_NEBUL_URL)
-            .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-            .use_responses_api(false)
-            // .temperature(1.0)
-            // .top_p(0.95)
-            // .presence_penalty(1.5)
-            // .extra_body(HashMap::from([("top_k".into(), serde_json::json!(20))]))
-            .build();
-        let bound = chat_model
-            .bind_tools(
-                &firecrawl_tools()
-                    .into_iter()
-                    .map(ToolLike::Tool)
-                    .collect::<Vec<_>>(),
-                None,
-            )
-            .expect("Failed to bind firecrawl_search tool");
-        let chat: Arc<dyn BaseChatModel + Send + Sync> =
-            Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
+        let api_key =
+            std::env::var("NEBUL_API_KEY").expect("NEBUL_API_KEY environment variable must be set");
 
-        let title = Arc::new(
+        let chat: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
             ChatOpenAI::builder()
-                .model(std::env::var("NEBUL_TITLE_MODEL").expect("Nebul title model should be set"))
+                .model(std::env::var("NEBUL_MODEL").expect("NEBUL_MODEL must be set"))
+                .reasoning_effort("medium")
                 .api_base(BASE_NEBUL_URL)
-                .api_key(std::env::var("NEBUL_API_KEY").expect("Nebul API key should be set"))
-                // .temperature(1.0)
-                // .top_p(1.0)
-                // .presence_penalty(2.0)
+                .api_key(&api_key)
+                .use_responses_api(false)
+                .build(),
+        );
+
+        let title: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
+            ChatOpenAI::builder()
+                .model(std::env::var("NEBUL_TITLE_MODEL").expect("NEBUL_TITLE_MODEL must be set"))
+                .api_base(BASE_NEBUL_URL)
+                .api_key(&api_key)
+                .build(),
+        );
+
+        let vision_model: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
+            ChatOpenAI::builder()
+                .model(std::env::var("NEBUL_VISION_MODEL").expect("NEBUL_VISION_MODEL must be set"))
+                .api_base(BASE_NEBUL_URL)
+                .api_key(&api_key)
+                .use_responses_api(false)
                 .build(),
         );
 
         Providers {
             chat,
             title,
-            tools: build_tool_map(),
+            vision: Some(VisionConfig {
+                model: vision_model,
+                default_tools: firecrawl_tools(),
+            }),
         }
     }
 }
@@ -150,16 +139,79 @@ impl ThreadService {
         }
     }
 
-    fn get_chat_provider(&self) -> Arc<dyn BaseChatModel + Send + Sync> {
-        self.providers.chat.clone()
-    }
-
     fn get_title_provider(&self) -> Arc<dyn BaseChatModel + Send + Sync> {
         self.providers.title.clone()
     }
 
-    fn get_tools(&self) -> &HashMap<String, Arc<dyn BaseTool>> {
-        &self.providers.tools
+    async fn prepare_llm_context(
+        &self,
+        mut messages: Vec<AnyMessage>,
+    ) -> Result<LlmContext, ThreadServiceError> {
+        let Some(vision) = self.providers.vision.as_ref() else {
+            self.resolve_blocks(&mut messages).await;
+            return Ok(LlmContext {
+                messages,
+                chat_model: self.providers.chat.clone(),
+                tools: HashMap::new(),
+            });
+        };
+
+        let allowed_images = collect_thread_images(&messages);
+
+        let mut tools: HashMap<String, Arc<dyn BaseTool>> = vision
+            .default_tools
+            .iter()
+            .map(|tool| (tool.name().to_string(), tool.clone()))
+            .collect();
+
+        if !allowed_images.is_empty() {
+            let describe = Arc::new(DescribeImageTool::new(
+                vision.model.clone(),
+                self.asset_service.clone(),
+                allowed_images.clone(),
+            )) as Arc<dyn BaseTool>;
+            tools.insert(describe_image_tool::TOOL_NAME.to_string(), describe);
+        }
+
+        let tool_likes: Vec<ToolLike> = tools.values().cloned().map(ToolLike::Tool).collect();
+        let bound = self
+            .providers
+            .chat
+            .bind_tools(&tool_likes, None)
+            .map_err(|e| {
+                ThreadServiceError::Internal(format!("Failed to bind tools to chat model: {e}"))
+            })?;
+        let chat_model: Arc<dyn BaseChatModel + Send + Sync> =
+            Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
+
+        project_for_text_llm(&mut messages);
+
+        if !allowed_images.is_empty() {
+            let id_list = allowed_images
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ");
+            let system_prompt = format!(
+                "You cannot see attached images directly. To learn anything about an image \
+                 you MUST call the `describe_image` tool with that image's `image_id` and a \
+                 concrete `question`. Do not claim to have seen an image without calling the \
+                 tool first. Available image_ids: {id_list}."
+            );
+            messages.insert(
+                0,
+                SystemMessage::builder()
+                    .content(system_prompt)
+                    .build()
+                    .into(),
+            );
+        }
+
+        Ok(LlmContext {
+            messages,
+            chat_model,
+            tools,
+        })
     }
 
     async fn upload_block_content(
@@ -860,10 +912,11 @@ impl ProtoThreadService for ThreadService {
             .await
             .map_err(ThreadServiceError::from)?;
 
-        self.resolve_blocks(&mut messages).await;
-
-        let chat_provider = self.get_chat_provider();
-        let tools = self.get_tools().clone();
+        let LlmContext {
+            messages: llm_messages,
+            chat_model: chat_provider,
+            tools,
+        } = self.prepare_llm_context(messages).await?;
 
         let db = self.db.clone();
         let human_parent_id = human_db_message
@@ -900,7 +953,7 @@ impl ProtoThreadService for ThreadService {
             db,
             chat_provider,
             tools,
-            messages,
+            llm_messages,
             thread_id,
             user_id,
             human_message_id,
