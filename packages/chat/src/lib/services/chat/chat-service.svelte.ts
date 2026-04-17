@@ -19,6 +19,7 @@ export class ThreadMessages {
 	offset = $state(0);
 	streamingMessageId: string | null = $state(null);
 	loaded = $state(false);
+	isTransient = $state(false);
 
 	fullTree: MessageNode[] | null = $state(null);
 	fullTreeLoading = $state(false);
@@ -172,10 +173,17 @@ export class ChatService {
 		if (!text.trim()) return;
 		this.viewMode = 'list';
 
-		let threadId = this.activeThreadId;
+		const current = this.activeThreadId;
+		const existing = current ? this.threadIndex.get(current) : undefined;
+		const needsNewThread = !current || existing?.isTransient === true;
+
+		let threadId: string;
 		let isNewThread = false;
 
-		if (!threadId) {
+		if (needsNewThread) {
+			if (current && existing?.isTransient) {
+				this.threadIndex.delete(current);
+			}
 			const thread = await this.threadClient.createThread();
 			const entry = new ThreadMessages(thread);
 			this.threads = [entry, ...this.threads];
@@ -184,6 +192,8 @@ export class ChatService {
 			threadId = thread.id;
 			this.newThread = thread;
 			isNewThread = true;
+		} else {
+			threadId = current!;
 		}
 
 		const entry = this.getThreadData(threadId);
@@ -193,7 +203,7 @@ export class ChatService {
 
 		const onFirstChunk = isNewThread
 			? () => {
-					this.threadClient.generateTitle(threadId!, text).then((updated) => {
+					this.threadClient.generateTitle(threadId, text).then((updated) => {
 						this.updateThread(updated);
 					});
 				}
@@ -213,13 +223,80 @@ export class ChatService {
 		}
 	}
 
+	addLocalExchange(userText: string, aiText: string): void {
+		this.viewMode = 'list';
+
+		const threadId = `transient-${crypto.randomUUID()}`;
+		const entry = new ThreadMessages({ id: threadId, title: '' });
+		entry.isTransient = true;
+		entry.loaded = true;
+
+		const humanId = `local-${crypto.randomUUID()}`;
+		const aiId = `local-${crypto.randomUUID()}`;
+
+		entry.messages = [
+			{
+				parentId: null,
+				message: {
+					type: 'human',
+					content: [
+						{
+							type: 'text',
+							id: null,
+							text: userText,
+							annotations: [],
+							index: null,
+							extras: null,
+						},
+					],
+					id: humanId,
+					name: null,
+					additionalKwargs: null,
+					responseMetadata: null,
+				},
+				children: [],
+				siblingIndex: 0,
+				depth: 0,
+			},
+			{
+				parentId: humanId,
+				message: {
+					type: 'ai',
+					content: [
+						{
+							type: 'text',
+							id: null,
+							text: aiText,
+							annotations: [],
+							index: null,
+							extras: null,
+						},
+					],
+					id: aiId,
+					name: null,
+					toolCalls: [],
+					invalidToolCalls: [],
+					usageMetadata: null,
+					additionalKwargs: null,
+					responseMetadata: null,
+				},
+				children: [],
+				siblingIndex: 0,
+				depth: 0,
+			},
+		];
+
+		this.threadIndex.set(threadId, entry);
+		this.activeThreadId = threadId;
+	}
+
 	async editMessage(messageId: string, text: string): Promise<void> {
 		const threadId = this.activeThreadId;
 		if (!threadId) return;
 		this.viewMode = 'list';
 
 		const entry = this.getThreadData(threadId);
-		if (!entry) return;
+		if (!entry || entry.isTransient) return;
 
 		const nodeIndex = entry.messages.findIndex((n) => n.message.id === messageId);
 		if (nodeIndex < 0) return;

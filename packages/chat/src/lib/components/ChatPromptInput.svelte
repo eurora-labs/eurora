@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	interface Props {
-		suggestions?: string[];
+		suggestions?: Suggestion[];
 		placeholder?: string;
 		header?: Snippet;
 		footer?: Snippet;
@@ -12,7 +12,8 @@
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as PromptInput from '@eurora/ui/components/ai-elements/prompt-input/index';
-	import * as Suggestion from '@eurora/ui/components/ai-elements/suggestion/index';
+	import * as SuggestionUI from '@eurora/ui/components/ai-elements/suggestion/index';
+	import type { Suggestion } from '$lib/models/suggestion.js';
 	import type { PromptInputMessage } from '@eurora/ui/components/ai-elements/prompt-input/index';
 	import type { Snippet } from 'svelte';
 
@@ -36,19 +37,15 @@
 		if (!text) return;
 		onSubmit(text);
 	}
-
-	function handleSuggestionClick(suggestion: string) {
-		onSubmit(suggestion);
-	}
 </script>
 
 <div class="grid shrink-0 gap-4">
 	{#if showSuggestions}
-		<Suggestion.Root class="px-4">
-			{#each suggestions as suggestion}
-				<Suggestion.Item {suggestion} onclick={handleSuggestionClick} />
+		<SuggestionUI.Root class="px-4">
+			{#each suggestions as suggestion (suggestion.label)}
+				<SuggestionUI.Item suggestion={suggestion.label} onclick={suggestion.onSelect} />
 			{/each}
-		</Suggestion.Root>
+		</SuggestionUI.Root>
 	{/if}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->

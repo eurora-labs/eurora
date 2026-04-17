@@ -80,7 +80,10 @@
 <div class="flex h-screen flex-col" data-testid="prompt-container">
 	<div class="flex-1"></div>
 	<ChatPromptInput
-		suggestions={['Tell me a joke', 'Write a poem', 'Explain quantum physics']}
+		suggestions={['Tell me a joke', 'Write a poem', 'Explain quantum physics'].map((label) => ({
+			label,
+			onSelect: () => handleSubmit(label),
+		}))}
 		placeholder="Ask me anything..."
 		onSubmit={handleSubmit}
 	/>
