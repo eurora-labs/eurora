@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { buildSuggestions } from '$lib/chat/suggestions.js';
 	import { MessageList, MessageGraph, ChatPromptInput } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
@@ -93,16 +94,9 @@
 		});
 	});
 
-	const suggestions = [
-		'What are the latest trends in AI?',
-		'How does machine learning work?',
-		'Explain quantum computing',
-		'Best practices for React development',
-		'Tell me about TypeScript benefits',
-		'How to optimize database queries?',
-		'What is the difference between SQL and NoSQL?',
-		'Explain cloud computing basics',
-	];
+	const suggestions = $derived(
+		buildSuggestions({ chips: assets, chatService, send: handleSubmit }),
+	);
 </script>
 
 {#snippet emptyState()}
