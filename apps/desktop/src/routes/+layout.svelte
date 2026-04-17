@@ -2,6 +2,7 @@
 	import '$styles/styles.css';
 	import { initDependencies } from '$lib/bootstrap/deps.js';
 	import AccessibilityPermission from '$lib/components/AccessibilityPermission.svelte';
+	import ResizeHandles from '$lib/components/ResizeHandles.svelte';
 	import Titlebar from '$lib/components/Titlebar.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
@@ -74,3 +75,7 @@
 <AccessibilityPermission />
 <UpdateChecker />
 <Toaster />
+
+{#if currentPlatform !== 'macos'}
+	<ResizeHandles />
+{/if}
