@@ -102,6 +102,14 @@
 		}
 	}
 
+	async function tryAssociateDesktopLogin(tokenValue: string): Promise<boolean> {
+		const associated = await authService.associateDesktopLoginIfPending(tokenValue, {
+			consumeRedirect: true,
+		});
+		if (associated) desktopLoginDone = true;
+		return associated;
+	}
+
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
 	let email = $state('');
@@ -159,6 +167,7 @@
 			});
 			const tokens = await authService.login(request);
 			auth.login(tokens);
+			if (await tryAssociateDesktopLogin(tokens.accessToken)) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -180,6 +189,7 @@
 			});
 			const tokens = await authService.register(request);
 			auth.login(tokens);
+			if (await tryAssociateDesktopLogin(tokens.accessToken)) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');

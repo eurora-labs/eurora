@@ -176,65 +176,56 @@ impl RunLog {
                     state.final_output = op.value.clone();
                 }
             }
-            "add" => {
-                if path_parts.len() >= 2 {
-                    match path_parts[0] {
-                        "logs" => {
-                            if path_parts.len() == 2 {
-                                if let Some(value) = &op.value
-                                    && let Ok(entry) =
-                                        serde_json::from_value::<LogEntry>(value.clone())
-                                {
-                                    state.logs.insert(path_parts[1].to_string(), entry);
+            "add" if path_parts.len() >= 2 => match path_parts[0] {
+                "logs" => {
+                    if path_parts.len() == 2 {
+                        if let Some(value) = &op.value
+                            && let Ok(entry) = serde_json::from_value::<LogEntry>(value.clone())
+                        {
+                            state.logs.insert(path_parts[1].to_string(), entry);
+                        }
+                    } else if path_parts.len() >= 3
+                        && let Some(entry) = state.logs.get_mut(path_parts[1])
+                    {
+                        match path_parts[2] {
+                            "streamed_output" if path_parts.len() == 4 && path_parts[3] == "-" => {
+                                if let Some(value) = &op.value {
+                                    entry.streamed_output.push(value.clone());
                                 }
-                            } else if path_parts.len() >= 3
-                                && let Some(entry) = state.logs.get_mut(path_parts[1])
+                            }
+                            "streamed_output_str"
+                                if path_parts.len() == 4 && path_parts[3] == "-" =>
                             {
-                                match path_parts[2] {
-                                    "streamed_output"
-                                        if path_parts.len() == 4 && path_parts[3] == "-" =>
-                                    {
-                                        if let Some(value) = &op.value {
-                                            entry.streamed_output.push(value.clone());
-                                        }
-                                    }
-                                    "streamed_output_str"
-                                        if path_parts.len() == 4 && path_parts[3] == "-" =>
-                                    {
-                                        if let Some(value) = &op.value
-                                            && let Some(s) = value.as_str()
-                                        {
-                                            entry.streamed_output_str.push(s.to_string());
-                                        }
-                                    }
-                                    "final_output" => {
-                                        entry.final_output = op.value.clone();
-                                    }
-                                    "end_time" => {
-                                        entry.end_time = op
-                                            .value
-                                            .clone()
-                                            .and_then(|v| v.as_str().map(String::from));
-                                    }
-                                    "inputs" => {
-                                        entry.inputs = op.value.clone();
-                                    }
-                                    _ => {}
+                                if let Some(value) = &op.value
+                                    && let Some(s) = value.as_str()
+                                {
+                                    entry.streamed_output_str.push(s.to_string());
                                 }
                             }
-                        }
-                        "streamed_output" if path_parts.len() == 2 && path_parts[1] == "-" => {
-                            if let Some(value) = &op.value {
-                                state.streamed_output.push(value.clone());
+                            "final_output" => {
+                                entry.final_output = op.value.clone();
                             }
+                            "end_time" => {
+                                entry.end_time =
+                                    op.value.clone().and_then(|v| v.as_str().map(String::from));
+                            }
+                            "inputs" => {
+                                entry.inputs = op.value.clone();
+                            }
+                            _ => {}
                         }
-                        "final_output" => {
-                            state.final_output = op.value.clone();
-                        }
-                        _ => {}
                     }
                 }
-            }
+                "streamed_output" if path_parts.len() == 2 && path_parts[1] == "-" => {
+                    if let Some(value) = &op.value {
+                        state.streamed_output.push(value.clone());
+                    }
+                }
+                "final_output" => {
+                    state.final_output = op.value.clone();
+                }
+                _ => {}
+            },
             _ => {}
         }
     }

@@ -101,6 +101,26 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
+    pub async fn resend_verification_email(
+        &mut self,
+        access_token: impl Into<String>,
+    ) -> Result<()> {
+        let mut client = self.client();
+        let mut request = tonic::Request::new(());
+        request.metadata_mut().insert(
+            "authorization",
+            format!("Bearer {}", access_token.into()).parse().unwrap(),
+        );
+        client
+            .resend_verification_email(request)
+            .await
+            .map_err(|e| {
+                tracing::error!("Resend verification email failed: {}", e);
+                anyhow!("Resend verification email failed: {}", e)
+            })?;
+        Ok(())
+    }
+
     fn client(&self) -> ProtoAuthServiceClient<Channel> {
         let channel = self.channel_rx.borrow().clone();
         ProtoAuthServiceClient::new(channel)

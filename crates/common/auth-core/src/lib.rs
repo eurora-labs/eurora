@@ -41,4 +41,6 @@ pub struct Claims {
     pub role: Role,
     #[serde(default)]
     pub aud: String,
+    #[serde(default)]
+    pub email_verified: bool,
 }

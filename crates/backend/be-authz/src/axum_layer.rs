@@ -133,6 +133,16 @@ pub async fn authz_middleware(
         }
     };
 
+    if !claims.email_verified {
+        return (
+            StatusCode::FORBIDDEN,
+            axum::Json(
+                serde_json::json!({"error": "Email verification required. Please check your inbox."}),
+            ),
+        )
+            .into_response();
+    }
+
     let role = claims.role.to_string();
 
     match state.authz.enforce(&role, &policy_path, &method) {
