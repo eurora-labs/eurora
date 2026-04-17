@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { buildSuggestions } from '$lib/chat/suggestions.js';
-	import { MessageList, MessageGraph, ChatPromptInput } from '@eurora/chat';
+	import { MessageList, MessageGraph, ChatPromptInput, middleTruncate } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
@@ -42,36 +42,11 @@
 	}
 
 	function handleSubmit(text: string) {
-		const assetIds = assets.map((a) => a.id);
-		chatService.sendMessage(text, assetIds).catch((e) => toast.error(String(e)));
+		chatService.sendMessage(text, assets).catch((e) => toast.error(String(e)));
 	}
 
 	function removeAsset(id: string) {
 		assets = assets.filter((a) => a.id !== id);
-	}
-
-	function middleTruncate(text: string, maxWords = 5): string {
-		const parts = text.split(/([^a-zA-Z0-9]+)/);
-		const words = parts.filter((p) => /[a-zA-Z0-9]/.test(p));
-		if (words.length <= maxWords * 2) return text;
-
-		let start = '';
-		let count = 0;
-		for (const part of parts) {
-			if (/[a-zA-Z0-9]/.test(part)) count++;
-			if (count > maxWords) break;
-			start += part;
-		}
-
-		let end = '';
-		count = 0;
-		for (let i = parts.length - 1; i >= 0; i--) {
-			if (/[a-zA-Z0-9]/.test(parts[i])) count++;
-			if (count > maxWords) break;
-			end = parts[i] + end;
-		}
-
-		return start + '(...)' + end;
 	}
 
 	function handleEdit(messageId: string, newText: string) {
