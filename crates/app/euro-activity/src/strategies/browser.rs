@@ -203,6 +203,7 @@ impl StrategySupport for BrowserStrategy {
             Chrome.get_name(),
             Edge.get_name(),
             Brave.get_name(),
+            Opera.get_name(),
         ]
     }
 
