@@ -690,29 +690,33 @@ impl DatabaseManager {
 
     #[builder]
     pub async fn cleanup_expired_auth_data(&self) -> DbResult<()> {
+        let mut tx = self.pool.begin().await?;
+
         let deleted_states = sqlx::query_scalar::<_, i64>(
             "WITH deleted AS (DELETE FROM oauth_state WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         let deleted_login_tokens = sqlx::query_scalar::<_, i64>(
             "WITH deleted AS (DELETE FROM login_tokens WHERE expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         let deleted_refresh_tokens = sqlx::query_scalar::<_, i64>(
             "WITH deleted AS (DELETE FROM refresh_tokens WHERE revoked = true AND created_at < now() - interval '30 days' RETURNING 1) SELECT count(*) FROM deleted",
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         let deleted_verification_tokens = sqlx::query_scalar::<_, i64>(
             "WITH deleted AS (DELETE FROM email_verification_tokens WHERE (consumed = true AND created_at < now() - interval '2 days') OR expires_at < now() - interval '1 hour' RETURNING 1) SELECT count(*) FROM deleted",
         )
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         if deleted_states > 0
             || deleted_login_tokens > 0

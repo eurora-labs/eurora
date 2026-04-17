@@ -1,7 +1,9 @@
+import { create } from '@bufbuild/protobuf';
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import { InjectionToken } from '@eurora/shared/context';
 import {
+	AssociateLoginTokenRequestSchema,
 	ProtoAuthService,
 	type LoginRequest,
 	type RegisterRequest,
@@ -73,6 +75,35 @@ export class AuthService {
 		await this.client.associateLoginToken(data, {
 			headers: new Headers({ authorization: `Bearer ${accessToken}` }),
 		});
+	}
+
+	public async associateDesktopLoginIfPending(
+		accessToken: string,
+		options: { consumeRedirect?: boolean } = {},
+	): Promise<boolean> {
+		const loginToken = sessionStorage.getItem('loginToken');
+		if (!loginToken) return false;
+
+		try {
+			const request = create(AssociateLoginTokenRequestSchema, {
+				codeChallenge: loginToken,
+			});
+			await this.associateLoginToken(request, accessToken);
+			sessionStorage.removeItem('loginToken');
+			sessionStorage.removeItem('challengeMethod');
+
+			if (options.consumeRedirect) {
+				const redirectUri = sessionStorage.getItem('deviceRedirectUri');
+				if (redirectUri) {
+					sessionStorage.removeItem('deviceRedirectUri');
+					window.location.href = redirectUri;
+				}
+			}
+			return true;
+		} catch (err) {
+			console.error('Failed to associate login token:', err);
+			return false;
+		}
 	}
 }
 

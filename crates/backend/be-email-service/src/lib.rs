@@ -44,14 +44,14 @@ impl EmailService {
             token
         );
 
-        let (subject, html, text) = templates::verification_email(&verification_url, display_name);
+        let email = templates::verification_email(&verification_url, display_name);
 
         let request = SendEmailRequest::builder()
             .from(&self.from_address)
             .to(vec![to.to_string()])
-            .subject(subject)
-            .html(html)
-            .text(text)
+            .subject(email.subject)
+            .html(email.html)
+            .text(email.text)
             .build();
 
         request

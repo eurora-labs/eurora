@@ -435,12 +435,9 @@ impl AuthService {
     }
 
     async fn send_verification_email(&self, user: &be_remote_db::User) -> Result<(), AuthError> {
-        let email_service = match &self.email_service {
-            Some(svc) => svc,
-            None => {
-                tracing::warn!("Email service not configured, skipping verification email");
-                return Ok(());
-            }
+        let Some(email_service) = &self.email_service else {
+            tracing::warn!("Email service not configured, skipping verification email");
+            return Ok(());
         };
 
         let raw_token = self.generate_random_string(64)?;

@@ -5887,9 +5887,9 @@ checksum = "7a79a3332a6609480d7d0c9eab957bca6b455b91bb84e66d19f5ff66294b85b8"
 
 [[package]]
 name = "lettermint-rs"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42c5a3caeef1dc325ad69484cd31b1ff5c407d5d54b00bbb77d2ee6f9f99949b"
+checksum = "fbbeb9c17981d32699608831651cf083a4dbbfc4c0159b83ccb20e0acf059e3e"
 dependencies = [
  "bon",
  "bytes",
