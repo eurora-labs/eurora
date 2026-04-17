@@ -147,8 +147,10 @@ impl ThreadService {
         &self,
         mut messages: Vec<AnyMessage>,
     ) -> Result<LlmContext, ThreadServiceError> {
+        self.resolve_plain_text_blocks(&mut messages).await;
+
         let Some(vision) = self.providers.vision.as_ref() else {
-            self.resolve_blocks(&mut messages).await;
+            self.resolve_image_blocks(&mut messages).await;
             return Ok(LlmContext {
                 messages,
                 chat_model: self.providers.chat.clone(),
@@ -251,7 +253,37 @@ impl ThreadService {
         Ok((asset_id, storage_uri))
     }
 
-    async fn resolve_blocks(&self, messages: &mut [AnyMessage]) {
+    async fn resolve_plain_text_blocks(&self, messages: &mut [AnyMessage]) {
+        let storage = self.asset_service.storage();
+        for message in messages.iter_mut() {
+            let content = match message {
+                AnyMessage::HumanMessage(m) => &mut m.content,
+                AnyMessage::SystemMessage(m) => &mut m.content,
+                _ => continue,
+            };
+            for block in content.iter_mut() {
+                let ContentBlock::PlainText(pt) = block else {
+                    continue;
+                };
+                if pt.text.is_some() {
+                    continue;
+                }
+                let Some(url) = pt.url.as_deref() else {
+                    continue;
+                };
+                match storage.download(url).await {
+                    Ok(bytes) => {
+                        pt.text = Some(String::from_utf8_lossy(&bytes).into_owned());
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to download plain-text asset {url}: {e}");
+                    }
+                }
+            }
+        }
+    }
+
+    async fn resolve_image_blocks(&self, messages: &mut [AnyMessage]) {
         use base64::{Engine as _, engine::general_purpose};
 
         let storage = self.asset_service.storage();
@@ -262,34 +294,23 @@ impl ThreadService {
                 _ => continue,
             };
             for block in content.iter_mut() {
-                match block {
-                    ContentBlock::PlainText(pt) if pt.text.is_none() => {
-                        let url = match pt.url.as_deref() {
-                            Some(u) => u,
-                            None => continue,
-                        };
-                        match storage.download(url).await {
-                            Ok(bytes) => {
-                                pt.text = Some(String::from_utf8_lossy(&bytes).into_owned());
-                            }
-                            Err(e) => {
-                                tracing::warn!("Failed to download plain-text asset {url}: {e}");
-                            }
-                        }
+                let ContentBlock::Image(img) = block else {
+                    continue;
+                };
+                if img.base64.is_some() {
+                    continue;
+                }
+                let Some(url) = img.url.as_deref() else {
+                    continue;
+                };
+                match storage.download(url).await {
+                    Ok(bytes) => {
+                        img.base64 = Some(general_purpose::STANDARD.encode(&bytes));
+                        img.url = None;
                     }
-                    ContentBlock::Image(img) if img.base64.is_none() && img.url.is_some() => {
-                        let url = img.url.as_deref().unwrap();
-                        match storage.download(url).await {
-                            Ok(bytes) => {
-                                img.base64 = Some(general_purpose::STANDARD.encode(&bytes));
-                                img.url = None;
-                            }
-                            Err(e) => {
-                                tracing::warn!("Failed to download image asset {url}: {e}");
-                            }
-                        }
+                    Err(e) => {
+                        tracing::warn!("Failed to download image asset {url}: {e}");
                     }
-                    _ => {}
                 }
             }
         }

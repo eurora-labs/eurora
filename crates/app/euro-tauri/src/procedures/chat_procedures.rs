@@ -1,5 +1,6 @@
 use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
 use agent_chain_core::proto::ChatStreamResponse;
+use euro_activity::types::ContextChip;
 use euro_timeline::TimelineManager;
 use futures::StreamExt;
 use tauri::{Manager, Runtime, ipc::Channel};
@@ -14,6 +15,7 @@ pub struct Query {
     text: String,
     assets: Vec<String>,
     parent_message_id: Option<String>,
+    preserved_asset_chips: Option<Vec<ContextChip>>,
 }
 
 #[taurpc::procedures(path = "chat")]
@@ -53,9 +55,21 @@ impl ChatApi for ChatApiImpl {
             .try_state()
             .ok_or(AppError::Unavailable("Active stream tokens"))?;
 
-        tracing::debug!("send_query: assets={:?}", query.assets);
+        tracing::debug!(
+            "send_query: assets={:?}, preserved_chips={}",
+            query.assets,
+            query
+                .preserved_asset_chips
+                .as_ref()
+                .map(|c| c.len())
+                .unwrap_or(0)
+        );
 
-        let (chip, asset_blocks, snapshot_blocks) = {
+        let is_edit = query.preserved_asset_chips.is_some();
+
+        let (chip, asset_blocks, snapshot_blocks) = if is_edit {
+            (None, ContentBlocks::new(), ContentBlocks::new())
+        } else {
             let timeline = timeline_state.lock().await;
             let _ = timeline.refresh_current_activity().await;
 
@@ -81,12 +95,19 @@ impl ChatApi for ChatApiImpl {
             }
         };
 
-        let mut asset_chips_json: Option<String> = None;
-        let mut context_blocks = ContentBlocks::new();
+        let asset_chips_json: Option<String> = if let Some(chips) = &query.preserved_asset_chips {
+            if chips.is_empty() {
+                None
+            } else {
+                serde_json::to_string(chips).ok()
+            }
+        } else if let Some(chip) = chip {
+            serde_json::to_string(&[chip]).ok()
+        } else {
+            None
+        };
 
-        if let Some(chip) = chip {
-            asset_chips_json = serde_json::to_string(&[chip]).ok();
-        }
+        let mut context_blocks = ContentBlocks::new();
 
         let mut all_blocks = ContentBlocks::new();
         all_blocks.extend(asset_blocks.into_inner());
