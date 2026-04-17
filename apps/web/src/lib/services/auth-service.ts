@@ -1,7 +1,9 @@
+import { create } from '@bufbuild/protobuf';
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import { InjectionToken } from '@eurora/shared/context';
 import {
+	AssociateLoginTokenRequestSchema,
 	ProtoAuthService,
 	type LoginRequest,
 	type RegisterRequest,
@@ -13,6 +15,7 @@ import {
 	type ThirdPartyAuthUrlResponse,
 	type LoginByLoginTokenRequest,
 	type AssociateLoginTokenRequest,
+	type VerifyEmailRequest,
 } from '@eurora/shared/proto/auth_service_pb.js';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
@@ -61,6 +64,10 @@ export class AuthService {
 		return await this.client.loginByLoginToken(data);
 	}
 
+	public async verifyEmail(data: VerifyEmailRequest): Promise<TokenResponse> {
+		return await this.client.verifyEmail(data);
+	}
+
 	public async associateLoginToken(
 		data: AssociateLoginTokenRequest,
 		accessToken: string,
@@ -68,6 +75,35 @@ export class AuthService {
 		await this.client.associateLoginToken(data, {
 			headers: new Headers({ authorization: `Bearer ${accessToken}` }),
 		});
+	}
+
+	public async associateDesktopLoginIfPending(
+		accessToken: string,
+		options: { consumeRedirect?: boolean } = {},
+	): Promise<boolean> {
+		const loginToken = sessionStorage.getItem('loginToken');
+		if (!loginToken) return false;
+
+		try {
+			const request = create(AssociateLoginTokenRequestSchema, {
+				codeChallenge: loginToken,
+			});
+			await this.associateLoginToken(request, accessToken);
+			sessionStorage.removeItem('loginToken');
+			sessionStorage.removeItem('challengeMethod');
+
+			if (options.consumeRedirect) {
+				const redirectUri = sessionStorage.getItem('deviceRedirectUri');
+				if (redirectUri) {
+					sessionStorage.removeItem('deviceRedirectUri');
+					window.location.href = redirectUri;
+				}
+			}
+			return true;
+		} catch (err) {
+			console.error('Failed to associate login token:', err);
+			return false;
+		}
 	}
 }
 
@@ -83,4 +119,5 @@ export type {
 	ThirdPartyAuthUrlResponse,
 	LoginByLoginTokenRequest,
 	AssociateLoginTokenRequest,
+	VerifyEmailRequest,
 };

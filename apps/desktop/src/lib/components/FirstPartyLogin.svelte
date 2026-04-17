@@ -15,8 +15,12 @@
 			if (!isLoginSuccess) {
 				return;
 			}
-			goto('/');
 			clearInterval(interval);
+			if (!user.emailVerified) {
+				goto('/onboarding/login/verify-email?redirect=/');
+			} else {
+				goto('/');
+			}
 		}, 5000);
 	}
 </script>

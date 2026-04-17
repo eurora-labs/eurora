@@ -76,7 +76,7 @@ impl MarkdownHeaderTextSplitter {
         custom_header_patterns: Option<HashMap<String, usize>>,
     ) -> Self {
         let mut headers = headers_to_split_on;
-        headers.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+        headers.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
         Self {
             headers_to_split_on: headers,
             return_each_line,

@@ -12,6 +12,8 @@ service ProtoAuthService {
   rpc AssociateLoginToken(AssociateLoginTokenRequest) returns (google.protobuf.Empty);
   rpc CheckEmail(CheckEmailRequest) returns (CheckEmailResponse);
   rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
+  rpc VerifyEmail(VerifyEmailRequest) returns (TokenResponse);
+  rpc ResendVerificationEmail(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 message LoginRequest {
@@ -79,3 +81,7 @@ message CheckEmailResponse {
 }
 
 message LogoutRequest {}
+
+message VerifyEmailRequest {
+  string token = 1;
+}

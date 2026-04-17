@@ -58,6 +58,7 @@
 			});
 			const tokens = await authService.register(request);
 			auth.login(tokens);
+			await authService.associateDesktopLoginIfPending(tokens.accessToken);
 			goto('/');
 		} catch (err) {
 			console.error('Registration error:', err);

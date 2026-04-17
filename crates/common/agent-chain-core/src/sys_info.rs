@@ -82,7 +82,7 @@ pub fn get_package_info() -> Vec<PackageInfo> {
     ];
 
     if packages.len() > 1 {
-        packages[1..].sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        packages[1..].sort_by_key(|a| a.name.to_lowercase());
     }
 
     packages

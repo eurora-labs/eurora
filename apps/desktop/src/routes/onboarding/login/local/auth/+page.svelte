@@ -20,11 +20,19 @@
 	let regEmail = $state('');
 	let regPassword = $state('');
 
+	function navigateAfterAuth() {
+		if (!user.emailVerified) {
+			goto('/onboarding/login/verify-email?redirect=/');
+		} else {
+			goto('/');
+		}
+	}
+
 	async function handleLogin() {
 		submitting = true;
 		try {
 			await user.login(login, password);
-			goto('/');
+			navigateAfterAuth();
 		} catch (error) {
 			toast.error(`Login failed: ${error}`);
 		} finally {
@@ -36,7 +44,7 @@
 		submitting = true;
 		try {
 			await user.register(regEmail, regPassword);
-			goto('/');
+			navigateAfterAuth();
 		} catch (error) {
 			toast.error(`Registration failed: ${error}`);
 		} finally {

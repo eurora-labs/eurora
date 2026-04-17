@@ -12,6 +12,7 @@ be-asset = { workspace = true }
 be-asset-service = { workspace = true }
 be-auth-core = { workspace = true }
 be-auth-service = { workspace = true }
+be-email-service = { workspace = true }
 be-authz = { workspace = true }
 be-payment-service = { workspace = true }
 be-remote-db = { workspace = true }

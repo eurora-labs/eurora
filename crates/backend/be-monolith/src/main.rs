@@ -159,11 +159,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .expect("Failed to initialize casbin enforcer");
 
-    let auth_service = AuthService::new(db_manager.clone(), jwt_config.clone());
-
     let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
         .map(|v| v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
+
+    let email_service = if local_mode {
+        tracing::info!("Email service disabled in local mode");
+        None
+    } else {
+        match be_email_service::EmailService::from_env() {
+            Ok(svc) => {
+                tracing::info!("Email service initialized");
+                Some(Arc::new(svc))
+            }
+            Err(e) => {
+                tracing::error!("Failed to initialize email service: {}", e);
+                return Err(e.into());
+            }
+        }
+    };
+
+    let auth_service = AuthService::new(db_manager.clone(), jwt_config.clone(), email_service);
 
     let storage_config =
         be_storage::StorageConfig::from_env().expect("Failed to load storage config");

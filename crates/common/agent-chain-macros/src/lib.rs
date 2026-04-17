@@ -498,10 +498,8 @@ fn parse_tool_attrs(attr: TokenStream) -> ToolAttrs {
                         ..
                     }),
                 ..
-            }) => {
-                if path.is_ident("return_direct") {
-                    result.return_direct = lit_bool.value();
-                }
+            }) if path.is_ident("return_direct") => {
+                result.return_direct = lit_bool.value();
             }
             _ => {}
         }

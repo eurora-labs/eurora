@@ -4,6 +4,7 @@ import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
 	authenticated = $state(false);
+	emailVerified = $state(false);
 	email = $state('');
 	displayName = $state<string | null>(null);
 	role = $state('');
@@ -18,15 +19,12 @@ export class UserService {
 	}
 
 	private async fetchProfile() {
-		const [e, d, r] = await Promise.all([
-			this.taurpc.auth.get_email(),
-			this.taurpc.auth.get_display_name(),
-			this.taurpc.auth.get_role(),
-		]);
+		const claims = await this.taurpc.auth.get_access_token_payload();
 		this.authenticated = true;
-		this.email = e;
-		this.displayName = d;
-		this.role = r;
+		this.email = claims.email;
+		this.displayName = claims.display_name ?? null;
+		this.role = claims.role;
+		this.emailVerified = claims.email_verified ?? false;
 	}
 
 	async init() {
@@ -43,8 +41,10 @@ export class UserService {
 					this.email = claims.email;
 					this.displayName = claims.display_name;
 					this.role = claims.role;
+					this.emailVerified = claims.email_verified ?? false;
 				} else {
 					this.authenticated = false;
+					this.emailVerified = false;
 					this.email = '';
 					this.displayName = null;
 					this.role = '';
@@ -77,6 +77,17 @@ export class UserService {
 			await this.fetchProfile();
 		}
 		return success;
+	}
+
+	async resendVerificationEmail(): Promise<void> {
+		await this.taurpc.auth.resend_verification_email();
+	}
+
+	async checkVerification(): Promise<boolean> {
+		await this.taurpc.auth.refresh_session();
+		const claims = await this.taurpc.auth.get_access_token_payload();
+		this.emailVerified = claims.email_verified ?? false;
+		return this.emailVerified;
 	}
 
 	async refreshSession(): Promise<void> {

@@ -1,5 +1,6 @@
 pub use auth_core::{Claims, Role};
 use be_auth_core::JwtConfig;
+use be_email_service::EmailService;
 use be_remote_db::{DatabaseManager, OAuthProvider};
 use bon::bon;
 use chrono::{DateTime, Duration, Utc};
@@ -9,7 +10,7 @@ use proto_gen::auth::{
     AssociateLoginTokenRequest, CheckEmailRequest, CheckEmailResponse, LoginByLoginTokenRequest,
     LoginRequest, LogoutRequest, Provider, RefreshTokenRequest, RegisterRequest,
     ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, ThirdPartyCredentials, TokenResponse,
-    login_request::Credential, proto_auth_service_server::ProtoAuthService,
+    VerifyEmailRequest, login_request::Credential, proto_auth_service_server::ProtoAuthService,
 };
 use rand::Rng;
 use sha2::{Digest, Sha256};
@@ -37,21 +38,29 @@ const MIN_PASSWORD_LENGTH: usize = 8;
 const MAX_PASSWORD_LENGTH: usize = 128;
 const LOGIN_TOKEN_EXPIRY_MINUTES: i64 = 20;
 const OAUTH_STATE_EXPIRY_MINUTES: i64 = 10;
+const VERIFICATION_TOKEN_EXPIRY_HOURS: i64 = 24;
+const VERIFICATION_RESEND_COOLDOWN_SECONDS: i64 = 60;
 
 pub struct AuthService {
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
+    email_service: Option<Arc<EmailService>>,
     google_oauth_client: OnceCell<GoogleOAuthClient>,
     github_oauth_client: std::sync::OnceLock<GitHubOAuthClient>,
 }
 
 #[bon]
 impl AuthService {
-    pub fn new(db: Arc<DatabaseManager>, jwt_config: JwtConfig) -> Self {
+    pub fn new(
+        db: Arc<DatabaseManager>,
+        jwt_config: JwtConfig,
+        email_service: Option<Arc<EmailService>>,
+    ) -> Self {
         tracing::info!("Creating new AuthService instance");
         Self {
             db,
             jwt_config,
+            email_service,
             google_oauth_client: OnceCell::new(),
             github_oauth_client: std::sync::OnceLock::new(),
         }
@@ -208,6 +217,7 @@ impl AuthService {
         email: &str,
         display_name: Option<String>,
         role: Role,
+        email_verified: bool,
     ) -> Result<(String, String, Vec<u8>, DateTime<Utc>), AuthError> {
         let now = Utc::now();
         let access_exp = now + Duration::hours(self.jwt_config.access_token_expiry_hours);
@@ -222,6 +232,7 @@ impl AuthService {
             token_type: "access".to_string(),
             role: role.clone(),
             aud: "eurora".to_string(),
+            email_verified,
         };
 
         let refresh_claims = Claims {
@@ -233,6 +244,7 @@ impl AuthService {
             token_type: "refresh".to_string(),
             role,
             aud: "eurora".to_string(),
+            email_verified,
         };
 
         let header = Header::new(Algorithm::HS256);
@@ -262,9 +274,10 @@ impl AuthService {
         email: &str,
         display_name: Option<String>,
         role: Role,
+        email_verified: bool,
     ) -> Result<(String, String), AuthError> {
         let (access_token, refresh_token, token_hash, refresh_exp) =
-            self.generate_jwt_tokens(user_id, email, display_name, role)?;
+            self.generate_jwt_tokens(user_id, email, display_name, role, email_verified)?;
 
         let user_uuid = Uuid::parse_str(user_id)
             .map_err(|e| AuthError::Internal(format!("Invalid user ID format: {e}")))?;
@@ -421,6 +434,55 @@ impl AuthService {
         Ok(())
     }
 
+    async fn send_verification_email(&self, user: &be_remote_db::User) -> Result<(), AuthError> {
+        let Some(email_service) = &self.email_service else {
+            tracing::warn!("Email service not configured, skipping verification email");
+            return Ok(());
+        };
+
+        let raw_token = self.generate_random_string(64)?;
+        let token_hash = Self::hash_verification_token(&raw_token);
+
+        self.db
+            .create_email_verification_token()
+            .user_id(user.id)
+            .token_hash(token_hash)
+            .expires_at(Utc::now() + Duration::hours(VERIFICATION_TOKEN_EXPIRY_HOURS))
+            .call()
+            .await?;
+
+        email_service
+            .send_verification_email(&user.email, &raw_token, user.display_name.as_deref())
+            .await
+            .map_err(|e| AuthError::Internal(format!("Failed to send verification email: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn sync_oauth_email_verified(
+        &self,
+        user: &be_remote_db::User,
+        provider_verified: bool,
+    ) -> bool {
+        if !user.email_verified
+            && provider_verified
+            && let Err(e) = self.db.set_email_verified().user_id(user.id).call().await
+        {
+            tracing::warn!(
+                "Failed to update email_verified for user {}: {}",
+                user.id,
+                e
+            );
+        }
+        user.email_verified || provider_verified
+    }
+
+    fn hash_verification_token(token: &str) -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.update(token.as_bytes());
+        hasher.finalize().to_vec()
+    }
+
     pub async fn register_user(
         &self,
         email: &str,
@@ -436,7 +498,7 @@ impl AuthService {
 
         let password_hash = self.hash_password(password)?;
 
-        let user = self
+        let mut user = self
             .db
             .create_user()
             .email(email.to_string())
@@ -444,6 +506,15 @@ impl AuthService {
             .password_hash(password_hash)
             .call()
             .await?;
+
+        if self.email_service.is_some() {
+            if let Err(e) = self.send_verification_email(&user).await {
+                tracing::error!(user_id = %user.id, "Failed to send verification email: {e}");
+            }
+        } else {
+            self.db.set_email_verified().user_id(user.id).call().await?;
+            user.email_verified = true;
+        }
 
         let role = self
             .ensure_plan_and_resolve_role(user.id, &user.email)
@@ -454,6 +525,7 @@ impl AuthService {
                 &user.email,
                 user.display_name.clone(),
                 role,
+                user.email_verified,
             )
             .await?;
 
@@ -489,6 +561,7 @@ impl AuthService {
                 &user.email,
                 user.display_name.clone(),
                 role,
+                user.email_verified,
             )
             .await?;
 
@@ -582,6 +655,10 @@ impl AuthService {
             .call()
             .await?;
 
+        let email_verified = self
+            .sync_oauth_email_verified(&user, user_info.verified_email)
+            .await;
+
         if let Some(token) = creds.login_token {
             self.try_associate_login_token_with_user(&user, &token)
                 .await;
@@ -596,6 +673,7 @@ impl AuthService {
                 &user.email,
                 user.display_name.clone(),
                 role,
+                email_verified,
             )
             .await?;
 
@@ -665,6 +743,10 @@ impl AuthService {
             .call()
             .await?;
 
+        let email_verified = self
+            .sync_oauth_email_verified(&user, user_info.verified_email)
+            .await;
+
         if let Some(token) = creds.login_token {
             self.try_associate_login_token_with_user(&user, &token)
                 .await;
@@ -679,6 +761,7 @@ impl AuthService {
                 &user.email,
                 user.display_name.clone(),
                 role,
+                email_verified,
             )
             .await?;
 
@@ -748,6 +831,7 @@ impl ProtoAuthService for AuthService {
                         &user.email,
                         user.display_name.clone(),
                         role,
+                        user.email_verified,
                     )
                     .await
                     .map_err(Status::from)?;
@@ -931,6 +1015,7 @@ impl ProtoAuthService for AuthService {
                 &user.email,
                 user.display_name.clone(),
                 role,
+                user.email_verified,
             )
             .map_err(Status::from)?;
 
@@ -1044,6 +1129,97 @@ impl ProtoAuthService for AuthService {
             .call()
             .await
             .map_err(|_| Status::from(AuthError::InvalidToken))?;
+
+        Ok(Response::new(()))
+    }
+
+    async fn verify_email(
+        &self,
+        request: Request<VerifyEmailRequest>,
+    ) -> Result<Response<TokenResponse>, Status> {
+        let req = request.into_inner();
+
+        if req.token.is_empty() {
+            return Err(Status::invalid_argument("Verification token is required"));
+        }
+
+        let token_hash = Self::hash_verification_token(&req.token);
+
+        let user = self
+            .db
+            .consume_email_verification_token()
+            .token_hash(&token_hash)
+            .call()
+            .await
+            .map_err(|e| {
+                tracing::warn!("Email verification failed: {}", e);
+                Status::invalid_argument("Invalid or expired verification token")
+            })?;
+
+        let role = self
+            .ensure_plan_and_resolve_role(user.id, &user.email)
+            .await
+            .map_err(Status::from)?;
+
+        let (access_token, refresh_token) = self
+            .generate_tokens(
+                &user.id.to_string(),
+                &user.email,
+                user.display_name.clone(),
+                role,
+                true,
+            )
+            .await
+            .map_err(Status::from)?;
+
+        tracing::info!(user_id = %user.id, "Email verified successfully");
+
+        Ok(Response::new(TokenResponse {
+            access_token,
+            refresh_token,
+            expires_in: self.jwt_config.access_token_expiry_hours * 3600,
+        }))
+    }
+
+    async fn resend_verification_email(
+        &self,
+        request: Request<()>,
+    ) -> Result<Response<()>, Status> {
+        let claims = self.authenticate_request_access_token(&request)?;
+
+        let user_id = Uuid::parse_str(&claims.sub)
+            .map_err(|_| Status::unauthenticated("Invalid user ID in token"))?;
+
+        let user = self
+            .db
+            .get_user()
+            .id(user_id)
+            .call()
+            .await
+            .map_err(|_| Status::unauthenticated("User not found"))?;
+
+        if user.email_verified {
+            return Err(Status::failed_precondition("Email is already verified"));
+        }
+
+        if let Ok(latest) = self
+            .db
+            .get_latest_verification_token_for_user()
+            .user_id(user.id)
+            .call()
+            .await
+        {
+            let elapsed = Utc::now() - latest.created_at;
+            if elapsed.num_seconds() < VERIFICATION_RESEND_COOLDOWN_SECONDS {
+                return Err(Status::resource_exhausted(
+                    "Please wait before requesting another verification email",
+                ));
+            }
+        }
+
+        self.send_verification_email(&user)
+            .await
+            .map_err(Status::from)?;
 
         Ok(Response::new(()))
     }
