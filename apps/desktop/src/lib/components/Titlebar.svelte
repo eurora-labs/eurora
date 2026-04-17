@@ -19,6 +19,16 @@
 	const user = inject(USER_SERVICE);
 
 	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
+	const activeThread = $derived(chatService.activeThread?.thread);
+	const threadTitle = $derived(activeThread?.title ?? 'New Chat');
+	const threadDateIso = $derived(activeThread?.createdAt ?? new Date().toISOString());
+
+	const dateFormatter = new Intl.DateTimeFormat('en', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
+	const threadDateLabel = $derived(dateFormatter.format(new Date(threadDateIso)));
 
 	let maximized = $state(false);
 	let isMac = platform() === 'macos';
@@ -52,7 +62,7 @@
 
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
 	<div class="flex-1" data-tauri-drag-region></div>
-	<div class="pointer-events-auto flex items-center gap-2 h-full px-2">
+	<div class="pointer-events-auto flex items-center gap-2 h-full px-2 min-w-0">
 		{#if hasMessages}
 			<Tabs.Root
 				value={chatService.viewMode}
@@ -70,6 +80,12 @@
 				</Tabs.List>
 			</Tabs.Root>
 		{/if}
+		<span class="truncate text-xs font-medium max-w-[28ch]" title={threadTitle}>
+			{threadTitle}
+		</span>
+		<time class="text-xs text-muted-foreground whitespace-nowrap" datetime={threadDateIso}>
+			{threadDateLabel}
+		</time>
 		{#if user.authenticated}
 			<Badge
 				variant={user.planLabel === 'Pro' ? 'outline' : 'secondary'}
