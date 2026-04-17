@@ -158,7 +158,10 @@ mod tests {
 
     #[test]
     fn extracts_bare_host() {
-        assert_eq!(extract_domain("https://x.com/some/path"), Some("x.com".into()));
+        assert_eq!(
+            extract_domain("https://x.com/some/path"),
+            Some("x.com".into())
+        );
     }
 
     #[test]
