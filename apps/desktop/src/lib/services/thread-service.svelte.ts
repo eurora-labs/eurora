@@ -1,11 +1,20 @@
 import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { ChatStreamResponse, Query } from '$lib/bindings/bindings.js';
+import type { ChatStreamResponse, ContextChip, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-import type { MessageNode } from '@eurora/chat/models/messages/index';
+import type { AssetChip, MessageNode } from '@eurora/chat/models/messages/index';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
-import type { IThreadService } from '@eurora/chat/services/thread/thread-service';
+import type {
+	IThreadService,
+	SendMessageOptions,
+} from '@eurora/chat/services/thread/thread-service';
+
+type ExtendedQuery = Query & { preserved_asset_chips: ContextChip[] | null };
+
+function toContextChip(chip: AssetChip): ContextChip {
+	return { id: chip.id, name: chip.name, icon: chip.icon, domain: chip.domain };
+}
 
 export class ThreadService implements IThreadService {
 	private readonly taurpc: TaurpcService;
@@ -72,14 +81,14 @@ export class ThreadService implements IThreadService {
 	async *sendMessage(
 		threadId: string,
 		text: string,
-		parentMessageId?: string | null,
-		signal?: AbortSignal,
-		assetIds?: string[],
+		options: SendMessageOptions = {},
 	): AsyncIterable<ChatStreamEvent> {
-		const query: Query = {
+		const { parentMessageId, signal, assetChips, preservedAssetChips } = options;
+		const query: ExtendedQuery = {
 			text,
-			assets: assetIds ?? [],
+			assets: assetChips?.map((c) => c.id) ?? [],
 			parent_message_id: parentMessageId ?? null,
+			preserved_asset_chips: preservedAssetChips?.map(toContextChip) ?? null,
 		};
 		const buffer: ChatStreamEvent[] = [];
 		let resolve: ((value: void) => void) | null = null;

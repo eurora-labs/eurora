@@ -340,6 +340,7 @@ export type Query = {
 	text: string,
 	assets: string[],
 	parent_message_id: string | null,
+	preserved_asset_chips: ContextChip[] | null,
 };
 
 export type Role = "Free" | "Tier1";

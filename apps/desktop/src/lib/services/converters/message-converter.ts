@@ -13,11 +13,41 @@ import type {
 	BlockIndex,
 	ContentBlock,
 } from '@eurora/chat/models/content-blocks/index';
-import type { MessageNode, Message as DomainMessage } from '@eurora/chat/models/messages/index';
+import type {
+	AssetChip,
+	MessageNode,
+	Message as DomainMessage,
+} from '@eurora/chat/models/messages/index';
 import type { AiMessageChunk, ChatStreamEvent } from '@eurora/chat/models/streaming';
 
 export function toMessageNodes(raw: BaseMessageWithSibling[]): MessageNode[] {
 	return raw.map(toMessageNode);
+}
+
+function parseAssetChips(additionalKwargs: string | null): AssetChip[] {
+	if (!additionalKwargs) return [];
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(additionalKwargs);
+	} catch {
+		return [];
+	}
+	if (!parsed || typeof parsed !== 'object') return [];
+	const raw = (parsed as Record<string, unknown>).asset_chips;
+	if (!Array.isArray(raw)) return [];
+	const chips: AssetChip[] = [];
+	for (const entry of raw) {
+		if (!entry || typeof entry !== 'object') continue;
+		const obj = entry as Record<string, unknown>;
+		if (typeof obj.id !== 'string' || typeof obj.name !== 'string') continue;
+		chips.push({
+			id: obj.id,
+			name: obj.name,
+			icon: typeof obj.icon === 'string' ? obj.icon : null,
+			domain: typeof obj.domain === 'string' ? obj.domain : null,
+		});
+	}
+	return chips;
 }
 
 function toMessageNode(raw: BaseMessageWithSibling): MessageNode {
@@ -42,6 +72,7 @@ function toMessage(raw: Message): DomainMessage {
 			name: raw.Human.name,
 			additionalKwargs: raw.Human.additional_kwargs,
 			responseMetadata: raw.Human.response_metadata,
+			assetChips: parseAssetChips(raw.Human.additional_kwargs),
 		};
 	}
 	if ('System' in raw) {

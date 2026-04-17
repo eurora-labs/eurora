@@ -12,8 +12,11 @@ export {
 	THREAD_SERVICE,
 	type BranchDirection,
 	type IThreadService,
+	type SendMessageOptions,
 } from './services/thread/thread-service.js';
+export type { AssetChip } from './models/messages/index.js';
 export type { Suggestion } from './models/suggestion.js';
+export { middleTruncate } from './utils/text.js';
 export type {
 	AiMessageChunk,
 	ChatStreamEvent,
