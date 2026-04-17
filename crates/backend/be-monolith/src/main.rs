@@ -163,18 +163,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map(|v| v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
 
-    let email_service = match be_email_service::EmailService::from_env() {
-        Ok(svc) => {
-            tracing::info!("Email service initialized");
-            Some(Arc::new(svc))
-        }
-        Err(e) if local_mode => {
-            tracing::warn!("Email service disabled in local mode: {}", e);
-            None
-        }
-        Err(e) => {
-            tracing::error!("Failed to initialize email service: {}", e);
-            return Err(e.into());
+    let email_service = if local_mode {
+        tracing::info!("Email service disabled in local mode");
+        None
+    } else {
+        match be_email_service::EmailService::from_env() {
+            Ok(svc) => {
+                tracing::info!("Email service initialized");
+                Some(Arc::new(svc))
+            }
+            Err(e) => {
+                tracing::error!("Failed to initialize email service: {}", e);
+                return Err(e.into());
+            }
         }
     };
 

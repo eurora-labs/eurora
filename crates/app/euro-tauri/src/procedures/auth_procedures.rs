@@ -36,13 +36,10 @@ pub trait AuthApi {
 
     async fn logout<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
     async fn is_authenticated<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
-    async fn get_role<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
-    async fn get_email<R: Runtime>(app_handle: AppHandle<R>) -> Result<String, String>;
-    async fn get_display_name<R: Runtime>(
+    async fn get_access_token_payload<R: Runtime>(
         app_handle: AppHandle<R>,
-    ) -> Result<Option<String>, String>;
+    ) -> Result<Claims, String>;
     async fn refresh_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
-    async fn is_email_verified<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
     async fn resend_verification_email<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
 }
 
@@ -244,17 +241,19 @@ impl AuthApi for AuthApiImpl {
         }
     }
 
-    async fn get_role<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
+    async fn get_access_token_payload<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+    ) -> Result<Claims, String> {
         let user_state = user_controller(&app_handle)?;
         let mut controller = user_state.lock().await;
         controller
             .get_or_refresh_access_token()
             .await
             .ctx("Failed to get access token")?;
-        let claims = controller
+        controller
             .get_access_token_payload()
-            .ctx("Failed to get access token payload")?;
-        Ok(claims.role.to_string())
+            .ctx("Failed to get access token payload")
     }
 
     async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
@@ -270,48 +269,6 @@ impl AuthApi for AuthApiImpl {
         }
 
         Ok(())
-    }
-
-    async fn get_email<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
-            .get_or_refresh_access_token()
-            .await
-            .ctx("Failed to get access token")?;
-        let claims = controller
-            .get_access_token_payload()
-            .ctx("Failed to get access token payload")?;
-        Ok(claims.email)
-    }
-
-    async fn get_display_name<R: Runtime>(
-        self,
-        app_handle: AppHandle<R>,
-    ) -> Result<Option<String>, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
-            .get_or_refresh_access_token()
-            .await
-            .ctx("Failed to get access token")?;
-        let claims = controller
-            .get_access_token_payload()
-            .ctx("Failed to get access token payload")?;
-        Ok(claims.display_name)
-    }
-
-    async fn is_email_verified<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
-            .get_or_refresh_access_token()
-            .await
-            .ctx("Failed to get access token")?;
-        let claims = controller
-            .get_access_token_payload()
-            .ctx("Failed to get access token payload")?;
-        Ok(claims.email_verified)
     }
 
     async fn resend_verification_email<R: Runtime>(
