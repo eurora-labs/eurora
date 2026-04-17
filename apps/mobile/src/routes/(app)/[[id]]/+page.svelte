@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { MessageList, ChatPromptInput } from '@eurora/chat';
+	import { MessageList, ChatPromptInput, type Suggestion } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Empty from '@eurora/ui/components/empty/index';
@@ -39,12 +39,12 @@
 		chatService.editMessage(messageId, newText).catch((e) => toast.error(String(e)));
 	}
 
-	const suggestions = [
+	const suggestions: Suggestion[] = [
 		'What are the latest trends in AI?',
 		'How does machine learning work?',
 		'Explain quantum computing',
 		'Best practices for React development',
-	];
+	].map((label) => ({ label, onSelect: () => handleSubmit(label) }));
 </script>
 
 {#snippet emptyState()}

@@ -4,6 +4,7 @@ use enum_dispatch::enum_dispatch;
 use euro_native_messaging::NativeMessage;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use url::Url;
 use uuid::Uuid;
 
 use crate::{
@@ -18,6 +19,7 @@ pub struct ContextChip {
     pub id: String,
     pub name: String,
     pub icon: Option<String>,
+    pub domain: Option<String>,
 }
 
 #[enum_dispatch(SaveableAsset, AssetFunctionality)]
@@ -128,6 +130,7 @@ impl Activity {
             id: self.id.clone(),
             name: self.title.clone().unwrap_or_else(|| self.name.clone()),
             icon: None,
+            domain: extract_domain(&self.name),
         }
     }
 
@@ -141,5 +144,42 @@ impl Activity {
 
     pub fn end_activity(&mut self) {
         self.end = Some(Utc::now());
+    }
+}
+
+fn extract_domain(value: &str) -> Option<String> {
+    let host = Url::parse(value).ok()?.host_str()?.to_ascii_lowercase();
+    Some(host.strip_prefix("www.").unwrap_or(&host).to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_domain;
+
+    #[test]
+    fn extracts_bare_host() {
+        assert_eq!(extract_domain("https://x.com/some/path"), Some("x.com".into()));
+    }
+
+    #[test]
+    fn strips_www_and_lowercases() {
+        assert_eq!(
+            extract_domain("https://WWW.Example.COM/"),
+            Some("example.com".into())
+        );
+    }
+
+    #[test]
+    fn preserves_subdomains() {
+        assert_eq!(
+            extract_domain("https://m.youtube.com/watch?v=1"),
+            Some("m.youtube.com".into())
+        );
+    }
+
+    #[test]
+    fn returns_none_for_non_urls() {
+        assert_eq!(extract_domain("Some Window Title"), None);
+        assert_eq!(extract_domain(""), None);
     }
 }
