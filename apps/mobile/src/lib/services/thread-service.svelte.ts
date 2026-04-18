@@ -5,7 +5,10 @@ import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
-import type { IThreadService } from '@eurora/chat/services/thread/thread-service';
+import type {
+	IThreadService,
+	SendMessageOptions,
+} from '@eurora/chat/services/thread/thread-service';
 
 export class ThreadService implements IThreadService {
 	private readonly taurpc: TaurpcService;
@@ -72,13 +75,12 @@ export class ThreadService implements IThreadService {
 	async *sendMessage(
 		threadId: string,
 		text: string,
-		parentMessageId?: string | null,
-		signal?: AbortSignal,
-		assetIds?: string[],
+		options: SendMessageOptions = {},
 	): AsyncIterable<ChatStreamEvent> {
+		const { parentMessageId, signal, assetChips } = options;
 		const query: Query = {
 			text,
-			assets: assetIds ?? [],
+			assets: assetChips?.map((c) => c.id) ?? [],
 			parent_message_id: parentMessageId ?? null,
 		};
 		const buffer: ChatStreamEvent[] = [];
