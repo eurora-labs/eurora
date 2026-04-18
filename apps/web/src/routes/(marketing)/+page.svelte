@@ -34,7 +34,7 @@
 </script>
 
 <svelte:head>
-	<title>Eurora — AI Assistant for Your Browser</title>
+	<title>Eurora - AI Assistant for Your Browser</title>
 	<meta
 		name="description"
 		content="Free, open-source AI assistant that reads what you read. Ask about any YouTube video, article, or tweet without copy and paste. Private and built in Europe."
@@ -122,15 +122,20 @@
 
 		<FeatureSection.Root>
 			<FeatureSection.Header>
-				<FeatureSection.Title
-					>Eurora — one application — every platform</FeatureSection.Title
-				>
+				<FeatureSection.Title>Integrates with every browser</FeatureSection.Title>
 				<FeatureSection.Subtitle>
-					Native macOS, Windows, and Linux. Browser extensions include: Chrome, Firefox,
-					Edge, Safari and all other browsers. Your preferences, your history, and your AI
-					— always with you, always in sync, always accessible, always private.
+					Eurora does not have vendor lock-in. You can use any browser, on any platform.
+					You can even connect any local AI model to it. Eurora is made with a certainty
+					of transparency and putting your needs first.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
+			<FeatureSection.Content class="overflow-hidden">
+				<img
+					src="https://d26xptavrz5c8t.cloudfront.net/image/eurora_and_browsers.png"
+					alt="Eurora and browsers"
+					class="w-full"
+				/>
+			</FeatureSection.Content>
 		</FeatureSection.Root>
 	</div>
 
