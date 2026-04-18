@@ -11,7 +11,9 @@
 <script lang="ts">
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
 	import { getTextContent } from '$lib/utils/message-content.js';
+	import { middleTruncate } from '$lib/utils/text.js';
 	import { inject } from '@eurora/shared/context';
+	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
 	import { initStickToBottomContext } from '@eurora/ui/components/ai-elements/conversation/index';
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
@@ -27,7 +29,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { tick } from 'svelte';
 	import type { ContentBlock } from '$lib/models/content-blocks/index.js';
-	import type { MessageNode } from '$lib/models/messages/index.js';
+	import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
 
 	let { emptyState, onCopy, onEdit }: Props = $props();
 
@@ -74,6 +76,10 @@
 
 	function getMessageId(node: MessageNode): string {
 		return node.message.id;
+	}
+
+	function getAssetChips(node: MessageNode): AssetChip[] {
+		return node.message.type === 'human' ? node.message.assetChips : [];
 	}
 
 	function handleCopy(content: string, messageId: string) {
@@ -182,9 +188,26 @@
 			{@const user = isUser(node)}
 			{@const reasoning = getReasoningContent(node)}
 			{@const messageId = getMessageId(node)}
+			{@const assetChips = getAssetChips(node)}
 			{@const isStreaming = chatService.activeThread?.streamingMessageId === messageId}
-			{#if content.length > 0 || !user}
+			{#if content.length > 0 || assetChips.length > 0 || !user}
 				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
+					{#if user && assetChips.length > 0}
+						<Attachment.Root variant="inline" class="ml-auto">
+							{#each assetChips as chip (chip.id)}
+								<Attachment.Item
+									data={{
+										type: 'file',
+										id: chip.id,
+										filename: middleTruncate(chip.name),
+									}}
+								>
+									<Attachment.Preview />
+									<Attachment.Info />
+								</Attachment.Item>
+							{/each}
+						</Attachment.Root>
+					{/if}
 					{#if reasoning}
 						<Reasoning.Root {isStreaming}>
 							<Reasoning.Trigger />

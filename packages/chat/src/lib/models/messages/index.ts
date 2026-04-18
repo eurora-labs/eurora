@@ -6,6 +6,7 @@ export type {
 	ToolCall,
 	UsageMetadata,
 } from './ai-message.js';
+export type { AssetChip } from './asset-chip.js';
 export type { ChatMessage } from './chat-message.js';
 export type { HumanMessage } from './human-message.js';
 export type { RemoveMessage } from './remove-message.js';

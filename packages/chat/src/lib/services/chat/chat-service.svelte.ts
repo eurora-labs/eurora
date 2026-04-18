@@ -1,5 +1,5 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { MessageNode } from '$lib/models/messages/index.js';
+import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
 
@@ -169,7 +169,7 @@ export class ChatService {
 		}
 	}
 
-	async sendMessage(text: string, assetIds?: string[]): Promise<void> {
+	async sendMessage(text: string, assetChips: AssetChip[] = []): Promise<void> {
 		if (!text.trim()) return;
 		this.viewMode = 'list';
 
@@ -199,7 +199,7 @@ export class ChatService {
 		const entry = this.getThreadData(threadId);
 		if (!entry) return;
 
-		this.appendPlaceholders(entry, text);
+		this.appendPlaceholders(entry, text, assetChips);
 
 		const onFirstChunk = isNewThread
 			? () => {
@@ -209,14 +209,10 @@ export class ChatService {
 				}
 			: undefined;
 
-		const receivedFinal = await this.consumeStream(
-			entry,
-			threadId,
-			text,
-			undefined,
-			assetIds,
+		const receivedFinal = await this.consumeStream(entry, threadId, text, {
+			assetChips,
 			onFirstChunk,
-		);
+		});
 
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
@@ -253,6 +249,7 @@ export class ChatService {
 					name: null,
 					additionalKwargs: null,
 					responseMetadata: null,
+					assetChips: [],
 				},
 				children: [],
 				siblingIndex: 0,
@@ -301,11 +298,17 @@ export class ChatService {
 		const nodeIndex = entry.messages.findIndex((n) => n.message.id === messageId);
 		if (nodeIndex < 0) return;
 
-		const parentId = entry.messages[nodeIndex].parentId;
+		const original = entry.messages[nodeIndex];
+		const parentId = original.parentId;
+		const preservedAssetChips =
+			original.message.type === 'human' ? original.message.assetChips : [];
 
 		entry.messages = entry.messages.slice(0, nodeIndex);
-		this.appendPlaceholders(entry, text);
-		const receivedFinal = await this.consumeStream(entry, threadId, text, parentId);
+		this.appendPlaceholders(entry, text, preservedAssetChips);
+		const receivedFinal = await this.consumeStream(entry, threadId, text, {
+			parentMessageId: parentId,
+			preservedAssetChips,
+		});
 
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
@@ -341,9 +344,12 @@ export class ChatService {
 		entry: ThreadMessages,
 		threadId: string,
 		text: string,
-		parentMessageId?: string | null,
-		assetIds?: string[],
-		onFirstChunk?: () => void,
+		options: {
+			parentMessageId?: string | null;
+			assetChips?: AssetChip[];
+			preservedAssetChips?: AssetChip[];
+			onFirstChunk?: () => void;
+		} = {},
 	): Promise<boolean> {
 		this.abortController?.abort();
 
@@ -359,13 +365,13 @@ export class ChatService {
 		let receivedFinal = false;
 
 		const abortController = new AbortController();
-		const stream = this.threadClient.sendMessage(
-			threadId,
-			text,
-			parentMessageId,
-			abortController.signal,
-			assetIds,
-		);
+		const stream = this.threadClient.sendMessage(threadId, text, {
+			parentMessageId: options.parentMessageId,
+			signal: abortController.signal,
+			assetChips: options.assetChips,
+			preservedAssetChips: options.preservedAssetChips,
+		});
+		let onFirstChunk = options.onFirstChunk;
 
 		try {
 			for await (const event of stream) {
@@ -470,7 +476,11 @@ export class ChatService {
 		return receivedFinal;
 	}
 
-	private appendPlaceholders(entry: ThreadMessages, text: string): void {
+	private appendPlaceholders(
+		entry: ThreadMessages,
+		text: string,
+		assetChips: AssetChip[] = [],
+	): void {
 		const humanId = `temp-${crypto.randomUUID()}`;
 		const aiId = `temp-${crypto.randomUUID()}`;
 
@@ -494,6 +504,7 @@ export class ChatService {
 					name: null,
 					additionalKwargs: null,
 					responseMetadata: null,
+					assetChips,
 				},
 				children: [],
 				siblingIndex: 0,

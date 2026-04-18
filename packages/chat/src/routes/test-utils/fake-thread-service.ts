@@ -2,7 +2,11 @@ import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { MessageNode } from '$lib/models/messages/index.js';
 import type { ChatStreamEvent } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
-import type { IThreadService, BranchDirection } from '$lib/services/thread/thread-service.js';
+import type {
+	BranchDirection,
+	IThreadService,
+	SendMessageOptions,
+} from '$lib/services/thread/thread-service.js';
 
 let nextId = 1;
 
@@ -39,6 +43,7 @@ export function makeMessageNode(
 						name: null,
 						additionalKwargs: null,
 						responseMetadata: null,
+						assetChips: [],
 					}
 				: {
 						type: 'ai',
@@ -147,9 +152,7 @@ export class FakeThreadService implements IThreadService {
 	async *sendMessage(
 		_threadId: string,
 		_text: string,
-		_parentMessageId?: string | null,
-		_signal?: AbortSignal,
-		_assetIds?: string[],
+		_options?: SendMessageOptions,
 	): AsyncIterable<ChatStreamEvent> {
 		for (const chunk of this.streamChunks) {
 			if (this.streamDelay > 0) {

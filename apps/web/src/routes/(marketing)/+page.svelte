@@ -85,7 +85,25 @@
 	<div class="flex flex-col gap-24">
 		<FeatureSection.Root>
 			<FeatureSection.Header>
-				<FeatureSection.Title>AI On Your Own Terms</FeatureSection.Title>
+				<FeatureSection.Title>New way to use AI</FeatureSection.Title>
+				<FeatureSection.Subtitle>
+					Eurora is built with a purpose to make an AI assistant that feel natural and
+					ergonomic. With a single click of a button, you can see every single chat as a
+					graph of edited messages. Navigate old conversations quickly and easily.
+				</FeatureSection.Subtitle>
+			</FeatureSection.Header>
+			<FeatureSection.Content class="overflow-hidden">
+				<img
+					src="https://d26xptavrz5c8t.cloudfront.net/image/rust_course_graph_view.png"
+					alt="Eurora graph view"
+					class="w-full"
+				/>
+			</FeatureSection.Content>
+		</FeatureSection.Root>
+
+		<FeatureSection.Root align="right">
+			<FeatureSection.Header>
+				<FeatureSection.Title>Easiest way to use AI</FeatureSection.Title>
 				<FeatureSection.Subtitle>
 					Get answers instantly. Eurora works on your platform, with your browser. All
 					data is stored securely in a Sovereign European data center. Eurora provides
