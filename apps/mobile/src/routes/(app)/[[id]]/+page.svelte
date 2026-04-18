@@ -23,7 +23,7 @@
 		const newThread = chatService.newThread;
 		if (newThread) {
 			chatService.newThread = undefined;
-			goto(`/${newThread.id}`, { replaceState: true });
+			goto(`/${newThread.id}`, { replaceState: true, keepFocus: true });
 		}
 	});
 
