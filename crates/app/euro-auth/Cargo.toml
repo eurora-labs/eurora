@@ -22,6 +22,7 @@ proto-gen = { workspace = true }
 rand = { workspace = true }
 sha2 = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = [
   "fs",
   "macros",

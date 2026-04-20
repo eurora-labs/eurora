@@ -1,4 +1,5 @@
 use crate::client::AuthClient;
+use crate::error::{AuthError, AuthResult};
 use anyhow::{Result, anyhow};
 use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -116,9 +117,14 @@ impl AuthManager {
 
     /// Returns a valid access token, refreshing from the server only if the
     /// stored token is missing or within the refresh-offset window of expiry.
-    pub async fn get_or_refresh_access_token(&self) -> Result<SecretString> {
+    ///
+    /// Callers can inspect the returned [`AuthError`] to distinguish a true
+    /// "logged out" state (refresh token rejected by the server) from a
+    /// transient failure (server unreachable, etc.); see [`AuthError::is_logged_out`]
+    /// and [`AuthError::is_transient`].
+    pub async fn get_or_refresh_access_token(&self) -> AuthResult<SecretString> {
         if self.has_fresh_access_token() {
-            return self.get_access_token();
+            return self.read_access_token();
         }
         self.ensure_refresh().await
     }
@@ -127,36 +133,39 @@ impl AuthManager {
     /// flight. If another task completes a refresh while this one is waiting
     /// for the lock, the freshly stored token is returned without a second
     /// round-trip to the server.
-    pub async fn refresh_tokens(&self) -> Result<SecretString> {
+    pub async fn refresh_tokens(&self) -> AuthResult<SecretString> {
         self.ensure_refresh().await
     }
 
-    async fn ensure_refresh(&self) -> Result<SecretString> {
+    async fn ensure_refresh(&self) -> AuthResult<SecretString> {
         let _guard = self.refresh_lock.lock().await;
 
         // Double-checked: another task may have refreshed while we waited.
         if self.has_fresh_access_token() {
-            return self.get_access_token();
+            return self.read_access_token();
         }
 
         self.perform_refresh().await?;
-        self.get_access_token()
+        self.read_access_token()
     }
 
-    async fn perform_refresh(&self) -> Result<()> {
-        let refresh_token = self.get_refresh_token()?;
+    async fn perform_refresh(&self) -> AuthResult<()> {
+        let refresh_token = self
+            .get_refresh_token()
+            .map_err(|_| AuthError::MissingRefreshToken)?;
         let response = self
             .auth_client
             .refresh_token(refresh_token.expose_secret())
-            .await
-            .map_err(|e| {
-                tracing::warn!("Token refresh failed: {e}");
-                e
-            })?;
+            .await?;
 
         store_access_token(response.access_token)?;
         store_refresh_token(response.refresh_token)?;
         Ok(())
+    }
+
+    fn read_access_token(&self) -> AuthResult<SecretString> {
+        self.get_access_token()
+            .map_err(|_| AuthError::MissingAccessToken)
     }
 
     fn has_fresh_access_token(&self) -> bool {
