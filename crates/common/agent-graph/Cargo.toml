@@ -1,15 +1,22 @@
 [package]
 name = "agent-graph"
-version = "0.0.2"
+version = "0.0.3"
 edition.workspace = true
 description = "Agent graph library"
 license = "MIT"
+repository = "https://github.com/eurora-labs/agent-flow"
 
 [dependencies]
-agent-chain-core = { workspace = true }
+agent-graph-checkpoint = { workspace = true }
 agent-graph-macros = { workspace = true }
+async-trait = { workspace = true }
+bon = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

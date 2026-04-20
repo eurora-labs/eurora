@@ -299,16 +299,39 @@ dependencies = [
 
 [[package]]
 name = "agent-graph"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
- "agent-chain-core",
+ "agent-graph-checkpoint",
  "agent-graph-macros",
+ "async-trait",
+ "bon",
  "futures",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "tracing",
 ]
+
+[[package]]
+name = "agent-graph-checkpoint"
+version = "0.0.1"
+
+[[package]]
+name = "agent-graph-checkpoint-conformance"
+version = "0.0.1"
+
+[[package]]
+name = "agent-graph-checkpoint-postgres"
+version = "0.0.1"
+
+[[package]]
+name = "agent-graph-checkpoint-sqlite"
+version = "0.0.1"
+
+[[package]]
+name = "agent-graph-cli"
+version = "0.0.1"
 
 [[package]]
 name = "agent-graph-macros"
@@ -317,6 +340,10 @@ dependencies = [
  "quote",
  "syn 2.0.117",
 ]
+
+[[package]]
+name = "agent-graph-prebuilt"
+version = "0.0.1"
 
 [[package]]
 name = "ahash"
