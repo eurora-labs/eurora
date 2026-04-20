@@ -7,6 +7,7 @@ license = "MIT"
 repository = "https://github.com/eurora-labs/agent-flow"
 
 [dependencies]
+agent-chain-core = { workspace = true }
 agent-graph-checkpoint = { workspace = true }
 agent-graph-macros = { workspace = true }
 async-trait = { workspace = true }
@@ -17,6 +18,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
+xxhash-rust = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
