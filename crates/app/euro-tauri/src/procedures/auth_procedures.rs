@@ -84,7 +84,7 @@ impl AuthApi for AuthApiImpl {
                 .ctx("Failed to switch to cloud endpoint")?;
         }
 
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
         let (code_verifier, code_challenge) = controller
             .get_login_tokens()
             .await
@@ -112,7 +112,7 @@ impl AuthApi for AuthApiImpl {
             None => return Ok(false),
         };
 
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
 
         let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
             .ctx("Failed to retrieve login token")?
@@ -151,7 +151,7 @@ impl AuthApi for AuthApiImpl {
         password: String,
     ) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
 
         controller
             .register(&email, &password)
@@ -178,7 +178,7 @@ impl AuthApi for AuthApiImpl {
         password: String,
     ) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
 
         controller
             .login(&login, &password)
@@ -200,7 +200,7 @@ impl AuthApi for AuthApiImpl {
 
     async fn logout<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
 
         controller.delete_user().ctx("Logout failed")?;
         emit_auth_state(&app_handle, None);
@@ -234,7 +234,7 @@ impl AuthApi for AuthApiImpl {
             return Ok(false);
         };
 
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
         match controller.get_or_refresh_access_token().await {
             Ok(token) => Ok(!token.expose_secret().is_empty()),
             Err(e) => Err(format!("Failed to get or refresh access token: {e}")),
@@ -246,7 +246,7 @@ impl AuthApi for AuthApiImpl {
         app_handle: AppHandle<R>,
     ) -> Result<Claims, String> {
         let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
         controller
             .get_or_refresh_access_token()
             .await
@@ -258,7 +258,7 @@ impl AuthApi for AuthApiImpl {
 
     async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
         controller
             .refresh_tokens()
             .await
@@ -276,7 +276,7 @@ impl AuthApi for AuthApiImpl {
         app_handle: AppHandle<R>,
     ) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
         controller
             .resend_verification_email()
             .await

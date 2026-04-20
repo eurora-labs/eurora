@@ -18,7 +18,7 @@ impl AuthClient {
     }
 
     pub async fn login_by_password(
-        &mut self,
+        &self,
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<TokenResponse> {
@@ -31,7 +31,7 @@ impl AuthClient {
         self.login(req).await
     }
 
-    async fn login(&mut self, data: LoginRequest) -> Result<TokenResponse> {
+    async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
         let mut client = self.client();
         let response = client.login(data).await.map_err(|e| {
             tracing::error!("Login failed: {}", e);
@@ -42,7 +42,7 @@ impl AuthClient {
     }
 
     pub async fn register(
-        &mut self,
+        &self,
         email: impl Into<String>,
         password: impl Into<String>,
         display_name: Option<String>,
@@ -63,10 +63,7 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    pub async fn refresh_token(
-        &mut self,
-        refresh_token: impl Into<String>,
-    ) -> Result<TokenResponse> {
+    pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
         let refresh_token: String = refresh_token.into();
         let mut client = self.client();
         let mut request = tonic::Request::new(RefreshTokenRequest {});
@@ -83,7 +80,7 @@ impl AuthClient {
     }
 
     pub async fn login_by_login_token(
-        &mut self,
+        &self,
         login_token: impl Into<String>,
     ) -> Result<TokenResponse> {
         let mut client = self.client();
@@ -101,10 +98,7 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    pub async fn resend_verification_email(
-        &mut self,
-        access_token: impl Into<String>,
-    ) -> Result<()> {
+    pub async fn resend_verification_email(&self, access_token: impl Into<String>) -> Result<()> {
         let mut client = self.client();
         let mut request = tonic::Request::new(());
         request.metadata_mut().insert(

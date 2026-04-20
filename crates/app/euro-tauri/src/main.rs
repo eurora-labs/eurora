@@ -316,19 +316,22 @@ fn init_state(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = tauri_app.handle();
 
-    let thread_channel_rx = endpoint_manager.subscribe();
-    let thread_manager = euro_thread::ThreadManager::new(thread_channel_rx);
+    // Single shared AuthManager so concurrent refreshes from any consumer
+    // (thread, timeline, user) coalesce through one refresh lock.
+    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.subscribe());
+
+    let thread_manager =
+        euro_thread::ThreadManager::new(endpoint_manager.subscribe(), auth_manager.clone());
     app_handle.manage(SharedThreadManager::new(thread_manager));
 
-    let timeline_channel_rx = endpoint_manager.subscribe();
     let timeline = euro_timeline::TimelineManager::builder()
-        .channel_rx(timeline_channel_rx)
+        .channel_rx(endpoint_manager.subscribe())
+        .auth_manager(auth_manager.clone())
         .build()?;
     app_handle.manage(Mutex::new(timeline));
 
     let path = tauri_app.path().app_data_dir()?;
-    let user_channel_rx = endpoint_manager.subscribe();
-    let user_controller = euro_user::Controller::new(path, user_channel_rx)?;
+    let user_controller = euro_user::Controller::new(path, auth_manager);
     app_handle.manage(SharedUserController::new(user_controller));
     app_handle.manage(ActiveStreamTokens::default());
 

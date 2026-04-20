@@ -53,13 +53,16 @@ fn init_state(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.handle();
 
-    let thread_channel_rx = endpoint_manager.subscribe();
-    let thread_manager = euro_thread::ThreadManager::new(thread_channel_rx);
+    // Single shared AuthManager so concurrent refreshes coalesce through one
+    // refresh lock, regardless of which consumer initiates the refresh.
+    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.subscribe());
+
+    let thread_manager =
+        euro_thread::ThreadManager::new(endpoint_manager.subscribe(), auth_manager.clone());
     app_handle.manage(SharedThreadManager::new(thread_manager));
 
     let path = app.path().app_data_dir()?;
-    let user_channel_rx = endpoint_manager.subscribe();
-    let user_controller = euro_user::Controller::new(path, user_channel_rx)?;
+    let user_controller = euro_user::Controller::new(path, auth_manager);
     app_handle.manage(SharedUserController::new(user_controller));
 
     app_handle.manage(crate::shared_types::ActiveStreamTokens::default());
