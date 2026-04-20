@@ -5,14 +5,14 @@ use euro_secret::{SecretString, secret};
 use std::path::PathBuf;
 
 #[derive(Clone)]
-pub struct Controller {
+pub struct UserController {
     pub auth_manager: AuthManager,
     storage: Storage,
 }
 
-impl Controller {
-    pub fn new(path: impl Into<PathBuf>, auth_manager: AuthManager) -> Controller {
-        Controller {
+impl UserController {
+    pub fn new(path: impl Into<PathBuf>, auth_manager: AuthManager) -> UserController {
+        UserController {
             auth_manager,
             storage: Storage::from_path(path),
         }
