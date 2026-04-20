@@ -1,4 +1,5 @@
-use anyhow::{Ok, Result, anyhow};
+use crate::error::{AuthError, AuthResult};
+use anyhow::{Result, anyhow};
 use proto_gen::auth::{
     EmailPasswordCredentials, LoginByLoginTokenRequest, LoginRequest, RefreshTokenRequest,
     RegisterRequest, TokenResponse, login_request::Credential,
@@ -18,7 +19,7 @@ impl AuthClient {
     }
 
     pub async fn login_by_password(
-        &mut self,
+        &self,
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<TokenResponse> {
@@ -31,7 +32,7 @@ impl AuthClient {
         self.login(req).await
     }
 
-    async fn login(&mut self, data: LoginRequest) -> Result<TokenResponse> {
+    async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
         let mut client = self.client();
         let response = client.login(data).await.map_err(|e| {
             tracing::error!("Login failed: {}", e);
@@ -42,7 +43,7 @@ impl AuthClient {
     }
 
     pub async fn register(
-        &mut self,
+        &self,
         email: impl Into<String>,
         password: impl Into<String>,
         display_name: Option<String>,
@@ -64,9 +65,9 @@ impl AuthClient {
     }
 
     pub async fn refresh_token(
-        &mut self,
+        &self,
         refresh_token: impl Into<String>,
-    ) -> Result<TokenResponse> {
+    ) -> AuthResult<TokenResponse> {
         let refresh_token: String = refresh_token.into();
         let mut client = self.client();
         let mut request = tonic::Request::new(RefreshTokenRequest {});
@@ -74,16 +75,20 @@ impl AuthClient {
             "authorization",
             format!("Bearer {}", refresh_token).parse().unwrap(),
         );
-        let response = client.refresh_token(request).await.map_err(|e| {
-            tracing::error!("Token refresh failed: {}", e);
-            anyhow!("Token refresh failed: {}", e)
+        let response = client.refresh_token(request).await.map_err(|status| {
+            tracing::warn!(
+                code = ?status.code(),
+                message = status.message(),
+                "Token refresh failed",
+            );
+            AuthError::from_refresh_status(status)
         })?;
 
         Ok(response.into_inner())
     }
 
     pub async fn login_by_login_token(
-        &mut self,
+        &self,
         login_token: impl Into<String>,
     ) -> Result<TokenResponse> {
         let mut client = self.client();
@@ -101,10 +106,7 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    pub async fn resend_verification_email(
-        &mut self,
-        access_token: impl Into<String>,
-    ) -> Result<()> {
+    pub async fn resend_verification_email(&self, access_token: impl Into<String>) -> Result<()> {
         let mut client = self.client();
         let mut request = tonic::Request::new(());
         request.metadata_mut().insert(

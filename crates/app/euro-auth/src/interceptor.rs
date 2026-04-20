@@ -1,4 +1,5 @@
 use crate::AuthManager;
+use crate::error::AuthError;
 use euro_secret::ExposeSecret;
 use std::pin::Pin;
 use tonic::{Request, Status, transport::Channel};
@@ -23,7 +24,7 @@ impl AsyncInterceptor for AuthInterceptor {
         Pin<Box<dyn std::future::Future<Output = Result<Request<()>, Status>> + Send + 'static>>;
 
     fn call(&mut self, mut request: Request<()>) -> Self::Future {
-        let mut auth_manager = self.auth_manager.clone();
+        let auth_manager = self.auth_manager.clone();
 
         Box::pin(async move {
             let token = auth_manager
@@ -31,7 +32,7 @@ impl AsyncInterceptor for AuthInterceptor {
                 .await
                 .map_err(|e| {
                     tracing::error!("Failed to get access token: {}", e);
-                    Status::unauthenticated(format!("Failed to retrieve access token: {}", e))
+                    status_for_auth_error(&e, "Failed to retrieve access token")
                 })?;
 
             let bearer_value = format!("Bearer {}", token.expose_secret());
@@ -55,4 +56,15 @@ pub fn build_authed_channel(channel: Channel, auth_manager: AuthManager) -> Auth
     ServiceBuilder::new()
         .layer(async_interceptor(interceptor))
         .service(channel)
+}
+
+fn status_for_auth_error(error: &AuthError, context: &str) -> Status {
+    let message = format!("{context}: {error}");
+    match error {
+        AuthError::InvalidRefreshToken
+        | AuthError::MissingRefreshToken
+        | AuthError::MissingAccessToken => Status::unauthenticated(message),
+        AuthError::Transient(_) => Status::unavailable(message),
+        AuthError::Other(_) => Status::internal(message),
+    }
 }

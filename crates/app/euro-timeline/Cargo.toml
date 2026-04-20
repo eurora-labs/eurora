@@ -11,6 +11,7 @@ agent-chain-core = { workspace = true }
 bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
+euro-auth = { workspace = true }
 euro-browser = { workspace = true }
 focus-tracker = { workspace = true }
 image = { workspace = true }

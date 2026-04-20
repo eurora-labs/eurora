@@ -1,7 +1,7 @@
 mod storage;
 
 mod controller;
-pub use controller::Controller;
+pub use controller::UserController;
 
 mod user;
 pub use euro_auth::{ACCESS_TOKEN_HANDLE, AuthManager, REFRESH_TOKEN_HANDLE};

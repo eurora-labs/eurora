@@ -1,10 +1,10 @@
 use euro_secret::ExposeSecret;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Runtime};
 
 use crate::error::ResultExt;
-use crate::shared_types::SharedUserController;
+use crate::procedures::auth_manager;
 
 fn rest_api_url() -> String {
     std::env::var("REST_API_URL")
@@ -48,17 +48,11 @@ impl PaymentApi for PaymentApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<String, String> {
-        let user_state = app_handle
-            .try_state::<SharedUserController>()
-            .ok_or_else(|| "User controller not available".to_string())?;
-
-        let token = {
-            let mut controller = user_state.lock().await;
-            controller
-                .get_or_refresh_access_token()
-                .await
-                .ctx("Failed to get access token")?
-        };
+        let auth_manager = auth_manager(&app_handle).await?;
+        let token = auth_manager
+            .get_or_refresh_access_token()
+            .await
+            .ctx("Failed to get access token")?;
 
         let base_url = rest_api_url();
         let client = Client::new();
@@ -94,17 +88,11 @@ impl PaymentApi for PaymentApiImpl {
     }
 
     async fn is_subscribed<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        let user_state = app_handle
-            .try_state::<SharedUserController>()
-            .ok_or_else(|| "User controller not available".to_string())?;
-
-        let token = {
-            let mut controller = user_state.lock().await;
-            controller
-                .get_or_refresh_access_token()
-                .await
-                .ctx("Failed to get access token")?
-        };
+        let auth_manager = auth_manager(&app_handle).await?;
+        let token = auth_manager
+            .get_or_refresh_access_token()
+            .await
+            .ctx("Failed to get access token")?;
 
         let base_url = rest_api_url();
         let sub: SubscriptionResponse = Client::new()
