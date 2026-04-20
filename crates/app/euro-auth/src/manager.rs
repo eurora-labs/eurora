@@ -6,42 +6,73 @@ use euro_secret::{ExposeSecret, SecretString, secret};
 use jsonwebtoken::dangerous::insecure_decode;
 use rand::Rng;
 use sha2::{Digest, Sha256};
-use tokio::sync::watch;
+use std::sync::Arc;
+use tokio::sync::{Mutex, watch};
 use tonic::transport::Channel;
 
-#[derive(Debug, Clone)]
-pub struct JwtConfig {
-    refresh_offset: i64,
+#[derive(Debug, Clone, Copy)]
+struct JwtConfig {
+    refresh_offset_seconds: i64,
 }
 
-#[derive(Debug, Clone)]
-pub struct AuthManager {
-    auth_client: AuthClient,
-    jwt_config: JwtConfig,
+impl JwtConfig {
+    fn from_env() -> Self {
+        let minutes: i64 = std::env::var("JWT_REFRESH_OFFSET")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(15)
+            .max(0);
+        Self {
+            refresh_offset_seconds: minutes.saturating_mul(60),
+        }
+    }
 }
 
 pub const ACCESS_TOKEN_HANDLE: &str = "AUTH_ACCESS_TOKEN";
 pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
 
+/// Shared authentication state.
+///
+/// `AuthManager` is cheap to clone — all clones share the same inner state via
+/// an `Arc`. In particular, they share a single refresh lock so that concurrent
+/// callers coalesce into one server-side refresh: the winning task performs the
+/// rotation, and queued callers observe the freshly stored access token after
+/// the lock is released. This is critical because the backend invalidates a
+/// refresh token on first use, so naive concurrent refreshes would cause all
+/// but one caller to receive `InvalidToken` and log the user out.
+#[derive(Debug, Clone)]
+pub struct AuthManager {
+    inner: Arc<Inner>,
+}
+
+#[derive(Debug)]
+struct Inner {
+    auth_client: AuthClient,
+    jwt_config: JwtConfig,
+    refresh_lock: Mutex<()>,
+}
+
 impl AuthManager {
     pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
-        let refresh_offset: i64 = std::env::var("JWT_REFRESH_OFFSET")
-            .unwrap_or("15".to_string())
-            .parse()
-            .unwrap_or(15)
-            .max(0);
         Self {
-            auth_client: AuthClient::new(channel_rx),
-            jwt_config: JwtConfig { refresh_offset },
+            inner: Arc::new(Inner {
+                auth_client: AuthClient::new(channel_rx),
+                jwt_config: JwtConfig::from_env(),
+                refresh_lock: Mutex::new(()),
+            }),
         }
     }
 
     pub async fn login(
-        &mut self,
+        &self,
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<SecretString> {
-        let response = self.auth_client.login_by_password(login, password).await?;
+        let response = self
+            .inner
+            .auth_client
+            .login_by_password(login, password)
+            .await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
@@ -50,11 +81,15 @@ impl AuthManager {
     }
 
     pub async fn register(
-        &mut self,
+        &self,
         email: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<SecretString> {
-        let response = self.auth_client.register(email, password, None).await?;
+        let response = self
+            .inner
+            .auth_client
+            .register(email, password, None)
+            .await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
@@ -82,52 +117,60 @@ impl AuthManager {
         Ok(token.claims)
     }
 
-    pub async fn get_or_refresh_access_token(&mut self) -> Result<SecretString> {
-        match self.get_access_token_payload() {
-            Ok(claims) => {
-                let now = chrono::Utc::now().timestamp();
-                let expiry_with_offset = claims.exp - self.jwt_config.refresh_offset * 60;
-
-                if now < expiry_with_offset {
-                    self.get_access_token()
-                } else {
-                    self.refresh_tokens().await.map_err(|err| {
-                        tracing::error!("Failed to refresh tokens: {}", err);
-                        err
-                    })?;
-                    self.get_access_token()
-                }
-            }
-
-            Err(_) => {
-                self.refresh_tokens().await.map_err(|err| {
-                    tracing::error!("Failed to refresh tokens: {}", err);
-                    err
-                })?;
-                self.get_access_token()
-            }
+    /// Returns a valid access token, refreshing from the server only if the
+    /// stored token is missing or within the refresh-offset window of expiry.
+    pub async fn get_or_refresh_access_token(&self) -> Result<SecretString> {
+        if self.has_fresh_access_token() {
+            return self.get_access_token();
         }
+        self.ensure_refresh().await
     }
 
-    pub async fn refresh_tokens(&mut self) -> Result<SecretString> {
-        let refresh_token = self.get_refresh_token()?;
+    /// Force a refresh, coalescing with any concurrent refresh already in
+    /// flight. If another task completes a refresh while this one is waiting
+    /// for the lock, the freshly stored token is returned without a second
+    /// round-trip to the server.
+    pub async fn refresh_tokens(&self) -> Result<SecretString> {
+        self.ensure_refresh().await
+    }
 
-        let response = match self
+    async fn ensure_refresh(&self) -> Result<SecretString> {
+        let _guard = self.inner.refresh_lock.lock().await;
+
+        // Double-checked: another task may have refreshed while we waited.
+        if self.has_fresh_access_token() {
+            return self.get_access_token();
+        }
+
+        self.perform_refresh().await?;
+        self.get_access_token()
+    }
+
+    async fn perform_refresh(&self) -> Result<()> {
+        let refresh_token = self.get_refresh_token()?;
+        let response = self
+            .inner
             .auth_client
             .refresh_token(refresh_token.expose_secret())
             .await
-        {
-            Ok(resp) => resp,
-            Err(e) => {
+            .map_err(|e| {
                 tracing::warn!("Token refresh failed: {e}");
-                return Err(e);
-            }
+                e
+            })?;
+
+        store_access_token(response.access_token)?;
+        store_refresh_token(response.refresh_token)?;
+        Ok(())
+    }
+
+    fn has_fresh_access_token(&self) -> bool {
+        let Ok(claims) = self.get_access_token_payload() else {
+            return false;
         };
-
-        store_access_token(response.access_token.clone())?;
-        store_refresh_token(response.refresh_token.clone())?;
-
-        Ok(SecretString::from(response.access_token))
+        let now = chrono::Utc::now().timestamp();
+        now < claims
+            .exp
+            .saturating_sub(self.inner.jwt_config.refresh_offset_seconds)
     }
 
     pub async fn get_login_tokens(&self) -> Result<(String, String)> {
@@ -143,15 +186,20 @@ impl AuthManager {
         Ok((code_verifier, code_challenge))
     }
 
-    pub async fn resend_verification_email(&mut self) -> Result<()> {
+    pub async fn resend_verification_email(&self) -> Result<()> {
         let access_token = self.get_access_token()?;
-        self.auth_client
+        self.inner
+            .auth_client
             .resend_verification_email(access_token.expose_secret())
             .await
     }
 
-    pub async fn login_by_login_token(&mut self, login_token: String) -> Result<SecretString> {
-        let response = self.auth_client.login_by_login_token(login_token).await?;
+    pub async fn login_by_login_token(&self, login_token: String) -> Result<SecretString> {
+        let response = self
+            .inner
+            .auth_client
+            .login_by_login_token(login_token)
+            .await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;

@@ -53,7 +53,7 @@ impl PaymentApi for PaymentApiImpl {
             .ok_or_else(|| "User controller not available".to_string())?;
 
         let token = {
-            let mut controller = user_state.lock().await;
+            let controller = user_state.lock().await;
             controller
                 .get_or_refresh_access_token()
                 .await
@@ -99,7 +99,7 @@ impl PaymentApi for PaymentApiImpl {
             .ok_or_else(|| "User controller not available".to_string())?;
 
         let token = {
-            let mut controller = user_state.lock().await;
+            let controller = user_state.lock().await;
             controller
                 .get_or_refresh_access_token()
                 .await

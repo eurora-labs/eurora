@@ -23,7 +23,7 @@ impl AsyncInterceptor for AuthInterceptor {
         Pin<Box<dyn std::future::Future<Output = Result<Request<()>, Status>> + Send + 'static>>;
 
     fn call(&mut self, mut request: Request<()>) -> Self::Future {
-        let mut auth_manager = self.auth_manager.clone();
+        let auth_manager = self.auth_manager.clone();
 
         Box::pin(async move {
             let token = auth_manager
