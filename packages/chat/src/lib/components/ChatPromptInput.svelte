@@ -39,6 +39,8 @@
 	const models = [{ id: 'glm-5.1', name: 'GLM-5.1: Multimodal', provider: 'zai' }];
 
 	let selectedModelId = $state(models[0].id);
+	let searchEnabled = $state(true);
+	let thinkingEnabled = $state(true);
 
 	const selectedModel = $derived(models.find((m) => m.id === selectedModelId) ?? models[0]);
 
@@ -86,11 +88,21 @@
 						<ModelSelector.Logo provider={selectedModel.provider} />
 						<ModelSelector.Name>{selectedModel.name}</ModelSelector.Name>
 					</PromptInput.Button>
-					<PromptInput.Button size="sm" variant="ghost">
+					<PromptInput.Button
+						size="sm"
+						variant={searchEnabled ? 'default' : 'ghost'}
+						aria-pressed={searchEnabled}
+						onclick={() => (searchEnabled = !searchEnabled)}
+					>
 						<GlobeIcon size={16} />
 						<span>Search</span>
 					</PromptInput.Button>
-					<PromptInput.Button size="sm" variant="ghost">
+					<PromptInput.Button
+						size="sm"
+						variant={thinkingEnabled ? 'default' : 'ghost'}
+						aria-pressed={thinkingEnabled}
+						onclick={() => (thinkingEnabled = !thinkingEnabled)}
+					>
 						<BrainIcon size={16} />
 						<span>Thinking</span>
 					</PromptInput.Button>
