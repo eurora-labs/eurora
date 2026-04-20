@@ -1,27 +1,21 @@
 use crate::{User, storage::Storage};
 use anyhow::{Context, Result};
-use euro_auth::{AuthManager, Claims};
-use euro_secret::{SecretString, secret};
+use euro_auth::AuthManager;
+use euro_secret::secret;
 use std::path::PathBuf;
-use tokio::sync::watch;
-use tonic::transport::Channel;
 
 #[derive(Clone)]
-pub struct Controller {
+pub struct UserController {
     pub auth_manager: AuthManager,
     storage: Storage,
 }
 
-impl Controller {
-    pub fn new(
-        path: impl Into<PathBuf>,
-        channel_rx: watch::Receiver<Channel>,
-    ) -> Result<Controller> {
-        let auth_manager = AuthManager::new(channel_rx);
-        Ok(Controller {
+impl UserController {
+    pub fn new(path: impl Into<PathBuf>, auth_manager: AuthManager) -> UserController {
+        UserController {
             auth_manager,
             storage: Storage::from_path(path),
-        })
+        }
     }
 
     pub fn get_or_create_user(&self) -> Result<User> {
@@ -43,59 +37,10 @@ impl Controller {
         self.storage.set(user).context("failed to set user")
     }
 
-    pub fn delete_user(&mut self) -> Result<()> {
+    pub fn delete_user(&self) -> Result<()> {
         self.storage.delete().context("failed to delete user")?;
         secret::delete(crate::ACCESS_TOKEN_HANDLE).ok();
         secret::delete(crate::REFRESH_TOKEN_HANDLE).ok();
         Ok(())
-    }
-
-    pub async fn register(
-        &mut self,
-        email: impl Into<String>,
-        password: impl Into<String>,
-    ) -> Result<SecretString> {
-        self.auth_manager.register(email, password).await
-    }
-
-    pub async fn login(
-        &mut self,
-        login: impl Into<String>,
-        password: impl Into<String>,
-    ) -> Result<SecretString> {
-        self.auth_manager.login(login, password).await
-    }
-
-    pub async fn get_or_refresh_access_token(&mut self) -> Result<SecretString> {
-        self.auth_manager.get_or_refresh_access_token().await
-    }
-
-    pub fn get_access_token_payload(&mut self) -> Result<Claims> {
-        self.auth_manager.get_access_token_payload()
-    }
-
-    pub fn get_refresh_token_payload(&mut self) -> Result<Claims> {
-        self.auth_manager.get_refresh_token_payload()
-    }
-
-    pub async fn refresh_tokens(&mut self) -> Result<SecretString> {
-        self.auth_manager.refresh_tokens().await
-    }
-
-    pub async fn get_login_tokens(&mut self) -> Result<(String, String)> {
-        self.auth_manager.get_login_tokens().await
-    }
-
-    pub async fn resend_verification_email(&mut self) -> Result<()> {
-        self.auth_manager.resend_verification_email().await
-    }
-
-    pub async fn login_by_login_token(
-        &mut self,
-        login_token: impl Into<String>,
-    ) -> Result<SecretString> {
-        self.auth_manager
-            .login_by_login_token(login_token.into())
-            .await
     }
 }

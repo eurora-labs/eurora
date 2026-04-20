@@ -42,8 +42,7 @@ pub struct ActivityStorage {
 }
 
 impl ActivityStorage {
-    pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
-        let auth_manager = AuthManager::new(channel_rx.clone());
+    pub fn new(channel_rx: watch::Receiver<Channel>, auth_manager: AuthManager) -> Self {
         Self {
             channel_rx,
             auth_manager,

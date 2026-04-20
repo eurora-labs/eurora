@@ -1,5 +1,6 @@
 use auth_core::Claims;
 use euro_secret::{ExposeSecret, SecretString, secret};
+use euro_user::AuthManager;
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
@@ -56,6 +57,16 @@ fn user_controller<R: Runtime>(
         .ok_or_else(|| "User controller not available".to_string())
 }
 
+/// Briefly lock the shared `UserController`, clone out its `AuthManager`,
+/// and return it. The clone is a cheap `Arc` bump; the lock is released
+/// before the caller `.await`s, so concurrent requests don't serialize on
+/// the outer mutex during network I/O.
+async fn auth_manager<R: Runtime>(app_handle: &AppHandle<R>) -> Result<AuthManager, String> {
+    let state = user_controller(app_handle)?;
+    let controller = state.lock().await;
+    Ok(controller.auth_manager.clone())
+}
+
 fn emit_auth_state<R: Runtime>(app_handle: &AppHandle<R>, claims: Option<Claims>) {
     let _ = TauRpcAuthApiEventTrigger::new(app_handle.clone()).auth_state_changed(claims);
 }
@@ -69,10 +80,9 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let auth_manager = auth_manager(&app_handle).await?;
 
-        let (code_verifier, code_challenge) = controller
+        let (code_verifier, code_challenge) = auth_manager
             .get_login_tokens()
             .await
             .ctx("Failed to get login tokens")?;
@@ -97,25 +107,24 @@ impl AuthApi for AuthApiImpl {
     }
 
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        let user_state = match app_handle.try_state::<SharedUserController>() {
-            Some(s) => s,
-            None => return Ok(false),
+        if app_handle.try_state::<SharedUserController>().is_none() {
+            return Ok(false);
         };
 
-        let mut controller = user_state.lock().await;
+        let auth_manager = auth_manager(&app_handle).await?;
 
         let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
             .ctx("Failed to retrieve login token")?
             .ok_or_else(|| "Login token not found".to_string())?;
 
-        match controller
+        match auth_manager
             .login_by_login_token(login_token.expose_secret().to_owned())
             .await
         {
             Ok(_) => {
                 secret::delete(LOGIN_CODE_VERIFIER).ctx("Failed to remove login token")?;
 
-                if let Ok(claims) = controller.get_access_token_payload() {
+                if let Ok(claims) = auth_manager.get_access_token_payload() {
                     emit_auth_state(&app_handle, Some(claims));
                 }
 
@@ -140,15 +149,14 @@ impl AuthApi for AuthApiImpl {
         login: String,
         password: String,
     ) -> Result<(), String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let auth_manager = auth_manager(&app_handle).await?;
 
-        controller
+        auth_manager
             .login(&login, &password)
             .await
             .ctx("Login failed")?;
 
-        if let Ok(claims) = controller.get_access_token_payload() {
+        if let Ok(claims) = auth_manager.get_access_token_payload() {
             emit_auth_state(&app_handle, Some(claims));
         }
 
@@ -167,15 +175,14 @@ impl AuthApi for AuthApiImpl {
         email: String,
         password: String,
     ) -> Result<(), String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let auth_manager = auth_manager(&app_handle).await?;
 
-        controller
+        auth_manager
             .register(&email, &password)
             .await
             .ctx("Registration failed")?;
 
-        if let Ok(claims) = controller.get_access_token_payload() {
+        if let Ok(claims) = auth_manager.get_access_token_payload() {
             emit_auth_state(&app_handle, Some(claims));
         }
 
@@ -190,7 +197,7 @@ impl AuthApi for AuthApiImpl {
 
     async fn logout<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
         let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
+        let controller = user_state.lock().await;
 
         controller.delete_user().ctx("Logout failed")?;
         emit_auth_state(&app_handle, None);
@@ -220,38 +227,47 @@ impl AuthApi for AuthApiImpl {
         .sleep(tokio::time::sleep)
         .await;
 
-        let Some(user_state) = result.ok() else {
+        if result.is_err() {
             return Ok(false);
-        };
+        }
 
-        let mut controller = user_state.lock().await;
-        match controller.get_or_refresh_access_token().await {
+        let auth_manager = auth_manager(&app_handle).await?;
+        match auth_manager.get_or_refresh_access_token().await {
             Ok(token) => Ok(!token.expose_secret().is_empty()),
-            Err(e) => Err(format!("Failed to get or refresh access token: {e}")),
+            // Definitively logged out — surface as `false` so the frontend
+            // shows the login screen.
+            Err(e) if e.is_logged_out() => Ok(false),
+            // Transient failure (server unreachable etc.) — local credentials
+            // are intact. Don't log the user out on connectivity blips; trust
+            // the last-known state if we have any token stored.
+            Err(e) => {
+                tracing::warn!(
+                    "is_authenticated: transient auth error, assuming last-known state: {e}"
+                );
+                Ok(auth_manager.get_access_token_payload().is_ok())
+            }
         }
     }
 
     async fn get_email<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        auth_manager
             .get_or_refresh_access_token()
             .await
             .ctx("Failed to get access token")?;
-        let claims = controller
+        let claims = auth_manager
             .get_access_token_payload()
             .ctx("Failed to get access token payload")?;
         Ok(claims.email)
     }
 
     async fn get_role<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<String, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        auth_manager
             .get_or_refresh_access_token()
             .await
             .ctx("Failed to get access token")?;
-        let claims = controller
+        let claims = auth_manager
             .get_access_token_payload()
             .ctx("Failed to get access token payload")?;
         Ok(claims.role.to_string())
@@ -261,27 +277,25 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<Option<String>, String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        auth_manager
             .get_or_refresh_access_token()
             .await
             .ctx("Failed to get access token")?;
-        let claims = controller
+        let claims = auth_manager
             .get_access_token_payload()
             .ctx("Failed to get access token payload")?;
         Ok(claims.display_name)
     }
 
     async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
-        let user_state = user_controller(&app_handle)?;
-        let mut controller = user_state.lock().await;
-        controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        auth_manager
             .refresh_tokens()
             .await
             .ctx("Failed to refresh session")?;
 
-        if let Ok(claims) = controller.get_access_token_payload() {
+        if let Ok(claims) = auth_manager.get_access_token_payload() {
             emit_auth_state(&app_handle, Some(claims));
         }
 

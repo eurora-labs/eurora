@@ -1,6 +1,7 @@
 use agent_chain_core::messages::ContentBlocks;
 use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
+use euro_auth::AuthManager;
 use std::sync::Arc;
 use tokio::sync::{Mutex, watch};
 use tonic::transport::Channel;
@@ -19,7 +20,10 @@ pub struct TimelineManager {
 #[bon]
 impl TimelineManager {
     #[builder]
-    pub fn new(channel_rx: watch::Receiver<Channel>) -> TimelineResult<Self> {
+    pub fn new(
+        channel_rx: watch::Receiver<Channel>,
+        auth_manager: AuthManager,
+    ) -> TimelineResult<Self> {
         let timeline_config = TimelineConfig::default();
         timeline_config.validate()?;
         let storage = Arc::new(Mutex::new(TimelineStorage::new(
@@ -28,7 +32,7 @@ impl TimelineManager {
 
         let collector =
             CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
-        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(channel_rx)));
+        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(channel_rx, auth_manager)));
 
         Ok(TimelineManager {
             storage,
