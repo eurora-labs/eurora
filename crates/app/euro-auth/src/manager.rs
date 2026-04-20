@@ -43,10 +43,10 @@ pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
 /// refresh token on first use, so naive concurrent refreshes would cause all
 /// but one caller to receive `InvalidToken` and log the user out.
 #[derive(Debug, Clone)]
-pub struct AuthManager(Arc<Inner>);
+pub struct AuthManager(Arc<AuthManagerInner>);
 
 impl Deref for AuthManager {
-    type Target = Inner;
+    type Target = AuthManagerInner;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -54,7 +54,7 @@ impl Deref for AuthManager {
 }
 
 #[derive(Debug)]
-pub struct Inner {
+pub struct AuthManagerInner {
     auth_client: AuthClient,
     jwt_config: JwtConfig,
     refresh_lock: Mutex<()>,
@@ -62,7 +62,7 @@ pub struct Inner {
 
 impl AuthManager {
     pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
-        Self(Arc::new(Inner {
+        Self(Arc::new(AuthManagerInner {
             auth_client: AuthClient::new(channel_rx),
             jwt_config: JwtConfig::from_env(),
             refresh_lock: Mutex::new(()),
