@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
 use crate::error::ResultExt;
+use crate::procedures::{auth_manager, user_controller};
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager, SharedUserController};
 
 #[taurpc::ipc_type]
@@ -45,14 +46,6 @@ pub trait AuthApi {
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
 
-fn user_controller<R: Runtime>(
-    app_handle: &AppHandle<R>,
-) -> Result<tauri::State<'_, SharedUserController>, String> {
-    app_handle
-        .try_state::<SharedUserController>()
-        .ok_or_else(|| "User controller not available".to_string())
-}
-
 fn emit_auth_state<R: Runtime>(app_handle: &AppHandle<R>, claims: Option<Claims>) {
     let _ = TauRpcAuthApiEventTrigger::new(app_handle.clone()).auth_state_changed(claims);
 }
@@ -66,8 +59,6 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
-        let user_state = user_controller(&app_handle)?;
-
         if !cfg!(debug_assertions) {
             {
                 let settings_state = app_handle.state::<SharedAppSettings>();
@@ -84,8 +75,8 @@ impl AuthApi for AuthApiImpl {
                 .ctx("Failed to switch to cloud endpoint")?;
         }
 
-        let controller = user_state.lock().await;
-        let (code_verifier, code_challenge) = controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        let (code_verifier, code_challenge) = auth_manager
             .get_login_tokens()
             .await
             .ctx("Failed to get login tokens")?;
@@ -107,25 +98,24 @@ impl AuthApi for AuthApiImpl {
     }
 
     async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        let user_state = match app_handle.try_state::<SharedUserController>() {
-            Some(s) => s,
-            None => return Ok(false),
+        if app_handle.try_state::<SharedUserController>().is_none() {
+            return Ok(false);
         };
 
-        let controller = user_state.lock().await;
+        let auth_manager = auth_manager(&app_handle).await?;
 
         let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
             .ctx("Failed to retrieve login token")?
             .ok_or_else(|| "Login token not found".to_string())?;
 
-        match controller
+        match auth_manager
             .login_by_login_token(login_token.expose_secret().to_owned())
             .await
         {
             Ok(_) => {
                 secret::delete(LOGIN_CODE_VERIFIER).ctx("Failed to remove login token")?;
 
-                if let Ok(claims) = controller.get_access_token_payload() {
+                if let Ok(claims) = auth_manager.get_access_token_payload() {
                     emit_auth_state(&app_handle, Some(claims));
                 }
 
@@ -150,15 +140,14 @@ impl AuthApi for AuthApiImpl {
         email: String,
         password: String,
     ) -> Result<(), String> {
-        let user_state = user_controller(&app_handle)?;
-        let controller = user_state.lock().await;
+        let auth_manager = auth_manager(&app_handle).await?;
 
-        controller
+        auth_manager
             .register(&email, &password)
             .await
             .ctx("Registration failed")?;
 
-        if let Ok(claims) = controller.get_access_token_payload() {
+        if let Ok(claims) = auth_manager.get_access_token_payload() {
             emit_auth_state(&app_handle, Some(claims));
         }
 
@@ -177,15 +166,14 @@ impl AuthApi for AuthApiImpl {
         login: String,
         password: String,
     ) -> Result<(), String> {
-        let user_state = user_controller(&app_handle)?;
-        let controller = user_state.lock().await;
+        let auth_manager = auth_manager(&app_handle).await?;
 
-        controller
+        auth_manager
             .login(&login, &password)
             .await
             .ctx("Login failed")?;
 
-        if let Ok(claims) = controller.get_access_token_payload() {
+        if let Ok(claims) = auth_manager.get_access_token_payload() {
             emit_auth_state(&app_handle, Some(claims));
         }
 
@@ -230,12 +218,12 @@ impl AuthApi for AuthApiImpl {
         .sleep(tokio::time::sleep)
         .await;
 
-        let Some(user_state) = result.ok() else {
+        if result.is_err() {
             return Ok(false);
-        };
+        }
 
-        let controller = user_state.lock().await;
-        match controller.get_or_refresh_access_token().await {
+        let auth_manager = auth_manager(&app_handle).await?;
+        match auth_manager.get_or_refresh_access_token().await {
             Ok(token) => Ok(!token.expose_secret().is_empty()),
             Err(e) => Err(format!("Failed to get or refresh access token: {e}")),
         }
@@ -245,26 +233,24 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<Claims, String> {
-        let user_state = user_controller(&app_handle)?;
-        let controller = user_state.lock().await;
-        controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        auth_manager
             .get_or_refresh_access_token()
             .await
             .ctx("Failed to get access token")?;
-        controller
+        auth_manager
             .get_access_token_payload()
             .ctx("Failed to get access token payload")
     }
 
     async fn refresh_session<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
-        let user_state = user_controller(&app_handle)?;
-        let controller = user_state.lock().await;
-        controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        auth_manager
             .refresh_tokens()
             .await
             .ctx("Failed to refresh session")?;
 
-        if let Ok(claims) = controller.get_access_token_payload() {
+        if let Ok(claims) = auth_manager.get_access_token_payload() {
             emit_auth_state(&app_handle, Some(claims));
         }
 
@@ -275,9 +261,8 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<(), String> {
-        let user_state = user_controller(&app_handle)?;
-        let controller = user_state.lock().await;
-        controller
+        let auth_manager = auth_manager(&app_handle).await?;
+        auth_manager
             .resend_verification_email()
             .await
             .ctx("Failed to resend verification email")
