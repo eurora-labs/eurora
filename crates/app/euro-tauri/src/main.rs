@@ -331,7 +331,7 @@ fn init_state(
     app_handle.manage(Mutex::new(timeline));
 
     let path = tauri_app.path().app_data_dir()?;
-    let user_controller = euro_user::Controller::new(path, auth_manager);
+    let user_controller = euro_user::UserController::new(path, auth_manager);
     app_handle.manage(SharedUserController::new(user_controller));
     app_handle.manage(ActiveStreamTokens::default());
 
