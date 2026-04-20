@@ -234,7 +234,18 @@ impl AuthApi for AuthApiImpl {
         let auth_manager = auth_manager(&app_handle).await?;
         match auth_manager.get_or_refresh_access_token().await {
             Ok(token) => Ok(!token.expose_secret().is_empty()),
-            Err(e) => Err(format!("Failed to get or refresh access token: {e}")),
+            // Definitively logged out — surface as `false` so the frontend
+            // shows the login screen.
+            Err(e) if e.is_logged_out() => Ok(false),
+            // Transient failure (server unreachable etc.) — local credentials
+            // are intact. Don't log the user out on connectivity blips; trust
+            // the last-known state if we have any token stored.
+            Err(e) => {
+                tracing::warn!(
+                    "is_authenticated: transient auth error, assuming last-known state: {e}"
+                );
+                Ok(auth_manager.get_access_token_payload().is_ok())
+            }
         }
     }
 

@@ -1,7 +1,7 @@
 use crate::{User, storage::Storage};
 use anyhow::{Context, Result};
-use euro_auth::{AuthManager, Claims};
-use euro_secret::{SecretString, secret};
+use euro_auth::AuthManager;
+use euro_secret::secret;
 use std::path::PathBuf;
 
 #[derive(Clone)]
@@ -42,54 +42,5 @@ impl UserController {
         secret::delete(crate::ACCESS_TOKEN_HANDLE).ok();
         secret::delete(crate::REFRESH_TOKEN_HANDLE).ok();
         Ok(())
-    }
-
-    pub async fn register(
-        &self,
-        email: impl Into<String>,
-        password: impl Into<String>,
-    ) -> Result<SecretString> {
-        self.auth_manager.register(email, password).await
-    }
-
-    pub async fn login(
-        &self,
-        login: impl Into<String>,
-        password: impl Into<String>,
-    ) -> Result<SecretString> {
-        self.auth_manager.login(login, password).await
-    }
-
-    pub async fn get_or_refresh_access_token(&self) -> Result<SecretString> {
-        self.auth_manager.get_or_refresh_access_token().await
-    }
-
-    pub fn get_access_token_payload(&self) -> Result<Claims> {
-        self.auth_manager.get_access_token_payload()
-    }
-
-    pub fn get_refresh_token_payload(&self) -> Result<Claims> {
-        self.auth_manager.get_refresh_token_payload()
-    }
-
-    pub async fn refresh_tokens(&self) -> Result<SecretString> {
-        self.auth_manager.refresh_tokens().await
-    }
-
-    pub async fn get_login_tokens(&self) -> Result<(String, String)> {
-        self.auth_manager.get_login_tokens().await
-    }
-
-    pub async fn resend_verification_email(&self) -> Result<()> {
-        self.auth_manager.resend_verification_email().await
-    }
-
-    pub async fn login_by_login_token(
-        &self,
-        login_token: impl Into<String>,
-    ) -> Result<SecretString> {
-        self.auth_manager
-            .login_by_login_token(login_token.into())
-            .await
     }
 }

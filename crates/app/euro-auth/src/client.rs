@@ -1,4 +1,5 @@
-use anyhow::{Ok, Result, anyhow};
+use crate::error::{AuthError, AuthResult};
+use anyhow::{Result, anyhow};
 use proto_gen::auth::{
     EmailPasswordCredentials, LoginByLoginTokenRequest, LoginRequest, RefreshTokenRequest,
     RegisterRequest, TokenResponse, login_request::Credential,
@@ -63,7 +64,10 @@ impl AuthClient {
         Ok(response.into_inner())
     }
 
-    pub async fn refresh_token(&self, refresh_token: impl Into<String>) -> Result<TokenResponse> {
+    pub async fn refresh_token(
+        &self,
+        refresh_token: impl Into<String>,
+    ) -> AuthResult<TokenResponse> {
         let refresh_token: String = refresh_token.into();
         let mut client = self.client();
         let mut request = tonic::Request::new(RefreshTokenRequest {});
@@ -71,9 +75,13 @@ impl AuthClient {
             "authorization",
             format!("Bearer {}", refresh_token).parse().unwrap(),
         );
-        let response = client.refresh_token(request).await.map_err(|e| {
-            tracing::error!("Token refresh failed: {}", e);
-            anyhow!("Token refresh failed: {}", e)
+        let response = client.refresh_token(request).await.map_err(|status| {
+            tracing::warn!(
+                code = ?status.code(),
+                message = status.message(),
+                "Token refresh failed",
+            );
+            AuthError::from_refresh_status(status)
         })?;
 
         Ok(response.into_inner())
