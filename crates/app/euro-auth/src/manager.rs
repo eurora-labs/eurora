@@ -6,6 +6,7 @@ use euro_secret::{ExposeSecret, SecretString, secret};
 use jsonwebtoken::dangerous::insecure_decode;
 use rand::Rng;
 use sha2::{Digest, Sha256};
+use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::{Mutex, watch};
 use tonic::transport::Channel;
@@ -41,12 +42,18 @@ pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
 /// refresh token on first use, so naive concurrent refreshes would cause all
 /// but one caller to receive `InvalidToken` and log the user out.
 #[derive(Debug, Clone)]
-pub struct AuthManager {
-    inner: Arc<Inner>,
+pub struct AuthManager(Arc<Inner>);
+
+impl Deref for AuthManager {
+    type Target = Inner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Debug)]
-struct Inner {
+pub struct Inner {
     auth_client: AuthClient,
     jwt_config: JwtConfig,
     refresh_lock: Mutex<()>,
@@ -54,13 +61,11 @@ struct Inner {
 
 impl AuthManager {
     pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
-        Self {
-            inner: Arc::new(Inner {
-                auth_client: AuthClient::new(channel_rx),
-                jwt_config: JwtConfig::from_env(),
-                refresh_lock: Mutex::new(()),
-            }),
-        }
+        Self(Arc::new(Inner {
+            auth_client: AuthClient::new(channel_rx),
+            jwt_config: JwtConfig::from_env(),
+            refresh_lock: Mutex::new(()),
+        }))
     }
 
     pub async fn login(
@@ -68,11 +73,7 @@ impl AuthManager {
         login: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<SecretString> {
-        let response = self
-            .inner
-            .auth_client
-            .login_by_password(login, password)
-            .await?;
+        let response = self.auth_client.login_by_password(login, password).await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
@@ -85,11 +86,7 @@ impl AuthManager {
         email: impl Into<String>,
         password: impl Into<String>,
     ) -> Result<SecretString> {
-        let response = self
-            .inner
-            .auth_client
-            .register(email, password, None)
-            .await?;
+        let response = self.auth_client.register(email, password, None).await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
@@ -135,7 +132,7 @@ impl AuthManager {
     }
 
     async fn ensure_refresh(&self) -> Result<SecretString> {
-        let _guard = self.inner.refresh_lock.lock().await;
+        let _guard = self.refresh_lock.lock().await;
 
         // Double-checked: another task may have refreshed while we waited.
         if self.has_fresh_access_token() {
@@ -149,7 +146,6 @@ impl AuthManager {
     async fn perform_refresh(&self) -> Result<()> {
         let refresh_token = self.get_refresh_token()?;
         let response = self
-            .inner
             .auth_client
             .refresh_token(refresh_token.expose_secret())
             .await
@@ -170,7 +166,7 @@ impl AuthManager {
         let now = chrono::Utc::now().timestamp();
         now < claims
             .exp
-            .saturating_sub(self.inner.jwt_config.refresh_offset_seconds)
+            .saturating_sub(self.jwt_config.refresh_offset_seconds)
     }
 
     pub async fn get_login_tokens(&self) -> Result<(String, String)> {
@@ -188,18 +184,13 @@ impl AuthManager {
 
     pub async fn resend_verification_email(&self) -> Result<()> {
         let access_token = self.get_access_token()?;
-        self.inner
-            .auth_client
+        self.auth_client
             .resend_verification_email(access_token.expose_secret())
             .await
     }
 
     pub async fn login_by_login_token(&self, login_token: String) -> Result<SecretString> {
-        let response = self
-            .inner
-            .auth_client
-            .login_by_login_token(login_token)
-            .await?;
+        let response = self.auth_client.login_by_login_token(login_token).await?;
 
         store_access_token(response.access_token.clone())?;
         store_refresh_token(response.refresh_token.clone())?;
