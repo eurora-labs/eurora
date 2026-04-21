@@ -1,3 +1,4 @@
+mod agent_loop;
 mod converters;
 mod describe_image_tool;
 mod error;
