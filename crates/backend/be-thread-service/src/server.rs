@@ -44,6 +44,7 @@ use crate::tools::firecrawl_tools;
 const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
 const CONTEXT_MESSAGE_LIMIT: u32 = 5;
 const MAX_CONTENT_BLOCKS: usize = 50;
+const MAX_TOOL_ROUNDS: usize = 15;
 
 struct Providers {
     chat: Arc<dyn BaseChatModel + Send + Sync>,
@@ -474,8 +475,6 @@ impl Drop for CancellableStream {
         self.token.cancel();
     }
 }
-
-const MAX_TOOL_ROUNDS: usize = 5;
 
 fn build_content_value(content: &str, reasoning: &str) -> serde_json::Value {
     let mut blocks = Vec::new();
