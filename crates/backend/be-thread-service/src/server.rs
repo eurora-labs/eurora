@@ -3,12 +3,11 @@ use crate::message_projection::{collect_thread_images, project_for_text_llm};
 use agent_chain::SystemMessage;
 use agent_chain::messages::{ContentBlock, ImageContentBlock, PlainTextContentBlock};
 use agent_chain::{
-    AIMessage, AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
-    messages::ToolCall, ollama::ChatOllama, openai::ChatOpenAI,
+    AnyMessage, BaseChatModel, BaseTool, HumanMessage, language_models::ToolLike,
+    ollama::ChatOllama, openai::ChatOpenAI,
 };
 use agent_chain_core::proto::{
-    BaseMessageWithSibling, ChatStreamFinalMessage, ChatStreamResponse, ProtoContentBlock,
-    chat_stream_response::Payload,
+    BaseMessageWithSibling, ChatStreamResponse, ProtoContentBlock, chat_stream_response::Payload,
 };
 use be_asset::AssetService;
 use be_authz::{extract_claims, parse_user_id};
@@ -32,11 +31,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 use tokio_util::sync::CancellationToken;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
+use crate::agent_loop::run_agent_loop;
 use crate::converters::convert_db_message_to_base_message;
 use crate::error::ThreadServiceError;
 use crate::tools::firecrawl_tools;
@@ -476,279 +476,6 @@ impl Drop for CancellableStream {
     }
 }
 
-fn build_content_value(content: &str, reasoning: &str) -> serde_json::Value {
-    let mut blocks = Vec::new();
-    if !reasoning.is_empty() {
-        blocks.push(serde_json::json!({"type": "reasoning", "reasoning": reasoning}));
-    }
-    if !content.is_empty() {
-        blocks.push(serde_json::json!({"type": "text", "text": content}));
-    }
-    serde_json::Value::Array(blocks)
-}
-
-#[bon::builder]
-async fn save_ai_message(
-    db: &Arc<DatabaseManager>,
-    thread_id: Uuid,
-    user_id: Uuid,
-    full_content: &str,
-    full_reasoning: &str,
-    total_input_tokens: i64,
-    total_output_tokens: i64,
-    total_reasoning_tokens: i64,
-    total_cache_creation_tokens: i64,
-    total_cache_read_tokens: i64,
-) -> Option<be_remote_db::Message> {
-    let content_value = build_content_value(full_content, full_reasoning);
-
-    let ai_message = match db
-        .create_message()
-        .thread_id(thread_id)
-        .user_id(user_id)
-        .message_type(MessageType::Ai)
-        .content(content_value)
-        .call()
-        .await
-    {
-        Ok(msg) => msg,
-        Err(e) => {
-            tracing::error!("Failed to save AI message to database: {e}");
-            return None;
-        }
-    };
-
-    if (total_input_tokens > 0 || total_output_tokens > 0)
-        && let Err(e) = db
-            .record_token_usage()
-            .user_id(user_id)
-            .thread_id(thread_id)
-            .message_id(ai_message.id)
-            .input_tokens(total_input_tokens)
-            .output_tokens(total_output_tokens)
-            .reasoning_tokens(total_reasoning_tokens)
-            .cache_creation_tokens(total_cache_creation_tokens)
-            .cache_read_tokens(total_cache_read_tokens)
-            .call()
-            .await
-    {
-        tracing::error!("Failed to record token usage: {e}");
-    }
-
-    Some(ai_message)
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn run_chat_stream(
-    tx: mpsc::Sender<Result<ChatStreamResponse, Status>>,
-    token: CancellationToken,
-    db: Arc<DatabaseManager>,
-    chat_provider: Arc<dyn BaseChatModel + Send + Sync>,
-    tools: HashMap<String, Arc<dyn BaseTool>>,
-    mut messages: Vec<AnyMessage>,
-    thread_id: Uuid,
-    user_id: Uuid,
-    human_message_id: Uuid,
-) {
-    let mut full_content = String::new();
-    let mut full_reasoning = String::new();
-    let mut total_input_tokens: i64 = 0;
-    let mut total_output_tokens: i64 = 0;
-    let mut total_reasoning_tokens: i64 = 0;
-    let mut total_cache_creation_tokens: i64 = 0;
-    let mut total_cache_read_tokens: i64 = 0;
-    let mut cancelled = false;
-
-    'outer: for round in 0..=MAX_TOOL_ROUNDS {
-        let provider_stream = tokio::select! {
-            result = chat_provider.stream(messages.clone(), None, None) => {
-                match result {
-                    Ok(stream) => stream,
-                    Err(e) => {
-                        tracing::error!("Error starting chat stream: {e}");
-                        let _ = tx.send(Err(Status::internal(e.to_string()))).await;
-                        return;
-                    }
-                }
-            }
-            () = token.cancelled() => {
-                tracing::info!("Chat stream cancelled before provider stream started");
-                cancelled = true;
-                break;
-            }
-        };
-
-        tokio::pin!(provider_stream);
-        let mut round_content = String::new();
-        let mut tool_calls: Vec<ToolCall> = Vec::new();
-
-        loop {
-            let chunk = tokio::select! {
-                item = provider_stream.next() => item,
-                () = token.cancelled() => {
-                    tracing::info!("Chat stream cancelled during provider streaming");
-                    cancelled = true;
-                    full_content.push_str(&round_content);
-                    break 'outer;
-                }
-            };
-
-            let Some(result) = chunk else { break };
-
-            match result {
-                Ok(chunk) => {
-                    let content = chunk.content.to_string();
-                    if !content.is_empty() {
-                        round_content.push_str(&content);
-                    }
-                    if let Some(reasoning) = chunk
-                        .additional_kwargs
-                        .get("reasoning_content")
-                        .and_then(|v| v.as_str())
-                    {
-                        full_reasoning.push_str(reasoning);
-                    }
-                    if !chunk.tool_calls.is_empty() {
-                        tool_calls.extend(chunk.tool_calls.clone());
-                    }
-                    if let Some(ref usage) = chunk.usage_metadata {
-                        total_input_tokens += usage.input_tokens;
-                        total_output_tokens += usage.output_tokens;
-                        if let Some(ref details) = usage.output_token_details {
-                            total_reasoning_tokens += details.reasoning.unwrap_or(0);
-                        }
-                        if let Some(ref details) = usage.input_token_details {
-                            total_cache_creation_tokens += details.cache_creation.unwrap_or(0);
-                            total_cache_read_tokens += details.cache_read.unwrap_or(0);
-                        }
-                    }
-
-                    if tx
-                        .send(Ok(ChatStreamResponse {
-                            payload: Some(Payload::Chunk(chunk.into())),
-                        }))
-                        .await
-                        .is_err()
-                    {
-                        tracing::info!("Chat stream receiver dropped, client disconnected");
-                        cancelled = true;
-                        full_content.push_str(&round_content);
-                        break 'outer;
-                    }
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(Status::internal(e.to_string()))).await;
-                    return;
-                }
-            }
-        }
-
-        full_content.push_str(&round_content);
-
-        if tool_calls.is_empty() || round == MAX_TOOL_ROUNDS {
-            break;
-        }
-
-        messages.push(
-            AIMessage::builder()
-                .content(&round_content)
-                .tool_calls(tool_calls.clone())
-                .build()
-                .into(),
-        );
-
-        for tc in tool_calls {
-            let tool_name = tc.name.clone();
-            let tool_call_id = tc.id.clone().unwrap_or_else(|| {
-                tracing::warn!("Tool call '{tool_name}' has no id");
-                String::new()
-            });
-
-            let result_msg = if let Some(tool) = tools.get(&tool_name) {
-                tokio::select! {
-                    result = tool.invoke_tool_call(tc) => result,
-                    () = token.cancelled() => {
-                        tracing::info!("Chat stream cancelled during tool invocation");
-                        cancelled = true;
-                        break 'outer;
-                    }
-                }
-            } else {
-                tracing::error!("Unknown tool: {tool_name}");
-                agent_chain::messages::ToolMessage::builder()
-                    .content(format!("Error: unknown tool '{tool_name}'"))
-                    .tool_call_id(tool_call_id)
-                    .status(agent_chain::messages::ToolStatus::Error)
-                    .build()
-                    .into()
-            };
-            messages.push(result_msg);
-        }
-    }
-
-    let has_content = !full_content.is_empty() || !full_reasoning.is_empty();
-
-    if cancelled {
-        if has_content {
-            save_ai_message()
-                .db(&db)
-                .thread_id(thread_id)
-                .user_id(user_id)
-                .full_content(&full_content)
-                .full_reasoning(&full_reasoning)
-                .total_input_tokens(total_input_tokens)
-                .total_output_tokens(total_output_tokens)
-                .total_reasoning_tokens(total_reasoning_tokens)
-                .total_cache_creation_tokens(total_cache_creation_tokens)
-                .total_cache_read_tokens(total_cache_read_tokens)
-                .call()
-                .await;
-        }
-        return;
-    }
-
-    if has_content {
-        let ai_message = match save_ai_message()
-            .db(&db)
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .full_content(&full_content)
-            .full_reasoning(&full_reasoning)
-            .total_input_tokens(total_input_tokens)
-            .total_output_tokens(total_output_tokens)
-            .total_reasoning_tokens(total_reasoning_tokens)
-            .total_cache_creation_tokens(total_cache_creation_tokens)
-            .total_cache_read_tokens(total_cache_read_tokens)
-            .call()
-            .await
-        {
-            Some(msg) => msg,
-            None => {
-                let _ = tx
-                    .send(Err(Status::internal("Failed to save AI message")))
-                    .await;
-                return;
-            }
-        };
-
-        let ai_proto = BaseMessageWithSibling {
-            parent_id: human_message_id.to_string(),
-            message: Some(ai_message.into()),
-            children: vec![],
-            sibling_index: 0,
-            depth: 0,
-        };
-
-        let _ = tx
-            .send(Ok(ChatStreamResponse {
-                payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
-                    messages: vec![ai_proto],
-                })),
-            }))
-            .await;
-    }
-}
-
 #[tonic::async_trait]
 impl ProtoThreadService for ThreadService {
     type ChatStreamStream = ChatStreamResult;
@@ -967,17 +694,20 @@ impl ProtoThreadService for ThreadService {
             }))
             .await;
 
-        tokio::spawn(run_chat_stream(
-            tx,
-            token,
-            db,
-            chat_provider,
-            tools,
-            llm_messages,
-            thread_id,
-            user_id,
-            human_message_id,
-        ));
+        tokio::spawn(
+            run_agent_loop()
+                .tx(tx)
+                .token(token)
+                .db(db)
+                .chat_model(chat_provider)
+                .tools(tools)
+                .messages(llm_messages)
+                .thread_id(thread_id)
+                .user_id(user_id)
+                .human_message_id(human_message_id)
+                .max_tool_rounds(MAX_TOOL_ROUNDS)
+                .call(),
+        );
 
         Ok(Response::new(Box::pin(stream) as Self::ChatStreamStream))
     }
