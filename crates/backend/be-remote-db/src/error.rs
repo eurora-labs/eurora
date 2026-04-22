@@ -8,8 +8,8 @@ pub enum DbError {
         id: Option<String>,
     },
 
-    #[error("Duplicate {field}: {value}")]
-    Duplicate { field: &'static str, value: String },
+    #[error("Unique constraint violated: {constraint}")]
+    UniqueViolation { constraint: String },
 
     #[error("Referenced {entity} does not exist")]
     ForeignKeyViolation { entity: &'static str },
@@ -60,10 +60,9 @@ impl DbError {
         }
     }
 
-    pub fn duplicate(field: &'static str, value: impl Into<String>) -> Self {
-        Self::Duplicate {
-            field,
-            value: value.into(),
+    pub fn unique_violation(constraint: impl Into<String>) -> Self {
+        Self::UniqueViolation {
+            constraint: constraint.into(),
         }
     }
 
@@ -107,8 +106,8 @@ impl DbError {
         matches!(self, Self::NotFound { .. })
     }
 
-    pub fn is_duplicate(&self) -> bool {
-        matches!(self, Self::Duplicate { .. })
+    pub fn is_unique_violation(&self) -> bool {
+        matches!(self, Self::UniqueViolation { .. })
     }
 }
 
@@ -122,13 +121,9 @@ impl From<sqlx::Error> for DbError {
             sqlx::Error::Database(db_err) => {
                 if let Some(code) = db_err.code() {
                     match code.as_ref() {
-                        "23505" => {
-                            let constraint = db_err.constraint().unwrap_or("unknown").to_string();
-                            Self::Duplicate {
-                                field: "constraint",
-                                value: constraint,
-                            }
-                        }
+                        "23505" => Self::UniqueViolation {
+                            constraint: db_err.constraint().unwrap_or("unknown").to_string(),
+                        },
                         "23503" => {
                             let entity_name = db_err
                                 .constraint()
@@ -169,10 +164,13 @@ mod tests {
     }
 
     #[test]
-    fn test_duplicate_error() {
-        let err = DbError::duplicate("email", "test@example.com");
-        assert!(err.is_duplicate());
-        assert_eq!(err.to_string(), "Duplicate email: test@example.com");
+    fn test_unique_violation_error() {
+        let err = DbError::unique_violation("users_email_key");
+        assert!(err.is_unique_violation());
+        assert_eq!(
+            err.to_string(),
+            "Unique constraint violated: users_email_key"
+        );
     }
 
     #[test]
