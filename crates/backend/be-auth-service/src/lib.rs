@@ -1,8 +1,7 @@
 pub use auth_core::{Claims, Role};
 use be_auth_core::JwtConfig;
 use be_email_service::EmailService;
-use be_remote_db::{DatabaseManager, OAuthProvider};
-use bon::bon;
+use be_remote_db::{DatabaseManager, DbError, OAuthProvider};
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{Algorithm, Header, encode};
 use openidconnect::{Nonce, PkceCodeChallenge, PkceCodeVerifier};
@@ -41,6 +40,35 @@ const OAUTH_STATE_EXPIRY_MINUTES: i64 = 10;
 const VERIFICATION_TOKEN_EXPIRY_HOURS: i64 = 24;
 const VERIFICATION_RESEND_COOLDOWN_SECONDS: i64 = 60;
 
+/// PostgreSQL auto-generates this name for the `UNIQUE` constraint on
+/// `users.email` (format: `<table>_<column>_key`). If the column or
+/// constraint is ever renamed, this constant must be updated to match.
+const USERS_EMAIL_UNIQUE_CONSTRAINT: &str = "users_email_key";
+
+/// OAuth identity tokens, already encrypted at rest.
+pub struct OAuthTokenBundle {
+    pub encrypted_access_token: Vec<u8>,
+    pub encrypted_refresh_token: Option<Vec<u8>>,
+    pub access_token_expiry: Option<DateTime<Utc>>,
+    pub scope: String,
+}
+
+/// A freshly authenticated identity returned by an OAuth provider.
+///
+/// The service either (a) finds an existing user via
+/// `(provider, provider_user_id)` and refreshes their tokens, or
+/// (b) creates a brand-new user. It never silently links to an existing
+/// account on email match — that path is a known account-takeover vector
+/// and is explicitly rejected with [`AuthError::OAuthEmailConflict`].
+pub struct NewOAuthIdentity {
+    pub provider: OAuthProvider,
+    pub provider_user_id: String,
+    pub email: String,
+    pub email_verified: bool,
+    pub name: String,
+    pub tokens: OAuthTokenBundle,
+}
+
 pub struct AuthService {
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
@@ -49,7 +77,6 @@ pub struct AuthService {
     github_oauth_client: std::sync::OnceLock<GitHubOAuthClient>,
 }
 
-#[bon]
 impl AuthService {
     pub fn new(
         db: Arc<DatabaseManager>,
@@ -343,89 +370,142 @@ impl AuthService {
         challenge.as_str().to_string()
     }
 
-    #[builder]
-    async fn find_or_create_oauth_user(
+    /// Resolve the user for an OAuth-provided identity.
+    ///
+    /// Returns the matching user if one exists for this
+    /// `(provider, provider_user_id)` pair (refreshing stored tokens as a
+    /// side-effect), or creates a brand-new user.
+    ///
+    /// Returns [`AuthError::OAuthEmailConflict`] if the email belongs to an
+    /// existing account under a different identity (password credentials or
+    /// another OAuth provider). Linking new providers to an existing account
+    /// must go through an explicit, authenticated flow — not through an
+    /// anonymous OAuth callback. Detection is race-free: the conflict surfaces
+    /// from the `users.email` unique-index violation at insert time.
+    async fn resolve_oauth_user(
+        &self,
+        identity: NewOAuthIdentity,
+    ) -> Result<be_remote_db::User, AuthError> {
+        if let Some(user) = self
+            .lookup_existing_oauth_identity(identity.provider, &identity.provider_user_id)
+            .await?
+        {
+            self.refresh_oauth_credentials(user.id, identity.provider, identity.tokens)
+                .await;
+            return Ok(user);
+        }
+
+        self.create_oauth_user(identity).await
+    }
+
+    async fn lookup_existing_oauth_identity(
         &self,
         provider: OAuthProvider,
         provider_user_id: &str,
-        email: &str,
-        email_verified: bool,
-        name: &str,
-        encrypted_access_token: Vec<u8>,
-        encrypted_refresh_token: Option<Vec<u8>>,
-        token_expiry: Option<chrono::DateTime<Utc>>,
-        scope: String,
-    ) -> Result<be_remote_db::User, AuthError> {
-        let existing = self
+    ) -> Result<Option<be_remote_db::User>, AuthError> {
+        match self
             .db
             .get_user_by_oauth_provider()
             .provider(provider)
             .provider_user_id(provider_user_id)
             .call()
-            .await;
+            .await
+        {
+            Ok(user) => Ok(Some(user)),
+            Err(e) if e.is_not_found() => Ok(None),
+            Err(e) => Err(AuthError::Database(e)),
+        }
+    }
 
-        match existing {
-            Ok(user) => {
-                if let Ok(oauth_creds) = self
-                    .db
-                    .get_oauth_credentials_by_provider_and_user()
-                    .provider(provider)
-                    .user_id(user.id)
-                    .call()
-                    .await
-                    && let Err(e) = self
-                        .db
-                        .update_oauth_credentials()
-                        .id(oauth_creds.id)
-                        .access_token(encrypted_access_token)
-                        .maybe_refresh_token(encrypted_refresh_token)
-                        .maybe_access_token_expiry(token_expiry)
-                        .scope(scope)
-                        .call()
-                        .await
-                {
-                    tracing::warn!("Failed to update OAuth credentials: {}", e);
-                }
-                Ok(user)
+    /// Rotate stored OAuth credentials in-place. Failures are logged but not
+    /// propagated — the user is already authenticated via the provider and a
+    /// transient credential-update failure must not break login.
+    async fn refresh_oauth_credentials(
+        &self,
+        user_id: Uuid,
+        provider: OAuthProvider,
+        tokens: OAuthTokenBundle,
+    ) {
+        let oauth_creds = match self
+            .db
+            .get_oauth_credentials_by_provider_and_user()
+            .provider(provider)
+            .user_id(user_id)
+            .call()
+            .await
+        {
+            Ok(creds) => creds,
+            Err(e) => {
+                tracing::warn!(
+                    %user_id,
+                    ?provider,
+                    error = %e,
+                    "Failed to locate OAuth credentials for refresh"
+                );
+                return;
             }
-            Err(_) => {
-                if let Ok(existing_user) = self.db.get_user().email(email.to_string()).call().await
-                {
-                    tracing::info!(
-                        "Linking {} provider to existing user {} via email match",
-                        provider,
-                        existing_user.email
-                    );
-                    self.db
-                        .create_oauth_credentials()
-                        .user_id(existing_user.id)
-                        .provider(provider)
-                        .provider_user_id(provider_user_id.to_string())
-                        .access_token(encrypted_access_token)
-                        .maybe_refresh_token(encrypted_refresh_token)
-                        .maybe_access_token_expiry(token_expiry)
-                        .scope(scope)
-                        .call()
-                        .await?;
-                    return Ok(existing_user);
-                }
+        };
 
-                let user = self
-                    .db
-                    .create_user_with_oauth()
-                    .email(email.to_string())
-                    .display_name(name.to_string())
-                    .email_verified(email_verified)
-                    .provider(provider)
-                    .provider_user_id(provider_user_id.to_string())
-                    .access_token(encrypted_access_token)
-                    .maybe_refresh_token(encrypted_refresh_token)
-                    .maybe_access_token_expiry(token_expiry)
-                    .scope(scope)
-                    .call()
-                    .await?;
-                Ok(user)
+        if let Err(e) = self
+            .db
+            .update_oauth_credentials()
+            .id(oauth_creds.id)
+            .access_token(tokens.encrypted_access_token)
+            .maybe_refresh_token(tokens.encrypted_refresh_token)
+            .maybe_access_token_expiry(tokens.access_token_expiry)
+            .scope(tokens.scope)
+            .call()
+            .await
+        {
+            tracing::warn!(
+                %user_id,
+                ?provider,
+                error = %e,
+                "Failed to update OAuth credentials"
+            );
+        }
+    }
+
+    async fn create_oauth_user(
+        &self,
+        identity: NewOAuthIdentity,
+    ) -> Result<be_remote_db::User, AuthError> {
+        let NewOAuthIdentity {
+            provider,
+            provider_user_id,
+            email,
+            email_verified,
+            name,
+            tokens,
+        } = identity;
+
+        match self
+            .db
+            .create_user_with_oauth()
+            .email(email.clone())
+            .display_name(name)
+            .email_verified(email_verified)
+            .provider(provider)
+            .provider_user_id(provider_user_id)
+            .access_token(tokens.encrypted_access_token)
+            .maybe_refresh_token(tokens.encrypted_refresh_token)
+            .maybe_access_token_expiry(tokens.access_token_expiry)
+            .scope(tokens.scope)
+            .call()
+            .await
+        {
+            Ok(user) => Ok(user),
+            Err(DbError::UniqueViolation { ref constraint })
+                if constraint == USERS_EMAIL_UNIQUE_CONSTRAINT =>
+            {
+                tracing::warn!(
+                    ?provider,
+                    email_hash = %Self::hash_email_for_log(&email),
+                    "OAuth login rejected: email already registered under a different identity"
+                );
+                Err(AuthError::OAuthEmailConflict)
             }
+            Err(e) => Err(AuthError::Database(e)),
         }
     }
 
@@ -481,6 +561,16 @@ impl AuthService {
         let mut hasher = Sha256::new();
         hasher.update(token.as_bytes());
         hasher.finalize().to_vec()
+    }
+
+    /// Produce a stable, non-reversible fingerprint of an email address for
+    /// structured logs. Lowercased first so provider casing drift doesn't
+    /// split the same email across two hashes. Lets SecOps correlate
+    /// attempted-takeover events without storing PII.
+    fn hash_email_for_log(email: &str) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(email.to_ascii_lowercase().as_bytes());
+        hex::encode(hasher.finalize())
     }
 
     pub async fn register_user(
@@ -631,28 +721,31 @@ impl AuthService {
             return Err(AuthError::EmailNotVerified);
         }
 
-        let oauth_access_token = encrypt_sensitive_string(user_info.access_token.expose_secret())?;
-        let oauth_refresh_token = user_info
+        let encrypted_access_token =
+            encrypt_sensitive_string(user_info.access_token.expose_secret())?;
+        let encrypted_refresh_token = user_info
             .refresh_token
             .as_ref()
             .map(|t| encrypt_sensitive_string(t.expose_secret()))
             .transpose()?;
-        let oauth_token_expiry = user_info.expires_in.map(|duration| {
-            chrono::Utc::now() + chrono::Duration::seconds(duration.as_secs() as i64)
-        });
+        let access_token_expiry = user_info
+            .expires_in
+            .map(|duration| Utc::now() + Duration::seconds(duration.as_secs() as i64));
 
         let user = self
-            .find_or_create_oauth_user()
-            .provider(OAuthProvider::Google)
-            .provider_user_id(&user_info.id)
-            .email(&user_info.email)
-            .email_verified(user_info.verified_email)
-            .name(&user_info.name)
-            .encrypted_access_token(oauth_access_token)
-            .maybe_encrypted_refresh_token(oauth_refresh_token)
-            .maybe_token_expiry(oauth_token_expiry)
-            .scope("openid email profile".to_string())
-            .call()
+            .resolve_oauth_user(NewOAuthIdentity {
+                provider: OAuthProvider::Google,
+                provider_user_id: user_info.id.clone(),
+                email: user_info.email.clone(),
+                email_verified: user_info.verified_email,
+                name: user_info.name.clone(),
+                tokens: OAuthTokenBundle {
+                    encrypted_access_token,
+                    encrypted_refresh_token,
+                    access_token_expiry,
+                    scope: "openid email profile".to_string(),
+                },
+            })
             .await?;
 
         let email_verified = self
@@ -729,18 +822,23 @@ impl AuthService {
             return Err(AuthError::EmailNotVerified);
         }
 
-        let oauth_access_token = encrypt_sensitive_string(user_info.access_token.expose_secret())?;
+        let encrypted_access_token =
+            encrypt_sensitive_string(user_info.access_token.expose_secret())?;
 
         let user = self
-            .find_or_create_oauth_user()
-            .provider(OAuthProvider::Github)
-            .provider_user_id(&user_info.id)
-            .email(&user_info.email)
-            .email_verified(user_info.verified_email)
-            .name(&user_info.name)
-            .encrypted_access_token(oauth_access_token)
-            .scope(user_info.scope)
-            .call()
+            .resolve_oauth_user(NewOAuthIdentity {
+                provider: OAuthProvider::Github,
+                provider_user_id: user_info.id.clone(),
+                email: user_info.email.clone(),
+                email_verified: user_info.verified_email,
+                name: user_info.name.clone(),
+                tokens: OAuthTokenBundle {
+                    encrypted_access_token,
+                    encrypted_refresh_token: None,
+                    access_token_expiry: None,
+                    scope: user_info.scope.clone(),
+                },
+            })
             .await?;
 
         let email_verified = self
@@ -1114,7 +1212,7 @@ impl ProtoAuthService for AuthService {
         }
 
         Ok(Response::new(CheckEmailResponse {
-            status: "not_found".into(),
+            status: "password".into(),
             provider: None,
         }))
     }
