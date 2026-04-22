@@ -1212,7 +1212,7 @@ impl ProtoAuthService for AuthService {
         }
 
         Ok(Response::new(CheckEmailResponse {
-            status: "not_found".into(),
+            status: "password".into(),
             provider: None,
         }))
     }
