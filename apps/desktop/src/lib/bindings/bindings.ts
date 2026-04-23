@@ -39,6 +39,12 @@ export type Claims = {
 	role: Role,
 	aud?: string,
 	email_verified?: boolean,
+	/**
+	 *  RFC 7519 JWT ID. Guarantees that two tokens minted for
+	 *  the same subject within the same second never collide
+	 *  after hashing (see refresh-token rotation).
+	 */
+	jti?: string,
 };
 
 export type ContextChip = {
@@ -398,6 +404,12 @@ export type Router = { "auth": {auth_state_changed: (claims: {
 	role: Role,
 	aud: string,
 	email_verified: boolean,
+	/**
+	 *  RFC 7519 JWT ID. Guarantees that two tokens minted for
+	 *  the same subject within the same second never collide
+	 *  after hashing (see refresh-token rotation).
+	 */
+	jti: string,
 } | null) => Promise<void>, 
 get_access_token_payload: () => Promise<Claims>, 
 get_login_token: () => Promise<LoginToken>, 
