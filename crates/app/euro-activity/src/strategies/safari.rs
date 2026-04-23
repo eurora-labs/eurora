@@ -94,25 +94,27 @@ impl SafariStrategy {
                             }
                         };
 
-                        let mut prev = last_url.lock().await;
-                        let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
-                            Ok(u) => u,
-                            Err(_) => continue,
+                        let Some(url) = metadata.url else {
+                            tracing::debug!("Ignoring Safari event without a parseable URL");
+                            continue;
                         };
 
+                        let mut prev = last_url.lock().await;
                         if let Some(prev_url) = prev.take()
                             && prev_url.domain() == url.domain()
                         {
                             *prev = Some(url);
                             continue;
                         }
-                        *prev = Some(url);
+                        *prev = Some(url.clone());
 
-                        let icon = metadata.icon.clone();
-                        let title = metadata.title.clone();
-                        let url_str = metadata.url.clone().unwrap_or_default();
-
-                        let activity = Activity::new(url_str, title, icon, "".to_string(), vec![]);
+                        let activity = Activity::new_browser(
+                            url,
+                            metadata.title,
+                            metadata.icon,
+                            String::new(),
+                            vec![],
+                        );
 
                         tracing::info!(
                             "Creating new activity from event: browser_pid={}, name={}",
@@ -202,13 +204,7 @@ impl ActivityStrategyFunctionality for SafariStrategy {
 
         match self.get_metadata().await {
             Ok(metadata) => {
-                let activity = Activity::new(
-                    metadata.url.unwrap_or_default(),
-                    metadata.title,
-                    metadata.icon,
-                    "".to_string(),
-                    vec![],
-                );
+                let activity = build_safari_activity(metadata, focus_window);
                 tracing::info!(
                     "Safari start_tracking: initial metadata activity: {}",
                     activity.name
@@ -245,39 +241,27 @@ impl ActivityStrategyFunctionality for SafariStrategy {
                 self.active_browser = Some(focus_window.process_name.to_string());
             }
 
-            match self.get_metadata().await {
-                Ok(metadata) => {
-                    if let Some(sender) = &self.sender {
-                        let activity = Activity::new(
-                            metadata.url.unwrap_or_default(),
-                            metadata.title,
-                            metadata.icon,
-                            "".to_string(),
-                            vec![],
-                        );
-                        tracing::info!(
-                            "Safari refocus: created activity from metadata: {}",
-                            activity.name
-                        );
-                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                            tracing::warn!("Failed to send new activity report - receiver dropped");
-                        }
-                    }
-                }
+            let activity = match self.get_metadata().await {
+                Ok(metadata) => build_safari_activity(metadata, focus_window),
                 Err(e) => {
                     tracing::warn!("Failed to get metadata on Safari refocus: {}", e);
-                    if let Some(sender) = &self.sender {
-                        let activity = Activity::new(
-                            focus_window.process_name.clone(),
-                            None,
-                            focus_window.icon.clone(),
-                            focus_window.process_name.clone(),
-                            vec![],
-                        );
-                        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                            tracing::warn!("Failed to send new activity report - receiver dropped");
-                        }
-                    }
+                    Activity::new(
+                        focus_window.process_name.clone(),
+                        None,
+                        focus_window.icon.clone(),
+                        focus_window.process_name.clone(),
+                        vec![],
+                    )
+                }
+            };
+
+            if let Some(sender) = &self.sender {
+                tracing::info!(
+                    "Safari refocus: created activity from metadata: {}",
+                    activity.name
+                );
+                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    tracing::warn!("Failed to send new activity report - receiver dropped");
                 }
             }
 
@@ -347,16 +331,44 @@ impl ActivityStrategyFunctionality for SafariStrategy {
             .await
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
 
-        let Some(payload) = response_frame.payload else {
-            return Ok(StrategyMetadata::default());
+        let payload = response_frame.payload.ok_or_else(|| {
+            ActivityError::invalid_data("Safari metadata response contained no payload")
+        })?;
+
+        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)?;
+
+        let NativeMessage::NativeMetadata(metadata) = native_metadata else {
+            return Err(ActivityError::invalid_data(
+                "Safari response did not contain metadata",
+            ));
         };
 
-        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+        Ok(StrategyMetadata::from(metadata))
+    }
+}
 
-        match native_metadata {
-            NativeMessage::NativeMetadata(metadata) => Ok(StrategyMetadata::from(metadata)),
-            _ => Ok(StrategyMetadata::default()),
+/// Build an Activity from Safari metadata, falling back to a process-level
+/// Activity if the metadata has no parseable URL.
+fn build_safari_activity(metadata: StrategyMetadata, focus_window: &FocusedWindow) -> Activity {
+    match metadata.url {
+        Some(url) => Activity::new_browser(
+            url,
+            metadata.title,
+            metadata.icon,
+            String::new(),
+            vec![],
+        ),
+        None => {
+            tracing::warn!(
+                "Safari metadata arrived without a URL; emitting process-level fallback"
+            );
+            Activity::new(
+                focus_window.process_name.clone(),
+                None,
+                focus_window.icon.clone(),
+                focus_window.process_name.clone(),
+                vec![],
+            )
         }
     }
 }

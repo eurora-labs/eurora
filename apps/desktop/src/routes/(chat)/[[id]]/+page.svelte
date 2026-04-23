@@ -16,7 +16,7 @@
 
 	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
-	let assets = $state<ContextChip[]>([]);
+	let assets = $state<ContextChip[] | null>(null);
 	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
 
 	const threadId = $derived(data.threadId);
@@ -42,10 +42,11 @@
 	}
 
 	function handleSubmit(text: string) {
-		chatService.sendMessage(text, assets).catch((e) => toast.error(String(e)));
+		chatService.sendMessage(text, assets ?? []).catch((e) => toast.error(String(e)));
 	}
 
 	function removeAsset(id: string) {
+		if (!assets) return;
 		assets = assets.filter((a) => a.id !== id);
 	}
 
@@ -67,10 +68,21 @@
 		taurpc.timeline.new_app_event.on((e) => {
 			latestTimelineItem = e;
 		});
+
+		// Seed the initial chip state so the suggestions row doesn't render
+		// stale "no active page" suggestions before the first event arrives.
+		// Without this, the reactive `$derived` below would briefly show the
+		// no-context suggestion and then swap it out under a clicking user.
+		taurpc.context_chip
+			.get()
+			.then((chips) => {
+				if (assets === null) assets = chips;
+			})
+			.catch((e) => toast.error(String(e)));
 	});
 
 	const suggestions = $derived(
-		buildSuggestions({ chips: assets, chatService, send: handleSubmit }),
+		assets === null ? [] : buildSuggestions({ chips: assets, chatService, send: handleSubmit }),
 	);
 </script>
 
@@ -97,7 +109,7 @@
 	{/if}
 	<ChatPromptInput onSubmit={handleSubmit} {suggestions}>
 		{#snippet header()}
-			{#if assets.length > 0}
+			{#if assets && assets.length > 0}
 				<Attachment.Root variant="inline">
 					{#each assets as asset (asset.id)}
 						<Attachment.Item
