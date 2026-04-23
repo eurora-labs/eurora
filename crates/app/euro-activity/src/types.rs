@@ -157,10 +157,7 @@ impl Activity {
     pub fn get_context_chip(&self) -> ContextChip {
         ContextChip {
             id: self.id.clone(),
-            name: self
-                .title
-                .clone()
-                .unwrap_or_else(|| self.name.clone()),
+            name: self.title.clone().unwrap_or_else(|| self.name.clone()),
             icon: None,
             domain: self.url.as_ref().and_then(domain_from_url),
         }

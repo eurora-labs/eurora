@@ -108,9 +108,7 @@ impl BrowserStrategy {
                     let metadata = StrategyMetadata::from(data);
 
                     let Some(url) = metadata.url else {
-                        tracing::debug!(
-                            "Ignoring TAB_ACTIVATED event without a parseable URL"
-                        );
+                        tracing::debug!("Ignoring TAB_ACTIVATED event without a parseable URL");
                         continue;
                     };
 
@@ -378,9 +376,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .await
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
 
-        let payload = response_frame.payload.ok_or_else(|| {
-            ActivityError::invalid_data("Metadata response contained no payload")
-        })?;
+        let payload = response_frame
+            .payload
+            .ok_or_else(|| ActivityError::invalid_data("Metadata response contained no payload"))?;
 
         let native_metadata = serde_json::from_str::<NativeMessage>(&payload)?;
 
