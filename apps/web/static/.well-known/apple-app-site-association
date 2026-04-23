@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["FKLH326P9A.com.eurora-labs.eurora.mobile.dev"],
+        "components": [
+          {
+            "/": "/mobile/callback*",
+            "comment": "Mobile login callback"
+          }
+        ]
+      }
+    ]
+  }
+}

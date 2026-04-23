@@ -45,12 +45,10 @@
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleURLName</key>
-			<string>com.eurora-labs.eurora.mobile</string>
 			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>eurora</string>
-			</array>
+			<array/>
+			<key>CFBundleURLName</key>
+			<string>https</string>
 		</dict>
 	</array>
 </dict>
