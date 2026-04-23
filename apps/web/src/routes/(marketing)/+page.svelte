@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
 	import ReadyToStart from '$lib/components/marketing/ReadyToStart.svelte';
+	import RotatingWords from '$lib/components/marketing/RotatingWords.svelte';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
 	import * as FeatureSection from '@eurora/ui/custom-components/feature-section/index';
@@ -42,9 +43,13 @@
 </svelte:head>
 
 <div class="px-4 pt-16 pb-16 flex flex-col gap-24">
-	<div class="flex flex-col items-start max-w-3xl mx-auto">
+	<div class="flex flex-col items-start max-w-3xl">
 		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
-			Your AI Assistant fully integrated into your browser
+			The most <RotatingWords
+				words={['advanced', 'seamless', 'private', 'European']}
+				delay={3500}
+				loop={false}
+			/> desktop AI assistant
 		</h1>
 		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
 			<span class="text-foreground font-semibold">Less typing, more answers.</span>
