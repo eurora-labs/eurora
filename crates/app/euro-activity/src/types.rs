@@ -95,6 +95,7 @@ pub struct Activity {
     pub id: String,
     pub name: String,
     pub title: Option<String>,
+    pub url: Option<Url>,
     #[serde(skip)]
     pub icon: Option<Arc<image::RgbaImage>>,
     pub process_name: String,
@@ -116,6 +117,34 @@ impl Activity {
             id: Uuid::new_v4().to_string(),
             name,
             title,
+            url: None,
+            icon,
+            process_name,
+            start: Utc::now(),
+            end: None,
+            assets,
+            snapshots: Vec::new(),
+        }
+    }
+
+    /// Construct an Activity that represents a focused browser page.
+    ///
+    /// A browser Activity is one whose `url` is always set to a parsed URL,
+    /// which in turn guarantees that `get_context_chip` emits a meaningful
+    /// `domain`. Callers that cannot parse a URL must fall back to
+    /// [`Activity::new`] instead of passing synthetic or empty values here.
+    pub fn new_browser(
+        url: Url,
+        title: Option<String>,
+        icon: Option<Arc<image::RgbaImage>>,
+        process_name: String,
+        assets: Vec<ActivityAsset>,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4().to_string(),
+            name: url.to_string(),
+            title,
+            url: Some(url),
             icon,
             process_name,
             start: Utc::now(),
@@ -130,8 +159,18 @@ impl Activity {
             id: self.id.clone(),
             name: self.title.clone().unwrap_or_else(|| self.name.clone()),
             icon: None,
-            domain: extract_domain(&self.name),
+            domain: self.url.as_ref().and_then(domain_from_url),
         }
+    }
+
+    /// Replace the URL and the URL-derived `name` in one step.
+    ///
+    /// Keeps `name` and `url` in sync so that downstream consumers (e.g.
+    /// storage, which uses `name`) and `get_context_chip` (which uses `url`)
+    /// never disagree about which page the Activity refers to.
+    pub fn set_url(&mut self, url: Url) {
+        self.name = url.to_string();
+        self.url = Some(url);
     }
 
     pub fn add_asset(&mut self, asset: ActivityAsset) {
@@ -147,19 +186,23 @@ impl Activity {
     }
 }
 
-fn extract_domain(value: &str) -> Option<String> {
-    let host = Url::parse(value).ok()?.host_str()?.to_ascii_lowercase();
+fn domain_from_url(url: &Url) -> Option<String> {
+    let host = url.host_str()?.to_ascii_lowercase();
     Some(host.strip_prefix("www.").unwrap_or(&host).to_owned())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::extract_domain;
+    use super::*;
+
+    fn parse(input: &str) -> Url {
+        Url::parse(input).expect("valid test URL")
+    }
 
     #[test]
     fn extracts_bare_host() {
         assert_eq!(
-            extract_domain("https://x.com/some/path"),
+            domain_from_url(&parse("https://x.com/some/path")),
             Some("x.com".into())
         );
     }
@@ -167,7 +210,7 @@ mod tests {
     #[test]
     fn strips_www_and_lowercases() {
         assert_eq!(
-            extract_domain("https://WWW.Example.COM/"),
+            domain_from_url(&parse("https://WWW.Example.COM/")),
             Some("example.com".into())
         );
     }
@@ -175,14 +218,50 @@ mod tests {
     #[test]
     fn preserves_subdomains() {
         assert_eq!(
-            extract_domain("https://m.youtube.com/watch?v=1"),
+            domain_from_url(&parse("https://m.youtube.com/watch?v=1")),
             Some("m.youtube.com".into())
         );
     }
 
     #[test]
-    fn returns_none_for_non_urls() {
-        assert_eq!(extract_domain("Some Window Title"), None);
-        assert_eq!(extract_domain(""), None);
+    fn browser_activity_has_domain_in_chip() {
+        let activity = Activity::new_browser(
+            parse("https://youtube.com/watch?v=abc"),
+            Some("Great Video".into()),
+            None,
+            "chrome".into(),
+            vec![],
+        );
+        let chip = activity.get_context_chip();
+        assert_eq!(chip.domain.as_deref(), Some("youtube.com"));
+        assert_eq!(chip.name, "Great Video");
+    }
+
+    #[test]
+    fn non_browser_activity_has_no_domain() {
+        let activity = Activity::new(
+            "Some Window Title".into(),
+            None,
+            None,
+            "someapp".into(),
+            vec![],
+        );
+        let chip = activity.get_context_chip();
+        assert_eq!(chip.domain, None);
+    }
+
+    #[test]
+    fn set_url_keeps_name_in_sync() {
+        let mut activity = Activity::new_browser(
+            parse("https://example.com/a"),
+            None,
+            None,
+            "chrome".into(),
+            vec![],
+        );
+        let new_url = parse("https://example.com/b");
+        activity.set_url(new_url.clone());
+        assert_eq!(activity.url.as_ref(), Some(&new_url));
+        assert_eq!(activity.name, new_url.to_string());
     }
 }
