@@ -107,31 +107,31 @@ impl BrowserStrategy {
                     };
                     let metadata = StrategyMetadata::from(data);
 
-                    let mut prev = last_url.lock().await;
-                    let url = match Url::parse(&metadata.url.clone().unwrap_or_default()) {
-                        Ok(u) => u,
-                        Err(_) => continue,
+                    let Some(url) = metadata.url else {
+                        tracing::debug!(
+                            "Ignoring TAB_ACTIVATED event without a parseable URL"
+                        );
+                        continue;
                     };
 
+                    let mut prev = last_url.lock().await;
                     if let Some(prev_url) = prev.take()
                         && prev_url.domain() == url.domain()
                     {
                         let title = metadata.title.unwrap_or_else(|| url.to_string());
-                        let url_str = url.to_string();
-                        *prev = Some(url);
-                        let _ = sender.send(ActivityReport::TitleUpdated {
-                            title,
-                            url: url_str,
-                        });
+                        *prev = Some(url.clone());
+                        let _ = sender.send(ActivityReport::TitleUpdated { title, url });
                         continue;
                     }
-                    *prev = Some(url);
+                    *prev = Some(url.clone());
 
-                    let icon = metadata.icon.clone();
-                    let title = metadata.title.clone();
-                    let url_str = metadata.url.clone().unwrap_or_default();
-
-                    let activity = Activity::new(url_str, title, icon, "".to_string(), vec![]);
+                    let activity = Activity::new_browser(
+                        url,
+                        metadata.title,
+                        metadata.icon,
+                        String::new(),
+                        vec![],
+                    );
 
                     tracing::info!(
                         "Creating new activity from event: browser_pid={}, name={}",
@@ -249,37 +249,46 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
 
         self.init_collection().await?;
 
-        match self.get_metadata().await {
-            Ok(metadata) => {
-                if let Some(ref url_str) = metadata.url
-                    && let Ok(url) = Url::parse(url_str)
-                {
-                    *self.last_url.lock().await = Some(url);
+        let activity = match self.get_metadata().await {
+            Ok(metadata) => match metadata.url {
+                Some(url) => {
+                    *self.last_url.lock().await = Some(url.clone());
+                    Activity::new_browser(
+                        url,
+                        metadata.title,
+                        metadata.icon,
+                        process_name.clone(),
+                        vec![],
+                    )
                 }
-                let activity = Activity::new(
-                    metadata.url.unwrap_or_default(),
-                    metadata.title,
-                    metadata.icon,
-                    process_name.clone(),
-                    vec![],
-                );
-                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                    tracing::warn!("Failed to send new activity report - receiver dropped");
+                None => {
+                    tracing::warn!(
+                        "Browser metadata arrived without a URL; emitting process-level fallback for {}",
+                        process_name
+                    );
+                    Activity::new(
+                        focus_window.process_name.clone(),
+                        None,
+                        focus_window.icon.clone(),
+                        focus_window.process_name.clone(),
+                        vec![],
+                    )
                 }
-            }
+            },
             Err(err) => {
-                let activity = Activity::new(
+                tracing::warn!("Failed to get browser metadata: {}", err);
+                Activity::new(
                     focus_window.process_name.clone(),
                     None,
                     focus_window.icon.clone(),
                     focus_window.process_name.clone(),
                     vec![],
-                );
-                if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-                    tracing::warn!("Failed to send new activity report - receiver dropped");
-                }
-                tracing::warn!("Failed to get metadata: {}", err);
+                )
             }
+        };
+
+        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+            tracing::warn!("Failed to send new activity report - receiver dropped");
         }
 
         tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
@@ -369,30 +378,30 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .await
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
 
-        let Some(payload) = response_frame.payload else {
-            tracing::warn!("No payload in metadata response");
-            return Ok(StrategyMetadata::default());
+        let payload = response_frame.payload.ok_or_else(|| {
+            ActivityError::invalid_data("Metadata response contained no payload")
+        })?;
+
+        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)?;
+
+        let NativeMessage::NativeMetadata(metadata) = native_metadata else {
+            return Err(ActivityError::invalid_data(
+                "Browser response did not contain metadata",
+            ));
         };
 
-        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)
-            .map_err(|e| -> ActivityError { ActivityError::from(e) })?;
+        let strategy_metadata = StrategyMetadata::from(metadata);
 
-        let metadata = match native_metadata {
-            NativeMessage::NativeMetadata(metadata) => {
-                if let Some(ref url) = metadata.url
-                    && !url.starts_with("http")
-                    && !url.starts_with("chrome-extension:")
-                {
-                    return Err(ActivityError::invalid_data(format!(
-                        "Invalid metadata URL: must start with 'http', got: {}",
-                        url
-                    )));
-                }
-                StrategyMetadata::from(metadata)
-            }
-            _ => StrategyMetadata::default(),
-        };
-        Ok(metadata)
+        if let Some(ref url) = strategy_metadata.url
+            && !matches!(url.scheme(), "http" | "https" | "chrome-extension")
+        {
+            return Err(ActivityError::invalid_data(format!(
+                "Unsupported metadata URL scheme: {}",
+                url.scheme()
+            )));
+        }
+
+        Ok(strategy_metadata)
     }
 }
 
