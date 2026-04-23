@@ -43,4 +43,9 @@ pub struct Claims {
     pub aud: String,
     #[serde(default)]
     pub email_verified: bool,
+    /// RFC 7519 JWT ID. Guarantees that two tokens minted for
+    /// the same subject within the same second never collide
+    /// after hashing (see refresh-token rotation).
+    #[serde(default)]
+    pub jti: String,
 }

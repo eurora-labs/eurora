@@ -450,6 +450,59 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
+    /// Atomically rotate a refresh token: revoke `old_token_hash` and insert
+    /// `new_token_hash` in the same transaction.
+    ///
+    /// Two concurrent rotations of the same presented token serialize on the
+    /// row lock acquired by `UPDATE`; the loser sees `revoked = true` after
+    /// the winner commits and is rejected with [`DbError::NotFound`]. This
+    /// guarantees one-for-one rotation: the new row only exists if the old
+    /// row was successfully revoked, and the old row is only revoked if the
+    /// new row was inserted.
+    #[builder]
+    pub async fn rotate_refresh_token(
+        &self,
+        old_token_hash: &[u8],
+        new_token_hash: Vec<u8>,
+        new_expires_at: DateTime<Utc>,
+    ) -> DbResult<RefreshToken> {
+        let now = Utc::now();
+        let mut tx = self.pool.begin().await?;
+
+        let revoked = sqlx::query_as::<_, RefreshToken>(
+            r#"
+            UPDATE refresh_tokens
+            SET revoked = true, updated_at = $2
+            WHERE token_hash = $1 AND revoked = false AND expires_at > now()
+            RETURNING id, user_id, token_hash, expires_at, revoked, created_at, updated_at
+            "#,
+        )
+        .bind(old_token_hash)
+        .bind(now)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| DbError::not_found("refresh_token"))?;
+
+        let inserted = sqlx::query_as::<_, RefreshToken>(
+            r#"
+            INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, false, $5, $5)
+            RETURNING id, user_id, token_hash, expires_at, revoked, created_at, updated_at
+            "#,
+        )
+        .bind(Uuid::now_v7())
+        .bind(revoked.user_id)
+        .bind(&new_token_hash)
+        .bind(new_expires_at)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+
+        Ok(inserted)
+    }
+
     #[builder]
     pub async fn create_oauth_state(
         &self,
