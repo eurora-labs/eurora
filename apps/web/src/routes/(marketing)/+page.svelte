@@ -1,6 +1,7 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
 	import ReadyToStart from '$lib/components/marketing/ReadyToStart.svelte';
+	import RotatingWords from '$lib/components/marketing/RotatingWords.svelte';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { AutoplayVideo } from '@eurora/ui/custom-components/autoplay-video/index';
 	import * as FeatureSection from '@eurora/ui/custom-components/feature-section/index';
@@ -42,11 +43,16 @@
 </svelte:head>
 
 <div class="px-4 pt-16 pb-16 flex flex-col gap-24">
-	<div class="flex flex-col items-start max-w-3xl mx-auto">
-		<h1 class="text-4xl font-bold text-shadow-xl sm:text-5xl lg:text-6xl">
-			Your AI Assistant fully integrated into your browser
+	<div class="flex flex-col items-start max-w-3xl">
+		<h1 class="typo-title text-shadow-xl">
+			The most <RotatingWords
+				words={['advanced', 'seamless', 'secure', 'European']}
+				delay={2500}
+				loop={false}
+			/>
+			<span class="block">desktop AI assistant</span>
 		</h1>
-		<p class="text-lg text-muted-foreground sm:text-xl max-w-2xl mt-3">
+		<p class="typo-body mt-6 max-w-2xl text-muted-foreground">
 			<span class="text-foreground font-semibold">Less typing, more answers.</span>
 			A private, open-source AI assistant that reads what you read. Ask questions about any YouTube
 			video, article, or tweet. Eurora captures the transcript, content, and metadata so you don't
@@ -62,19 +68,18 @@
 			<AutoplayVideo src={active.src} loop={active.loop} class="rounded-xl" />
 		{/key}
 
-		<div class="grid grid-cols-3 gap-3">
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-3">
 			{#each tabs as tab}
 				<button type="button" class="text-left" onclick={() => (activeTab = tab.id)}>
 					<Card.Root
-						class="h-full cursor-pointer transition-colors py-3 {activeTab === tab.id
+						class="h-full cursor-pointer transition-colors p-4 sm:p-5 {activeTab ===
+						tab.id
 							? 'border-primary bg-primary/5'
 							: 'hover:border-muted-foreground/25'}"
 					>
-						<Card.Header class="px-3 py-0 sm:px-4 gap-0.5">
-							<Card.Title class="text-xs sm:text-sm">{tab.label}</Card.Title>
-							<Card.Description class="text-xs hidden sm:block"
-								>{tab.description}</Card.Description
-							>
+						<Card.Header class="p-0 gap-1">
+							<Card.Title class="typo-body font-semibold">{tab.label}</Card.Title>
+							<Card.Description class="typo-body">{tab.description}</Card.Description>
 						</Card.Header>
 					</Card.Root>
 				</button>

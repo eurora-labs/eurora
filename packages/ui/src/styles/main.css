@@ -214,3 +214,15 @@
 @utility animate-progress-shine {
 	animation: progress-shine 2s ease-in-out infinite;
 }
+
+@utility typo-title {
+	font-weight: 700;
+	font-size: clamp(2.25rem, 1.5rem + 3vw, 3rem);
+	line-height: 1.1;
+	letter-spacing: -0.02em;
+}
+
+@utility typo-body {
+	font-size: 1.125rem;
+	line-height: 1.6;
+}
