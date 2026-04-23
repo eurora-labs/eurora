@@ -2,6 +2,17 @@
 rustflags = ["--cfg", "tokio_unstable"]
 target-dir = "target" # Needs to be the default directory as this assumption is used by some of the TypeScript files
 
+# Statically link the MSVC C runtime so shipped binaries don't depend on
+# VCRUNTIME140.dll / MSVCP140.dll being present on the target machine.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["--cfg", "tokio_unstable", "-C", "target-feature=+crt-static"]
+
+[target.i686-pc-windows-msvc]
+rustflags = ["--cfg", "tokio_unstable", "-C", "target-feature=+crt-static"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["--cfg", "tokio_unstable", "-C", "target-feature=+crt-static"]
+
 # Android NDK linkers (minSdk = 24)
 [target.aarch64-linux-android]
 linker = "aarch64-linux-android24-clang"
