@@ -1,10 +1,21 @@
-import { webNavigationListener } from '../shared/background/bg';
+import { injectIntoAllTabs, webNavigationListener } from '../shared/background/bg';
 import { startNativeMessenger } from '../shared/background/native-messenger';
 import browser from 'webextension-polyfill';
 
-browser.webNavigation.onCommitted.addListener(({ tabId, url, frameId }) => {
-	webNavigationListener(tabId, url, frameId).catch(console.error);
-	return true;
+browser.webNavigation.onCommitted.addListener(
+	({ tabId, url, frameId }) => {
+		webNavigationListener(tabId, url, frameId).catch(console.error);
+	},
+	{ url: [{ schemes: ['http', 'https', 'file'] }] },
+);
+
+browser.runtime.onInstalled.addListener(async ({ reason }) => {
+	if (reason !== 'install' && reason !== 'update') return;
+	await injectIntoAllTabs();
+});
+
+browser.runtime.onStartup.addListener(async () => {
+	await injectIntoAllTabs();
 });
 
 browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
