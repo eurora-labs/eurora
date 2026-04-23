@@ -48,7 +48,7 @@
 			The most <RotatingWords
 				words={['advanced', 'seamless', 'secure', 'European']}
 				delay={2500}
-				loop={false}
+				loop={true}
 			/>
 			<span class="block">desktop AI assistant</span>
 		</h1>
