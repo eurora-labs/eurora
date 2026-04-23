@@ -2,10 +2,31 @@ import { matchSite } from './match';
 import { loadRegistry } from './registry';
 import browser from 'webextension-polyfill';
 
-export async function webNavigationListener(tabId: number, url: string, frameId: number) {
-	try {
-		if (frameId !== 0 || !url) return;
+const INJECTABLE_SCHEME = /^(https?|file):/;
 
+export function isInjectableUrl(url: string | undefined): url is string {
+	return !!url && INJECTABLE_SCHEME.test(url);
+}
+
+export async function webNavigationListener(tabId: number, url: string, frameId: number) {
+	if (frameId !== 0) return;
+	if (!isInjectableUrl(url)) return;
+	await injectIntoTab(tabId, url);
+}
+
+export async function injectIntoAllTabs() {
+	const tabs = await browser.tabs.query({});
+	await Promise.all(
+		tabs.map(async (tab) => {
+			if (tab.id === undefined || tab.discarded) return;
+			if (!isInjectableUrl(tab.url)) return;
+			await injectIntoTab(tab.id, tab.url);
+		}),
+	);
+}
+
+async function injectIntoTab(tabId: number, url: string) {
+	try {
 		const [check] = await browser.scripting.executeScript({
 			target: { tabId, frameIds: [0] },
 			func: () => document.documentElement.hasAttribute('eurora-ext-ready'),
@@ -25,35 +46,26 @@ export async function webNavigationListener(tabId: number, url: string, frameId:
 
 		const defaultChunk = 'scripts/content/sites/_default/index.js';
 		const commonChunk = 'scripts/content/sites/_common/index.js';
-		if (!site) {
-			await browser.tabs
-				.sendMessage(tabId, {
+		const message = site
+			? {
+					type: 'SITE_LOAD',
+					siteId: site.id,
+					chunk: `scripts/content/${site.chunk}`,
+					defaultChunk,
+					commonChunk,
+				}
+			: {
 					type: 'SITE_LOAD',
 					siteId: 'default',
 					chunk: defaultChunk,
 					defaultChunk,
 					commonChunk,
-				})
-				.catch((error) => {
-					console.error('Failed to send SITE_LOAD message:', error);
-				});
-			return;
-		}
+				};
 
-		await browser.tabs
-			.sendMessage(tabId, {
-				type: 'SITE_LOAD',
-				siteId: site.id,
-				chunk: `scripts/content/${site.chunk}`,
-				defaultChunk,
-				commonChunk,
-			})
-			.catch((error) => {
-				console.error('Failed to send SITE_LOAD message:', error);
-			});
+		await browser.tabs.sendMessage(tabId, message).catch((error) => {
+			console.error('Failed to send SITE_LOAD message:', error);
+		});
 	} catch (error) {
-		if (url?.startsWith('http')) {
-			console.error('BG injection error: ', error);
-		}
+		console.error('BG injection error: ', error);
 	}
 }
