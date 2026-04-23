@@ -260,6 +260,7 @@ impl AuthService {
             role: role.clone(),
             aud: "eurora".to_string(),
             email_verified,
+            jti: Uuid::now_v7().to_string(),
         };
 
         let refresh_claims = Claims {
@@ -272,6 +273,7 @@ impl AuthService {
             role,
             aud: "eurora".to_string(),
             email_verified,
+            jti: Uuid::now_v7().to_string(),
         };
 
         let header = Header::new(Algorithm::HS256);
@@ -632,28 +634,37 @@ impl AuthService {
     ) -> Result<TokenResponse, AuthError> {
         let token_hash = self.hash_refresh_token(refresh_token);
 
-        let revoked_token = self
+        let existing = self
             .db
-            .revoke_refresh_token()
+            .get_refresh_token_by_hash()
             .token_hash(&token_hash)
             .call()
             .await
             .map_err(|_| AuthError::InvalidToken)?;
 
-        let user = self.db.get_user().id(revoked_token.user_id).call().await?;
+        let user = self.db.get_user().id(existing.user_id).call().await?;
 
         let role = self
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
-        let (access_token, new_refresh_token) = self
-            .generate_tokens(
+
+        let (access_token, new_refresh_token, new_token_hash, new_refresh_exp) = self
+            .generate_jwt_tokens(
                 &user.id.to_string(),
                 &user.email,
                 user.display_name.clone(),
                 role,
                 user.email_verified,
-            )
-            .await?;
+            )?;
+
+        self.db
+            .rotate_refresh_token()
+            .old_token_hash(&token_hash)
+            .new_token_hash(new_token_hash)
+            .new_expires_at(new_refresh_exp)
+            .call()
+            .await
+            .map_err(|_| AuthError::InvalidToken)?;
 
         Ok(TokenResponse {
             access_token,
