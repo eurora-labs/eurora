@@ -204,6 +204,18 @@ impl StrategySupport for BrowserStrategy {
             Edge.get_name(),
             Brave.get_name(),
             Opera.get_name(),
+            Vivaldi.get_name(),
+            ArcBrowser.get_name(),
+            TorBrowser.get_name(),
+            Chromium.get_name(),
+            Waterfox.get_name(),
+            PaleMoon.get_name(),
+            Zen.get_name(),
+            DuckDuckGo.get_name(),
+            Min.get_name(),
+            Falkon.get_name(),
+            Midori.get_name(),
+            SeaMonkey.get_name(),
         ]
     }
 
