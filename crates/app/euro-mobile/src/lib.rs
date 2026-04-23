@@ -32,8 +32,31 @@ fn mobile_entry_point() {
     run();
 }
 
-pub fn run() {
+fn load_env() {
     dotenv::dotenv().ok();
+
+    // On mobile the app's working directory is the sandbox, so `dotenv()`
+    // above can't find the project's .env. build.rs bakes those values into
+    // the binary via cargo:rustc-env; inject them into the process env so
+    // existing `std::env::var(...)` call sites (and EndpointManager::from_env)
+    // see them.
+    for (key, value) in [
+        ("AUTH_SERVICE_URL", option_env!("AUTH_SERVICE_URL")),
+        ("API_BASE_URL", option_env!("API_BASE_URL")),
+    ] {
+        if std::env::var_os(key).is_some() {
+            continue;
+        }
+        if let Some(v) = value {
+            // SAFETY: called once at startup before any threads are spawned
+            // that might read env concurrently.
+            unsafe { std::env::set_var(key, v) };
+        }
+    }
+}
+
+pub fn run() {
+    load_env();
 
     let tauri_context = tauri::generate_context!();
 
