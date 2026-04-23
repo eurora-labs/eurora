@@ -6,6 +6,7 @@ use focus_tracker::FocusedWindow;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use tokio::sync::mpsc;
+use url::Url;
 
 pub mod browser;
 pub mod default;
@@ -23,9 +24,14 @@ use crate::{
     types::{Activity, ActivityAsset, ActivitySnapshot},
 };
 
+/// Metadata returned by a strategy about the currently focused target.
+///
+/// The `url` is stored as a parsed [`Url`] so that the rest of the pipeline
+/// cannot accidentally accept malformed or empty URL strings and silently
+/// emit an Activity without a domain.
 #[derive(Debug, Clone, Default)]
 pub struct StrategyMetadata {
-    pub url: Option<String>,
+    pub url: Option<Url>,
     pub title: Option<String>,
     pub icon: Option<Arc<image::RgbaImage>>,
 }
@@ -33,7 +39,7 @@ pub struct StrategyMetadata {
 #[derive(Debug, Clone)]
 pub enum ActivityReport {
     NewActivity(Activity),
-    TitleUpdated { title: String, url: String },
+    TitleUpdated { title: String, url: Url },
     Stopping,
 }
 
@@ -56,8 +62,9 @@ impl From<NativeMetadata> for StrategyMetadata {
             }
             None => None,
         };
+        let url = metadata.url.as_deref().and_then(|raw| Url::parse(raw).ok());
         StrategyMetadata {
-            url: metadata.url,
+            url,
             title: metadata.title,
             icon,
         }
