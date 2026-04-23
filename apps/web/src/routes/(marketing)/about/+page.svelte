@@ -41,11 +41,9 @@
 
 <!-- Hero -->
 <div class="mb-12">
-	<p class="text-sm font-medium tracking-widest uppercase text-primary mb-4">Who we are</p>
-	<h1 class="text-4xl font-bold mb-4 sm:text-5xl">
-		We believe that European AI should work for you.
-	</h1>
-	<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+	<p class="typo-body font-medium tracking-widest uppercase text-primary mb-4">Who we are</p>
+	<h1 class="typo-title mb-4">We believe that European AI should work for you.</h1>
+	<p class="typo-body max-w-2xl text-muted-foreground">
 		Eurora is a company based in The Netherlands, founded by two people who got tired of AI
 		tools that treat your data as the product. We decided to build something better, rooted in
 		Europe's strong tradition of privacy and user rights.
@@ -69,32 +67,32 @@
 					/>
 					<div>
 						<div class="flex items-center gap-2">
-							<h2 class="text-xl font-bold">Laura Thommen</h2>
+							<h2 class="typo-body font-bold">Laura Thommen</h2>
 							<Badge variant="secondary">CEO</Badge>
 						</div>
-						<p class="text-sm text-muted-foreground mt-0.5">
+						<p class="typo-body text-muted-foreground mt-0.5">
 							30+ years in Executive Leadership
 						</p>
 					</div>
 				</div>
 
-				<p class="text-muted-foreground leading-relaxed mb-5">
+				<p class="typo-body text-muted-foreground mb-5">
 					Drove product adoption at Apple, Adobe, Avid, DDN Storage and Northrop Grumman.
 					Laura has seen firsthand how technology succeeds when it puts people first — and
 					fails when it doesn't.
 				</p>
 
-				<div class="space-y-3 mb-5 text-sm">
+				<div class="space-y-3 mb-5">
 					<div>
-						<p class="font-medium mb-1">Background</p>
-						<p class="text-muted-foreground">
+						<p class="typo-body font-medium mb-1">Background</p>
+						<p class="typo-body text-muted-foreground">
 							Sales leadership to executive management. Built go-to-market teams
 							across enterprise software and hardware.
 						</p>
 					</div>
 					<div>
-						<p class="font-medium mb-1">Education</p>
-						<p class="text-muted-foreground">
+						<p class="typo-body font-medium mb-1">Education</p>
+						<p class="typo-body text-muted-foreground">
 							MBA, Pepperdine University. BS Business Administration, USC.
 						</p>
 					</div>
@@ -104,7 +102,7 @@
 					<div class="relative">
 						{#if copiedLaura}
 							<span
-								class="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground whitespace-nowrap"
+								class="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-primary px-2 py-1 typo-body text-primary-foreground whitespace-nowrap"
 								>Copied!</span
 							>
 						{/if}
@@ -145,32 +143,32 @@
 					/>
 					<div>
 						<div class="flex items-center gap-2">
-							<h2 class="text-xl font-bold">Andre Roelofs</h2>
+							<h2 class="typo-body font-bold">Andre Roelofs</h2>
 							<Badge variant="secondary">CTO</Badge>
 						</div>
-						<p class="text-sm text-muted-foreground mt-0.5">
+						<p class="typo-body text-muted-foreground mt-0.5">
 							AI & engineering leadership
 						</p>
 					</div>
 				</div>
 
-				<p class="text-muted-foreground leading-relaxed mb-5">
+				<p class="typo-body text-muted-foreground mb-5">
 					Former Head of Engineering &amp; ML at Cuebric, where he led development of
 					award-winning AI solutions. Andre founded Eurora because he believed the best AI
 					tools shouldn't require giving up your privacy.
 				</p>
 
-				<div class="space-y-3 mb-5 text-sm">
+				<div class="space-y-3 mb-5">
 					<div>
-						<p class="font-medium mb-1">Background</p>
-						<p class="text-muted-foreground">
+						<p class="typo-body font-medium mb-1">Background</p>
+						<p class="typo-body text-muted-foreground">
 							Software architecture, machine learning, and computer vision. Production
 							AI systems from research through deployment.
 						</p>
 					</div>
 					<div>
-						<p class="font-medium mb-1">Education</p>
-						<p class="text-muted-foreground">
+						<p class="typo-body font-medium mb-1">Education</p>
+						<p class="typo-body text-muted-foreground">
 							BS Computer Science, Avans University. Graduate studies in AI,
 							Maastricht University.
 						</p>
@@ -181,7 +179,7 @@
 					<div class="relative">
 						{#if copiedAndre}
 							<span
-								class="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground whitespace-nowrap"
+								class="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-primary px-2 py-1 typo-body text-primary-foreground whitespace-nowrap"
 								>Copied!</span
 							>
 						{/if}
@@ -221,8 +219,8 @@
 </div>
 
 <div class="mb-16">
-	<h2 class="text-3xl font-bold mb-3">Why we built this</h2>
-	<p class="text-muted-foreground max-w-2xl mb-10 leading-relaxed">
+	<h2 class="typo-title mb-4">Why we built this</h2>
+	<p class="typo-body text-muted-foreground max-w-2xl mb-10">
 		Every AI assistant we tried had the same trade-off: convenience in exchange for your data.
 		Eurora Labs has proven that you do not need to compromise convenience in exchange for your
 		data. Here's what drives every decision we make.
@@ -230,29 +228,29 @@
 
 	<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 		<div class="rounded-2xl bg-card p-8">
-			<h3 class="font-semibold text-lg mb-2">Your data stays yours</h3>
-			<p class="text-sm text-muted-foreground leading-relaxed">
+			<h3 class="typo-body font-semibold mb-2">Your data stays yours</h3>
+			<p class="typo-body text-muted-foreground">
 				All data lives in sovereign European infrastructure. We can't read it, we can't sell
 				it, and we architected the system so we never could.
 			</p>
 		</div>
 		<div class="rounded-2xl bg-card p-8">
-			<h3 class="font-semibold text-lg mb-2">Open source, always</h3>
-			<p class="text-sm text-muted-foreground leading-relaxed">
+			<h3 class="typo-body font-semibold mb-2">Open source, always</h3>
+			<p class="typo-body text-muted-foreground">
 				Every line of Eurora's code is public. You don't have to take our word for it. Read
 				the source, audit it and run it yourself.
 			</p>
 		</div>
 		<div class="rounded-2xl bg-card p-8">
-			<h3 class="font-semibold text-lg mb-2">One assistant, everywhere</h3>
-			<p class="text-sm text-muted-foreground leading-relaxed">
+			<h3 class="typo-body font-semibold mb-2">One assistant, everywhere</h3>
+			<p class="typo-body text-muted-foreground">
 				A single AI that works across every platform and browser. Eurora is a single unified
 				assistant that has all the context.
 			</p>
 		</div>
 		<div class="rounded-2xl bg-card p-8">
-			<h3 class="font-semibold text-lg mb-2">Built for people</h3>
-			<p class="text-sm text-muted-foreground leading-relaxed">
+			<h3 class="typo-body font-semibold mb-2">Built for people</h3>
+			<p class="typo-body text-muted-foreground">
 				We built it for you. That means you stay in control of everything Eurora does.
 			</p>
 		</div>
@@ -263,8 +261,8 @@
 	<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
 		{#each stats as stat}
 			<div class="rounded-2xl bg-card p-6 text-center">
-				<p class="text-3xl font-bold text-primary mb-1">{stat.value}</p>
-				<p class="text-sm text-muted-foreground">{stat.label}</p>
+				<p class="typo-title text-primary mb-1">{stat.value}</p>
+				<p class="typo-body text-muted-foreground">{stat.label}</p>
 			</div>
 		{/each}
 	</div>

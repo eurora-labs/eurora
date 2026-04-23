@@ -211,7 +211,7 @@
 
 	.download-btn-hint {
 		font-weight: 400;
-		font-size: 0.8rem;
+		font-size: 1.125rem;
 		opacity: 0.85;
 	}
 </style>

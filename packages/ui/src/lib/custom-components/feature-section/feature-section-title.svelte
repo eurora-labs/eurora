@@ -13,7 +13,7 @@
 <h2
 	bind:this={ref}
 	data-slot="feature-section-title"
-	class={cn('text-3xl font-bold sm:text-4xl lg:text-5xl', className)}
+	class={cn('typo-title', className)}
 	{...restProps}
 >
 	{@render children?.()}
