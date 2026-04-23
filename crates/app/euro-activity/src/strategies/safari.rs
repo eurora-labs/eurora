@@ -351,13 +351,9 @@ impl ActivityStrategyFunctionality for SafariStrategy {
 /// Activity if the metadata has no parseable URL.
 fn build_safari_activity(metadata: StrategyMetadata, focus_window: &FocusedWindow) -> Activity {
     match metadata.url {
-        Some(url) => Activity::new_browser(
-            url,
-            metadata.title,
-            metadata.icon,
-            String::new(),
-            vec![],
-        ),
+        Some(url) => {
+            Activity::new_browser(url, metadata.title, metadata.icon, String::new(), vec![])
+        }
         None => {
             tracing::warn!(
                 "Safari metadata arrived without a URL; emitting process-level fallback"

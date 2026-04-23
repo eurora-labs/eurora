@@ -62,10 +62,7 @@ impl From<NativeMetadata> for StrategyMetadata {
             }
             None => None,
         };
-        let url = metadata
-            .url
-            .as_deref()
-            .and_then(|raw| Url::parse(raw).ok());
+        let url = metadata.url.as_deref().and_then(|raw| Url::parse(raw).ok());
         StrategyMetadata {
             url,
             title: metadata.title,
