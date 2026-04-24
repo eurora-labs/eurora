@@ -1,5 +1,13 @@
 # Eurora
 
+<p align="center">
+  <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/eurora-labs/eurora"/>
+  <img alt="Github Last Commit" src="https://img.shields.io/github/last-commit/eurora-labs/eurora"/>
+  <img alt="Github Contributors" src="https://img.shields.io/github/contributors/eurora-labs/eurora"/>
+  <img alt="GitHub closed issues" src="https://img.shields.io/github/issues-closed/eurora-labs/eurora"/
+  <img alt="Discord" src="https://img.shields.io/discord/1471808039349653516?logo=discord"/>
+</p>
+
 Welcome to Eurora, a context aware, cross-platform, fully private and open source AI assistant.
 
 Eurora provides seamless OS integration and makes asking questions much easier. The cloud servers run in The Netherlands and all the data is stored in European Sovereign Data Centers, ensuring full privacy for users all around the world via the highest standards set by the European Union. We have first-party support for local deployment and extensive documentation for running this on your own home server.
@@ -52,3 +60,13 @@ Main points of Sustainable Use License (SUL) are:
 ## Installation
 
 Please download the version for your platform on https://www.eurora-labs.com/
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=eurora-labs%2Feurora&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=eurora-labs/eurora&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=eurora-labs/eurora&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=eurora-labs/eurora&type=date&legend=top-left" />
+ </picture>
+</a>
