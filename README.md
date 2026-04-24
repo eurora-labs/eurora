@@ -5,14 +5,14 @@
   <img alt="Github Last Commit" src="https://img.shields.io/github/last-commit/eurora-labs/eurora"/>
   <img alt="Github Contributors" src="https://img.shields.io/github/contributors/eurora-labs/eurora"/>
   <img alt="GitHub closed issues" src="https://img.shields.io/github/issues-closed/eurora-labs/eurora"/
-  <img alt="Discord" src="https://img.shields.io/discord/1471808039349653516?logo=discord"/>
+  <img alt="Discord" src="https://img.shields.io/discord/1471808039349653516?label=discord"/>
 </p>
 
 Welcome to Eurora, a context aware, cross-platform, fully private and open source AI assistant.
 
 Eurora provides seamless OS integration and makes asking questions much easier. The cloud servers run in The Netherlands and all the data is stored in European Sovereign Data Centers, ensuring full privacy for users all around the world via the highest standards set by the European Union. We have first-party support for local deployment and extensive documentation for running this on your own home server.
 
-![Eurora](./assets/eurora-preview.gif)
+![Eurora](./assets/eurora-github.png)
 
 We're a community driven project, and we welcome contributions from anyone who is interested in helping us build a better future for AI.
 
