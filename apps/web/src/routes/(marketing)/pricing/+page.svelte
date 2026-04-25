@@ -18,7 +18,7 @@
 </script>
 
 <svelte:head>
-	<title>Pricing — Eurora Labs</title>
+	<title>Pricing - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Start free with limited cloud calls, upgrade to Pro at €19.99/month for unlimited European cloud AI, or contact us for custom enterprise deployment."

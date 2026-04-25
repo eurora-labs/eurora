@@ -14,7 +14,7 @@
 </script>
 
 <svelte:head>
-	<title>Partners — Eurora Labs</title>
+	<title>Partners - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Join the Eurora partner program. Build on privacy-first, open-source AI with EU data residency. Access technical enablement, co-marketing, and early product influence."
@@ -37,7 +37,7 @@
 
 	<div class="space-y-6 max-w-3xl">
 		<div>
-			<h3 class="typo-body font-bold mb-2">Technical Enablement & Support</h3>
+			<h3 class="typo-body font-bold mb-2">Technical Enablement &amp; Support</h3>
 			<p class="typo-body text-muted-foreground">
 				Training, integration credits, and direct access to Eurora engineers to help your
 				team build, deploy, and sell with confidence.
@@ -45,7 +45,7 @@
 		</div>
 
 		<div>
-			<h3 class="typo-body font-bold mb-2">Marketing & Brand Amplification</h3>
+			<h3 class="typo-body font-bold mb-2">Marketing &amp; Brand Amplification</h3>
 			<p class="typo-body text-muted-foreground">
 				Co-marketing opportunities, joint content, events, and visibility that elevate your
 				brand and showcase shared success.
@@ -53,7 +53,7 @@
 		</div>
 
 		<div>
-			<h3 class="typo-body font-bold mb-2">Product Access & Influence</h3>
+			<h3 class="typo-body font-bold mb-2">Product Access &amp; Influence</h3>
 			<p class="typo-body text-muted-foreground">
 				Early access to new features, roadmap visibility, and the opportunity to shape what
 				comes next.

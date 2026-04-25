@@ -7,11 +7,11 @@
 	const ollamaPullCommand = 'ollama pull llama3.2';
 	const ollamaServeCommand = 'ollama serve';
 
-	const envFileContents = `# Required — set these to random strings (e.g. openssl rand -hex 32)
+	const envFileContents = `# Required - set these to random strings (e.g. openssl rand -hex 32)
 JWT_ACCESS_SECRET=
 JWT_REFRESH_SECRET=
 
-# Optional — uncomment and change as needed
+# Optional - uncomment and change as needed
 # OLLAMA_MODEL=llama3.2
 # EURORA_GRPC_PORT=39051
 # EURORA_POSTGRES_PORT=39432
@@ -122,7 +122,7 @@ volumes:
 </script>
 
 <svelte:head>
-	<title>Self-Hosting — Eurora Labs</title>
+	<title>Self-Hosting - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Self-host Eurora with Docker Compose and Ollama. Run AI locally with full control over your data. Step-by-step guide with environment variable reference."
@@ -141,7 +141,7 @@ volumes:
 			<h2 class="mb-2 text-2xl font-semibold">Prerequisites</h2>
 			<ul class="list-disc space-y-2 pl-5 text-muted-foreground">
 				<li>
-					<strong>Docker &amp; Docker Compose</strong> — follow the
+					<strong>Docker &amp; Docker Compose</strong> - follow the
 					<a
 						href="https://docs.docker.com/get-docker/"
 						target="_blank"
@@ -152,7 +152,7 @@ volumes:
 					>. Docker Desktop includes Compose by default.
 				</li>
 				<li>
-					<strong>Ollama</strong> — install from
+					<strong>Ollama</strong> - install from
 					<a
 						href="https://ollama.com"
 						target="_blank"
@@ -178,7 +178,7 @@ volumes:
 						</CodeBlock.Root>
 					</div>
 					<p class="mt-2 text-sm">
-						You can use any model Ollama supports — just set
+						You can use any model Ollama supports - just set
 						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
 							>OLLAMA_MODEL</code
 						>
@@ -339,7 +339,7 @@ volumes:
 				</table>
 			</div>
 			<p class="mt-2 text-xs text-muted-foreground">
-				<span class="text-destructive">*</span> Required — must be explicitly set.
+				<span class="text-destructive">*</span> Required - must be explicitly set.
 			</p>
 		</section>
 

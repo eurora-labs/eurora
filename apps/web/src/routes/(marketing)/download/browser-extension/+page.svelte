@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>Browser Extension — Eurora Labs</title>
+	<title>Browser Extension - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Install the Eurora browser extension for Chrome, Firefox, Edge, or Safari. Give your AI assistant full context from the web pages you browse."

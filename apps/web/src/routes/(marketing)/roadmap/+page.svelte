@@ -29,20 +29,20 @@
 		{
 			id: 'foundation',
 			title: 'Foundation',
-			subtitle: 'Core platform & infrastructure',
+			subtitle: 'Core platform &amp; infrastructure',
 			status: 'completed',
 			progress: 100,
 			quarter: 'Q1 2026',
 			icon: RocketIcon,
 			color: 'var(--chart-1)',
 			items: [
-				{ label: 'Desktop app for macOS, Windows & Linux', done: true },
+				{ label: 'Desktop app for macOS, Windows &amp; Linux', done: true },
 				{
 					label: 'Browser extension (Chrome, Firefox, Edge, Safari, Librewolf, Brave, and more)',
 					done: true,
 				},
 				{ label: 'European cloud infrastructure', done: true },
-				{ label: 'Conversation history & sync', done: true },
+				{ label: 'Conversation history &amp; sync', done: true },
 			],
 		},
 		{
@@ -113,7 +113,7 @@
 </script>
 
 <svelte:head>
-	<title>Roadmap — Eurora Labs</title>
+	<title>Roadmap - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Eurora's public roadmap: see what we've shipped, what's in progress, and what's planned. Desktop apps, browser extensions, memories, and more."
@@ -246,7 +246,7 @@
 		<h2 class="text-2xl font-bold mb-3">Something missing?</h2>
 		<p class="text-muted-foreground max-w-lg mx-auto mb-6">
 			We shape our roadmap around what matters to you. If there's a feature you'd love to see,
-			let us know — or open an issue on GitHub.
+			let us know - or open an issue on GitHub.
 		</p>
 		<div class="flex items-center justify-center gap-3 flex-wrap">
 			<a
