@@ -33,7 +33,7 @@
 					of Commerce under number 98516167.
 				</p>
 				<p class="mt-4">
-					This Privacy Policy explains how we collect, use, share and protect information
+					This Privacy Policy explains how we collect, use, share, and protect information
 					in relation to our website www.eurora-labs.com (the "Website"), our desktop
 					application (the "Desktop Application"), our browser extension (the "Browser
 					Extension"), and any related services (collectively, the "Service"). We process

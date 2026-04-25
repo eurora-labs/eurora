@@ -92,10 +92,9 @@
 			<FeatureSection.Header>
 				<FeatureSection.Title>New way to use AI</FeatureSection.Title>
 				<FeatureSection.Subtitle>
-					Eurora is built with a single purpose: to make an AI assistant that feels
-					natural and ergonomic. With a single click of a button, you can see every single
-					chat as a graph of edited messages. Navigate old conversations quickly and
-					easily.
+					Eurora is built with one purpose: to be an AI assistant that feels natural and
+					ergonomic. With a single click, every chat becomes a graph of edited messages.
+					Navigate old conversations quickly and easily.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
 			<FeatureSection.Content class="overflow-hidden">
@@ -111,8 +110,8 @@
 			<FeatureSection.Header>
 				<FeatureSection.Title>Easiest way to use AI</FeatureSection.Title>
 				<FeatureSection.Subtitle>
-					Get answers instantly. Eurora works on your platform, with your browser. All
-					data is stored securely in a Sovereign European data center. Eurora provides
+					Get answers instantly. Eurora works on every platform, in any browser. All data
+					is stored securely in a sovereign European data center. Eurora provides
 					independence and accessibility with the highest standard of data protection and
 					privacy.
 				</FeatureSection.Subtitle>

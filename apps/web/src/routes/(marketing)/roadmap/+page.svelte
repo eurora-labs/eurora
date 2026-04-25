@@ -38,7 +38,7 @@
 			items: [
 				{ label: 'Desktop app for macOS, Windows & Linux', done: true },
 				{
-					label: 'Browser extension (Chrome, Firefox, Edge, Safari, Librewolf, Brave and all others)',
+					label: 'Browser extension (Chrome, Firefox, Edge, Safari, Librewolf, Brave, and more)',
 					done: true,
 				},
 				{ label: 'European cloud infrastructure', done: true },
@@ -69,7 +69,7 @@
 		{
 			id: 'memories',
 			title: 'Memories',
-			subtitle: 'Full support for recording, storing and managing memories',
+			subtitle: 'Full support for recording, storing, and managing memories',
 			status: 'upcoming',
 			progress: 0,
 			quarter: 'Q3 2026',

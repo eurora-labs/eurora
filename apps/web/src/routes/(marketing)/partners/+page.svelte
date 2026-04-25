@@ -17,7 +17,7 @@
 	<title>Partners — Eurora Labs</title>
 	<meta
 		name="description"
-		content="Join the Eurora partner program. Build on privacy-first, open-source AI with EU data residency. Access preferred pricing, technical enablement, and go-to-market collaboration."
+		content="Join the Eurora partner program. Build on privacy-first, open-source AI with EU data residency. Access technical enablement, co-marketing, and early product influence."
 	/>
 </svelte:head>
 
@@ -27,9 +27,8 @@
 	<p class="typo-body max-w-3xl text-muted-foreground">
 		Eurora partners with forward-thinking companies to build the future of private, open-source
 		AI. Our partner program is designed for shared growth, offering access to our platform,
-		developer ecosystem, and collaborative enablement programs along with meaningful commercial
-		upside, hands-on support, and deep go-to-market collaboration to help partners
-		differentiate, scale, and succeed faster.
+		developer ecosystem, and collaborative enablement programs, along with hands-on support to
+		help partners differentiate, scale, and succeed faster.
 	</p>
 </div>
 
@@ -37,14 +36,6 @@
 	<h2 class="typo-title mb-6">What partners can expect</h2>
 
 	<div class="space-y-6 max-w-3xl">
-		<div>
-			<h3 class="typo-body font-bold mb-2">Commercial Advantages</h3>
-			<p class="typo-body text-muted-foreground">
-				Preferred pricing, referral incentives, and revenue-sharing programs designed to
-				reward partner investment and performance.
-			</p>
-		</div>
-
 		<div>
 			<h3 class="typo-body font-bold mb-2">Technical Enablement & Support</h3>
 			<p class="typo-body text-muted-foreground">
@@ -58,14 +49,6 @@
 			<p class="typo-body text-muted-foreground">
 				Co-marketing opportunities, joint content, events, and visibility that elevate your
 				brand and showcase shared success.
-			</p>
-		</div>
-
-		<div>
-			<h3 class="typo-body font-bold mb-2">Go-to-Market Collaboration</h3>
-			<p class="typo-body text-muted-foreground">
-				Account alignment, sales enablement, and deal support to help you engage the right
-				customers and close faster.
 			</p>
 		</div>
 
