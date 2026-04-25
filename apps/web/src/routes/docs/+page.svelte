@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>Documentation — Eurora Labs</title>
+	<title>Documentation - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Eurora documentation. Get started with the context-aware, cross-platform, open-source AI assistant that integrates with your browser and operating system."
@@ -16,7 +16,7 @@
 	<p class="mb-12 text-lg text-muted-foreground">
 		Eurora is a context-aware, cross-platform, open-source AI platform built in Europe. It
 		integrates with your operating system and browser to give AI full awareness of what you're
-		working on — without selling your data or invading your privacy.
+		working on - without selling your data or invading your privacy.
 	</p>
 
 	<div class="flex flex-col gap-12">

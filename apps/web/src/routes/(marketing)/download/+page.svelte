@@ -45,7 +45,7 @@
 </script>
 
 <svelte:head>
-	<title>Download — Eurora Labs</title>
+	<title>Download - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Download Eurora for free on macOS, Windows, or Linux. A private, open-source AI assistant with browser integration for Chrome, Firefox, Edge, and Safari."
@@ -86,7 +86,7 @@
 		<Collapsible.Trigger
 			class="flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground [&[data-state=open]>svg]:rotate-180"
 		>
-			All platforms & architectures
+			All platforms &amp; architectures
 			<ChevronDownIcon class="size-4 transition-transform" />
 		</Collapsible.Trigger>
 		<Collapsible.Content>

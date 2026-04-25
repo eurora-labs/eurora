@@ -32,7 +32,7 @@
 </script>
 
 <svelte:head>
-	<title>About — Eurora Labs</title>
+	<title>About - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Meet the team behind Eurora. A Netherlands-based, self-funded company building private, open-source AI tools with EU data residency and full transparency."

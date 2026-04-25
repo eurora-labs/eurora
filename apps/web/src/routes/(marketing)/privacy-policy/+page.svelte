@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>Privacy Policy — Eurora Labs</title>
+	<title>Privacy Policy - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Eurora Labs privacy policy. Learn how we collect, use, and protect your data. GDPR-compliant, EU-hosted, open-source, with no data sold to third parties."
