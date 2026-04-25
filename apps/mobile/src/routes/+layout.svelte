@@ -49,7 +49,7 @@
 
 <ModeWatcher defaultMode="dark" track={false} />
 
-<div class="app-shell relative flex flex-col h-screen overflow-hidden">
+<div class="app-shell relative flex flex-col h-dvh overflow-hidden">
 	{@render children?.()}
 </div>
 
