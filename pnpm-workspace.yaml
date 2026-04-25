@@ -1,28 +1,28 @@
 packages:
-  - apps/*
-  - packages/*
-  - packages/prosemirror/*
-  - crates/*
-  - backend/*
-  - e2e
+    - apps/*
+    - packages/*
+    - packages/prosemirror/*
+    - crates/*
+    - backend/*
+    - e2e
 
 catalog:
-  '@lucide/svelte': ^0.577.0
-  '@tailwindcss/postcss': ^4.2.2
-  '@vitest/ui': 3.2.4
-  postcss: ^8.5.10
-  tailwindcss: ^4.2.4
-  vite: 6.4.2
-  vitest: 3.2.4
+    '@lucide/svelte': ^0.577.0
+    '@tailwindcss/postcss': ^4.2.2
+    '@vitest/ui': 3.2.4
+    postcss: ^8.5.10
+    tailwindcss: ^4.2.4
+    vite: 6.4.2
+    vitest: 3.2.4
 
 catalogs:
-  redux:
-    '@reduxjs/toolkit': ^2.5.0
-  svelte:
-    '@sveltejs/adapter-static': 3.0.10
-    '@sveltejs/kit': 2.57.1
-    '@sveltejs/vite-plugin-svelte': 5.1.1
-    svelte: 5.55.4
-    svelte-check: 4.4.6
+    redux:
+        '@reduxjs/toolkit': ^2.5.0
+    svelte:
+        '@sveltejs/adapter-static': 3.0.10
+        '@sveltejs/kit': 2.57.1
+        '@sveltejs/vite-plugin-svelte': 5.1.1
+        svelte: 5.55.4
+        svelte-check: 4.4.6
 onlyBuiltDependencies:
-  - esbuild
+    - esbuild

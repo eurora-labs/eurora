@@ -37,7 +37,7 @@
 
 				<figcaption class="mt-2 text-center text-sm text-muted-foreground px-8">
 					Eurora's desktop app providing context-aware AI assistance while browsing
-					YouTube. In this case, Eurora picked up the current youtube video as an asset.
+					YouTube. In this case, Eurora picked up the current YouTube video as an asset.
 				</figcaption>
 			</figure>
 		</section>
@@ -46,7 +46,7 @@
 			<h2 class="mb-4 text-2xl font-semibold">Getting Started</h2>
 			<p class="mb-8 text-muted-foreground">
 				The easiest way to start using Eurora is to download the app and sign up for a free
-				account. Below you will find a video with full overview.
+				account. Below you will find a video with a full overview.
 			</p>
 		</section>
 

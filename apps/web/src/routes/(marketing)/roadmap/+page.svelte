@@ -48,7 +48,7 @@
 		{
 			id: 'integration',
 			title: 'Full integration',
-			subtitle: 'Support for real time context from all desktop apps',
+			subtitle: 'Support for real-time context from all desktop apps',
 			status: 'active',
 			progress: 20,
 			quarter: 'Q2 2026',
@@ -94,7 +94,7 @@
 			color: 'var(--chart-4)',
 			items: [
 				{ label: 'Local file system integration', done: false },
-				{ label: 'Support for all the cloud file systems', done: false },
+				{ label: 'Support for all major cloud file systems', done: false },
 			],
 		},
 	];
