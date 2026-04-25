@@ -57,7 +57,7 @@
 			</li>
 			<li class="flex items-center gap-2.5 typo-body">
 				<CheckIcon class="h-5 w-5 shrink-0 text-primary" />
-				All data stored in a Sovereign European Data Center
+				All data stored in a sovereign European data center
 			</li>
 			<li class="flex items-center gap-2.5 typo-body">
 				<CheckIcon class="h-5 w-5 shrink-0 text-primary" />
@@ -87,7 +87,7 @@
 				<span class="typo-body font-semibold text-orange-500">Recommended</span>
 			</div>
 			<p class="typo-body text-muted-foreground">
-				Fully private and secure European Cloud AI
+				Fully private and secure European cloud AI
 			</p>
 			<div class="flex items-baseline gap-2">
 				<span class="typo-title">€19.99</span>

@@ -37,7 +37,7 @@
 
 				<figcaption class="mt-2 text-center text-sm text-muted-foreground px-8">
 					Eurora's desktop app providing context-aware AI assistance while browsing
-					YouTube. In this case, Eurora picked up the current YouTube video as an asset.
+					YouTube. In this case, Eurora has captured the current YouTube video as context.
 				</figcaption>
 			</figure>
 		</section>

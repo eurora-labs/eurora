@@ -77,23 +77,24 @@
 				</div>
 
 				<p class="typo-body text-muted-foreground mb-5">
-					Drove product adoption at Apple, Adobe, Avid, DDN Storage and Northrop Grumman.
-					Laura has seen firsthand how technology succeeds when it puts people first — and
-					fails when it doesn't.
+					30+ years driving product adoption at Apple, Adobe, Avid, DDN Storage and
+					Northrop Grumman. Laura has seen firsthand how technology succeeds when it puts
+					people first - fails when it doesn't.
 				</p>
 
 				<div class="space-y-3 mb-5">
 					<div>
 						<p class="typo-body font-medium mb-1">Background</p>
 						<p class="typo-body text-muted-foreground">
-							Sales leadership to executive management. Built go-to-market teams
-							across enterprise software and hardware.
+							Sales leadership to executive management. Built and scaled go-to-market
+							teams across enterprise software and hardware.
 						</p>
 					</div>
 					<div>
 						<p class="typo-body font-medium mb-1">Education</p>
 						<p class="typo-body text-muted-foreground">
-							MBA, Pepperdine University. BS Business Administration, USC.
+							MBA, Pepperdine University. BS, Business Administration (Finance minor),
+							University of Southern California.
 						</p>
 					</div>
 				</div>
@@ -169,7 +170,7 @@
 					<div>
 						<p class="typo-body font-medium mb-1">Education</p>
 						<p class="typo-body text-muted-foreground">
-							BS Computer Science, Avans University. Graduate studies in AI,
+							BS, Computer Science, Avans University. Graduate studies in AI,
 							Maastricht University.
 						</p>
 					</div>
