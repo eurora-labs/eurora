@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import SearchDialog from '@eurora/chat/components/SearchDialog.svelte';
 	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
@@ -9,6 +10,7 @@
 	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import SquarePenIcon from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
@@ -19,6 +21,7 @@
 	const sidebarState = useSidebar();
 
 	let threadInitialized = false;
+	let searchOpen = $state(false);
 
 	const identityLabel = $derived(user.displayName ?? user.email);
 	const avatarLetter = $derived(identityLabel ? identityLabel.charAt(0).toUpperCase() : '');
@@ -51,6 +54,15 @@
 		goto('/');
 	}
 
+	function openSearch() {
+		searchOpen = true;
+	}
+
+	function handleSearchSelect(threadId: string) {
+		sidebarState.setOpenMobile(false);
+		goto(`/${threadId}`);
+	}
+
 	function openSettings() {
 		sidebarState.setOpenMobile(false);
 		goto('/settings');
@@ -71,6 +83,12 @@
 				<Sidebar.MenuButton onclick={createChat}>
 					<SquarePenIcon />
 					<span>New chat</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton onclick={openSearch}>
+					<SearchIcon />
+					<span>Search</span>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
@@ -118,3 +136,5 @@
 		</Sidebar.Menu>
 	</Sidebar.Footer>
 </Sidebar.Root>
+
+<SearchDialog bind:open={searchOpen} onSelect={handleSearchSelect} />
