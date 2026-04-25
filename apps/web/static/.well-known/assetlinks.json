@@ -1,12 +1,12 @@
 [
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.eurora_labs.eurora.mobile.dev",
-      "sha256_cert_fingerprints": [
-        "D5:D3:E3:EC:82:A0:E2:56:47:15:54:A8:38:02:FF:71:4E:08:27:48:73:D6:F1:D6:3F:FA:CF:6F:EB:EB:5B:A7"
-      ]
-    }
-  }
+	{
+		"relation": ["delegate_permission/common.handle_all_urls"],
+		"target": {
+			"namespace": "android_app",
+			"package_name": "com.eurora_labs.eurora.mobile.dev",
+			"sha256_cert_fingerprints": [
+				"D5:D3:E3:EC:82:A0:E2:56:47:15:54:A8:38:02:FF:71:4E:08:27:48:73:D6:F1:D6:3F:FA:CF:6F:EB:EB:5B:A7"
+			]
+		}
+	}
 ]

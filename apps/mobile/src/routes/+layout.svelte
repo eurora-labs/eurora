@@ -49,10 +49,7 @@
 
 <ModeWatcher defaultMode="dark" track={false} />
 
-<div
-	class="app-shell relative flex flex-col h-screen overflow-hidden"
-	style="padding-top: var(--safe-area-top); padding-bottom: var(--safe-area-bottom);"
->
+<div class="app-shell relative flex flex-col h-screen overflow-hidden">
 	{@render children?.()}
 </div>
 
