@@ -85,7 +85,7 @@
 </script>
 
 <InputGroupTextarea
-	class={cn('field-sizing-content max-h-48 min-h-16', className)}
+	class={cn('field-sizing-content min-h-11 max-h-48 sm:min-h-16', className)}
 	name="message"
 	{placeholder}
 	oncompositionstart={handleCompositionStart}
