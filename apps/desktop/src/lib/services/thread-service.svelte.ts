@@ -1,8 +1,8 @@
 import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
-import { InjectionToken } from '@eurora/shared/context';
 import type { ChatStreamResponse, ContextChip, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { AssetChip, MessageNode } from '@eurora/chat/models/messages/index';
+import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type {
@@ -78,6 +78,30 @@ export class ThreadService implements IThreadService {
 		};
 	}
 
+	async searchThreads(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<ThreadSearchResult[]> {
+		const raw = await this.taurpc.thread.search_threads(query, limit, offset);
+		return raw.map((r) => ({ id: r.id, title: r.title, rank: r.rank }));
+	}
+
+	async searchMessages(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<MessageSearchResult[]> {
+		const raw = await this.taurpc.thread.search_messages(query, limit, offset);
+		return raw.map((r) => ({
+			id: r.id,
+			threadId: r.thread_id,
+			messageType: r.message_type,
+			snippet: r.snippet,
+			rank: r.rank,
+		}));
+	}
+
 	async *sendMessage(
 		threadId: string,
 		text: string,
@@ -150,5 +174,3 @@ export class ThreadService implements IThreadService {
 		}
 	}
 }
-
-export const THREAD_SERVICE = new InjectionToken<ThreadService>('ThreadService');

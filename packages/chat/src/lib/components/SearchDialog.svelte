@@ -1,22 +1,24 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import {
-		type SearchMessageResultView,
-		type SearchThreadResultView,
-	} from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { THREAD_SERVICE } from '$lib/services/thread/thread-service.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Command from '@eurora/ui/components/command/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
-	let { open = $bindable(false) }: { open?: boolean } = $props();
+	import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
 
-	const taurpc = inject(TAURPC_SERVICE);
+	interface Props {
+		open?: boolean;
+		onSelect?: (threadId: string) => void;
+	}
+
+	let { open = $bindable(false), onSelect }: Props = $props();
+
+	const threadService = inject(THREAD_SERVICE);
 
 	let query = $state('');
-	let threadResults: SearchThreadResultView[] = $state([]);
-	let messageResults: SearchMessageResultView[] = $state([]);
+	let threadResults: ThreadSearchResult[] = $state([]);
+	let messageResults: MessageSearchResult[] = $state([]);
 	let loading = $state(false);
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -42,8 +44,8 @@
 		debounceTimer = setTimeout(async () => {
 			try {
 				const [threads, messages] = await Promise.all([
-					taurpc.thread.search_threads(q, 10, 0),
-					taurpc.thread.search_messages(q, 10, 0),
+					threadService.searchThreads(q, 10, 0),
+					threadService.searchMessages(q, 10, 0),
 				]);
 				threadResults = threads;
 				messageResults = messages;
@@ -59,14 +61,7 @@
 
 	function selectThread(id: string) {
 		open = false;
-		// threadService.activeThreadId = id;
-		goto(`/${id}`);
-	}
-
-	function selectMessage(threadId: string) {
-		open = false;
-		// threadService.activeThreadId = threadId;
-		goto(`/${threadId}`);
+		onSelect?.(id);
 	}
 
 	function sanitizeSnippet(html: string): string {
@@ -136,11 +131,11 @@
 				{#each messageResults as message}
 					<Command.Item
 						value="msg-{message.id}"
-						onSelect={() => selectMessage(message.thread_id)}
+						onSelect={() => selectThread(message.threadId)}
 					>
 						<MessageSquareIcon class="size-4 text-foreground" />
 						<div class="flex flex-col gap-0.5 min-w-0">
-							<span class="text-xs">{message.message_type}</span>
+							<span class="text-xs">{message.messageType}</span>
 							<span class="line-clamp-2 text-sm"
 								>{@html sanitizeSnippet(message.snippet)}</span
 							>

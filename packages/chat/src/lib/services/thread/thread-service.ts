@@ -1,5 +1,6 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
+import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
 import type { ChatStreamEvent } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 
@@ -28,6 +29,8 @@ export interface IThreadService {
 	deleteThread(threadId: string): Promise<void>;
 	createThread(): Promise<Thread>;
 	generateTitle(threadId: string, content: string): Promise<Thread>;
+	searchThreads(query: string, limit: number, offset: number): Promise<ThreadSearchResult[]>;
+	searchMessages(query: string, limit: number, offset: number): Promise<MessageSearchResult[]>;
 	sendMessage(
 		threadId: string,
 		text: string,
