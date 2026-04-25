@@ -11,6 +11,9 @@
 			id: 'first',
 			label: 'Context recognition',
 			description: 'Instant context from your browser that you can ask about',
+			title: 'Ask any YouTube video a question',
+			subtitle:
+				'Watch Eurora pull the full transcript from a YouTube video and answer questions about it instantly, with no copy and paste required.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4',
 			loop: false,
 		},
@@ -18,6 +21,9 @@
 			id: 'second',
 			label: 'Instantly works on every website',
 			description: 'Eurora instantly answers your questions.',
+			title: 'One assistant for every website',
+			subtitle:
+				'See Eurora jump between articles, docs, and web apps, picking up the content of each page automatically so your questions always have the right context.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/multiple_websites_demo.mp4',
 			loop: true,
 		},
@@ -25,6 +31,9 @@
 			id: 'third',
 			label: 'The last AI assistant you will ever need',
 			description: 'A single AI assistant that works everywhere',
+			title: 'Turn any tweet into a conversation',
+			subtitle:
+				'Eurora reads the tweet and the surrounding thread, so you can dig deeper without ever leaving the page.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/twitter_demo.mp4',
 			loop: false,
 		},
@@ -65,6 +74,10 @@
 
 	<div class="flex flex-col gap-4">
 		{#key activeTab}
+			<div class="flex flex-col gap-3">
+				<h2 class="typo-title">{active.title}</h2>
+				<p class="typo-body max-w-3xl text-muted-foreground">{active.subtitle}</p>
+			</div>
 			<AutoplayVideo src={active.src} loop={active.loop} class="rounded-xl" />
 		{/key}
 
