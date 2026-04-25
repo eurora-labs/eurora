@@ -13,5 +13,12 @@
 		"moduleResolution": "nodenext",
 		"target": "ES2024"
 	},
-	"include": ["svelte.config.js", "vite.config.ts", "src/**/*"]
+	"include": [
+		"playwright.config.ts",
+		"postcss.config.mjs",
+		"svelte.config.js",
+		"vite.config.ts",
+		"vitest-setup-client.ts",
+		"src/**/*"
+	]
 }

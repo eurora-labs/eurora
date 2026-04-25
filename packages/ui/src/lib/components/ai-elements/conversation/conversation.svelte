@@ -17,7 +17,7 @@
 <div
 	bind:this={ref}
 	data-slot="conversation"
-	class={cn('relative flex h-full flex-col overflow-hidden', className)}
+	class={cn('relative flex flex-col overflow-hidden', className)}
 	role="log"
 	{...restProps}
 >
