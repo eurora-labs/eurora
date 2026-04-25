@@ -92,9 +92,10 @@
 			<FeatureSection.Header>
 				<FeatureSection.Title>New way to use AI</FeatureSection.Title>
 				<FeatureSection.Subtitle>
-					Eurora is built with a purpose to make an AI assistant that feel natural and
-					ergonomic. With a single click of a button, you can see every single chat as a
-					graph of edited messages. Navigate old conversations quickly and easily.
+					Eurora is built with a single purpose: to make an AI assistant that feels
+					natural and ergonomic. With a single click of a button, you can see every single
+					chat as a graph of edited messages. Navigate old conversations quickly and
+					easily.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
 			<FeatureSection.Content class="overflow-hidden">
@@ -130,8 +131,8 @@
 				<FeatureSection.Title>Integrates with every browser</FeatureSection.Title>
 				<FeatureSection.Subtitle>
 					Eurora does not have vendor lock-in. You can use any browser, on any platform.
-					You can even connect any local AI model to it. Eurora is made with a certainty
-					of transparency and putting your needs first.
+					You can even connect any local AI model to it. Eurora is built with a commitment
+					to transparency and to putting your needs first.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
 			<FeatureSection.Content class="overflow-hidden">

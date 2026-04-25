@@ -222,8 +222,8 @@
 	<h2 class="typo-title mb-4">Why we built this</h2>
 	<p class="typo-body text-muted-foreground max-w-2xl mb-10">
 		Every AI assistant we tried had the same trade-off: convenience in exchange for your data.
-		Eurora Labs has proven that you do not need to compromise convenience in exchange for your
-		data. Here's what drives every decision we make.
+		Eurora Labs has proven that you don't need to trade your data for convenience. Here's what
+		drives every decision we make.
 	</p>
 
 	<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
