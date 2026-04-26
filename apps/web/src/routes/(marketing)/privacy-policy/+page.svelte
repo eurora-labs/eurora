@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>Privacy Policy — Eurora Labs</title>
+	<title>Privacy Policy - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Eurora Labs privacy policy. Learn how we collect, use, and protect your data. GDPR-compliant, EU-hosted, open-source, with no data sold to third parties."
@@ -33,7 +33,7 @@
 					of Commerce under number 98516167.
 				</p>
 				<p class="mt-4">
-					This Privacy Policy explains how we collect, use, share and protect information
+					This Privacy Policy explains how we collect, use, share, and protect information
 					in relation to our website www.eurora-labs.com (the "Website"), our desktop
 					application (the "Desktop Application"), our browser extension (the "Browser
 					Extension"), and any related services (collectively, the "Service"). We process

@@ -61,7 +61,7 @@
 				<UserButton />
 			{:else}
 				<Button variant="ghost" href="/login" class="backdrop-blur-2xl">
-					Login
+					Sign In
 					<LogInIcon />
 				</Button>
 			{/if}
@@ -74,7 +74,7 @@
 				<UserButton />
 			{:else}
 				<Button variant="ghost" href="/login" size="sm" class="backdrop-blur-2xl">
-					Login
+					Sign In
 					<LogInIcon />
 				</Button>
 			{/if}
@@ -127,7 +127,7 @@
 								onclick={closeMobile}
 								class="w-full"
 							>
-								Login
+								Sign In
 								<LogInIcon />
 							</Button>
 						{/if}

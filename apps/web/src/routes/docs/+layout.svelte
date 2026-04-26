@@ -3,6 +3,7 @@
 	import MenuBar from '$lib/components/MenuBar.svelte';
 	import DocsSidebar from '$lib/components/docs/Sidebar.svelte';
 	import { docsNavItems } from '$lib/components/docs/nav.js';
+	import Footer from '$lib/components/marketing/Footer.svelte';
 
 	let { children } = $props();
 </script>
@@ -42,3 +43,5 @@
 		</div>
 	</div>
 </div>
+
+<Footer />

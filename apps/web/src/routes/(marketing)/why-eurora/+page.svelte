@@ -1,4 +1,19 @@
 <script lang="ts">
+	import { Avatar, AvatarFallback, AvatarImage } from '@eurora/ui/components/avatar/index';
+	import { Button } from '@eurora/ui/components/button/index';
+	import GithubIcon from '@lucide/svelte/icons/github';
+	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
+	import MailIcon from '@lucide/svelte/icons/mail';
+
+	const andre_roelofs_img = 'https://d26xptavrz5c8t.cloudfront.net/image/andre.png';
+
+	let copied = $state(false);
+
+	async function copyEmail() {
+		await navigator.clipboard.writeText('andre@eurora-labs.com');
+		copied = true;
+		setTimeout(() => (copied = false), 2000);
+	}
 </script>
 
 <svelte:head>
@@ -99,7 +114,67 @@
 			I have shown that AI assistants can be enjoyable to use without compromising on privacy
 			and security. Eurora is how I want to use AI going forward. Eurora is ultimately made
 			for you, so I would love to hear your thoughts. Please find the social media links
-			below. Leave a comment anywhere you want. I read it all and will reply as soon as I can.
+			below. Leave a comment anywhere you want. I read them all and will reply as soon as I
+			can.
 		</p>
 	</section>
+</div>
+
+<div class="mb-12 flex justify-end">
+	<div>
+		<p class="typo-body font-medium tracking-widest uppercase text-primary text-xs mb-2">
+			Written by
+		</p>
+		<div class="flex items-start gap-4 mr-5">
+			<Avatar class="size-12 ring-2 ring-border mt-0.5">
+				<AvatarImage src={andre_roelofs_img} alt="Andre Roelofs" />
+				<AvatarFallback>AR</AvatarFallback>
+			</Avatar>
+			<div>
+				<p class="typo-body font-semibold">Andre Roelofs</p>
+				<p class="typo-body text-muted-foreground">CTO &amp; Co-founder</p>
+				<div class="flex items-center gap-1 mt-1 -ml-2">
+					<Button
+						variant="ghost"
+						size="icon"
+						class="h-7 w-7 text-muted-foreground"
+						href="https://www.linkedin.com/in/andre-roelofs/"
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label="Andre Roelofs on LinkedIn"
+					>
+						<LinkedinIcon class="h-3.5 w-3.5" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						class="h-7 w-7 text-muted-foreground"
+						href="https://github.com/AndreRoelofs"
+						target="_blank"
+						rel="noopener noreferrer"
+						aria-label="Andre Roelofs on GitHub"
+					>
+						<GithubIcon class="h-3.5 w-3.5" />
+					</Button>
+					<div class="relative">
+						{#if copied}
+							<span
+								class="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-primary px-2 py-1 typo-body text-primary-foreground whitespace-nowrap"
+								>Copied!</span
+							>
+						{/if}
+						<Button
+							variant="ghost"
+							size="icon"
+							class="h-7 w-7 text-muted-foreground"
+							onclick={copyEmail}
+							aria-label="Copy email address"
+						>
+							<MailIcon class="h-3.5 w-3.5" />
+						</Button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>

@@ -11,6 +11,9 @@
 			id: 'first',
 			label: 'Context recognition',
 			description: 'Instant context from your browser that you can ask about',
+			title: 'Ask any YouTube video a question',
+			subtitle:
+				'Watch Eurora pull the full transcript from a YouTube video and answer questions about it instantly, with no copy and paste required.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/youtube_demo.mp4',
 			loop: false,
 		},
@@ -18,6 +21,9 @@
 			id: 'second',
 			label: 'Instantly works on every website',
 			description: 'Eurora instantly answers your questions.',
+			title: 'One assistant for every website',
+			subtitle:
+				'See Eurora jump between articles, docs, and web apps, picking up the content of each page automatically so your questions always have the right context.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/multiple_websites_demo.mp4',
 			loop: true,
 		},
@@ -25,6 +31,9 @@
 			id: 'third',
 			label: 'The last AI assistant you will ever need',
 			description: 'A single AI assistant that works everywhere',
+			title: 'Turn any tweet into a conversation',
+			subtitle:
+				'Eurora reads the tweet and the surrounding thread, so you can dig deeper without ever leaving the page.',
 			src: 'https://d26xptavrz5c8t.cloudfront.net/video/twitter_demo.mp4',
 			loop: false,
 		},
@@ -65,6 +74,10 @@
 
 	<div class="flex flex-col gap-4">
 		{#key activeTab}
+			<div class="flex flex-col gap-3">
+				<h2 class="typo-title">{active.title}</h2>
+				<p class="typo-body max-w-3xl text-muted-foreground">{active.subtitle}</p>
+			</div>
 			<AutoplayVideo src={active.src} loop={active.loop} class="rounded-xl" />
 		{/key}
 
@@ -92,9 +105,9 @@
 			<FeatureSection.Header>
 				<FeatureSection.Title>New way to use AI</FeatureSection.Title>
 				<FeatureSection.Subtitle>
-					Eurora is built with a purpose to make an AI assistant that feel natural and
-					ergonomic. With a single click of a button, you can see every single chat as a
-					graph of edited messages. Navigate old conversations quickly and easily.
+					Eurora is built with one purpose: to be an AI assistant that feels natural and
+					ergonomic. With a single click, every chat becomes a graph of edited messages.
+					Navigate old conversations quickly and easily.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
 			<FeatureSection.Content class="overflow-hidden">
@@ -110,8 +123,8 @@
 			<FeatureSection.Header>
 				<FeatureSection.Title>Easiest way to use AI</FeatureSection.Title>
 				<FeatureSection.Subtitle>
-					Get answers instantly. Eurora works on your platform, with your browser. All
-					data is stored securely in a Sovereign European data center. Eurora provides
+					Get answers instantly. Eurora works on every platform, in any browser. All data
+					is stored securely in a sovereign European data center. Eurora provides
 					independence and accessibility with the highest standard of data protection and
 					privacy.
 				</FeatureSection.Subtitle>
@@ -130,8 +143,8 @@
 				<FeatureSection.Title>Integrates with every browser</FeatureSection.Title>
 				<FeatureSection.Subtitle>
 					Eurora does not have vendor lock-in. You can use any browser, on any platform.
-					You can even connect any local AI model to it. Eurora is made with a certainty
-					of transparency and putting your needs first.
+					You can even connect any local AI model to it. Eurora is built with a commitment
+					to transparency and to putting your needs first.
 				</FeatureSection.Subtitle>
 			</FeatureSection.Header>
 			<FeatureSection.Content class="overflow-hidden">

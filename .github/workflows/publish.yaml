@@ -621,7 +621,7 @@ jobs:
                     codesign --force --sign "$SIGN_IDENTITY" "release/darwin/${ARCH_DIR}/$DMG_NAME"
                     echo "DMG signed with: $SIGN_IDENTITY"
                   else
-                    echo "ERROR: No 'Developer ID Application' signing identity found for team $APPLE_TEAM_ID — refusing to upload unsigned DMG ($DMG_NAME)"
+                    echo "ERROR: No 'Developer ID Application' signing identity found for team $APPLE_TEAM_ID - refusing to upload unsigned DMG ($DMG_NAME)"
                     exit 1
                   fi
 
