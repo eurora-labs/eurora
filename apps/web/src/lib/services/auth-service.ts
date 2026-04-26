@@ -1,3 +1,4 @@
+import { consumeAppRedirectUri } from '$lib/auth/redirect-uri';
 import { create } from '@bufbuild/protobuf';
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
@@ -77,7 +78,7 @@ export class AuthService {
 		});
 	}
 
-	public async associateDesktopLoginIfPending(
+	public async associateAppLoginIfPending(
 		accessToken: string,
 		options: { consumeRedirect?: boolean } = {},
 	): Promise<boolean> {
@@ -93,9 +94,8 @@ export class AuthService {
 			sessionStorage.removeItem('challengeMethod');
 
 			if (options.consumeRedirect) {
-				const redirectUri = sessionStorage.getItem('deviceRedirectUri');
+				const redirectUri = consumeAppRedirectUri();
 				if (redirectUri) {
-					sessionStorage.removeItem('deviceRedirectUri');
 					window.location.href = redirectUri;
 				}
 			}

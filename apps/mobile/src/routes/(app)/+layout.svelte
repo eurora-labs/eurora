@@ -27,16 +27,14 @@
 </script>
 
 {#if ready}
-	<Sidebar.Provider>
+	<Sidebar.Provider class="h-dvh min-h-dvh">
 		<MobileSidebar />
-		<Sidebar.Inset>
-			<header class="flex items-center gap-2 px-3 py-2 border-b border-border">
+		<Sidebar.Inset class="h-dvh min-h-0">
+			<header class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
 				<Sidebar.Trigger />
 				<h1 class="text-sm font-semibold text-foreground">Eurora</h1>
 			</header>
-			<main class="flex-1 min-h-0 bg-background">
-				{@render children?.()}
-			</main>
+			{@render children?.()}
 		</Sidebar.Inset>
 	</Sidebar.Provider>
 {/if}

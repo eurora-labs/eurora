@@ -5,7 +5,7 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
 		<meta
 			name="viewport"
-			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content"
 		/>
 		<style>
 			:root {
@@ -13,6 +13,12 @@
 			}
 			.dark {
 				--background: oklch(0.2303 0.0125 264.2926);
+			}
+			html,
+			body {
+				height: 100%;
+				overflow: hidden;
+				overscroll-behavior: none;
 			}
 		</style>
 		%sveltekit.head%

@@ -28,6 +28,22 @@ export type Claims = {
 	token_type: string,
 	role: Role,
 	aud?: string,
+	email_verified?: boolean,
+	/**
+	 *  RFC 7519 JWT ID. Guarantees that two tokens minted for
+	 *  the same subject within the same second never collide
+	 *  after hashing (see refresh-token rotation).
+	 */
+	jti?: string,
+};
+
+export type GetLoginTokenArgs = {
+	/**
+	 *  Redirect URI the OAuth flow should send the user to once authentication
+	 *  completes. Echoed verbatim into the `redirect_uri` query param the web
+	 *  login page consumes via `validateAppRedirectUri`.
+	 */
+	redirect_uri: string,
 };
 
 export type Index = { IntIndex: bigint } | { StrIndex: string };
@@ -316,6 +332,20 @@ export type Query = {
 
 export type Role = "Free" | "Tier1";
 
+export type SearchMessageResultView = {
+	id: string,
+	thread_id: string,
+	message_type: string,
+	snippet: string,
+	rank: number,
+};
+
+export type SearchThreadResultView = {
+	id: string,
+	title: string,
+	rank: number,
+};
+
 export type Thread = {
 	id: string | null,
 	title: string,
@@ -324,7 +354,7 @@ export type Thread = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_display_name":[],"get_email":[],"get_login_token":[],"get_role":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'thread':'{"create":[],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"switch_branch":["thread_id","message_id","direction"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"complete_login":["callback_url"],"get_display_name":[],"get_email":[],"get_login_token":["args"],"get_role":[],"is_authenticated":[],"login":["login","password"],"logout":[],"refresh_session":[],"register":["email","password"]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'thread':'{"create":[],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -334,15 +364,22 @@ export type Router = { "auth": {auth_state_changed: (claims: {
 	token_type: string,
 	role: Role,
 	aud: string,
+	email_verified: boolean,
+	/**
+	 *  RFC 7519 JWT ID. Guarantees that two tokens minted for
+	 *  the same subject within the same second never collide
+	 *  after hashing (see refresh-token rotation).
+	 */
+	jti: string,
 } | null) => Promise<void>, 
+complete_login: (callbackUrl: string) => Promise<boolean>, 
 get_display_name: () => Promise<string | null>, 
 get_email: () => Promise<string>, 
-get_login_token: () => Promise<LoginToken>, 
+get_login_token: (args: GetLoginTokenArgs) => Promise<LoginToken>, 
 get_role: () => Promise<string>, 
 is_authenticated: () => Promise<boolean>, 
 login: (login: string, password: string) => Promise<null>, 
 logout: () => Promise<null>, 
-poll_for_login: () => Promise<boolean>, 
 refresh_session: () => Promise<null>, 
 register: (email: string, password: string) => Promise<null>},
 "chat": {cancel_query: (threadId: string) => Promise<null>, 
@@ -352,6 +389,8 @@ delete: (threadId: string) => Promise<null>,
 generate_title: (threadId: string, content: string) => Promise<Thread>, 
 get_messages: (threadId: string, limit: number, offset: number, allVariants: boolean) => Promise<BaseMessageWithSibling[]>, 
 list: (limit: number, offset: number) => Promise<Thread[]>, 
+search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 
+search_threads: (query: string, limit: number, offset: number) => Promise<SearchThreadResultView[]>, 
 switch_branch: (threadId: string, messageId: string, direction: number) => Promise<BaseMessageWithSibling[]>} };
 
 export const createTauRPCProxy = () => createProxy<Router>(ARGS_MAP)

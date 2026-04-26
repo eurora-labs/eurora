@@ -1,5 +1,6 @@
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { MessageNode } from '$lib/models/messages/index.js';
+import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
 import type { ChatStreamEvent } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type {
@@ -147,6 +148,27 @@ export class FakeThreadService implements IThreadService {
 		const thread = this.threads.find((t) => t.id === threadId);
 		if (!thread) throw new Error('Thread not found');
 		return { ...thread, title: `Generated title for ${threadId}` };
+	}
+
+	async searchThreads(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<ThreadSearchResult[]> {
+		const needle = query.trim().toLowerCase();
+		if (!needle) return [];
+		return this.threads
+			.filter((t) => t.title.toLowerCase().includes(needle))
+			.slice(offset, offset + limit)
+			.map((t) => ({ id: t.id, title: t.title, rank: 1 }));
+	}
+
+	async searchMessages(
+		_query: string,
+		_limit: number,
+		_offset: number,
+	): Promise<MessageSearchResult[]> {
+		return [];
 	}
 
 	async *sendMessage(
