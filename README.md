@@ -4,7 +4,7 @@
   <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/m/eurora-labs/eurora"/>
   <img alt="Github Last Commit" src="https://img.shields.io/github/last-commit/eurora-labs/eurora"/>
   <img alt="Github Contributors" src="https://img.shields.io/github/contributors/eurora-labs/eurora"/>
-  <img alt="GitHub closed issues" src="https://img.shields.io/github/issues-closed/eurora-labs/eurora"/
+  <img alt="GitHub closed issues" src="https://img.shields.io/github/issues-closed/eurora-labs/eurora"/>
   <img alt="Discord" src="https://img.shields.io/discord/1471808039349653516?label=discord"/>
 </p>
 
