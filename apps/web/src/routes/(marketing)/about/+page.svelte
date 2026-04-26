@@ -79,7 +79,7 @@
 				<p class="typo-body text-muted-foreground mb-5">
 					30+ years driving product adoption at Apple, Adobe, Avid, DDN Storage and
 					Northrop Grumman. Laura has seen firsthand how technology succeeds when it puts
-					people first - fails when it doesn't.
+					people first.
 				</p>
 
 				<div class="space-y-3 mb-5">
@@ -93,8 +93,8 @@
 					<div>
 						<p class="typo-body font-medium mb-1">Education</p>
 						<p class="typo-body text-muted-foreground">
-							MBA, Pepperdine University. BS, Business Administration (Finance minor),
-							University of Southern California.
+							MBA, Pepperdine University. BS, Business Administration, University of
+							Southern California.
 						</p>
 					</div>
 				</div>
