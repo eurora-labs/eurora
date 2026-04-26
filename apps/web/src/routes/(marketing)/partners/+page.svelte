@@ -33,7 +33,7 @@
 
 <div class="mb-16">
 	<p class="typo-body font-medium tracking-widest uppercase text-primary mb-3">Partner Program</p>
-	<h1 class="typo-title mb-4">Interested in becoming a Eurora partner?</h1>
+	<h1 class="typo-title mb-4">Interested in becoming an Eurora partner?</h1>
 	<p class="typo-body max-w-2xl text-muted-foreground mb-4">
 		Eurora partners with forward-thinking companies to build the future of private, open-source
 		AI. Our partner program is designed for shared growth, offering access to our platform,
@@ -46,7 +46,7 @@
 </div>
 
 <div class="mb-16">
-	<h2 class="typo-title mb-4">Who we partner with</h2>
+	<h2 class="typo-title mb-4">Who are our partners</h2>
 	<p class="typo-body text-muted-foreground max-w-2xl mb-10">
 		Whether you're integrating with Eurora, deploying it for clients, or extending it in the
 		open, there's a place in the program for you.
