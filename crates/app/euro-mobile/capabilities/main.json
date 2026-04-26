@@ -12,6 +12,7 @@
 		"process:default",
 		"store:default",
 		"deep-link:default",
+		"oauth-session:default",
 		"http:allow-fetch",
 		{
 			"identifier": "http:default",

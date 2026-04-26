@@ -2,7 +2,10 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["FKLH326P9A.com.eurora-labs.eurora.mobile.dev"],
+        "appIDs": [
+          "FKLH326P9A.com.eurora-labs.eurora.mobile",
+          "FKLH326P9A.com.eurora-labs.eurora.mobile.dev"
+        ],
         "components": [
           {
             "/": "/mobile/callback*",

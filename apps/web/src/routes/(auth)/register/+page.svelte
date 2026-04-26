@@ -58,7 +58,10 @@
 			});
 			const tokens = await authService.register(request);
 			auth.login(tokens);
-			await authService.associateDesktopLoginIfPending(tokens.accessToken);
+			const associated = await authService.associateAppLoginIfPending(tokens.accessToken, {
+				consumeRedirect: true,
+			});
+			if (associated) return;
 			goto('/');
 		} catch (err) {
 			console.error('Registration error:', err);

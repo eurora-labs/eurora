@@ -18,6 +18,7 @@ android {
     namespace = "com.eurora_labs.eurora.mobile.dev"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
+        manifestPlaceholders["oauthSessionRedirectScheme"] = "eurora"
         applicationId = "com.eurora_labs.eurora.mobile.dev"
         minSdk = 24
         targetSdk = 36
@@ -45,8 +46,12 @@ android {
             )
         }
     }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         buildConfig = true

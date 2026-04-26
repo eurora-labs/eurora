@@ -65,12 +65,12 @@ export class UserService {
 		await this.taurpc.auth.logout();
 	}
 
-	async getLoginToken(): Promise<LoginToken> {
-		return this.taurpc.auth.get_login_token();
+	async getLoginToken(redirectUri: string): Promise<LoginToken> {
+		return this.taurpc.auth.get_login_token({ redirect_uri: redirectUri });
 	}
 
-	async pollForLogin(): Promise<boolean> {
-		const success = await this.taurpc.auth.poll_for_login();
+	async completeLogin(callbackUrl: string): Promise<boolean> {
+		const success = await this.taurpc.auth.complete_login(callbackUrl);
 		if (success) {
 			await this.fetchProfile();
 		}

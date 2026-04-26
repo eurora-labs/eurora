@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { consumeAppRedirectUri, storeAppRedirectUri } from '$lib/auth/redirect-uri';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
 	import { auth, accessToken, currentUser } from '$lib/stores/auth.js';
@@ -19,22 +20,9 @@
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 
-	let desktopLoginDone = $state(false);
+	let appLoginDone = $state(false);
 	const authService = inject(AUTH_SERVICE);
-	let pendingDesktopLogin = $state<string | null>(null);
-
-	function storeDeviceRedirectUri() {
-		const redirectUri = page.url.searchParams.get('redirect_uri');
-		if (redirectUri && redirectUri.startsWith('eurora://')) {
-			sessionStorage.setItem('deviceRedirectUri', redirectUri);
-		}
-	}
-
-	function consumeDeviceRedirectUri(): string | null {
-		const uri = sessionStorage.getItem('deviceRedirectUri');
-		if (uri) sessionStorage.removeItem('deviceRedirectUri');
-		return uri;
-	}
+	let pendingAppLogin = $state<string | null>(null);
 
 	onMount(async () => {
 		try {
@@ -48,11 +36,11 @@
 				}
 				sessionStorage.setItem('loginToken', loginToken);
 				sessionStorage.setItem('challengeMethod', challengeMethod);
-				storeDeviceRedirectUri();
+				storeAppRedirectUri(page.url.searchParams.get('redirect_uri'));
 
 				const isValid = await auth.ensureValidToken();
 				if (isValid && get(accessToken)) {
-					pendingDesktopLogin = loginToken;
+					pendingAppLogin = loginToken;
 				} else {
 					goto('/login');
 				}
@@ -66,47 +54,47 @@
 		}
 	});
 
-	async function handleConfirmDesktopLogin() {
-		if (!pendingDesktopLogin) return;
+	async function handleConfirmAppLogin() {
+		if (!pendingAppLogin) return;
 		loading = true;
 		submitError = null;
 
 		const token = get(accessToken);
 		if (!token) {
 			submitError = 'Session expired. Please sign in again.';
-			pendingDesktopLogin = null;
+			pendingAppLogin = null;
 			loading = false;
 			return;
 		}
 
 		try {
 			const request = create(AssociateLoginTokenRequestSchema, {
-				codeChallenge: pendingDesktopLogin,
+				codeChallenge: pendingAppLogin,
 			});
 			await authService.associateLoginToken(request, token);
 			sessionStorage.removeItem('loginToken');
 			sessionStorage.removeItem('challengeMethod');
-			desktopLoginDone = true;
-			pendingDesktopLogin = null;
+			appLoginDone = true;
+			pendingAppLogin = null;
 
-			const redirectUri = consumeDeviceRedirectUri();
+			const redirectUri = consumeAppRedirectUri();
 			if (redirectUri) {
 				window.location.href = redirectUri;
 				return;
 			}
 		} catch (err) {
 			console.error('Failed to associate login token:', err);
-			submitError = 'Failed to authorize desktop app. Please try again.';
+			submitError = 'Failed to authorize the Eurora app. Please try again.';
 		} finally {
 			loading = false;
 		}
 	}
 
-	async function tryAssociateDesktopLogin(tokenValue: string): Promise<boolean> {
-		const associated = await authService.associateDesktopLoginIfPending(tokenValue, {
+	async function tryAssociateAppLogin(tokenValue: string): Promise<boolean> {
+		const associated = await authService.associateAppLoginIfPending(tokenValue, {
 			consumeRedirect: true,
 		});
-		if (associated) desktopLoginDone = true;
+		if (associated) appLoginDone = true;
 		return associated;
 	}
 
@@ -167,7 +155,7 @@
 			});
 			const tokens = await authService.login(request);
 			auth.login(tokens);
-			if (await tryAssociateDesktopLogin(tokens.accessToken)) return;
+			if (await tryAssociateAppLogin(tokens.accessToken)) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -189,7 +177,7 @@
 			});
 			const tokens = await authService.register(request);
 			auth.login(tokens);
-			if (await tryAssociateDesktopLogin(tokens.accessToken)) return;
+			if (await tryAssociateAppLogin(tokens.accessToken)) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -240,18 +228,18 @@
 
 <div class="flex min-h-screen items-start justify-center px-4 pt-[25vh]">
 	<div class="w-full max-w-md space-y-8">
-		{#if desktopLoginDone}
+		{#if appLoginDone}
 			<div class="text-center">
 				<h1 class="text-3xl font-bold tracking-tight">App connected</h1>
 				<p class="text-muted-foreground mt-2">
 					You can close this tab and return to the app.
 				</p>
 			</div>
-		{:else if pendingDesktopLogin}
+		{:else if pendingAppLogin}
 			<div class="text-center">
-				<h1 class="text-3xl font-bold tracking-tight">Authorize desktop app</h1>
+				<h1 class="text-3xl font-bold tracking-tight">Authorize the Eurora app</h1>
 				<p class="text-muted-foreground mt-2">
-					Sign in to the Eurora desktop app as <strong>{$currentUser?.email}</strong>?
+					Sign in to the Eurora app as <strong>{$currentUser?.email}</strong>?
 				</p>
 			</div>
 
@@ -263,7 +251,7 @@
 				{/if}
 
 				<div class="flex flex-col gap-3">
-					<Button class="w-full" disabled={loading} onclick={handleConfirmDesktopLogin}>
+					<Button class="w-full" disabled={loading} onclick={handleConfirmAppLogin}>
 						{loading ? 'Authorizing...' : 'Authorize'}
 					</Button>
 					<Button
@@ -272,7 +260,7 @@
 						disabled={loading}
 						onclick={() => {
 							auth.logout();
-							pendingDesktopLogin = null;
+							pendingAppLogin = null;
 						}}
 					>
 						Log out

@@ -14,6 +14,14 @@ pub struct LoginToken {
     pub url: String,
 }
 
+#[taurpc::ipc_type]
+pub struct GetLoginTokenArgs {
+    /// Redirect URI the OAuth flow should send the user to once authentication
+    /// completes. Echoed verbatim into the `redirect_uri` query param the web
+    /// login page consumes via `validateAppRedirectUri`.
+    pub redirect_uri: String,
+}
+
 #[taurpc::procedures(
     path = "auth",
     export_to = "../../../apps/mobile/src/lib/bindings/bindings.ts"
@@ -22,8 +30,14 @@ pub trait AuthApi {
     #[taurpc(event)]
     async fn auth_state_changed(claims: Option<Claims>);
 
-    async fn get_login_token<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginToken, String>;
-    async fn poll_for_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
+    async fn get_login_token<R: Runtime>(
+        app_handle: AppHandle<R>,
+        args: GetLoginTokenArgs,
+    ) -> Result<LoginToken, String>;
+    async fn complete_login<R: Runtime>(
+        app_handle: AppHandle<R>,
+        callback_url: String,
+    ) -> Result<bool, String>;
 
     async fn login<R: Runtime>(
         app_handle: AppHandle<R>,
@@ -48,6 +62,30 @@ pub trait AuthApi {
 }
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
+const LOGIN_REDIRECT_URI: &str = "LOGIN_REDIRECT_URI";
+
+/// Accepted redirect URI shapes mirror the web validator
+/// (`apps/web/src/lib/auth/redirect-uri.ts`):
+///   - `eurora://...` (custom URL scheme intercepted by ASWebAuthenticationSession)
+///   - `<webOrigin>/mobile/callback` (universal link fallback)
+fn parse_redirect_uri(raw: &str) -> Result<Url, String> {
+    let parsed = Url::parse(raw).map_err(|e| format!("Invalid redirect URI: {e}"))?;
+    let scheme = parsed.scheme();
+    let path = parsed.path();
+    let allowed = scheme == "eurora"
+        || ((scheme == "https" || scheme == "http") && path == "/mobile/callback");
+    if !allowed {
+        return Err(format!("Disallowed redirect URI: {raw}"));
+    }
+    Ok(parsed)
+}
+
+fn redirect_uri_matches(expected: &Url, received: &Url) -> bool {
+    expected.scheme() == received.scheme()
+        && expected.host_str() == received.host_str()
+        && expected.port_or_known_default() == received.port_or_known_default()
+        && expected.path() == received.path()
+}
 
 fn user_controller<R: Runtime>(
     app_handle: &AppHandle<R>,
@@ -79,8 +117,11 @@ impl AuthApi for AuthApiImpl {
     async fn get_login_token<R: Runtime>(
         self,
         app_handle: AppHandle<R>,
+        args: GetLoginTokenArgs,
     ) -> Result<LoginToken, String> {
         let auth_manager = auth_manager(&app_handle).await?;
+
+        let redirect_uri = parse_redirect_uri(&args.redirect_uri)?;
 
         let (code_verifier, code_challenge) = auth_manager
             .get_login_tokens()
@@ -94,10 +135,15 @@ impl AuthApi for AuthApiImpl {
         url.query_pairs_mut()
             .append_pair("code_challenge", &code_challenge)
             .append_pair("code_challenge_method", "S256")
-            .append_pair("redirect_uri", &format!("{base_url}/mobile/callback"));
+            .append_pair("redirect_uri", redirect_uri.as_str());
 
         secret::persist(LOGIN_CODE_VERIFIER, &SecretString::from(code_verifier))
             .ctx("Failed to persist code verifier")?;
+        secret::persist(
+            LOGIN_REDIRECT_URI,
+            &SecretString::from(redirect_uri.to_string()),
+        )
+        .ctx("Failed to persist redirect URI")?;
 
         Ok(LoginToken {
             code_challenge: code_challenge.to_string(),
@@ -106,10 +152,25 @@ impl AuthApi for AuthApiImpl {
         })
     }
 
-    async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
+    async fn complete_login<R: Runtime>(
+        self,
+        app_handle: AppHandle<R>,
+        callback_url: String,
+    ) -> Result<bool, String> {
         if app_handle.try_state::<SharedUserController>().is_none() {
             return Ok(false);
         };
+
+        let expected_redirect = secret::retrieve(LOGIN_REDIRECT_URI)
+            .ctx("Failed to retrieve expected redirect URI")?
+            .ok_or_else(|| "No login in progress".to_string())?;
+        let expected = Url::parse(expected_redirect.expose_secret())
+            .map_err(|e| format!("Stored redirect URI is invalid: {e}"))?;
+        let received = Url::parse(&callback_url)
+            .map_err(|e| format!("Callback URL is not a valid URL: {e}"))?;
+        if !redirect_uri_matches(&expected, &received) {
+            return Err("Callback URL does not match the expected redirect URI".to_string());
+        }
 
         let auth_manager = auth_manager(&app_handle).await?;
 
@@ -123,6 +184,7 @@ impl AuthApi for AuthApiImpl {
         {
             Ok(_) => {
                 secret::delete(LOGIN_CODE_VERIFIER).ctx("Failed to remove login token")?;
+                secret::delete(LOGIN_REDIRECT_URI).ctx("Failed to remove redirect URI")?;
 
                 if let Ok(claims) = auth_manager.get_access_token_payload() {
                     emit_auth_state(&app_handle, Some(claims));
