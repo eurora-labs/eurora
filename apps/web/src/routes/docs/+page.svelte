@@ -4,7 +4,7 @@
 </script>
 
 <svelte:head>
-	<title>Documentation — Eurora Labs</title>
+	<title>Documentation - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Eurora documentation. Get started with the context-aware, cross-platform, open-source AI assistant that integrates with your browser and operating system."
@@ -16,7 +16,7 @@
 	<p class="mb-12 text-lg text-muted-foreground">
 		Eurora is a context-aware, cross-platform, open-source AI platform built in Europe. It
 		integrates with your operating system and browser to give AI full awareness of what you're
-		working on — without selling your data or invading your privacy.
+		working on - without selling your data or invading your privacy.
 	</p>
 
 	<div class="flex flex-col gap-12">
@@ -37,7 +37,7 @@
 
 				<figcaption class="mt-2 text-center text-sm text-muted-foreground px-8">
 					Eurora's desktop app providing context-aware AI assistance while browsing
-					YouTube. In this case, Eurora picked up the current youtube video as an asset.
+					YouTube. In this case, Eurora has captured the current YouTube video as context.
 				</figcaption>
 			</figure>
 		</section>
@@ -46,7 +46,7 @@
 			<h2 class="mb-4 text-2xl font-semibold">Getting Started</h2>
 			<p class="mb-8 text-muted-foreground">
 				The easiest way to start using Eurora is to download the app and sign up for a free
-				account. Below you will find a video with full overview.
+				account. Below you will find a video with a full overview.
 			</p>
 		</section>
 

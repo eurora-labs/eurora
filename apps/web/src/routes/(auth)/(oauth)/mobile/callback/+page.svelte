@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-	<title>Eurora — Authentication</title>
+	<title>Eurora - Authentication</title>
 </svelte:head>
 
 <div

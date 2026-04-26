@@ -44,7 +44,7 @@ async function fetchFaviconAsBase64(faviconUrl: string): Promise<string> {
 	});
 }
 
-// Safari often has null favIconUrl — fall back to content script DOM query
+// Safari often has null favIconUrl - fall back to content script DOM query
 async function getFaviconUrlFromContentScript(tabId: number): Promise<string | null> {
 	try {
 		const results = await browser.scripting.executeScript({

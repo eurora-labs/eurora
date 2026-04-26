@@ -29,7 +29,7 @@
 </script>
 
 <svelte:head>
-	<title>Contact — Eurora Labs</title>
+	<title>Contact - Eurora Labs</title>
 	<meta
 		name="description"
 		content="Get in touch with Eurora Labs by email or join our community on Discord, GitHub, Reddit, Bluesky, and X. Based in Vlijmen, The Netherlands."
@@ -40,7 +40,7 @@
 	<p class="text-sm font-medium tracking-widest uppercase text-primary mb-3">Get in touch</p>
 	<h1 class="text-4xl font-bold mb-4 sm:text-5xl">We read every message.</h1>
 	<p class="max-w-2xl text-lg text-muted-foreground leading-relaxed">
-		Whether you have a question, want to report a bug, or just want to say hello — reach out
+		Whether you have a question, want to report a bug, or just want to say hello - reach out
 		through any of the channels below.
 	</p>
 </div>
