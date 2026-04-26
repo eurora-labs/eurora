@@ -27,10 +27,10 @@
 		resources: {
 			title: 'Resources & Support',
 			links: [
-				{ name: 'Documentation', href: '/docs' },
 				// { name: 'Help Center', href: '/help' },
 				{ name: 'Contact', href: '/contact' },
-				// { name: 'Blog', href: '/blog' },
+				{ name: 'Documentation', href: '/docs' },
+				{ name: 'Partners', href: '/partners' },
 			],
 		},
 		social: {
