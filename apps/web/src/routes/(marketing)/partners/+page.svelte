@@ -233,15 +233,6 @@
 	</div>
 	<div class="md:col-span-2">
 		<Accordion.Root type="single">
-			<Accordion.Item value="fee">
-				<Accordion.Trigger class="text-lg py-5"
-					>Is there a partnership fee?</Accordion.Trigger
-				>
-				<Accordion.Content class="text-lg leading-relaxed text-muted-foreground">
-					No. Joining the Eurora partner program is free. Specific commercial terms are
-					agreed per engagement.
-				</Accordion.Content>
-			</Accordion.Item>
 			<Accordion.Item value="exclusive">
 				<Accordion.Trigger class="text-lg py-5"
 					>Do you offer exclusive partnerships?</Accordion.Trigger
@@ -261,12 +252,9 @@
 				</Accordion.Content>
 			</Accordion.Item>
 			<Accordion.Item value="selfhost">
-				<Accordion.Trigger class="text-lg py-5"
-					>Can we white-label or self-host Eurora?</Accordion.Trigger
-				>
+				<Accordion.Trigger class="text-lg py-5">Can we self-host Eurora?</Accordion.Trigger>
 				<Accordion.Content class="text-lg leading-relaxed text-muted-foreground">
-					Yes. Eurora is open source and self-hostable. White-label options are available
-					for solution partners deploying to end customers.
+					Yes. Eurora is open source and self-hostable.
 				</Accordion.Content>
 			</Accordion.Item>
 			<Accordion.Item value="data">
