@@ -165,7 +165,7 @@
 
 <div class="mb-16 rounded-2xl bg-card p-8 sm:p-12">
 	<QuoteIcon class="size-8 text-primary mb-4" />
-	<blockquote class="typo-title max-w-3xl mb-6">
+	<blockquote class="typo-body max-w-3xl mb-6">
 		At Eurora Labs, we believe in the power of open source to drive innovation and empower
 		people to succeed. We're committed to bring European Open Source AI to the world.
 	</blockquote>
