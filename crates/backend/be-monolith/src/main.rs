@@ -8,7 +8,7 @@ use be_authz::{
     AuthzState, CasbinAuthz, GrpcAuthzLayer, TrustedProxies, authz_middleware,
     new_auth_failure_rate_limiter, new_health_check_rate_limiter,
 };
-use be_payment_service::init_payment_service;
+use be_payment_service::{PaymentService, init_payment_service};
 use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use be_thread_service::{ProtoThreadServiceServer, ThreadService};
@@ -181,6 +181,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let auth_service = AuthService::new(db_manager.clone(), jwt_config.clone(), email_service);
 
+    let payment_service = match init_payment_service(db_manager.clone()) {
+        Ok(svc) => Some(svc),
+        Err(e) if local_mode => {
+            tracing::warn!("Payment service disabled in local mode: {}", e);
+            None
+        }
+        Err(e) => {
+            tracing::error!("Failed to initialize payment service: {}", e);
+            return Err(e.into());
+        }
+    };
+
     let storage_config =
         be_storage::StorageConfig::from_env().expect("Failed to load storage config");
     let storage = Arc::new(
@@ -216,16 +228,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let payment_router = match init_payment_service(db_manager.clone()) {
-        Ok(router) => router,
-        Err(e) if local_mode => {
-            tracing::warn!("Payment service disabled in local mode: {}", e);
-            axum::Router::new()
-        }
-        Err(e) => {
-            tracing::error!("Failed to initialize payment service: {}", e);
-            return Err(e.into());
-        }
+    let (payment_router, payment_drainer) = match payment_service {
+        Some(PaymentService {
+            router, drainer, ..
+        }) => (router, Some(drainer)),
+        None => (axum::Router::new(), None),
     };
 
     let auth_rate_limiter = new_auth_failure_rate_limiter();
@@ -314,15 +321,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         result = grpc_future => {
             if let Err(e) = result {
                 tracing::error!("gRPC server error: {}", e);
+                if let Some(drainer) = payment_drainer { drainer.shutdown().await; }
                 return Err(e.into());
             }
         }
         result = http_future => {
             if let Err(e) = result {
                 tracing::error!("HTTP server error: {}", e);
+                if let Some(drainer) = payment_drainer { drainer.shutdown().await; }
                 return Err(e.into());
             }
         }
+    }
+
+    if let Some(drainer) = payment_drainer {
+        drainer.shutdown().await;
     }
 
     Ok(())

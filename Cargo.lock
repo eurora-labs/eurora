@@ -1685,6 +1685,7 @@ dependencies = [
  "tower-http",
  "tower_governor",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

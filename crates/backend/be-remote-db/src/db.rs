@@ -12,8 +12,8 @@ use crate::{
     error::{DbError, DbResult},
     types::{
         Activity, ActivityAsset, Asset, AssetStatus, EmailVerificationToken, LoginToken, Message,
-        OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials, RefreshToken,
-        SearchResultMessage, SearchResultThread, Thread, TokenUsage, User,
+        OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials, ProvisioningJob,
+        RefreshToken, SearchResultMessage, SearchResultThread, Thread, TokenUsage, User,
     },
 };
 
@@ -125,6 +125,12 @@ impl DatabaseManager {
             .await?;
         }
 
+        self.enqueue_stripe_customer_provisioning()
+            .executor(&mut *tx)
+            .user_id(user_id)
+            .call()
+            .await?;
+
         tx.commit().await?;
 
         Ok(user)
@@ -186,6 +192,12 @@ impl DatabaseManager {
         .bind(now)
         .execute(&mut *tx)
         .await?;
+
+        self.enqueue_stripe_customer_provisioning()
+            .executor(&mut *tx)
+            .user_id(user_id)
+            .call()
+            .await?;
 
         tx.commit().await?;
 
@@ -1604,6 +1616,7 @@ impl DatabaseManager {
         &self,
         executor: E,
         customer_id: &str,
+        app_user_id: Option<Uuid>,
         email: Option<&str>,
         raw_data: &serde_json::Value,
     ) -> DbResult<()>
@@ -1615,7 +1628,7 @@ impl DatabaseManager {
         sqlx::query(
             r#"
             INSERT INTO stripe.customers (id, app_user_id, email, created_at, updated_at, raw_data)
-            VALUES ($1, (SELECT id FROM users WHERE email = $2), $2, $3, $3, $4)
+            VALUES ($1, $2, $3, $4, $4, $5)
             ON CONFLICT (id) DO UPDATE
             SET email = COALESCE(EXCLUDED.email, stripe.customers.email),
                 app_user_id = COALESCE(EXCLUDED.app_user_id, stripe.customers.app_user_id),
@@ -1624,6 +1637,7 @@ impl DatabaseManager {
             "#,
         )
         .bind(customer_id)
+        .bind(app_user_id)
         .bind(email)
         .bind(now)
         .bind(raw_data)
@@ -1656,6 +1670,122 @@ impl DatabaseManager {
         .await?;
 
         Ok(())
+    }
+
+    #[builder]
+    pub async fn get_stripe_customer_id_for_user(&self, user_id: Uuid) -> DbResult<Option<String>> {
+        let result: Option<Option<String>> =
+            sqlx::query_scalar("SELECT stripe_customer_id FROM users WHERE id = $1")
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(result.flatten())
+    }
+
+    #[builder]
+    pub async fn enqueue_stripe_customer_provisioning<'e, E>(
+        &self,
+        executor: E,
+        user_id: Uuid,
+    ) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        sqlx::query(
+            r#"
+            INSERT INTO stripe.customer_provisioning_jobs (user_id)
+            VALUES ($1)
+            ON CONFLICT (user_id) DO NOTHING
+            "#,
+        )
+        .bind(user_id)
+        .execute(executor)
+        .await?;
+        Ok(())
+    }
+
+    /// Atomically claim up to `limit` due provisioning jobs.
+    ///
+    /// Uses `FOR UPDATE SKIP LOCKED` so multiple drainer workers (or a worker
+    /// alongside a re-deploy) cannot pick the same row twice. Selected rows
+    /// have `next_attempt_at` pushed into the future to act as a lease — if the
+    /// worker crashes mid-provision the row becomes claimable again after the
+    /// lease expires.
+    #[builder]
+    pub async fn claim_due_provisioning_jobs(
+        &self,
+        limit: i64,
+        lease: chrono::Duration,
+    ) -> DbResult<Vec<ProvisioningJob>> {
+        let lease_until = Utc::now() + lease;
+        let jobs = sqlx::query_as::<_, ProvisioningJob>(
+            r#"
+            WITH due AS (
+                SELECT user_id
+                FROM stripe.customer_provisioning_jobs
+                WHERE next_attempt_at <= now()
+                ORDER BY next_attempt_at
+                LIMIT $1
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE stripe.customer_provisioning_jobs AS j
+            SET next_attempt_at = $2,
+                updated_at = now()
+            FROM due
+            WHERE j.user_id = due.user_id
+            RETURNING j.user_id, j.attempts, j.next_attempt_at, j.last_error,
+                      j.created_at, j.updated_at
+            "#,
+        )
+        .bind(limit)
+        .bind(lease_until)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(jobs)
+    }
+
+    #[builder]
+    pub async fn complete_stripe_customer_provisioning(&self, user_id: Uuid) -> DbResult<()> {
+        sqlx::query("DELETE FROM stripe.customer_provisioning_jobs WHERE user_id = $1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    #[builder]
+    pub async fn fail_stripe_customer_provisioning(
+        &self,
+        user_id: Uuid,
+        error: &str,
+        retry_after: chrono::Duration,
+    ) -> DbResult<()> {
+        let next_attempt_at = Utc::now() + retry_after;
+        sqlx::query(
+            r#"
+            UPDATE stripe.customer_provisioning_jobs
+            SET attempts = attempts + 1,
+                next_attempt_at = $2,
+                last_error = $3,
+                updated_at = now()
+            WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .bind(next_attempt_at)
+        .bind(error)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    #[builder]
+    pub async fn count_pending_provisioning_jobs(&self) -> DbResult<i64> {
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM stripe.customer_provisioning_jobs")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(count)
     }
 
     #[builder]

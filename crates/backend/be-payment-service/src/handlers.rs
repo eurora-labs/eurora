@@ -7,7 +7,6 @@ use stripe_checkout::CheckoutSessionMode;
 use stripe_checkout::checkout_session::{
     CreateCheckoutSession, CreateCheckoutSessionLineItems, RetrieveCheckoutSession,
 };
-use stripe_core::customer::{CreateCustomer, ListCustomer};
 use stripe_webhook::{Event, EventObject, Webhook};
 
 use crate::analytics;
@@ -20,62 +19,36 @@ use crate::types::{
 };
 use crate::webhook;
 
-async fn resolve_customer_id(state: &AppState, email: &str) -> Result<String, PaymentError> {
-    let page = ListCustomer::new()
-        .email(email)
-        .limit(1)
-        .send(&state.client)
-        .await?;
+/// Resolve the Stripe customer id for the authenticated user.
+///
+/// In steady state every user has a `stripe_customer_id` populated by the
+/// registration outbox + drainer. As a safety net for the small race where
+/// a brand-new user hits a billing endpoint before the drainer caught up,
+/// this falls back to a synchronous provision via the configured
+/// `BillingProvisioner`.
+async fn resolve_customer_id(
+    state: &AppState,
+    claims: &be_auth_core::Claims,
+) -> Result<String, PaymentError> {
+    let user_id = uuid::Uuid::parse_str(&claims.sub)
+        .map_err(|e| PaymentError::Internal(anyhow::anyhow!("malformed user id in token: {e}")))?;
 
-    if let Some(c) = page.data.first() {
-        return Ok(c.id.to_string());
-    }
-
-    let customer = CreateCustomer::new()
-        .email(email)
-        .send(&state.client)
-        .await?;
-
-    let customer_id = customer.id.to_string();
-
-    let raw_data = serde_json::to_value(&customer).unwrap_or_default();
-    let mut tx = state
+    if let Some(existing) = state
         .db
-        .pool
-        .begin()
-        .await
-        .map_err(|e| anyhow::anyhow!("begin tx: {e}"))?;
-
-    state
-        .db
-        .upsert_stripe_customer()
-        .executor(&mut *tx)
-        .customer_id(&customer_id)
-        .email(email)
-        .raw_data(&raw_data)
+        .get_stripe_customer_id_for_user()
+        .user_id(user_id)
         .call()
         .await
-        .map_err(|e| anyhow::anyhow!("upsert stripe customer: {e}"))?;
-
-    if let Ok(user) = state.db.get_user().email(email.to_string()).call().await {
-        state
-            .db
-            .link_stripe_customer_to_user()
-            .executor(&mut *tx)
-            .user_id(user.id)
-            .stripe_customer_id(&customer_id)
-            .call()
-            .await
-            .map_err(|e| anyhow::anyhow!("link stripe customer to user: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("lookup stripe customer link: {e}"))?
+    {
+        return Ok(existing);
     }
 
-    tx.commit()
+    state
+        .provisioner
+        .ensure_customer(user_id, &claims.email)
         .await
-        .map_err(|e| anyhow::anyhow!("commit tx: {e}"))?;
-
-    tracing::info!(%customer_id, "Auto-created Stripe customer for new account");
-
-    Ok(customer_id)
+        .map_err(|err| PaymentError::Internal(anyhow::anyhow!("billing provisioning: {err}")))
 }
 
 pub async fn get_pricing(State(state): State<Arc<AppState>>) -> Json<PricingResponse> {
@@ -106,7 +79,11 @@ pub async fn create_checkout_session(
         ));
     }
 
-    let email = &claims.email;
+    let customer_id = resolve_customer_id(&state, &claims)
+        .await
+        .inspect_err(|_| {
+            analytics::track_checkout_session_creation_failed(Some(&body.price_id), "provisioning");
+        })?;
 
     let line_items = vec![CreateCheckoutSessionLineItems {
         quantity: Some(1),
@@ -120,31 +97,17 @@ pub async fn create_checkout_session(
     );
     let cancel_url = format!("{}/pricing", state.config.frontend_url);
 
-    let mut req = CreateCheckoutSession::new()
+    let session = CreateCheckoutSession::new()
         .mode(CheckoutSessionMode::Subscription)
         .line_items(line_items)
+        .customer(&customer_id)
         .success_url(&success_url)
-        .cancel_url(&cancel_url);
-
-    let existing = ListCustomer::new()
-        .email(email)
-        .limit(1)
+        .cancel_url(&cancel_url)
         .send(&state.client)
         .await
-        .inspect_err(|_e| {
+        .inspect_err(|_| {
             analytics::track_checkout_session_creation_failed(Some(&body.price_id), "stripe_error");
         })?;
-
-    if let Some(customer) = existing.data.first() {
-        tracing::info!(customer_id = %customer.id, "Reusing existing Stripe customer");
-        req = req.customer(&customer.id);
-    } else {
-        req = req.customer_email(email);
-    }
-
-    let session = req.send(&state.client).await.inspect_err(|_e| {
-        analytics::track_checkout_session_creation_failed(Some(&body.price_id), "stripe_error");
-    })?;
 
     let url = session.url.ok_or_else(|| {
         analytics::track_checkout_session_creation_failed(
@@ -166,7 +129,7 @@ pub async fn create_portal_session(
     State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<CreatePortalResponse>, PaymentError> {
-    let customer_id = resolve_customer_id(&state, &claims.email)
+    let customer_id = resolve_customer_id(&state, &claims)
         .await
         .inspect_err(|e| {
             analytics::track_billing_portal_failed(e.error_kind());
@@ -192,14 +155,7 @@ pub async fn get_subscription_status(
     State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<SubscriptionStatus>, PaymentError> {
-    let customer_id = match resolve_customer_id(&state, &claims.email).await {
-        Ok(id) => id,
-        Err(PaymentError::InvalidField(_)) => {
-            analytics::track_subscription_status_checked(None, None);
-            return Ok(Json(SubscriptionStatus::default()));
-        }
-        Err(e) => return Err(e),
-    };
+    let customer_id = resolve_customer_id(&state, &claims).await?;
 
     let page = stripe_billing::subscription::ListSubscription::new()
         .customer(&customer_id)

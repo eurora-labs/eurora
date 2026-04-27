@@ -42,16 +42,17 @@ async-stripe-webhook = { version = "1.0.0-rc.3", features = [
 axum = { workspace = true, features = ["macros"] }
 be-auth-core = { workspace = true }
 be-remote-db = { workspace = true }
+chrono = { workspace = true }
 posthog-rs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["rt"] }
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
 tower = { workspace = true }
 tower_governor = "0.8"
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
-chrono = { workspace = true }
 jsonwebtoken = { workspace = true }

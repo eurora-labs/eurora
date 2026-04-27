@@ -16,8 +16,10 @@ use tower_http::trace::TraceLayer;
 pub mod analytics;
 pub mod auth;
 pub mod config;
+pub mod drainer;
 pub mod error;
 pub mod handlers;
+pub mod provision;
 pub mod service;
 pub mod types;
 pub mod webhook;
@@ -66,16 +68,31 @@ pub fn create_router(state: Arc<AppState>) -> Result<Router> {
         .with_state(state))
 }
 
-pub fn init_payment_service(db: Arc<DatabaseManager>) -> Result<Router> {
+pub struct PaymentService {
+    pub router: Router,
+    pub provisioner: Arc<StripeBillingProvisioner>,
+    pub drainer: drainer::DrainerHandle,
+}
+
+pub fn init_payment_service(db: Arc<DatabaseManager>) -> Result<PaymentService> {
     tracing::debug!("Initializing payment service");
 
-    let state = Arc::new(AppState::from_env(db).context("Failed to create payment service state")?);
+    let state =
+        Arc::new(AppState::from_env(db.clone()).context("Failed to create payment service state")?);
+    let provisioner = state.provisioner.clone();
+    let router = create_router(state)?;
+    let drainer = drainer::spawn_drainer(db, provisioner.clone());
 
-    create_router(state)
+    Ok(PaymentService {
+        router,
+        provisioner,
+        drainer,
+    })
 }
 
 pub use config::PaymentConfig;
 pub use error::PaymentError;
+pub use provision::{ProvisionError, StripeBillingProvisioner};
 pub use types::{
     CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
     PricingResponse, SubscriptionStatus,
