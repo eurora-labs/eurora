@@ -124,7 +124,7 @@ specta = "=2.0.0-rc.23"
 strum = "0.28.0"
 strum_macros = "0.28.0"
 syn = "2.0"  # collapse 2.0.101, 1.0.109, 1.0.109(build)
-tauri-plugin-oauth-session = "0.1.0"
+tauri-plugin-appauth = "0.2.0"
 tempfile = "3.24"
 thiserror = "2.0.18"
 tokio = "1.49.0"

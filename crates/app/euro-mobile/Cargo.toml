@@ -36,8 +36,7 @@ specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.10" }
 tauri = { version = "2.10.2", features = [] }
 tauri-plugin-http = "2"
-tauri-plugin-deep-link = "2"
-tauri-plugin-oauth-session = { workspace = true }
+tauri-plugin-appauth = { workspace = true }
 tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
