@@ -71,6 +71,16 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ProvisioningJob {
+    pub user_id: Uuid,
+    pub attempts: i32,
+    pub next_attempt_at: DateTime<Utc>,
+    pub last_error: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PasswordCredentials {
     pub user_id: Uuid,
     #[serde(skip_serializing)]
