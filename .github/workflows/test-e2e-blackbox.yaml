@@ -1,7 +1,6 @@
 name: E2E Blackbox Tests
 env:
     RUST_BACKTRACE: full
-    RUSTUP_TOOLCHAIN: stable
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
 
 on:
