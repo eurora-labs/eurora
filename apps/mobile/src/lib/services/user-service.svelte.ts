@@ -1,5 +1,5 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { LoginToken } from '$lib/bindings/bindings.js';
+import type { LoginOutcome } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
@@ -65,16 +65,21 @@ export class UserService {
 		await this.taurpc.auth.logout();
 	}
 
-	async getLoginToken(redirectUri: string): Promise<LoginToken> {
-		return this.taurpc.auth.get_login_token({ redirect_uri: redirectUri });
-	}
-
-	async completeLogin(callbackUrl: string): Promise<boolean> {
-		const success = await this.taurpc.auth.complete_login(callbackUrl);
-		if (success) {
+	/**
+	 * Drives the entire OAuth flow on the Rust side: builds the auth URL with
+	 * a fresh PKCE pair, opens the in-app browser via `tauri-plugin-appauth`,
+	 * and exchanges the verifier for tokens once the redirect fires.
+	 *
+	 * The Rust side never throws for `USER_CANCELED` — it returns
+	 * `{ kind: 'canceled' }` so the UI can silently return to idle without
+	 * surfacing an error.
+	 */
+	async startLogin(): Promise<LoginOutcome> {
+		const outcome = await this.taurpc.auth.start_login();
+		if (outcome.kind === 'success') {
 			await this.fetchProfile();
 		}
-		return success;
+		return outcome;
 	}
 
 	async refreshSession(): Promise<void> {

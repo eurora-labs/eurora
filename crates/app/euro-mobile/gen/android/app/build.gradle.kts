@@ -18,7 +18,7 @@ android {
     namespace = "com.eurora_labs.eurora.mobile.dev"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        manifestPlaceholders["oauthSessionRedirectScheme"] = "eurora"
+        manifestPlaceholders["tauriBrowserRedirectScheme"] = "eurora"
         applicationId = "com.eurora_labs.eurora.mobile.dev"
         minSdk = 24
         targetSdk = 36
