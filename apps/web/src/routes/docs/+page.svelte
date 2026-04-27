@@ -54,7 +54,7 @@
 			<h2 class="mb-4 text-2xl font-semibold">Motivation</h2>
 			<p class="mb-8 text-muted-foreground">
 				Curious why I built Eurora? Read more in the <a
-					href="/docs/why-eurora"
+					href="/why-eurora"
 					class="text-primary underline underline-offset-4 hover:text-primary/80"
 					>Why Eurora</a
 				> guide.
