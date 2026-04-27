@@ -67,7 +67,7 @@ class NativeMessagingBridge {
 
         queue.async { [weak self] in
             guard let self, let connection = self.connection, self.isConnected else {
-                self?.logger.error("Cannot forward response — not connected")
+                self?.logger.error("Cannot forward response - not connected")
                 return
             }
 
@@ -146,7 +146,7 @@ class NativeMessagingBridge {
             logger.error("Connection failed: \(error.localizedDescription)")
             isConnected = false
             isConnecting = false
-            // Don't auto-reconnect — let the next sendMessage call trigger reconnection
+            // Don't auto-reconnect - let the next sendMessage call trigger reconnection
 
         case .cancelled:
             logger.debug("Connection cancelled")
