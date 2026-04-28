@@ -52,7 +52,7 @@ url = { workspace = true }
 tauri-build = { version = "2", features = [] }
 
 [features]
-default = ["custom-protocol", "devtools"]
+default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 devtools = ["tauri/devtools"]
 
