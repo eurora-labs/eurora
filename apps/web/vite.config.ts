@@ -1,3 +1,4 @@
+import { sentrySvelteKit } from '@sentry/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, loadEnv } from 'vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
@@ -20,8 +21,26 @@ export default defineConfig(({ mode }) => {
 		process.env.VITE_REST_API_URL = env.VITE_GRPC_API_URL;
 	}
 
+	const sentryAuthToken = env.SENTRY_AUTH_TOKEN;
+	const sentryOrg = env.SENTRY_ORG;
+	const sentryProject = env.SENTRY_PROJECT;
+	const uploadSourceMaps = Boolean(sentryAuthToken && sentryOrg && sentryProject);
+
 	return {
-		plugins: [sveltekit(), devtoolsJson()],
+		plugins: [
+			sentrySvelteKit({
+				autoUploadSourceMaps: uploadSourceMaps,
+				sourceMapsUploadOptions: uploadSourceMaps
+					? {
+							org: sentryOrg,
+							project: sentryProject,
+							authToken: sentryAuthToken,
+						}
+					: undefined,
+			}),
+			sveltekit(),
+			devtoolsJson(),
+		],
 		optimizeDeps: {
 			exclude: ['@eurora/ui'],
 		},
