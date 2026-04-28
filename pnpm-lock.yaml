@@ -522,21 +522,6 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.10.1
         version: 2.10.1
-      '@tauri-apps/plugin-http':
-        specifier: ^2.5.8
-        version: 2.5.8
-      '@tauri-apps/plugin-log':
-        specifier: ^2.8.0
-        version: 2.8.0
-      '@tauri-apps/plugin-os':
-        specifier: ^2.3.2
-        version: 2.3.2
-      '@tauri-apps/plugin-process':
-        specifier: ^2.3.1
-        version: 2.3.1
-      '@tauri-apps/plugin-store':
-        specifier: ^2.4.2
-        version: 2.4.2
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.55.4)
@@ -550,7 +535,7 @@ importers:
         specifier: catalog:svelte
         version: 4.4.6(picomatch@4.0.4)(svelte@5.55.4)(typescript@5.9.3)
       svelte-sonner:
-        specifier: ^1.0.8
+        specifier: ^1.1.0
         version: 1.1.0(svelte@5.55.4)
       tailwindcss:
         specifier: 'catalog:'
@@ -9097,13 +9082,14 @@ snapshots:
     dependencies:
       '@bufbuild/protobuf': 2.12.0
 
-  '@covector/apply@0.10.0':
+  '@covector/apply@0.10.0(mocha@10.8.2)':
     dependencies:
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)
       semver: 7.7.4
     transitivePeerDependencies:
       - encoding
+      - mocha
 
   '@covector/assemble@0.12.0':
     dependencies:
@@ -9120,7 +9106,7 @@ snapshots:
       - encoding
       - supports-color
 
-  '@covector/changelog@0.12.0(mocha@10.8.2)':
+  '@covector/changelog@0.12.0':
     dependencies:
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)
@@ -9130,7 +9116,6 @@ snapshots:
       unified: 9.2.2
     transitivePeerDependencies:
       - encoding
-      - mocha
       - supports-color
 
   '@covector/command@0.8.0':
@@ -12351,9 +12336,9 @@ snapshots:
   covector@0.12.4(mocha@10.8.2):
     dependencies:
       '@clack/prompts': 0.7.0
-      '@covector/apply': 0.10.0
+      '@covector/apply': 0.10.0(mocha@10.8.2)
       '@covector/assemble': 0.12.0
-      '@covector/changelog': 0.12.0(mocha@10.8.2)
+      '@covector/changelog': 0.12.0
       '@covector/command': 0.8.0
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)

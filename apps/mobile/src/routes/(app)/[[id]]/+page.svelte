@@ -27,16 +27,22 @@
 		}
 	});
 
+	function errMsg(e: unknown): string {
+		return e instanceof Error ? e.message : String(e);
+	}
+
 	function handleCopy(content: string) {
-		navigator.clipboard.writeText(content).catch((e) => toast.error(`Failed to copy: ${e}`));
+		navigator.clipboard
+			.writeText(content)
+			.catch((e) => toast.error(`Failed to copy: ${errMsg(e)}`));
 	}
 
 	function handleSubmit(text: string) {
-		chatService.sendMessage(text).catch((e) => toast.error(String(e)));
+		chatService.sendMessage(text).catch((e) => toast.error(errMsg(e)));
 	}
 
 	function handleEdit(messageId: string, newText: string) {
-		chatService.editMessage(messageId, newText).catch((e) => toast.error(String(e)));
+		chatService.editMessage(messageId, newText).catch((e) => toast.error(errMsg(e)));
 	}
 
 	const suggestions: Suggestion[] = [

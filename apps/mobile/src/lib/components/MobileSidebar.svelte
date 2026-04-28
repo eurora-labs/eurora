@@ -20,23 +20,13 @@
 	const user = inject(USER_SERVICE);
 	const sidebarState = useSidebar();
 
-	let threadInitialized = false;
 	let searchOpen = $state(false);
 
 	const identityLabel = $derived(user.displayName ?? user.email);
 	const avatarLetter = $derived(identityLabel ? identityLabel.charAt(0).toUpperCase() : '');
 
-	$effect(() => {
-		if (!threadInitialized) {
-			threadInitialized = true;
-			chatService.loadThreads(20, 0);
-		}
-	});
-
 	onMount(() => {
-		return () => {
-			chatService.destroy();
-		};
+		chatService.loadThreads(20, 0);
 	});
 
 	function handleThreadSelect(threadId: string) {
@@ -70,9 +60,11 @@
 
 	function logout() {
 		sidebarState.setOpenMobile(false);
-		user.logout()
-			.then(() => goto('/login'))
-			.catch((error) => toast.error(`Failed to log out: ${error}`));
+		user.logout().catch((error) =>
+			toast.error(
+				`Failed to log out: ${error instanceof Error ? error.message : String(error)}`,
+			),
+		);
 	}
 </script>
 

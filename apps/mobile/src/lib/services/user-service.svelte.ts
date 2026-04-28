@@ -4,12 +4,13 @@ import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
 	authenticated = $state(false);
+	initialized = $state(false);
 	email = $state('');
 	displayName = $state<string | null>(null);
 	role = $state('');
 
 	private readonly taurpc: TaurpcService;
-	private readonly unlisteners: Promise<() => void>[] = [];
+	private readonly unlisteners: Array<() => void> = [];
 
 	constructor(taurpc: TaurpcService) {
 		this.taurpc = taurpc;
@@ -28,14 +29,8 @@ export class UserService {
 	}
 
 	async init() {
-		const isAuth = await this.taurpc.auth.is_authenticated();
-
-		if (isAuth) {
-			await this.fetchProfile();
-		}
-
-		this.unlisteners.push(
-			this.taurpc.auth.auth_state_changed.on((claims) => {
+		try {
+			const unlisten = await this.taurpc.auth.auth_state_changed.on((claims) => {
 				if (claims) {
 					this.authenticated = true;
 					this.email = claims.email;
@@ -47,8 +42,16 @@ export class UserService {
 					this.displayName = null;
 					this.role = '';
 				}
-			}),
-		);
+			});
+			this.unlisteners.push(unlisten);
+
+			const isAuth = await this.taurpc.auth.is_authenticated();
+			if (isAuth) {
+				await this.fetchProfile();
+			}
+		} finally {
+			this.initialized = true;
+		}
 	}
 
 	async login(login: string, password: string): Promise<void> {
@@ -87,9 +90,7 @@ export class UserService {
 	}
 
 	destroy() {
-		for (const p of this.unlisteners) {
-			p.then((unlisten) => unlisten());
-		}
+		for (const fn of this.unlisteners) fn();
 		this.unlisteners.length = 0;
 	}
 }

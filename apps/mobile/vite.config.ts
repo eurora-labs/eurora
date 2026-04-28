@@ -17,7 +17,6 @@ export default defineConfig({
 	envPrefix: ['VITE_', 'TAURI_'],
 
 	build: {
-		rollupOptions: { output: { manualChunks: {} } },
 		target: 'modules',
 		minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
 		sourcemap: true,
