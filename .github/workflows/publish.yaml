@@ -760,6 +760,9 @@ jobs:
               env:
                   CARGO_BUILD_TARGET: aarch64-apple-ios
 
+            - name: Install xcodegen
+              run: brew install xcodegen
+
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
