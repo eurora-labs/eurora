@@ -7,13 +7,17 @@
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { ModeWatcher, setMode } from 'mode-watcher';
 	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	let { children } = $props();
 
 	initDependencies();
 
 	const userService = inject(USER_SERVICE);
-	userService.init();
+	userService.init().catch((err) => {
+		console.error('Failed to initialize user service:', err);
+		toast.error('Failed to initialize. Please restart the app.');
+	});
 
 	onMount(() => {
 		setMode('dark');

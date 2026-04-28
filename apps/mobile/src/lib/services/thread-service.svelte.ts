@@ -6,6 +6,7 @@ import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/model
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type {
+	BranchDirection,
 	IThreadService,
 	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
@@ -42,7 +43,7 @@ export class ThreadService implements IThreadService {
 	async switchBranch(
 		threadId: string,
 		messageId: string,
-		direction: number,
+		direction: BranchDirection,
 	): Promise<MessageNode[]> {
 		const raw = await this.taurpc.thread.switch_branch(threadId, messageId, direction);
 		return toMessageNodes(raw);
@@ -54,8 +55,11 @@ export class ThreadService implements IThreadService {
 
 	async createThread(): Promise<Thread> {
 		const raw = await this.taurpc.thread.create();
+		if (!raw.id) {
+			throw new Error('Backend returned thread without id');
+		}
 		return {
-			id: raw.id!,
+			id: raw.id,
 			title: raw.title,
 			createdAt: raw.created_at,
 			updatedAt: raw.updated_at,
@@ -64,8 +68,11 @@ export class ThreadService implements IThreadService {
 
 	async generateTitle(threadId: string, content: string): Promise<Thread> {
 		const raw = await this.taurpc.thread.generate_title(threadId, content);
+		if (!raw.id) {
+			throw new Error('Backend returned thread without id');
+		}
 		return {
-			id: raw.id!,
+			id: raw.id,
 			title: raw.title,
 			createdAt: raw.created_at,
 			updatedAt: raw.updated_at,
