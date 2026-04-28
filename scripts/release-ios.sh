@@ -142,7 +142,11 @@ echo "==> Compiling Rust staticlib for iOS (release)"
 rustup target add aarch64-apple-ios >/dev/null
 cd "$REPO_ROOT"
 
-CARGO_PROFILE_RELEASE_LTO=fat \
+# Pin to the same deployment target as the Xcode project (project.yml).
+# Without this, rustc/cc-rs default to the SDK's max (iOS 26+ on Xcode 26),
+# producing object files the linker rejects as "newer than being linked".
+IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+	CARGO_PROFILE_RELEASE_LTO=fat \
 	CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
 	CARGO_PROFILE_RELEASE_OPT_LEVEL=s \
 	cargo build --release --target aarch64-apple-ios -p euro-mobile
