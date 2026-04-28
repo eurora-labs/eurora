@@ -11,6 +11,8 @@
 		"strict": true
 	},
 	"include": [
+		".svelte-kit/ambient.d.ts",
+		".svelte-kit/non-ambient.d.ts",
 		"playwright.config.ts",
 		"postcss.config.mjs",
 		"svelte.config.js",
