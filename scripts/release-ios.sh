@@ -146,6 +146,18 @@ CARGO_PROFILE_RELEASE_LTO=fat \
 mkdir -p "$APPLE_DIR/Externals/arm64/release"
 cp "$REPO_ROOT/target/aarch64-apple-ios/release/libeuro_mobile.a" "$APPLE_DIR/Externals/arm64/release/libapp.a"
 
+# `assets/` is a folder reference in project.yml. It can be empty (Tauri-build
+# inlines the frontend into libapp.a), but the directory must exist or
+# xcodebuild fails the resource-copy step.
+mkdir -p "$APPLE_DIR/assets"
+
+echo "==> Regenerating Xcode project from project.yml"
+# The committed pbxproj reflects whatever Externals subdirs existed on the
+# developer machine at xcodegen time (typically debug). Regenerate so the
+# pbxproj only references what we just staged (arm64/release).
+command -v xcodegen >/dev/null || error "xcodegen not found on PATH; install it (brew install xcodegen)"
+( cd "$APPLE_DIR" && xcodegen generate --spec project.yml --quiet )
+
 echo "==> Archiving Xcode project"
 cd "$APPLE_DIR"
 
