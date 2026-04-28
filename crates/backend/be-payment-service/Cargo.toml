@@ -18,24 +18,24 @@ ignored = [
 
 [dependencies]
 anyhow = { workspace = true }
-async-stripe = { version = "1.0.0-rc.3", default-features = false, features = [
+async-stripe = { version = "1.0.0-rc.5", default-features = false, features = [
   "rustls-aws-lc-rs",
   "rustls-tls-webpki-roots",
   "uuid"
 ] }
-async-stripe-billing = { version = "1.0.0-rc.3", features = [
+async-stripe-billing = { version = "1.0.0-rc.5", features = [
   "billing_portal_session",
   "subscription"
 ] }
-async-stripe-checkout = { version = "1.0.0-rc.3", features = [
+async-stripe-checkout = { version = "1.0.0-rc.5", features = [
   "checkout_session"
 ] }
-async-stripe-core = { version = "1.0.0-rc.3", features = [
+async-stripe-core = { version = "1.0.0-rc.5", features = [
   "customer",
   "payment_intent"
 ] }
-async-stripe-shared = { version = "1.0.0-rc.3", features = ["serialize"] }
-async-stripe-webhook = { version = "1.0.0-rc.3", features = [
+async-stripe-shared = { version = "1.0.0-rc.5", features = ["serialize"] }
+async-stripe-webhook = { version = "1.0.0-rc.5", features = [
   "async-stripe-billing",
   "async-stripe-checkout"
 ] }
