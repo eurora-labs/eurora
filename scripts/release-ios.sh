@@ -66,6 +66,10 @@ done
 [ -z "$BUILD_NUMBER" ] && error "--build-number is required"
 [ -z "$DIST" ] && error "--dist is required"
 
+# Resolve --dist to an absolute path before we start cd'ing around.
+mkdir -p "$DIST"
+DIST="$(cd "$DIST" && pwd -P)"
+
 case "$CHANNEL" in
 release)
 	BUNDLE_ID="com.eurora-labs.eurora"
@@ -211,7 +215,6 @@ xcodebuild -exportArchive \
 IPA_PATH="$(find "$EXPORT_DIR" -maxdepth 2 -name '*.ipa' | head -1)"
 [ -z "$IPA_PATH" ] && error "no .ipa produced under $EXPORT_DIR"
 
-mkdir -p "$DIST"
 DEST_IPA="$DIST/${PRODUCT_NAME// /_}_${VERSION}_${BUILD_NUMBER}.ipa"
 cp "$IPA_PATH" "$DEST_IPA"
 echo "==> .ipa at $DEST_IPA"
