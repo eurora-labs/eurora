@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use be_remote_db::DatabaseManager;
+use be_remote_db::{ClaimedProvisioningJob, DatabaseManager, DbError};
 use chrono::Duration as ChronoDuration;
 use tokio::sync::oneshot;
 use tokio::time::{Duration, sleep};
@@ -10,7 +10,7 @@ use crate::provision::{ProvisionError, StripeBillingProvisioner};
 
 /// Maximum number of jobs claimed per tick. Sized so a backlog drains in a
 /// few iterations without monopolising the Stripe API.
-const BATCH_SIZE: i64 = 50;
+const BATCH_SIZE: usize = 50;
 
 /// How long a claimed job stays "leased" before another worker may retry it.
 /// Sized to be longer than the worst-case Stripe + DB round-trip.
@@ -23,35 +23,29 @@ const IDLE_POLL_INTERVAL: Duration = Duration::from_secs(15);
 /// batch size). Lets a backlog drain quickly without busy-looping.
 const BUSY_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
-/// Permanent failures are kept for inspection; transient failures back off
-/// exponentially up to `MAX_BACKOFF`.
+/// Cap on transient retry backoff.
 const MAX_BACKOFF: ChronoDuration = ChronoDuration::hours(1);
 
-/// Once a job hits this many attempts we cap its backoff at [`MAX_BACKOFF`]
-/// (instead of growing exponentially) and rely on backlog alerting to surface
-/// the row for manual intervention. The job continues to retry indefinitely.
-const MAX_ATTEMPTS: i32 = 20;
-
 pub struct DrainerHandle {
-    shutdown: Option<oneshot::Sender<()>>,
+    shutdown: oneshot::Sender<()>,
     join: tokio::task::JoinHandle<()>,
 }
 
 impl DrainerHandle {
-    pub async fn shutdown(mut self) {
-        if let Some(tx) = self.shutdown.take() {
-            let _ = tx.send(());
-        }
-        let _ = self.join.await;
+    pub async fn shutdown(self) {
+        let Self { shutdown, join } = self;
+        let _ = shutdown.send(());
+        let _ = join.await;
     }
 }
 
 /// Spawn the background worker that drains the
 /// `stripe.customer_provisioning_jobs` outbox.
 ///
-/// Idempotent on a per-user basis: each job is leased via
-/// `claim_due_provisioning_jobs`, then the provisioner is called and either
-/// the row is deleted (success) or rescheduled with backoff (failure).
+/// Each job is leased via `claim_due_provisioning_jobs`, then the provisioner
+/// is called and either the row is deleted as part of the link-write
+/// transaction (success), rescheduled with backoff (transient failure), or
+/// dead-lettered (permanent failure).
 pub fn spawn_drainer(
     db: Arc<DatabaseManager>,
     provisioner: Arc<StripeBillingProvisioner>,
@@ -69,7 +63,7 @@ pub fn spawn_drainer(
                 }
             };
 
-            let next_delay = if processed >= BATCH_SIZE as usize {
+            let next_delay = if processed >= BATCH_SIZE {
                 BUSY_POLL_INTERVAL
             } else {
                 IDLE_POLL_INTERVAL
@@ -86,7 +80,7 @@ pub fn spawn_drainer(
     });
 
     DrainerHandle {
-        shutdown: Some(shutdown_tx),
+        shutdown: shutdown_tx,
         join,
     }
 }
@@ -94,18 +88,17 @@ pub fn spawn_drainer(
 async fn tick(
     db: &DatabaseManager,
     provisioner: &StripeBillingProvisioner,
-) -> anyhow::Result<usize> {
+) -> Result<usize, DbError> {
     let jobs = db
         .claim_due_provisioning_jobs()
-        .limit(BATCH_SIZE)
+        .limit(BATCH_SIZE as i64)
         .lease(LEASE)
         .call()
         .await?;
 
     let count = jobs.len();
     if count > 0 {
-        let backlog = db.count_pending_provisioning_jobs().call().await.ok();
-        tracing::debug!(claimed = count, backlog = ?backlog, "Drainer claimed jobs");
+        tracing::debug!(claimed = count, "Drainer claimed jobs");
     }
 
     for job in jobs {
@@ -118,54 +111,37 @@ async fn tick(
 async fn process_job(
     db: &DatabaseManager,
     provisioner: &StripeBillingProvisioner,
-    job: be_remote_db::ProvisioningJob,
+    job: ClaimedProvisioningJob,
 ) {
-    let user = match db.get_user().id(job.user_id).call().await {
-        Ok(u) => u,
-        Err(e) if e.is_not_found() => {
-            tracing::info!(user_id = %job.user_id, "User vanished before provisioning — clearing job");
-            if let Err(e) = db
-                .complete_stripe_customer_provisioning()
-                .user_id(job.user_id)
-                .call()
-                .await
-            {
-                tracing::warn!(user_id = %job.user_id, error = %e, "Failed to clear orphan job");
-            }
-            return;
-        }
-        Err(e) => {
-            tracing::warn!(user_id = %job.user_id, error = %e, "Failed to load user for provisioning");
-            return;
-        }
-    };
-
-    match provisioner.ensure_customer(user.id, &user.email).await {
+    match provisioner.ensure_customer(job.user_id, &job.email).await {
         Ok(_) => {
+            // persist_link inside the provisioner has already deleted the
+            // job row in the same transaction as the link write — nothing
+            // more to do here.
             analytics::track_customer_provisioning_attempt("succeeded");
-            if let Err(e) = db
-                .complete_stripe_customer_provisioning()
-                .user_id(job.user_id)
-                .call()
-                .await
-            {
-                tracing::error!(user_id = %job.user_id, error = %e, "Provisioned but failed to clear job");
-            }
         }
         Err(err) => {
             analytics::track_customer_provisioning_attempt(err.kind());
             let next_attempts = job.attempts.saturating_add(1);
             let permanent = matches!(err, ProvisionError::Permanent(_));
-            let exhausted = next_attempts >= MAX_ATTEMPTS;
 
-            if permanent || exhausted {
+            if permanent {
                 tracing::error!(
                     user_id = %job.user_id,
                     attempts = next_attempts,
-                    permanent,
                     error = %err,
-                    "Stripe customer provisioning blocked — manual intervention required"
+                    "Stripe customer provisioning permanently failed — dead-lettering"
                 );
+                if let Err(e) = db
+                    .dead_letter_stripe_customer_provisioning(job.user_id, &err.to_string())
+                    .await
+                {
+                    tracing::error!(
+                        user_id = %job.user_id,
+                        error = %e,
+                        "Failed to dead-letter provisioning job"
+                    );
+                }
             } else {
                 tracing::warn!(
                     user_id = %job.user_id,
@@ -173,23 +149,17 @@ async fn process_job(
                     error = %err,
                     "Stripe customer provisioning failed — will retry"
                 );
-            }
-
-            let backoff = if permanent || exhausted {
-                MAX_BACKOFF
-            } else {
-                exponential_backoff(next_attempts)
-            };
-
-            if let Err(e) = db
-                .fail_stripe_customer_provisioning()
-                .user_id(job.user_id)
-                .error(&err.to_string())
-                .retry_after(backoff)
-                .call()
-                .await
-            {
-                tracing::error!(user_id = %job.user_id, error = %e, "Failed to record provisioning failure");
+                let backoff = exponential_backoff(next_attempts);
+                if let Err(e) = db
+                    .fail_stripe_customer_provisioning(job.user_id, &err.to_string(), backoff)
+                    .await
+                {
+                    tracing::error!(
+                        user_id = %job.user_id,
+                        error = %e,
+                        "Failed to record provisioning failure"
+                    );
+                }
             }
         }
     }
@@ -198,12 +168,7 @@ async fn process_job(
 fn exponential_backoff(attempts: i32) -> ChronoDuration {
     let exp = attempts.clamp(1, 12) as u32;
     let secs = 2_i64.saturating_pow(exp);
-    let candidate = ChronoDuration::seconds(secs);
-    if candidate > MAX_BACKOFF {
-        MAX_BACKOFF
-    } else {
-        candidate
-    }
+    ChronoDuration::seconds(secs).min(MAX_BACKOFF)
 }
 
 #[cfg(test)]

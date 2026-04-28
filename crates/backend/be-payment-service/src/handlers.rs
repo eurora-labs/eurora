@@ -19,36 +19,26 @@ use crate::types::{
 };
 use crate::webhook;
 
-/// Resolve the Stripe customer id for the authenticated user.
+/// Look up the Stripe customer id for the authenticated user.
 ///
-/// In steady state every user has a `stripe_customer_id` populated by the
-/// registration outbox + drainer. As a safety net for the small race where
-/// a brand-new user hits a billing endpoint before the drainer caught up,
-/// this falls back to a synchronous provision via the configured
-/// `BillingProvisioner`.
-async fn resolve_customer_id(
+/// Eager provisioning happens in the registration outbox + background drainer,
+/// so in steady state every user has a `stripe_customer_id` already. The
+/// brief window between signup and the first drainer tick surfaces here as
+/// `Ok(None)` — handlers decide what to do (error vs. empty response).
+async fn lookup_customer_id(
     state: &AppState,
     claims: &be_auth_core::Claims,
-) -> Result<String, PaymentError> {
+) -> Result<Option<String>, PaymentError> {
     let user_id = uuid::Uuid::parse_str(&claims.sub)
         .map_err(|e| PaymentError::Internal(anyhow::anyhow!("malformed user id in token: {e}")))?;
 
-    if let Some(existing) = state
+    state
         .db
         .get_stripe_customer_id_for_user()
         .user_id(user_id)
         .call()
         .await
-        .map_err(|e| anyhow::anyhow!("lookup stripe customer link: {e}"))?
-    {
-        return Ok(existing);
-    }
-
-    state
-        .provisioner
-        .ensure_customer(user_id, &claims.email)
-        .await
-        .map_err(|err| PaymentError::Internal(anyhow::anyhow!("billing provisioning: {err}")))
+        .map_err(|e| PaymentError::Internal(anyhow::anyhow!("lookup stripe customer link: {e}")))
 }
 
 pub async fn get_pricing(State(state): State<Arc<AppState>>) -> Json<PricingResponse> {
@@ -79,10 +69,17 @@ pub async fn create_checkout_session(
         ));
     }
 
-    let customer_id = resolve_customer_id(&state, &claims)
+    let customer_id = lookup_customer_id(&state, &claims)
         .await
         .inspect_err(|_| {
             analytics::track_checkout_session_creation_failed(Some(&body.price_id), "provisioning");
+        })?
+        .ok_or_else(|| {
+            analytics::track_checkout_session_creation_failed(
+                Some(&body.price_id),
+                "billing_not_ready",
+            );
+            PaymentError::BillingNotReady
         })?;
 
     let line_items = vec![CreateCheckoutSessionLineItems {
@@ -129,10 +126,14 @@ pub async fn create_portal_session(
     State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<CreatePortalResponse>, PaymentError> {
-    let customer_id = resolve_customer_id(&state, &claims)
+    let customer_id = lookup_customer_id(&state, &claims)
         .await
         .inspect_err(|e| {
             analytics::track_billing_portal_failed(e.error_kind());
+        })?
+        .ok_or_else(|| {
+            analytics::track_billing_portal_failed("billing_not_ready");
+            PaymentError::BillingNotReady
         })?;
     let return_url = format!("{}/settings/billing", state.config.frontend_url);
 
@@ -155,7 +156,10 @@ pub async fn get_subscription_status(
     State(state): State<Arc<AppState>>,
     AuthUser(claims): AuthUser,
 ) -> Result<Json<SubscriptionStatus>, PaymentError> {
-    let customer_id = resolve_customer_id(&state, &claims).await?;
+    let Some(customer_id) = lookup_customer_id(&state, &claims).await? else {
+        analytics::track_subscription_status_checked(None, None);
+        return Ok(Json(SubscriptionStatus::default()));
+    };
 
     let page = stripe_billing::subscription::ListSubscription::new()
         .customer(&customer_id)
