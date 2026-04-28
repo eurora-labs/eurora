@@ -157,7 +157,6 @@ CI=true xcodebuild archive \
 	-configuration release \
 	-destination "generic/platform=iOS" \
 	-archivePath "$ARCHIVE_PATH" \
-	-allowProvisioningUpdates NO \
 	CODE_SIGN_STYLE=Manual \
 	CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
 	PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
