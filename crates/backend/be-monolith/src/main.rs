@@ -229,9 +229,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let (payment_router, payment_drainer) = match payment_service {
-        Some(PaymentService {
-            router, drainer, ..
-        }) => (router, Some(drainer)),
+        Some(PaymentService { router, drainer }) => (router, Some(drainer)),
         None => (axum::Router::new(), None),
     };
 
@@ -317,26 +315,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::info!("Shutting down HTTP server...");
     });
 
-    tokio::select! {
-        result = grpc_future => {
-            if let Err(e) = result {
-                tracing::error!("gRPC server error: {}", e);
-                if let Some(drainer) = payment_drainer { drainer.shutdown().await; }
-                return Err(e.into());
-            }
-        }
-        result = http_future => {
-            if let Err(e) = result {
-                tracing::error!("HTTP server error: {}", e);
-                if let Some(drainer) = payment_drainer { drainer.shutdown().await; }
-                return Err(e.into());
-            }
-        }
-    }
+    let outcome: Result<(), Box<dyn std::error::Error>> = tokio::select! {
+        result = grpc_future => result.map_err(|e| {
+            tracing::error!("gRPC server error: {}", e);
+            e.into()
+        }),
+        result = http_future => result.map_err(|e| {
+            tracing::error!("HTTP server error: {}", e);
+            e.into()
+        }),
+    };
 
     if let Some(drainer) = payment_drainer {
         drainer.shutdown().await;
     }
 
-    Ok(())
+    outcome
 }

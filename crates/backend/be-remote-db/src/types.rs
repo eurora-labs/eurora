@@ -70,14 +70,11 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ProvisioningJob {
+#[derive(Debug, Clone, FromRow)]
+pub struct ClaimedProvisioningJob {
     pub user_id: Uuid,
+    pub email: String,
     pub attempts: i32,
-    pub next_attempt_at: DateTime<Utc>,
-    pub last_error: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

@@ -4,7 +4,6 @@ use std::sync::Arc;
 use be_remote_db::DatabaseManager;
 use stripe::{IdempotencyKey, RequestStrategy, StripeError, StripeRequest};
 use stripe_core::customer::{CreateCustomer, ListCustomer};
-use stripe_shared::Customer;
 use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
@@ -31,10 +30,6 @@ impl ProvisionError {
 /// `ensure_customer` is idempotent on `user_id`: repeated calls converge on a
 /// single Stripe customer and a single `users.stripe_customer_id` link. The
 /// drainer relies on this for retry safety.
-///
-/// Holds its own `stripe::Client` and `Arc<DatabaseManager>` rather than a
-/// reference to `AppState` so the application state can in turn carry an
-/// `Arc<StripeBillingProvisioner>` without forming a reference cycle.
 pub struct StripeBillingProvisioner {
     client: stripe::Client,
     db: Arc<DatabaseManager>,
@@ -71,14 +66,12 @@ impl StripeBillingProvisioner {
             .await
             .map_err(stripe_to_provision_error)?;
 
-        let customer: Customer = if let Some(existing) = existing_in_stripe.data.into_iter().next()
-        {
+        let customer = if let Some(existing) = existing_in_stripe.data.into_iter().next() {
             existing
         } else {
-            // Idempotency-Key = the user's UUID. Retries from the same caller
-            // (or the drainer after a transient failure) collapse to a single
-            // customer even if Stripe returned the response and we never
-            // observed it.
+            // Idempotency-Key = the user's UUID. Retries from the drainer
+            // after a transient failure collapse to a single customer even
+            // if Stripe returned the response and we never observed it.
             let key = IdempotencyKey::from(user_id);
             let metadata = HashMap::from([("app_user_id".to_string(), user_id.to_string())]);
             CreateCustomer::new()
@@ -104,6 +97,9 @@ impl StripeBillingProvisioner {
     }
 }
 
+/// Single transaction: write the Stripe customer row, link it to the user,
+/// and remove the outbox job. Atomicity here is what makes the drainer
+/// crash-safe — either the link and the job-deletion both happen, or neither.
 async fn persist_link(
     db: &DatabaseManager,
     user_id: Uuid,
@@ -126,6 +122,12 @@ async fn persist_link(
         .executor(&mut *tx)
         .user_id(user_id)
         .stripe_customer_id(customer_id)
+        .call()
+        .await?;
+
+    db.delete_provisioning_job()
+        .executor(&mut *tx)
+        .user_id(user_id)
         .call()
         .await?;
 

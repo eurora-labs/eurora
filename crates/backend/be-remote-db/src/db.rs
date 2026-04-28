@@ -11,9 +11,10 @@ use crate::{
     MessageType, PaginationParams,
     error::{DbError, DbResult},
     types::{
-        Activity, ActivityAsset, Asset, AssetStatus, EmailVerificationToken, LoginToken, Message,
-        OAuthCredentials, OAuthProvider, OAuthState, PasswordCredentials, ProvisioningJob,
-        RefreshToken, SearchResultMessage, SearchResultThread, Thread, TokenUsage, User,
+        Activity, ActivityAsset, Asset, AssetStatus, ClaimedProvisioningJob,
+        EmailVerificationToken, LoginToken, Message, OAuthCredentials, OAuthProvider, OAuthState,
+        PasswordCredentials, RefreshToken, SearchResultMessage, SearchResultThread, Thread,
+        TokenUsage, User,
     },
 };
 
@@ -1704,37 +1705,39 @@ impl DatabaseManager {
         Ok(())
     }
 
-    /// Atomically claim up to `limit` due provisioning jobs.
+    /// Atomically claim up to `limit` due provisioning jobs, joining on
+    /// `users` so the drainer doesn't need a second round trip for the email.
     ///
-    /// Uses `FOR UPDATE SKIP LOCKED` so multiple drainer workers (or a worker
-    /// alongside a re-deploy) cannot pick the same row twice. Selected rows
-    /// have `next_attempt_at` pushed into the future to act as a lease — if the
-    /// worker crashes mid-provision the row becomes claimable again after the
-    /// lease expires.
+    /// `FOR UPDATE OF j SKIP LOCKED` locks only the job row, not the user row,
+    /// and lets multiple drainer workers run safely in parallel. Selected
+    /// rows have `next_attempt_at` pushed into the future to act as a lease —
+    /// if the worker crashes mid-provision the row becomes claimable again
+    /// after the lease expires. Dead-lettered rows are skipped.
     #[builder]
     pub async fn claim_due_provisioning_jobs(
         &self,
         limit: i64,
         lease: chrono::Duration,
-    ) -> DbResult<Vec<ProvisioningJob>> {
+    ) -> DbResult<Vec<ClaimedProvisioningJob>> {
         let lease_until = Utc::now() + lease;
-        let jobs = sqlx::query_as::<_, ProvisioningJob>(
+        let jobs = sqlx::query_as::<_, ClaimedProvisioningJob>(
             r#"
             WITH due AS (
-                SELECT user_id
-                FROM stripe.customer_provisioning_jobs
-                WHERE next_attempt_at <= now()
-                ORDER BY next_attempt_at
+                SELECT j.user_id, u.email
+                FROM stripe.customer_provisioning_jobs j
+                INNER JOIN users u ON u.id = j.user_id
+                WHERE j.dead_letter = FALSE
+                  AND j.next_attempt_at <= now()
+                ORDER BY j.next_attempt_at
                 LIMIT $1
-                FOR UPDATE SKIP LOCKED
+                FOR UPDATE OF j SKIP LOCKED
             )
             UPDATE stripe.customer_provisioning_jobs AS j
             SET next_attempt_at = $2,
                 updated_at = now()
             FROM due
             WHERE j.user_id = due.user_id
-            RETURNING j.user_id, j.attempts, j.next_attempt_at, j.last_error,
-                      j.created_at, j.updated_at
+            RETURNING j.user_id, due.email, j.attempts
             "#,
         )
         .bind(limit)
@@ -1744,16 +1747,21 @@ impl DatabaseManager {
         Ok(jobs)
     }
 
+    /// Delete a provisioning job. Intended to be called inside the same
+    /// transaction as the link write so that "customer linked" and "job
+    /// removed" are atomic.
     #[builder]
-    pub async fn complete_stripe_customer_provisioning(&self, user_id: Uuid) -> DbResult<()> {
+    pub async fn delete_provisioning_job<'e, E>(&self, executor: E, user_id: Uuid) -> DbResult<()>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
         sqlx::query("DELETE FROM stripe.customer_provisioning_jobs WHERE user_id = $1")
             .bind(user_id)
-            .execute(&self.pool)
+            .execute(executor)
             .await?;
         Ok(())
     }
 
-    #[builder]
     pub async fn fail_stripe_customer_provisioning(
         &self,
         user_id: Uuid,
@@ -1779,13 +1787,28 @@ impl DatabaseManager {
         Ok(())
     }
 
-    #[builder]
-    pub async fn count_pending_provisioning_jobs(&self) -> DbResult<i64> {
-        let (count,): (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM stripe.customer_provisioning_jobs")
-                .fetch_one(&self.pool)
-                .await?;
-        Ok(count)
+    /// Mark a provisioning job as dead — it will not be retried. The drainer
+    /// uses this for permanent (4xx, non-rate-limit) failures from Stripe.
+    pub async fn dead_letter_stripe_customer_provisioning(
+        &self,
+        user_id: Uuid,
+        error: &str,
+    ) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            UPDATE stripe.customer_provisioning_jobs
+            SET dead_letter = TRUE,
+                attempts = attempts + 1,
+                last_error = $2,
+                updated_at = now()
+            WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .bind(error)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     #[builder]

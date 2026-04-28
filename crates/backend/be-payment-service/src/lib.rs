@@ -24,6 +24,7 @@ pub mod service;
 pub mod types;
 pub mod webhook;
 
+use provision::StripeBillingProvisioner;
 use service::AppState;
 
 pub fn create_router(state: Arc<AppState>) -> Result<Router> {
@@ -70,7 +71,6 @@ pub fn create_router(state: Arc<AppState>) -> Result<Router> {
 
 pub struct PaymentService {
     pub router: Router,
-    pub provisioner: Arc<StripeBillingProvisioner>,
     pub drainer: drainer::DrainerHandle,
 }
 
@@ -79,20 +79,18 @@ pub fn init_payment_service(db: Arc<DatabaseManager>) -> Result<PaymentService> 
 
     let state =
         Arc::new(AppState::from_env(db.clone()).context("Failed to create payment service state")?);
-    let provisioner = state.provisioner.clone();
+    let provisioner = Arc::new(StripeBillingProvisioner::new(
+        state.client.clone(),
+        db.clone(),
+    ));
     let router = create_router(state)?;
-    let drainer = drainer::spawn_drainer(db, provisioner.clone());
+    let drainer = drainer::spawn_drainer(db, provisioner);
 
-    Ok(PaymentService {
-        router,
-        provisioner,
-        drainer,
-    })
+    Ok(PaymentService { router, drainer })
 }
 
 pub use config::PaymentConfig;
 pub use error::PaymentError;
-pub use provision::{ProvisionError, StripeBillingProvisioner};
 pub use types::{
     CheckoutStatusResponse, CreateCheckoutRequest, CreateCheckoutResponse, CreatePortalResponse,
     PricingResponse, SubscriptionStatus,
