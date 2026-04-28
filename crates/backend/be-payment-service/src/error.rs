@@ -25,6 +25,9 @@ pub enum PaymentError {
     #[error("Configuration error: {0}")]
     Config(String),
 
+    #[error("Billing account is being set up — please retry shortly")]
+    BillingNotReady,
+
     #[error("{0}")]
     Internal(#[from] anyhow::Error),
 }
@@ -39,6 +42,7 @@ impl PaymentError {
             Self::MissingField(_) => "missing_field",
             Self::InvalidField(_) => "invalid_field",
             Self::Config(_) => "config_error",
+            Self::BillingNotReady => "billing_not_ready",
             Self::Internal(_) => "internal_error",
         }
     }
@@ -81,6 +85,7 @@ impl IntoResponse for PaymentError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error".to_string(),
             ),
+            PaymentError::BillingNotReady => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             PaymentError::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Internal server error".to_string(),

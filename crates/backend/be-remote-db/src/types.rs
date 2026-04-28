@@ -70,6 +70,13 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, FromRow)]
+pub struct ClaimedProvisioningJob {
+    pub user_id: Uuid,
+    pub email: String,
+    pub attempts: i32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct PasswordCredentials {
     pub user_id: Uuid,
