@@ -116,6 +116,7 @@ pub async fn on_checkout_completed(
     db.upsert_stripe_customer()
         .executor(&mut *tx)
         .customer_id(&customer_id)
+        .maybe_app_user_id(user.as_ref().map(|u| u.id))
         .email(&customer_email)
         .raw_data(raw_data)
         .call()

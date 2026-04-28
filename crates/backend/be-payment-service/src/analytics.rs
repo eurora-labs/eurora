@@ -88,3 +88,9 @@ pub fn track_webhook_invoice_payment_failed(attempt_count: u64) {
     event.insert_prop("attempt_count", attempt_count).ok();
     capture_async(event);
 }
+
+pub fn track_customer_provisioning_attempt(outcome: &str) {
+    let mut event = Event::new_anon("stripe_customer_provisioning_attempt");
+    event.insert_prop("outcome", outcome).ok();
+    capture_async(event);
+}
