@@ -1,6 +1,6 @@
 name: euro-mobile
 options:
-  bundleIdPrefix: com.eurora-labs.eurora.mobile.dev
+  bundleIdPrefix: com.eurora-labs.eurora
   deploymentTarget:
     iOS: 16.0
 fileGroups: [../../src]
@@ -10,9 +10,11 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Eurora Mobile Dev
-      PRODUCT_BUNDLE_IDENTIFIER: com.eurora-labs.eurora.mobile.dev
+      PRODUCT_NAME: Eurora Dev
+      PRODUCT_BUNDLE_IDENTIFIER: com.eurora-labs.eurora.dev
       DEVELOPMENT_TEAM: FKLH326P9A
+      MARKETING_VERSION: 0.0.0
+      CURRENT_PROJECT_VERSION: 1
 targetTemplates:
   app:
     type: application
@@ -53,8 +55,9 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 1.0.0
-        CFBundleVersion: "1.0.0"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: euro-mobile_iOS/euro-mobile_iOS.entitlements
     scheme:
@@ -82,7 +85,12 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
     preBuildScripts:
-      - script: pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+      - script: |
+          if [ "${CI:-}" = "true" ]; then
+            echo "CI=true: skipping cargo build (handled by release-ios.sh)"
+            exit 0
+          fi
+          pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:
