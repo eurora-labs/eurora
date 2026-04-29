@@ -5,6 +5,7 @@
 	import { create } from '@bufbuild/protobuf';
 	import { inject } from '@eurora/shared/context';
 	import { LoginRequestSchema, type Provider } from '@eurora/shared/proto/auth_service_pb.js';
+	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 
 	let { provider }: { provider: Provider } = $props();
@@ -16,7 +17,11 @@
 		const error = query.get('error');
 
 		if (error) {
-			console.error('OAuth error:', error, query.get('error_description'));
+			Sentry.captureMessage('OAuth provider returned error', {
+				level: 'warning',
+				tags: { area: 'auth.oauth', provider: String(provider) },
+				extra: { error, description: query.get('error_description') },
+			});
 			goto('/login?error=oauth_failed');
 			return;
 		}
@@ -25,7 +30,10 @@
 		const state = query.get('state');
 
 		if (!code || !state) {
-			console.error('Missing required OAuth parameters');
+			Sentry.captureMessage('OAuth callback missing code or state', {
+				level: 'warning',
+				tags: { area: 'auth.oauth', provider: String(provider) },
+			});
 			goto('/login?error=invalid_callback');
 			return;
 		}
@@ -65,7 +73,9 @@
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect);
 		} catch (error) {
-			console.error('Token exchange failed:', error);
+			Sentry.captureException(error, {
+				tags: { area: 'auth.oauth', provider: String(provider) },
+			});
 			goto('/login?error=token_exchange_failed');
 		}
 	});

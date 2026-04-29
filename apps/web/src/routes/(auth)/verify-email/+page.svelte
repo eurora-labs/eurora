@@ -10,6 +10,7 @@
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import CircleX from '@lucide/svelte/icons/circle-x';
+	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 
 	const authService = inject(AUTH_SERVICE);
@@ -31,6 +32,7 @@
 			auth.login(tokens);
 			status = 'success';
 		} catch (err) {
+			Sentry.captureException(err, { tags: { area: 'auth.verify-email' } });
 			status = 'error';
 			errorMessage =
 				err instanceof Error ? err.message : 'Invalid or expired verification token.';

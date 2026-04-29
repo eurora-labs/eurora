@@ -16,6 +16,7 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
 
@@ -42,7 +43,10 @@
 			let challengeMethod = page.url.searchParams.get('code_challenge_method');
 			if (loginToken && challengeMethod) {
 				if (loginToken.length !== 43 || challengeMethod !== 'S256') {
-					console.error('Invalid login token or challenge method');
+					Sentry.captureMessage('Invalid login token or challenge method', {
+						level: 'warning',
+						tags: { area: 'auth.desktop-login' },
+					});
 					goto('/login?error=invalid_login_token');
 					return;
 				}
@@ -60,7 +64,8 @@
 			}
 			loginToken = sessionStorage.getItem('loginToken');
 			challengeMethod = sessionStorage.getItem('challengeMethod');
-		} catch (_error) {
+		} catch (error) {
+			Sentry.captureException(error, { tags: { area: 'auth.desktop-login' } });
 			goto('/login?error=invalid_login_token');
 			return;
 		}
@@ -95,7 +100,7 @@
 				return;
 			}
 		} catch (err) {
-			console.error('Failed to associate login token:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.associate-desktop' } });
 			submitError = 'Failed to authorize desktop app. Please try again.';
 		} finally {
 			loading = false;
@@ -146,7 +151,7 @@
 			}
 			showPassword = true;
 		} catch (err) {
-			console.error('Check email error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.check-email' } });
 			submitError =
 				err instanceof Error ? err.message : 'Something went wrong. Please try again.';
 		} finally {
@@ -172,7 +177,7 @@
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
 		} catch (err) {
-			console.error('Email/password login error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.login-password' } });
 			submitError = err instanceof Error ? err.message : 'Invalid email or password.';
 			loading = false;
 		}
@@ -194,7 +199,7 @@
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
 		} catch (err) {
-			console.error('Registration error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.register' } });
 			submitError =
 				err instanceof Error ? err.message : 'Registration failed. Please try again.';
 			loading = false;
@@ -209,7 +214,9 @@
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
 			window.location.href = url;
 		} catch (err) {
-			console.error('Google login error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'auth.oauth-redirect', provider: 'google' },
+			});
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			loading = false;
 		}
@@ -223,7 +230,9 @@
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
 			window.location.href = url;
 		} catch (err) {
-			console.error('GitHub login error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'auth.oauth-redirect', provider: 'github' },
+			});
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			loading = false;
 		}

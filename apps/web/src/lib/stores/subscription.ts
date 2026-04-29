@@ -1,6 +1,7 @@
 import { auth, accessToken } from '$lib/stores/auth.js';
 import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 import { inject } from '@eurora/shared/context';
+import * as Sentry from '@sentry/sveltekit';
 import { writable, derived, get } from 'svelte/store';
 
 export interface SubscriptionStatus {
@@ -56,7 +57,7 @@ export const subscriptionStore = {
 				fetched: true,
 			});
 		} catch (err) {
-			console.error('Failed to fetch subscription:', err);
+			Sentry.captureException(err, { tags: { area: 'payment.subscription-fetch' } });
 			store.update((s) => ({
 				...s,
 				loading: false,

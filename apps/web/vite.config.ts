@@ -24,7 +24,15 @@ export default defineConfig(({ mode }) => {
 	const sentryAuthToken = env.SENTRY_AUTH_TOKEN;
 	const sentryOrg = env.SENTRY_ORG;
 	const sentryProject = env.SENTRY_PROJECT;
+	const sentryRelease = env.PUBLIC_SENTRY_RELEASE;
 	const uploadSourceMaps = Boolean(sentryAuthToken && sentryOrg && sentryProject);
+
+	if (uploadSourceMaps && !sentryRelease) {
+		throw new Error(
+			'Missing PUBLIC_SENTRY_RELEASE. It is required when uploading source maps so ' +
+				'the runtime release matches the uploaded artifacts.',
+		);
+	}
 
 	return {
 		plugins: [
@@ -35,6 +43,7 @@ export default defineConfig(({ mode }) => {
 							org: sentryOrg,
 							project: sentryProject,
 							authToken: sentryAuthToken,
+							release: { name: sentryRelease },
 						}
 					: undefined,
 			}),
