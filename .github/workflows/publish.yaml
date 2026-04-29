@@ -811,6 +811,115 @@ jobs:
                   path: release/
                   if-no-files-found: error
 
+    build-tauri-android:
+        needs: [build-sveltekit, build-sveltekit-mobile]
+        runs-on: ubuntu-latest
+        env:
+            CARGO_TERM_COLOR: always
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  persist-credentials: false
+
+            - name: Set version and channel
+              shell: bash
+              env:
+                  BUILD_VERSION: ${{ needs.build-sveltekit.outputs.version }}
+                  BUILD_CHANNEL: ${{ needs.build-sveltekit.outputs.channel }}
+              run: |
+                  {
+                    echo 'version<<EOF'
+                    echo "$BUILD_VERSION"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+                  {
+                    echo 'channel<<EOF'
+                    echo "$BUILD_CHANNEL"
+                    echo 'EOF'
+                  } >> "$GITHUB_ENV"
+
+            - name: Set up JDK 17
+              uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: '17'
+
+            - name: Set up Android NDK
+              uses: nttld/setup-ndk@v1
+              id: setup-ndk
+              with:
+                  ndk-version: r27c
+                  add-to-path: false
+
+            - name: Install Rust Android targets
+              run: |
+                  rustup target add \
+                    aarch64-linux-android \
+                    armv7-linux-androideabi \
+                    i686-linux-android \
+                    x86_64-linux-android
+
+            - name: Rust Cache
+              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              with:
+                  shared-key: app-release-build-${{ github.event.inputs.channel || 'nightly' }}-android
+                  cache-on-failure: true
+
+            - name: Init Node Environment
+              uses: ./.github/actions/init-env-node
+
+            - name: Install Protoc
+              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
+              with:
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Compile Protobuf
+              run: pnpm proto:typescript
+
+            - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+              name: Download SvelteKit mobile build output
+              with:
+                  name: sveltekit-mobile-build
+                  path: ./apps/mobile/build/
+
+            - name: Set up Ruby for fastlane
+              uses: ruby/setup-ruby@v1
+              with:
+                  ruby-version: '3.3'
+                  bundler-cache: false
+
+            - name: Install fastlane
+              run: gem install --no-document fastlane
+
+            - name: Build and upload Android app
+              shell: bash
+              env:
+                  RELEASE_CHANNEL: ${{ env.channel }}
+                  RELEASE_VERSION: ${{ env.version }}
+                  BUILD_NUMBER: ${{ github.run_number }}
+                  ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+                  NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+                  ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+                  ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+                  ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+                  ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+                  GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+              run: |
+                  ./scripts/release-android.sh \
+                    --channel      "$RELEASE_CHANNEL" \
+                    --version      "$RELEASE_VERSION" \
+                    --build-number "$BUILD_NUMBER" \
+                    --dist         "./release" \
+                    --upload
+
+            - name: Upload Android artifacts
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: 'android-${{ env.channel }}-${{ github.run_number }}'
+                  path: release/
+                  if-no-files-found: error
+
     publish-tauri:
         needs: [build-sveltekit, build-tauri]
         runs-on: ubuntu-latest
