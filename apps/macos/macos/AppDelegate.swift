@@ -40,20 +40,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Eurora launcher starting")
 
-        // Register as a launchd user agent. launchd both starts the launcher
-        // at login (RunAtLoad) and respawns it on crash (KeepAlive), giving
-        // us a single source of truth for the "always running" property the
-        // Safari extension relies on. Registration is idempotent.
-        #if !DEBUG
-            registerLaunchdAgent()
-        #endif
-
-        launchEuroraDesktop()
-
-        // Observe Tauri app termination so we can shut down with it,
-        // and Safari launch/quit so we keep the browser PID current.
-        observeWorkspaceAppLifecycle()
-
+        // Start the bridge listener first — it is the resource the Safari
+        // extension is waiting on. Everything else (launchd registration,
+        // observers, the gRPC client, launching Eurora) can run after.
         let server = LocalBridgeServer()
         server.delegate = self
         server.start()
@@ -66,6 +55,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         client.delegate = self
         client.connect()
         self.grpcClient = client
+
+        // Observe Eurora and Safari lifecycle so we can keep the browser
+        // PID current and log Eurora terminations.
+        observeWorkspaceAppLifecycle()
+
+        // Register as a launchd user agent. launchd both starts the launcher
+        // at login (RunAtLoad) and respawns it on crash (KeepAlive), giving
+        // us a single source of truth for the "always running" property the
+        // Safari extension relies on. Registration is idempotent.
+        #if !DEBUG
+            registerLaunchdAgent()
+        #endif
+
+        launchEuroraDesktop()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -175,6 +178,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     // MARK: - Tauri Desktop App Lifecycle
 
     private func launchEuroraDesktop() {
+        // Short-circuit when Eurora is already up (session restore, or the
+        // launcher being relaunched while the desktop app is still alive).
+        // NSWorkspace.openApplication on a running app is a semantic no-op,
+        // but it still does the bundle resolution work synchronously.
+        if let running = NSWorkspace.shared.runningApplications.first(where: {
+            guard let bundleId = $0.bundleIdentifier else { return false }
+            return desktopBundleIdentifiers.contains(bundleId)
+        }) {
+            logger.info(
+                "Eurora already running (PID \(running.processIdentifier)); skipping launch")
+            return
+        }
+
         guard let resourceURL = Bundle.main.resourceURL else {
             logger.error("Could not locate app Resources directory")
             return
