@@ -1,4 +1,4 @@
-import type { SubscriptionStatus } from '$lib/stores/subscription.js';
+import type { SubscriptionStatus } from '$lib/services/subscription-service.svelte.js';
 
 declare global {
 	namespace App {

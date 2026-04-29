@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { auth, isAuthenticated, accessToken } from '$lib/stores/auth.js';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
 	import { Button, type ButtonProps } from '@eurora/ui/components/button/index';
@@ -10,6 +10,7 @@
 	import { toast } from 'svelte-sonner';
 	import type { Snippet } from 'svelte';
 
+	const auth = inject(AUTH_SERVICE);
 	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID ?? '';
@@ -28,7 +29,7 @@
 	});
 
 	async function handleGetPro() {
-		if (!$isAuthenticated) {
+		if (!auth.isAuthenticated) {
 			goto('/login?redirect=' + encodeURIComponent('/pricing?checkout=true'));
 			return;
 		}
@@ -45,7 +46,7 @@
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${$accessToken}`,
+					Authorization: `Bearer ${auth.accessToken}`,
 				},
 				body: JSON.stringify({
 					price_id: STRIPE_PRO_PRICE_ID,

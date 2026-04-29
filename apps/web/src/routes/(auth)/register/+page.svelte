@@ -1,21 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
-	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
-	import { auth } from '$lib/stores/auth.js';
-	import { create } from '@bufbuild/protobuf';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
-	import {
-		Provider,
-		RegisterRequestSchema,
-		CheckEmailRequestSchema,
-	} from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Sentry from '@sentry/sveltekit';
 
-	const authService = inject(AUTH_SERVICE);
+	const auth = inject(AUTH_SERVICE);
 
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
@@ -28,14 +21,9 @@
 		loading = true;
 		submitError = null;
 		try {
-			const resp = await authService.checkEmail(
-				create(CheckEmailRequestSchema, { email: email.trim() }),
-			);
-			if (resp.status === 'oauth' && resp.provider !== null) {
-				const provider =
-					resp.provider === Provider.GOOGLE ? Provider.GOOGLE : Provider.GITHUB;
-				const url = (await authService.getThirdPartyAuthUrl(provider)).url;
-				window.location.href = url;
+			const result = await auth.checkEmail(email.trim());
+			if (result.status === 'oauth') {
+				window.location.href = await auth.getOAuthRedirectUrl(result.provider);
 				return;
 			}
 			showRegisterFields = true;
@@ -53,13 +41,8 @@
 		loading = true;
 		submitError = null;
 		try {
-			const request = create(RegisterRequestSchema, {
-				email: email.trim(),
-				password,
-			});
-			const tokens = await authService.register(request);
-			auth.login(tokens);
-			await authService.associateDesktopLoginIfPending(tokens.accessToken);
+			await auth.register(email.trim(), password);
+			await auth.associateDesktopLoginIfPending();
 			goto('/');
 		} catch (err) {
 			Sentry.captureException(err, { tags: { area: 'auth.register' } });
@@ -73,8 +56,7 @@
 		loading = true;
 		submitError = null;
 		try {
-			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
-			window.location.href = url;
+			window.location.href = await auth.getOAuthRedirectUrl('google');
 		} catch (err) {
 			Sentry.captureException(err, {
 				tags: { area: 'auth.oauth-redirect', provider: 'google' },
@@ -89,8 +71,7 @@
 		loading = true;
 		submitError = null;
 		try {
-			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
-			window.location.href = url;
+			window.location.href = await auth.getOAuthRedirectUrl('github');
 		} catch (err) {
 			Sentry.captureException(err, {
 				tags: { area: 'auth.oauth-redirect', provider: 'github' },
