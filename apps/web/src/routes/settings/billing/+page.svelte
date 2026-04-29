@@ -13,6 +13,7 @@
 	import AlertCircleIcon from '@lucide/svelte/icons/alert-circle';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import * as Sentry from '@sentry/sveltekit';
 
 	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
 
@@ -75,7 +76,7 @@
 			const { url } = await res.json();
 			window.location.href = url;
 		} catch (err) {
-			console.error('Portal error:', err);
+			Sentry.captureException(err, { tags: { area: 'payment.portal' } });
 			portalError = err instanceof Error ? err.message : 'Failed to open billing portal.';
 			portalLoading = false;
 		}
