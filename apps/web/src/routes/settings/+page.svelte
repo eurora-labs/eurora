@@ -1,8 +1,8 @@
 <script lang="ts">
 	import GetProButton from '$lib/components/GetProButton.svelte';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { DOWNLOAD_SERVICE, type DownloadOption } from '$lib/services/download-service.js';
-	import { currentUser } from '$lib/stores/auth.js';
-	import { subscription, subscriptionLoading } from '$lib/stores/subscription.js';
+	import { SUBSCRIPTION_SERVICE } from '$lib/services/subscription-service.svelte.js';
 	import { getArch, getOS } from '$lib/utils/getOS';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -16,8 +16,10 @@
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import type { Component } from 'svelte';
 
+	const auth = inject(AUTH_SERVICE);
+	const subscription = inject(SUBSCRIPTION_SERVICE);
 	const downloadService = inject(DOWNLOAD_SERVICE);
-	const isFreePlan = $derived(!$subscriptionLoading && !$subscription?.subscription_id);
+	const isFreePlan = $derived(!subscription.loading && !subscription.data?.subscription_id);
 
 	const detectedOS = getOS();
 	const detectedArch = getArch();
@@ -40,10 +42,10 @@
 </script>
 
 <svelte:head>
-	<title>{$currentUser?.name || 'User'} - Eurora Labs</title>
+	<title>{auth.user?.name || 'User'} - Eurora Labs</title>
 </svelte:head>
 
-{#if $currentUser}
+{#if auth.user}
 	{#if isFreePlan}
 		<Card.Root
 			class="relative overflow-hidden bg-linear-to-r from-primary/5 via-primary/10 to-transparent p-6"

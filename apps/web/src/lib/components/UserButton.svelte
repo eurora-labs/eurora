@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { currentUser, auth } from '$lib/stores/auth.js';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
+	import { inject } from '@eurora/shared/context';
 	import * as Avatar from '@eurora/ui/components/avatar/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import UserIcon from '@lucide/svelte/icons/user';
+
+	const auth = inject(AUTH_SERVICE);
 
 	function handleLogout() {
 		auth.logout();
@@ -32,17 +35,13 @@
 	}
 </script>
 
-{#if $currentUser}
+{#if auth.user}
 	<DropdownMenu.Root>
 		<DropdownMenu.Trigger>
 			<Button variant="ghost" class="relative h-8 w-8 rounded-full p-0">
 				<Avatar.Root class="h-8 w-8">
-					<Avatar.Image
-						src={$currentUser.avatar}
-						alt={$currentUser.name || $currentUser.email}
-					/>
-					<Avatar.Fallback
-						>{getInitials($currentUser.name, $currentUser.email)}</Avatar.Fallback
+					<Avatar.Image src={auth.user.avatar} alt={auth.user.name || auth.user.email} />
+					<Avatar.Fallback>{getInitials(auth.user.name, auth.user.email)}</Avatar.Fallback
 					>
 				</Avatar.Root>
 			</Button>

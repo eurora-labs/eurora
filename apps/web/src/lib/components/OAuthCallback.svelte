@@ -1,16 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
-	import { auth } from '$lib/stores/auth.js';
-	import { create } from '@bufbuild/protobuf';
+	import { AUTH_SERVICE, type OAuthProvider } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
-	import { LoginRequestSchema, type Provider } from '@eurora/shared/proto/auth_service_pb.js';
 	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 
-	let { provider }: { provider: Provider } = $props();
+	let { provider }: { provider: OAuthProvider } = $props();
 
-	const authService = inject(AUTH_SERVICE);
+	const auth = inject(AUTH_SERVICE);
 
 	onMount(async () => {
 		const query = new URLSearchParams(window.location.search);
@@ -19,7 +16,7 @@
 		if (error) {
 			Sentry.captureMessage('OAuth provider returned error', {
 				level: 'warning',
-				tags: { area: 'auth.oauth', provider: String(provider) },
+				tags: { area: 'auth.oauth', provider },
 				extra: { error, description: query.get('error_description') },
 			});
 			goto('/login?error=oauth_failed');
@@ -32,7 +29,7 @@
 		if (!code || !state) {
 			Sentry.captureMessage('OAuth callback missing code or state', {
 				level: 'warning',
-				tags: { area: 'auth.oauth', provider: String(provider) },
+				tags: { area: 'auth.oauth', provider },
 			});
 			goto('/login?error=invalid_callback');
 			return;
@@ -44,21 +41,7 @@
 		if (challengeMethod) sessionStorage.removeItem('challengeMethod');
 
 		try {
-			const loginData = create(LoginRequestSchema, {
-				credential: {
-					value: {
-						provider,
-						code,
-						state,
-						loginToken,
-						challengeMethod,
-					},
-					case: 'thirdParty',
-				},
-			});
-
-			const tokens = await authService.login(loginData);
-			auth.login(tokens);
+			await auth.loginWithOAuth(provider, code, state, { loginToken, challengeMethod });
 
 			if (loginToken) {
 				const deviceRedirectUri = sessionStorage.getItem('deviceRedirectUri');
@@ -72,10 +55,8 @@
 			const redirect = sessionStorage.getItem('postLoginRedirect') || '/';
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect);
-		} catch (error) {
-			Sentry.captureException(error, {
-				tags: { area: 'auth.oauth', provider: String(provider) },
-			});
+		} catch (err) {
+			Sentry.captureException(err, { tags: { area: 'auth.oauth', provider } });
 			goto('/login?error=token_exchange_failed');
 		}
 	});
