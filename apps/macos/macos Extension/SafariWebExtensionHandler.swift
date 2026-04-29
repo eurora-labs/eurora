@@ -1,3 +1,4 @@
+import AppKit
 import SafariServices
 import os.log
 
@@ -47,6 +48,8 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             return
         }
 
+        ensureContainerAppLaunched()
+
         NativeMessagingBridge.shared.ensureConnected()
 
         NativeMessagingBridge.shared.sendMessage(messageDict) { [weak self] result in
@@ -56,6 +59,49 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             case .failure(let error):
                 self?.logger.error("Bridge error: \(error.localizedDescription)")
                 self?.completeWithError(context: context, error: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Ensure the launcher app is running before talking to the bridge. If
+    /// launchd already started it (the common case once the user has
+    /// approved the agent in System Settings), the running-process check
+    /// short-circuits. If not — first install, manual `launchctl unload`,
+    /// or any other reason the agent isn't loaded — fire an explicit
+    /// background launch so the bridge has something to connect to.
+    /// The bridge buffers the in-flight `sendMessage` call across the
+    /// launch, so callers do not need to wait here.
+    private func ensureContainerAppLaunched() {
+        let containerAppURL = Bundle.main.bundleURL
+            .deletingLastPathComponent()  // …/Contents/PlugIns
+            .deletingLastPathComponent()  // …/Contents
+            .deletingLastPathComponent()  // …/EuroraLauncher.app
+
+        guard let containerBundle = Bundle(url: containerAppURL),
+              let containerBundleId = containerBundle.bundleIdentifier else {
+            logger.error("Could not resolve container app bundle at \(containerAppURL.path)")
+            return
+        }
+
+        let alreadyRunning = NSWorkspace.shared.runningApplications.contains { app in
+            app.bundleIdentifier == containerBundleId
+        }
+        if alreadyRunning { return }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        configuration.addsToRecentItems = false
+        configuration.hides = true
+
+        logger.info("Container app not running; launching \(containerBundleId)")
+        NSWorkspace.shared.openApplication(
+            at: containerAppURL, configuration: configuration
+        ) { [weak self] _, error in
+            if let error {
+                self?.logger.error(
+                    "Failed to launch container app: \(error.localizedDescription)")
+            } else {
+                self?.logger.info("Container app launched on demand")
             }
         }
     }

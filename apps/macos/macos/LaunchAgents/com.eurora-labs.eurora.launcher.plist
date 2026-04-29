@@ -13,18 +13,14 @@
 	<key>RunAtLoad</key>
 	<true/>
 	<!--
-	    Restart on crash but never on a graceful exit. The launcher exits
-	    cleanly when the Tauri desktop app quits (see AppDelegate's
-	    workspaceAppDidTerminate); a blanket KeepAlive=true would race
-	    that into an infinite respawn loop.
+	    Keep the launcher running unconditionally. It is the always-on
+	    bridge between Safari and the desktop app; tying its lifecycle
+	    to Eurora's would leave the bridge dead between Eurora sessions.
+	    The launcher no longer self-terminates on Eurora quit, so this
+	    cannot loop.
 	-->
 	<key>KeepAlive</key>
-	<dict>
-		<key>Crashed</key>
-		<true/>
-		<key>SuccessfulExit</key>
-		<false/>
-	</dict>
+	<true/>
 	<key>ProcessType</key>
 	<string>Background</string>
 	<key>LimitLoadToSessionType</key>

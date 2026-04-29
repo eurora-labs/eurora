@@ -83,20 +83,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     #if !DEBUG
         private func registerLaunchdAgent() {
             let service = SMAppService.agent(plistName: launchdAgentPlistName)
+            let initialStatus = self.describe(status: service.status)
+            logger.info("Launchd agent initial status: \(initialStatus, privacy: .public)")
+
             switch service.status {
             case .enabled:
-                logger.debug("Launchd agent already registered")
+                logger.info(
+                    "Launchd agent already enabled — launchd should keep launcher alive at login"
+                )
             case .notRegistered, .notFound:
                 do {
                     try service.register()
-                    logger.info("Launchd agent registered")
+                    let postStatus = self.describe(status: service.status)
+                    logger.info(
+                        "Launchd agent registered (post-register status: \(postStatus, privacy: .public))"
+                    )
                 } catch {
-                    logger.error("Failed to register launchd agent: \(error.localizedDescription)")
+                    logger.error(
+                        "Failed to register launchd agent: \(error.localizedDescription, privacy: .public)"
+                    )
                 }
             case .requiresApproval:
-                logger.info("Launchd agent requires user approval in System Settings")
+                logger.warning(
+                    "Launchd agent requires user approval in System Settings → General → Login Items & Extensions → Allow in the Background"
+                )
             @unknown default:
-                logger.warning("Unknown launchd agent status: \(String(describing: service.status))")
+                logger.warning(
+                    "Unknown launchd agent status: \(initialStatus, privacy: .public)"
+                )
+            }
+        }
+
+        private func describe(status: SMAppService.Status) -> String {
+            switch status {
+            case .notRegistered: return "notRegistered"
+            case .enabled: return "enabled"
+            case .requiresApproval: return "requiresApproval"
+            case .notFound: return "notFound"
+            @unknown default: return "unknown(\(status.rawValue))"
             }
         }
     #endif
@@ -123,8 +147,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         else { return }
 
         if desktopBundleIdentifiers.contains(bundleId) {
-            logger.info("Eurora terminated, shutting down launcher")
-            NSApplication.shared.terminate(nil)
+            // The launcher is the always-on bridge between Safari and the
+            // desktop app; it must outlive Eurora so the bridge is ready
+            // when Eurora is relaunched. The gRPC client's connect loop
+            // continues retrying in the background.
+            logger.info("Eurora terminated; launcher staying alive to bridge future sessions")
         } else if safariBundleIdentifiers.contains(bundleId) {
             logger.info(
                 "Safari terminated (was PID \(app.processIdentifier)), clearing browser PID")
