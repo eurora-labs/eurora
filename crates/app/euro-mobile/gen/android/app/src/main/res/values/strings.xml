@@ -1,4 +1,6 @@
 <resources>
-    <string name="app_name">Eurora Mobile Dev</string>
-    <string name="main_activity_title">Eurora Mobile Dev</string>
+    <!--
+      app_name and main_activity_title are produced by build.gradle.kts via
+      resValue() so they can vary per channel (release / nightly / dev).
+    -->
 </resources>

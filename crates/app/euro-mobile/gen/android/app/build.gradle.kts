@@ -13,17 +13,39 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Channel-aware identity. ANDROID_CHANNEL is set by scripts/release-android.sh
+// and the publish.yaml workflow. Local builds default to the dev identity.
+val androidChannel: String = (System.getenv("ANDROID_CHANNEL") ?: "dev").lowercase()
+val (channelApplicationId, channelAppLabel) = when (androidChannel) {
+    "release" -> "com.eurora_labs.eurora" to "Eurora"
+    "nightly" -> "com.eurora_labs.eurora.nightly" to "Eurora Nightly"
+    else -> "com.eurora_labs.eurora.mobile.dev" to "Eurora Mobile Dev"
+}
+
 android {
     compileSdk = 36
     namespace = "com.eurora_labs.eurora.mobile.dev"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         manifestPlaceholders["tauriBrowserRedirectScheme"] = "eurora"
-        applicationId = "com.eurora_labs.eurora.mobile.dev"
+        applicationId = channelApplicationId
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+        resValue("string", "app_name", channelAppLabel)
+        resValue("string", "main_activity_title", channelAppLabel)
+    }
+    signingConfigs {
+        create("release") {
+            val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -44,6 +66,12 @@ android {
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
                     .toList().toTypedArray()
             )
+            // Only attach the release signing config when the keystore env vars
+            // are present. Without this guard, `pnpm tauri android build` from a
+            // dev machine would fail at sign time.
+            if (!System.getenv("ANDROID_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
