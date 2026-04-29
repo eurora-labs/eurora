@@ -36,6 +36,7 @@
 		65C9D4D12F3494AF00FAED22 /* app in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C62F3494AF00FAED22 /* app */; };
 		65C9D4D22F3494AF00FAED22 /* scripts in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C72F3494AF00FAED22 /* scripts */; };
 		65C9D4D32F3494AF00FAED22 /* icon-48x48.png in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4C82F3494AF00FAED22 /* icon-48x48.png */; };
+		65DA01112F40000ABCDE0002 /* com.eurora-labs.eurora.launcher.plist in Embed Launchd Agent */ = {isa = PBXBuildFile; fileRef = 65DA01112F40000ABCDE0001 /* com.eurora-labs.eurora.launcher.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,6 +59,17 @@
 				654B71FE2F332FE600A08DFD /* macos Extension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		65DA01112F40000ABCDE0003 /* Embed Launchd Agent */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "Contents/Library/LaunchAgents";
+			dstSubfolderSpec = 1;
+			files = (
+				65DA01112F40000ABCDE0002 /* com.eurora-labs.eurora.launcher.plist in Embed Launchd Agent */,
+			);
+			name = "Embed Launchd Agent";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -88,6 +100,7 @@
 		65C9D4C62F3494AF00FAED22 /* app */ = {isa = PBXFileReference; lastKnownFileType = folder; name = app; path = ../../browser/dist/safari/app; sourceTree = "<group>"; };
 		65C9D4C72F3494AF00FAED22 /* scripts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = scripts; path = ../../browser/dist/safari/scripts; sourceTree = "<group>"; };
 		65C9D4C82F3494AF00FAED22 /* icon-48x48.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-48x48.png"; path = "../../browser/dist/safari/icon-48x48.png"; sourceTree = "<group>"; };
+		65DA01112F40000ABCDE0001 /* com.eurora-labs.eurora.launcher.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "LaunchAgents/com.eurora-labs.eurora.launcher.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -146,6 +159,7 @@
 				654B71F32F332FE600A08DFD /* Main.storyboard */,
 				654B71F62F332FE600A08DFD /* Assets.xcassets */,
 				654B71F82F332FE600A08DFD /* Info.plist */,
+				65DA01112F40000ABCDE0001 /* com.eurora-labs.eurora.launcher.plist */,
 				654B71E72F332FE600A08DFD /* Resources */,
 			);
 			path = macos;
@@ -205,6 +219,7 @@
 				654B71DF2F332FE600A08DFD /* Frameworks */,
 				654B71E02F332FE600A08DFD /* Resources */,
 				654B720A2F332FE600A08DFD /* Embed Foundation Extensions */,
+				65DA01112F40000ABCDE0003 /* Embed Launchd Agent */,
 			);
 			buildRules = (
 			);

@@ -24,14 +24,28 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private var pendingServerRequests: [String: [String: Any]] = [:]
     private let pendingServerRequestsLock = NSLock()
 
+    // Extension requests that arrived while the gRPC client was disconnected.
+    // They are forwarded as soon as the gRPC stream comes back up. Bounded
+    // so a permanently-down Tauri server cannot grow this without limit.
+    private struct PendingForwardRequest {
+        let message: [String: Any]
+        let deadline: Date
+        let completion: ([String: Any]?) -> Void
+    }
+    private var pendingForwardRequests: [PendingForwardRequest] = []
+    private let pendingForwardRequestsLock = NSLock()
+    private let maxPendingForwardRequests = 256
+    private let launchdAgentPlistName = "com.eurora-labs.eurora.launcher.plist"
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Eurora launcher starting")
 
-        // Register as a login item so the launcher (not the embedded Tauri
-        // app) starts on system boot.  SMAppService.mainApp is idempotent —
-        // calling register() when already enabled is a no-op.
+        // Register as a launchd user agent. launchd both starts the launcher
+        // at login (RunAtLoad) and respawns it on crash (KeepAlive), giving
+        // us a single source of truth for the "always running" property the
+        // Safari extension relies on. Registration is idempotent.
         #if !DEBUG
-            registerAsLoginItem()
+            registerLaunchdAgent()
         #endif
 
         launchEuroraDesktop()
@@ -59,29 +73,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         grpcClient = nil
         localBridgeServer?.stop()
         localBridgeServer = nil
+        drainPendingForwardRequests(reason: "launcher shutting down")
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    // MARK: - Login Item Registration
+    // MARK: - Launchd Agent Registration
 
     #if !DEBUG
-        private func registerAsLoginItem() {
-            let service = SMAppService.mainApp
+        private func registerLaunchdAgent() {
+            let service = SMAppService.agent(plistName: launchdAgentPlistName)
             switch service.status {
             case .enabled:
-                logger.debug("Already registered as login item")
+                logger.debug("Launchd agent already registered")
             case .notRegistered, .notFound:
                 do {
                     try service.register()
-                    logger.info("Registered as login item")
+                    logger.info("Launchd agent registered")
                 } catch {
-                    logger.error("Failed to register as login item: \(error.localizedDescription)")
+                    logger.error("Failed to register launchd agent: \(error.localizedDescription)")
                 }
             case .requiresApproval:
-                logger.info("Login item requires user approval in System Settings")
+                logger.info("Launchd agent requires user approval in System Settings")
             @unknown default:
-                logger.warning("Unknown login item status: \(String(describing: service.status))")
+                logger.warning("Unknown launchd agent status: \(String(describing: service.status))")
             }
         }
     #endif
@@ -190,6 +205,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
 
     func browserBridgeClientDidConnect(_ client: BrowserBridgeClient) {
         logger.info("Connected to gRPC server")
+        flushPendingForwardRequests()
     }
     func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?) {
         if let error {
@@ -198,8 +214,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
             logger.info("Disconnected from gRPC server")
         }
 
-        // Drain pending extension requests — the server can no longer respond,
-        // so complete them all with an error to avoid hanging the Safari extension.
+        // Fail in-flight requests — they were on a now-dead stream and the
+        // server has no record of them. Queued (not-yet-forwarded) requests
+        // in `pendingForwardRequests` are intentionally left alone so they
+        // ride out the reconnect cycle.
         pendingExtensionRequestsLock.lock()
         let pending = pendingExtensionRequests
         pendingExtensionRequests.removeAll()
@@ -260,16 +278,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private func forwardExtRequest(
         _ message: [String: Any], completion: @escaping ([String: Any]?) -> Void
     ) {
-        guard let client = grpcClient, client.isConnected else {
-            completion(["kind": ["Error": ["message": "gRPC client not connected"]]])
+        if let client = grpcClient, client.isConnected {
+            sendForwardableMessage(message, completion: completion)
             return
         }
-        var reqId: String?
-        if let kind = message["kind"] as? [String: Any],
-            let req = kind["Request"] as? [String: Any], let id = req["id"]
-        {
-            reqId = "\(id)"
+
+        // gRPC isn't connected. Events are fire-and-forget and stale within
+        // seconds, so dropping them is preferable to queuing indefinitely.
+        // Request frames are buffered with a deadline; they're forwarded as
+        // soon as `browserBridgeClientDidConnect` fires.
+        if isEventMessage(message) {
+            logger.debug("Dropping event while gRPC client offline")
+            completion(["status": "dropped"])
+            return
         }
+
+        enqueuePendingForwardRequest(message, completion: completion)
+    }
+
+    /// Forward a message on a known-good gRPC stream, registering its
+    /// completion in `pendingExtensionRequests` and arming the per-request
+    /// timeout. Caller must have verified that `grpcClient.isConnected`.
+    private func sendForwardableMessage(
+        _ message: [String: Any], completion: @escaping ([String: Any]?) -> Void
+    ) {
+        let reqId = extractRequestId(from: message)
         if let reqId {
             pendingExtensionRequestsLock.lock()
             pendingExtensionRequests[reqId] = completion
@@ -291,6 +324,121 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         }
         sendDictToServer(message)
         if reqId == nil { completion(["status": "ok"]) }
+    }
+
+    private func extractRequestId(from message: [String: Any]) -> String? {
+        guard let kind = message["kind"] as? [String: Any],
+              let req = kind["Request"] as? [String: Any],
+              let id = req["id"] else { return nil }
+        return "\(id)"
+    }
+
+    private func isEventMessage(_ message: [String: Any]) -> Bool {
+        guard let kind = message["kind"] as? [String: Any] else { return false }
+        return kind["Event"] != nil
+    }
+
+    // MARK: - Pending Forward Queue
+
+    private func enqueuePendingForwardRequest(
+        _ message: [String: Any], completion: @escaping ([String: Any]?) -> Void
+    ) {
+        let entry = PendingForwardRequest(
+            message: message,
+            deadline: Date().addingTimeInterval(requestTimeoutSeconds),
+            completion: completion
+        )
+
+        var dropped: PendingForwardRequest?
+        pendingForwardRequestsLock.lock()
+        if pendingForwardRequests.count >= maxPendingForwardRequests {
+            // Bound the queue. Dropping the oldest is the right policy: it
+            // has been waiting longest and is closest to its deadline.
+            dropped = pendingForwardRequests.removeFirst()
+        }
+        pendingForwardRequests.append(entry)
+        pendingForwardRequestsLock.unlock()
+
+        if let dropped {
+            logger.warning("Pending forward queue full; dropped oldest entry")
+            dropped.completion(["kind": ["Error": ["message": "Forward queue overflow"]]])
+        }
+
+        scheduleForwardQueueDeadlineCheck()
+    }
+
+    private func scheduleForwardQueueDeadlineCheck() {
+        pendingForwardRequestsLock.lock()
+        let nextDeadline = pendingForwardRequests.map { $0.deadline }.min()
+        pendingForwardRequestsLock.unlock()
+        guard let nextDeadline else { return }
+
+        let delay = max(0, nextDeadline.timeIntervalSinceNow)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.failExpiredForwardRequests()
+        }
+    }
+
+    private func failExpiredForwardRequests() {
+        let now = Date()
+        var expired: [PendingForwardRequest] = []
+
+        pendingForwardRequestsLock.lock()
+        var remaining: [PendingForwardRequest] = []
+        for entry in pendingForwardRequests {
+            if entry.deadline <= now {
+                expired.append(entry)
+            } else {
+                remaining.append(entry)
+            }
+        }
+        pendingForwardRequests = remaining
+        pendingForwardRequestsLock.unlock()
+
+        if !expired.isEmpty {
+            logger.warning("Failing \(expired.count) queued forward request(s) past deadline")
+            let errDict: [String: Any] = [
+                "kind": ["Error": ["message": "Request timed out waiting for desktop app"]]
+            ]
+            for entry in expired {
+                entry.completion(errDict)
+            }
+        }
+    }
+
+    private func flushPendingForwardRequests() {
+        pendingForwardRequestsLock.lock()
+        let entries = pendingForwardRequests
+        pendingForwardRequests.removeAll()
+        pendingForwardRequestsLock.unlock()
+
+        guard !entries.isEmpty else { return }
+        logger.info("Flushing \(entries.count) queued forward request(s) on reconnect")
+
+        let now = Date()
+        for entry in entries {
+            if entry.deadline <= now {
+                entry.completion(["kind": ["Error": ["message": "Request timed out waiting for desktop app"]]])
+                continue
+            }
+            sendForwardableMessage(entry.message, completion: entry.completion)
+        }
+    }
+
+    private func drainPendingForwardRequests(reason: String) {
+        pendingForwardRequestsLock.lock()
+        let entries = pendingForwardRequests
+        pendingForwardRequests.removeAll()
+        pendingForwardRequestsLock.unlock()
+
+        guard !entries.isEmpty else { return }
+        logger.info("Draining \(entries.count) queued forward request(s): \(reason)")
+        let errDict: [String: Any] = [
+            "kind": ["Error": ["message": reason]]
+        ]
+        for entry in entries {
+            entry.completion(errDict)
+        }
     }
 
     private func sendDictToServer(_ dict: [String: Any]) {

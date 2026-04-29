@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.eurora-labs.eurora.launcher</string>
+	<key>BundleProgram</key>
+	<string>Contents/MacOS/EuroraLauncher</string>
+	<key>AssociatedBundleIdentifiers</key>
+	<array>
+		<string>com.eurora-labs.eurora.macos</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<!--
+	    Restart on crash but never on a graceful exit. The launcher exits
+	    cleanly when the Tauri desktop app quits (see AppDelegate's
+	    workspaceAppDidTerminate); a blanket KeepAlive=true would race
+	    that into an infinite respawn loop.
+	-->
+	<key>KeepAlive</key>
+	<dict>
+		<key>Crashed</key>
+		<true/>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ProcessType</key>
+	<string>Background</string>
+	<key>LimitLoadToSessionType</key>
+	<string>Aqua</string>
+</dict>
+</plist>

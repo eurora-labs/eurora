@@ -3,6 +3,10 @@ import Network
 import os.log
 
 private let kBridgeConnectionPort: UInt16 = 14311
+private let kDefaultMessageDeadline: TimeInterval = 10.0
+private let kMinReconnectDelay: TimeInterval = 0.25
+private let kMaxReconnectDelay: TimeInterval = 2.0
+private let kMaxPendingMessages = 256
 
 @available(macOS 15.0, *)
 class NativeMessagingBridge {
@@ -15,15 +19,31 @@ class NativeMessagingBridge {
     private var connection: NWConnection?
     private var isConnected = false
     private var isConnecting = false
+    private var stopped = false
+
+    private var reconnectDelay: TimeInterval = kMinReconnectDelay
+    private var reconnectScheduled = false
+
+    private struct PendingMessage {
+        let body: [String: Any]
+        let timeout: TimeInterval
+        let deadline: Date
+        let completion: (Result<[String: Any], Error>) -> Void
+    }
+    private var pendingMessages: [PendingMessage] = []
 
     private let responseLock = NSLock()
     private var pendingCallbacks: [String: (Result<Data, Error>) -> Void] = [:]
 
     private init() {}
 
+    // MARK: - Public API
+
     func ensureConnected() {
         queue.async { [weak self] in
-            self?.connectIfNeeded()
+            guard let self else { return }
+            self.stopped = false
+            self.connectIfNeeded()
         }
     }
 
@@ -38,48 +58,45 @@ class NativeMessagingBridge {
                 return
             }
 
-            if !self.isConnected {
-                self.connectIfNeeded()
+            self.stopped = false
 
-                self.queue.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    guard let self else {
-                        completion(.failure(BridgeError.bridgeDeallocated))
-                        return
-                    }
-                    if self.isConnected {
-                        self.doSendMessage(message, timeout: timeout, completion: completion)
-                    } else {
-                        completion(.failure(BridgeError.processNotRunning))
-                    }
-                }
+            if self.isConnected {
+                self.doSendMessage(message, timeout: timeout, completion: completion)
                 return
             }
 
-            self.doSendMessage(message, timeout: timeout, completion: completion)
+            // Buffer until the connection becomes ready, then drain.
+            // Deadline bounds how long the caller is willing to wait for the
+            // launcher to come up — typically ~10s, generous enough to absorb
+            // a launcher restart but tight enough that Safari's own extension
+            // timeouts don't fire underneath us.
+            let deadline = Date().addingTimeInterval(kDefaultMessageDeadline)
+            self.enqueue(
+                PendingMessage(
+                    body: message, timeout: timeout, deadline: deadline, completion: completion
+                ))
+            self.connectIfNeeded()
+            self.scheduleNextDeadlineCheck()
         }
     }
 
     func handleResponseFromExtension(_ response: [String: Any]) -> Bool {
-        guard let kind = response["kind"] as? [String: Any],
-              kind["Response"] != nil else {
+        guard let kind = response["kind"] as? [String: Any], kind["Response"] != nil else {
             return false
         }
 
         queue.async { [weak self] in
-            guard let self, let connection = self.connection, self.isConnected else {
-                self?.logger.error("Cannot forward response - not connected")
-                return
-            }
+            guard let self else { return }
 
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: response, options: [])
                 let framedData = Self.frameMessage(jsonData)
 
-                connection.send(content: framedData, completion: .contentProcessed { error in
-                    if let error {
-                        self.logger.error("Failed to forward response: \(error.localizedDescription)")
-                    }
-                })
+                if self.isConnected, let connection = self.connection {
+                    self.send(framedData, via: connection)
+                } else {
+                    self.logger.debug("Cannot forward response — not connected (dropped)")
+                }
             } catch {
                 self.logger.error("Failed to serialize response: \(error.localizedDescription)")
             }
@@ -90,23 +107,92 @@ class NativeMessagingBridge {
 
     func stop() {
         queue.async { [weak self] in
-            self?.disconnectInternal()
+            guard let self else { return }
+            self.stopped = true
+            self.failAllPending(BridgeError.processStopped)
+            self.tearDownConnection()
         }
     }
 
-    // MARK: - Private: Connection
+    // MARK: - Pending Queue
+
+    private func enqueue(_ message: PendingMessage) {
+        if pendingMessages.count >= kMaxPendingMessages {
+            // Bound the queue so a permanently-down launcher can't grow it
+            // without limit. Drop the oldest entry — it has been waiting
+            // longest, and freeing it lets the caller retry on its own
+            // schedule.
+            let dropped = pendingMessages.removeFirst()
+            logger.warning("Pending message queue full; dropping oldest entry")
+            dropped.completion(.failure(BridgeError.processNotRunning))
+        }
+        pendingMessages.append(message)
+    }
+
+    private func drainReadyQueue() {
+        guard isConnected else { return }
+        let messages = pendingMessages
+        pendingMessages.removeAll()
+        for message in messages {
+            doSendMessage(message.body, timeout: message.timeout, completion: message.completion)
+        }
+    }
+
+    private func failExpiredMessages() {
+        let now = Date()
+        var remaining: [PendingMessage] = []
+        var expired: [PendingMessage] = []
+        for message in pendingMessages {
+            if message.deadline <= now {
+                expired.append(message)
+            } else {
+                remaining.append(message)
+            }
+        }
+        pendingMessages = remaining
+        for message in expired {
+            message.completion(.failure(BridgeError.processNotRunning))
+        }
+    }
+
+    private func scheduleNextDeadlineCheck() {
+        guard let nextDeadline = pendingMessages.map({ $0.deadline }).min() else { return }
+        let delay = max(0, nextDeadline.timeIntervalSinceNow)
+        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.failExpiredMessages()
+        }
+    }
+
+    private func failAllPending(_ error: Error) {
+        let messages = pendingMessages
+        pendingMessages.removeAll()
+        for message in messages {
+            message.completion(.failure(error))
+        }
+
+        responseLock.lock()
+        let callbacks = pendingCallbacks
+        pendingCallbacks.removeAll()
+        responseLock.unlock()
+        for (_, callback) in callbacks {
+            callback(.failure(error))
+        }
+    }
+
+    // MARK: - Connection Lifecycle
 
     private func connectIfNeeded() {
-        guard !isConnected && !isConnecting else { return }
+        guard !stopped, !isConnected, !isConnecting else { return }
 
         isConnecting = true
 
         connection?.cancel()
         connection = nil
 
-        logger.info("Connecting to local bridge server on port \(kBridgeConnectionPort)")
-
-        guard let port = NWEndpoint.Port(rawValue: kBridgeConnectionPort) else { return }
+        guard let port = NWEndpoint.Port(rawValue: kBridgeConnectionPort) else {
+            isConnecting = false
+            return
+        }
         let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: port)
         let conn = NWConnection(to: endpoint, using: .tcp)
 
@@ -114,24 +200,16 @@ class NativeMessagingBridge {
             self?.handleConnectionState(state)
         }
 
-        self.connection = conn
+        connection = conn
+        logger.debug("Connecting to local bridge server on port \(kBridgeConnectionPort)")
         conn.start(queue: queue)
     }
 
-    private func disconnectInternal() {
+    private func tearDownConnection() {
         isConnected = false
         isConnecting = false
         connection?.cancel()
         connection = nil
-
-        responseLock.lock()
-        let callbacks = pendingCallbacks
-        pendingCallbacks.removeAll()
-        responseLock.unlock()
-
-        for (_, callback) in callbacks {
-            callback(.failure(BridgeError.processStopped))
-        }
     }
 
     private func handleConnectionState(_ state: NWConnection.State) {
@@ -140,28 +218,50 @@ class NativeMessagingBridge {
             logger.info("Connected to local bridge server")
             isConnected = true
             isConnecting = false
+            reconnectDelay = kMinReconnectDelay
             startReceiving()
+            drainReadyQueue()
 
         case .failed(let error):
-            logger.error("Connection failed: \(error.localizedDescription)")
-            isConnected = false
-            isConnecting = false
-            // Don't auto-reconnect - let the next sendMessage call trigger reconnection
+            logger.warning("Connection failed: \(error.localizedDescription)")
+            tearDownConnection()
+            scheduleReconnect()
 
         case .cancelled:
             logger.debug("Connection cancelled")
             isConnected = false
             isConnecting = false
+            // If `stop()` cancelled us we don't reconnect; otherwise treat
+            // this like any other disconnect and back off.
+            if !stopped {
+                scheduleReconnect()
+            }
 
         case .waiting(let error):
-            logger.warning("Connection waiting: \(error.localizedDescription)")
+            logger.debug("Connection waiting: \(error.localizedDescription)")
 
         default:
             break
         }
     }
 
-    // MARK: - Private: Sending
+    private func scheduleReconnect() {
+        guard !stopped, !reconnectScheduled else { return }
+        reconnectScheduled = true
+
+        let delay = reconnectDelay
+        // Exponential backoff capped at kMaxReconnectDelay, mirroring the
+        // 2s ceiling used by the launcher's own gRPC client.
+        reconnectDelay = min(reconnectDelay * 2, kMaxReconnectDelay)
+
+        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            self.reconnectScheduled = false
+            self.connectIfNeeded()
+        }
+    }
+
+    // MARK: - Sending
 
     private func extractRequestId(from message: [String: Any]) -> String? {
         guard let kind = message["kind"] as? [String: Any],
@@ -200,7 +300,14 @@ class NativeMessagingBridge {
         completion: @escaping (Result<[String: Any], Error>) -> Void
     ) {
         guard let connection, isConnected else {
-            completion(.failure(BridgeError.processNotRunning))
+            // Lost connection between enqueue and drain; re-buffer.
+            let deadline = Date().addingTimeInterval(kDefaultMessageDeadline)
+            enqueue(
+                PendingMessage(
+                    body: message, timeout: timeout, deadline: deadline, completion: completion
+                ))
+            connectIfNeeded()
+            scheduleNextDeadlineCheck()
             return
         }
 
@@ -219,7 +326,9 @@ class NativeMessagingBridge {
 
             setupTimeout(callbackId: callbackId, timeout: timeout, callbackLock: callbackLock,
                          callbackFired: callbackFired, completion: completion)
-            sendFramedMessage(jsonData, via: connection)
+
+            let framedData = Self.frameMessage(jsonData)
+            send(framedData, via: connection)
         } catch { completion(.failure(error)) }
     }
 
@@ -241,8 +350,7 @@ class NativeMessagingBridge {
         }
     }
 
-    private func sendFramedMessage(_ jsonData: Data, via connection: NWConnection) {
-        let framedData = Self.frameMessage(jsonData)
+    private func send(_ framedData: Data, via connection: NWConnection) {
         connection.send(content: framedData, completion: .contentProcessed { [weak self] error in
             if let error { self?.logger.error("Send error: \(error.localizedDescription)") }
         })
@@ -272,8 +380,16 @@ extension NativeMessagingBridge {
     }
 
     private func handleLengthReceive(data: Data?, isComplete: Bool, error: NWError?) {
-        if let error { logger.error("Receive error: \(error.localizedDescription)"); isConnected = false; return }
-        if isComplete { logger.debug("Connection closed by server"); isConnected = false; return }
+        if let error {
+            logger.warning("Receive error: \(error.localizedDescription)")
+            handleReadFailure()
+            return
+        }
+        if isComplete {
+            logger.debug("Connection closed by server")
+            handleReadFailure()
+            return
+        }
         guard let lengthData = data, lengthData.count == 4 else { receiveNextMessage(); return }
         let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
         guard length > 0 && length < 1024 * 1024 * 1024 else {
@@ -292,14 +408,37 @@ extension NativeMessagingBridge {
 
     private func handleBodyReceive(data: Data?, length: Int, isComplete: Bool, error: NWError?) {
         if let error {
-            logger.error("Receive body error: \(error.localizedDescription)")
-            isConnected = false
+            logger.warning("Receive body error: \(error.localizedDescription)")
+            handleReadFailure()
             return
         }
-        if isComplete && data == nil { isConnected = false; return }
+        if isComplete && data == nil {
+            handleReadFailure()
+            return
+        }
         guard let messageData = data, messageData.count == length else { receiveNextMessage(); return }
         handleReceivedMessage(messageData)
         receiveNextMessage()
+    }
+
+    /// Triggered when the receive side detects the peer has gone away.
+    /// We tear the connection down and let the reconnect loop pick it up;
+    /// in-flight per-request callbacks are failed so the extension hears
+    /// back rather than hanging until their own timeout fires.
+    private func handleReadFailure() {
+        tearDownConnection()
+
+        responseLock.lock()
+        let callbacks = pendingCallbacks
+        pendingCallbacks.removeAll()
+        responseLock.unlock()
+        for (_, callback) in callbacks {
+            callback(.failure(BridgeError.processStopped))
+        }
+
+        if !stopped {
+            scheduleReconnect()
+        }
     }
 
     private func handleReceivedMessage(_ data: Data) {
