@@ -9,7 +9,7 @@
 		"test:watch": "vitest --watch --mode development"
 	},
 	"devDependencies": {
-		"@bufbuild/buf": "^1.68.1",
+		"@bufbuild/buf": "^1.68.4",
 		"@bufbuild/protobuf": "^2.12.0",
 		"@bufbuild/protoc-gen-es": "^2.12.0",
 		"typescript": "^5.9.3",
