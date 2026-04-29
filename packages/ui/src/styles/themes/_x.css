@@ -1,0 +1,39 @@
+/*
+ * X (formerly Twitter) — minimalist monochrome.
+ *
+ * Brand identity is essentially achromatic; we lean on near-black/near-white
+ * primaries with a faint cool-gray accent so the UI reads as "X" without
+ * fighting Eurora's neutral surfaces.
+ */
+
+:root[data-theme='x']:not(.dark) {
+	--primary: oklch(0.18 0.005 285);
+	--primary-foreground: oklch(1 0 0);
+	--accent: oklch(0.55 0.02 250);
+	--accent-foreground: oklch(1 0 0);
+	--ring: oklch(0.18 0.005 285);
+	--sidebar-primary: oklch(0.18 0.005 285);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.55 0.02 250);
+	--sidebar-accent-foreground: oklch(1 0 0);
+	--sidebar-ring: oklch(0.18 0.005 285);
+	--chart-1: oklch(0.18 0.005 285);
+	--chart-2: oklch(0.55 0.02 250);
+	--chart-3: oklch(0.7 0.015 250);
+}
+
+:root[data-theme='x'].dark {
+	--primary: oklch(0.96 0 0);
+	--primary-foreground: oklch(0.18 0.005 285);
+	--accent: oklch(0.65 0.025 245);
+	--accent-foreground: oklch(0.18 0.005 285);
+	--ring: oklch(0.96 0 0);
+	--sidebar-primary: oklch(0.96 0 0);
+	--sidebar-primary-foreground: oklch(0.18 0.005 285);
+	--sidebar-accent: oklch(0.65 0.025 245);
+	--sidebar-accent-foreground: oklch(0.18 0.005 285);
+	--sidebar-ring: oklch(0.96 0 0);
+	--chart-1: oklch(0.96 0 0);
+	--chart-2: oklch(0.65 0.025 245);
+	--chart-3: oklch(0.5 0.02 245);
+}

@@ -1,0 +1,75 @@
+/*
+ * Default Eurora palette. Applies whenever no `data-theme` is set on the
+ * root element (or when it is set to `default`). Per-domain themes override
+ * a subset of these variables in their own files.
+ */
+
+:root,
+:root[data-theme='default'] {
+	--background: oklch(0.9821 0 0);
+	--foreground: oklch(0.3211 0 0);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.3211 0 0);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.3211 0 0);
+	--primary: oklch(0.5676 0.2021 283.0838);
+	--primary-foreground: oklch(1 0 0);
+	--secondary: oklch(0.8214 0.072 249.3482);
+	--secondary-foreground: oklch(0.3211 0 0);
+	--muted: oklch(0.8202 0.0213 91.6163);
+	--muted-foreground: oklch(0.5382 0 0);
+	--accent: oklch(0.6475 0.0642 117.426);
+	--accent-foreground: oklch(1 0 0);
+	--destructive: oklch(0.6368 0.2078 25.3313);
+	--border: oklch(0.8699 0 0);
+	--input: oklch(0.8699 0 0);
+	--ring: oklch(0.5676 0.2021 283.0838);
+	--chart-1: oklch(0.5676 0.2021 283.0838);
+	--chart-2: oklch(0.5261 0.1705 314.6534);
+	--chart-3: oklch(0.339 0.1793 301.6848);
+	--chart-4: oklch(0.6746 0.1414 261.338);
+	--chart-5: oklch(0.588 0.0993 245.7394);
+	--sidebar: oklch(0.9821 0 0);
+	--sidebar-foreground: oklch(0.3211 0 0);
+	--sidebar-primary: oklch(0.5676 0.2021 283.0838);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.6475 0.0642 117.426);
+	--sidebar-accent-foreground: oklch(1 0 0);
+	--sidebar-border: oklch(0.8699 0 0);
+	--sidebar-ring: oklch(0.5676 0.2021 283.0838);
+}
+
+.dark,
+:root[data-theme='default'].dark {
+	--background: oklch(0.2303 0.0125 264.2926);
+	--foreground: oklch(0.9219 0 0);
+	--card: oklch(0.321 0.0078 223.6661);
+	--card-foreground: oklch(0.9219 0 0);
+	--popover: oklch(0.321 0.0078 223.6661);
+	--popover-foreground: oklch(0.9219 0 0);
+	--primary: oklch(0.5676 0.2021 283.0838);
+	--primary-foreground: oklch(1 0 0);
+	--secondary: oklch(0.339 0.1793 301.6848);
+	--secondary-foreground: oklch(0.9219 0 0);
+	--muted: oklch(0.3867 0 0);
+	--muted-foreground: oklch(0.7155 0 0);
+	--accent: oklch(0.6746 0.1414 261.338);
+	--accent-foreground: oklch(0.9219 0 0);
+	--destructive: oklch(0.6368 0.2078 25.3313);
+	--border: oklch(0.3867 0 0);
+	--input: oklch(0.3867 0 0);
+	--ring: oklch(0.5676 0.2021 283.0838);
+	--chart-1: oklch(0.5676 0.2021 283.0838);
+	--chart-2: oklch(0.5261 0.1705 314.6534);
+	--chart-3: oklch(0.339 0.1793 301.6848);
+	--chart-4: oklch(0.6746 0.1414 261.338);
+	--chart-5: oklch(0.588 0.0993 245.7394);
+	--sidebar: oklch(0.2303 0.0125 264.2926);
+	--sidebar-foreground: oklch(0.9219 0 0);
+	--sidebar-primary: oklch(0.5676 0.2021 283.0838);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.6746 0.1414 261.338);
+	--sidebar-accent-foreground: oklch(0.9219 0 0);
+	--sidebar-border: oklch(0.3867 0 0);
+	--sidebar-ring: oklch(0.5676 0.2021 283.0838);
+}

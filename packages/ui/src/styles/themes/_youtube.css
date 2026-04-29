@@ -1,0 +1,39 @@
+/*
+ * YouTube — saturated red primary, warm orange accent.
+ *
+ * Light: full-strength red close to YouTube's #FF0000.
+ * Dark:  slightly lifted lightness so the red stays vibrant on dark surfaces
+ *        without clipping into pure red.
+ */
+
+:root[data-theme='youtube']:not(.dark) {
+	--primary: oklch(0.628 0.258 29.23);
+	--primary-foreground: oklch(1 0 0);
+	--accent: oklch(0.72 0.18 40);
+	--accent-foreground: oklch(1 0 0);
+	--ring: oklch(0.628 0.258 29.23);
+	--sidebar-primary: oklch(0.628 0.258 29.23);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.72 0.18 40);
+	--sidebar-accent-foreground: oklch(1 0 0);
+	--sidebar-ring: oklch(0.628 0.258 29.23);
+	--chart-1: oklch(0.628 0.258 29.23);
+	--chart-2: oklch(0.72 0.18 40);
+	--chart-3: oklch(0.55 0.22 25);
+}
+
+:root[data-theme='youtube'].dark {
+	--primary: oklch(0.66 0.24 27);
+	--primary-foreground: oklch(1 0 0);
+	--accent: oklch(0.74 0.16 42);
+	--accent-foreground: oklch(0.18 0.01 27);
+	--ring: oklch(0.66 0.24 27);
+	--sidebar-primary: oklch(0.66 0.24 27);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.74 0.16 42);
+	--sidebar-accent-foreground: oklch(0.18 0.01 27);
+	--sidebar-ring: oklch(0.66 0.24 27);
+	--chart-1: oklch(0.66 0.24 27);
+	--chart-2: oklch(0.74 0.16 42);
+	--chart-3: oklch(0.55 0.22 25);
+}

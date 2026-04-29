@@ -1,0 +1,36 @@
+/*
+ * Wikipedia — restrained, encyclopaedic. Warm charcoal primary with a
+ * slate-blue accent, evoking print typography on cream paper.
+ */
+
+:root[data-theme='wikipedia']:not(.dark) {
+	--primary: oklch(0.28 0.012 60);
+	--primary-foreground: oklch(0.98 0.005 80);
+	--accent: oklch(0.5 0.05 240);
+	--accent-foreground: oklch(0.98 0.005 80);
+	--ring: oklch(0.28 0.012 60);
+	--sidebar-primary: oklch(0.28 0.012 60);
+	--sidebar-primary-foreground: oklch(0.98 0.005 80);
+	--sidebar-accent: oklch(0.5 0.05 240);
+	--sidebar-accent-foreground: oklch(0.98 0.005 80);
+	--sidebar-ring: oklch(0.28 0.012 60);
+	--chart-1: oklch(0.28 0.012 60);
+	--chart-2: oklch(0.5 0.05 240);
+	--chart-3: oklch(0.65 0.04 240);
+}
+
+:root[data-theme='wikipedia'].dark {
+	--primary: oklch(0.92 0.008 80);
+	--primary-foreground: oklch(0.22 0.012 60);
+	--accent: oklch(0.65 0.06 240);
+	--accent-foreground: oklch(0.22 0.012 60);
+	--ring: oklch(0.92 0.008 80);
+	--sidebar-primary: oklch(0.92 0.008 80);
+	--sidebar-primary-foreground: oklch(0.22 0.012 60);
+	--sidebar-accent: oklch(0.65 0.06 240);
+	--sidebar-accent-foreground: oklch(0.22 0.012 60);
+	--sidebar-ring: oklch(0.92 0.008 80);
+	--chart-1: oklch(0.92 0.008 80);
+	--chart-2: oklch(0.65 0.06 240);
+	--chart-3: oklch(0.5 0.05 240);
+}

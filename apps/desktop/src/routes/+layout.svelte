@@ -5,6 +5,7 @@
 	import ResizeHandles from '$lib/components/ResizeHandles.svelte';
 	import Titlebar from '$lib/components/Titlebar.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
+	import { THEME_SERVICE } from '$lib/services/theme-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
@@ -24,6 +25,9 @@
 
 	const userService = inject(USER_SERVICE);
 	userService.init();
+
+	const themeService = inject(THEME_SERVICE);
+	themeService.init();
 
 	onMount(() => {
 		setMode('dark');
