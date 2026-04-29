@@ -2,29 +2,35 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import MenuBar from '$lib/components/MenuBar.svelte';
-	import { currentUser, isAuthenticated } from '$lib/stores/auth.js';
-	import { subscriptionStore, subscription } from '$lib/stores/subscription.js';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
+	import { SUBSCRIPTION_SERVICE } from '$lib/services/subscription-service.svelte.js';
+	import { inject } from '@eurora/shared/context';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { ContactDialog } from '@eurora/ui/custom-components/contact-dialog/index';
 	import SquarePen from '@lucide/svelte/icons/square-pen';
 	import { onMount } from 'svelte';
+
+	const auth = inject(AUTH_SERVICE);
+	const subscription = inject(SUBSCRIPTION_SERVICE);
 
 	let contactDialogOpen = $state(false);
 
 	let { children } = $props();
 
 	$effect(() => {
-		if (!$isAuthenticated) {
+		if (!auth.isAuthenticated) {
 			goto('/login?redirect=/settings');
 		}
 	});
 
 	onMount(() => {
-		subscriptionStore.fetch();
+		subscription.fetch();
 	});
 
 	const planLabel = $derived(
-		$subscription?.subscription_id && $subscription?.status === 'active' ? 'Pro' : 'Free',
+		subscription.data?.subscription_id && subscription.data?.status === 'active'
+			? 'Pro'
+			: 'Free',
 	);
 
 	const navItems = [
@@ -76,11 +82,11 @@
 	<div class="flex flex-1 flex-col pt-16">
 		<div class="mx-auto flex w-full max-w-7xl items-start gap-12 py-10">
 			<nav class="hidden md:flex w-56 shrink-0 flex-col gap-0.5">
-				{#if $currentUser}
+				{#if auth.user}
 					<div class="mb-4 flex flex-col overflow-hidden py-1 px-2">
 						<span class="flex items-center gap-1.5 leading-tight">
 							<span class="truncate text-sm font-medium"
-								>{$currentUser.name || 'User'}</span
+								>{auth.user.name || 'User'}</span
 							>
 							<a
 								href="/settings"
@@ -90,7 +96,7 @@
 							</a>
 						</span>
 						<span class="truncate text-xs leading-tight text-muted-foreground">
-							{planLabel} - {$currentUser.email}
+							{planLabel} - {auth.user.email}
 						</span>
 					</div>
 				{/if}
