@@ -17,6 +17,7 @@ import {
 	type AssociateLoginTokenRequest,
 	type VerifyEmailRequest,
 } from '@eurora/shared/proto/auth_service_pb.js';
+import * as Sentry from '@sentry/sveltekit';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
 export class AuthService {
@@ -101,7 +102,7 @@ export class AuthService {
 			}
 			return true;
 		} catch (err) {
-			console.error('Failed to associate login token:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.associate-desktop' } });
 			return false;
 		}
 	}

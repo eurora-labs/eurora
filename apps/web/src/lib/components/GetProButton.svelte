@@ -5,6 +5,7 @@
 	import { inject } from '@eurora/shared/context';
 	import { Button, type ButtonProps } from '@eurora/ui/components/button/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import type { Snippet } from 'svelte';
@@ -59,7 +60,10 @@
 			const { url } = await res.json();
 			window.location.href = url;
 		} catch (err) {
-			console.error('Checkout error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'payment.checkout' },
+				extra: { priceId: STRIPE_PRO_PRICE_ID },
+			});
 			toast.error(
 				err instanceof Error ? err.message : 'Something went wrong. Please try again.',
 			);
