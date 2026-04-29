@@ -13,6 +13,7 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import * as Sentry from '@sentry/sveltekit';
 
 	const authService = inject(AUTH_SERVICE);
 
@@ -39,7 +40,7 @@
 			}
 			showRegisterFields = true;
 		} catch (err) {
-			console.error('Check email error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.check-email' } });
 			submitError =
 				err instanceof Error ? err.message : 'Something went wrong. Please try again.';
 		} finally {
@@ -61,7 +62,7 @@
 			await authService.associateDesktopLoginIfPending(tokens.accessToken);
 			goto('/');
 		} catch (err) {
-			console.error('Registration error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.register' } });
 			submitError =
 				err instanceof Error ? err.message : 'Registration failed. Please try again.';
 			loading = false;
@@ -75,7 +76,9 @@
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
 			window.location.href = url;
 		} catch (err) {
-			console.error('Google registration error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'auth.oauth-redirect', provider: 'google' },
+			});
 			submitError =
 				err instanceof Error ? err.message : 'Registration failed. Please try again.';
 			loading = false;
@@ -89,7 +92,9 @@
 			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
 			window.location.href = url;
 		} catch (err) {
-			console.error('GitHub registration error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'auth.oauth-redirect', provider: 'github' },
+			});
 			submitError =
 				err instanceof Error ? err.message : 'Registration failed. Please try again.';
 			loading = false;

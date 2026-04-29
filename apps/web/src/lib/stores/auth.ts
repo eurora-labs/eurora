@@ -3,6 +3,7 @@ import { AUTH_SERVICE, type AuthService, type TokenResponse } from '$lib/service
 import { create } from '@bufbuild/protobuf';
 import { inject } from '@eurora/shared/context';
 import { RefreshTokenRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
+import * as Sentry from '@sentry/sveltekit';
 import { writable, derived, get } from 'svelte/store';
 
 export interface User {
@@ -63,6 +64,8 @@ function initializeAuthState(): AuthState {
 			const now = Date.now();
 			const accessFresh = !!accessToken && expiresAt > now + 5 * 60 * 1000;
 
+			Sentry.setUser({ id: user.id });
+
 			return {
 				isAuthenticated: true,
 				user,
@@ -71,8 +74,8 @@ function initializeAuthState(): AuthState {
 				expiresAt,
 			};
 		}
-	} catch (_error) {
-		console.error('Error initializing auth state:', _error);
+	} catch (error) {
+		Sentry.captureException(error, { tags: { area: 'auth.init' } });
 	}
 
 	return {
@@ -122,8 +125,8 @@ function decodeJWTPayload(token: string): any {
 				.join(''),
 		);
 		return JSON.parse(jsonPayload);
-	} catch (_error) {
-		console.error('Error decoding JWT:', _error);
+	} catch (error) {
+		Sentry.captureException(error, { tags: { area: 'auth.jwt-decode' } });
 		return null;
 	}
 }
@@ -147,6 +150,8 @@ export const auth = {
 
 			storeTokens(tokens, user);
 
+			Sentry.setUser({ id: user.id });
+
 			authStore.set({
 				isAuthenticated: true,
 				user,
@@ -155,13 +160,14 @@ export const auth = {
 				expiresAt: Date.now() + Number(tokens.expiresIn) * 1000,
 			});
 		} catch (error) {
-			console.error('Error during login:', error);
+			Sentry.captureException(error, { tags: { area: 'auth.login' } });
 			throw error;
 		}
 	},
 
 	logout: () => {
 		clearTokens();
+		Sentry.setUser(null);
 		authStore.set({
 			isAuthenticated: false,
 			user: null,
@@ -194,7 +200,7 @@ export const auth = {
 
 			return tokens;
 		} catch (error) {
-			console.error('Token refresh failed:', error);
+			Sentry.captureException(error, { tags: { area: 'auth.refresh' } });
 			auth.logout();
 			throw error;
 		}
