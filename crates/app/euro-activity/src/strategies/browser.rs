@@ -185,6 +185,76 @@ impl BrowserStrategy {
         fallback_pid
     }
 
+    /// Refresh `active_browser` / `active_browser_pid` for `focus_window`, fetch
+    /// fresh metadata, and emit a `NewActivity` report. Falls back to a
+    /// process-level activity when the bridge has no URL for us yet.
+    ///
+    /// Assumes `self.sender` is already populated (i.e. `start_tracking` ran).
+    async fn emit_activity_for_focus(
+        &mut self,
+        focus_window: &FocusedWindow,
+    ) -> ActivityResult<()> {
+        let process_name = focus_window.process_name.clone();
+
+        let messenger_pid = self
+            .resolve_messenger_pid(&process_name, focus_window.process_id)
+            .await;
+        self.active_browser_pid
+            .store(messenger_pid, Ordering::Relaxed);
+        self.active_browser = Some(process_name.clone());
+
+        let sender = self
+            .sender
+            .clone()
+            .ok_or_else(|| ActivityError::Strategy("Sender not initialized".to_string()))?;
+
+        let activity = match self.get_metadata().await {
+            Ok(metadata) => match metadata.url {
+                Some(url) => {
+                    *self.last_url.lock().await = Some(url.clone());
+                    Activity::new_browser(
+                        url,
+                        metadata.title,
+                        metadata.icon,
+                        process_name.clone(),
+                        vec![],
+                    )
+                }
+                None => {
+                    tracing::warn!(
+                        "Browser metadata arrived without a URL; emitting process-level fallback for {}",
+                        process_name
+                    );
+                    *self.last_url.lock().await = None;
+                    Activity::new(
+                        process_name.clone(),
+                        None,
+                        focus_window.icon.clone(),
+                        process_name.clone(),
+                        vec![],
+                    )
+                }
+            },
+            Err(err) => {
+                tracing::warn!("Failed to get browser metadata: {}", err);
+                *self.last_url.lock().await = None;
+                Activity::new(
+                    process_name.clone(),
+                    None,
+                    focus_window.icon.clone(),
+                    process_name.clone(),
+                    vec![],
+                )
+            }
+        };
+
+        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+            tracing::warn!("Failed to send new activity report - receiver dropped");
+        }
+
+        Ok(())
+    }
+
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_service().await?;
@@ -235,61 +305,14 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         focus_window: &FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        self.sender = Some(sender.clone());
-        let process_name = focus_window.process_name.clone();
-        self.active_browser = Some(process_name.clone());
-
-        let messenger_pid = self
-            .resolve_messenger_pid(&process_name, focus_window.process_id)
-            .await;
-        self.active_browser_pid
-            .store(messenger_pid, Ordering::Relaxed);
-
+        self.sender = Some(sender);
         self.init_collection().await?;
+        self.emit_activity_for_focus(focus_window).await?;
 
-        let activity = match self.get_metadata().await {
-            Ok(metadata) => match metadata.url {
-                Some(url) => {
-                    *self.last_url.lock().await = Some(url.clone());
-                    Activity::new_browser(
-                        url,
-                        metadata.title,
-                        metadata.icon,
-                        process_name.clone(),
-                        vec![],
-                    )
-                }
-                None => {
-                    tracing::warn!(
-                        "Browser metadata arrived without a URL; emitting process-level fallback for {}",
-                        process_name
-                    );
-                    Activity::new(
-                        focus_window.process_name.clone(),
-                        None,
-                        focus_window.icon.clone(),
-                        focus_window.process_name.clone(),
-                        vec![],
-                    )
-                }
-            },
-            Err(err) => {
-                tracing::warn!("Failed to get browser metadata: {}", err);
-                Activity::new(
-                    focus_window.process_name.clone(),
-                    None,
-                    focus_window.icon.clone(),
-                    focus_window.process_name.clone(),
-                    vec![],
-                )
-            }
-        };
-
-        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-            tracing::warn!("Failed to send new activity report - receiver dropped");
-        }
-
-        tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
+        tracing::debug!(
+            "Browser strategy starting tracking for: {}",
+            focus_window.process_name
+        );
         Ok(())
     }
 
@@ -302,23 +325,21 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             focus_window.process_name
         );
 
-        if self.can_handle_process(focus_window) {
-            let messenger_pid = self
-                .resolve_messenger_pid(&focus_window.process_name, focus_window.process_id)
-                .await;
-            self.active_browser_pid
-                .store(messenger_pid, Ordering::Relaxed);
-            self.active_browser = Some(focus_window.process_name.to_string());
-
-            Ok(true)
-        } else {
+        if !self.can_handle_process(focus_window) {
             tracing::debug!(
                 "Browser strategy cannot handle: {}, stopping tracking",
                 focus_window.process_name
             );
             self.stop_tracking().await?;
-            Ok(false)
+            return Ok(false);
         }
+
+        if self.active_browser.as_deref() == Some(focus_window.process_name.as_str()) {
+            return Ok(true);
+        }
+
+        self.emit_activity_for_focus(focus_window).await?;
+        Ok(true)
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
