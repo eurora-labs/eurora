@@ -1,10 +1,6 @@
 <script lang="ts">
-	import { auth, accessToken } from '$lib/stores/auth.js';
-	import {
-		subscriptionStore,
-		subscription,
-		subscriptionError,
-	} from '$lib/stores/subscription.js';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
+	import { SUBSCRIPTION_SERVICE } from '$lib/services/subscription-service.svelte.js';
 	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
@@ -15,22 +11,25 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import * as Sentry from '@sentry/sveltekit';
 
+	const auth = inject(AUTH_SERVICE);
+	const subscription = inject(SUBSCRIPTION_SERVICE);
 	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
 
 	let portalLoading = $state(false);
 	let portalError = $state<string | null>(null);
 
-	const planName = $derived($subscription?.price_id ? 'Pro' : 'Free');
+	const planName = $derived(subscription.data?.price_id ? 'Pro' : 'Free');
 
-	const planPrice = $derived($subscription?.price_id ? '€19.99 / month' : '€0.00 / month');
+	const planPrice = $derived(subscription.data?.price_id ? '€19.99 / month' : '€0.00 / month');
 
-	const hasPaidPlan = $derived(!!$subscription?.subscription_id);
+	const hasPaidPlan = $derived(!!subscription.data?.subscription_id);
 
-	const isCanceling = $derived($subscription?.cancel_at_period_end === true);
+	const isCanceling = $derived(subscription.data?.cancel_at_period_end === true);
 
 	const cancelAtFormatted = $derived.by(() => {
-		if (!$subscription?.cancel_at) return null;
-		return new Date($subscription.cancel_at * 1000).toLocaleDateString('en-US', {
+		const cancelAt = subscription.data?.cancel_at;
+		if (!cancelAt) return null;
+		return new Date(cancelAt * 1000).toLocaleDateString('en-US', {
 			month: 'long',
 			day: 'numeric',
 			year: 'numeric',
@@ -38,7 +37,7 @@
 	});
 
 	const statusVariant = $derived.by<'default' | 'secondary' | 'destructive' | 'outline'>(() => {
-		switch ($subscription?.status) {
+		switch (subscription.data?.status) {
 			case 'active':
 				return 'default';
 			case 'past_due':
@@ -51,7 +50,7 @@
 		}
 	});
 
-	const error = $derived(portalError ?? $subscriptionError);
+	const error = $derived(portalError ?? subscription.error);
 
 	async function handleManageBilling() {
 		portalLoading = true;
@@ -64,7 +63,7 @@
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${$accessToken}`,
+					Authorization: `Bearer ${auth.accessToken}`,
 				},
 			});
 
@@ -101,7 +100,7 @@
 						variant="outline"
 						size="sm"
 						class="mt-3"
-						onclick={() => subscriptionStore.refresh()}>Retry</Button
+						onclick={() => subscription.refresh()}>Retry</Button
 					>
 				</div>
 			</div>
@@ -113,9 +112,9 @@
 			<div>
 				<div class="flex items-center gap-2">
 					<h3 class="text-2xl font-bold tracking-tight">{planName}</h3>
-					{#if hasPaidPlan && $subscription?.status}
+					{#if hasPaidPlan && subscription.data?.status}
 						<Badge variant={statusVariant} class="capitalize">
-							{isCanceling ? 'Canceling' : $subscription.status}
+							{isCanceling ? 'Canceling' : subscription.data.status}
 						</Badge>
 					{/if}
 				</div>

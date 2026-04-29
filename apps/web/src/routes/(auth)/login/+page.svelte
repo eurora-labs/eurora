@@ -2,27 +2,24 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
-	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
-	import { auth, accessToken, currentUser } from '$lib/stores/auth.js';
-	import { create } from '@bufbuild/protobuf';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
-	import {
-		Provider,
-		AssociateLoginTokenRequestSchema,
-		LoginRequestSchema,
-		CheckEmailRequestSchema,
-		RegisterRequestSchema,
-	} from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
-	import { get } from 'svelte/store';
+
+	const auth = inject(AUTH_SERVICE);
 
 	let desktopLoginDone = $state(false);
-	const authService = inject(AUTH_SERVICE);
 	let pendingDesktopLogin = $state<string | null>(null);
+	let loading = $state(false);
+	let submitError = $state<string | null>(null);
+	let email = $state('');
+	let password = $state('');
+	let showPassword = $state(false);
+	let showRegister = $state(false);
 
 	function storeDeviceRedirectUri() {
 		const redirectUri = page.url.searchParams.get('redirect_uri');
@@ -37,47 +34,54 @@
 		return uri;
 	}
 
+	function storeRedirectParam() {
+		const redirect = page.url.searchParams.get('redirect');
+		if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+			sessionStorage.setItem('postLoginRedirect', redirect);
+		}
+	}
+
 	onMount(async () => {
 		try {
-			let loginToken = page.url.searchParams.get('code_challenge');
-			let challengeMethod = page.url.searchParams.get('code_challenge_method');
-			if (loginToken && challengeMethod) {
-				if (loginToken.length !== 43 || challengeMethod !== 'S256') {
-					Sentry.captureMessage('Invalid login token or challenge method', {
-						level: 'warning',
-						tags: { area: 'auth.desktop-login' },
-					});
-					goto('/login?error=invalid_login_token');
-					return;
-				}
-				sessionStorage.setItem('loginToken', loginToken);
-				sessionStorage.setItem('challengeMethod', challengeMethod);
-				storeDeviceRedirectUri();
+			const loginToken = page.url.searchParams.get('code_challenge');
+			const challengeMethod = page.url.searchParams.get('code_challenge_method');
+			if (!loginToken || !challengeMethod) return;
 
-				const isValid = await auth.ensureValidToken();
-				if (isValid && get(accessToken)) {
-					pendingDesktopLogin = loginToken;
-				} else {
-					goto('/login');
-				}
+			if (loginToken.length !== 43 || challengeMethod !== 'S256') {
+				Sentry.captureMessage('Invalid login token or challenge method', {
+					level: 'warning',
+					tags: { area: 'auth.desktop-login' },
+				});
+				goto('/login?error=invalid_login_token');
 				return;
 			}
-			loginToken = sessionStorage.getItem('loginToken');
-			challengeMethod = sessionStorage.getItem('challengeMethod');
+			sessionStorage.setItem('loginToken', loginToken);
+			sessionStorage.setItem('challengeMethod', challengeMethod);
+			storeDeviceRedirectUri();
+
+			if ((await auth.ensureValidToken()) && auth.accessToken) {
+				pendingDesktopLogin = loginToken;
+			} else {
+				goto('/login');
+			}
 		} catch (error) {
 			Sentry.captureException(error, { tags: { area: 'auth.desktop-login' } });
 			goto('/login?error=invalid_login_token');
-			return;
 		}
 	});
+
+	async function tryAssociateDesktopLogin(): Promise<boolean> {
+		const associated = await auth.associateDesktopLoginIfPending({ consumeRedirect: true });
+		if (associated) desktopLoginDone = true;
+		return associated;
+	}
 
 	async function handleConfirmDesktopLogin() {
 		if (!pendingDesktopLogin) return;
 		loading = true;
 		submitError = null;
 
-		const token = get(accessToken);
-		if (!token) {
+		if (!(await auth.ensureValidToken())) {
 			submitError = 'Session expired. Please sign in again.';
 			pendingDesktopLogin = null;
 			loading = false;
@@ -85,12 +89,7 @@
 		}
 
 		try {
-			const request = create(AssociateLoginTokenRequestSchema, {
-				codeChallenge: pendingDesktopLogin,
-			});
-			await authService.associateLoginToken(request, token);
-			sessionStorage.removeItem('loginToken');
-			sessionStorage.removeItem('challengeMethod');
+			await auth.associateDesktopLogin(pendingDesktopLogin);
 			desktopLoginDone = true;
 			pendingDesktopLogin = null;
 
@@ -107,45 +106,18 @@
 		}
 	}
 
-	async function tryAssociateDesktopLogin(tokenValue: string): Promise<boolean> {
-		const associated = await authService.associateDesktopLoginIfPending(tokenValue, {
-			consumeRedirect: true,
-		});
-		if (associated) desktopLoginDone = true;
-		return associated;
-	}
-
-	let loading = $state(false);
-	let submitError = $state<string | null>(null);
-	let email = $state('');
-	let password = $state('');
-	let showPassword = $state(false);
-	let showRegister = $state(false);
-
-	function storeRedirectParam() {
-		const redirect = page.url.searchParams.get('redirect');
-		if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
-			sessionStorage.setItem('postLoginRedirect', redirect);
-		}
-	}
-
 	async function handleEmailContinue() {
 		if (!email.trim()) return;
 		loading = true;
 		submitError = null;
 		try {
 			storeRedirectParam();
-			const resp = await authService.checkEmail(
-				create(CheckEmailRequestSchema, { email: email.trim() }),
-			);
-			if (resp.status === 'oauth' && resp.provider !== null) {
-				const provider =
-					resp.provider === Provider.GOOGLE ? Provider.GOOGLE : Provider.GITHUB;
-				const url = (await authService.getThirdPartyAuthUrl(provider)).url;
-				window.location.href = url;
+			const result = await auth.checkEmail(email.trim());
+			if (result.status === 'oauth') {
+				window.location.href = await auth.getOAuthRedirectUrl(result.provider);
 				return;
 			}
-			if (resp.status === 'not_found') {
+			if (result.status === 'not_found') {
 				showRegister = true;
 				return;
 			}
@@ -164,15 +136,8 @@
 		loading = true;
 		submitError = null;
 		try {
-			const request = create(LoginRequestSchema, {
-				credential: {
-					case: 'emailPassword',
-					value: { login: email.trim(), password },
-				},
-			});
-			const tokens = await authService.login(request);
-			auth.login(tokens);
-			if (await tryAssociateDesktopLogin(tokens.accessToken)) return;
+			await auth.login(email.trim(), password);
+			if (await tryAssociateDesktopLogin()) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -188,13 +153,8 @@
 		loading = true;
 		submitError = null;
 		try {
-			const request = create(RegisterRequestSchema, {
-				email: email.trim(),
-				password,
-			});
-			const tokens = await authService.register(request);
-			auth.login(tokens);
-			if (await tryAssociateDesktopLogin(tokens.accessToken)) return;
+			await auth.register(email.trim(), password);
+			if (await tryAssociateDesktopLogin()) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -211,8 +171,7 @@
 		submitError = null;
 		try {
 			storeRedirectParam();
-			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
-			window.location.href = url;
+			window.location.href = await auth.getOAuthRedirectUrl('google');
 		} catch (err) {
 			Sentry.captureException(err, {
 				tags: { area: 'auth.oauth-redirect', provider: 'google' },
@@ -227,8 +186,7 @@
 		submitError = null;
 		try {
 			storeRedirectParam();
-			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
-			window.location.href = url;
+			window.location.href = await auth.getOAuthRedirectUrl('github');
 		} catch (err) {
 			Sentry.captureException(err, {
 				tags: { area: 'auth.oauth-redirect', provider: 'github' },
@@ -260,7 +218,7 @@
 			<div class="text-center">
 				<h1 class="text-3xl font-bold tracking-tight">Authorize desktop app</h1>
 				<p class="text-muted-foreground mt-2">
-					Sign in to the Eurora desktop app as <strong>{$currentUser?.email}</strong>?
+					Sign in to the Eurora desktop app as <strong>{auth.user?.email}</strong>?
 				</p>
 			</div>
 
