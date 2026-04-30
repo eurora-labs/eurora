@@ -1,14 +1,10 @@
-pub use crate::strategies::ActivityStrategyFunctionality;
-pub use crate::strategies::processes::*;
-use crate::strategies::{ActivityReport, StrategyMetadata};
-pub use crate::strategies::{ActivityStrategy, StrategySupport};
-use crate::{
-    Activity, ActivityError,
-    error::ActivityResult,
-    types::{ActivityAsset, ActivitySnapshot},
-};
 use async_trait::async_trait;
+pub use euro_browser::{
+    BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
+    ResponseFrame,
+};
 use euro_native_messaging::NativeMessage;
+use euro_process::*;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::{
@@ -18,9 +14,13 @@ use std::sync::{
 use tokio::sync::mpsc;
 use url::Url;
 
-pub use euro_browser::{
-    BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
-    ResponseFrame,
+pub use crate::strategies::ActivityStrategyFunctionality;
+use crate::strategies::{ActivityReport, StrategyMetadata};
+pub use crate::strategies::{ActivityStrategy, StrategySupport};
+use crate::{
+    Activity, ActivityError,
+    error::ActivityResult,
+    types::{ActivityAsset, ActivitySnapshot},
 };
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -101,7 +101,9 @@ impl BrowserStrategy {
                     }
                 };
 
-                if event_frame.action.as_str() == "TAB_ACTIVATED" {
+                if event_frame.action.as_str() == "TAB_ACTIVATED"
+                    || event_frame.action.as_str() == "TAB_UPDATED"
+                {
                     let NativeMessage::NativeMetadata(data) = native_message else {
                         continue;
                     };
@@ -284,6 +286,7 @@ impl StrategySupport for BrowserStrategy {
             Falkon.get_name(),
             Midori.get_name(),
             SeaMonkey.get_name(),
+            Safari.get_name(),
         ]
     }
 

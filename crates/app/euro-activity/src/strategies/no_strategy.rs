@@ -1,12 +1,11 @@
 use async_trait::async_trait;
-use euro_process::EuroraNightly;
+use euro_process::{Eurora, EuroraNightly, ProcessFunctionality};
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::{
     error::ActivityResult,
-    processes::{Eurora, ProcessFunctionality},
     strategies::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
         StrategySupport,
