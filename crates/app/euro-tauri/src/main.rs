@@ -368,7 +368,7 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
 
             if let Some(icon) = activity_event.icon.as_ref() {
                 if let Some(c) =
-                    color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 10, 10)
+                    color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 1, 10)
                         .ok()
                         .and_then(|c| c.into_iter().next())
                 {
