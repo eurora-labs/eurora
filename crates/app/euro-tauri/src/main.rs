@@ -6,7 +6,7 @@
 use dotenv::dotenv;
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
-use euro_tauri::procedures::timeline_procedures::TimelineAppEvent;
+use euro_tauri::procedures::timeline_procedures::{AccentColor, TimelineAppEvent};
 use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
     WindowState, create_window,
@@ -362,36 +362,21 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
         while let Ok(activity_event) = activity_receiver.recv().await {
             tracing::debug!("Activity changed to: {}", activity_event.name);
 
-            let mut primary_icon_color = None;
-            let mut icon_bg = None;
+            let mut accent = None;
             let mut icon_base64 = None;
 
             if let Some(icon) = activity_event.icon.as_ref() {
-                if let Some(c) =
-                    color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 10, 10)
-                        .ok()
-                        .and_then(|c| c.into_iter().next())
-                {
-                    let (r, g, b) = (c.r, c.g, c.b);
-                    primary_icon_color = Some(format!("#{r:02X}{g:02X}{b:02X}"));
-                    let luminance = 0.299 * r as f64 + 0.587 * g as f64 + 0.114 * b as f64;
-                    icon_bg = Some(
-                        if luminance / 255.0 > 0.5 {
-                            "black"
-                        } else {
-                            "white"
-                        }
-                        .to_string(),
-                    );
-                }
+                accent = color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 1, 2)
+                    .ok()
+                    .and_then(|c| c.into_iter().next())
+                    .map(|c| AccentColor::from_rgb(c.r, c.g, c.b));
                 icon_base64 = euro_vision::rgba_to_base64(icon).ok();
             }
 
             let _ = TauRpcTimelineApiEventTrigger::new(activity_handle.clone()).new_app_event(
                 TimelineAppEvent {
                     name: activity_event.name.clone(),
-                    color: primary_icon_color,
-                    icon_bg,
+                    accent,
                     icon_base64,
                 },
             );
