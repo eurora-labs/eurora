@@ -11,7 +11,6 @@ use url::Url;
 pub mod browser;
 pub mod default;
 pub mod no_strategy;
-pub mod processes;
 pub mod safari;
 
 pub use browser::BrowserStrategy;
