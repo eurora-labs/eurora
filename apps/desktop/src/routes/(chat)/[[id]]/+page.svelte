@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { buildSuggestions } from '$lib/chat/suggestions.js';
+	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { MessageList, MessageGraph, ChatPromptInput, middleTruncate } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
@@ -10,17 +11,18 @@
 	import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import type { ContextChip, TimelineAppEvent } from '$lib/bindings/bindings.js';
+	import type { ContextChip } from '$lib/bindings/bindings.js';
 
 	let { data } = $props();
 
 	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
+	const timelineService = inject(TIMELINE_SERVICE);
 	let assets = $state<ContextChip[] | null>(null);
-	let latestTimelineItem = $state<TimelineAppEvent | null>(null);
 
 	const threadId = $derived(data.threadId);
 	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
+	const latestTimelineItem = $derived(timelineService.latest);
 
 	$effect(() => {
 		if (threadId) {
@@ -63,10 +65,6 @@
 	onMount(() => {
 		taurpc.timeline.new_assets_event.on((chips) => {
 			assets = chips;
-		});
-
-		taurpc.timeline.new_app_event.on((e) => {
-			latestTimelineItem = e;
 		});
 
 		// Seed the initial chip state so the suggestions row doesn't render

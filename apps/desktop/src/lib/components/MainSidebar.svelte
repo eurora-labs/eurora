@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import SearchDialog from '$lib/components/SearchDialog.svelte';
+	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
@@ -27,8 +27,8 @@
 	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
+	const timelineService = inject(TIMELINE_SERVICE);
 	const sidebarState = useSidebar();
-	let timelineItems: TimelineAppEvent[] = $state([]);
 
 	let logoHovered = $state(false);
 	let quitDialogOpen = $state(false);
@@ -42,7 +42,7 @@
 	}
 	let visibleTimelineItems = $derived.by(() => {
 		const limit = sidebarState.open ? 3 : 1;
-		return timelineItems.slice(-limit);
+		return timelineService.recent.slice(-limit);
 	});
 
 	function getFirstLetterAndCapitalize(name: string) {
@@ -63,17 +63,6 @@
 	});
 
 	onMount(() => {
-		const unlistenPromises: Promise<() => void>[] = [];
-
-		unlistenPromises.push(
-			taurpc.timeline.new_app_event.on((e) => {
-				if (timelineItems.length >= 5) {
-					timelineItems.shift();
-				}
-				timelineItems.push(e);
-			}),
-		);
-
 		if (!user.authenticated) {
 			chatService.loadingThreads = false;
 		}
@@ -81,9 +70,6 @@
 		return () => {
 			chatService.destroy();
 			threadInitialized = false;
-			for (const p of unlistenPromises) {
-				p.then((unlisten) => unlisten());
-			}
 		};
 	});
 
