@@ -101,7 +101,9 @@ impl BrowserStrategy {
                     }
                 };
 
-                if event_frame.action.as_str() == "TAB_ACTIVATED" {
+                if event_frame.action.as_str() == "TAB_ACTIVATED"
+                    || event_frame.action.as_str() == "TAB_UPDATED"
+                {
                     let NativeMessage::NativeMetadata(data) = native_message else {
                         continue;
                     };
@@ -284,6 +286,7 @@ impl StrategySupport for BrowserStrategy {
             Falkon.get_name(),
             Midori.get_name(),
             SeaMonkey.get_name(),
+            // Safari.get_name(),
         ]
     }
 
