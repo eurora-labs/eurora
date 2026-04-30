@@ -158,8 +158,9 @@
 			<Timeline.Root class="w-full" defaultOpen={false}>
 				{#each visibleTimelineItems as item, i}
 					<Timeline.Item
-						color={item.color}
-						iconBg={item.icon_bg}
+						color={item.accent?.hex}
+						iconBg={item.accent?.icon_bg}
+						iconColor={item.accent?.icon_bg === '#000000' ? '#ffffff' : '#000000'}
 						highlighted={i === visibleTimelineItems.length - 1}
 						iconSrc={item.icon_base64}
 						name={item.name}

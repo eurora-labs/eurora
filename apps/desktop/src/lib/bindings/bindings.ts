@@ -3,6 +3,21 @@ export type APISettings = {
 	endpoint: string,
 };
 
+export type AccentColor = {
+	// Dominant color in CSS form: lowercase `#rrggbb`.
+	hex: string,
+	/**
+	 *  Text/foreground color (`#000000` or `#ffffff`) chosen via WCAG relative
+	 *  luminance. Use for text rendered on top of `hex`.
+	 */
+	on_hex: string,
+	/**
+	 *  Icon-background color (`#000000` or `#ffffff`) chosen via NTSC
+	 *  perceived brightness. Use for shapes that visually contrast with `hex`.
+	 */
+	icon_bg: string,
+};
+
 export type Annotation = { Citation: ProtoCitation } | { NonStandard: ProtoNonStandardAnnotation };
 
 export type AppSettings = {
@@ -382,8 +397,7 @@ export type Thread = {
 
 export type TimelineAppEvent = {
 	name: string,
-	color: string | null,
-	icon_bg: string | null,
+	accent: AccentColor | null,
 	icon_base64: string | null,
 };
 

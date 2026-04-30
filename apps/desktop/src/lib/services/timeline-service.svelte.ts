@@ -1,6 +1,5 @@
-import { pickForeground } from '$lib/utils/contrast.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { TimelineAppEvent } from '$lib/bindings/bindings.js';
+import type { AccentColor, TimelineAppEvent } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 const RECENT_LIMIT = 5;
@@ -36,7 +35,7 @@ export class TimelineService {
 			this.taurpc.timeline.new_app_event.on((event) => {
 				const next = [...this.recent, event];
 				this.recent = next.length > RECENT_LIMIT ? next.slice(-RECENT_LIMIT) : next;
-				applyAccent(event.color);
+				applyAccent(event.accent);
 			}),
 		);
 	}
@@ -51,24 +50,23 @@ export class TimelineService {
 	}
 }
 
-function applyAccent(color: string | null) {
+function applyAccent(accent: AccentColor | null) {
 	if (typeof document === 'undefined') return;
-	const foreground = color ? pickForeground(color) : null;
-	if (!color || !foreground) {
+	if (!accent) {
 		clearAccent();
 		return;
 	}
 	const root = document.documentElement.style;
-	root.setProperty('--primary', color);
-	root.setProperty('--primary-foreground', foreground);
-	root.setProperty('--ring', color);
-	root.setProperty('--accent', color);
-	root.setProperty('--accent-foreground', foreground);
-	root.setProperty('--sidebar-primary', color);
-	root.setProperty('--sidebar-primary-foreground', foreground);
-	root.setProperty('--sidebar-ring', color);
-	root.setProperty('--sidebar-accent', color);
-	root.setProperty('--sidebar-accent-foreground', foreground);
+	root.setProperty('--primary', accent.hex);
+	root.setProperty('--primary-foreground', accent.on_hex);
+	root.setProperty('--ring', accent.hex);
+	root.setProperty('--accent', accent.hex);
+	root.setProperty('--accent-foreground', accent.on_hex);
+	root.setProperty('--sidebar-primary', accent.hex);
+	root.setProperty('--sidebar-primary-foreground', accent.on_hex);
+	root.setProperty('--sidebar-ring', accent.hex);
+	root.setProperty('--sidebar-accent', accent.hex);
+	root.setProperty('--sidebar-accent-foreground', accent.on_hex);
 }
 
 function clearAccent() {
