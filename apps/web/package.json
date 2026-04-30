@@ -29,7 +29,7 @@
 		"@tailwindcss/typography": "^0.5.19",
 		"@tauri-apps/plugin-updater": "^2.10.1",
 		"amplify-adapter": "^1.3.0",
-		"bits-ui": "^2.17.3",
+		"bits-ui": "^2.18.0",
 		"eslint": "^9.39.4",
 		"esm-env": "^1.2.2",
 		"grpc-web": "^1.5.0",
