@@ -1,5 +1,5 @@
+import { resolveFaviconBase64 } from './favicon';
 import { sendMessageWithRetry } from './messaging';
-import { getCurrentTabIcon } from './tabs';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, NativeMetadata } from '../content/bindings';
@@ -162,7 +162,7 @@ async function handleGetMetadata(reqFrame: RequestFrame): Promise<void> {
 			return;
 		}
 
-		const iconBase64 = await getCurrentTabIcon(activeTab);
+		const iconBase64 = await resolveFaviconBase64(activeTab);
 
 		const resp: Frame = {
 			kind: {

@@ -1,7 +1,7 @@
+import { resolveFaviconBase64 } from './favicon';
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
 import { sendMessageWithRetry } from './messaging';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
-import { getCurrentTabIcon } from './tabs';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings';
@@ -157,7 +157,7 @@ async function onActionContentData(frame: RequestFrame, messageType: string): Pr
 
 async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-	const iconBase64 = await getCurrentTabIcon(activeTab);
+	const iconBase64 = await resolveFaviconBase64(activeTab);
 
 	const response: ResponseFrame = {
 		id: frame.id,

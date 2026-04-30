@@ -1,4 +1,4 @@
-import { getCurrentTabIcon } from './tabs';
+import { resolveFaviconBase64 } from './favicon';
 import browser from 'webextension-polyfill';
 import type { NativeMetadata, Frame } from '../content/bindings';
 
@@ -70,7 +70,7 @@ async function sendMetadataForActiveTab(): Promise<void> {
 
 async function sendMetadataEvent(tab: browser.Tabs.Tab, port: browser.Runtime.Port): Promise<void> {
 	try {
-		const iconBase64 = await getCurrentTabIcon(tab);
+		const iconBase64 = await resolveFaviconBase64(tab);
 
 		const metadata = {
 			kind: 'NativeMetadata',
