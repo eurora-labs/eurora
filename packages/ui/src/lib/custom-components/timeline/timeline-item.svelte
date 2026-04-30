@@ -2,6 +2,7 @@
 	export interface TimelineItemProps {
 		color?: string | null;
 		iconBg?: string | null;
+		iconColor?: string | null;
 		highlighted?: boolean;
 		iconSrc?: string | null;
 		name?: string;
@@ -12,6 +13,7 @@
 	let {
 		color = 'white',
 		iconBg = 'white',
+		iconColor = 'black',
 		highlighted = false,
 		iconSrc,
 		name = '',
@@ -19,7 +21,7 @@
 
 	let borderColor = $derived(color === 'white' ? 'black' : (color ?? 'black'));
 	let resolvedIconBg = $derived(iconBg ?? 'white');
-	let letterColor = $derived(resolvedIconBg === 'black' ? 'white' : 'black');
+	let resolvedIconColor = $derived(iconColor ?? 'black');
 </script>
 
 <div
@@ -41,7 +43,7 @@
 		{:else}
 			<div
 				class="w-8 h-8 rounded-full p-1 flex items-center justify-center"
-				style="background-color: {resolvedIconBg}; color: {letterColor};"
+				style="background-color: {resolvedIconBg}; color: {resolvedIconColor};"
 			>
 				{name.charAt(0).toUpperCase()}
 			</div>
