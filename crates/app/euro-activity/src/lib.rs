@@ -7,8 +7,6 @@ pub mod strategies;
 pub mod types;
 mod utils;
 
-pub use strategies::processes;
-
 pub use assets::youtube::TranscriptLine;
 pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
 pub use config::{
