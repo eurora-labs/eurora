@@ -1,4 +1,4 @@
-use crate::{strategies::safari::SafariStrategy, utils::render_svg_bytes};
+use crate::utils::render_svg_bytes;
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
@@ -11,7 +11,6 @@ use url::Url;
 pub mod browser;
 pub mod default;
 pub mod no_strategy;
-pub mod safari;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
@@ -99,14 +98,12 @@ macro_rules! register_strategies {
 #[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Clone)]
 pub enum ActivityStrategy {
-    SafariStrategy,
     BrowserStrategy,
     DefaultStrategy,
     NoStrategy,
 }
 
-// register_strategies!(NoStrategy, BrowserStrategy);
-register_strategies!(NoStrategy, SafariStrategy, BrowserStrategy);
+register_strategies!(NoStrategy, BrowserStrategy);
 
 #[async_trait]
 #[enum_dispatch]

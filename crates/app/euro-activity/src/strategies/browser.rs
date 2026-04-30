@@ -286,7 +286,7 @@ impl StrategySupport for BrowserStrategy {
             Falkon.get_name(),
             Midori.get_name(),
             SeaMonkey.get_name(),
-            // Safari.get_name(),
+            Safari.get_name(),
         ]
     }
 
