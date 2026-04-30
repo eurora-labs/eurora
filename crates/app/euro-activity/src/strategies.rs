@@ -106,7 +106,8 @@ pub enum ActivityStrategy {
     NoStrategy,
 }
 
-register_strategies!(NoStrategy, SafariStrategy, BrowserStrategy);
+// register_strategies!(NoStrategy, SafariStrategy, BrowserStrategy);
+register_strategies!(NoStrategy, BrowserStrategy);
 
 #[async_trait]
 #[enum_dispatch]

@@ -288,6 +288,11 @@ impl BrowserBridgeService {
 
     pub async fn send_to_browser(&self, browser_pid: u32, frame: Frame) -> Result<(), Status> {
         let registry = self.registry.read().await;
+        tracing::debug!(
+            "All registered pids: {:?}",
+            registry.keys().collect::<Vec<_>>()
+        );
+        tracing::debug!("Sending frame to browser_pid={}", browser_pid);
         if let Some(messenger) = registry.get(&browser_pid) {
             messenger
                 .tx

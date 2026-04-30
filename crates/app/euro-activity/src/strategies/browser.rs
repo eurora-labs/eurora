@@ -158,6 +158,7 @@ impl BrowserStrategy {
             .send_request(browser_pid, "GET_ASSETS", None)
             .await
             .ok()?;
+        tracing::debug!("fetch_asset: response={:?}", response);
         let payload = response.payload?;
         let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
         ActivityAsset::try_from(native_message).ok()
@@ -284,6 +285,7 @@ impl StrategySupport for BrowserStrategy {
             Falkon.get_name(),
             Midori.get_name(),
             SeaMonkey.get_name(),
+            Safari.get_name(),
         ]
     }
 
