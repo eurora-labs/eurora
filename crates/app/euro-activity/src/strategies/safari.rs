@@ -1,5 +1,4 @@
 pub use crate::strategies::ActivityStrategyFunctionality;
-pub use crate::strategies::processes::*;
 use crate::strategies::{ActivityReport, StrategyMetadata};
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use crate::{
@@ -9,6 +8,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use euro_native_messaging::NativeMessage;
+use euro_process::*;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
