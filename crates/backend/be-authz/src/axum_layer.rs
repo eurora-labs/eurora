@@ -8,7 +8,7 @@ use axum::response::{IntoResponse, Response};
 use be_auth_core::JwtConfig;
 
 use crate::CasbinAuthz;
-use crate::bypass::is_rest_bypass;
+use crate::bypass::{is_email_verification_exempt, is_rest_bypass};
 use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter, TrustedProxies};
 
 pub struct AuthzState {
@@ -133,7 +133,7 @@ pub async fn authz_middleware(
         }
     };
 
-    if !claims.email_verified {
+    if !claims.email_verified && !is_email_verification_exempt(&policy_path) {
         return (
             StatusCode::FORBIDDEN,
             axum::Json(
@@ -172,5 +172,225 @@ pub async fn authz_middleware(
             )
                 .into_response()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! These tests pin a contract that has bitten production: any short-circuit
+    //! response produced inside `authz_middleware` (401 missing token, 403
+    //! email-verified, 403 RBAC, 429 rate limit) must propagate through outer
+    //! layers like CORS. A reversed layer order silently strips
+    //! `Access-Control-*` headers from error responses, causing browsers to
+    //! report the failure as a generic "Failed to fetch" instead of the real
+    //! HTTP status — see `be-monolith/src/main.rs` for the production wiring.
+    use super::*;
+    use axum::Router;
+    use axum::body::Body;
+    use axum::http::{HeaderValue, Method, Request, StatusCode, header};
+    use axum::routing::post;
+    use be_auth_core::{Claims, JwtConfig, Role};
+    use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, encode};
+    use tower::ServiceExt;
+    use tower_http::cors::{AllowOrigin, CorsLayer};
+
+    use crate::rate_limit::{
+        TrustedProxies, new_auth_failure_rate_limiter, new_health_check_rate_limiter,
+    };
+
+    const TEST_ALLOWED_ORIGIN: &str = "https://www.eurora-labs.com";
+    const TEST_JWT_SECRET: &[u8] = b"test-secret-do-not-use-in-production";
+
+    fn build_test_jwt_config() -> JwtConfig {
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.set_audience(&["eurora"]);
+        validation.required_spec_claims.insert("aud".to_string());
+        JwtConfig {
+            access_token_encoding_key: EncodingKey::from_secret(TEST_JWT_SECRET),
+            access_token_decoding_key: DecodingKey::from_secret(TEST_JWT_SECRET),
+            refresh_token_encoding_key: EncodingKey::from_secret(TEST_JWT_SECRET),
+            refresh_token_decoding_key: DecodingKey::from_secret(TEST_JWT_SECRET),
+            access_token_expiry_hours: 1,
+            refresh_token_expiry_days: 7,
+            validation,
+            approved_emails: vec![],
+        }
+    }
+
+    fn mint_access_token(jwt_config: &JwtConfig, email_verified: bool) -> String {
+        let now = chrono::Utc::now();
+        let claims = Claims {
+            sub: uuid::Uuid::new_v4().to_string(),
+            email: "user@example.com".to_string(),
+            display_name: None,
+            iat: now.timestamp(),
+            exp: (now + chrono::Duration::hours(1)).timestamp(),
+            token_type: "access".to_string(),
+            role: Role::Free,
+            aud: "eurora".to_string(),
+            email_verified,
+            jti: uuid::Uuid::new_v4().to_string(),
+        };
+        encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &jwt_config.access_token_encoding_key,
+        )
+        .expect("failed to encode test JWT")
+    }
+
+    async fn build_router(jwt_config: JwtConfig) -> Router {
+        let base = env!("CARGO_MANIFEST_DIR");
+        let model = format!("{base}/../../../config/authz/model.conf");
+        let policy = format!("{base}/../../../config/authz/policy.csv");
+        let authz = CasbinAuthz::new(&model, &policy)
+            .await
+            .expect("failed to init enforcer");
+
+        let state = Arc::new(AuthzState::new(
+            authz,
+            jwt_config,
+            new_auth_failure_rate_limiter(),
+            new_health_check_rate_limiter(),
+            TrustedProxies::new(vec![]),
+        ));
+
+        let cors = CorsLayer::new()
+            .allow_origin(AllowOrigin::list([HeaderValue::from_static(
+                TEST_ALLOWED_ORIGIN,
+            )]))
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+            .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
+
+        // Mirror the production layer order from `be-monolith/src/main.rs`:
+        // authz inside, CORS outermost.
+        //
+        // `/payment/checkout` is on the email-verification exempt list, so it
+        // exercises the "auth required, verification not required" branch.
+        // `/payment/portal` is not exempt, so it exercises the verified-only
+        // branch — used to pin the CORS contract on the 403 response.
+        Router::new()
+            .route("/payment/checkout", post(|| async { StatusCode::OK }))
+            .route("/payment/portal", post(|| async { StatusCode::OK }))
+            .layer(axum::middleware::from_fn_with_state(
+                state,
+                authz_middleware,
+            ))
+            .layer(cors)
+    }
+
+    fn request_with_origin(method: Method, uri: &str, auth: Option<&str>) -> Request<Body> {
+        let mut builder = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header(header::ORIGIN, TEST_ALLOWED_ORIGIN);
+        if let Some(token) = auth {
+            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        builder
+            .body(Body::empty())
+            .expect("failed to build request")
+    }
+
+    #[tokio::test]
+    async fn missing_authorization_header_response_carries_cors_header() {
+        let router = build_router(build_test_jwt_config()).await;
+        let response = router
+            .oneshot(request_with_origin(Method::POST, "/payment/checkout", None))
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .and_then(|v| v.to_str().ok()),
+            Some(TEST_ALLOWED_ORIGIN),
+            "401 from authz must propagate through outer CORS layer; \
+             a missing Access-Control-Allow-Origin header surfaces in browsers \
+             as a generic 'Failed to fetch'"
+        );
+    }
+
+    #[tokio::test]
+    async fn unverified_email_response_carries_cors_header() {
+        let jwt_config = build_test_jwt_config();
+        let token = mint_access_token(&jwt_config, false);
+        let router = build_router(jwt_config).await;
+
+        let response = router
+            .oneshot(request_with_origin(
+                Method::POST,
+                "/payment/portal",
+                Some(&token),
+            ))
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .and_then(|v| v.to_str().ok()),
+            Some(TEST_ALLOWED_ORIGIN),
+            "403 email-verification denial must propagate through outer CORS layer"
+        );
+    }
+
+    #[tokio::test]
+    async fn unverified_email_can_reach_exempt_route() {
+        let jwt_config = build_test_jwt_config();
+        let token = mint_access_token(&jwt_config, false);
+        let router = build_router(jwt_config).await;
+
+        let response = router
+            .oneshot(request_with_origin(
+                Method::POST,
+                "/payment/checkout",
+                Some(&token),
+            ))
+            .await
+            .expect("router should respond");
+
+        assert_eq!(
+            response.status(),
+            StatusCode::OK,
+            "/payment/checkout is on the email-verification exempt list; \
+             unverified users must be allowed through so they can subscribe"
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .and_then(|v| v.to_str().ok()),
+            Some(TEST_ALLOWED_ORIGIN)
+        );
+    }
+
+    #[tokio::test]
+    async fn verified_email_request_is_authorized() {
+        let jwt_config = build_test_jwt_config();
+        let token = mint_access_token(&jwt_config, true);
+        let router = build_router(jwt_config).await;
+
+        let response = router
+            .oneshot(request_with_origin(
+                Method::POST,
+                "/payment/checkout",
+                Some(&token),
+            ))
+            .await
+            .expect("router should respond");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+                .and_then(|v| v.to_str().ok()),
+            Some(TEST_ALLOWED_ORIGIN)
+        );
     }
 }

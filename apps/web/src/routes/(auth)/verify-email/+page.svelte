@@ -1,18 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
-	import { auth } from '$lib/stores/auth.js';
-	import { create } from '@bufbuild/protobuf';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
-	import { VerifyEmailRequestSchema } from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import CircleX from '@lucide/svelte/icons/circle-x';
+	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 
-	const authService = inject(AUTH_SERVICE);
+	const auth = inject(AUTH_SERVICE);
 
 	let status: 'verifying' | 'success' | 'error' = $state('verifying');
 	let errorMessage = $state('');
@@ -26,11 +24,10 @@
 		}
 
 		try {
-			const request = create(VerifyEmailRequestSchema, { token });
-			const tokens = await authService.verifyEmail(request);
-			auth.login(tokens);
+			await auth.verifyEmail(token);
 			status = 'success';
 		} catch (err) {
+			Sentry.captureException(err, { tags: { area: 'auth.verify-email' } });
 			status = 'error';
 			errorMessage =
 				err instanceof Error ? err.message : 'Invalid or expired verification token.';

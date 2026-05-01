@@ -1,3 +1,10 @@
+import {
+	collectIconCandidatesFromLinks,
+	originFallbackCandidate,
+	resolveBestCandidate,
+	type IconCandidate,
+	type IconLinkRecord,
+} from '../../../shared/background/favicon-ranker';
 import browser from 'webextension-polyfill';
 import type { CommonBrowserMessage, WatcherParams } from './types.js';
 import type { WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
@@ -43,77 +50,36 @@ export class CommonWatcher {
 		_obj: CommonBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		const icon_base64 = await this.getFavicon();
-		const responseFrame = {
+		const icon_base64 = await resolveDocumentFavicon();
+		return {
 			kind: 'NativeMetadata',
 			data: {
 				url: window.location.href,
 				icon_base64,
+				title: document.title || null,
 			},
 		};
-		return responseFrame;
 	}
+}
 
-	private getFaviconUrl(): string | null {
-		const selectors = [
-			'link[rel="icon"]',
-			'link[rel="shortcut icon"]',
-			'link[rel="mask-icon"]',
-			'link[rel="apple-touch-icon"]',
-			'link[rel="apple-touch-icon-precomposed"]',
-		];
+async function resolveDocumentFavicon(): Promise<string> {
+	const records: IconLinkRecord[] = Array.from(
+		document.querySelectorAll<HTMLLinkElement>('link[rel]'),
+	)
+		.filter((link) => !!link.href)
+		.map((link) => ({
+			href: link.href,
+			rel: link.rel || '',
+			type: link.type || '',
+			sizes: link.getAttribute('sizes') || '',
+		}));
 
-		for (const sel of selectors) {
-			const link = document.querySelector(sel) as HTMLLinkElement;
-			if (link && link.href) {
-				return link.href;
-			}
-		}
+	const candidates: IconCandidate[] = collectIconCandidatesFromLinks(records);
 
-		try {
-			return new URL('/favicon.ico', window.location.origin).href;
-		} catch (_) {
-			return null;
-		}
-	}
+	const fallback = originFallbackCandidate(window.location.href, candidates.length);
+	if (fallback) candidates.push(fallback);
 
-	private async getFavicon(): Promise<string> {
-		try {
-			const faviconUrl = this.getFaviconUrl();
-			if (!faviconUrl) {
-				console.warn('No favicon found');
-				return '';
-			}
-
-			let response: Response;
-			try {
-				response = await fetch(faviconUrl, { credentials: 'include' });
-			} catch (err) {
-				console.error('Failed to fetch favicon', err);
-				return '';
-			}
-			const blob = await response.blob();
-
-			return await new Promise<string>((resolve) => {
-				const reader = new FileReader();
-				reader.onloadend = () => {
-					const dataUrl = reader.result;
-					if (typeof dataUrl !== 'string') {
-						console.warn('Unexpected FileReader result');
-						resolve('');
-						return;
-					}
-					const base64 = dataUrl.split(',')[1] || '';
-					resolve(base64);
-				};
-				reader.onerror = () => resolve('');
-				reader.readAsDataURL(blob);
-			});
-		} catch (err) {
-			console.error('Failed to read favicon', err);
-			return '';
-		}
-	}
+	return await resolveBestCandidate(candidates);
 }
 
 let initialized = false;

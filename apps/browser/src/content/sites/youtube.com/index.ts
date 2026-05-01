@@ -30,15 +30,11 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	public listen(
 		obj: BrowserObj,
 		sender: browser.Runtime.MessageSender,
-		sendResponse: (response?: any) => void,
-	): boolean {
+	): Promise<WatcherResponse> | false {
 		if ((obj as YoutubeBrowserMessage).type === 'PLAY') {
-			this.handlePlay(obj as YoutubeBrowserMessage, sender)
-				.then((result) => sendResponse(result))
-				.catch(() => sendResponse());
-			return true;
+			return this.handlePlay(obj as YoutubeBrowserMessage, sender).catch(() => undefined);
 		}
-		return super.listen(obj, sender, sendResponse);
+		return super.listen(obj, sender);
 	}
 
 	public async handlePlay(
