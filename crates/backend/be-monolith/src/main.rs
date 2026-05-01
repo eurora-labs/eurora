@@ -286,15 +286,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         axum::routing::get(|| async { axum::http::StatusCode::OK }),
     );
 
+    // Layer order matters: the last `.layer()` call is the OUTERMOST wrapper.
+    // CORS must be outermost so that responses produced by `authz_middleware`
+    // (e.g. 401/403/429 short-circuits) still carry `Access-Control-*` headers —
+    // otherwise the browser blocks them at the network layer and surfaces a
+    // generic "Failed to fetch" instead of the real status.
     let http_router = update_router
         .merge(payment_router)
         .merge(health_route)
         .layer(DefaultBodyLimit::max(HTTP_MAX_BODY_SIZE))
-        .layer(build_cors())
         .layer(axum::middleware::from_fn_with_state(
             authz_state,
             authz_middleware,
-        ));
+        ))
+        .layer(build_cors());
 
     let grpc_future = grpc_server.serve_with_shutdown(grpc_addr, async {
         tokio::signal::ctrl_c()

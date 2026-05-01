@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { create } from '@bufbuild/protobuf';
+import { EmptySchema } from '@bufbuild/protobuf/wkt';
 import { createClient, type Client } from '@connectrpc/connect';
 import { createGrpcWebTransport } from '@connectrpc/connect-web';
 import { InjectionToken } from '@eurora/shared/context';
@@ -24,6 +25,7 @@ export interface User {
 	email: string;
 	name?: string;
 	avatar?: string;
+	emailVerified: boolean;
 }
 
 export type CheckEmailResult =
@@ -101,6 +103,16 @@ export class AuthService {
 	async verifyEmail(token: string): Promise<void> {
 		const tokens = await this.#grpc.verifyEmail(create(VerifyEmailRequestSchema, { token }));
 		this.#setSession(tokens);
+	}
+
+	async resendVerificationEmail(): Promise<void> {
+		const accessToken = this.accessToken;
+		if (!accessToken) {
+			throw new Error('Cannot resend verification email without an active session');
+		}
+		await this.#grpc.resendVerificationEmail(create(EmptySchema), {
+			headers: new Headers({ authorization: `Bearer ${accessToken}` }),
+		});
 	}
 
 	async checkEmail(email: string): Promise<CheckEmailResult> {
@@ -202,10 +214,16 @@ export class AuthService {
 		}
 		try {
 			const tokens = await this.#grpc.refreshToken(create(RefreshTokenRequestSchema, {}));
-			if (!this.user) {
-				throw new Error('Cannot refresh session without a user');
+			// Re-derive the user from the new access token: fields like
+			// `emailVerified` can flip mid-session (e.g. user clicks the
+			// verification link in another tab) and we want the cookie + state
+			// to reflect the new claims.
+			const user = userFromAccessToken(tokens.accessToken);
+			if (!user) {
+				throw new Error('Invalid refreshed access token');
 			}
-			this.#writeCookies(tokens, this.user);
+			this.#writeCookies(tokens, user);
+			this.user = user;
 			this.accessToken = tokens.accessToken;
 			this.#refreshTokenValue = tokens.refreshToken;
 			this.#expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
@@ -217,16 +235,10 @@ export class AuthService {
 	}
 
 	#setSession(tokens: TokenResponse): void {
-		const claims = decodeJwtPayload(tokens.accessToken);
-		if (!claims) {
+		const user = userFromAccessToken(tokens.accessToken);
+		if (!user) {
 			throw new Error('Invalid access token');
 		}
-		const user: User = {
-			id: claims.sub ?? claims.user_id ?? 'unknown',
-			email: claims.email ?? 'unknown@example.com',
-			name: claims.name ?? claims.email,
-			avatar: claims.avatar ?? claims.picture,
-		};
 		const expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
 
 		this.#writeCookies(tokens, user);
@@ -248,9 +260,16 @@ export class AuthService {
 
 			if (!refreshToken || !expiresAtStr || !userStr) return;
 
-			const user = JSON.parse(decodeURIComponent(userStr)) as User;
 			const expiresAt = Number.parseInt(expiresAtStr, 10);
 			const accessFresh = !!accessToken && expiresAt > Date.now() + REFRESH_LEEWAY_MS;
+
+			// Prefer claims from the access token when it's fresh — they are
+			// the source of truth for fields like `emailVerified`. Fall back to
+			// the cookie payload only when the access token is missing or
+			// expired (the user can still hold a usable refresh token).
+			const user =
+				(accessFresh && accessToken ? userFromAccessToken(accessToken) : null) ??
+				normalizeUser(JSON.parse(decodeURIComponent(userStr)));
 
 			Sentry.setUser({ id: user.id });
 
@@ -309,7 +328,18 @@ function readCookie(name: string): string | null {
 	return match ? match[1] : null;
 }
 
-function decodeJwtPayload(token: string): Record<string, string> | null {
+interface JwtPayload {
+	sub?: string;
+	user_id?: string;
+	email?: string;
+	name?: string;
+	avatar?: string;
+	picture?: string;
+	email_verified?: boolean;
+	[key: string]: unknown;
+}
+
+function decodeJwtPayload(token: string): JwtPayload | null {
 	try {
 		const base64Url = token.split('.')[1];
 		const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -319,9 +349,35 @@ function decodeJwtPayload(token: string): Record<string, string> | null {
 				.map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
 				.join(''),
 		);
-		return JSON.parse(json);
+		return JSON.parse(json) as JwtPayload;
 	} catch (err) {
 		Sentry.captureException(err, { tags: { area: 'auth.jwt-decode' } });
 		return null;
 	}
+}
+
+function userFromAccessToken(token: string): User | null {
+	const claims = decodeJwtPayload(token);
+	if (!claims) return null;
+	return {
+		id: claims.sub ?? claims.user_id ?? 'unknown',
+		email: claims.email ?? 'unknown@example.com',
+		name: claims.name ?? claims.email,
+		avatar: claims.avatar ?? claims.picture,
+		emailVerified: claims.email_verified === true,
+	};
+}
+
+// Older cookies may lack `emailVerified`. Default it to `false` rather than
+// `undefined` so callers can rely on the boolean shape; the next refresh will
+// repopulate it from the access token.
+function normalizeUser(raw: unknown): User {
+	const user = raw as Partial<User> & { id?: string; email?: string };
+	return {
+		id: user.id ?? 'unknown',
+		email: user.email ?? 'unknown@example.com',
+		name: user.name,
+		avatar: user.avatar,
+		emailVerified: user.emailVerified === true,
+	};
 }
