@@ -282,7 +282,6 @@ impl StrategySupport for BrowserStrategy {
             PaleMoon.get_name(),
             Zen.get_name(),
             DuckDuckGo.get_name(),
-            Min.get_name(),
             Falkon.get_name(),
             Midori.get_name(),
             SeaMonkey.get_name(),
