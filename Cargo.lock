@@ -3799,6 +3799,7 @@ dependencies = [
  "euro-browser",
  "euro-encrypt",
  "euro-endpoint",
+ "euro-process",
  "euro-secret",
  "euro-settings",
  "euro-thread",
@@ -3893,8 +3894,6 @@ dependencies = [
  "euro-storage",
  "serde",
  "serde_json",
- "tokio",
- "tonic",
  "uuid",
 ]
 

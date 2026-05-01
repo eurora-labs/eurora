@@ -51,6 +51,14 @@ pub struct TimelineAppEvent {
     pub name: String,
     pub accent: Option<AccentColor>,
     pub icon_base64: Option<String>,
+    /// Executable name of the focused process. Used by the frontend to
+    /// resolve which browser (if any) the user is currently on so it can
+    /// surface the matching extension install affordance.
+    pub process_name: String,
+    /// OS-level process id of the focused process. Required when the
+    /// frontend wants to act on that specific browser instance (for
+    /// example, opening a URL inside it rather than the OS default).
+    pub process_id: u32,
 }
 
 #[taurpc::procedures(path = "timeline")]

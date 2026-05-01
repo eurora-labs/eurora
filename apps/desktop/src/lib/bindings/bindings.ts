@@ -36,6 +36,17 @@ export type BaseMessageWithSibling = {
 
 export type Block = { Text: ProtoTextContentBlock } | { InvalidToolCall: ProtoInvalidToolCallBlock } | { Reasoning: ProtoReasoningContentBlock } | { NonStandard: ProtoNonStandardContentBlock } | { Image: ProtoImageContentBlock } | { Video: ProtoVideoContentBlock } | { Audio: ProtoAudioContentBlock } | { PlainText: ProtoPlainTextContentBlock } | { File: ProtoFileContentBlock } | { ToolCall: ProtoToolCallBlock } | { ToolCallChunk: ProtoToolCallChunkBlock } | { ServerToolCall: ProtoServerToolCall } | { ServerToolCallChunk: ProtoServerToolCallChunk } | { ServerToolResult: ProtoServerToolResult };
 
+/**
+ *  Push payload describing whether a given browser process currently has a
+ *  native messenger connected. Emitted whenever the browser bridge registry
+ *  transitions (a messenger registers or disconnects). The frontend uses
+ *  this to update the "install extension" affordance without polling.
+ */
+export type BrowserExtensionStatus = {
+	process_name: string,
+	connected: boolean,
+};
+
 export type ChatStreamFinalMessage = {
 	messages: BaseMessageWithSibling[],
 };
@@ -399,6 +410,18 @@ export type TimelineAppEvent = {
 	name: string,
 	accent: AccentColor | null,
 	icon_base64: string | null,
+	/**
+	 *  Executable name of the focused process. Used by the frontend to
+	 *  resolve which browser (if any) the user is currently on so it can
+	 *  surface the matching extension install affordance.
+	 */
+	process_name: string,
+	/**
+	 *  OS-level process id of the focused process. Required when the
+	 *  frontend wants to act on that specific browser instance (for
+	 *  example, opening a URL inside it rather than the OS default).
+	 */
+	process_id: number,
 };
 
 export type UpdateInfo = {
@@ -407,7 +430,7 @@ export type UpdateInfo = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_browser_extension_url":["process_name"],"get_docker_compose_path":[],"install_update":[],"is_browser_extension_connected":["process_name"],"list_activities":[],"open_url_in_browser":["process_id","url"],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -453,7 +476,8 @@ get_telemetry_settings: () => Promise<TelemetrySettings>,
 set_api_settings: (apiSettings: APISettings) => Promise<APISettings>, 
 set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>, 
 set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
-"system": {check_accessibility_permission: () => Promise<boolean>, 
+"system": {browser_extension_status_changed: (status: BrowserExtensionStatus) => Promise<void>, 
+check_accessibility_permission: () => Promise<boolean>, 
 check_for_update: () => Promise<{
 	version: string,
 	body: string | null,
@@ -461,9 +485,12 @@ check_for_update: () => Promise<{
 check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 focus_main_window: () => Promise<null>, 
 get_browser_connection_count: () => Promise<bigint>, 
+get_browser_extension_url: (processName: string) => Promise<string | null>, 
 get_docker_compose_path: () => Promise<string>, 
 install_update: () => Promise<null>, 
+is_browser_extension_connected: (processName: string) => Promise<boolean>, 
 list_activities: () => Promise<ContextChip[]>, 
+open_url_in_browser: (processId: number, url: string) => Promise<null>, 
 quit: () => Promise<null>, 
 request_accessibility_permission: () => Promise<null>, 
 start_local_backend: (ollamaModel: string) => Promise<LocalBackendInfo>},
