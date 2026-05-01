@@ -3,6 +3,12 @@ pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook", "/health"];
 pub(crate) const GRPC_BYPASS_SERVICES: &[&str] =
     &["auth_service.ProtoAuthService", "grpc.health.v1.Health"];
 
+/// REST paths that still require a valid JWT but do not require
+/// `email_verified` to be true. Distinct from `REST_BYPASS_*`, which skips
+/// authentication entirely. Keep this list narrow — every entry is a route
+/// that an unverified user is trusted to call.
+pub(crate) const REST_EMAIL_VERIFICATION_EXEMPT_EXACT: &[&str] = &["/payment/checkout"];
+
 fn normalize_path(path: &str) -> String {
     use percent_encoding::percent_decode_str;
 
@@ -33,6 +39,13 @@ pub fn is_rest_bypass(path: &str) -> bool {
 
 pub fn is_grpc_bypass(service: &str) -> bool {
     GRPC_BYPASS_SERVICES.contains(&service)
+}
+
+pub fn is_email_verification_exempt(path: &str) -> bool {
+    let normalized = normalize_path(path);
+    REST_EMAIL_VERIFICATION_EXEMPT_EXACT
+        .iter()
+        .any(|&exact| normalized == exact)
 }
 
 #[cfg(test)]
@@ -99,6 +112,39 @@ mod tests {
         assert_eq!(normalize_path("/a/%2e%2e/b"), "/b");
         assert_eq!(normalize_path("/%2e/a"), "/a");
         assert_eq!(normalize_path("/a/b%20c"), "/a/b c");
+    }
+
+    #[test]
+    fn email_verification_exempt_exact_match() {
+        assert!(is_email_verification_exempt("/payment/checkout"));
+    }
+
+    #[test]
+    fn email_verification_exempt_rejects_non_matching() {
+        assert!(!is_email_verification_exempt("/payment/portal"));
+        assert!(!is_email_verification_exempt("/payment/checkout/extra"));
+        assert!(!is_email_verification_exempt("/api/users"));
+        assert!(!is_email_verification_exempt("/"));
+    }
+
+    #[test]
+    fn email_verification_exempt_normalizes_before_matching() {
+        // Traversal that escapes the exempt path falls through to the
+        // verified-only branch, just like `is_rest_bypass`.
+        assert!(!is_email_verification_exempt(
+            "/payment/checkout/../api/admin"
+        ));
+        assert!(!is_email_verification_exempt("/payment/%2e%2e/api/admin"));
+        // Production callers pass `MatchedPath`, so traversal cannot reach
+        // this helper in practice — `normalize_path` is defense in depth.
+    }
+
+    #[test]
+    fn email_verification_exempt_strips_query_and_fragment() {
+        assert!(is_email_verification_exempt(
+            "/payment/checkout?session=abc"
+        ));
+        assert!(is_email_verification_exempt("/payment/checkout#x"));
     }
 
     #[test]
