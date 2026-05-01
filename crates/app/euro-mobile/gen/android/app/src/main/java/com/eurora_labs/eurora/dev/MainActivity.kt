@@ -1,4 +1,4 @@
-package com.eurora_labs.eurora.mobile.dev
+package com.eurora_labs.eurora.dev
 
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge

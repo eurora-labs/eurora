@@ -16,18 +16,24 @@ val tauriProperties = Properties().apply {
 // Channel-aware identity. ANDROID_CHANNEL is set by scripts/release-android.sh
 // and the publish.yaml workflow. Local builds default to the dev identity.
 val androidChannel: String = (System.getenv("ANDROID_CHANNEL") ?: "dev").lowercase()
-val (channelApplicationId, channelAppLabel) = when (androidChannel) {
-    "release" -> "com.eurora_labs.eurora" to "Eurora"
-    "nightly" -> "com.eurora_labs.eurora.nightly" to "Eurora Nightly"
-    else -> "com.eurora_labs.eurora.mobile.dev" to "Eurora Mobile Dev"
+val channelApplicationId: String = when (androidChannel) {
+    "release" -> "com.eurora_labs.eurora"
+    "nightly" -> "com.eurora_labs.eurora.nightly"
+    else -> "com.eurora_labs.eurora.dev"
+}
+val channelAppLabel: String = when (androidChannel) {
+    "release" -> "Eurora"
+    "nightly" -> "Eurora Nightly"
+    else -> "Eurora Dev"
 }
 
 android {
     compileSdk = 36
-    namespace = "com.eurora_labs.eurora.mobile.dev"
+    namespace = "com.eurora_labs.eurora.dev"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         manifestPlaceholders["tauriBrowserRedirectScheme"] = "eurora"
+        manifestPlaceholders["appAuthRedirectScheme"] = "eurora"
         applicationId = channelApplicationId
         minSdk = 24
         targetSdk = 36
