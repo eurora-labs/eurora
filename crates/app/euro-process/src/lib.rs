@@ -1,8 +1,10 @@
 use cfg_if::cfg_if;
 
+mod app_process;
 mod browser;
 
-pub use browser::*;
+pub use app_process::AppProcess;
+pub use browser::{Browser, BrowserStore};
 
 #[inline(always)]
 pub fn os_pick<'a>(_windows: &'a str, _linux: &'a str, _macos: &'a str) -> &'a str {
@@ -14,27 +16,18 @@ pub fn os_pick<'a>(_windows: &'a str, _linux: &'a str, _macos: &'a str) -> &'a s
     }
 }
 
-pub trait ProcessFunctionality {
-    fn get_name(&self) -> &str;
+/// Compare a process name declared at compile time against a focused-window
+/// report from the OS.
+///
+/// On Windows the comparison is ASCII case-insensitive because the focus
+/// tracker reports executable names with inconsistent casing there. On other
+/// targets the comparison is byte-exact.
+#[cfg(target_os = "windows")]
+pub(crate) fn process_name_matches(known: &str, candidate: &str) -> bool {
+    known.eq_ignore_ascii_case(candidate)
 }
 
-#[derive(Debug, Clone)]
-pub struct Eurora;
-
-impl ProcessFunctionality for Eurora {
-    fn get_name(&self) -> &str {
-        match cfg!(debug_assertions) {
-            true => os_pick("euro-tauri.exe", "euro-tauri", "euro-tauri"),
-            false => os_pick("eurora.exe", "eurora", "Eurora"),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct EuroraNightly;
-
-impl ProcessFunctionality for EuroraNightly {
-    fn get_name(&self) -> &str {
-        os_pick("eurora-nightly.exe", "eurora-nightly", "Eurora Nightly")
-    }
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn process_name_matches(known: &str, candidate: &str) -> bool {
+    known == candidate
 }
