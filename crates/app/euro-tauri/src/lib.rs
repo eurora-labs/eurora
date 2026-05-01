@@ -5,6 +5,7 @@
     clippy::too_many_lines
 )]
 
+pub mod browser_launcher;
 pub mod error;
 pub mod procedures;
 pub mod shared_types;

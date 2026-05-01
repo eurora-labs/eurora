@@ -99,6 +99,7 @@ pub struct Activity {
     #[serde(skip)]
     pub icon: Option<Arc<image::RgbaImage>>,
     pub process_name: String,
+    pub process_id: u32,
     pub start: DateTime<Utc>,
     pub end: Option<DateTime<Utc>>,
     pub assets: Vec<ActivityAsset>,
@@ -111,6 +112,7 @@ impl Activity {
         title: Option<String>,
         icon: Option<Arc<image::RgbaImage>>,
         process_name: String,
+        process_id: u32,
         assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
@@ -120,6 +122,7 @@ impl Activity {
             url: None,
             icon,
             process_name,
+            process_id,
             start: Utc::now(),
             end: None,
             assets,
@@ -138,6 +141,7 @@ impl Activity {
         title: Option<String>,
         icon: Option<Arc<image::RgbaImage>>,
         process_name: String,
+        process_id: u32,
         assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
@@ -147,6 +151,7 @@ impl Activity {
             url: Some(url),
             icon,
             process_name,
+            process_id,
             start: Utc::now(),
             end: None,
             assets,
@@ -230,11 +235,13 @@ mod tests {
             Some("Great Video".into()),
             None,
             "chrome".into(),
+            42,
             vec![],
         );
         let chip = activity.get_context_chip();
         assert_eq!(chip.domain.as_deref(), Some("youtube.com"));
         assert_eq!(chip.name, "Great Video");
+        assert_eq!(activity.process_id, 42);
     }
 
     #[test]
@@ -244,10 +251,12 @@ mod tests {
             None,
             None,
             "someapp".into(),
+            7,
             vec![],
         );
         let chip = activity.get_context_chip();
         assert_eq!(chip.domain, None);
+        assert_eq!(activity.process_id, 7);
     }
 
     #[test]
@@ -257,6 +266,7 @@ mod tests {
             None,
             None,
             "chrome".into(),
+            0,
             vec![],
         );
         let new_url = parse("https://example.com/b");

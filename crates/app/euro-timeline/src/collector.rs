@@ -141,6 +141,8 @@ impl CollectorService {
 
                         let focus_event = ActivityEvent {
                             name: activity.name.clone(),
+                            process_name: activity.process_name.clone(),
+                            process_id: activity.process_id,
                             icon: activity.icon.clone(),
                         };
                         let _ = activity_event_tx_inner.send(focus_event);
@@ -193,9 +195,7 @@ impl CollectorService {
 
                         let mut prev = prev_focus.lock().await;
                         if new_focus != *prev {
-                            if NoStrategy::get_supported_processes()
-                                .contains(&process_name.as_str())
-                            {
+                            if NoStrategy::matches_process(&process_name) {
                                 tracing::debug!(
                                     "Ignoring focus change to own process: {}",
                                     process_name

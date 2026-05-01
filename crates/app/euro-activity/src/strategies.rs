@@ -3,8 +3,7 @@ use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
 use focus_tracker::FocusedWindow;
-use std::collections::HashMap;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -69,32 +68,6 @@ impl From<NativeMetadata> for StrategyMetadata {
     }
 }
 
-macro_rules! register_strategies {
-    ($($Strategy:ident),+ $(,)?) => {
-        static PROCESS_STRATEGY_MAP: LazyLock<HashMap<&'static str, ActivityStrategy>> =
-            LazyLock::new(|| {
-                let mut map = HashMap::new();
-                $(
-                    for name in $Strategy::get_supported_processes() {
-                        map.insert(name, ActivityStrategy::$Strategy($Strategy::default()));
-                    }
-                )+
-                map
-            });
-
-        impl ActivityStrategy {
-            pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
-                match PROCESS_STRATEGY_MAP.get(process_name) {
-                    $(
-                        Some(ActivityStrategy::$Strategy(_)) => $Strategy::create().await,
-                    )+
-                    _ => Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy)),
-                }
-            }
-        }
-    };
-}
-
 #[enum_dispatch(ActivityStrategyFunctionality)]
 #[derive(Clone)]
 pub enum ActivityStrategy {
@@ -103,7 +76,23 @@ pub enum ActivityStrategy {
     NoStrategy,
 }
 
-register_strategies!(NoStrategy, BrowserStrategy);
+impl ActivityStrategy {
+    /// Build the strategy responsible for the given focused process.
+    ///
+    /// Strategies are tried in priority order: [`NoStrategy`] suppresses
+    /// tracking for Eurora's own processes, [`BrowserStrategy`] handles
+    /// known browsers, and any other process falls through to
+    /// [`DefaultStrategy`].
+    pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
+        if NoStrategy::matches_process(process_name) {
+            return NoStrategy::create().await;
+        }
+        if BrowserStrategy::matches_process(process_name) {
+            return BrowserStrategy::create().await;
+        }
+        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
+    }
+}
 
 #[async_trait]
 #[enum_dispatch]
@@ -128,17 +117,9 @@ pub trait ActivityStrategyFunctionality {
 
 #[async_trait]
 pub trait StrategySupport {
-    fn get_supported_processes() -> Vec<&'static str>;
+    /// Return `true` if this strategy is responsible for the given focused
+    /// process. Implementations must normalize the comparison (e.g.
+    /// case-insensitivity on Windows) so dispatch and self-reporting agree.
+    fn matches_process(process_name: &str) -> bool;
     async fn create() -> ActivityResult<ActivityStrategy>;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_browser_supported_processes() {
-        let processes = BrowserStrategy::get_supported_processes();
-        assert!(!processes.is_empty());
-    }
 }
