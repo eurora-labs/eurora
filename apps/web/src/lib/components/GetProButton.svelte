@@ -25,7 +25,6 @@
 	}: ButtonProps & { children?: Snippet; autoTrigger?: boolean } = $props();
 
 	let loading = $state(false);
-	let resending = $state(false);
 
 	onMount(() => {
 		if (autoTrigger) handleGetPro();
@@ -42,14 +41,6 @@
 		try {
 			if (!(await auth.ensureValidToken())) {
 				goto('/login?redirect=' + encodeURIComponent(CHECKOUT_REDIRECT));
-				return;
-			}
-
-			// Gate the checkout call on the verification flag from the JWT.
-			// The backend enforces this too, but short-circuiting here gives the
-			// user a useful next step (resend) instead of a generic toast.
-			if (!auth.user?.emailVerified) {
-				promptEmailVerification();
 				return;
 			}
 
@@ -70,14 +61,6 @@
 			} | null;
 
 			if (!res.ok) {
-				if (
-					res.status === 403 &&
-					typeof body?.error === 'string' &&
-					/email/i.test(body.error)
-				) {
-					promptEmailVerification();
-					return;
-				}
 				throw new Error(body?.error ?? `Checkout failed (${res.status})`);
 			}
 
@@ -95,38 +78,6 @@
 			);
 		} finally {
 			loading = false;
-		}
-	}
-
-	function promptEmailVerification() {
-		const email = auth.user?.email;
-		toast.message('Verify your email to continue', {
-			description: email
-				? `We sent a verification link to ${email}. Click the link, then try again.`
-				: 'We sent you a verification link. Click it, then try again.',
-			action: {
-				label: 'Resend email',
-				onClick: () => {
-					void resendVerificationEmail();
-				},
-			},
-			duration: 10_000,
-		});
-	}
-
-	async function resendVerificationEmail() {
-		if (resending) return;
-		resending = true;
-		try {
-			await auth.resendVerificationEmail();
-			toast.success('Verification email sent. Check your inbox.');
-		} catch (err) {
-			Sentry.captureException(err, { tags: { area: 'auth.resend-verification' } });
-			const message =
-				err instanceof Error ? err.message : 'Could not send verification email.';
-			toast.error(message);
-		} finally {
-			resending = false;
 		}
 	}
 </script>
