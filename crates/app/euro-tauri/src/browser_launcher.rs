@@ -41,7 +41,7 @@ fn open_url_in_process_impl(pid: u32, url: &str) -> Result<(), String> {
 
 #[cfg(target_os = "macos")]
 fn open_url_in_process_impl(pid: u32, url: &str) -> Result<(), String> {
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     unsafe extern "C" {
         fn proc_pidpath(pid: i32, buffer: *mut u8, buffersize: u32) -> i32;

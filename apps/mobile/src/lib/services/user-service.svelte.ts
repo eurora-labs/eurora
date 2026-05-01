@@ -1,15 +1,16 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { LoginToken } from '$lib/bindings/bindings.js';
+import type { LoginOutcome } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
 	authenticated = $state(false);
+	initialized = $state(false);
 	email = $state('');
 	displayName = $state<string | null>(null);
 	role = $state('');
 
 	private readonly taurpc: TaurpcService;
-	private readonly unlisteners: Promise<() => void>[] = [];
+	private readonly unlisteners: Array<() => void> = [];
 
 	constructor(taurpc: TaurpcService) {
 		this.taurpc = taurpc;
@@ -28,14 +29,8 @@ export class UserService {
 	}
 
 	async init() {
-		const isAuth = await this.taurpc.auth.is_authenticated();
-
-		if (isAuth) {
-			await this.fetchProfile();
-		}
-
-		this.unlisteners.push(
-			this.taurpc.auth.auth_state_changed.on((claims) => {
+		try {
+			const unlisten = await this.taurpc.auth.auth_state_changed.on((claims) => {
 				if (claims) {
 					this.authenticated = true;
 					this.email = claims.email;
@@ -47,8 +42,16 @@ export class UserService {
 					this.displayName = null;
 					this.role = '';
 				}
-			}),
-		);
+			});
+			this.unlisteners.push(unlisten);
+
+			const isAuth = await this.taurpc.auth.is_authenticated();
+			if (isAuth) {
+				await this.fetchProfile();
+			}
+		} finally {
+			this.initialized = true;
+		}
 	}
 
 	async login(login: string, password: string): Promise<void> {
@@ -65,16 +68,21 @@ export class UserService {
 		await this.taurpc.auth.logout();
 	}
 
-	async getLoginToken(): Promise<LoginToken> {
-		return this.taurpc.auth.get_login_token();
-	}
-
-	async pollForLogin(): Promise<boolean> {
-		const success = await this.taurpc.auth.poll_for_login();
-		if (success) {
+	/**
+	 * Drives the entire OAuth flow on the Rust side: builds the auth URL with
+	 * a fresh PKCE pair, opens the in-app browser via `tauri-plugin-appauth`,
+	 * and exchanges the verifier for tokens once the redirect fires.
+	 *
+	 * The Rust side never throws for `USER_CANCELED` — it returns
+	 * `{ kind: 'canceled' }` so the UI can silently return to idle without
+	 * surfacing an error.
+	 */
+	async startLogin(): Promise<LoginOutcome> {
+		const outcome = await this.taurpc.auth.start_login();
+		if (outcome.kind === 'success') {
 			await this.fetchProfile();
 		}
-		return success;
+		return outcome;
 	}
 
 	async refreshSession(): Promise<void> {
@@ -82,9 +90,7 @@ export class UserService {
 	}
 
 	destroy() {
-		for (const p of this.unlisteners) {
-			p.then((unlisten) => unlisten());
-		}
+		for (const fn of this.unlisteners) fn();
 		this.unlisteners.length = 0;
 	}
 }

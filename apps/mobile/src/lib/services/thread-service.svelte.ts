@@ -1,11 +1,12 @@
 import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
-import { InjectionToken } from '@eurora/shared/context';
 import type { ChatStreamResponse, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { MessageNode } from '@eurora/chat/models/messages/index';
+import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type {
+	BranchDirection,
 	IThreadService,
 	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
@@ -42,7 +43,7 @@ export class ThreadService implements IThreadService {
 	async switchBranch(
 		threadId: string,
 		messageId: string,
-		direction: number,
+		direction: BranchDirection,
 	): Promise<MessageNode[]> {
 		const raw = await this.taurpc.thread.switch_branch(threadId, messageId, direction);
 		return toMessageNodes(raw);
@@ -54,8 +55,11 @@ export class ThreadService implements IThreadService {
 
 	async createThread(): Promise<Thread> {
 		const raw = await this.taurpc.thread.create();
+		if (!raw.id) {
+			throw new Error('Backend returned thread without id');
+		}
 		return {
-			id: raw.id!,
+			id: raw.id,
 			title: raw.title,
 			createdAt: raw.created_at,
 			updatedAt: raw.updated_at,
@@ -64,12 +68,39 @@ export class ThreadService implements IThreadService {
 
 	async generateTitle(threadId: string, content: string): Promise<Thread> {
 		const raw = await this.taurpc.thread.generate_title(threadId, content);
+		if (!raw.id) {
+			throw new Error('Backend returned thread without id');
+		}
 		return {
-			id: raw.id!,
+			id: raw.id,
 			title: raw.title,
 			createdAt: raw.created_at,
 			updatedAt: raw.updated_at,
 		};
+	}
+
+	async searchThreads(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<ThreadSearchResult[]> {
+		const raw = await this.taurpc.thread.search_threads(query, limit, offset);
+		return raw.map((r) => ({ id: r.id, title: r.title, rank: r.rank }));
+	}
+
+	async searchMessages(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<MessageSearchResult[]> {
+		const raw = await this.taurpc.thread.search_messages(query, limit, offset);
+		return raw.map((r) => ({
+			id: r.id,
+			threadId: r.thread_id,
+			messageType: r.message_type,
+			snippet: r.snippet,
+			rank: r.rank,
+		}));
 	}
 
 	async *sendMessage(
@@ -143,5 +174,3 @@ export class ThreadService implements IThreadService {
 		}
 	}
 }
-
-export const THREAD_SERVICE = new InjectionToken<ThreadService>('ThreadService');

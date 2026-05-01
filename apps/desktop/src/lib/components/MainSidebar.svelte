@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import SearchDialog from '$lib/components/SearchDialog.svelte';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import SearchDialog from '@eurora/chat/components/SearchDialog.svelte';
 	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
@@ -231,7 +231,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<SearchDialog bind:open={searchOpen} />
+<SearchDialog bind:open={searchOpen} onSelect={(threadId) => goto(`/${threadId}`)} />
 
 <Dialog.Root bind:open={quitDialogOpen}>
 	<Dialog.Content class="sm:max-w-100">

@@ -124,6 +124,7 @@ specta = "=2.0.0-rc.23"
 strum = "0.28.0"
 strum_macros = "0.28.0"
 syn = "2.0"  # collapse 2.0.101, 1.0.109, 1.0.109(build)
+tauri-plugin-appauth = "0.2.0"
 tempfile = "3.24"
 thiserror = "2.0.18"
 tokio = "1.49.0"
@@ -153,6 +154,18 @@ codegen-units = 256
 [profile.dev]
 overflow-checks = false
 incremental = true
+# Keep file:line info for backtraces/panics, drop variable inspection.
+# Cuts debug `.so` size 3-5x — directly shrinks the Android APK that gets
+# transferred to the emulator on every `pnpm dev:android` cycle.
+debug = "line-tables-only"
+
+# Light opt + no debug info for all third-party deps. Speeds up linking and
+# shrinks the resulting binary. First-time dep compile is slightly slower;
+# every iteration after is faster. Workspace crates are unaffected (the `*`
+# glob only matches non-workspace packages).
+[profile.dev.package."*"]
+opt-level = 1
+debug = false
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3

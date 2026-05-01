@@ -1,10 +1,10 @@
 {
-	"productName": "Eurora Mobile Dev",
-	"identifier": "com.eurora-labs.eurora.mobile.dev",
+	"productName": "Eurora Dev",
+	"identifier": "com.eurora-labs.eurora.dev",
 	"mainBinaryName": "eurora-mobile",
 	"build": {
 		"beforeDevCommand": "pnpm --filter @eurora/mobile dev",
-		"beforeBuildCommand": "pnpm --filter @eurora/mobile build",
+		"beforeBuildCommand": "pnpm -w mobile:before-build",
 		"frontendDist": "../../../apps/mobile/build",
 		"devUrl": "http://localhost:1421"
 	},
@@ -23,16 +23,6 @@
 		"iOS": {
 			"minimumSystemVersion": "16.0",
 			"developmentTeam": "FKLH326P9A"
-		}
-	},
-	"plugins": {
-		"deep-link": {
-			"mobile": [
-				{ "host": "www.eurora-labs.com", "pathPrefix": ["/mobile/callback"] }
-			],
-			"desktop": {
-				"schemes": ["eurora"]
-			}
 		}
 	},
 	"app": {

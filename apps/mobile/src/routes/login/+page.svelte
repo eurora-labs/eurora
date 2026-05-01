@@ -4,111 +4,46 @@
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
-	import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
-	import { openUrl } from '@tauri-apps/plugin-opener';
-	import { onDestroy } from 'svelte';
 
 	const user = inject(USER_SERVICE);
 
-	const CALLBACK_HOST = 'www.eurora-labs.com';
-	const CALLBACK_PATH = '/mobile/callback';
-
 	let loading = $state(false);
 	let error = $state('');
-	let handlingCallback = false;
-	let intervalId: ReturnType<typeof setInterval> | null = null;
-	let unlistenDeepLink: (() => void) | null = null;
-
-	async function handleAuthCallback() {
-		if (handlingCallback) return;
-		handlingCallback = true;
-		try {
-			const success = await user.pollForLogin();
-			if (success) {
-				stopPolling();
-				goto('/');
-			}
-		} catch {
-			stopPolling();
-			error = 'Login failed. Please try again.';
-			loading = false;
-		} finally {
-			handlingCallback = false;
-		}
-	}
 
 	async function startLogin() {
 		loading = true;
 		error = '';
 
 		try {
-			unlistenDeepLink = await onOpenUrl((urls) => {
-				const isCallback = urls.some((url) => {
-					try {
-						const parsed = new URL(url);
-						return (
-							parsed.hostname === CALLBACK_HOST &&
-							parsed.pathname.startsWith(CALLBACK_PATH)
-						);
-					} catch {
-						return false;
-					}
-				});
-				if (isCallback) {
-					handleAuthCallback();
-				}
-			});
-
-			const loginToken = await user.getLoginToken();
-			await openUrl(loginToken.url);
-
-			intervalId = setInterval(async () => {
-				try {
-					const success = await user.pollForLogin();
-					if (success) {
-						stopPolling();
-						goto('/');
-					}
-				} catch {
-					stopPolling();
-					error = 'Login failed. Please try again.';
+			const outcome = await user.startLogin();
+			switch (outcome.kind) {
+				case 'success':
+					goto('/');
+					return;
+				case 'canceled':
 					loading = false;
-				}
-			}, 5000);
-		} catch {
-			error = 'Failed to start login. Please try again.';
+					return;
+				case 'rejected':
+					error = 'Login could not be completed. Please try again.';
+					loading = false;
+					return;
+			}
+		} catch (err) {
+			console.error('Login failed:', err);
+			error = 'Login failed. Please try again.';
 			loading = false;
 		}
 	}
-
-	function stopPolling() {
-		if (intervalId) {
-			clearInterval(intervalId);
-			intervalId = null;
-		}
-		if (unlistenDeepLink) {
-			unlistenDeepLink();
-			unlistenDeepLink = null;
-		}
-	}
-
-	function cancel() {
-		stopPolling();
-		loading = false;
-	}
-
-	onDestroy(stopPolling);
 </script>
 
 <div class="flex flex-col items-center justify-center h-full px-8">
 	{#if loading}
 		<div class="flex flex-col items-center gap-6">
 			<Spinner class="w-10 h-10" />
-			<h1 class="text-xl font-semibold text-foreground">Waiting for you to log in...</h1>
+			<h1 class="text-xl font-semibold text-foreground">Signing you in...</h1>
 			<p class="text-sm text-muted-foreground text-center">
-				Complete sign-in in your browser, then return here.
+				Complete sign-in in the secure browser sheet.
 			</p>
-			<Button variant="outline" onclick={cancel}>Cancel</Button>
 		</div>
 	{:else}
 		<div class="flex flex-col items-center gap-6 w-full max-w-sm">

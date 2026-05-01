@@ -1,17 +1,28 @@
 use auth_core::Claims;
-use euro_secret::{ExposeSecret, SecretString, secret};
+use euro_secret::ExposeSecret;
 use euro_user::AuthManager;
+use serde::{Deserialize, Serialize};
+use specta::Type;
 use tauri::{AppHandle, Manager, Runtime};
+use tauri_plugin_appauth::{AppAuthExt, BrowserOnlyRequest};
 use url::Url;
 
 use crate::error::ResultExt;
 use crate::shared_types::{SharedAppSettings, SharedUserController};
 
-#[taurpc::ipc_type]
-pub struct LoginToken {
-    pub code_challenge: String,
-    pub expires_in: i64,
-    pub url: String,
+/// Custom URL scheme registered with iOS (`Info.plist` `CFBundleURLSchemes`)
+/// and Android (`tauriBrowserRedirectScheme` manifest placeholder). The web
+/// login page redirects here once the user finishes; `tauri-plugin-appauth`
+/// captures the redirect through `ASWebAuthenticationSession` /
+/// `BrowserSessionActivity` and resolves the awaited future.
+const REDIRECT_URI: &str = "eurora://mobile/callback";
+
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum LoginOutcome {
+    Success,
+    Canceled,
+    Rejected,
 }
 
 #[taurpc::procedures(
@@ -22,8 +33,7 @@ pub trait AuthApi {
     #[taurpc(event)]
     async fn auth_state_changed(claims: Option<Claims>);
 
-    async fn get_login_token<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginToken, String>;
-    async fn poll_for_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<bool, String>;
+    async fn start_login<R: Runtime>(app_handle: AppHandle<R>) -> Result<LoginOutcome, String>;
 
     async fn login<R: Runtime>(
         app_handle: AppHandle<R>,
@@ -47,7 +57,16 @@ pub trait AuthApi {
     async fn refresh_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String>;
 }
 
-const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
+fn build_auth_url(code_challenge: &str) -> Result<Url, String> {
+    let base = std::env::var("AUTH_SERVICE_URL")
+        .unwrap_or_else(|_| "https://www.eurora-labs.com".to_string());
+    let mut url = Url::parse(&format!("{base}/login")).ctx("Invalid AUTH_SERVICE_URL")?;
+    url.query_pairs_mut()
+        .append_pair("code_challenge", code_challenge)
+        .append_pair("code_challenge_method", "S256")
+        .append_pair("redirect_uri", REDIRECT_URI);
+    Ok(url)
+}
 
 fn user_controller<R: Runtime>(
     app_handle: &AppHandle<R>,
@@ -71,74 +90,71 @@ fn emit_auth_state<R: Runtime>(app_handle: &AppHandle<R>, claims: Option<Claims>
     let _ = TauRpcAuthApiEventTrigger::new(app_handle.clone()).auth_state_changed(claims);
 }
 
+async fn save_settings<R: Runtime>(app_handle: &AppHandle<R>) -> Result<(), String> {
+    let state = app_handle.state::<SharedAppSettings>();
+    let settings = state.lock().await;
+    settings
+        .save_to_default_path()
+        .ctx("Failed to save settings")
+}
+
 #[derive(Clone)]
 pub struct AuthApiImpl;
 
 #[taurpc::resolvers]
 impl AuthApi for AuthApiImpl {
-    async fn get_login_token<R: Runtime>(
+    async fn start_login<R: Runtime>(
         self,
         app_handle: AppHandle<R>,
-    ) -> Result<LoginToken, String> {
+    ) -> Result<LoginOutcome, String> {
         let auth_manager = auth_manager(&app_handle).await?;
 
         let (code_verifier, code_challenge) = auth_manager
             .get_login_tokens()
             .await
             .ctx("Failed to get login tokens")?;
-        let expires_in: i64 = 60 * 20;
 
-        let base_url = std::env::var("AUTH_SERVICE_URL")
-            .unwrap_or_else(|_| "https://www.eurora-labs.com".to_string());
-        let mut url = Url::parse(&format!("{base_url}/login")).ctx("Invalid AUTH_SERVICE_URL")?;
-        url.query_pairs_mut()
-            .append_pair("code_challenge", &code_challenge)
-            .append_pair("code_challenge_method", "S256")
-            .append_pair("redirect_uri", &format!("{base_url}/mobile/callback"));
+        let auth_url = build_auth_url(&code_challenge)?;
 
-        secret::persist(LOGIN_CODE_VERIFIER, &SecretString::from(code_verifier))
-            .ctx("Failed to persist code verifier")?;
+        // Run the in-app browser session via appauth. The verifier lives only
+        // in this awaiting frame — never touches disk — and is consumed by the
+        // backend exchange below. If the app is killed mid-flow the OS tears
+        // down the browser session anyway, so persistence wouldn't recover us.
+        let session = app_handle
+            .appauth()
+            .authorize_browser_only(BrowserOnlyRequest {
+                auth_url: auth_url.to_string(),
+                redirect_uri: REDIRECT_URI.to_string(),
+                prefers_ephemeral_session: true,
+            })
+            .await;
 
-        Ok(LoginToken {
-            code_challenge: code_challenge.to_string(),
-            expires_in,
-            url: url.to_string(),
-        })
-    }
-
-    async fn poll_for_login<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {
-        if app_handle.try_state::<SharedUserController>().is_none() {
-            return Ok(false);
-        };
-
-        let auth_manager = auth_manager(&app_handle).await?;
-
-        let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
-            .ctx("Failed to retrieve login token")?
-            .ok_or_else(|| "Login token not found".to_string())?;
-
-        match auth_manager
-            .login_by_login_token(login_token.expose_secret().to_owned())
-            .await
-        {
+        match session {
             Ok(_) => {
-                secret::delete(LOGIN_CODE_VERIFIER).ctx("Failed to remove login token")?;
-
-                if let Ok(claims) = auth_manager.get_access_token_payload() {
-                    emit_auth_state(&app_handle, Some(claims));
+                // The captured callback URL carries no payload we need: the
+                // bespoke backend protocol uses the redirect purely as a
+                // "user finished" signal — the verifier we already hold is
+                // the bearer for token exchange.
+                match auth_manager.login_by_login_token(code_verifier).await {
+                    Ok(_) => {
+                        if let Ok(claims) = auth_manager.get_access_token_payload() {
+                            emit_auth_state(&app_handle, Some(claims));
+                        }
+                        save_settings(&app_handle).await?;
+                        Ok(LoginOutcome::Success)
+                    }
+                    Err(e) => {
+                        tracing::error!("Login by login token failed: {e}");
+                        Ok(LoginOutcome::Rejected)
+                    }
                 }
-
-                let state = app_handle.state::<SharedAppSettings>();
-                let settings = state.lock().await;
-                settings
-                    .save_to_default_path()
-                    .ctx("Failed to save settings")?;
-
-                Ok(true)
             }
-            Err(e) => {
-                tracing::error!("Login by login token failed: {e}");
-                Ok(false)
+            Err(err) => {
+                let code = err.code();
+                if code == "USER_CANCELED" {
+                    return Ok(LoginOutcome::Canceled);
+                }
+                Err(format!("[{code}] {err}"))
             }
         }
     }
@@ -160,13 +176,7 @@ impl AuthApi for AuthApiImpl {
             emit_auth_state(&app_handle, Some(claims));
         }
 
-        let state = app_handle.state::<SharedAppSettings>();
-        let settings = state.lock().await;
-        settings
-            .save_to_default_path()
-            .ctx("Failed to save settings")?;
-
-        Ok(())
+        save_settings(&app_handle).await
     }
 
     async fn register<R: Runtime>(
@@ -186,13 +196,7 @@ impl AuthApi for AuthApiImpl {
             emit_auth_state(&app_handle, Some(claims));
         }
 
-        let state = app_handle.state::<SharedAppSettings>();
-        let settings = state.lock().await;
-        settings
-            .save_to_default_path()
-            .ctx("Failed to save settings")?;
-
-        Ok(())
+        save_settings(&app_handle).await
     }
 
     async fn logout<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<(), String> {
@@ -202,13 +206,7 @@ impl AuthApi for AuthApiImpl {
         controller.delete_user().ctx("Logout failed")?;
         emit_auth_state(&app_handle, None);
 
-        let state = app_handle.state::<SharedAppSettings>();
-        let settings = state.lock().await;
-        settings
-            .save_to_default_path()
-            .ctx("Failed to save settings")?;
-
-        Ok(())
+        save_settings(&app_handle).await
     }
 
     async fn is_authenticated<R: Runtime>(self, app_handle: AppHandle<R>) -> Result<bool, String> {

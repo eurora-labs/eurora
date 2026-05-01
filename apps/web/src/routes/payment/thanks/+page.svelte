@@ -85,7 +85,7 @@
 				</div>
 				<Card.Description>
 					Your Pro subscription is now active. You can now enjoy all Pro features in the
-					Eurora desktop app. Redirecting in {countdown}s...
+					Eurora app. Redirecting in {countdown}s...
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-3">

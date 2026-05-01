@@ -1,4 +1,5 @@
 import { browser } from '$app/environment';
+import { consumeAppRedirectUri } from '$lib/auth/redirect-uri';
 import { create } from '@bufbuild/protobuf';
 import { EmptySchema } from '@bufbuild/protobuf/wkt';
 import { createClient, type Client } from '@connectrpc/connect';
@@ -148,10 +149,10 @@ export class AuthService {
 		}
 	}
 
-	async associateDesktopLogin(loginToken: string): Promise<void> {
+	async associateAppLogin(loginToken: string): Promise<void> {
 		const accessToken = this.accessToken;
 		if (!accessToken) {
-			throw new Error('Cannot associate desktop login without an active session');
+			throw new Error('Cannot associate app login without an active session');
 		}
 		await this.#grpc.associateLoginToken(
 			create(AssociateLoginTokenRequestSchema, { codeChallenge: loginToken }),
@@ -163,24 +164,21 @@ export class AuthService {
 		}
 	}
 
-	async associateDesktopLoginIfPending(
-		opts: { consumeRedirect?: boolean } = {},
-	): Promise<boolean> {
+	async associateAppLoginIfPending(opts: { consumeRedirect?: boolean } = {}): Promise<boolean> {
 		if (!browser) return false;
 		const loginToken = sessionStorage.getItem('loginToken');
 		if (!loginToken) return false;
 
 		try {
-			await this.associateDesktopLogin(loginToken);
+			await this.associateAppLogin(loginToken);
 		} catch (err) {
-			Sentry.captureException(err, { tags: { area: 'auth.associate-desktop' } });
+			Sentry.captureException(err, { tags: { area: 'auth.associate-app' } });
 			return false;
 		}
 
 		if (opts.consumeRedirect) {
-			const redirectUri = sessionStorage.getItem('deviceRedirectUri');
+			const redirectUri = consumeAppRedirectUri();
 			if (redirectUri) {
-				sessionStorage.removeItem('deviceRedirectUri');
 				window.location.href = redirectUri;
 			}
 		}

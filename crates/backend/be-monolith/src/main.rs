@@ -15,7 +15,7 @@ use be_thread_service::{ProtoThreadServiceServer, ThreadService};
 use be_update_service::init_update_service;
 use dotenv::dotenv;
 use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -27,8 +27,17 @@ const GRPC_MAX_DECODE_SIZE: usize = 1024 * 1024 * 1024; // 1 GB
 const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
 fn build_cors() -> CorsLayer {
+    const PROD_ORIGINS: &str = "https://www.eurora-labs.com,https://api.eurora-labs.com";
+    const DEV_ORIGINS: &str = "http://localhost:5173,http://localhost:3000";
+
+    let default_origins = if cfg!(debug_assertions) {
+        DEV_ORIGINS
+    } else {
+        PROD_ORIGINS
+    };
+
     let allowed: Vec<HeaderValue> = std::env::var("CORS_ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "https://www.eurora-labs.com,https://api.eurora-labs.com".into())
+        .unwrap_or_else(|_| default_origins.into())
         .split(',')
         .filter_map(|s| {
             let s = s.trim();
@@ -55,8 +64,16 @@ fn build_cors() -> CorsLayer {
             header::HeaderName::from_static("x-grpc-web"),
             header::HeaderName::from_static("x-user-agent"),
             header::HeaderName::from_static("grpc-timeout"),
+            header::HeaderName::from_static("connect-protocol-version"),
+            header::HeaderName::from_static("connect-timeout-ms"),
+        ])
+        .expose_headers([
+            header::HeaderName::from_static("grpc-status"),
+            header::HeaderName::from_static("grpc-message"),
+            header::HeaderName::from_static("grpc-status-details-bin"),
         ])
         .allow_credentials(true)
+        .max_age(Duration::from_secs(3600))
 }
 
 #[tokio::main]

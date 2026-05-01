@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { consumeAppRedirectUri } from '$lib/auth/redirect-uri';
 	import { AUTH_SERVICE, type OAuthProvider } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Sentry from '@sentry/sveltekit';
@@ -44,10 +45,9 @@
 			await auth.loginWithOAuth(provider, code, state, { loginToken, challengeMethod });
 
 			if (loginToken) {
-				const deviceRedirectUri = sessionStorage.getItem('deviceRedirectUri');
-				if (deviceRedirectUri) {
-					sessionStorage.removeItem('deviceRedirectUri');
-					window.location.href = deviceRedirectUri;
+				const redirectUri = consumeAppRedirectUri();
+				if (redirectUri) {
+					window.location.href = redirectUri;
 					return;
 				}
 			}

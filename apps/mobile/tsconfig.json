@@ -13,5 +13,5 @@
 		"moduleResolution": "nodenext",
 		"target": "ES2024"
 	},
-	"include": ["svelte.config.js", "vite.config.ts", "src/**/*"]
+	"include": ["postcss.config.mjs", "svelte.config.js", "vite.config.ts", "src/**/*"]
 }

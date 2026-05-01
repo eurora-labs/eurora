@@ -488,9 +488,6 @@ importers:
 
   apps/mobile:
     dependencies:
-      '@tauri-apps/plugin-deep-link':
-        specifier: ^2
-        version: 2.4.8
       '@tauri-apps/plugin-opener':
         specifier: ^2.5.3
         version: 2.5.3
@@ -525,21 +522,6 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.10.1
         version: 2.10.1
-      '@tauri-apps/plugin-http':
-        specifier: ^2.5.8
-        version: 2.5.8
-      '@tauri-apps/plugin-log':
-        specifier: ^2.8.0
-        version: 2.8.0
-      '@tauri-apps/plugin-os':
-        specifier: ^2.3.2
-        version: 2.3.2
-      '@tauri-apps/plugin-process':
-        specifier: ^2.3.1
-        version: 2.3.1
-      '@tauri-apps/plugin-store':
-        specifier: ^2.4.2
-        version: 2.4.2
       mode-watcher:
         specifier: ^1.1.0
         version: 1.1.0(svelte@5.55.4)
@@ -553,7 +535,7 @@ importers:
         specifier: catalog:svelte
         version: 4.4.6(picomatch@4.0.4)(svelte@5.55.4)(typescript@5.9.3)
       svelte-sonner:
-        specifier: ^1.0.8
+        specifier: ^1.1.0
         version: 1.1.0(svelte@5.55.4)
       tailwindcss:
         specifier: 'catalog:'
@@ -3362,9 +3344,6 @@ packages:
 
   '@tauri-apps/plugin-clipboard-manager@2.3.2':
     resolution: {integrity: sha512-CUlb5Hqi2oZbcZf4VUyUH53XWPPdtpw43EUpCza5HWZJwxEoDowFzNUDt1tRUXA8Uq+XPn17Ysfptip33sG4eQ==}
-
-  '@tauri-apps/plugin-deep-link@2.4.8':
-    resolution: {integrity: sha512-Cd2Cs960MGuGONeIwxOPx9wqwedetAHOGlwK5boJ/SMTfAtAyfErpfVPEn+EJzgXsJun8EKzsEumHjr+64V4fw==}
 
   '@tauri-apps/plugin-dialog@2.7.0':
     resolution: {integrity: sha512-4nS/hfGMGCXiAS3LtVjH9AgsSAPJeG/7R+q8agTFqytjnMa4Zq95Bq8WzVDkckpanX+yyRHXnRtrKXkANKDHvw==}
@@ -11599,10 +11578,6 @@ snapshots:
       '@tauri-apps/cli-win32-x64-msvc': 2.10.1
 
   '@tauri-apps/plugin-clipboard-manager@2.3.2':
-    dependencies:
-      '@tauri-apps/api': 2.10.1
-
-  '@tauri-apps/plugin-deep-link@2.4.8':
     dependencies:
       '@tauri-apps/api': 2.10.1
 

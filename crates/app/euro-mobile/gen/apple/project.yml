@@ -1,6 +1,6 @@
 name: euro-mobile
 options:
-  bundleIdPrefix: com.eurora-labs.eurora.mobile.dev
+  bundleIdPrefix: com.eurora-labs.eurora
   deploymentTarget:
     iOS: 16.0
 fileGroups: [../../src]
@@ -10,9 +10,11 @@ configs:
 settingGroups:
   app:
     base:
-      PRODUCT_NAME: Eurora Mobile Dev
-      PRODUCT_BUNDLE_IDENTIFIER: com.eurora-labs.eurora.mobile.dev
+      PRODUCT_NAME: Eurora Dev
+      PRODUCT_BUNDLE_IDENTIFIER: com.eurora-labs.eurora.dev
       DEVELOPMENT_TEAM: FKLH326P9A
+      MARKETING_VERSION: 0.0.0
+      CURRENT_PROJECT_VERSION: 1
 targetTemplates:
   app:
     type: application
@@ -31,7 +33,14 @@ targets:
     sources:
       - path: Sources
       - path: Assets.xcassets
+      # Externals/<arch>/<config>/libapp.a is found by the linker via
+      # LIBRARY_SEARCH_PATHS + OTHER_LDFLAGS=-lapp (see settings below).
+      # Excluding .a files prevents xcodegen from also adding libapp.a to
+      # the Copy Resources phase, which Apple rejects at TestFlight upload
+      # ("standalone executables or libraries are not permitted").
       - path: Externals
+        excludes:
+          - "**/*.a"
       - path: euro-mobile_iOS
       - path: assets
         buildPhase: resources
@@ -53,8 +62,9 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 1.0.0
-        CFBundleVersion: "1.0.0"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
     entitlements:
       path: euro-mobile_iOS/euro-mobile_iOS.entitlements
     scheme:
@@ -66,14 +76,16 @@ targets:
         ENABLE_BITCODE: false
         ARCHS: [arm64]
         VALID_ARCHS: arm64
-        LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
-        LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
+        # Use $(DT_TOOLCHAIN_DIR) (always XcodeDefault.xctoolchain) instead of
+        # $(TOOLCHAIN_DIR), which on Xcode 26 can resolve to the Metal cryptex
+        # toolchain during link and miss the Swift compat libs.
+        LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)
+        LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)
+        OTHER_LDFLAGS: $(inherited) -lapp
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
       groups: [app]
     dependencies:
-      - framework: libapp.a
-        embed: false
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework
@@ -82,7 +94,12 @@ targets:
       - sdk: UIKit.framework
       - sdk: WebKit.framework
     preBuildScripts:
-      - script: pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+      - script: |
+          if [ "${CI:-}" = "true" ]; then
+            echo "CI=true: skipping cargo build (handled by release-ios.sh)"
+            exit 0
+          fi
+          pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:

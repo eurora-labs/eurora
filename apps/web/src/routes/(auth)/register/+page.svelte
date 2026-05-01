@@ -42,7 +42,7 @@
 		submitError = null;
 		try {
 			await auth.register(email.trim(), password);
-			await auth.associateDesktopLoginIfPending();
+			if (await auth.associateAppLoginIfPending({ consumeRedirect: true })) return;
 			goto('/');
 		} catch (err) {
 			Sentry.captureException(err, { tags: { area: 'auth.register' } });
