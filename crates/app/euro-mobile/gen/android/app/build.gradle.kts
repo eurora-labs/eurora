@@ -16,6 +16,14 @@ val tauriProperties = Properties().apply {
 // Channel-aware identity. ANDROID_CHANNEL is set by scripts/release-android.sh
 // and the publish.yaml workflow. Local builds default to the dev identity.
 val androidChannel: String = (System.getenv("ANDROID_CHANNEL") ?: "dev").lowercase()
+
+// Opt in to keeping unstripped Rust .so debug symbols inside the debug APK
+// (needed only when attaching lldb to the running process). Default OFF — an
+// unstripped libeuro_mobile.so is hundreds of MB and dominates emulator install
+// time. Set KEEP_NATIVE_DEBUG_SYMBOLS=1 when you actually need native debugging.
+val keepNativeDebugSymbols: Boolean =
+    System.getenv("KEEP_NATIVE_DEBUG_SYMBOLS")?.let { it == "1" || it.equals("true", true) }
+        ?: false
 val channelApplicationId: String = when (androidChannel) {
     "release" -> "com.eurora_labs.eurora"
     "nightly" -> "com.eurora_labs.eurora.nightly"
@@ -57,12 +65,15 @@ android {
         getByName("debug") {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             isDebuggable = true
-            isJniDebuggable = true
+            isJniDebuggable = keepNativeDebugSymbols
             isMinifyEnabled = false
-            packaging {                jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
-                jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
+            if (keepNativeDebugSymbols) {
+                packaging {
+                    jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
+                    jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
+                    jniLibs.keepDebugSymbols.add("*/x86/*.so")
+                    jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
+                }
             }
         }
         getByName("release") {
@@ -89,6 +100,28 @@ android {
     }
     buildFeatures {
         buildConfig = true
+        // Tauri does not use any of these — turn them off so AGP doesn't
+        // register their tasks for every variant.
+        aidl = false
+        renderScript = false
+        shaders = false
+        resValues = true
+    }
+    // Don't fail dev builds on lint findings. Release builds still get checked.
+    lint {
+        checkReleaseBuilds = true
+        abortOnError = false
+        ignoreWarnings = true
+    }
+}
+
+// Skip wiring up Android/unit test variants for debug builds — we don't run
+// instrumented tests from the Tauri Android dev loop, and registering them
+// adds configuration overhead per ABI flavor.
+androidComponents {
+    beforeVariants(selector().withBuildType("debug")) { variant ->
+        variant.enableAndroidTest = false
+        variant.enableUnitTest = false
     }
 }
 

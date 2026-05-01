@@ -13,7 +13,7 @@
 		"prod:monolith": "cargo run -p be-monolith -- --mode production",
 		"docker:monolith": "./scripts/build-monolith-image.sh --restart",
 		"dev:desktop": "cd crates/app/euro-tauri && tauri dev",
-		"dev:android": "pnpm tauri android dev --host --config crates/app/euro-mobile/tauri.conf.json --features devtools",
+		"dev:android": "concurrently --kill-others -n vite,android -c blue,green \"pnpm --filter @eurora/mobile dev\" \"pnpm tauri android dev --config crates/app/euro-mobile/tauri.conf.json --config crates/app/euro-mobile/tauri.android-dev.conf.json --features devtools --no-dev-server-wait\"",
 		"dev:ios": "pnpm tauri ios dev --host --config crates/app/euro-mobile/tauri.conf.json --features devtools",
 		"build:android": "pnpm tauri android build --config crates/app/euro-mobile/tauri.conf.json",
 		"build:ios": "pnpm tauri ios build --config crates/app/euro-mobile/tauri.conf.json",
