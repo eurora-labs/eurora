@@ -1,185 +1,230 @@
-use crate::{ProcessFunctionality, os_pick};
+//! Catalog of browsers Eurora can identify by their executable name and the
+//! extension stores that distribute the Eurora extension for each.
+//!
+//! Adding support for a new browser is a single variant in [`Browser`] plus
+//! the corresponding arms in [`Browser::process_name`] and [`Browser::store`].
+//! The compiler enforces that both match expressions cover every variant.
 
-mod chromium;
-mod firefox;
+use crate::{os_pick, process_name_matches};
 
-pub use chromium::*;
-pub use firefox::*;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Public extension store that distributes the Eurora extension for a
+/// browser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BrowserStore {
-    /// Chrome Web Store
-    CWS,
-    /// Mozilla Add-ons Store
-    AMO,
-    /// Microsoft Edge Add-ons
-    Edge,
-    /// Browser handles extension installation outside of a public store
-    /// (e.g. Safari ships the extension bundled with the host app).
-    Other,
+    /// [Chrome Web Store](https://chromewebstore.google.com/).
+    ChromeWebStore,
+    /// [Mozilla Add-ons](https://addons.mozilla.org/).
+    MozillaAddons,
+    /// [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/).
+    EdgeAddons,
+    /// The browser ships the extension bundled with the host application
+    /// (e.g. Safari) or otherwise has no public, directly-linkable listing.
+    Bundled,
 }
 
 impl BrowserStore {
-    /// Public landing page for the Eurora extension on this store, or `None`
-    /// when the browser does not have a directly-linkable listing
-    /// (Safari, Pale Moon, etc.).
-    ///
-    /// URLs are filled in once the listings are live.
-    pub fn extension_url(&self) -> Option<&'static str> {
+    /// Public landing page for the Eurora extension on this store, or
+    /// `None` for [`BrowserStore::Bundled`] which has no public listing.
+    pub const fn extension_url(self) -> Option<&'static str> {
         match self {
-            BrowserStore::CWS => Some(
+            BrowserStore::ChromeWebStore => Some(
                 "https://chromewebstore.google.com/detail/eurora/bfndcocdeinignobnnjplgoggmgebihm",
             ),
-            BrowserStore::AMO => Some("https://addons.mozilla.org/en-US/firefox/addon/eurora/"),
-            BrowserStore::Edge => Some(
+            BrowserStore::MozillaAddons => {
+                Some("https://addons.mozilla.org/en-US/firefox/addon/eurora/")
+            }
+            BrowserStore::EdgeAddons => Some(
                 "https://microsoftedge.microsoft.com/addons/detail/eurora/jldnbebjeaegfgpboohhoipokpbpncke",
             ),
-            BrowserStore::Other => None,
+            BrowserStore::Bundled => None,
         }
     }
 }
 
-pub trait BrowserFunctionality {
-    fn get_store(&self) -> BrowserStore;
+/// Browsers Eurora can identify by their focused-window process name.
+///
+/// Variants are grouped by family (Chromium-based, then Firefox-based, then
+/// standalone) for readability.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Browser {
+    Chrome,
+    Brave,
+    Edge,
+    Opera,
+    Vivaldi,
+    Arc,
+    Chromium,
+    Firefox,
+    Librewolf,
+    Waterfox,
+    Zen,
+    Tor,
+    DuckDuckGo,
+    Falkon,
+    Midori,
+    SeaMonkey,
+    Safari,
+    PaleMoon,
 }
 
-/// Resolve the process executable name reported by the focus tracker into the
-/// extension store of the browser it identifies, when that browser is one we
-/// recognize.
-///
-/// The single match arm here is intentionally the canonical mapping: every
-/// known browser appears once and the compiler will flag a missing arm if a
-/// new browser type is added without a corresponding case.
-pub fn browser_store_for_process(process_name: &str) -> Option<BrowserStore> {
-    if process_name.is_empty() {
-        return None;
-    }
-    let candidates: &[(&str, BrowserStore)] = &[
-        (Chrome.get_name(), Chrome.get_store()),
-        (Brave.get_name(), Brave.get_store()),
-        (Edge.get_name(), Edge.get_store()),
-        (Opera.get_name(), Opera.get_store()),
-        (Vivaldi.get_name(), Vivaldi.get_store()),
-        (ArcBrowser.get_name(), ArcBrowser.get_store()),
-        (Chromium.get_name(), Chromium.get_store()),
-        (Firefox.get_name(), Firefox.get_store()),
-        (Librewolf.get_name(), Librewolf.get_store()),
-        (Waterfox.get_name(), Waterfox.get_store()),
-        (Zen.get_name(), Zen.get_store()),
-        (TorBrowser.get_name(), TorBrowser.get_store()),
-        (DuckDuckGo.get_name(), DuckDuckGo.get_store()),
-        (Falkon.get_name(), Falkon.get_store()),
-        (Midori.get_name(), Midori.get_store()),
-        (SeaMonkey.get_name(), SeaMonkey.get_store()),
-        (Safari.get_name(), Safari.get_store()),
-        (PaleMoon.get_name(), PaleMoon.get_store()),
+impl Browser {
+    /// Every known browser, in declaration order.
+    ///
+    /// Order is not part of the public contract; iterate with `.iter()` if
+    /// you need a stable view.
+    pub const ALL: &'static [Browser] = &[
+        Browser::Chrome,
+        Browser::Brave,
+        Browser::Edge,
+        Browser::Opera,
+        Browser::Vivaldi,
+        Browser::Arc,
+        Browser::Chromium,
+        Browser::Firefox,
+        Browser::Librewolf,
+        Browser::Waterfox,
+        Browser::Zen,
+        Browser::Tor,
+        Browser::DuckDuckGo,
+        Browser::Falkon,
+        Browser::Midori,
+        Browser::SeaMonkey,
+        Browser::Safari,
+        Browser::PaleMoon,
     ];
 
-    candidates
-        .iter()
-        .find(|(name, _)| *name == process_name)
-        .map(|(_, store)| *store)
-}
-
-#[derive(Debug, Clone)]
-pub struct Safari;
-
-impl ProcessFunctionality for Safari {
-    fn get_name(&self) -> &str {
-        os_pick("safari.exe", "safari", "Safari")
+    /// Executable / process name reported by the focus tracker on the
+    /// current target OS.
+    pub fn process_name(self) -> &'static str {
+        match self {
+            Browser::Chrome => os_pick("chrome.exe", "chrome", "Google Chrome"),
+            Browser::Brave => os_pick("brave.exe", "brave", "Brave Browser"),
+            Browser::Edge => os_pick("msedge.exe", "msedge", "Microsoft Edge"),
+            Browser::Opera => os_pick("opera.exe", "opera", "Opera"),
+            Browser::Vivaldi => os_pick("vivaldi.exe", "vivaldi-bin", "Vivaldi"),
+            Browser::Arc => os_pick("Arc.exe", "arc", "Arc"),
+            Browser::Chromium => os_pick("chromium.exe", "chromium", "Chromium"),
+            Browser::Firefox => os_pick("firefox.exe", "firefox", "Firefox"),
+            Browser::Librewolf => os_pick("librewolf.exe", "librewolf", "LibreWolf"),
+            Browser::Waterfox => os_pick("waterfox.exe", "waterfox", "Waterfox"),
+            Browser::Zen => os_pick("zen.exe", "zen", "Zen Browser"),
+            Browser::Tor => os_pick("tor.exe", "tor-browser", "Tor Browser"),
+            Browser::DuckDuckGo => os_pick("DuckDuckGo.exe", "duckduckgo", "DuckDuckGo"),
+            Browser::Falkon => os_pick("falkon.exe", "falkon", "Falkon"),
+            Browser::Midori => os_pick("midori.exe", "midori", "Midori"),
+            Browser::SeaMonkey => os_pick("seamonkey.exe", "seamonkey", "SeaMonkey"),
+            Browser::Safari => os_pick("safari.exe", "safari", "Safari"),
+            Browser::PaleMoon => os_pick("palemoon.exe", "palemoon", "Pale Moon"),
+        }
     }
-}
 
-impl BrowserFunctionality for Safari {
-    fn get_store(&self) -> BrowserStore {
-        // Safari extension is installed automatically, no need for store
-        BrowserStore::Other
+    /// Extension store that serves the Eurora extension for this browser.
+    pub const fn store(self) -> BrowserStore {
+        // TODO(opera-store): switch Opera to its own add-ons store once the
+        // Eurora listing is published there.
+        match self {
+            Browser::Chrome
+            | Browser::Brave
+            | Browser::Opera
+            | Browser::Vivaldi
+            | Browser::Arc
+            | Browser::Chromium => BrowserStore::ChromeWebStore,
+            Browser::Edge => BrowserStore::EdgeAddons,
+            Browser::Firefox
+            | Browser::Librewolf
+            | Browser::Waterfox
+            | Browser::Zen
+            | Browser::Tor
+            | Browser::DuckDuckGo
+            | Browser::Falkon
+            | Browser::Midori
+            | Browser::SeaMonkey => BrowserStore::MozillaAddons,
+            Browser::Safari | Browser::PaleMoon => BrowserStore::Bundled,
+        }
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct PaleMoon;
-
-impl ProcessFunctionality for PaleMoon {
-    fn get_name(&self) -> &str {
-        os_pick("palemoon.exe", "palemoon", "Pale Moon")
-    }
-}
-
-impl BrowserFunctionality for PaleMoon {
-    fn get_store(&self) -> BrowserStore {
-        BrowserStore::Other
+    /// Resolve a focused-process executable name to a known browser.
+    ///
+    /// Matching is case-insensitive on Windows and byte-exact elsewhere; see
+    /// `process_name_matches` in the crate root.
+    pub fn from_process_name(process_name: &str) -> Option<Self> {
+        if process_name.is_empty() {
+            return None;
+        }
+        Browser::ALL
+            .iter()
+            .copied()
+            .find(|b| process_name_matches(b.process_name(), process_name))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
-    fn test_get_name() {
-        let process = Librewolf;
-        assert_eq!(
-            process.get_name(),
-            os_pick("librewolf.exe", "librewolf", "LibreWolf")
-        );
+    fn every_browser_round_trips_through_process_name() {
+        for browser in Browser::ALL {
+            assert_eq!(
+                Browser::from_process_name(browser.process_name()),
+                Some(*browser),
+                "round-trip failed for {browser:?}"
+            );
+        }
     }
 
     #[test]
-    fn classifies_chromium_browsers_as_cws() {
-        assert_eq!(
-            browser_store_for_process(Chrome.get_name()),
-            Some(BrowserStore::CWS)
-        );
-        assert_eq!(
-            browser_store_for_process(Brave.get_name()),
-            Some(BrowserStore::CWS)
-        );
+    fn process_names_are_unique() {
+        let mut seen = HashSet::new();
+        for browser in Browser::ALL {
+            let name = browser.process_name();
+            assert!(
+                seen.insert(name),
+                "duplicate process name {name:?} for {browser:?}"
+            );
+        }
     }
 
     #[test]
-    fn classifies_firefox_browsers_as_amo() {
-        assert_eq!(
-            browser_store_for_process(Firefox.get_name()),
-            Some(BrowserStore::AMO)
-        );
-        assert_eq!(
-            browser_store_for_process(Librewolf.get_name()),
-            Some(BrowserStore::AMO)
-        );
-    }
-
-    #[test]
-    fn classifies_edge_with_dedicated_store() {
-        assert_eq!(
-            browser_store_for_process(Edge.get_name()),
-            Some(BrowserStore::Edge)
-        );
-    }
-
-    #[test]
-    fn classifies_safari_as_other() {
-        assert_eq!(
-            browser_store_for_process(Safari.get_name()),
-            Some(BrowserStore::Other)
-        );
+    fn store_classification_is_stable() {
+        assert_eq!(Browser::Chrome.store(), BrowserStore::ChromeWebStore);
+        assert_eq!(Browser::Brave.store(), BrowserStore::ChromeWebStore);
+        assert_eq!(Browser::Edge.store(), BrowserStore::EdgeAddons);
+        assert_eq!(Browser::Firefox.store(), BrowserStore::MozillaAddons);
+        assert_eq!(Browser::Librewolf.store(), BrowserStore::MozillaAddons);
+        assert_eq!(Browser::Safari.store(), BrowserStore::Bundled);
+        assert_eq!(Browser::PaleMoon.store(), BrowserStore::Bundled);
     }
 
     #[test]
     fn unknown_process_does_not_resolve() {
-        assert_eq!(browser_store_for_process(""), None);
-        assert_eq!(browser_store_for_process("not-a-browser"), None);
+        assert_eq!(Browser::from_process_name(""), None);
+        assert_eq!(Browser::from_process_name("not-a-browser"), None);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_lookup_is_case_insensitive() {
+        assert_eq!(
+            Browser::from_process_name("CHROME.EXE"),
+            Some(Browser::Chrome)
+        );
+        assert_eq!(
+            Browser::from_process_name("Firefox.Exe"),
+            Some(Browser::Firefox)
+        );
     }
 
     #[test]
-    fn other_store_has_no_extension_url() {
-        assert!(BrowserStore::Other.extension_url().is_none());
+    fn linkable_stores_expose_extension_url() {
+        assert!(BrowserStore::ChromeWebStore.extension_url().is_some());
+        assert!(BrowserStore::MozillaAddons.extension_url().is_some());
+        assert!(BrowserStore::EdgeAddons.extension_url().is_some());
     }
 
     #[test]
-    fn linkable_stores_have_extension_url() {
-        assert!(BrowserStore::CWS.extension_url().is_some());
-        assert!(BrowserStore::AMO.extension_url().is_some());
-        assert!(BrowserStore::Edge.extension_url().is_some());
+    fn bundled_store_has_no_extension_url() {
+        assert!(BrowserStore::Bundled.extension_url().is_none());
     }
 }

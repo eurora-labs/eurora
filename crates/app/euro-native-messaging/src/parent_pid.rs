@@ -33,10 +33,14 @@ pub fn get_parent_pid() -> u32 {
 
 #[cfg(target_os = "linux")]
 fn get_parent_pid_impl() -> u32 {
-    use euro_process::{Chrome, Firefox, Librewolf, ProcessFunctionality};
+    use euro_process::Browser;
     use std::os::unix::process::parent_id;
 
-    let browser_names: &[&str] = &[Firefox.get_name(), Chrome.get_name(), Librewolf.get_name()];
+    let browser_names: &[&str] = &[
+        Browser::Firefox.process_name(),
+        Browser::Chrome.process_name(),
+        Browser::Librewolf.process_name(),
+    ];
 
     let direct_ppid = parent_id();
 
@@ -109,7 +113,7 @@ fn get_parent_pid_impl() -> u32 {
 
 #[cfg(target_os = "windows")]
 fn get_parent_pid_impl() -> u32 {
-    use euro_process::{Chrome, Firefox, Librewolf, ProcessFunctionality};
+    use euro_process::Browser;
     use std::collections::{HashMap, HashSet};
     use std::mem::MaybeUninit;
     use std::process;
@@ -146,7 +150,11 @@ fn get_parent_pid_impl() -> u32 {
     const TH32CS_SNAPPROCESS: u32 = 0x00000002;
     const INVALID_HANDLE_VALUE: isize = -1;
 
-    let browser_names: &[&str] = &[Firefox.get_name(), Chrome.get_name(), Librewolf.get_name()];
+    let browser_names: &[&str] = &[
+        Browser::Firefox.process_name(),
+        Browser::Chrome.process_name(),
+        Browser::Librewolf.process_name(),
+    ];
     let current_pid = process::id();
 
     let mut parent_map: HashMap<u32, (u32, String)> = HashMap::new();

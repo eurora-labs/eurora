@@ -195,9 +195,7 @@ impl CollectorService {
 
                         let mut prev = prev_focus.lock().await;
                         if new_focus != *prev {
-                            if NoStrategy::get_supported_processes()
-                                .contains(&process_name.as_str())
-                            {
+                            if NoStrategy::matches_process(&process_name) {
                                 tracing::debug!(
                                     "Ignoring focus change to own process: {}",
                                     process_name

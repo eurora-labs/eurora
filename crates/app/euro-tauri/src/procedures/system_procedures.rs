@@ -479,8 +479,8 @@ impl SystemApi for SystemApiImpl {
         self,
         process_name: String,
     ) -> Result<Option<String>, String> {
-        Ok(euro_process::browser_store_for_process(&process_name)
-            .and_then(|store| store.extension_url())
+        Ok(euro_process::Browser::from_process_name(&process_name)
+            .and_then(|browser| browser.store().extension_url())
             .map(str::to_owned))
     }
 
