@@ -39,12 +39,12 @@ pub struct LocalBackendInfo {
     pub postgres_port: u16,
 }
 
-/// Push payload describing whether a given browser process currently has a
-/// native messenger connected. Emitted whenever the browser bridge registry
-/// transitions (a messenger registers or disconnects). The frontend uses
-/// this to update the "install extension" affordance without polling.
+/// Push payload describing a registration / disconnect transition on the
+/// app bridge for a particular OS process. The frontend currently uses
+/// this for the browser-extension install affordance; future client kinds
+/// will get their own events.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
-pub struct BrowserExtensionStatus {
+pub struct AppBridgeClientStatus {
     pub process_name: String,
     pub connected: bool,
 }
@@ -79,16 +79,16 @@ pub trait SystemApi {
         ollama_model: String,
     ) -> Result<LocalBackendInfo, String>;
 
-    async fn get_browser_connection_count() -> Result<usize, String>;
+    async fn get_app_bridge_client_count() -> Result<usize, String>;
 
     async fn get_browser_extension_url(process_name: String) -> Result<Option<String>, String>;
 
-    async fn is_browser_extension_connected(process_name: String) -> Result<bool, String>;
+    async fn is_app_bridge_client_connected(process_name: String) -> Result<bool, String>;
 
     async fn open_url_in_browser(process_id: u32, url: String) -> Result<(), String>;
 
     #[taurpc(event)]
-    async fn browser_extension_status_changed(status: BrowserExtensionStatus);
+    async fn app_bridge_client_status_changed(status: AppBridgeClientStatus);
 
     async fn focus_main_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 }
@@ -469,8 +469,8 @@ impl SystemApi for SystemApiImpl {
         })
     }
 
-    async fn get_browser_connection_count(self) -> Result<usize, String> {
-        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+    async fn get_app_bridge_client_count(self) -> Result<usize, String> {
+        let service = euro_bridge::AppBridgeService::get_or_init().await;
         let count = service.connection_count().await;
         Ok(count)
     }
@@ -484,13 +484,13 @@ impl SystemApi for SystemApiImpl {
             .map(str::to_owned))
     }
 
-    async fn is_browser_extension_connected(self, process_name: String) -> Result<bool, String> {
+    async fn is_app_bridge_client_connected(self, process_name: String) -> Result<bool, String> {
         if process_name.is_empty() {
             return Ok(false);
         }
-        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+        let service = euro_bridge::AppBridgeService::get_or_init().await;
         Ok(service
-            .find_pid_by_browser_name(&process_name)
+            .find_pid_by_process_name(&process_name, Some(euro_bridge::ClientKind::Browser))
             .await
             .is_some())
     }

@@ -24,8 +24,8 @@
 		6557CFF12F351EE300ACCFF3 /* GRPCNIOTransportHTTP2TransportServices in Frameworks */ = {isa = PBXBuildFile; productRef = 6557CFF02F351EE300ACCFF3 /* GRPCNIOTransportHTTP2TransportServices */; };
 		6557CFF32F351EE800ACCFF3 /* GRPCInProcessTransport in Frameworks */ = {isa = PBXBuildFile; productRef = 6557CFF22F351EE800ACCFF3 /* GRPCInProcessTransport */; };
 		6557CFF52F351EF000ACCFF3 /* GRPCCodeGen in Frameworks */ = {isa = PBXBuildFile; productRef = 6557CFF42F351EF000ACCFF3 /* GRPCCodeGen */; };
-		6557CFF92F3522A300ACCFF3 /* browser_bridge.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6557CFF82F3522A300ACCFF3 /* browser_bridge.grpc.swift */; };
-		6557CFFB2F3522BA00ACCFF3 /* browser_bridge.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6557CFFA2F3522BA00ACCFF3 /* browser_bridge.pb.swift */; };
+		6557CFF92F3522A300ACCFF3 /* app_bridge.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6557CFF82F3522A300ACCFF3 /* app_bridge.grpc.swift */; };
+		6557CFFB2F3522BA00ACCFF3 /* app_bridge.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6557CFFA2F3522BA00ACCFF3 /* app_bridge.pb.swift */; };
 		659A98322F35FA4C0086B5D5 /* script.js in Resources */ = {isa = PBXBuildFile; fileRef = 659A98312F35FA4C0086B5D5 /* script.js */; };
 		65C9D4C92F3494AF00FAED22 /* icon-128x128.png in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4BE2F3494AF00FAED22 /* icon-128x128.png */; };
 		65C9D4CA2F3494AF00FAED22 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 65C9D4BF2F3494AF00FAED22 /* assets */; };
@@ -76,8 +76,8 @@
 		654B72042F332FE600A08DFD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6557CFC82F3514F700ACCFF3 /* BrowserBridgeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowserBridgeClient.swift; sourceTree = "<group>"; };
 		6557CFCA2F35151300ACCFF3 /* LocalBridgeServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalBridgeServer.swift; sourceTree = "<group>"; };
-		6557CFF82F3522A300ACCFF3 /* browser_bridge.grpc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = browser_bridge.grpc.swift; path = Shared/Generated/browser_bridge.grpc.swift; sourceTree = SOURCE_ROOT; };
-		6557CFFA2F3522BA00ACCFF3 /* browser_bridge.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = browser_bridge.pb.swift; path = Shared/Generated/browser_bridge.pb.swift; sourceTree = SOURCE_ROOT; };
+		6557CFF82F3522A300ACCFF3 /* app_bridge.grpc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = app_bridge.grpc.swift; path = Shared/Generated/app_bridge.grpc.swift; sourceTree = SOURCE_ROOT; };
+		6557CFFA2F3522BA00ACCFF3 /* app_bridge.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = app_bridge.pb.swift; path = Shared/Generated/app_bridge.pb.swift; sourceTree = SOURCE_ROOT; };
 		659A98312F35FA4C0086B5D5 /* script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = script.js; path = ../../browser/dist/safari/script.js; sourceTree = "<group>"; };
 		65C9D4BE2F3494AF00FAED22 /* icon-128x128.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "icon-128x128.png"; path = "../../browser/dist/safari/icon-128x128.png"; sourceTree = "<group>"; };
 		65C9D4BF2F3494AF00FAED22 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../browser/dist/safari/assets; sourceTree = "<group>"; };
@@ -137,8 +137,8 @@
 		654B71E42F332FE600A08DFD /* macos */ = {
 			isa = PBXGroup;
 			children = (
-				6557CFFA2F3522BA00ACCFF3 /* browser_bridge.pb.swift */,
-				6557CFF82F3522A300ACCFF3 /* browser_bridge.grpc.swift */,
+				6557CFFA2F3522BA00ACCFF3 /* app_bridge.pb.swift */,
+				6557CFF82F3522A300ACCFF3 /* app_bridge.grpc.swift */,
 				6557CFCA2F35151300ACCFF3 /* LocalBridgeServer.swift */,
 				6557CFC82F3514F700ACCFF3 /* BrowserBridgeClient.swift */,
 				653D3CD92F335387008D09DC /* macos.entitlements */,
@@ -324,10 +324,10 @@
 			files = (
 				6557CFC92F3514FD00ACCFF3 /* BrowserBridgeClient.swift in Sources */,
 				6557CFCB2F35151E00ACCFF3 /* LocalBridgeServer.swift in Sources */,
-				6557CFF92F3522A300ACCFF3 /* browser_bridge.grpc.swift in Sources */,
+				6557CFF92F3522A300ACCFF3 /* app_bridge.grpc.swift in Sources */,
 				654B71E62F332FE600A08DFD /* AppDelegate.swift in Sources */,
 				653D3CD72F3336DA008D09DC /* NativeMessagingBridge.swift in Sources */,
-				6557CFFB2F3522BA00ACCFF3 /* browser_bridge.pb.swift in Sources */,
+				6557CFFB2F3522BA00ACCFF3 /* app_bridge.pb.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

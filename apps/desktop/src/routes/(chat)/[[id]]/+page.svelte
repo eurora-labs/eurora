@@ -62,7 +62,7 @@
 		// focused process can't overwrite state for the current one.
 		Promise.all([
 			taurpc.system.get_browser_extension_url(processName),
-			taurpc.system.is_browser_extension_connected(processName),
+			taurpc.system.is_app_bridge_client_connected(processName),
 		])
 			.then(([url, connected]) => {
 				if (focusedProcessName !== processName) return;
@@ -139,7 +139,7 @@
 			})
 			.catch((e) => toast.error(String(e)));
 
-		taurpc.system.browser_extension_status_changed
+		taurpc.system.app_bridge_client_status_changed
 			.on((status) => {
 				if (status.process_name !== focusedProcessName) return;
 				extensionConnected = status.connected;
@@ -148,7 +148,7 @@
 				unlistenStatus = unlisten;
 			})
 			.catch((e) => {
-				toast.error(`Failed to subscribe to browser extension status: ${e}`);
+				toast.error(`Failed to subscribe to app bridge client status: ${e}`);
 			});
 	});
 

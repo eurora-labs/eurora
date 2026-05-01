@@ -67,7 +67,8 @@ dotenv = "0.15.0"
 enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
-euro-browser = { path = "crates/app/euro-browser" }
+euro-bridge = { path = "crates/app/euro-bridge" }
+euro-bridge-protocol = { path = "crates/app/euro-bridge-protocol" }
 euro-debug = { path = "crates/app/euro-debug" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-endpoint = { path = "crates/app/euro-endpoint", default-features = false }

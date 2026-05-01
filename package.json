@@ -39,7 +39,7 @@
 		"commit": "cz",
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
 		"proto:rust": "cargo build -p proto-gen",
-		"proto:swift": "protoc --proto_path=proto --swift_out=apps/macos/Shared/Generated --plugin=protoc-gen-grpc-swift=$(which protoc-gen-grpc-swift-2) --grpc-swift_out=apps/macos/Shared/Generated proto/browser_bridge.proto",
+		"bridge:specta": "cargo run -p euro-bridge-protocol --features codegen -- --generate_specta && cargo run -p euro-native-messaging -- --generate_specta",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",

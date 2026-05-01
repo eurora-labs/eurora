@@ -1,3 +1,6 @@
+//! Best-effort PID → process name lookup. Used to label registered clients
+//! with something humans can recognise (e.g. `chrome.exe`, `WINWORD.EXE`).
+
 pub fn get_process_name(pid: u32) -> Option<String> {
     get_process_name_impl(pid)
 }

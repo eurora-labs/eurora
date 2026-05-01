@@ -1,7 +1,7 @@
 use crate::MAX_FRAME_SIZE;
-use crate::server::Frame;
 use anyhow::{Context, Result, anyhow, bail};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use euro_bridge_protocol::Frame;
 use image::{ImageBuffer, Rgba};
 use resvg::render;
 use specta_typescript::BigIntExportBehavior;
@@ -54,15 +54,38 @@ pub fn convert_svg_to_rgba(svg: &str) -> Result<image::RgbaImage> {
 pub fn generate_typescript_definitions() -> Result<()> {
     use specta_typescript::Typescript;
 
-    if let Err(e) = Typescript::default()
+    use crate::types::{
+        NativeArticleAsset, NativeArticleSnapshot, NativeImage, NativeMetadata, NativeTwitterAsset,
+        NativeTwitterTweet, NativeYoutubeAsset, NativeYoutubeSnapshot, NotificationsData,
+        ParseResult, ProfilePageData, SearchData, TimelineData, TweetPageData, UnsupportedPageData,
+    };
+
+    // Hand-curated type collection: `specta::collect()` would also pull in
+    // every `specta::Type` from `euro_bridge_protocol`, which is already
+    // exported separately to `bridge-protocol.ts` by that crate's own
+    // codegen binary. Listing the native-messaging types explicitly keeps
+    // the two files cleanly separated.
+    let types = specta::TypeCollection::default()
+        .register::<NativeImage>()
+        .register::<NativeMetadata>()
+        .register::<NativeArticleAsset>()
+        .register::<NativeArticleSnapshot>()
+        .register::<NativeTwitterAsset>()
+        .register::<NativeTwitterTweet>()
+        .register::<ParseResult>()
+        .register::<TweetPageData>()
+        .register::<ProfilePageData>()
+        .register::<TimelineData>()
+        .register::<SearchData>()
+        .register::<NotificationsData>()
+        .register::<UnsupportedPageData>()
+        .register::<NativeYoutubeAsset>()
+        .register::<NativeYoutubeSnapshot>();
+
+    Typescript::default()
         .bigint(BigIntExportBehavior::Fail)
-        .export_to(
-            "apps/browser/src/shared/content/bindings.ts",
-            &specta::collect(),
-        )
-    {
-        tracing::debug!("Failed to generate TypeScript definitions: {}", e);
-    }
+        .export_to("apps/browser/src/shared/content/bindings.ts", &types)
+        .context("exporting TypeScript bindings")?;
 
     Ok(())
 }

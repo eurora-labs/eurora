@@ -35,7 +35,7 @@ dirs = { workspace = true }
 dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-auth = { workspace = true }
-euro-browser = { workspace = true }
+euro-bridge = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }

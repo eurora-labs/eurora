@@ -396,17 +396,18 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
     });
 }
 
-/// Forward native-messenger registration / disconnect lifecycle events from
-/// the browser bridge to the frontend as `browser_extension_status_changed`
-/// events. The UI uses these to flip the "install extension" affordance the
-/// moment a messenger connects, without polling.
-fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
+/// Forward bridge client lifecycle events to the frontend as
+/// `app_bridge_client_status_changed`. Phase 1 only emits for `Browser`
+/// clients (the existing UI affordance is browser-extension specific);
+/// future client kinds will get their own routing in later phases.
+fn spawn_app_bridge_status_forwarder(app_handle: tauri::AppHandle) {
+    use euro_bridge::ClientKind;
     use euro_tauri::procedures::system_procedures::{
-        BrowserExtensionStatus, TauRpcSystemApiEventTrigger,
+        AppBridgeClientStatus, TauRpcSystemApiEventTrigger,
     };
 
     tauri::async_runtime::spawn(async move {
-        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+        let service = euro_bridge::AppBridgeService::get_or_init().await;
         let mut registrations_rx = service.subscribe_to_registrations();
         let mut disconnects_rx = service.subscribe_to_disconnects();
 
@@ -414,16 +415,17 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
             tokio::select! {
                 event = registrations_rx.recv() => {
                     match event {
-                        Ok(reg) => {
+                        Ok(reg) if reg.client_kind == ClientKind::Browser => {
                             let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
-                                .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.browser_name,
+                                .app_bridge_client_status_changed(AppBridgeClientStatus {
+                                    process_name: reg.process_name,
                                     connected: true,
                                 });
                         }
+                        Ok(_) => {}
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                             tracing::warn!(
-                                "Browser registration subscription lagged by {n} events"
+                                "App bridge registration subscription lagged by {n} events"
                             );
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
@@ -431,16 +433,17 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
                 }
                 event = disconnects_rx.recv() => {
                     match event {
-                        Ok(reg) => {
+                        Ok(reg) if reg.client_kind == ClientKind::Browser => {
                             let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
-                                .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.browser_name,
+                                .app_bridge_client_status_changed(AppBridgeClientStatus {
+                                    process_name: reg.process_name,
                                     connected: false,
                                 });
                         }
+                        Ok(_) => {}
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                             tracing::warn!(
-                                "Browser disconnect subscription lagged by {n} events"
+                                "App bridge disconnect subscription lagged by {n} events"
                             );
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
@@ -523,7 +526,7 @@ fn main() {
 
                     init_state(tauri_app, &endpoint_manager)?;
                     spawn_timeline_listeners(tauri_app.handle().clone());
-                    spawn_browser_status_bridge(tauri_app.handle().clone());
+                    spawn_app_bridge_status_forwarder(tauri_app.handle().clone());
 
                     Ok(())
                 })

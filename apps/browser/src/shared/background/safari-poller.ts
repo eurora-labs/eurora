@@ -2,7 +2,8 @@ import { resolveFaviconBase64 } from './favicon';
 import { sendMessageWithRetry } from './messaging';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
-import type { Frame, RequestFrame, NativeMetadata } from '../content/bindings';
+import type { NativeMetadata } from '../content/bindings';
+import type { Frame, RequestFrame } from '../content/bridge-protocol';
 
 declare const __DEV__: boolean;
 const host = __DEV__ ? 'com.eurora.dev' : 'com.eurora.app';

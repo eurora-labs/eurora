@@ -31,7 +31,7 @@
 		if (intervalId) return;
 		intervalId = setInterval(async () => {
 			try {
-				const count = await taurpc.system.get_browser_connection_count();
+				const count = await taurpc.system.get_app_bridge_client_count();
 				if (count > 0) {
 					connected = true;
 					downloaded = true;
@@ -46,7 +46,7 @@
 
 	onMount(async () => {
 		try {
-			const count = await taurpc.system.get_browser_connection_count();
+			const count = await taurpc.system.get_app_bridge_client_count();
 			if (count > 0) {
 				navigateAfterExtension();
 				return;

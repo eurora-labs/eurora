@@ -216,7 +216,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         }
     }
     func browserBridgeClient(
-        _ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame
+        _ client: BrowserBridgeClient, didReceiveFrame frame: AppBridge_Frame
     ) {
         handleFrameFromServer(frame)
     }
@@ -298,7 +298,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         grpcClient?.send(frame: frame)
     }
 
-    private func handleFrameFromServer(_ frame: BrowserBridge_Frame) {
+    private func handleFrameFromServer(_ frame: AppBridge_Frame) {
         guard let fk = frame.kind else { return }
         switch fk {
         case .response(let r): deliverResponse(id: r.id, frame: frame)
@@ -310,7 +310,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         }
     }
 
-    private func deliverResponse(id: UInt32, frame: BrowserBridge_Frame) {
+    private func deliverResponse(id: UInt32, frame: AppBridge_Frame) {
         let idStr = "\(id)"
         pendingExtensionRequestsLock.lock()
         let completion = pendingExtensionRequests.removeValue(forKey: idStr)
@@ -323,7 +323,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         completion(dict)
     }
 
-    private func forwardServerReq(request: BrowserBridge_RequestFrame, frame: BrowserBridge_Frame) {
+    private func forwardServerReq(request: AppBridge_RequestFrame, frame: AppBridge_Frame) {
         let reqIdStr = "\(request.id)"
         let action = request.action
         guard let dict = Self.dictionaryFromFrame(frame) else {
@@ -373,10 +373,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         pendingServerRequests.removeValue(forKey: requestId)
         pendingServerRequestsLock.unlock()
         let idVal: UInt32 = UInt32(requestId) ?? 0
-        var ef = BrowserBridge_ErrorFrame()
+        var ef = AppBridge_ErrorFrame()
         ef.id = idVal
         ef.message = error
-        var f = BrowserBridge_Frame()
+        var f = AppBridge_Frame()
         f.error = ef
         grpcClient?.send(frame: f)
     }
@@ -386,9 +386,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
 
 @available(macOS 15.0, *)
 extension AppDelegate {
-    static func frameFromDictionary(_ dict: [String: Any]) -> BrowserBridge_Frame? {
+    static func frameFromDictionary(_ dict: [String: Any]) -> AppBridge_Frame? {
         guard let kind = dict["kind"] as? [String: Any] else { return nil }
-        var frame = BrowserBridge_Frame()
+        var frame = AppBridge_Frame()
 
         if let request = kind["Request"] as? [String: Any] {
             frame.request = makeRequestFrame(from: request)
@@ -409,31 +409,31 @@ extension AppDelegate {
         return frame
     }
 
-    private static func makeRequestFrame(from dict: [String: Any]) -> BrowserBridge_RequestFrame {
-        var reqFrame = BrowserBridge_RequestFrame()
+    private static func makeRequestFrame(from dict: [String: Any]) -> AppBridge_RequestFrame {
+        var reqFrame = AppBridge_RequestFrame()
         if let identifier = dict["id"] as? Int { reqFrame.id = UInt32(identifier) }
         if let action = dict["action"] as? String { reqFrame.action = action }
         if let payload = dict["payload"] as? String { reqFrame.payload = payload }
         return reqFrame
     }
 
-    private static func makeResponseFrame(from dict: [String: Any]) -> BrowserBridge_ResponseFrame {
-        var respFrame = BrowserBridge_ResponseFrame()
+    private static func makeResponseFrame(from dict: [String: Any]) -> AppBridge_ResponseFrame {
+        var respFrame = AppBridge_ResponseFrame()
         if let identifier = dict["id"] as? Int { respFrame.id = UInt32(identifier) }
         if let action = dict["action"] as? String { respFrame.action = action }
         if let payload = dict["payload"] as? String { respFrame.payload = payload }
         return respFrame
     }
 
-    private static func makeEventFrame(from dict: [String: Any]) -> BrowserBridge_EventFrame {
-        var evtFrame = BrowserBridge_EventFrame()
+    private static func makeEventFrame(from dict: [String: Any]) -> AppBridge_EventFrame {
+        var evtFrame = AppBridge_EventFrame()
         if let action = dict["action"] as? String { evtFrame.action = action }
         if let payload = dict["payload"] as? String { evtFrame.payload = payload }
         return evtFrame
     }
 
-    private static func makeErrorFrame(from dict: [String: Any]) -> BrowserBridge_ErrorFrame {
-        var errFrame = BrowserBridge_ErrorFrame()
+    private static func makeErrorFrame(from dict: [String: Any]) -> AppBridge_ErrorFrame {
+        var errFrame = AppBridge_ErrorFrame()
         if let identifier = dict["id"] as? Int { errFrame.id = UInt32(identifier) }
         if let code = dict["code"] as? Int { errFrame.code = UInt32(code) }
         if let message = dict["message"] as? String { errFrame.message = message }
@@ -441,26 +441,27 @@ extension AppDelegate {
         return errFrame
     }
 
-    private static func makeCancelFrame(from dict: [String: Any]) -> BrowserBridge_CancelFrame {
-        var cancelFrame = BrowserBridge_CancelFrame()
+    private static func makeCancelFrame(from dict: [String: Any]) -> AppBridge_CancelFrame {
+        var cancelFrame = AppBridge_CancelFrame()
         if let identifier = dict["id"] as? Int { cancelFrame.id = UInt32(identifier) }
         return cancelFrame
     }
 
-    private static func makeRegisterFrame(from dict: [String: Any]) -> BrowserBridge_RegisterFrame {
-        var regFrame = BrowserBridge_RegisterFrame()
+    private static func makeRegisterFrame(from dict: [String: Any]) -> AppBridge_RegisterFrame {
+        var regFrame = AppBridge_RegisterFrame()
         if let hostPid = dict["host_pid"] as? Int { regFrame.hostPid = UInt32(hostPid) }
-        if let browserPid = dict["browser_pid"] as? Int { regFrame.browserPid = UInt32(browserPid) }
+        if let appPid = dict["app_pid"] as? Int { regFrame.appPid = UInt32(appPid) }
+        regFrame.clientKind = .browser
         return regFrame
     }
 
-    static func dictionaryFromFrame(_ frame: BrowserBridge_Frame) -> [String: Any]? {
+    static func dictionaryFromFrame(_ frame: AppBridge_Frame) -> [String: Any]? {
         guard let frameKind = frame.kind else { return nil }
         guard let kind = kindDictFromFrameKind(frameKind) else { return nil }
         return ["kind": kind]
     }
 
-    private static func kindDictFromFrameKind(_ frameKind: BrowserBridge_Frame.OneOf_Kind)
+    private static func kindDictFromFrameKind(_ frameKind: AppBridge_Frame.OneOf_Kind)
         -> [String: Any]?
     {
         switch frameKind {
@@ -473,25 +474,25 @@ extension AppDelegate {
         }
     }
 
-    private static func requestDict(from req: BrowserBridge_RequestFrame) -> [String: Any] {
+    private static func requestDict(from req: AppBridge_RequestFrame) -> [String: Any] {
         var dict: [String: Any] = ["id": Int(req.id), "action": req.action]
         if req.hasPayload { dict["payload"] = req.payload }
         return dict
     }
 
-    private static func responseDict(from resp: BrowserBridge_ResponseFrame) -> [String: Any] {
+    private static func responseDict(from resp: AppBridge_ResponseFrame) -> [String: Any] {
         var dict: [String: Any] = ["id": Int(resp.id), "action": resp.action]
         if resp.hasPayload { dict["payload"] = resp.payload }
         return dict
     }
 
-    private static func eventDict(from evt: BrowserBridge_EventFrame) -> [String: Any] {
+    private static func eventDict(from evt: AppBridge_EventFrame) -> [String: Any] {
         var dict: [String: Any] = ["action": evt.action]
         if evt.hasPayload { dict["payload"] = evt.payload }
         return dict
     }
 
-    private static func errorDict(from err: BrowserBridge_ErrorFrame) -> [String: Any] {
+    private static func errorDict(from err: AppBridge_ErrorFrame) -> [String: Any] {
         var dict: [String: Any] = [
             "id": Int(err.id), "code": Int(err.code), "message": err.message,
         ]

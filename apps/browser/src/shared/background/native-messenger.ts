@@ -4,7 +4,7 @@ import { sendMessageWithRetry } from './messaging';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
-import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings';
+import type { Frame, RequestFrame, ResponseFrame } from '../content/bridge-protocol';
 
 declare const __DEV__: boolean;
 const host = __DEV__ ? 'com.eurora.dev' : 'com.eurora.app';

@@ -11,7 +11,7 @@ protocol BrowserBridgeClientDelegate: AnyObject {
     func browserBridgeClientDidConnect(_ client: BrowserBridgeClient)
     func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?)
     func browserBridgeClient(
-        _ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame)
+        _ client: BrowserBridgeClient, didReceiveFrame frame: AppBridge_Frame)
 }
 
 @available(macOS 15.0, *)
@@ -30,7 +30,7 @@ final class BrowserBridgeClient: @unchecked Sendable {
     private var shouldReconnect = true
     private let lock = NSLock()
 
-    private var outboundContinuation: AsyncStream<BrowserBridge_Frame>.Continuation?
+    private var outboundContinuation: AsyncStream<AppBridge_Frame>.Continuation?
 
     var isConnected: Bool {
         lock.lock()
@@ -89,7 +89,7 @@ final class BrowserBridgeClient: @unchecked Sendable {
         }
     }
 
-    func send(frame: BrowserBridge_Frame) {
+    func send(frame: AppBridge_Frame) {
         lock.lock()
         let continuation = outboundContinuation
         lock.unlock()
@@ -138,18 +138,19 @@ final class BrowserBridgeClient: @unchecked Sendable {
         }
     }
 
-    private func buildRegistrationFrame(browserPid: UInt32) -> BrowserBridge_Frame {
-        var registerFrame = BrowserBridge_RegisterFrame()
+    private func buildRegistrationFrame(browserPid: UInt32) -> AppBridge_Frame {
+        var registerFrame = AppBridge_RegisterFrame()
         registerFrame.hostPid = self.hostPid
-        registerFrame.browserPid = browserPid
-        var frame = BrowserBridge_Frame()
+        registerFrame.appPid = browserPid
+        registerFrame.clientKind = .browser
+        var frame = AppBridge_Frame()
         frame.register = registerFrame
         return frame
     }
 
     private func makeOutboundProducer(
-        _ outboundStream: AsyncStream<BrowserBridge_Frame>
-    ) -> @Sendable (RPCWriter<BrowserBridge_Frame>) async throws -> Void {
+        _ outboundStream: AsyncStream<AppBridge_Frame>
+    ) -> @Sendable (RPCWriter<AppBridge_Frame>) async throws -> Void {
         return { writer in
             self.logger.debug("Producer started, forwarding outbound frames...")
             do {
@@ -166,7 +167,7 @@ final class BrowserBridgeClient: @unchecked Sendable {
     }
 
     private func processInboundFrames(
-        _ response: StreamingClientResponse<BrowserBridge_Frame>
+        _ response: StreamingClientResponse<AppBridge_Frame>
     ) async {
         await MainActor.run { self.delegate?.browserBridgeClientDidConnect(self) }
         do {
@@ -189,7 +190,7 @@ final class BrowserBridgeClient: @unchecked Sendable {
         )
 
         try await withGRPCClient(transport: transport) { grpcClient in
-            let bridgeClient = BrowserBridge_BrowserBridge.Client(wrapping: grpcClient)
+            let bridgeClient = AppBridge_AppBridge.Client(wrapping: grpcClient)
 
             self.lock.lock()
             let currentBrowserPid = self.browserPid
@@ -200,13 +201,13 @@ final class BrowserBridgeClient: @unchecked Sendable {
                 "Sending registration: host=\(self.hostPid), browser=\(currentBrowserPid)")
 
             let (outboundStream, continuation) = AsyncStream.makeStream(
-                of: BrowserBridge_Frame.self)
+                of: AppBridge_Frame.self)
             self.lock.lock()
             self.outboundContinuation = continuation
             self.lock.unlock()
             continuation.yield(regFrame)
 
-            let request = StreamingClientRequest<BrowserBridge_Frame>(
+            let request = StreamingClientRequest<AppBridge_Frame>(
                 metadata: [:], producer: self.makeOutboundProducer(outboundStream)
             )
 

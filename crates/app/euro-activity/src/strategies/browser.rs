@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-pub use euro_browser::{
-    BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
-    ResponseFrame,
+pub use euro_bridge::{
+    AppBridgeService, ClientKind, EventFrame, Frame, FrameKind, RequestFrame, ResponseFrame,
 };
 use euro_native_messaging::NativeMessage;
 use euro_process::Browser;
@@ -29,7 +28,7 @@ pub struct BrowserStrategy {
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
 
     #[serde(skip)]
-    bridge_service: Option<&'static BrowserBridgeService>,
+    bridge_service: Option<&'static AppBridgeService>,
 
     #[serde(skip)]
     event_subscription_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
@@ -49,7 +48,7 @@ pub struct BrowserStrategy {
 
 impl BrowserStrategy {
     async fn initialize_service(&mut self) -> ActivityResult<()> {
-        let service = BrowserBridgeService::get_or_init().await;
+        let service = AppBridgeService::get_or_init().await;
         self.bridge_service = Some(service);
         Ok(())
     }
@@ -79,7 +78,7 @@ impl BrowserStrategy {
             let last_url = Arc::clone(&last_url);
 
             loop {
-                let (browser_pid, event_frame) = match events_rx.recv().await {
+                let (app_pid, event_frame) = match events_rx.recv().await {
                     Ok(val) => val,
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                         tracing::warn!("Event subscription lagged by {} events, resuming", n);
@@ -89,7 +88,7 @@ impl BrowserStrategy {
                 };
 
                 let expected_pid = active_pid.load(Ordering::Relaxed);
-                if expected_pid == 0 || browser_pid != expected_pid {
+                if expected_pid == 0 || app_pid != expected_pid {
                     continue;
                 }
 
@@ -140,13 +139,13 @@ impl BrowserStrategy {
                         metadata.title,
                         metadata.icon,
                         process_name,
-                        browser_pid,
+                        app_pid,
                         vec![],
                     );
 
                     tracing::info!(
-                        "Creating new activity from event: browser_pid={}, name={}",
-                        browser_pid,
+                        "Creating new activity from event: app_pid={}, name={}",
+                        app_pid,
                         activity.name
                     );
                     if sender.send(ActivityReport::NewActivity(activity)).is_err() {
@@ -163,12 +162,9 @@ impl BrowserStrategy {
         Ok(())
     }
 
-    async fn fetch_asset(
-        service: &BrowserBridgeService,
-        browser_pid: u32,
-    ) -> Option<ActivityAsset> {
+    async fn fetch_asset(service: &AppBridgeService, app_pid: u32) -> Option<ActivityAsset> {
         let response = service
-            .send_request(browser_pid, "GET_ASSETS", None)
+            .send_request(app_pid, "GET_ASSETS", None)
             .await
             .ok()?;
         let payload = response.payload?;
@@ -176,12 +172,9 @@ impl BrowserStrategy {
         ActivityAsset::try_from(native_message).ok()
     }
 
-    async fn fetch_snapshot(
-        service: &BrowserBridgeService,
-        browser_pid: u32,
-    ) -> Option<ActivitySnapshot> {
+    async fn fetch_snapshot(service: &AppBridgeService, app_pid: u32) -> Option<ActivitySnapshot> {
         let response = service
-            .send_request(browser_pid, "GET_SNAPSHOT", None)
+            .send_request(app_pid, "GET_SNAPSHOT", None)
             .await
             .ok()?;
         let payload = response.payload?;
@@ -191,7 +184,9 @@ impl BrowserStrategy {
 
     async fn resolve_messenger_pid(&self, process_name: &str, fallback_pid: u32) -> u32 {
         if let Some(service) = &self.bridge_service
-            && let Some(pid) = service.find_pid_by_browser_name(process_name).await
+            && let Some(pid) = service
+                .find_pid_by_process_name(process_name, Some(ClientKind::Browser))
+                .await
         {
             return pid;
         }
@@ -362,11 +357,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         let Some(service) = self.bridge_service else {
             return Ok(vec![]);
         };
-        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
-        if browser_pid == 0 {
+        let app_pid = self.active_browser_pid.load(Ordering::Relaxed);
+        if app_pid == 0 {
             return Ok(vec![]);
         }
-        Ok(Self::fetch_asset(service, browser_pid)
+        Ok(Self::fetch_asset(service, app_pid)
             .await
             .into_iter()
             .collect())
@@ -376,11 +371,11 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         let Some(service) = self.bridge_service else {
             return Ok(vec![]);
         };
-        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
-        if browser_pid == 0 {
+        let app_pid = self.active_browser_pid.load(Ordering::Relaxed);
+        if app_pid == 0 {
             return Ok(vec![]);
         }
-        Ok(Self::fetch_snapshot(service, browser_pid)
+        Ok(Self::fetch_snapshot(service, app_pid)
             .await
             .into_iter()
             .collect())
@@ -394,13 +389,13 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .as_ref()
             .ok_or_else(|| ActivityError::invalid_data("Bridge service not available"))?;
 
-        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
-        if browser_pid == 0 {
+        let app_pid = self.active_browser_pid.load(Ordering::Relaxed);
+        if app_pid == 0 {
             return Err(ActivityError::invalid_data("No active browser PID set"));
         }
 
         let response_frame = service
-            .get_metadata(browser_pid)
+            .get_metadata(app_pid)
             .await
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
 

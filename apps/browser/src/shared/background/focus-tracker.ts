@@ -1,6 +1,7 @@
 import { resolveFaviconBase64 } from './favicon';
 import browser from 'webextension-polyfill';
-import type { NativeMetadata, Frame } from '../content/bindings';
+import type { NativeMetadata } from '../content/bindings';
+import type { Frame } from '../content/bridge-protocol';
 
 let activeNativePort: browser.Runtime.Port | null = null;
 

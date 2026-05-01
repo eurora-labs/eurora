@@ -39,7 +39,7 @@ let package = Package(
                 .product(name: "GRPCProtobuf", package: "grpc-swift-protobuf"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "EuroraShared",
-                "BrowserBridgeProto"
+                "AppBridgeProto"
             ],
             path: "macos",
             sources: [
@@ -51,7 +51,7 @@ let package = Package(
             plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
         .target(
-            name: "BrowserBridgeProto",
+            name: "AppBridgeProto",
             dependencies: [
                 .product(name: "GRPCCore", package: "grpc-swift-2"),
                 .product(name: "GRPCProtobuf", package: "grpc-swift-protobuf"),
