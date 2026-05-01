@@ -14,6 +14,7 @@
 	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID ?? '';
+	const CHECKOUT_REDIRECT = '/pricing?checkout=true';
 
 	let {
 		class: className = '',
@@ -24,13 +25,15 @@
 	}: ButtonProps & { children?: Snippet; autoTrigger?: boolean } = $props();
 
 	let loading = $state(false);
+	let resending = $state(false);
+
 	onMount(() => {
 		if (autoTrigger) handleGetPro();
 	});
 
 	async function handleGetPro() {
 		if (!auth.isAuthenticated) {
-			goto('/login?redirect=' + encodeURIComponent('/pricing?checkout=true'));
+			goto('/login?redirect=' + encodeURIComponent(CHECKOUT_REDIRECT));
 			return;
 		}
 
@@ -38,7 +41,15 @@
 
 		try {
 			if (!(await auth.ensureValidToken())) {
-				goto('/login?redirect=' + encodeURIComponent('/pricing?checkout=true'));
+				goto('/login?redirect=' + encodeURIComponent(CHECKOUT_REDIRECT));
+				return;
+			}
+
+			// Gate the checkout call on the verification flag from the JWT.
+			// The backend enforces this too, but short-circuiting here gives the
+			// user a useful next step (resend) instead of a generic toast.
+			if (!auth.user?.emailVerified) {
+				promptEmailVerification();
 				return;
 			}
 
@@ -53,13 +64,27 @@
 				}),
 			});
 
+			const body = (await res.json().catch(() => null)) as {
+				url?: string;
+				error?: string;
+			} | null;
+
 			if (!res.ok) {
-				const body = await res.json().catch(() => null);
+				if (
+					res.status === 403 &&
+					typeof body?.error === 'string' &&
+					/email/i.test(body.error)
+				) {
+					promptEmailVerification();
+					return;
+				}
 				throw new Error(body?.error ?? `Checkout failed (${res.status})`);
 			}
 
-			const { url } = await res.json();
-			window.location.href = url;
+			if (!body?.url) {
+				throw new Error('Checkout response missing redirect URL');
+			}
+			window.location.href = body.url;
 		} catch (err) {
 			Sentry.captureException(err, {
 				tags: { area: 'payment.checkout' },
@@ -68,7 +93,40 @@
 			toast.error(
 				err instanceof Error ? err.message : 'Something went wrong. Please try again.',
 			);
+		} finally {
 			loading = false;
+		}
+	}
+
+	function promptEmailVerification() {
+		const email = auth.user?.email;
+		toast.message('Verify your email to continue', {
+			description: email
+				? `We sent a verification link to ${email}. Click the link, then try again.`
+				: 'We sent you a verification link. Click it, then try again.',
+			action: {
+				label: 'Resend email',
+				onClick: () => {
+					void resendVerificationEmail();
+				},
+			},
+			duration: 10_000,
+		});
+	}
+
+	async function resendVerificationEmail() {
+		if (resending) return;
+		resending = true;
+		try {
+			await auth.resendVerificationEmail();
+			toast.success('Verification email sent. Check your inbox.');
+		} catch (err) {
+			Sentry.captureException(err, { tags: { area: 'auth.resend-verification' } });
+			const message =
+				err instanceof Error ? err.message : 'Could not send verification email.';
+			toast.error(message);
+		} finally {
+			resending = false;
 		}
 	}
 </script>
