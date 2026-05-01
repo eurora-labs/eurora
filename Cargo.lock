@@ -1592,6 +1592,7 @@ dependencies = [
  "chrono",
  "governor",
  "http 1.4.0",
+ "jsonwebtoken",
  "percent-encoding",
  "serde_json",
  "thiserror 2.0.18",
@@ -1599,6 +1600,7 @@ dependencies = [
  "tonic",
  "tonic-prost",
  "tower",
+ "tower-http",
  "tracing",
  "uuid",
 ]
