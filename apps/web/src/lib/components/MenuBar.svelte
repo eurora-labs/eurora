@@ -1,6 +1,7 @@
 <script lang="ts">
 	import UserButton from '$lib/components/UserButton.svelte';
-	import { isAuthenticated } from '$lib/stores/auth.js';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
+	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as NavigationMenu from '@eurora/ui/components/navigation-menu/index';
 	import { navigationMenuTriggerStyle } from '@eurora/ui/components/navigation-menu/navigation-menu-trigger.svelte';
@@ -12,6 +13,8 @@
 	import type { Snippet } from 'svelte';
 
 	let { mobileNav }: { mobileNav?: Snippet<[() => void]> } = $props();
+
+	const auth = inject(AUTH_SERVICE);
 
 	let mobileOpen = $state(false);
 
@@ -57,7 +60,7 @@
 			<Button variant="ghost" size="icon" href="https://github.com/eurora-labs/eurora">
 				<SiGithub />
 			</Button>
-			{#if $isAuthenticated}
+			{#if auth.isAuthenticated}
 				<UserButton />
 			{:else}
 				<Button variant="ghost" href="/login" class="backdrop-blur-2xl">
@@ -70,7 +73,7 @@
 
 		<!-- Mobile actions -->
 		<div class="flex md:hidden items-center gap-3">
-			{#if $isAuthenticated}
+			{#if auth.isAuthenticated}
 				<UserButton />
 			{:else}
 				<Button variant="ghost" href="/login" size="sm" class="backdrop-blur-2xl">
@@ -118,7 +121,7 @@
 							onclick={closeMobile}
 							class="w-full">Download</Button
 						>
-						{#if $isAuthenticated}
+						{#if auth.isAuthenticated}
 							<UserButton />
 						{:else}
 							<Button

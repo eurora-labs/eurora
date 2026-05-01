@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { auth, accessToken } from '$lib/stores/auth.js';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -11,6 +11,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onDestroy, onMount } from 'svelte';
 
+	const auth = inject(AUTH_SERVICE);
 	const REST_API_URL = inject(CONFIG_SERVICE).restApiUrl;
 
 	let status = $state<'loading' | 'complete' | 'failed'>('loading');
@@ -36,7 +37,7 @@
 				`${REST_API_URL}/payment/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
 				{
 					headers: {
-						Authorization: `Bearer ${$accessToken}`,
+						Authorization: `Bearer ${auth.accessToken}`,
 					},
 				},
 			);
@@ -84,7 +85,7 @@
 				</div>
 				<Card.Description>
 					Your Pro subscription is now active. You can now enjoy all Pro features in the
-					Eurora desktop app. Redirecting in {countdown}s...
+					Eurora app. Redirecting in {countdown}s...
 				</Card.Description>
 			</Card.Header>
 			<Card.Content class="space-y-3">

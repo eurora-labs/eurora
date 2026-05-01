@@ -9,7 +9,9 @@ pub use proto::{
     EventFrame, Frame, RegisterFrame, RequestFrame, ResponseFrame,
     browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
 };
-pub use server::{BROWSER_BRIDGE_PORT, BrowserBridgeService, RegisteredMessenger};
+pub use server::{
+    BROWSER_BRIDGE_PORT, BrowserBridgeService, RegisteredMessenger, RegistrationEvent,
+};
 
 pub async fn start_browser_bridge_server() {
     let service = BrowserBridgeService::get_or_init().await;

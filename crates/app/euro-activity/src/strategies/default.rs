@@ -17,8 +17,8 @@ pub struct DefaultStrategy;
 
 #[async_trait]
 impl StrategySupport for DefaultStrategy {
-    fn get_supported_processes() -> Vec<&'static str> {
-        vec![]
+    fn matches_process(_process_name: &str) -> bool {
+        false
     }
 
     async fn create() -> ActivityResult<ActivityStrategy> {
@@ -47,6 +47,7 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
             focus_window.window_title.clone(),
             focus_window.icon.clone(),
             focus_window.process_name.clone(),
+            focus_window.process_id,
             vec![],
         );
 
@@ -91,8 +92,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_supported_processes() {
-        let processes = DefaultStrategy::get_supported_processes();
-        assert!(processes.is_empty());
+    fn matches_no_process() {
+        assert!(!DefaultStrategy::matches_process(""));
+        assert!(!DefaultStrategy::matches_process("anything"));
     }
 }

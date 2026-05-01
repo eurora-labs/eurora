@@ -3,101 +3,18 @@
 	import { page } from '$app/state';
 	import { consumeAppRedirectUri, storeAppRedirectUri } from '$lib/auth/redirect-uri';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
-	import { AUTH_SERVICE } from '$lib/services/auth-service.js';
-	import { auth, accessToken, currentUser } from '$lib/stores/auth.js';
-	import { create } from '@bufbuild/protobuf';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
-	import {
-		Provider,
-		AssociateLoginTokenRequestSchema,
-		LoginRequestSchema,
-		CheckEmailRequestSchema,
-		RegisterRequestSchema,
-	} from '@eurora/shared/proto/auth_service_pb.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
-	import { get } from 'svelte/store';
+
+	const auth = inject(AUTH_SERVICE);
 
 	let appLoginDone = $state(false);
-	const authService = inject(AUTH_SERVICE);
 	let pendingAppLogin = $state<string | null>(null);
-
-	onMount(async () => {
-		try {
-			let loginToken = page.url.searchParams.get('code_challenge');
-			let challengeMethod = page.url.searchParams.get('code_challenge_method');
-			if (loginToken && challengeMethod) {
-				if (loginToken.length !== 43 || challengeMethod !== 'S256') {
-					console.error('Invalid login token or challenge method');
-					goto('/login?error=invalid_login_token');
-					return;
-				}
-				sessionStorage.setItem('loginToken', loginToken);
-				sessionStorage.setItem('challengeMethod', challengeMethod);
-				storeAppRedirectUri(page.url.searchParams.get('redirect_uri'));
-
-				const isValid = await auth.ensureValidToken();
-				if (isValid && get(accessToken)) {
-					pendingAppLogin = loginToken;
-				} else {
-					goto('/login');
-				}
-				return;
-			}
-			loginToken = sessionStorage.getItem('loginToken');
-			challengeMethod = sessionStorage.getItem('challengeMethod');
-		} catch (_error) {
-			goto('/login?error=invalid_login_token');
-			return;
-		}
-	});
-
-	async function handleConfirmAppLogin() {
-		if (!pendingAppLogin) return;
-		loading = true;
-		submitError = null;
-
-		const token = get(accessToken);
-		if (!token) {
-			submitError = 'Session expired. Please sign in again.';
-			pendingAppLogin = null;
-			loading = false;
-			return;
-		}
-
-		try {
-			const request = create(AssociateLoginTokenRequestSchema, {
-				codeChallenge: pendingAppLogin,
-			});
-			await authService.associateLoginToken(request, token);
-			sessionStorage.removeItem('loginToken');
-			sessionStorage.removeItem('challengeMethod');
-			appLoginDone = true;
-			pendingAppLogin = null;
-
-			const redirectUri = consumeAppRedirectUri();
-			if (redirectUri) {
-				window.location.href = redirectUri;
-				return;
-			}
-		} catch (err) {
-			console.error('Failed to associate login token:', err);
-			submitError = 'Failed to authorize the Eurora app. Please try again.';
-		} finally {
-			loading = false;
-		}
-	}
-
-	async function tryAssociateAppLogin(tokenValue: string): Promise<boolean> {
-		const associated = await authService.associateAppLoginIfPending(tokenValue, {
-			consumeRedirect: true,
-		});
-		if (associated) appLoginDone = true;
-		return associated;
-	}
-
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
 	let email = $state('');
@@ -112,29 +29,89 @@
 		}
 	}
 
+	onMount(async () => {
+		try {
+			const loginToken = page.url.searchParams.get('code_challenge');
+			const challengeMethod = page.url.searchParams.get('code_challenge_method');
+			if (!loginToken || !challengeMethod) return;
+
+			if (loginToken.length !== 43 || challengeMethod !== 'S256') {
+				Sentry.captureMessage('Invalid login token or challenge method', {
+					level: 'warning',
+					tags: { area: 'auth.app-login' },
+				});
+				goto('/login?error=invalid_login_token');
+				return;
+			}
+			sessionStorage.setItem('loginToken', loginToken);
+			sessionStorage.setItem('challengeMethod', challengeMethod);
+			storeAppRedirectUri(page.url.searchParams.get('redirect_uri'));
+
+			if ((await auth.ensureValidToken()) && auth.accessToken) {
+				pendingAppLogin = loginToken;
+			} else {
+				goto('/login');
+			}
+		} catch (error) {
+			Sentry.captureException(error, { tags: { area: 'auth.app-login' } });
+			goto('/login?error=invalid_login_token');
+		}
+	});
+
+	async function tryAssociateAppLogin(): Promise<boolean> {
+		const associated = await auth.associateAppLoginIfPending({ consumeRedirect: true });
+		if (associated) appLoginDone = true;
+		return associated;
+	}
+
+	async function handleConfirmAppLogin() {
+		if (!pendingAppLogin) return;
+		loading = true;
+		submitError = null;
+
+		if (!(await auth.ensureValidToken())) {
+			submitError = 'Session expired. Please sign in again.';
+			pendingAppLogin = null;
+			loading = false;
+			return;
+		}
+
+		try {
+			await auth.associateAppLogin(pendingAppLogin);
+			appLoginDone = true;
+			pendingAppLogin = null;
+
+			const redirectUri = consumeAppRedirectUri();
+			if (redirectUri) {
+				window.location.href = redirectUri;
+				return;
+			}
+		} catch (err) {
+			Sentry.captureException(err, { tags: { area: 'auth.associate-app' } });
+			submitError = 'Failed to authorize the Eurora app. Please try again.';
+		} finally {
+			loading = false;
+		}
+	}
+
 	async function handleEmailContinue() {
 		if (!email.trim()) return;
 		loading = true;
 		submitError = null;
 		try {
 			storeRedirectParam();
-			const resp = await authService.checkEmail(
-				create(CheckEmailRequestSchema, { email: email.trim() }),
-			);
-			if (resp.status === 'oauth' && resp.provider !== null) {
-				const provider =
-					resp.provider === Provider.GOOGLE ? Provider.GOOGLE : Provider.GITHUB;
-				const url = (await authService.getThirdPartyAuthUrl(provider)).url;
-				window.location.href = url;
+			const result = await auth.checkEmail(email.trim());
+			if (result.status === 'oauth') {
+				window.location.href = await auth.getOAuthRedirectUrl(result.provider);
 				return;
 			}
-			if (resp.status === 'not_found') {
+			if (result.status === 'not_found') {
 				showRegister = true;
 				return;
 			}
 			showPassword = true;
 		} catch (err) {
-			console.error('Check email error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.check-email' } });
 			submitError =
 				err instanceof Error ? err.message : 'Something went wrong. Please try again.';
 		} finally {
@@ -147,20 +124,13 @@
 		loading = true;
 		submitError = null;
 		try {
-			const request = create(LoginRequestSchema, {
-				credential: {
-					case: 'emailPassword',
-					value: { login: email.trim(), password },
-				},
-			});
-			const tokens = await authService.login(request);
-			auth.login(tokens);
-			if (await tryAssociateAppLogin(tokens.accessToken)) return;
+			await auth.login(email.trim(), password);
+			if (await tryAssociateAppLogin()) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
 		} catch (err) {
-			console.error('Email/password login error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.login-password' } });
 			submitError = err instanceof Error ? err.message : 'Invalid email or password.';
 			loading = false;
 		}
@@ -171,18 +141,13 @@
 		loading = true;
 		submitError = null;
 		try {
-			const request = create(RegisterRequestSchema, {
-				email: email.trim(),
-				password,
-			});
-			const tokens = await authService.register(request);
-			auth.login(tokens);
-			if (await tryAssociateAppLogin(tokens.accessToken)) return;
+			await auth.register(email.trim(), password);
+			if (await tryAssociateAppLogin()) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
 		} catch (err) {
-			console.error('Registration error:', err);
+			Sentry.captureException(err, { tags: { area: 'auth.register' } });
 			submitError =
 				err instanceof Error ? err.message : 'Registration failed. Please try again.';
 			loading = false;
@@ -194,10 +159,11 @@
 		submitError = null;
 		try {
 			storeRedirectParam();
-			const url = (await authService.getThirdPartyAuthUrl(Provider.GOOGLE)).url;
-			window.location.href = url;
+			window.location.href = await auth.getOAuthRedirectUrl('google');
 		} catch (err) {
-			console.error('Google login error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'auth.oauth-redirect', provider: 'google' },
+			});
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			loading = false;
 		}
@@ -208,10 +174,11 @@
 		submitError = null;
 		try {
 			storeRedirectParam();
-			const url = (await authService.getThirdPartyAuthUrl(Provider.GITHUB)).url;
-			window.location.href = url;
+			window.location.href = await auth.getOAuthRedirectUrl('github');
 		} catch (err) {
-			console.error('GitHub login error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'auth.oauth-redirect', provider: 'github' },
+			});
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			loading = false;
 		}
@@ -239,7 +206,7 @@
 			<div class="text-center">
 				<h1 class="text-3xl font-bold tracking-tight">Authorize the Eurora app</h1>
 				<p class="text-muted-foreground mt-2">
-					Sign in to the Eurora app as <strong>{$currentUser?.email}</strong>?
+					Sign in to the Eurora app as <strong>{auth.user?.email}</strong>?
 				</p>
 			</div>
 

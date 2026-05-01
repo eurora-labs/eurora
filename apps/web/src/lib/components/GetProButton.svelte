@@ -1,17 +1,20 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { auth, isAuthenticated, accessToken } from '$lib/stores/auth.js';
+	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
 	import { Button, type ButtonProps } from '@eurora/ui/components/button/index';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import type { Snippet } from 'svelte';
 
+	const auth = inject(AUTH_SERVICE);
 	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID ?? '';
+	const CHECKOUT_REDIRECT = '/pricing?checkout=true';
 
 	let {
 		class: className = '',
@@ -22,13 +25,14 @@
 	}: ButtonProps & { children?: Snippet; autoTrigger?: boolean } = $props();
 
 	let loading = $state(false);
+
 	onMount(() => {
 		if (autoTrigger) handleGetPro();
 	});
 
 	async function handleGetPro() {
-		if (!$isAuthenticated) {
-			goto('/login?redirect=' + encodeURIComponent('/pricing?checkout=true'));
+		if (!auth.isAuthenticated) {
+			goto('/login?redirect=' + encodeURIComponent(CHECKOUT_REDIRECT));
 			return;
 		}
 
@@ -36,7 +40,7 @@
 
 		try {
 			if (!(await auth.ensureValidToken())) {
-				goto('/login?redirect=' + encodeURIComponent('/pricing?checkout=true'));
+				goto('/login?redirect=' + encodeURIComponent(CHECKOUT_REDIRECT));
 				return;
 			}
 
@@ -44,25 +48,35 @@
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${$accessToken}`,
+					Authorization: `Bearer ${auth.accessToken}`,
 				},
 				body: JSON.stringify({
 					price_id: STRIPE_PRO_PRICE_ID,
 				}),
 			});
 
+			const body = (await res.json().catch(() => null)) as {
+				url?: string;
+				error?: string;
+			} | null;
+
 			if (!res.ok) {
-				const body = await res.json().catch(() => null);
 				throw new Error(body?.error ?? `Checkout failed (${res.status})`);
 			}
 
-			const { url } = await res.json();
-			window.location.href = url;
+			if (!body?.url) {
+				throw new Error('Checkout response missing redirect URL');
+			}
+			window.location.href = body.url;
 		} catch (err) {
-			console.error('Checkout error:', err);
+			Sentry.captureException(err, {
+				tags: { area: 'payment.checkout' },
+				extra: { priceId: STRIPE_PRO_PRICE_ID },
+			});
 			toast.error(
 				err instanceof Error ? err.message : 'Something went wrong. Please try again.',
 			);
+		} finally {
 			loading = false;
 		}
 	}

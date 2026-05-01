@@ -1,26 +1,26 @@
+use async_trait::async_trait;
+pub use euro_browser::{
+    BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
+    ResponseFrame,
+};
+use euro_native_messaging::NativeMessage;
+use euro_process::Browser;
+use focus_tracker::FocusedWindow;
+use serde::{Deserialize, Serialize};
+use std::sync::{
+    Arc, RwLock,
+    atomic::{AtomicU32, Ordering},
+};
+use tokio::sync::mpsc;
+use url::Url;
+
 pub use crate::strategies::ActivityStrategyFunctionality;
-pub use crate::strategies::processes::*;
 use crate::strategies::{ActivityReport, StrategyMetadata};
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
 use crate::{
     Activity, ActivityError,
     error::ActivityResult,
     types::{ActivityAsset, ActivitySnapshot},
-};
-use async_trait::async_trait;
-use euro_native_messaging::NativeMessage;
-use focus_tracker::FocusedWindow;
-use serde::{Deserialize, Serialize};
-use std::sync::{
-    Arc,
-    atomic::{AtomicU32, Ordering},
-};
-use tokio::sync::mpsc;
-use url::Url;
-
-pub use euro_browser::{
-    BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
-    ResponseFrame,
 };
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -34,8 +34,11 @@ pub struct BrowserStrategy {
     #[serde(skip)]
     event_subscription_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 
+    /// Name of the focused browser process. Shared with the event-listening
+    /// task so that `Activity` records emitted from tab events carry the
+    /// correct `process_name` instead of an empty placeholder.
     #[serde(skip)]
-    active_browser: Option<String>,
+    active_browser: Arc<RwLock<Option<String>>>,
 
     #[serde(skip)]
     active_browser_pid: Arc<AtomicU32>,
@@ -70,6 +73,7 @@ impl BrowserStrategy {
         let mut events_rx = service.subscribe_to_events();
         let last_url = Arc::clone(&self.last_url);
         let active_pid = Arc::clone(&self.active_browser_pid);
+        let active_browser = Arc::clone(&self.active_browser);
 
         let handle = tokio::spawn(async move {
             let last_url = Arc::clone(&last_url);
@@ -101,7 +105,9 @@ impl BrowserStrategy {
                     }
                 };
 
-                if event_frame.action.as_str() == "TAB_ACTIVATED" {
+                if event_frame.action.as_str() == "TAB_ACTIVATED"
+                    || event_frame.action.as_str() == "TAB_UPDATED"
+                {
                     let NativeMessage::NativeMetadata(data) = native_message else {
                         continue;
                     };
@@ -123,11 +129,18 @@ impl BrowserStrategy {
                     }
                     *prev = Some(url.clone());
 
+                    let process_name = active_browser
+                        .read()
+                        .ok()
+                        .and_then(|guard| guard.clone())
+                        .unwrap_or_default();
+
                     let activity = Activity::new_browser(
                         url,
                         metadata.title,
                         metadata.icon,
-                        String::new(),
+                        process_name,
+                        browser_pid,
                         vec![],
                     );
 
@@ -185,6 +198,80 @@ impl BrowserStrategy {
         fallback_pid
     }
 
+    /// Refresh `active_browser` / `active_browser_pid` for `focus_window`, fetch
+    /// fresh metadata, and emit a `NewActivity` report. Falls back to a
+    /// process-level activity when the bridge has no URL for us yet.
+    ///
+    /// Assumes `self.sender` is already populated (i.e. `start_tracking` ran).
+    async fn emit_activity_for_focus(
+        &mut self,
+        focus_window: &FocusedWindow,
+    ) -> ActivityResult<()> {
+        let process_name = focus_window.process_name.clone();
+        let focus_pid = focus_window.process_id;
+
+        let messenger_pid = self.resolve_messenger_pid(&process_name, focus_pid).await;
+        self.active_browser_pid
+            .store(messenger_pid, Ordering::Relaxed);
+        if let Ok(mut guard) = self.active_browser.write() {
+            *guard = Some(process_name.clone());
+        }
+
+        let sender = self
+            .sender
+            .clone()
+            .ok_or_else(|| ActivityError::Strategy("Sender not initialized".to_string()))?;
+
+        let activity = match self.get_metadata().await {
+            Ok(metadata) => match metadata.url {
+                Some(url) => {
+                    *self.last_url.lock().await = Some(url.clone());
+                    Activity::new_browser(
+                        url,
+                        metadata.title,
+                        metadata.icon,
+                        process_name.clone(),
+                        focus_pid,
+                        vec![],
+                    )
+                }
+                None => {
+                    tracing::warn!(
+                        "Browser metadata arrived without a URL; emitting process-level fallback for {}",
+                        process_name
+                    );
+                    *self.last_url.lock().await = None;
+                    Activity::new(
+                        process_name.clone(),
+                        None,
+                        focus_window.icon.clone(),
+                        process_name.clone(),
+                        focus_pid,
+                        vec![],
+                    )
+                }
+            },
+            Err(err) => {
+                tracing::warn!("Failed to get browser metadata: {}", err);
+                *self.last_url.lock().await = None;
+                Activity::new(
+                    process_name.clone(),
+                    None,
+                    focus_window.icon.clone(),
+                    process_name.clone(),
+                    focus_pid,
+                    vec![],
+                )
+            }
+        };
+
+        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+            tracing::warn!("Failed to send new activity report - receiver dropped");
+        }
+
+        Ok(())
+    }
+
     pub async fn new() -> ActivityResult<Self> {
         let mut strategy = BrowserStrategy::default();
         strategy.initialize_service().await?;
@@ -194,27 +281,8 @@ impl BrowserStrategy {
 
 #[async_trait]
 impl StrategySupport for BrowserStrategy {
-    fn get_supported_processes() -> Vec<&'static str> {
-        vec![
-            Librewolf.get_name(),
-            Firefox.get_name(),
-            Chrome.get_name(),
-            Edge.get_name(),
-            Brave.get_name(),
-            Opera.get_name(),
-            Vivaldi.get_name(),
-            ArcBrowser.get_name(),
-            TorBrowser.get_name(),
-            Chromium.get_name(),
-            Waterfox.get_name(),
-            PaleMoon.get_name(),
-            Zen.get_name(),
-            DuckDuckGo.get_name(),
-            Min.get_name(),
-            Falkon.get_name(),
-            Midori.get_name(),
-            SeaMonkey.get_name(),
-        ]
+    fn matches_process(process_name: &str) -> bool {
+        Browser::from_process_name(process_name).is_some()
     }
 
     async fn create() -> ActivityResult<ActivityStrategy> {
@@ -227,7 +295,7 @@ impl StrategySupport for BrowserStrategy {
 #[async_trait]
 impl ActivityStrategyFunctionality for BrowserStrategy {
     fn can_handle_process(&self, focus_window: &FocusedWindow) -> bool {
-        BrowserStrategy::get_supported_processes().contains(&focus_window.process_name.as_str())
+        BrowserStrategy::matches_process(&focus_window.process_name)
     }
 
     async fn start_tracking(
@@ -235,61 +303,14 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         focus_window: &FocusedWindow,
         sender: mpsc::UnboundedSender<ActivityReport>,
     ) -> ActivityResult<()> {
-        self.sender = Some(sender.clone());
-        let process_name = focus_window.process_name.clone();
-        self.active_browser = Some(process_name.clone());
-
-        let messenger_pid = self
-            .resolve_messenger_pid(&process_name, focus_window.process_id)
-            .await;
-        self.active_browser_pid
-            .store(messenger_pid, Ordering::Relaxed);
-
+        self.sender = Some(sender);
         self.init_collection().await?;
+        self.emit_activity_for_focus(focus_window).await?;
 
-        let activity = match self.get_metadata().await {
-            Ok(metadata) => match metadata.url {
-                Some(url) => {
-                    *self.last_url.lock().await = Some(url.clone());
-                    Activity::new_browser(
-                        url,
-                        metadata.title,
-                        metadata.icon,
-                        process_name.clone(),
-                        vec![],
-                    )
-                }
-                None => {
-                    tracing::warn!(
-                        "Browser metadata arrived without a URL; emitting process-level fallback for {}",
-                        process_name
-                    );
-                    Activity::new(
-                        focus_window.process_name.clone(),
-                        None,
-                        focus_window.icon.clone(),
-                        focus_window.process_name.clone(),
-                        vec![],
-                    )
-                }
-            },
-            Err(err) => {
-                tracing::warn!("Failed to get browser metadata: {}", err);
-                Activity::new(
-                    focus_window.process_name.clone(),
-                    None,
-                    focus_window.icon.clone(),
-                    focus_window.process_name.clone(),
-                    vec![],
-                )
-            }
-        };
-
-        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
-            tracing::warn!("Failed to send new activity report - receiver dropped");
-        }
-
-        tracing::debug!("Browser strategy starting tracking for: {:?}", process_name);
+        tracing::debug!(
+            "Browser strategy starting tracking for: {}",
+            focus_window.process_name
+        );
         Ok(())
     }
 
@@ -302,29 +323,36 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             focus_window.process_name
         );
 
-        if self.can_handle_process(focus_window) {
-            let messenger_pid = self
-                .resolve_messenger_pid(&focus_window.process_name, focus_window.process_id)
-                .await;
-            self.active_browser_pid
-                .store(messenger_pid, Ordering::Relaxed);
-            self.active_browser = Some(focus_window.process_name.to_string());
-
-            Ok(true)
-        } else {
+        if !self.can_handle_process(focus_window) {
             tracing::debug!(
                 "Browser strategy cannot handle: {}, stopping tracking",
                 focus_window.process_name
             );
             self.stop_tracking().await?;
-            Ok(false)
+            return Ok(false);
         }
+
+        let already_active = self
+            .active_browser
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .as_deref()
+            == Some(focus_window.process_name.as_str());
+        if already_active {
+            return Ok(true);
+        }
+
+        self.emit_activity_for_focus(focus_window).await?;
+        Ok(true)
     }
 
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
         tracing::debug!("Browser strategy stopping tracking");
 
-        self.active_browser = None;
+        if let Ok(mut guard) = self.active_browser.write() {
+            *guard = None;
+        }
         self.active_browser_pid.store(0, Ordering::Relaxed);
 
         Ok(())
@@ -408,17 +436,26 @@ mod tests {
     use crate::strategies::*;
 
     #[test]
-    fn test_supported_processes() {
-        let processes = BrowserStrategy::get_supported_processes();
-        assert!(!processes.is_empty());
-
+    fn matches_known_browser_per_target_os() {
         #[cfg(target_os = "windows")]
-        assert!(processes.contains(&"firefox.exe"));
+        assert!(BrowserStrategy::matches_process("firefox.exe"));
 
         #[cfg(target_os = "linux")]
-        assert!(processes.contains(&"firefox"));
+        assert!(BrowserStrategy::matches_process("firefox"));
 
         #[cfg(target_os = "macos")]
-        assert!(processes.contains(&"Firefox"));
+        assert!(BrowserStrategy::matches_process("Firefox"));
+    }
+
+    #[test]
+    fn does_not_match_unknown_process() {
+        assert!(!BrowserStrategy::matches_process(""));
+        assert!(!BrowserStrategy::matches_process("not-a-browser"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_dispatch_is_case_insensitive() {
+        assert!(BrowserStrategy::matches_process("FIREFOX.EXE"));
     }
 }

@@ -1,12 +1,11 @@
 use async_trait::async_trait;
-use euro_process::EuroraNightly;
+use euro_process::AppProcess;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::{
     error::ActivityResult,
-    processes::{Eurora, ProcessFunctionality},
     strategies::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
         StrategySupport,
@@ -19,8 +18,8 @@ pub struct NoStrategy;
 
 #[async_trait]
 impl StrategySupport for NoStrategy {
-    fn get_supported_processes() -> Vec<&'static str> {
-        vec![Eurora.get_name(), EuroraNightly.get_name()]
+    fn matches_process(process_name: &str) -> bool {
+        AppProcess::from_process_name(process_name).is_some()
     }
 
     async fn create() -> ActivityResult<ActivityStrategy> {
@@ -31,7 +30,7 @@ impl StrategySupport for NoStrategy {
 #[async_trait]
 impl ActivityStrategyFunctionality for NoStrategy {
     fn can_handle_process(&self, focus_window: &FocusedWindow) -> bool {
-        NoStrategy::get_supported_processes().contains(&focus_window.process_name.as_str())
+        NoStrategy::matches_process(&focus_window.process_name)
     }
 
     async fn start_tracking(

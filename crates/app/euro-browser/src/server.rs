@@ -55,13 +55,23 @@ pub struct RegisteredMessenger {
     pub browser_name: String,
 }
 
+/// Lightweight summary of a registered native messenger, broadcast on the
+/// registrations channel so subscribers can react to connect/disconnect
+/// transitions without taking a read lock on the registry.
+#[derive(Debug, Clone)]
+pub struct RegistrationEvent {
+    pub browser_pid: u32,
+    pub browser_name: String,
+}
+
 #[derive(Clone)]
 pub struct BrowserBridgeService {
     pub registry: Arc<RwLock<HashMap<u32, RegisteredMessenger>>>,
     pub app_from_tx: broadcast::Sender<Frame>,
     pub frames_from_messengers_tx: broadcast::Sender<(u32, Frame)>,
     events_tx: broadcast::Sender<(u32, EventFrame)>,
-    disconnects_tx: broadcast::Sender<u32>,
+    registrations_tx: broadcast::Sender<RegistrationEvent>,
+    disconnects_tx: broadcast::Sender<RegistrationEvent>,
     pending_requests: Arc<DashMap<u32, PendingRequest>>,
     request_id_counter: Arc<AtomicU32>,
 }
@@ -71,6 +81,7 @@ impl BrowserBridgeService {
         let (app_from_tx, _) = broadcast::channel(100);
         let (frames_from_messengers_tx, _) = broadcast::channel(100);
         let (events_tx, _) = broadcast::channel(100);
+        let (registrations_tx, _) = broadcast::channel(32);
         let (disconnects_tx, _) = broadcast::channel(32);
 
         Self {
@@ -78,6 +89,7 @@ impl BrowserBridgeService {
             app_from_tx,
             frames_from_messengers_tx,
             events_tx,
+            registrations_tx,
             disconnects_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
@@ -272,7 +284,15 @@ impl BrowserBridgeService {
         self.events_tx.subscribe()
     }
 
-    pub fn subscribe_to_disconnects(&self) -> broadcast::Receiver<u32> {
+    /// Receive a [`RegistrationEvent`] every time a native messenger
+    /// registers. Symmetric with [`Self::subscribe_to_disconnects`] —
+    /// subscribers can therefore observe the full lifecycle of a messenger
+    /// without polling the registry.
+    pub fn subscribe_to_registrations(&self) -> broadcast::Receiver<RegistrationEvent> {
+        self.registrations_tx.subscribe()
+    }
+
+    pub fn subscribe_to_disconnects(&self) -> broadcast::Receiver<RegistrationEvent> {
         self.disconnects_tx.subscribe()
     }
 
@@ -444,9 +464,16 @@ impl BrowserBridge for BrowserBridgeService {
                 registry.len()
             );
         }
+
+        let _ = self.registrations_tx.send(RegistrationEvent {
+            browser_pid,
+            browser_name: browser_name.clone(),
+        });
+
         let registry = self.registry.clone();
         let frames_tx = self.frames_from_messengers_tx.clone();
         let disconnects_tx = self.disconnects_tx.clone();
+        let browser_name_for_spawn = browser_name.clone();
 
         tokio::spawn(async move {
             tracing::info!(
@@ -491,7 +518,10 @@ impl BrowserBridge for BrowserBridgeService {
                 .is_some_and(|m| m.host_pid == host_pid)
             {
                 registry.remove(&browser_pid);
-                let _ = disconnects_tx.send(browser_pid);
+                let _ = disconnects_tx.send(RegistrationEvent {
+                    browser_pid,
+                    browser_name: browser_name_for_spawn.clone(),
+                });
                 tracing::info!(
                     "Unregistered native messenger for browser PID {} and host PID {}. Remaining: {}",
                     browser_pid,
