@@ -39,6 +39,16 @@ pub struct LocalBackendInfo {
     pub postgres_port: u16,
 }
 
+/// Push payload describing whether a given browser process currently has a
+/// native messenger connected. Emitted whenever the browser bridge registry
+/// transitions (a messenger registers or disconnects). The frontend uses
+/// this to update the "install extension" affordance without polling.
+#[derive(Clone, Debug, Serialize, Deserialize, Type)]
+pub struct BrowserExtensionStatus {
+    pub process_name: String,
+    pub connected: bool,
+}
+
 #[taurpc::procedures(path = "system")]
 pub trait SystemApi {
     async fn check_grpc_server_connection(server_address: Option<String>)
@@ -70,6 +80,15 @@ pub trait SystemApi {
     ) -> Result<LocalBackendInfo, String>;
 
     async fn get_browser_connection_count() -> Result<usize, String>;
+
+    async fn get_browser_extension_url(process_name: String) -> Result<Option<String>, String>;
+
+    async fn is_browser_extension_connected(process_name: String) -> Result<bool, String>;
+
+    async fn open_url_in_browser(process_id: u32, url: String) -> Result<(), String>;
+
+    #[taurpc(event)]
+    async fn browser_extension_status_changed(status: BrowserExtensionStatus);
 
     async fn focus_main_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
 }
@@ -454,6 +473,30 @@ impl SystemApi for SystemApiImpl {
         let service = euro_browser::BrowserBridgeService::get_or_init().await;
         let count = service.connection_count().await;
         Ok(count)
+    }
+
+    async fn get_browser_extension_url(
+        self,
+        process_name: String,
+    ) -> Result<Option<String>, String> {
+        Ok(euro_process::browser_store_for_process(&process_name)
+            .and_then(|store| store.extension_url())
+            .map(str::to_owned))
+    }
+
+    async fn is_browser_extension_connected(self, process_name: String) -> Result<bool, String> {
+        if process_name.is_empty() {
+            return Ok(false);
+        }
+        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+        Ok(service
+            .find_pid_by_browser_name(&process_name)
+            .await
+            .is_some())
+    }
+
+    async fn open_url_in_browser(self, process_id: u32, url: String) -> Result<(), String> {
+        crate::browser_launcher::open_url_in_process(process_id, &url)
     }
 
     async fn focus_main_window<R: Runtime>(

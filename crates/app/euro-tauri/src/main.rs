@@ -378,6 +378,8 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
                     name: activity_event.name.clone(),
                     accent,
                     icon_base64,
+                    process_name: activity_event.process_name.clone(),
+                    process_id: activity_event.process_id,
                 },
             );
         }
@@ -390,6 +392,61 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
             tracing::error!("Failed to start timeline collection: {e}");
         } else {
             tracing::debug!("Timeline collection started successfully");
+        }
+    });
+}
+
+/// Forward native-messenger registration / disconnect lifecycle events from
+/// the browser bridge to the frontend as `browser_extension_status_changed`
+/// events. The UI uses these to flip the "install extension" affordance the
+/// moment a messenger connects, without polling.
+fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
+    use euro_tauri::procedures::system_procedures::{
+        BrowserExtensionStatus, TauRpcSystemApiEventTrigger,
+    };
+
+    tauri::async_runtime::spawn(async move {
+        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+        let mut registrations_rx = service.subscribe_to_registrations();
+        let mut disconnects_rx = service.subscribe_to_disconnects();
+
+        loop {
+            tokio::select! {
+                event = registrations_rx.recv() => {
+                    match event {
+                        Ok(reg) => {
+                            let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
+                                .browser_extension_status_changed(BrowserExtensionStatus {
+                                    process_name: reg.browser_name,
+                                    connected: true,
+                                });
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!(
+                                "Browser registration subscription lagged by {n} events"
+                            );
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                event = disconnects_rx.recv() => {
+                    match event {
+                        Ok(reg) => {
+                            let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
+                                .browser_extension_status_changed(BrowserExtensionStatus {
+                                    process_name: reg.browser_name,
+                                    connected: false,
+                                });
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!(
+                                "Browser disconnect subscription lagged by {n} events"
+                            );
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            }
         }
     });
 }
@@ -466,6 +523,7 @@ fn main() {
 
                     init_state(tauri_app, &endpoint_manager)?;
                     spawn_timeline_listeners(tauri_app.handle().clone());
+                    spawn_browser_status_bridge(tauri_app.handle().clone());
 
                     Ok(())
                 })

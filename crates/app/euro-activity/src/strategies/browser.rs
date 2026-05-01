@@ -8,7 +8,7 @@ use euro_process::*;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use std::sync::{
-    Arc,
+    Arc, RwLock,
     atomic::{AtomicU32, Ordering},
 };
 use tokio::sync::mpsc;
@@ -34,8 +34,11 @@ pub struct BrowserStrategy {
     #[serde(skip)]
     event_subscription_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
 
+    /// Name of the focused browser process. Shared with the event-listening
+    /// task so that `Activity` records emitted from tab events carry the
+    /// correct `process_name` instead of an empty placeholder.
     #[serde(skip)]
-    active_browser: Option<String>,
+    active_browser: Arc<RwLock<Option<String>>>,
 
     #[serde(skip)]
     active_browser_pid: Arc<AtomicU32>,
@@ -70,6 +73,7 @@ impl BrowserStrategy {
         let mut events_rx = service.subscribe_to_events();
         let last_url = Arc::clone(&self.last_url);
         let active_pid = Arc::clone(&self.active_browser_pid);
+        let active_browser = Arc::clone(&self.active_browser);
 
         let handle = tokio::spawn(async move {
             let last_url = Arc::clone(&last_url);
@@ -125,11 +129,18 @@ impl BrowserStrategy {
                     }
                     *prev = Some(url.clone());
 
+                    let process_name = active_browser
+                        .read()
+                        .ok()
+                        .and_then(|guard| guard.clone())
+                        .unwrap_or_default();
+
                     let activity = Activity::new_browser(
                         url,
                         metadata.title,
                         metadata.icon,
-                        String::new(),
+                        process_name,
+                        browser_pid,
                         vec![],
                     );
 
@@ -197,13 +208,14 @@ impl BrowserStrategy {
         focus_window: &FocusedWindow,
     ) -> ActivityResult<()> {
         let process_name = focus_window.process_name.clone();
+        let focus_pid = focus_window.process_id;
 
-        let messenger_pid = self
-            .resolve_messenger_pid(&process_name, focus_window.process_id)
-            .await;
+        let messenger_pid = self.resolve_messenger_pid(&process_name, focus_pid).await;
         self.active_browser_pid
             .store(messenger_pid, Ordering::Relaxed);
-        self.active_browser = Some(process_name.clone());
+        if let Ok(mut guard) = self.active_browser.write() {
+            *guard = Some(process_name.clone());
+        }
 
         let sender = self
             .sender
@@ -219,6 +231,7 @@ impl BrowserStrategy {
                         metadata.title,
                         metadata.icon,
                         process_name.clone(),
+                        focus_pid,
                         vec![],
                     )
                 }
@@ -233,6 +246,7 @@ impl BrowserStrategy {
                         None,
                         focus_window.icon.clone(),
                         process_name.clone(),
+                        focus_pid,
                         vec![],
                     )
                 }
@@ -245,6 +259,7 @@ impl BrowserStrategy {
                     None,
                     focus_window.icon.clone(),
                     process_name.clone(),
+                    focus_pid,
                     vec![],
                 )
             }
@@ -336,7 +351,14 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             return Ok(false);
         }
 
-        if self.active_browser.as_deref() == Some(focus_window.process_name.as_str()) {
+        let already_active = self
+            .active_browser
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
+            .as_deref()
+            == Some(focus_window.process_name.as_str());
+        if already_active {
             return Ok(true);
         }
 
@@ -347,7 +369,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     async fn stop_tracking(&mut self) -> ActivityResult<()> {
         tracing::debug!("Browser strategy stopping tracking");
 
-        self.active_browser = None;
+        if let Ok(mut guard) = self.active_browser.write() {
+            *guard = None;
+        }
         self.active_browser_pid.store(0, Ordering::Relaxed);
 
         Ok(())

@@ -47,6 +47,7 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
             focus_window.window_title.clone(),
             focus_window.icon.clone(),
             focus_window.process_name.clone(),
+            focus_window.process_id,
             vec![],
         );
 
