@@ -141,6 +141,8 @@ impl CollectorService {
 
                         let focus_event = ActivityEvent {
                             name: activity.name.clone(),
+                            process_name: activity.process_name.clone(),
+                            process_id: activity.process_id,
                             icon: activity.icon.clone(),
                         };
                         let _ = activity_event_tx_inner.send(focus_event);

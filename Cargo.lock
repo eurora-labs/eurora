@@ -3799,6 +3799,7 @@ dependencies = [
  "euro-browser",
  "euro-encrypt",
  "euro-endpoint",
+ "euro-process",
  "euro-secret",
  "euro-settings",
  "euro-thread",
