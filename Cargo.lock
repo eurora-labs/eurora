@@ -3894,8 +3894,6 @@ dependencies = [
  "euro-storage",
  "serde",
  "serde_json",
- "tokio",
- "tonic",
  "uuid",
 ]
 
