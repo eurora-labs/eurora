@@ -58,6 +58,7 @@ pub struct RegistrationEvent {
 struct ServerHandle {
     shutdown_tx: watch::Sender<bool>,
     task: JoinHandle<()>,
+    local_addr: SocketAddr,
 }
 
 /// In-process bridge service. A single instance is shared via
@@ -195,12 +196,32 @@ impl BridgeService {
         });
     }
 
-    /// Bind and serve the bridge on `{BRIDGE_HOST}:{BRIDGE_PORT}`. The
-    /// listener is bound before this returns; the accept loop runs in
-    /// the background. Calling again while the server is already
-    /// running is a no-op. If a previous server task ended (e.g. the
-    /// process panicked), it is reaped and a fresh server is started.
-    pub async fn start_server(&self) -> Result<(), std::io::Error> {
+    /// Bind and serve the bridge on `{BRIDGE_HOST}:{BRIDGE_PORT}` and
+    /// return the resolved local address. Equivalent to
+    /// [`start_server_on`] with the well-known address.
+    pub async fn start_server(&self) -> Result<SocketAddr, std::io::Error> {
+        let bind_addr: SocketAddr = (
+            BRIDGE_HOST
+                .parse::<std::net::IpAddr>()
+                .expect("valid loopback ip"),
+            BRIDGE_PORT,
+        )
+            .into();
+        self.start_server_on(bind_addr).await
+    }
+
+    /// Bind and serve the bridge on `bind_addr`. Use port `0` to let
+    /// the OS pick an ephemeral port; the returned [`SocketAddr`] is
+    /// the resolved one (with the chosen port filled in). The listener
+    /// is bound before this returns; the accept loop runs in the
+    /// background. Calling again while the server is already running
+    /// is a no-op that returns the existing local address. If a
+    /// previous server task ended (e.g. the process panicked), it is
+    /// reaped and a fresh server is started.
+    pub async fn start_server_on(
+        &self,
+        bind_addr: SocketAddr,
+    ) -> Result<SocketAddr, std::io::Error> {
         let mut guard = self.server.lock().await;
 
         if let Some(handle) = guard.as_ref()
@@ -210,20 +231,14 @@ impl BridgeService {
             *guard = None;
         }
 
-        if guard.is_some() {
+        if let Some(handle) = guard.as_ref() {
             tracing::debug!("Bridge WebSocket server already running");
-            return Ok(());
+            return Ok(handle.local_addr);
         }
 
-        let bind_addr: SocketAddr = (
-            BRIDGE_HOST
-                .parse::<std::net::IpAddr>()
-                .expect("valid loopback ip"),
-            BRIDGE_PORT,
-        )
-            .into();
         let listener = TcpListener::bind(bind_addr).await?;
-        tracing::info!("Bridge WebSocket server listening on {bind_addr}{BRIDGE_PATH}");
+        let local_addr = listener.local_addr()?;
+        tracing::info!("Bridge WebSocket server listening on {local_addr}{BRIDGE_PATH}");
 
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
         let app = Router::new()
@@ -247,8 +262,23 @@ impl BridgeService {
             tracing::info!("Bridge WebSocket server stopped");
         });
 
-        *guard = Some(ServerHandle { shutdown_tx, task });
-        Ok(())
+        *guard = Some(ServerHandle {
+            shutdown_tx,
+            task,
+            local_addr,
+        });
+        Ok(local_addr)
+    }
+
+    /// Address the running server is bound to, or `None` if the server
+    /// is not currently running. Useful for tests that bind to an
+    /// ephemeral port and need the resolved address to dial.
+    pub async fn local_addr(&self) -> Option<SocketAddr> {
+        self.server
+            .lock()
+            .await
+            .as_ref()
+            .map(|handle| handle.local_addr)
     }
 
     /// Signal the running server to shut down, then wait for the

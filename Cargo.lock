@@ -3762,10 +3762,13 @@ dependencies = [
  "euro-bridge-protocol",
  "euro-browser",
  "euro-process",
+ "futures-util",
  "serde",
  "serde_json",
  "specta",
  "specta-typescript",
+ "tokio",
+ "tokio-tungstenite",
  "tracing",
  "uuid",
 ]

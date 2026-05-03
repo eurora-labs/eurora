@@ -3,14 +3,14 @@ pub mod server;
 
 pub use euro_bridge_protocol::{
     BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, ErrorFrame, EventFrame, Frame,
-    FrameKind, RegisterFrame, RequestFrame, ResponseFrame, bridge_url,
+    FrameKind, RegisterFrame, RequestFrame, ResponseFrame, bridge_url, bridge_url_for,
 };
 pub use server::{BridgeService, RegisteredClient, RegistrationEvent};
 
 /// Initialize and start the browser bridge WebSocket server. Idempotent —
-/// safe to call multiple times. Returns the bind error if the listener
-/// can't be opened.
-pub async fn start_bridge_server() -> Result<(), std::io::Error> {
+/// safe to call multiple times. Returns the resolved local address on
+/// success, or the bind error if the listener can't be opened.
+pub async fn start_bridge_server() -> Result<std::net::SocketAddr, std::io::Error> {
     BridgeService::get_or_init().await.start_server().await
 }
 

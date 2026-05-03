@@ -2,33 +2,38 @@
 //! `tokio-tungstenite` client. Uses the production server entrypoint so
 //! the upgrade path, registration, dispatch, and shutdown are
 //! exercised together.
+//!
+//! Each test binds to an ephemeral port via `start_server_on` so the
+//! suite can run alongside (or in parallel with) anything that holds
+//! the well-known bridge port.
 
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use euro_browser::{
     BridgeError, BridgeService, EventFrame, Frame, FrameKind, RegisterFrame, ResponseFrame,
+    bridge_url_for,
 };
 use futures_util::{SinkExt, StreamExt};
-use tokio::net::TcpListener;
 use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::protocol::Message as TMessage;
 
+/// Bind the bridge to an ephemeral loopback port for the duration of a
+/// single test.
+async fn start_ephemeral_bridge() -> (BridgeService, SocketAddr) {
+    let service = BridgeService::new();
+    let addr = service
+        .start_server_on(([127, 0, 0, 1], 0).into())
+        .await
+        .expect("bind ephemeral bridge");
+    (service, addr)
+}
+
 #[tokio::test]
 async fn round_trip_request_response() {
-    // The bridge always binds the well-known port; skip if something
-    // else is already on it (e.g. a desktop app running locally).
-    if TcpListener::bind(("127.0.0.1", euro_browser::BRIDGE_PORT))
-        .await
-        .is_err()
-    {
-        eprintln!("skipping: bridge port already bound");
-        return;
-    }
+    let (service, addr) = start_ephemeral_bridge().await;
 
-    let service = BridgeService::new();
-    service.start_server().await.expect("bind bridge");
-
-    let url = euro_browser::bridge_url();
+    let url = bridge_url_for(addr);
     let (mut ws, _resp) = tokio_tungstenite::connect_async(&url).await.unwrap();
 
     let host_pid = 9_999_999;
@@ -128,18 +133,9 @@ async fn send_request_to_unregistered_app_returns_not_found() {
 /// registry, and expose it via `find_clients_by_kind`.
 #[tokio::test]
 async fn register_with_app_kind_is_discoverable() {
-    if TcpListener::bind(("127.0.0.1", euro_browser::BRIDGE_PORT))
-        .await
-        .is_err()
-    {
-        eprintln!("skipping: bridge port already bound");
-        return;
-    }
+    let (service, addr) = start_ephemeral_bridge().await;
 
-    let service = BridgeService::new();
-    service.start_server().await.expect("bind bridge");
-
-    let url = euro_browser::bridge_url();
+    let url = bridge_url_for(addr);
     let (mut ws, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
 
     let host_pid = 0;
@@ -183,29 +179,52 @@ async fn register_with_app_kind_is_discoverable() {
 
 #[tokio::test]
 async fn server_can_be_stopped_and_restarted() {
-    if TcpListener::bind(("127.0.0.1", euro_browser::BRIDGE_PORT))
-        .await
-        .is_err()
-    {
-        eprintln!("skipping: bridge port already bound");
-        return;
-    }
-
     let service = BridgeService::new();
 
-    service.start_server().await.expect("first bind");
+    let first_addr = service
+        .start_server_on(([127, 0, 0, 1], 0).into())
+        .await
+        .expect("first bind");
+    assert_eq!(service.local_addr().await, Some(first_addr));
     service.stop_server().await;
+    assert_eq!(service.local_addr().await, None);
 
     // After a clean stop the listener must be free, and a second
     // start_server must succeed without leaking the previous shutdown
-    // signal.
-    service.start_server().await.expect("second bind");
+    // signal. We deliberately request a fresh ephemeral port — the OS
+    // may or may not hand back the same one, and the test should not
+    // depend on it.
+    let second_addr = service
+        .start_server_on(([127, 0, 0, 1], 0).into())
+        .await
+        .expect("second bind");
 
-    let url = euro_browser::bridge_url();
+    let url = bridge_url_for(second_addr);
     let (mut ws, _) = tokio_tungstenite::connect_async(&url)
         .await
         .expect("connect after restart");
     ws.close(None).await.unwrap();
+
+    service.stop_server().await;
+}
+
+/// Re-binding while already running must be a no-op that surfaces the
+/// existing local address, not a spurious bind error.
+#[tokio::test]
+async fn start_server_on_is_idempotent() {
+    let service = BridgeService::new();
+    let first = service
+        .start_server_on(([127, 0, 0, 1], 0).into())
+        .await
+        .expect("first bind");
+
+    // Asking for a different port while running must still return the
+    // currently-bound address rather than rebinding.
+    let second = service
+        .start_server_on(([127, 0, 0, 1], 0).into())
+        .await
+        .expect("second call returns running addr");
+    assert_eq!(first, second);
 
     service.stop_server().await;
 }
