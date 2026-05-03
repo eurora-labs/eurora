@@ -7,8 +7,13 @@ description = "Asset types and TypeScript bindings for the Eurora Office add-in 
 
 [dependencies]
 euro-bridge-protocol = { workspace = true }
+euro-browser = { workspace = true }
+euro-process = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 anyhow = { workspace = true, optional = true }
 specta-typescript = { version = "0.0.10", optional = true }
