@@ -26,9 +26,7 @@ async fn round_trip_request_response() {
     }
 
     let service = BridgeService::new();
-    service.start_frame_handler();
-    service.start_server().await;
-    tokio::time::sleep(Duration::from_millis(50)).await;
+    service.start_server().await.expect("bind bridge");
 
     let url = euro_browser::bridge_url();
     let (mut ws, _resp) = tokio_tungstenite::connect_async(&url).await.unwrap();
@@ -109,7 +107,7 @@ async fn round_trip_request_response() {
         .unwrap();
     assert_eq!(disc.app_pid, app_pid);
 
-    BridgeService::stop_server().await;
+    service.stop_server().await;
 }
 
 #[tokio::test]
@@ -117,4 +115,33 @@ async fn send_request_to_unregistered_app_returns_not_found() {
     let service = BridgeService::new();
     let result = service.send_request(0, "GET_METADATA", None).await;
     assert!(matches!(result, Err(BridgeError::NotFound { app_pid: 0 })));
+}
+
+#[tokio::test]
+async fn server_can_be_stopped_and_restarted() {
+    if TcpListener::bind(("127.0.0.1", euro_browser::BRIDGE_PORT))
+        .await
+        .is_err()
+    {
+        eprintln!("skipping: bridge port already bound");
+        return;
+    }
+
+    let service = BridgeService::new();
+
+    service.start_server().await.expect("first bind");
+    service.stop_server().await;
+
+    // After a clean stop the listener must be free, and a second
+    // start_server must succeed without leaking the previous shutdown
+    // signal.
+    service.start_server().await.expect("second bind");
+
+    let url = euro_browser::bridge_url();
+    let (mut ws, _) = tokio_tungstenite::connect_async(&url)
+        .await
+        .expect("connect after restart");
+    ws.close(None).await.unwrap();
+
+    service.stop_server().await;
 }

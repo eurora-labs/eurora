@@ -45,7 +45,9 @@ impl TimelineManager {
         tracing::debug!("Starting timeline manager");
 
         tracing::info!("Starting bridge WebSocket server");
-        euro_browser::start_bridge_server().await;
+        if let Err(err) = euro_browser::start_bridge_server().await {
+            tracing::error!("Failed to start bridge WebSocket server: {err}");
+        }
 
         self.collector.start().await
     }

@@ -8,15 +8,16 @@ pub use euro_bridge_protocol::{
 pub use server::{BridgeService, RegisteredClient, RegistrationEvent};
 
 /// Initialize and start the browser bridge WebSocket server. Idempotent —
-/// safe to call multiple times.
-pub async fn start_bridge_server() {
-    let service = BridgeService::get_or_init().await;
-    service.start_frame_handler();
-    service.start_server().await;
+/// safe to call multiple times. Returns the bind error if the listener
+/// can't be opened.
+pub async fn start_bridge_server() -> Result<(), std::io::Error> {
+    BridgeService::get_or_init().await.start_server().await
 }
 
-/// Signal the running bridge server to shut down gracefully. No-op if
-/// the server isn't running.
+/// Signal the running bridge server to shut down and wait for it to
+/// terminate. No-op if the server isn't running (or was never started).
 pub async fn stop_bridge_server() {
-    BridgeService::stop_server().await;
+    if let Some(service) = BridgeService::get() {
+        service.stop_server().await;
+    }
 }
