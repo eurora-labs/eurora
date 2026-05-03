@@ -48,12 +48,24 @@ export type FrameKind =
 
 /**
  *  Mandatory first frame on every connection. Identifies the host
- *  process (the bridge) and the application process being represented
- *  (e.g. the Chrome PID).
+ *  process (the bridge) and the application process being represented.
+ *
+ *  `app_pid` is the OS PID for clients that have one (browsers via the
+ *  native-messaging host, the macOS launcher representing Safari).
+ *  Sandboxed clients without access to a real PID — Office.js add-ins
+ *  in particular — synthesize a stable per-session identifier and set
+ *  `app_kind` to a logical name (e.g. `"microsoft-word"`) so the
+ *  desktop can locate the client without relying on OS process lookup.
  */
 export type RegisterFrame = {
 	host_pid: number;
 	app_pid: number;
+	/**
+	 *  Logical client identifier for non-PID-based integrations.
+	 *  `None` for clients whose `app_pid` corresponds to a real OS
+	 *  process discoverable via process-name lookup.
+	 */
+	app_kind?: string | null;
 };
 
 // Desktop-initiated request to a connected client.

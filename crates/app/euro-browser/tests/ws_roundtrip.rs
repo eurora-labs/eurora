@@ -34,8 +34,12 @@ async fn round_trip_request_response() {
     let host_pid = 9_999_999;
     let app_pid = std::process::id();
 
-    let register =
-        serde_json::to_string(&Frame::from(RegisterFrame { host_pid, app_pid })).unwrap();
+    let register = serde_json::to_string(&Frame::from(RegisterFrame {
+        host_pid,
+        app_pid,
+        app_kind: None,
+    }))
+    .unwrap();
     ws.send(TMessage::text(register)).await.unwrap();
 
     let mut registrations = service.subscribe_to_registrations();
@@ -44,6 +48,7 @@ async fn round_trip_request_response() {
         .expect("registration not received in time")
         .expect("registration channel closed");
     assert_eq!(event.app_pid, app_pid);
+    assert!(event.app_kind.is_none());
     assert_eq!(service.connection_count(), 1);
 
     let svc = service.clone();
@@ -115,6 +120,65 @@ async fn send_request_to_unregistered_app_returns_not_found() {
     let service = BridgeService::new();
     let result = service.send_request(0, "GET_METADATA", None).await;
     assert!(matches!(result, Err(BridgeError::NotFound { app_pid: 0 })));
+}
+
+/// Sandboxed clients (Word add-in, future Office integrations) register
+/// with a logical `app_kind` instead of a real OS PID. The desktop must
+/// surface the kind on the registration event, persist it on the
+/// registry, and expose it via `find_clients_by_kind`.
+#[tokio::test]
+async fn register_with_app_kind_is_discoverable() {
+    if TcpListener::bind(("127.0.0.1", euro_browser::BRIDGE_PORT))
+        .await
+        .is_err()
+    {
+        eprintln!("skipping: bridge port already bound");
+        return;
+    }
+
+    let service = BridgeService::new();
+    service.start_server().await.expect("bind bridge");
+
+    let url = euro_browser::bridge_url();
+    let (mut ws, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+
+    let host_pid = 0;
+    let app_pid = 0xC0FFEE;
+    let kind = "microsoft-word";
+
+    let register = serde_json::to_string(&Frame::from(RegisterFrame {
+        host_pid,
+        app_pid,
+        app_kind: Some(kind.into()),
+    }))
+    .unwrap();
+
+    let mut registrations = service.subscribe_to_registrations();
+    ws.send(TMessage::text(register)).await.unwrap();
+
+    let event = timeout(Duration::from_secs(2), registrations.recv())
+        .await
+        .expect("registration not received in time")
+        .expect("registration channel closed");
+    assert_eq!(event.app_pid, app_pid);
+    assert_eq!(event.app_kind.as_deref(), Some(kind));
+
+    let pids = service.find_clients_by_kind(kind);
+    assert_eq!(pids, vec![app_pid]);
+
+    let mut disconnects = service.subscribe_to_disconnects();
+    ws.close(None).await.unwrap();
+    drop(ws);
+
+    let disc = timeout(Duration::from_secs(2), disconnects.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(disc.app_pid, app_pid);
+    assert_eq!(disc.app_kind.as_deref(), Some(kind));
+    assert!(service.find_clients_by_kind(kind).is_empty());
+
+    service.stop_server().await;
 }
 
 #[tokio::test]

@@ -216,7 +216,9 @@ fn render_externally_tagged_extension(decl: &EnumDecl) -> String {
 
     out.push_str("    public init(from decoder: Decoder) throws {\n");
     out.push_str("        let container = try decoder.container(keyedBy: CodingKeys.self)\n");
-    out.push_str("        guard container.allKeys.count == 1, let key = container.allKeys.first else {\n");
+    out.push_str(
+        "        guard container.allKeys.count == 1, let key = container.allKeys.first else {\n",
+    );
     out.push_str("            throw DecodingError.dataCorrupted(\n");
     out.push_str("                DecodingError.Context(\n");
     out.push_str("                    codingPath: decoder.codingPath,\n");

@@ -55,8 +55,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegat
 
         let hostPid = UInt32(getpid())
         let appPid = findSafariPid().map { UInt32($0) } ?? 0
-        logger.info("Starting bridge WebSocket client: host=\(hostPid, privacy: .public), app=\(appPid, privacy: .public)")
-        let client = BridgeWebSocketClient(hostPid: hostPid, appPid: appPid)
+        let appKind = "safari"
+        logger.info("Starting bridge WebSocket client: host=\(hostPid, privacy: .public), app=\(appPid, privacy: .public), kind=\(appKind, privacy: .public)")
+        let client = BridgeWebSocketClient(hostPid: hostPid, appPid: appPid, appKind: appKind)
         client.delegate = self
         client.start()
         self.bridgeClient = client
