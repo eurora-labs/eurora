@@ -23,7 +23,11 @@ export default ts.config(
 				projectService: {
 					// This prevents lint error when running eslint from
 					// subdirectories, ignoring the root tsconfig.json
-					allowDefaultProject: ['svelte.config.js', 'packages/shared/vite.config.ts'],
+					allowDefaultProject: [
+						'svelte.config.js',
+						'packages/shared/vite.config.ts',
+						'apps/office-addin/scripts/render-manifest.mjs',
+					],
 				},
 			},
 		},
