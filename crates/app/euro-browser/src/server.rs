@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use axum::Router;
@@ -16,7 +16,8 @@ use euro_bridge_protocol::{
 };
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
-use tokio::sync::{OnceCell, broadcast, mpsc, oneshot, watch};
+use tokio::sync::{Mutex, OnceCell, broadcast, mpsc, oneshot, watch};
+use tokio::task::JoinHandle;
 
 use crate::process_name::get_process_name;
 
@@ -26,9 +27,6 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 const OUTBOUND_QUEUE_SIZE: usize = 32;
 
 static GLOBAL_SERVICE: OnceCell<BridgeService> = OnceCell::const_new();
-static SERVER_STARTED: AtomicBool = AtomicBool::new(false);
-static FRAME_HANDLER_STARTED: AtomicBool = AtomicBool::new(false);
-static SHUTDOWN_TX: OnceCell<watch::Sender<bool>> = OnceCell::const_new();
 
 /// A WebSocket-connected bridge client (typically a browser
 /// native-messaging host).
@@ -52,6 +50,11 @@ pub struct RegistrationEvent {
     pub app_name: String,
 }
 
+struct ServerHandle {
+    shutdown_tx: watch::Sender<bool>,
+    task: JoinHandle<()>,
+}
+
 /// In-process bridge service. A single instance is shared via
 /// [`BridgeService::get_or_init`]; clones are cheap because all state
 /// lives behind `Arc`s and tokio channels.
@@ -64,6 +67,7 @@ pub struct BridgeService {
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
     pending_requests: Arc<DashMap<u32, oneshot::Sender<Frame>>>,
     request_id_counter: Arc<AtomicU32>,
+    server: Arc<Mutex<Option<ServerHandle>>>,
 }
 
 impl Default for BridgeService {
@@ -73,13 +77,17 @@ impl Default for BridgeService {
 }
 
 impl BridgeService {
+    /// Build a new service and spawn its frame-dispatch task. The
+    /// dispatch task runs for the lifetime of the service (it exits
+    /// when the inbound broadcast sender is dropped, i.e. when the
+    /// last clone of this service is gone).
     pub fn new() -> Self {
         let (frames_from_clients_tx, _) = broadcast::channel(100);
         let (events_tx, _) = broadcast::channel(100);
         let (registrations_tx, _) = broadcast::channel(32);
         let (disconnects_tx, _) = broadcast::channel(32);
 
-        Self {
+        let service = Self {
             registry: Arc::new(DashMap::new()),
             frames_from_clients_tx,
             events_tx,
@@ -87,24 +95,26 @@ impl BridgeService {
             disconnects_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
-        }
-    }
-
-    pub async fn get_or_init() -> &'static BridgeService {
-        let service = GLOBAL_SERVICE
-            .get_or_init(|| async { BridgeService::new() })
-            .await;
-        service.start_frame_handler();
+            server: Arc::new(Mutex::new(None)),
+        };
+        service.spawn_frame_handler();
         service
     }
 
-    /// Spawn the dispatch loop that turns inbound client frames into
-    /// resolved request futures and broadcast events. Idempotent.
-    pub fn start_frame_handler(&self) {
-        if FRAME_HANDLER_STARTED.swap(true, Ordering::SeqCst) {
-            return;
-        }
+    pub async fn get_or_init() -> &'static BridgeService {
+        GLOBAL_SERVICE
+            .get_or_init(|| async { BridgeService::new() })
+            .await
+    }
 
+    /// Returns the global service if [`get_or_init`] has been called at
+    /// least once, otherwise `None`. Useful for shutdown paths that
+    /// shouldn't accidentally bring the service into existence.
+    pub fn get() -> Option<&'static BridgeService> {
+        GLOBAL_SERVICE.get()
+    }
+
+    fn spawn_frame_handler(&self) {
         let pending_requests = Arc::clone(&self.pending_requests);
         let events_tx = self.events_tx.clone();
         let mut frames_rx = self.frames_from_clients_tx.subscribe();
@@ -181,24 +191,24 @@ impl BridgeService {
     }
 
     /// Bind and serve the bridge on `{BRIDGE_HOST}:{BRIDGE_PORT}`. The
-    /// server task runs in the background; this method returns once the
-    /// listener is ready (or immediately if the server is already
-    /// running).
-    pub async fn start_server(&self) {
-        if SERVER_STARTED
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_err()
+    /// listener is bound before this returns; the accept loop runs in
+    /// the background. Calling again while the server is already
+    /// running is a no-op. If a previous server task ended (e.g. the
+    /// process panicked), it is reaped and a fresh server is started.
+    pub async fn start_server(&self) -> Result<(), std::io::Error> {
+        let mut guard = self.server.lock().await;
+
+        if let Some(handle) = guard.as_ref()
+            && handle.task.is_finished()
         {
-            tracing::debug!("Bridge WebSocket server already running");
-            return;
+            tracing::warn!("Reaping bridge server task that exited unexpectedly; restarting");
+            *guard = None;
         }
 
-        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
-        let _ = SHUTDOWN_TX.set(shutdown_tx);
-
-        let app = Router::new()
-            .route(BRIDGE_PATH, get(ws_upgrade))
-            .with_state(self.clone());
+        if guard.is_some() {
+            tracing::debug!("Bridge WebSocket server already running");
+            return Ok(());
+        }
 
         let bind_addr: SocketAddr = (
             BRIDGE_HOST
@@ -207,54 +217,53 @@ impl BridgeService {
             BRIDGE_PORT,
         )
             .into();
-        let listener = match TcpListener::bind(bind_addr).await {
-            Ok(listener) => listener,
-            Err(err) => {
-                tracing::error!("Failed to bind bridge WebSocket server on {bind_addr}: {err}");
-                SERVER_STARTED.store(false, Ordering::SeqCst);
-                return;
-            }
-        };
-
+        let listener = TcpListener::bind(bind_addr).await?;
         tracing::info!("Bridge WebSocket server listening on {bind_addr}{BRIDGE_PATH}");
 
-        tokio::spawn(async move {
+        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        let app = Router::new()
+            .route(BRIDGE_PATH, get(ws_upgrade))
+            .with_state(self.clone());
+
+        let task = tokio::spawn(async move {
             let serve = axum::serve(
                 listener,
                 app.into_make_service_with_connect_info::<SocketAddr>(),
             )
             .with_graceful_shutdown(async move {
-                while shutdown_rx.changed().await.is_ok() {
-                    if *shutdown_rx.borrow() {
-                        tracing::info!("Bridge WebSocket server received shutdown signal");
-                        break;
-                    }
-                }
+                let _ = shutdown_rx.wait_for(|v| *v).await;
+                tracing::info!("Bridge WebSocket server received shutdown signal");
             });
 
             if let Err(err) = serve.await {
                 tracing::error!("Bridge WebSocket server error: {err}");
             }
 
-            SERVER_STARTED.store(false, Ordering::SeqCst);
             tracing::info!("Bridge WebSocket server stopped");
         });
+
+        *guard = Some(ServerHandle { shutdown_tx, task });
+        Ok(())
     }
 
-    pub async fn stop_server() {
-        if !SERVER_STARTED.load(Ordering::SeqCst) {
+    /// Signal the running server to shut down, then wait for the
+    /// accept loop and any in-flight connections to fully terminate.
+    /// No-op if the server isn't running. The lock is held across the
+    /// wait so a concurrent [`start_server`] doesn't race the listener
+    /// for the port.
+    pub async fn stop_server(&self) {
+        let mut guard = self.server.lock().await;
+        let Some(handle) = guard.take() else {
             tracing::debug!("Bridge WebSocket server is not running");
             return;
-        }
+        };
 
-        if let Some(tx) = SHUTDOWN_TX.get() {
-            tracing::info!("Sending shutdown signal to bridge WebSocket server");
-            let _ = tx.send(true);
-        }
-    }
+        tracing::info!("Sending shutdown signal to bridge WebSocket server");
+        let _ = handle.shutdown_tx.send(true);
 
-    pub fn is_server_running() -> bool {
-        SERVER_STARTED.load(Ordering::SeqCst)
+        if let Err(err) = handle.task.await {
+            tracing::warn!("Bridge WebSocket server task ended unexpectedly: {err}");
+        }
     }
 
     /// Receive an [`EventFrame`] every time a client pushes one. The
@@ -618,7 +627,6 @@ mod tests {
     #[tokio::test]
     async fn send_request_resolves_when_response_arrives() {
         let service = BridgeService::new();
-        service.start_frame_handler();
 
         let (outbound_tx, mut outbound_rx) = mpsc::channel::<Frame>(8);
         service.registry.insert(
