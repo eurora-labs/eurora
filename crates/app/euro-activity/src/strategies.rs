@@ -10,11 +10,13 @@ use url::Url;
 pub mod browser;
 pub mod default;
 pub mod no_strategy;
+pub mod word;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
 use euro_native_messaging::NativeMetadata;
 pub use no_strategy::NoStrategy;
+pub use word::WordStrategy;
 
 use crate::{
     error::ActivityResult,
@@ -72,6 +74,7 @@ impl From<NativeMetadata> for StrategyMetadata {
 #[derive(Clone)]
 pub enum ActivityStrategy {
     BrowserStrategy,
+    WordStrategy,
     DefaultStrategy,
     NoStrategy,
 }
@@ -81,7 +84,8 @@ impl ActivityStrategy {
     ///
     /// Strategies are tried in priority order: [`NoStrategy`] suppresses
     /// tracking for Eurora's own processes, [`BrowserStrategy`] handles
-    /// known browsers, and any other process falls through to
+    /// known browsers, [`WordStrategy`] handles the Microsoft Word
+    /// integration, and any other process falls through to
     /// [`DefaultStrategy`].
     pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
         if NoStrategy::matches_process(process_name) {
@@ -89,6 +93,9 @@ impl ActivityStrategy {
         }
         if BrowserStrategy::matches_process(process_name) {
             return BrowserStrategy::create().await;
+        }
+        if WordStrategy::matches_process(process_name) {
+            return WordStrategy::create().await;
         }
         Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
     }

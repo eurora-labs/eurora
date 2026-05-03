@@ -1,0 +1,36 @@
+[package]
+name = "euro-office"
+version = "0.0.0"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+description = "Asset types and TypeScript bindings for the Eurora Office add-in (Word today; Excel/PowerPoint planned)."
+
+[dependencies]
+euro-bridge-protocol = { workspace = true }
+euro-browser = { workspace = true }
+euro-process = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+specta = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+anyhow = { workspace = true, optional = true }
+specta-typescript = { version = "0.0.10", optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+codegen = ["dep:anyhow", "dep:specta-typescript"]
+
+[[bin]]
+name = "euro-office"
+path = "src/bin/codegen.rs"
+required-features = ["codegen"]
+
+[lints.clippy]
+all = "deny"
+correctness = "deny"
+perf = "deny"

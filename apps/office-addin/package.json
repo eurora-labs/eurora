@@ -1,0 +1,33 @@
+{
+	"name": "@eurora/office-addin",
+	"private": true,
+	"version": "0.4.0",
+	"type": "module",
+	"description": "Eurora Microsoft Office add-in. Headless Shared Runtime that bridges Word into the Eurora desktop over a local WebSocket.",
+	"scripts": {
+		"dev": "vite",
+		"build": "vite build && node scripts/copy-bundle-extras.mjs",
+		"preview": "vite preview",
+		"render-manifest": "node scripts/render-manifest.mjs",
+		"start": "pnpm render-manifest && office-addin-debugging start manifest.dev.xml desktop",
+		"stop": "office-addin-debugging stop manifest.dev.xml",
+		"validate": "pnpm render-manifest && office-addin-manifest validate manifest.dev.xml",
+		"check-types": "tsc --noEmit",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
+		"test": "vitest run",
+		"test:unit": "vitest"
+	},
+	"devDependencies": {
+		"@types/node": "^22.9.0",
+		"@types/office-js": "^1.0.498",
+		"eslint": "^9.39.4",
+		"office-addin-debugging": "^6.0.5",
+		"office-addin-dev-certs": "^2.0.4",
+		"office-addin-manifest": "^2.0.4",
+		"prettier": "^3.8.3",
+		"typescript": "5.9.3",
+		"vite": "catalog:",
+		"vitest": "catalog:"
+	}
+}

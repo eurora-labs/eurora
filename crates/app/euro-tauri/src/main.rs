@@ -217,6 +217,29 @@ fn install_native_messaging_manifests(app: &tauri::App) {
     }
 }
 
+fn install_office_word_addin(app: &tauri::App) {
+    use euro_tauri::office_addin::{Error, InstallOutcome, install_for_app};
+
+    match install_for_app(app.handle()) {
+        Ok(InstallOutcome::Installed { manifest_path }) => tracing::info!(
+            "Installed Office add-in manifest at {}",
+            manifest_path.display()
+        ),
+        Ok(InstallOutcome::SkippedHostNotPresent) => tracing::info!(
+            "Microsoft Word has not been launched on this account; \
+             deferring Office add-in install until next desktop launch"
+        ),
+        Ok(InstallOutcome::SkippedUnsupportedOs) => {
+            tracing::debug!("Office add-in install not applicable on this OS");
+        }
+        Err(Error::MissingResource(path)) => tracing::warn!(
+            "Office add-in resources not bundled at {}; skipping install",
+            path.display()
+        ),
+        Err(e) => tracing::warn!("Failed to install Office add-in: {e}"),
+    }
+}
+
 fn init_encryption(data_dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(debug_assertions)]
     let main_key = euro_encrypt::MainKey::from_bytes([
@@ -406,7 +429,7 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
     };
 
     tauri::async_runtime::spawn(async move {
-        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+        let service = euro_browser::BridgeService::get_or_init().await;
         let mut registrations_rx = service.subscribe_to_registrations();
         let mut disconnects_rx = service.subscribe_to_disconnects();
 
@@ -417,7 +440,7 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
                         Ok(reg) => {
                             let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
                                 .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.browser_name,
+                                    process_name: reg.app_name,
                                     connected: true,
                                 });
                         }
@@ -434,7 +457,7 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
                         Ok(reg) => {
                             let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
                                 .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.browser_name,
+                                    process_name: reg.app_name,
                                     connected: false,
                                 });
                         }
@@ -497,6 +520,7 @@ fn main() {
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
                     install_native_messaging_manifests(tauri_app);
+                    install_office_word_addin(tauri_app);
 
                     let data_dir = tauri_app.path().app_data_dir()?;
                     init_encryption(data_dir)?;

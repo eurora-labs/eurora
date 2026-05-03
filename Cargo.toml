@@ -67,6 +67,7 @@ dotenv = "0.15.0"
 enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
+euro-bridge-protocol = { path = "crates/app/euro-bridge-protocol" }
 euro-browser = { path = "crates/app/euro-browser" }
 euro-debug = { path = "crates/app/euro-debug" }
 euro-encrypt = { path = "crates/app/euro-encrypt" }
@@ -82,6 +83,7 @@ euro-thread = { path = "crates/app/euro-thread" }
 euro-timeline = { path = "crates/app/euro-timeline" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
+euro-office = { path = "crates/app/euro-office" }
 focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "1.0.0" }
 futures = "0.3.31"
@@ -128,6 +130,7 @@ tempfile = "3.24"
 thiserror = "2.0.18"
 tokio = "1.49.0"
 tokio-stream = "0.1"
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
 tokio-util = "0.7"
 toml = "1.1"
 toml_edit = "0.23.10"  # collapse 0.22, 0.20, 0.19

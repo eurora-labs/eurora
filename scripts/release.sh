@@ -204,6 +204,11 @@ cat "$TMP_DIR/tauri.conf.json"
 export VERSION
 export CHANNEL
 
+# Build the Office add-in so its dist/ tree is on disk before tauri-bundler
+# walks bundle.resources. Mirrors how native-messaging is built below.
+info "Building office add-in"
+(cd "$PWD/.." && pnpm build:office-addin)
+
 # Create binaries directory for externalBin
 BINARIES_DIR="$PWD/../crates/app/euro-tauri/binaries"
 mkdir -p "$BINARIES_DIR"

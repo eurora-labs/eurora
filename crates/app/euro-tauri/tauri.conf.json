@@ -4,7 +4,7 @@
 	"mainBinaryName": "eurora",
 	"build": {
 		"beforeDevCommand": "pnpm dev:internal-tauri",
-		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || pnpm build:desktop build:launcher-window  -- --mode development",
+		"beforeBuildCommand": "[ \"$CI\" = \"true\" ] || (pnpm build:desktop build:launcher-window -- --mode development && pnpm build:office-addin)",
 		"frontendDist": "../../../apps/desktop/build",
 		"devUrl": "http://localhost:1420"
 	},
