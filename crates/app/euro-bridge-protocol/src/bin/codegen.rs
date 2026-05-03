@@ -114,18 +114,17 @@ fn inject_externally_tagged_enums(input: &str) -> String {
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i];
-        if let Some(name) = parse_codable_enum_header(line) {
-            if let Some((variants, end)) = parse_enum_body(&lines, i + 1)
-                && variants.iter().all(|v| !v.payload.is_empty())
-            {
-                output.push(line.replacen(": Codable", "", 1));
-                for body_line in &lines[i + 1..=end] {
-                    output.push((*body_line).to_string());
-                }
-                decls.push(EnumDecl { name, variants });
-                i = end + 1;
-                continue;
+        if let Some(name) = parse_codable_enum_header(line)
+            && let Some((variants, end)) = parse_enum_body(&lines, i + 1)
+            && variants.iter().all(|v| !v.payload.is_empty())
+        {
+            output.push(line.replacen(": Codable", "", 1));
+            for body_line in &lines[i + 1..=end] {
+                output.push((*body_line).to_string());
             }
+            decls.push(EnumDecl { name, variants });
+            i = end + 1;
+            continue;
         }
         output.push(line.to_string());
         i += 1;
