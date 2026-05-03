@@ -23,6 +23,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
     )
 
     private let hostPid: UInt32
+    private let appKind: String?
     private let url: URL
     private let urlSession: URLSession
 
@@ -47,11 +48,13 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
     public init(
         hostPid: UInt32,
         appPid: UInt32,
+        appKind: String? = nil,
         url: URL = BridgeProtocol.url,
         urlSession: URLSession = .shared
     ) {
         self.hostPid = hostPid
         self.appPid = appPid
+        self.appKind = appKind
         self.url = url
         self.urlSession = urlSession
     }
@@ -113,7 +116,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         logger.info("App PID updated to \(newPid, privacy: .public)")
 
         if let task {
-            let register = Frame(RegisterFrame(hostPid: hostPid, appPid: newPid))
+            let register = Frame(RegisterFrame(hostPid: hostPid, appPid: newPid, appKind: appKind))
             send(frame: register, on: task)
         }
     }
@@ -177,7 +180,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
             "Connecting to bridge at \(self.url.absoluteString, privacy: .public): host=\(self.hostPid, privacy: .public), app=\(pid, privacy: .public)"
         )
 
-        let register = Frame(RegisterFrame(hostPid: hostPid, appPid: pid))
+        let register = Frame(RegisterFrame(hostPid: hostPid, appPid: pid, appKind: appKind))
         guard await sendAwait(frame: register, on: task) else {
             await teardown(task: task, error: nil)
             return

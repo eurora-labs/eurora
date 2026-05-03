@@ -67,12 +67,23 @@ pub struct CancelFrame {
 }
 
 /// Mandatory first frame on every connection. Identifies the host
-/// process (the bridge) and the application process being represented
-/// (e.g. the Chrome PID).
+/// process (the bridge) and the application process being represented.
+///
+/// `app_pid` is the OS PID for clients that have one (browsers via the
+/// native-messaging host, the macOS launcher representing Safari).
+/// Sandboxed clients without access to a real PID — Office.js add-ins
+/// in particular — synthesize a stable per-session identifier and set
+/// `app_kind` to a logical name (e.g. `"microsoft-word"`) so the
+/// desktop can locate the client without relying on OS process lookup.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct RegisterFrame {
     pub host_pid: u32,
     pub app_pid: u32,
+    /// Logical client identifier for non-PID-based integrations.
+    /// `None` for clients whose `app_pid` corresponds to a real OS
+    /// process discoverable via process-name lookup.
+    #[serde(default)]
+    pub app_kind: Option<String>,
 }
 
 impl From<RequestFrame> for Frame {
@@ -158,10 +169,11 @@ mod tests {
     }
 
     #[test]
-    fn register_frame_serializes_as_host_and_app_pid() {
+    fn register_frame_serializes_with_all_fields() {
         let frame = Frame::from(RegisterFrame {
             host_pid: 1,
             app_pid: 2,
+            app_kind: None,
         });
 
         let json = serde_json::to_value(&frame).expect("serialize");
@@ -172,10 +184,60 @@ mod tests {
                     "Register": {
                         "host_pid": 1,
                         "app_pid": 2,
+                        "app_kind": null,
                     }
                 }
             }),
         );
+    }
+
+    #[test]
+    fn register_frame_round_trips_with_app_kind() {
+        let frame = Frame::from(RegisterFrame {
+            host_pid: 0,
+            app_pid: 4242,
+            app_kind: Some("microsoft-word".into()),
+        });
+
+        let json = serde_json::to_value(&frame).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "kind": {
+                    "Register": {
+                        "host_pid": 0,
+                        "app_pid": 4242,
+                        "app_kind": "microsoft-word",
+                    }
+                }
+            }),
+        );
+
+        let round_tripped: Frame = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(round_tripped, frame);
+    }
+
+    /// Older client builds emit Register frames without the `app_kind`
+    /// field; the desktop must continue to accept them and treat the
+    /// kind as `None`.
+    #[test]
+    fn register_frame_accepts_missing_app_kind() {
+        let json = serde_json::json!({
+            "kind": {
+                "Register": {
+                    "host_pid": 1,
+                    "app_pid": 2,
+                }
+            }
+        });
+
+        let frame: Frame = serde_json::from_value(json).expect("deserialize");
+        let FrameKind::Register(register) = frame.kind else {
+            panic!("expected register frame");
+        };
+        assert_eq!(register.host_pid, 1);
+        assert_eq!(register.app_pid, 2);
+        assert!(register.app_kind.is_none());
     }
 
     #[test]

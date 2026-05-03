@@ -29,7 +29,7 @@ const OUTBOUND_QUEUE_SIZE: usize = 32;
 static GLOBAL_SERVICE: OnceCell<BridgeService> = OnceCell::const_new();
 
 /// A WebSocket-connected bridge client (typically a browser
-/// native-messaging host).
+/// native-messaging host or an Office add-in runtime).
 #[derive(Debug)]
 pub struct RegisteredClient {
     /// Outbound queue for frames the desktop wants to send to this
@@ -39,6 +39,10 @@ pub struct RegisteredClient {
     pub host_pid: u32,
     pub app_pid: u32,
     pub app_name: String,
+    /// Logical kind sent by the client during registration. `None` for
+    /// PID-based clients (browsers); `Some` for sandboxed integrations
+    /// like the Word add-in (`Some("microsoft-word")`).
+    pub app_kind: Option<String>,
 }
 
 /// Lightweight summary of a registered client, broadcast on the
@@ -48,6 +52,7 @@ pub struct RegisteredClient {
 pub struct RegistrationEvent {
     pub app_pid: u32,
     pub app_name: String,
+    pub app_kind: Option<String>,
 }
 
 struct ServerHandle {
@@ -293,6 +298,18 @@ impl BridgeService {
             .map(|entry| entry.value().app_pid)
     }
 
+    /// Return the `app_pid`s of every currently-registered client whose
+    /// `app_kind` equals `kind`. Used by integrations whose clients
+    /// don't correspond to an OS process (e.g. the Word add-in
+    /// strategy locating its in-Word runtime).
+    pub fn find_clients_by_kind(&self, kind: &str) -> Vec<u32> {
+        self.registry
+            .iter()
+            .filter(|entry| entry.value().app_kind.as_deref() == Some(kind))
+            .map(|entry| entry.value().app_pid)
+            .collect()
+    }
+
     /// Send a request to `app_pid` and await a correlated response.
     /// Times out after [`DEFAULT_REQUEST_TIMEOUT`]; on timeout a
     /// `Cancel` frame is sent so the client can drop any work it
@@ -412,7 +429,11 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
 
     let app_pid = register.app_pid;
     let host_pid = register.host_pid;
-    let app_name = get_process_name(app_pid).unwrap_or_else(|| format!("unknown_{app_pid}"));
+    let app_kind = register.app_kind;
+    let app_name = match &app_kind {
+        Some(kind) => kind.clone(),
+        None => get_process_name(app_pid).unwrap_or_else(|| format!("unknown_{app_pid}")),
+    };
 
     let (outbound_tx, outbound_rx) = mpsc::channel::<Frame>(OUTBOUND_QUEUE_SIZE);
 
@@ -423,6 +444,7 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
             host_pid,
             app_pid,
             app_name: app_name.clone(),
+            app_kind: app_kind.clone(),
         },
     ) {
         tracing::warn!(
@@ -432,12 +454,13 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
     }
 
     tracing::info!(
-        "Bridge client registered: app_pid={app_pid} host_pid={host_pid} app_name={app_name:?} (peer={peer})"
+        "Bridge client registered: app_pid={app_pid} host_pid={host_pid} app_name={app_name:?} app_kind={app_kind:?} (peer={peer})"
     );
 
     let _ = service.registrations_tx.send(RegistrationEvent {
         app_pid,
         app_name: app_name.clone(),
+        app_kind: app_kind.clone(),
     });
 
     let writer = tokio::spawn(writer_task(sink, outbound_rx));
@@ -452,6 +475,7 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
         let _ = service.disconnects_tx.send(RegistrationEvent {
             app_pid,
             app_name: removed.app_name,
+            app_kind: removed.app_kind,
         });
         tracing::info!(
             "Bridge client unregistered: app_pid={app_pid} host_pid={host_pid} (remaining={})",
@@ -636,6 +660,7 @@ mod tests {
                 host_pid: 1,
                 app_pid: 7,
                 app_name: "test".into(),
+                app_kind: None,
             },
         );
 
@@ -668,5 +693,47 @@ mod tests {
             .expect("join")
             .expect("response");
         assert_eq!(response.payload.as_deref(), Some("pong"));
+    }
+
+    #[tokio::test]
+    async fn find_clients_by_kind_returns_only_matching_clients() {
+        let service = BridgeService::new();
+        let (tx, _rx) = mpsc::channel::<Frame>(8);
+
+        service.registry.insert(
+            10,
+            RegisteredClient {
+                tx: tx.clone(),
+                host_pid: 1,
+                app_pid: 10,
+                app_name: "microsoft-word".into(),
+                app_kind: Some("microsoft-word".into()),
+            },
+        );
+        service.registry.insert(
+            11,
+            RegisteredClient {
+                tx: tx.clone(),
+                host_pid: 1,
+                app_pid: 11,
+                app_name: "Chrome".into(),
+                app_kind: None,
+            },
+        );
+        service.registry.insert(
+            12,
+            RegisteredClient {
+                tx,
+                host_pid: 2,
+                app_pid: 12,
+                app_name: "microsoft-word".into(),
+                app_kind: Some("microsoft-word".into()),
+            },
+        );
+
+        let mut found = service.find_clients_by_kind("microsoft-word");
+        found.sort_unstable();
+        assert_eq!(found, vec![10, 12]);
+        assert!(service.find_clients_by_kind("safari").is_empty());
     }
 }

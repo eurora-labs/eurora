@@ -122,7 +122,11 @@ extension Frame {
         case .event(let e): return "Event(action=\(e.action))"
         case .error(let e): return "Error(id=\(e.id), code=\(e.code))"
         case .cancel(let c): return "Cancel(id=\(c.id))"
-        case .register(let r): return "Register(host=\(r.hostPid), app=\(r.appPid))"
+        case .register(let r):
+            if let kind = r.appKind {
+                return "Register(host=\(r.hostPid), app=\(r.appPid), kind=\(kind))"
+            }
+            return "Register(host=\(r.hostPid), app=\(r.appPid))"
         }
     }
 }

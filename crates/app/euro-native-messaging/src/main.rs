@@ -32,9 +32,13 @@ fn frame_summary(frame: &Frame) -> String {
         FrameKind::Event(e) => format!("Event(action={})", e.action),
         FrameKind::Error(e) => format!("Error(id={}, code={})", e.id, e.code),
         FrameKind::Cancel(c) => format!("Cancel(id={})", c.id),
-        FrameKind::Register(r) => {
-            format!("Register(host={}, app={})", r.host_pid, r.app_pid)
-        }
+        FrameKind::Register(r) => match &r.app_kind {
+            Some(kind) => format!(
+                "Register(host={}, app={}, kind={kind})",
+                r.host_pid, r.app_pid
+            ),
+            None => format!("Register(host={}, app={})", r.host_pid, r.app_pid),
+        },
     }
 }
 
@@ -181,7 +185,11 @@ async fn run_bridge_session(
 
     let (mut sink, mut stream) = socket.split();
 
-    let register = Frame::from(RegisterFrame { host_pid, app_pid });
+    let register = Frame::from(RegisterFrame {
+        host_pid,
+        app_pid,
+        app_kind: None,
+    });
     if let Err(err) = send_frame(&mut sink, &register).await {
         tracing::error!("Failed to send Register frame: {err}");
         return;

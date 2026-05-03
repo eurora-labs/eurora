@@ -42,15 +42,23 @@ public enum FrameKind {
 }
 
 /// Mandatory first frame on every connection. Identifies the host
-/// process (the bridge) and the application process being represented
-/// (e.g. the Chrome PID).
+/// process (the bridge) and the application process being represented.
+/// 
+/// `app_pid` is the OS PID for clients that have one (browsers via the
+/// native-messaging host, the macOS launcher representing Safari).
+/// Sandboxed clients without access to a real PID — Office.js add-ins
+/// in particular — synthesize a stable per-session identifier and set
+/// `app_kind` to a logical name (e.g. `"microsoft-word"`) so the
+/// desktop can locate the client without relying on OS process lookup.
 public struct RegisterFrame: Codable {
     public let hostPid: UInt32
     public let appPid: UInt32
+    public let appKind: String?
 
     private enum CodingKeys: String, CodingKey {
         case hostPid = "host_pid"
         case appPid = "app_pid"
+        case appKind = "app_kind"
     }
 }
 
