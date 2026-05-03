@@ -30,9 +30,17 @@ pub const BRIDGE_PORT: u16 = 1431;
 /// HTTP path that performs the WebSocket upgrade.
 pub const BRIDGE_PATH: &str = "/bridge";
 
-/// Convenience: full WebSocket URL for connecting to the local bridge.
+/// Convenience: full WebSocket URL for connecting to the local bridge
+/// on its well-known port.
 pub fn bridge_url() -> String {
     format!("ws://{BRIDGE_HOST}:{BRIDGE_PORT}{BRIDGE_PATH}")
+}
+
+/// Build a bridge WebSocket URL for an arbitrary bound address. Used by
+/// tests that bind the bridge to an ephemeral port (port `0`) and then
+/// need the resolved URL to connect a client.
+pub fn bridge_url_for(addr: std::net::SocketAddr) -> String {
+    format!("ws://{addr}{BRIDGE_PATH}")
 }
 
 /// Build the [`specta::TypeCollection`] containing every type that

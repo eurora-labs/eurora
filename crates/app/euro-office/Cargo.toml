@@ -19,7 +19,10 @@ anyhow = { workspace = true, optional = true }
 specta-typescript = { version = "0.0.10", optional = true }
 
 [dev-dependencies]
+futures-util = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tokio-tungstenite = { workspace = true }
 
 [features]
 default = []

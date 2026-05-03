@@ -83,13 +83,18 @@ export type ResponseFrame = {
 };
 
 /**
- *  Snapshot of a Word document's textual content.
+ *  Snapshot of a Word document's textual content as it travels over the
+ *  bridge.
  *
  *  Sent by the Office add-in's runtime as the JSON payload of a
  *  `ResponseFrame` for `GET_ASSETS`. The desktop deserializes this
  *  directly — there is no `NativeMessage` discriminator wrapper because
  *  the WebSocket transport (unlike Chrome's stdio native-messaging)
  *  does not require a single envelope shape per message.
+ *
+ *  This is a pure wire type: it derives [`specta::Type`] so it appears in
+ *  the TypeScript bindings consumed by the add-in. The desktop wraps it
+ *  in a [`WordAsset`] (with a stable UUID) before storing.
  */
 export type WordDocumentAsset = {
 	/**

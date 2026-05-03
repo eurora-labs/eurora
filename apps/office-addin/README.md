@@ -69,13 +69,52 @@ The Tauri installer copies these as bundled resources (Phase 4).
 
 ## Manual smoke test
 
-1. Build & sideload as above.
-2. Start the desktop with `pnpm dev:desktop`.
-3. Open any `.docx` in Word — confirm the add-in registers in the desktop's bridge
-   logs as `app_kind=microsoft-word`.
-4. Trigger asset generation from the desktop (Word strategy) — confirm the document
-   text round-trips back through the WebSocket.
-5. Quit and restart the desktop — confirm the add-in reconnects automatically.
+Run through these on every release candidate. Steps 1–4 are the golden
+path; steps 5–7 cover the edges Phase 8's automated tests deliberately
+don't reach (real Office, real OS catalog state, real reconnect).
+
+1. **Build & sideload** the add-in as above (`pnpm --filter
+@eurora/office-addin start`).
+2. **Start the desktop** with `pnpm dev:desktop`.
+3. **Register check** — open any `.docx` in Word and confirm the add-in
+   registers in the desktop's bridge logs as
+   `app_kind=microsoft-word`. The line to look for is
+   `Bridge client registered: … app_kind=Some("microsoft-word")` from
+   `crates/app/euro-browser/src/server.rs`.
+4. **Round-trip check** — trigger asset generation from the desktop
+   (the Word strategy fires on focus) and confirm `body.text` arrives
+   on the desktop side as a `WordDocumentAsset` (no `NativeMessage`
+   wrapper).
+5. **Reconnect via backoff** — kill the desktop process while Word is
+   open. The add-in's WebSocket client schedules retries with
+   exponential backoff capped at 30 s (see `DEFAULT_BACKOFF` in
+   `src/bridge/client.ts`). Watch the runtime page's DevTools console
+   for the retry log lines, then start the desktop and confirm the
+   next attempt re-registers within ~30 s without sideloading again.
+6. **Idempotent reinstall** — re-run the desktop installer (or, in
+   dev, call `euro_tauri::office_addin::install_for_app` from a
+   debugger). Confirm:
+    - **macOS:** `~/Library/Containers/com.microsoft.Word/Data/Documents/wef/com.eurora.word.xml`
+      is overwritten in place; mtime advances, path doesn't change.
+    - **Windows:** `%APPDATA%\Eurora\OfficeAddins\com.eurora.word.xml`
+      is overwritten in place, and
+      `HKCU\Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{8a4e6c52-3d0f-4a7b-9e2d-1f5c7b8e0a91}`
+      keeps the same subkey GUID across runs (`reg query` it before
+      and after — `Url`, `Id`, `Flags`, `ShowInMenu` should be
+      identical).
+    - **Linux:** `install_for_app` returns `InstallOutcome::SkippedUnsupportedOs`
+      and writes nothing. Word doesn't run natively here.
+7. **Cross-platform** — the integration must be verified on **both**
+   Windows (WebView2 host) and macOS (WKWebView host) before shipping.
+   Office.js loads behave subtly differently between the two
+   runtimes (timing of `Office.onReady`, secure-context handling for
+   `ws://127.0.0.1`); steps 3–5 must pass on each.
+
+If the add-in fails to register on macOS the first time the desktop
+launches, see also `InstallOutcome::SkippedHostNotPresent` — Word's
+sandboxed container is created on first Word launch, and the desktop
+defers manifest installation rather than racing Office's own
+provisioning. Launching Word once and restarting the desktop fixes it.
 
 ## Why no UI?
 
