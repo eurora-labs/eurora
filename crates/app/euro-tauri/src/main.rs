@@ -218,29 +218,25 @@ fn install_native_messaging_manifests(app: &tauri::App) {
 }
 
 fn install_office_word_addin(app: &tauri::App) {
-    // Linux: Word doesn't run natively, nothing to do.
-    #[cfg(target_os = "linux")]
-    {
-        let _ = app;
-        tracing::debug!("Skipping Office add-in install on Linux");
-    }
+    use euro_tauri::office_addin::{Error, InstallOutcome, install_for_app};
 
-    #[cfg(not(target_os = "linux"))]
-    {
-        match euro_tauri::office_addin::render_manifest_for_app(&app.handle()) {
-            Ok(_xml) => {
-                // Phase 5 will write `_xml` into the per-OS Office catalog
-                // (macOS WEF directory, Windows trusted-catalog registry).
-                tracing::info!("Rendered Office add-in manifest from bundled template");
-            }
-            Err(euro_tauri::office_addin::Error::MissingResource(path)) => {
-                tracing::warn!(
-                    "Office add-in resources not bundled at {}; skipping install",
-                    path.display()
-                );
-            }
-            Err(e) => tracing::warn!("Failed to render Office add-in manifest: {e}"),
+    match install_for_app(app.handle()) {
+        Ok(InstallOutcome::Installed { manifest_path }) => tracing::info!(
+            "Installed Office add-in manifest at {}",
+            manifest_path.display()
+        ),
+        Ok(InstallOutcome::SkippedHostNotPresent) => tracing::info!(
+            "Microsoft Word has not been launched on this account; \
+             deferring Office add-in install until next desktop launch"
+        ),
+        Ok(InstallOutcome::SkippedUnsupportedOs) => {
+            tracing::debug!("Office add-in install not applicable on this OS");
         }
+        Err(Error::MissingResource(path)) => tracing::warn!(
+            "Office add-in resources not bundled at {}; skipping install",
+            path.display()
+        ),
+        Err(e) => tracing::warn!("Failed to install Office add-in: {e}"),
     }
 }
 
