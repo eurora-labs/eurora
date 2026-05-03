@@ -25,6 +25,9 @@
 		"check": {
 			"dependsOn": ["package"]
 		},
+		"check-types": {
+			"dependsOn": ["package"]
+		},
 		"playwright:install": {},
 		"test": {
 			"dependsOn": ["package", "playwright:install"]

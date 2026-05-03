@@ -94,6 +94,7 @@ jobs:
               run: pnpm proto:typescript
             - run: pnpm build
             - run: pnpm check
+            - run: pnpm check-types
             - run: pnpm test
 
     rust-lint:
