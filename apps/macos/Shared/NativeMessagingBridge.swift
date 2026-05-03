@@ -4,10 +4,41 @@ import os.log
 
 private let kBridgeConnectionPort: UInt16 = 14311
 
-@available(macOS 15.0, *)
-class NativeMessagingBridge {
+/// Errors raised by the local extension <-> launcher bridge.
+public enum BridgeError: Error, LocalizedError {
+    case bridgeDeallocated
+    case notConnected
+    case disconnected
+    case timeout
+    case malformedFrame
+    case duplicateRequestId(UInt32)
 
-    static let shared = NativeMessagingBridge()
+    public var errorDescription: String? {
+        switch self {
+        case .bridgeDeallocated:
+            return "Native messaging bridge was deallocated"
+        case .notConnected:
+            return "Launcher app is not running"
+        case .disconnected:
+            return "Launcher connection was closed"
+        case .timeout:
+            return "Request timed out"
+        case .malformedFrame:
+            return "Malformed bridge frame"
+        case .duplicateRequestId(let id):
+            return "Two in-flight requests share id \(id)"
+        }
+    }
+}
+
+/// Connection between the Safari extension and the launcher app over a
+/// length-prefixed JSON socket on `127.0.0.1:14311`. Outbound messages are
+/// `Frame` values; replies are correlated by the request `id` of the
+/// originating `RequestFrame`.
+@available(macOS 13.0, *)
+public final class NativeMessagingBridge: @unchecked Sendable {
+
+    public static let shared = NativeMessagingBridge()
 
     private let logger = Logger(subsystem: "com.eurora.macos", category: "NativeMessagingBridge")
     private let queue = DispatchQueue(label: "com.eurora.native-messaging-bridge", qos: .userInitiated)
@@ -16,337 +47,285 @@ class NativeMessagingBridge {
     private var isConnected = false
     private var isConnecting = false
 
-    private let responseLock = NSLock()
-    private var pendingCallbacks: [String: (Result<Data, Error>) -> Void] = [:]
+    private let pendingLock = NSLock()
+    private var pending: [UInt32: CheckedContinuation<Frame, Error>] = [:]
 
     private init() {}
 
-    func ensureConnected() {
+    // MARK: - Public API
+
+    /// Open a connection to the launcher if one isn't already in flight.
+    public func ensureConnected() {
         queue.async { [weak self] in
             self?.connectIfNeeded()
         }
     }
 
-    func sendMessage(
-        _ message: [String: Any],
-        timeout: TimeInterval = 10.0,
-        completion: @escaping (Result<[String: Any], Error>) -> Void
-    ) {
-        queue.async { [weak self] in
-            guard let self else {
-                completion(.failure(BridgeError.bridgeDeallocated))
-                return
-            }
+    /// Send a request frame and await the correlated reply (a `Response` or
+    /// `Error` frame whose `id` matches the request). Throws on timeout,
+    /// disconnect, or transport failure.
+    public func send(
+        request: RequestFrame,
+        timeout: TimeInterval = 10.0
+    ) async throws -> Frame {
+        let frame = Frame(request)
+        let id = request.id
 
-            if !self.isConnected {
-                self.connectIfNeeded()
+        if !isConnected {
+            ensureConnected()
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
 
-                self.queue.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    guard let self else {
-                        completion(.failure(BridgeError.bridgeDeallocated))
+        return try await withTimeout(timeout) {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Frame, Error>) in
+                self.queue.async {
+                    guard let connection = self.connection, self.isConnected else {
+                        continuation.resume(throwing: BridgeError.notConnected)
                         return
                     }
-                    if self.isConnected {
-                        self.doSendMessage(message, timeout: timeout, completion: completion)
-                    } else {
-                        completion(.failure(BridgeError.processNotRunning))
+
+                    self.pendingLock.lock()
+                    if self.pending[id] != nil {
+                        self.pendingLock.unlock()
+                        continuation.resume(throwing: BridgeError.duplicateRequestId(id))
+                        return
+                    }
+                    self.pending[id] = continuation
+                    self.pendingLock.unlock()
+
+                    self.write(frame, on: connection) { error in
+                        if let error {
+                            self.removePending(id: id)?.resume(throwing: error)
+                        }
                     }
                 }
-                return
             }
-
-            self.doSendMessage(message, timeout: timeout, completion: completion)
+        } onTimeout: {
+            self.removePending(id: id)?.resume(throwing: BridgeError.timeout)
         }
     }
 
-    func handleResponseFromExtension(_ response: [String: Any]) -> Bool {
-        guard let kind = response["kind"] as? [String: Any],
-              kind["Response"] != nil else {
-            return false
-        }
-
+    /// Forward a server-initiated response (or any unsolicited frame) back
+    /// to the launcher, e.g. when the Safari extension answers a request
+    /// that was originally pushed from the desktop. No reply is awaited.
+    public func forward(_ frame: Frame) {
         queue.async { [weak self] in
             guard let self, let connection = self.connection, self.isConnected else {
-                self?.logger.error("Cannot forward response - not connected")
+                self?.logger.error("Cannot forward — not connected: \(frame.summary, privacy: .public)")
                 return
             }
-
-            do {
-                let jsonData = try JSONSerialization.data(withJSONObject: response, options: [])
-                let framedData = Self.frameMessage(jsonData)
-
-                connection.send(content: framedData, completion: .contentProcessed { error in
-                    if let error {
-                        self.logger.error("Failed to forward response: \(error.localizedDescription)")
-                    }
-                })
-            } catch {
-                self.logger.error("Failed to serialize response: \(error.localizedDescription)")
+            self.write(frame, on: connection) { error in
+                if let error {
+                    self.logger.error("Forward error: \(error.localizedDescription, privacy: .public)")
+                }
             }
         }
-
-        return true
     }
 
-    func stop() {
+    public func stop() {
         queue.async { [weak self] in
-            self?.disconnectInternal()
+            self?.tearDown()
         }
     }
 
-    // MARK: - Private: Connection
+    // MARK: - Connection
 
     private func connectIfNeeded() {
-        guard !isConnected && !isConnecting else { return }
-
+        guard !isConnected, !isConnecting else { return }
         isConnecting = true
 
         connection?.cancel()
         connection = nil
 
-        logger.info("Connecting to local bridge server on port \(kBridgeConnectionPort)")
+        logger.info("Connecting to local bridge server on port \(kBridgeConnectionPort, privacy: .public)")
 
-        guard let port = NWEndpoint.Port(rawValue: kBridgeConnectionPort) else { return }
+        guard let port = NWEndpoint.Port(rawValue: kBridgeConnectionPort) else {
+            isConnecting = false
+            return
+        }
         let endpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: port)
         let conn = NWConnection(to: endpoint, using: .tcp)
 
         conn.stateUpdateHandler = { [weak self] state in
-            self?.handleConnectionState(state)
+            self?.handleState(state)
         }
-
-        self.connection = conn
+        connection = conn
         conn.start(queue: queue)
     }
 
-    private func disconnectInternal() {
-        isConnected = false
-        isConnecting = false
-        connection?.cancel()
-        connection = nil
-
-        responseLock.lock()
-        let callbacks = pendingCallbacks
-        pendingCallbacks.removeAll()
-        responseLock.unlock()
-
-        for (_, callback) in callbacks {
-            callback(.failure(BridgeError.processStopped))
-        }
-    }
-
-    private func handleConnectionState(_ state: NWConnection.State) {
+    private func handleState(_ state: NWConnection.State) {
         switch state {
         case .ready:
             logger.info("Connected to local bridge server")
             isConnected = true
             isConnecting = false
-            startReceiving()
-
+            receiveLength()
         case .failed(let error):
-            logger.error("Connection failed: \(error.localizedDescription)")
-            isConnected = false
-            isConnecting = false
-            // Don't auto-reconnect - let the next sendMessage call trigger reconnection
-
+            logger.error("Connection failed: \(error.localizedDescription, privacy: .public)")
+            tearDown()
         case .cancelled:
-            logger.debug("Connection cancelled")
-            isConnected = false
-            isConnecting = false
-
+            tearDown()
         case .waiting(let error):
-            logger.warning("Connection waiting: \(error.localizedDescription)")
-
+            logger.warning("Connection waiting: \(error.localizedDescription, privacy: .public)")
         default:
             break
         }
     }
 
-    // MARK: - Private: Sending
+    private func tearDown() {
+        isConnected = false
+        isConnecting = false
+        connection?.cancel()
+        connection = nil
 
-    private func extractRequestId(from message: [String: Any]) -> String? {
-        guard let kind = message["kind"] as? [String: Any],
-              let request = kind["Request"] as? [String: Any],
-              let id = request["id"] else { return nil }
-        return "\(id)"
-    }
-
-    private func makeCallback(
-        completion: @escaping (Result<[String: Any], Error>) -> Void,
-        callbackLock: NSLock,
-        callbackFired: UnsafeMutablePointer<Bool>
-    ) -> (Result<Data, Error>) -> Void {
-        return { result in
-            callbackLock.lock()
-            guard !callbackFired.pointee else { callbackLock.unlock(); return }
-            callbackFired.pointee = true
-            callbackLock.unlock()
-
-            switch result {
-            case .success(let data):
-                do {
-                    if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        completion(.success(dict))
-                    } else { completion(.failure(BridgeError.invalidResponse)) }
-                } catch { completion(.failure(error)) }
-            case .failure(let error):
-                completion(.failure(error))
-            }
+        let drained = drainPending()
+        for continuation in drained {
+            continuation.resume(throwing: BridgeError.disconnected)
         }
     }
 
-    private func doSendMessage(
-        _ message: [String: Any],
-        timeout: TimeInterval,
-        completion: @escaping (Result<[String: Any], Error>) -> Void
-    ) {
-        guard let connection, isConnected else {
-            completion(.failure(BridgeError.processNotRunning))
+    // MARK: - Length-prefixed framing
+
+    private func receiveLength() {
+        guard let connection, isConnected else { return }
+        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
+            guard let self else { return }
+
+            if let error {
+                self.logger.error("Receive error: \(error.localizedDescription, privacy: .public)")
+                self.tearDown()
+                return
+            }
+            if isComplete {
+                self.logger.debug("Server closed connection")
+                self.tearDown()
+                return
+            }
+            guard let lengthData = data, lengthData.count == 4 else {
+                self.receiveLength()
+                return
+            }
+            let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
+            guard length > 0, Int(length) <= BridgeProtocol.maxFrameSize else {
+                self.logger.error("Invalid message length: \(length, privacy: .public)")
+                self.tearDown()
+                return
+            }
+            self.receiveBody(length: Int(length))
+        }
+    }
+
+    private func receiveBody(length: Int) {
+        guard let connection else { return }
+        connection.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, isComplete, error in
+            guard let self else { return }
+            if let error {
+                self.logger.error("Receive body error: \(error.localizedDescription, privacy: .public)")
+                self.tearDown()
+                return
+            }
+            if isComplete && data == nil {
+                self.tearDown()
+                return
+            }
+            guard let body = data, body.count == length else {
+                self.receiveLength()
+                return
+            }
+            self.handleBody(body)
+            self.receiveLength()
+        }
+    }
+
+    private func handleBody(_ data: Data) {
+        let frame: Frame
+        do {
+            frame = try Frame.decode(data)
+        } catch {
+            logger.error("Decode error: \(error.localizedDescription, privacy: .public)")
             return
         }
 
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: message, options: [])
-            let callbackId = extractRequestId(from: message) ?? UUID().uuidString
-            let callbackLock = NSLock()
-            let callbackFired = UnsafeMutablePointer<Bool>.allocate(capacity: 1)
-            callbackFired.initialize(to: false)
-
-            responseLock.lock()
-            pendingCallbacks[callbackId] = makeCallback(
-                completion: completion, callbackLock: callbackLock, callbackFired: callbackFired
-            )
-            responseLock.unlock()
-
-            setupTimeout(callbackId: callbackId, timeout: timeout, callbackLock: callbackLock,
-                         callbackFired: callbackFired, completion: completion)
-            sendFramedMessage(jsonData, via: connection)
-        } catch { completion(.failure(error)) }
-    }
-
-    private func setupTimeout(
-        callbackId: String, timeout: TimeInterval, callbackLock: NSLock,
-        callbackFired: UnsafeMutablePointer<Bool>,
-        completion: @escaping (Result<[String: Any], Error>) -> Void
-    ) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
-            callbackLock.lock()
-            guard !callbackFired.pointee else { callbackLock.unlock(); return }
-            callbackFired.pointee = true
-            callbackLock.unlock()
-
-            self?.responseLock.lock()
-            self?.pendingCallbacks.removeValue(forKey: callbackId)
-            self?.responseLock.unlock()
-            completion(.failure(BridgeError.timeout))
+        let id: UInt32?
+        switch frame.kind {
+        case .response(let r): id = r.id
+        case .error(let e): id = e.id
+        default: id = nil
         }
+
+        guard let id, let continuation = removePending(id: id) else {
+            logger.debug("No pending request for: \(frame.summary, privacy: .public)")
+            return
+        }
+        continuation.resume(returning: frame)
     }
 
-    private func sendFramedMessage(_ jsonData: Data, via connection: NWConnection) {
-        let framedData = Self.frameMessage(jsonData)
-        connection.send(content: framedData, completion: .contentProcessed { [weak self] error in
-            if let error { self?.logger.error("Send error: \(error.localizedDescription)") }
+    private func write(
+        _ frame: Frame,
+        on connection: NWConnection,
+        completion: @escaping (Error?) -> Void
+    ) {
+        let data: Data
+        do {
+            data = try frame.encodeJSON()
+        } catch {
+            completion(error)
+            return
+        }
+        let framed = Self.frame(data)
+        connection.send(content: framed, completion: .contentProcessed { error in
+            completion(error.map { $0 as Error })
         })
     }
 
-    // MARK: - Static Helpers
+    // MARK: - Pending request bookkeeping
 
-    static func frameMessage(_ data: Data) -> Data {
+    private func removePending(id: UInt32) -> CheckedContinuation<Frame, Error>? {
+        pendingLock.lock()
+        defer { pendingLock.unlock() }
+        return pending.removeValue(forKey: id)
+    }
+
+    private func drainPending() -> [CheckedContinuation<Frame, Error>] {
+        pendingLock.lock()
+        defer { pendingLock.unlock() }
+        let drained = Array(pending.values)
+        pending.removeAll()
+        return drained
+    }
+
+    // MARK: - Static helpers
+
+    static func frame(_ data: Data) -> Data {
         var length = UInt32(data.count).littleEndian
-        var framedData = Data(bytes: &length, count: 4)
-        framedData.append(data)
-        return framedData
+        var framed = Data(bytes: &length, count: 4)
+        framed.append(data)
+        return framed
     }
 }
 
-// MARK: - Receiving
-
-@available(macOS 15.0, *)
-extension NativeMessagingBridge {
-    func startReceiving() { receiveNextMessage() }
-
-    func receiveNextMessage() {
-        guard let connection, isConnected else { return }
-        connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
-            self?.handleLengthReceive(data: data, isComplete: isComplete, error: error)
+/// Run `operation` with a timeout. If it doesn't finish first, run
+/// `onTimeout` (e.g. to fail any pending continuation) and throw
+/// `BridgeError.timeout`.
+@available(macOS 13.0, *)
+private func withTimeout<T: Sendable>(
+    _ seconds: TimeInterval,
+    operation: @escaping @Sendable () async throws -> T,
+    onTimeout: @escaping @Sendable () -> Void
+) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask {
+            try await operation()
         }
-    }
-
-    private func handleLengthReceive(data: Data?, isComplete: Bool, error: NWError?) {
-        if let error { logger.error("Receive error: \(error.localizedDescription)"); isConnected = false; return }
-        if isComplete { logger.debug("Connection closed by server"); isConnected = false; return }
-        guard let lengthData = data, lengthData.count == 4 else { receiveNextMessage(); return }
-        let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
-        guard length > 0 && length < 1024 * 1024 * 1024 else {
-            logger.error("Invalid message length: \(length)"); receiveNextMessage(); return
+        group.addTask {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            onTimeout()
+            throw BridgeError.timeout
         }
-        receiveMessageBody(length: Int(length))
-    }
-
-    private func receiveMessageBody(length: Int) {
-        guard let connection else { return }
-        let len = length
-        connection.receive(minimumIncompleteLength: len, maximumLength: len) { [weak self] data, _, isComplete, error in
-            self?.handleBodyReceive(data: data, length: length, isComplete: isComplete, error: error)
+        guard let first = try await group.next() else {
+            throw BridgeError.timeout
         }
-    }
-
-    private func handleBodyReceive(data: Data?, length: Int, isComplete: Bool, error: NWError?) {
-        if let error {
-            logger.error("Receive body error: \(error.localizedDescription)")
-            isConnected = false
-            return
-        }
-        if isComplete && data == nil { isConnected = false; return }
-        guard let messageData = data, messageData.count == length else { receiveNextMessage(); return }
-        handleReceivedMessage(messageData)
-        receiveNextMessage()
-    }
-
-    private func handleReceivedMessage(_ data: Data) {
-        do {
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let kind = json["kind"] as? [String: Any] else { return }
-            let responseId = extractResponseId(from: kind)
-            if let responseId {
-                responseLock.lock()
-                let callback = pendingCallbacks.removeValue(forKey: responseId)
-                responseLock.unlock()
-                if let callback { callback(.success(data)); return }
-            }
-        } catch {
-            logger.error("Failed to parse received message: \(error.localizedDescription)")
-        }
-        logger.debug("Received message with no pending callback")
-    }
-
-    private func extractResponseId(from kind: [String: Any]) -> String? {
-        if let resp = kind["Response"] as? [String: Any], let id = resp["id"] { return "\(id)" }
-        if let err = kind["Error"] as? [String: Any], let id = err["id"] { return "\(id)" }
-        return nil
-    }
-}
-
-// MARK: - Error Types
-
-enum BridgeError: Error, LocalizedError {
-    case bridgeDeallocated
-    case processNotRunning
-    case processStopped
-    case timeout
-    case invalidResponse
-
-    var errorDescription: String? {
-        switch self {
-        case .bridgeDeallocated:
-            return "Native messaging bridge was deallocated"
-        case .processNotRunning:
-            return "Container app is not running"
-        case .processStopped:
-            return "Container app connection was stopped"
-        case .timeout:
-            return "Request timed out"
-        case .invalidResponse:
-            return "Invalid response from container app"
-        }
+        group.cancelAll()
+        return first
     }
 }

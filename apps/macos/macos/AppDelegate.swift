@@ -4,12 +4,14 @@ import ServiceManagement
 import os.log
 
 @main
-@available(macOS 15.0, *)
-class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
+@available(macOS 13.0, *)
+class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegate,
     LocalBridgeServerDelegate
 {
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
     private let requestTimeoutSeconds: TimeInterval = 30
+    private let pendingServerRequestTTL: TimeInterval = 10
+
     private let extensionBundleIdentifier = "com.eurora-labs.eurora.macos.extension"
     private let desktopBundleIdentifiers = [
         "com.eurora-labs.eurora", "com.eurora-labs.eurora.nightly",
@@ -17,27 +19,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
     private let safariBundleIdentifiers = [
         "com.apple.Safari", "com.apple.SafariTechnologyPreview",
     ]
-    private var grpcClient: BrowserBridgeClient?
+
+    private var bridgeClient: BridgeWebSocketClient?
     private var localBridgeServer: LocalBridgeServer?
-    private var pendingExtensionRequests: [String: ([String: Any]?) -> Void] = [:]
-    private let pendingExtensionRequestsLock = NSLock()
-    private var pendingServerRequests: [String: [String: Any]] = [:]
-    private let pendingServerRequestsLock = NSLock()
+
+    /// Requests we've sent to the desktop on behalf of the Safari extension,
+    /// awaiting a `Response`/`Error` reply. Keyed by request id.
+    private let extensionRequestsLock = NSLock()
+    private var extensionRequests: [UInt32: (Frame) -> Void] = [:]
+
+    /// Requests pushed by the desktop that haven't yet been picked up by the
+    /// Safari extension via `POLL_REQUESTS`. Keyed by request id.
+    private let serverRequestsLock = NSLock()
+    private var serverRequests: [UInt32: PendingServerRequest] = [:]
+
+    private struct PendingServerRequest {
+        let frame: Frame
+        let storedAt: Date
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("Eurora launcher starting")
 
-        // Register as a login item so the launcher (not the embedded Tauri
-        // app) starts on system boot.  SMAppService.mainApp is idempotent —
-        // calling register() when already enabled is a no-op.
         #if !DEBUG
             registerAsLoginItem()
         #endif
 
         launchEuroraDesktop()
-
-        // Observe Tauri app termination so we can shut down with it,
-        // and Safari launch/quit so we keep the browser PID current.
         observeWorkspaceAppLifecycle()
 
         let server = LocalBridgeServer()
@@ -46,47 +54,47 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
         self.localBridgeServer = server
 
         let hostPid = UInt32(getpid())
-        let browserPid = findSafariPid().map { UInt32($0) } ?? 0
-        logger.info("Starting gRPC client: host=\(hostPid), browser=\(browserPid)")
-        let client = BrowserBridgeClient(hostPid: hostPid, browserPid: browserPid)
+        let appPid = findSafariPid().map { UInt32($0) } ?? 0
+        logger.info("Starting bridge WebSocket client: host=\(hostPid, privacy: .public), app=\(appPid, privacy: .public)")
+        let client = BridgeWebSocketClient(hostPid: hostPid, appPid: appPid)
         client.delegate = self
-        client.connect()
-        self.grpcClient = client
+        client.start()
+        self.bridgeClient = client
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        grpcClient?.disconnect()
-        grpcClient = nil
+        bridgeClient?.stop()
+        bridgeClient = nil
         localBridgeServer?.stop()
         localBridgeServer = nil
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    // MARK: - Login Item Registration
+    // MARK: - Login item
 
     #if !DEBUG
-        private func registerAsLoginItem() {
-            let service = SMAppService.mainApp
-            switch service.status {
-            case .enabled:
-                logger.debug("Already registered as login item")
-            case .notRegistered, .notFound:
-                do {
-                    try service.register()
-                    logger.info("Registered as login item")
-                } catch {
-                    logger.error("Failed to register as login item: \(error.localizedDescription)")
-                }
-            case .requiresApproval:
-                logger.info("Login item requires user approval in System Settings")
-            @unknown default:
-                logger.warning("Unknown login item status: \(String(describing: service.status))")
+    private func registerAsLoginItem() {
+        let service = SMAppService.mainApp
+        switch service.status {
+        case .enabled:
+            logger.debug("Already registered as login item")
+        case .notRegistered, .notFound:
+            do {
+                try service.register()
+                logger.info("Registered as login item")
+            } catch {
+                logger.error("Failed to register as login item: \(error.localizedDescription, privacy: .public)")
             }
+        case .requiresApproval:
+            logger.info("Login item requires user approval in System Settings")
+        @unknown default:
+            logger.warning("Unknown login item status")
         }
+    }
     #endif
 
-    // MARK: - App Lifecycle Observation
+    // MARK: - App lifecycle observation
 
     private func observeWorkspaceAppLifecycle() {
         let center = NSWorkspace.shared.notificationCenter
@@ -102,8 +110,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
 
     @objc private func workspaceAppDidTerminate(_ notification: Notification) {
         guard
-            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
-                as? NSRunningApplication,
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
             let bundleId = app.bundleIdentifier
         else { return }
 
@@ -111,26 +118,24 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
             logger.info("Eurora terminated, shutting down launcher")
             NSApplication.shared.terminate(nil)
         } else if safariBundleIdentifiers.contains(bundleId) {
-            logger.info(
-                "Safari terminated (was PID \(app.processIdentifier)), clearing browser PID")
-            grpcClient?.updateBrowserPid(0)
+            logger.info("Safari terminated (was PID \(app.processIdentifier, privacy: .public)), clearing app PID")
+            bridgeClient?.updateAppPid(0)
         }
     }
 
     @objc private func workspaceAppDidLaunch(_ notification: Notification) {
         guard
-            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
-                as? NSRunningApplication,
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
             let bundleId = app.bundleIdentifier,
             safariBundleIdentifiers.contains(bundleId)
         else { return }
 
         let pid = UInt32(app.processIdentifier)
-        logger.info("Safari launched (PID: \(pid)), updating browser PID")
-        grpcClient?.updateBrowserPid(pid)
+        logger.info("Safari launched (PID: \(pid, privacy: .public)), updating app PID")
+        bridgeClient?.updateAppPid(pid)
     }
 
-    // MARK: - Tauri Desktop App Lifecycle
+    // MARK: - Tauri desktop launch
 
     private func launchEuroraDesktop() {
         guard let resourceURL = Bundle.main.resourceURL else {
@@ -138,364 +143,202 @@ class AppDelegate: NSObject, NSApplicationDelegate, BrowserBridgeClientDelegate,
             return
         }
 
-        // Discover the embedded Tauri app dynamically — the product name
-        // differs between release ("Eurora.app") and nightly
-        // ("Eurora Nightly.app"), so we scan Resources for any .app
-        // whose bundle identifier matches a known desktop build.
         let desktopAppURL: URL? = {
-            guard
-                let contents = try? FileManager.default.contentsOfDirectory(
-                    at: resourceURL, includingPropertiesForKeys: nil)
-            else { return nil }
+            guard let contents = try? FileManager.default.contentsOfDirectory(
+                at: resourceURL, includingPropertiesForKeys: nil
+            ) else { return nil }
             return contents.first { url in
-                guard url.pathExtension == "app" else { return false }
-                guard let bundle = Bundle(url: url),
-                    let bundleId = bundle.bundleIdentifier
+                guard url.pathExtension == "app",
+                      let bundle = Bundle(url: url),
+                      let bundleId = bundle.bundleIdentifier
                 else { return false }
                 return self.desktopBundleIdentifiers.contains(bundleId)
             }
         }()
 
         guard let desktopAppURL else {
-            logger.error(
-                "No embedded desktop app found in Resources matching \(self.desktopBundleIdentifiers)"
-            )
+            logger.error("No embedded desktop app found in Resources")
             return
         }
-        logger.info("Found embedded desktop app: \(desktopAppURL.lastPathComponent)")
+        logger.info("Found embedded desktop app: \(desktopAppURL.lastPathComponent, privacy: .public)")
 
         let config = NSWorkspace.OpenConfiguration()
         config.activates = true
-
-        NSWorkspace.shared.openApplication(at: desktopAppURL, configuration: config) {
-            [weak self] app, error in
-            if let error = error {
-                self?.logger.error("Failed to launch Eurora: \(error.localizedDescription)")
+        NSWorkspace.shared.openApplication(at: desktopAppURL, configuration: config) { [weak self] app, error in
+            if let error {
+                self?.logger.error("Failed to launch Eurora: \(error.localizedDescription, privacy: .public)")
             } else {
-                self?.logger.info(
-                    "Eurora launched successfully (PID: \(app?.processIdentifier ?? 0))")
+                self?.logger.info("Eurora launched successfully (PID: \(app?.processIdentifier ?? 0, privacy: .public))")
             }
         }
     }
 
-    // MARK: - Safari PID Detection
-
     private func findSafariPid() -> pid_t? {
-        return NSWorkspace.shared.runningApplications.first {
+        NSWorkspace.shared.runningApplications.first {
             safariBundleIdentifiers.contains($0.bundleIdentifier ?? "")
         }?.processIdentifier
     }
 
-    // MARK: - BrowserBridgeClientDelegate
+    // MARK: - BridgeWebSocketClientDelegate
 
-    func browserBridgeClientDidConnect(_ client: BrowserBridgeClient) {
-        logger.info("Connected to gRPC server")
+    func bridgeWebSocketClientDidConnect(_ client: BridgeWebSocketClient) {
+        logger.info("Connected to desktop bridge")
     }
-    func browserBridgeClientDidDisconnect(_ client: BrowserBridgeClient, error: Error?) {
+
+    func bridgeWebSocketClientDidDisconnect(_ client: BridgeWebSocketClient, error: Error?) {
         if let error {
-            logger.warning("Disconnected: \(error.localizedDescription)")
+            logger.warning("Disconnected from desktop bridge: \(error.localizedDescription, privacy: .public)")
         } else {
-            logger.info("Disconnected from gRPC server")
+            logger.info("Disconnected from desktop bridge")
         }
 
-        // Drain pending extension requests — the server can no longer respond,
-        // so complete them all with an error to avoid hanging the Safari extension.
-        pendingExtensionRequestsLock.lock()
-        let pending = pendingExtensionRequests
-        pendingExtensionRequests.removeAll()
-        pendingExtensionRequestsLock.unlock()
-
+        // Drain pending extension requests — the server can no longer respond.
+        let pending = drainExtensionRequests()
         if !pending.isEmpty {
-            logger.info("Draining \(pending.count) pending extension request(s) due to disconnect")
-            let errDict: [String: Any] = [
-                "kind": ["Error": ["message": "gRPC client disconnected"]]
-            ]
+            logger.info("Draining \(pending.count, privacy: .public) pending extension request(s) due to disconnect")
+            let errFrame = Frame(ErrorFrame(id: 0, message: "Bridge client disconnected"))
             for (_, completion) in pending {
-                completion(errDict)
+                completion(errFrame)
             }
         }
     }
-    func browserBridgeClient(
-        _ client: BrowserBridgeClient, didReceiveFrame frame: BrowserBridge_Frame
-    ) {
-        handleFrameFromServer(frame)
+
+    func bridgeWebSocketClient(_ client: BridgeWebSocketClient, didReceive frame: Frame) {
+        switch frame.kind {
+        case .response(let r): deliverToExtensionRequest(id: r.id, frame: frame)
+        case .error(let e): deliverToExtensionRequest(id: e.id, frame: frame)
+        case .request(let r): storeServerRequest(id: r.id, frame: frame)
+        case .event, .cancel: localBridgeServer?.broadcast(frame: frame)
+        case .register: break
+        }
     }
 
     // MARK: - LocalBridgeServerDelegate
 
     func localBridgeServer(
-        _ server: LocalBridgeServer, didReceiveMessage message: [String: Any],
-        completion: @escaping ([String: Any]?) -> Void
+        _ server: LocalBridgeServer,
+        didReceive frame: Frame,
+        completion: @escaping (Frame?) -> Void
     ) {
-        // The delegate is called on LocalBridgeServer's background queue.
-        // Dispatch to main so all grpcClient access is serialized.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            if let kind = message["kind"] as? [String: Any],
-                let resp = kind["Response"] as? [String: Any], let rid = resp["id"]
-            {
-                let idStr = "\(rid)"
-                self.pendingServerRequestsLock.lock()
-                let had = self.pendingServerRequests.removeValue(forKey: idStr) != nil
-                self.pendingServerRequestsLock.unlock()
-                if had {
-                    self.sendDictToServer(message)
-                    completion(["status": "forwarded"])
-                    return
-                }
-            }
-            if let kind = message["kind"] as? [String: Any],
-                let req = kind["Request"] as? [String: Any],
-                let action = req["action"] as? String,
-                action == "POLL_REQUESTS"
-            {
-                self.handlePollRequests(completion: completion)
-                return
-            }
-
-            self.forwardExtRequest(message, completion: completion)
+            self.routeFromExtension(frame: frame, completion: completion)
         }
     }
 
-    private func forwardExtRequest(
-        _ message: [String: Any], completion: @escaping ([String: Any]?) -> Void
-    ) {
-        guard let client = grpcClient, client.isConnected else {
-            completion(["kind": ["Error": ["message": "gRPC client not connected"]]])
-            return
-        }
-        var reqId: String?
-        if let kind = message["kind"] as? [String: Any],
-            let req = kind["Request"] as? [String: Any], let id = req["id"]
-        {
-            reqId = "\(id)"
-        }
-        if let reqId {
-            pendingExtensionRequestsLock.lock()
-            pendingExtensionRequests[reqId] = completion
-            pendingExtensionRequestsLock.unlock()
+    private func routeFromExtension(frame: Frame, completion: @escaping (Frame?) -> Void) {
+        switch frame.kind {
+        case .response(let r):
+            // Extension is replying to a server-pushed request. Drop the
+            // entry from our pending-server map (if it's still there) and
+            // forward to the desktop.
+            removeServerRequest(id: r.id)
+            sendToBridge(frame)
+            completion(Frame(ResponseFrame(id: r.id, action: r.action, payload: "{\"status\":\"forwarded\"}")))
 
-            // Schedule a timeout so the Safari extension is not left hanging
-            // if the gRPC server never responds.
-            let timeout = requestTimeoutSeconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
-                guard let self else { return }
-                self.pendingExtensionRequestsLock.lock()
-                let timedOut = self.pendingExtensionRequests.removeValue(forKey: reqId)
-                self.pendingExtensionRequestsLock.unlock()
-                if let timedOut {
-                    self.logger.warning("Request \(reqId) timed out after \(timeout)s")
-                    timedOut(["kind": ["Error": ["message": "Request timed out"]]])
-                }
-            }
-        }
-        sendDictToServer(message)
-        if reqId == nil { completion(["status": "ok"]) }
-    }
+        case .error(let e):
+            removeServerRequest(id: e.id)
+            sendToBridge(frame)
+            completion(nil)
 
-    private func sendDictToServer(_ dict: [String: Any]) {
-        guard let frame = Self.frameFromDictionary(dict) else { return }
-        grpcClient?.send(frame: frame)
-    }
+        case .request(let r) where r.action == "POLL_REQUESTS":
+            handlePollRequests(requestId: r.id, completion: completion)
 
-    private func handleFrameFromServer(_ frame: BrowserBridge_Frame) {
-        guard let fk = frame.kind else { return }
-        switch fk {
-        case .response(let r): deliverResponse(id: r.id, frame: frame)
-        case .error(let e): deliverResponse(id: e.id, frame: frame)
-        case .request(let r): forwardServerReq(request: r, frame: frame)
+        case .request(let r):
+            forwardExtensionRequest(request: r, completion: completion)
+
         case .event, .cancel:
-            if let d = Self.dictionaryFromFrame(frame) { localBridgeServer?.broadcast(message: d) }
-        case .register: break
+            sendToBridge(frame)
+            completion(nil)
+
+        case .register:
+            logger.warning("Ignoring Register from extension")
+            completion(Frame(ErrorFrame(id: 0, message: "Register frames are not accepted from the extension")))
         }
     }
 
-    private func deliverResponse(id: UInt32, frame: BrowserBridge_Frame) {
-        let idStr = "\(id)"
-        pendingExtensionRequestsLock.lock()
-        let completion = pendingExtensionRequests.removeValue(forKey: idStr)
-        pendingExtensionRequestsLock.unlock()
-        guard let completion else { return }
-        guard let dict = Self.dictionaryFromFrame(frame) else {
-            completion(["kind": ["Error": ["message": "Convert failed"]]])
+    // MARK: - Extension → desktop request forwarding
+
+    private func forwardExtensionRequest(
+        request: RequestFrame,
+        completion: @escaping (Frame?) -> Void
+    ) {
+        guard let bridgeClient, bridgeClient.isConnected else {
+            completion(Frame(ErrorFrame(id: request.id, message: "Bridge client not connected")))
             return
         }
-        completion(dict)
+
+        let id = request.id
+        extensionRequestsLock.lock()
+        extensionRequests[id] = completion
+        extensionRequestsLock.unlock()
+
+        let timeout = requestTimeoutSeconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in
+            guard let self else { return }
+            self.extensionRequestsLock.lock()
+            let timedOut = self.extensionRequests.removeValue(forKey: id)
+            self.extensionRequestsLock.unlock()
+            if let timedOut {
+                self.logger.warning("Extension request \(id, privacy: .public) timed out after \(timeout, privacy: .public)s")
+                timedOut(Frame(ErrorFrame(id: id, message: "Request timed out")))
+            }
+        }
+
+        sendToBridge(Frame(request))
     }
 
-    private func forwardServerReq(request: BrowserBridge_RequestFrame, frame: BrowserBridge_Frame) {
-        let reqIdStr = "\(request.id)"
-        let action = request.action
-        guard let dict = Self.dictionaryFromFrame(frame) else {
-            sendErrResp(requestId: reqIdStr, action: action, error: "Frame conversion failed")
-            return
-        }
-        pendingServerRequestsLock.lock()
-        pendingServerRequests[reqIdStr] = [
-            "frame": dict,
-            "storedAt": Date().timeIntervalSince1970,
-        ]
-        pendingServerRequestsLock.unlock()
+    private func deliverToExtensionRequest(id: UInt32, frame: Frame) {
+        extensionRequestsLock.lock()
+        let completion = extensionRequests.removeValue(forKey: id)
+        extensionRequestsLock.unlock()
+        completion?(frame)
     }
 
-    private func handlePollRequests(completion: @escaping ([String: Any]?) -> Void) {
-        let now = Date().timeIntervalSince1970
-        pendingServerRequestsLock.lock()
-        pendingServerRequests = pendingServerRequests.filter {
-            guard let storedAt = $0.value["storedAt"] as? TimeInterval else { return false }
-            return (now - storedAt) < 10.0
-        }
-        let requests = pendingServerRequests.values.compactMap { $0["frame"] as? [String: Any] }
-        pendingServerRequests.removeAll()
-        pendingServerRequestsLock.unlock()
+    private func drainExtensionRequests() -> [(UInt32, (Frame) -> Void)] {
+        extensionRequestsLock.lock()
+        let snapshot = extensionRequests.map { ($0.key, $0.value) }
+        extensionRequests.removeAll()
+        extensionRequestsLock.unlock()
+        return snapshot
+    }
+
+    // MARK: - Desktop → extension request queueing
+
+    private func storeServerRequest(id: UInt32, frame: Frame) {
+        serverRequestsLock.lock()
+        serverRequests[id] = PendingServerRequest(frame: frame, storedAt: Date())
+        serverRequestsLock.unlock()
+    }
+
+    private func removeServerRequest(id: UInt32) {
+        serverRequestsLock.lock()
+        serverRequests.removeValue(forKey: id)
+        serverRequestsLock.unlock()
+    }
+
+    private func handlePollRequests(requestId: UInt32, completion: @escaping (Frame?) -> Void) {
+        let cutoff = Date().addingTimeInterval(-pendingServerRequestTTL)
+
+        serverRequestsLock.lock()
+        serverRequests = serverRequests.filter { $0.value.storedAt > cutoff }
+        let frames = serverRequests.values.map(\.frame)
+        serverRequests.removeAll()
+        serverRequestsLock.unlock()
 
         let payload: String
-        if let data = try? JSONSerialization.data(withJSONObject: requests, options: []),
-            let str = String(data: data, encoding: .utf8)
-        {
-            payload = str
-        } else {
+        do {
+            let data = try JSONEncoder().encode(frames)
+            payload = String(data: data, encoding: .utf8) ?? "[]"
+        } catch {
+            logger.error("Failed to encode polled requests: \(error.localizedDescription, privacy: .public)")
             payload = "[]"
         }
-        completion([
-            "kind": [
-                "Response": [
-                    "id": 0,
-                    "action": "POLL_REQUESTS",
-                    "payload": payload,
-                ]
-            ]
-        ])
+
+        completion(Frame(ResponseFrame(id: requestId, action: "POLL_REQUESTS", payload: payload)))
     }
 
-    private func sendErrResp(requestId: String, action: String, error: String) {
-        pendingServerRequestsLock.lock()
-        pendingServerRequests.removeValue(forKey: requestId)
-        pendingServerRequestsLock.unlock()
-        let idVal: UInt32 = UInt32(requestId) ?? 0
-        var ef = BrowserBridge_ErrorFrame()
-        ef.id = idVal
-        ef.message = error
-        var f = BrowserBridge_Frame()
-        f.error = ef
-        grpcClient?.send(frame: f)
-    }
-}
-
-// MARK: - Frame / Dictionary Conversion
-
-@available(macOS 15.0, *)
-extension AppDelegate {
-    static func frameFromDictionary(_ dict: [String: Any]) -> BrowserBridge_Frame? {
-        guard let kind = dict["kind"] as? [String: Any] else { return nil }
-        var frame = BrowserBridge_Frame()
-
-        if let request = kind["Request"] as? [String: Any] {
-            frame.request = makeRequestFrame(from: request)
-        } else if let response = kind["Response"] as? [String: Any] {
-            frame.response = makeResponseFrame(from: response)
-        } else if let event = kind["Event"] as? [String: Any] {
-            frame.event = makeEventFrame(from: event)
-        } else if let error = kind["Error"] as? [String: Any] {
-            frame.error = makeErrorFrame(from: error)
-        } else if let cancel = kind["Cancel"] as? [String: Any] {
-            frame.cancel = makeCancelFrame(from: cancel)
-        } else if let register = kind["Register"] as? [String: Any] {
-            frame.register = makeRegisterFrame(from: register)
-        } else {
-            return nil
-        }
-
-        return frame
-    }
-
-    private static func makeRequestFrame(from dict: [String: Any]) -> BrowserBridge_RequestFrame {
-        var reqFrame = BrowserBridge_RequestFrame()
-        if let identifier = dict["id"] as? Int { reqFrame.id = UInt32(identifier) }
-        if let action = dict["action"] as? String { reqFrame.action = action }
-        if let payload = dict["payload"] as? String { reqFrame.payload = payload }
-        return reqFrame
-    }
-
-    private static func makeResponseFrame(from dict: [String: Any]) -> BrowserBridge_ResponseFrame {
-        var respFrame = BrowserBridge_ResponseFrame()
-        if let identifier = dict["id"] as? Int { respFrame.id = UInt32(identifier) }
-        if let action = dict["action"] as? String { respFrame.action = action }
-        if let payload = dict["payload"] as? String { respFrame.payload = payload }
-        return respFrame
-    }
-
-    private static func makeEventFrame(from dict: [String: Any]) -> BrowserBridge_EventFrame {
-        var evtFrame = BrowserBridge_EventFrame()
-        if let action = dict["action"] as? String { evtFrame.action = action }
-        if let payload = dict["payload"] as? String { evtFrame.payload = payload }
-        return evtFrame
-    }
-
-    private static func makeErrorFrame(from dict: [String: Any]) -> BrowserBridge_ErrorFrame {
-        var errFrame = BrowserBridge_ErrorFrame()
-        if let identifier = dict["id"] as? Int { errFrame.id = UInt32(identifier) }
-        if let code = dict["code"] as? Int { errFrame.code = UInt32(code) }
-        if let message = dict["message"] as? String { errFrame.message = message }
-        if let details = dict["details"] as? String { errFrame.details = details }
-        return errFrame
-    }
-
-    private static func makeCancelFrame(from dict: [String: Any]) -> BrowserBridge_CancelFrame {
-        var cancelFrame = BrowserBridge_CancelFrame()
-        if let identifier = dict["id"] as? Int { cancelFrame.id = UInt32(identifier) }
-        return cancelFrame
-    }
-
-    private static func makeRegisterFrame(from dict: [String: Any]) -> BrowserBridge_RegisterFrame {
-        var regFrame = BrowserBridge_RegisterFrame()
-        if let hostPid = dict["host_pid"] as? Int { regFrame.hostPid = UInt32(hostPid) }
-        if let browserPid = dict["browser_pid"] as? Int { regFrame.browserPid = UInt32(browserPid) }
-        return regFrame
-    }
-
-    static func dictionaryFromFrame(_ frame: BrowserBridge_Frame) -> [String: Any]? {
-        guard let frameKind = frame.kind else { return nil }
-        guard let kind = kindDictFromFrameKind(frameKind) else { return nil }
-        return ["kind": kind]
-    }
-
-    private static func kindDictFromFrameKind(_ frameKind: BrowserBridge_Frame.OneOf_Kind)
-        -> [String: Any]?
-    {
-        switch frameKind {
-        case .request(let req): return ["Request": requestDict(from: req)]
-        case .response(let resp): return ["Response": responseDict(from: resp)]
-        case .event(let evt): return ["Event": eventDict(from: evt)]
-        case .error(let err): return ["Error": errorDict(from: err)]
-        case .cancel(let cnl): return ["Cancel": ["id": Int(cnl.id)]]
-        case .register: return nil
-        }
-    }
-
-    private static func requestDict(from req: BrowserBridge_RequestFrame) -> [String: Any] {
-        var dict: [String: Any] = ["id": Int(req.id), "action": req.action]
-        if req.hasPayload { dict["payload"] = req.payload }
-        return dict
-    }
-
-    private static func responseDict(from resp: BrowserBridge_ResponseFrame) -> [String: Any] {
-        var dict: [String: Any] = ["id": Int(resp.id), "action": resp.action]
-        if resp.hasPayload { dict["payload"] = resp.payload }
-        return dict
-    }
-
-    private static func eventDict(from evt: BrowserBridge_EventFrame) -> [String: Any] {
-        var dict: [String: Any] = ["action": evt.action]
-        if evt.hasPayload { dict["payload"] = evt.payload }
-        return dict
-    }
-
-    private static func errorDict(from err: BrowserBridge_ErrorFrame) -> [String: Any] {
-        var dict: [String: Any] = [
-            "id": Int(err.id), "code": Int(err.code), "message": err.message,
-        ]
-        if err.hasDetails { dict["details"] = err.details }
-        return dict
+    private func sendToBridge(_ frame: Frame) {
+        bridgeClient?.send(frame: frame)
     }
 }

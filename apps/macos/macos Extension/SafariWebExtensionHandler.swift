@@ -1,93 +1,145 @@
 import SafariServices
 import os.log
 
-@available(macOS 15.0, *)
-class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
+private let extensionLogger = Logger(
+    subsystem: "com.eurora.macos.extension",
+    category: "SafariWebExtensionHandler"
+)
 
-    private let logger = Logger(subsystem: "com.eurora.macos.extension", category: "SafariWebExtensionHandler")
+@available(macOS 13.0, *)
+class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
     func beginRequest(with context: NSExtensionContext) {
         let request = context.inputItems.first as? NSExtensionItem
+        let raw = Self.extractMessage(from: request)
+        let profileStr = Self.extractProfile(from: request).map { $0.uuidString } ?? "none"
+        extensionLogger.debug("Received native message (profile: \(profileStr, privacy: .public))")
 
-        let profile: UUID?
+        guard let raw else {
+            extensionLogger.error("Empty native message")
+            Self.completeWithError(context: context, message: "Empty native message")
+            return
+        }
+
+        let frame: Frame
+        do {
+            frame = try Self.decodeFrame(from: raw)
+        } catch {
+            extensionLogger.error("Failed to decode incoming frame: \(error.localizedDescription, privacy: .public)")
+            Self.completeWithError(context: context, message: "Invalid message format")
+            return
+        }
+
+        switch frame.kind {
+        case .response, .error:
+            // Reply to a server-pushed request — forward and acknowledge.
+            NativeMessagingBridge.shared.ensureConnected()
+            NativeMessagingBridge.shared.forward(frame)
+            Self.completeWithStatus(context: context, status: "forwarded")
+
+        case .request(let request):
+            NativeMessagingBridge.shared.ensureConnected()
+            Task {
+                do {
+                    let response = try await NativeMessagingBridge.shared.send(request: request)
+                    Self.completeWithFrame(context: context, frame: response)
+                } catch {
+                    extensionLogger.error("Bridge error: \(error.localizedDescription, privacy: .public)")
+                    Self.completeWithError(
+                        context: context,
+                        id: request.id,
+                        message: error.localizedDescription
+                    )
+                }
+            }
+
+        case .event, .cancel:
+            // Best-effort: forward and acknowledge with no reply expected.
+            NativeMessagingBridge.shared.ensureConnected()
+            NativeMessagingBridge.shared.forward(frame)
+            Self.completeWithStatus(context: context, status: "forwarded")
+
+        case .register:
+            extensionLogger.warning("Ignoring unexpected Register frame from extension")
+            Self.completeWithError(
+                context: context,
+                message: "Register frames are not accepted from the extension"
+            )
+        }
+    }
+
+    // MARK: - Decoding
+
+    private static func extractMessage(from request: NSExtensionItem?) -> Any? {
+        if #available(iOS 15.0, macOS 11.0, *) {
+            return request?.userInfo?[SFExtensionMessageKey]
+        }
+        return request?.userInfo?["message"]
+    }
+
+    private static func extractProfile(from request: NSExtensionItem?) -> UUID? {
         if #available(iOS 17.0, macOS 14.0, *) {
-            profile = request?.userInfo?[SFExtensionProfileKey] as? UUID
+            return request?.userInfo?[SFExtensionProfileKey] as? UUID
+        }
+        return request?.userInfo?["profile"] as? UUID
+    }
+
+    private static func decodeFrame(from raw: Any) throws -> Frame {
+        let data: Data
+        if let frameData = raw as? Data {
+            data = frameData
+        } else if let string = raw as? String, let stringData = string.data(using: .utf8) {
+            data = stringData
         } else {
-            profile = request?.userInfo?["profile"] as? UUID
+            data = try JSONSerialization.data(withJSONObject: raw, options: [])
         }
+        return try Frame.decode(data)
+    }
 
-        let message: Any?
-        if #available(iOS 15.0, macOS 11.0, *) {
-            message = request?.userInfo?[SFExtensionMessageKey]
-        } else {
-            message = request?.userInfo?["message"]
-        }
+    // MARK: - Replying back to the JS extension
 
-        let profileStr = profile?.uuidString ?? "none"
-        let msgDesc = String(describing: message)
-        logger.debug("Received native message: \(msgDesc) (profile: \(profileStr))")
-
-        guard let messageDict = message as? [String: Any] else {
-            logger.error("Invalid message format — expected dictionary")
-            completeWithError(context: context, error: "Invalid message format")
-            return
-        }
-
-        // Check if this is a response to a pending native request (from gRPC server)
-        // rather than a new outbound request from the extension.
-        if let kind = messageDict["kind"] as? [String: Any],
-           kind["Response"] != nil {
-            if NativeMessagingBridge.shared.handleResponseFromExtension(messageDict) {
-                logger.debug("Forwarded response to container app")
-                completeWithResponse(context: context, response: ["status": "forwarded"])
-            } else {
-                logger.warning("Received Response frame with no matching pending request")
-                completeWithResponse(context: context, response: ["status": "error", "error": "unmatched_response"])
+    private static func completeWithFrame(context: NSExtensionContext, frame: Frame) {
+        do {
+            let data = try frame.encodeJSON()
+            guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                completeWithError(context: context, message: "Frame did not encode to a JSON object")
+                return
             }
-            return
-        }
-
-        NativeMessagingBridge.shared.ensureConnected()
-
-        NativeMessagingBridge.shared.sendMessage(messageDict) { [weak self] result in
-            switch result {
-            case .success(let responseDict):
-                self?.completeWithResponse(context: context, response: responseDict)
-            case .failure(let error):
-                self?.logger.error("Bridge error: \(error.localizedDescription)")
-                self?.completeWithError(context: context, error: error.localizedDescription)
-            }
+            sendMessage(context: context, payload: object)
+        } catch {
+            completeWithError(context: context, message: error.localizedDescription)
         }
     }
 
-    private func completeWithResponse(context: NSExtensionContext, response: [String: Any]) {
-        let responseItem = NSExtensionItem()
-
-        if #available(iOS 15.0, macOS 11.0, *) {
-            responseItem.userInfo = [SFExtensionMessageKey: response]
-        } else {
-            responseItem.userInfo = ["message": response]
-        }
-
-        context.completeRequest(returningItems: [responseItem], completionHandler: nil)
+    private static func completeWithStatus(context: NSExtensionContext, status: String) {
+        sendMessage(context: context, payload: ["status": status])
     }
 
-    private func completeWithError(context: NSExtensionContext, error: String) {
-        let responseItem = NSExtensionItem()
-        let errorResponse: [String: Any] = [
-            "kind": [
-                "Error": [
-                    "message": error
-                ]
-            ]
-        ]
-
-        if #available(iOS 15.0, macOS 11.0, *) {
-            responseItem.userInfo = [SFExtensionMessageKey: errorResponse]
-        } else {
-            responseItem.userInfo = ["message": errorResponse]
+    private static func completeWithError(
+        context: NSExtensionContext,
+        id: UInt32 = 0,
+        message: String
+    ) {
+        let frame = Frame(ErrorFrame(id: id, message: message))
+        do {
+            let data = try frame.encodeJSON()
+            if let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                sendMessage(context: context, payload: object)
+                return
+            }
+        } catch {
+            extensionLogger.error("Failed to encode error frame: \(error.localizedDescription, privacy: .public)")
         }
+        sendMessage(context: context, payload: ["error": message])
+    }
 
-        context.completeRequest(returningItems: [responseItem], completionHandler: nil)
+    private static func sendMessage(context: NSExtensionContext, payload: [String: Any]) {
+        let item = NSExtensionItem()
+        if #available(iOS 15.0, macOS 11.0, *) {
+            item.userInfo = [SFExtensionMessageKey: payload]
+        } else {
+            item.userInfo = ["message": payload]
+        }
+        context.completeRequest(returningItems: [item], completionHandler: nil)
     }
 }
