@@ -22,6 +22,7 @@
 		"build:ui": "turbo run build --filter @eurora/ui...",
 		"build:test": "cd crates/app/euro-tauri && tauri build --config tauri.conf.test.json -- --profile dev",
 		"build:browser": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:all",
+		"build:office-addin": "pnpm specta:office && pnpm --filter @eurora/office-addin run build",
 		"build:firefox": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:firefox",
 		"build:chrome": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:chrome",
 		"build:edge": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:edge",

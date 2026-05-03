@@ -15,7 +15,7 @@ const DEFAULTS = {
 	ADDIN_ID: process.env.OFFICE_ADDIN_ID ?? 'b0c1c6a4-4d0a-4c6f-9f3a-eee5eeee5eee',
 	VERSION: process.env.OFFICE_ADDIN_VERSION ?? '1.0.0.0',
 	SOURCE_LOCATION: process.env.OFFICE_ADDIN_SOURCE_LOCATION ?? `${DEV_HOST}/runtime.html`,
-	ICON_BASE_URL: process.env.OFFICE_ADDIN_ICON_BASE_URL ?? `${DEV_HOST}/assets/`,
+	ICON_BASE_URL: process.env.OFFICE_ADDIN_ICON_BASE_URL ?? `${DEV_HOST}/icons/`,
 };
 
 const template = await readFile(TEMPLATE, 'utf8');
