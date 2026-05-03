@@ -470,9 +470,8 @@ impl SystemApi for SystemApiImpl {
     }
 
     async fn get_browser_connection_count(self) -> Result<usize, String> {
-        let service = euro_browser::BrowserBridgeService::get_or_init().await;
-        let count = service.connection_count().await;
-        Ok(count)
+        let service = euro_browser::BridgeService::get_or_init().await;
+        Ok(service.connection_count())
     }
 
     async fn get_browser_extension_url(
@@ -488,11 +487,8 @@ impl SystemApi for SystemApiImpl {
         if process_name.is_empty() {
             return Ok(false);
         }
-        let service = euro_browser::BrowserBridgeService::get_or_init().await;
-        Ok(service
-            .find_pid_by_browser_name(&process_name)
-            .await
-            .is_some())
+        let service = euro_browser::BridgeService::get_or_init().await;
+        Ok(service.find_pid_by_app_name(&process_name).is_some())
     }
 
     async fn open_url_in_browser(self, process_id: u32, url: String) -> Result<(), String> {

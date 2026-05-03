@@ -5,7 +5,6 @@ use strum_macros::AsRefStr;
 
 mod article;
 mod metadata;
-pub mod proto;
 mod twitter;
 mod youtube;
 

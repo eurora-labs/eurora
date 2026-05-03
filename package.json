@@ -40,6 +40,7 @@
 		"proto:typescript": "buf generate && turbo run build --filter @eurora/shared --force",
 		"proto:rust": "cargo build -p proto-gen",
 		"proto:swift": "protoc --proto_path=proto --swift_out=apps/macos/Shared/Generated --plugin=protoc-gen-grpc-swift=$(which protoc-gen-grpc-swift-2) --grpc-swift_out=apps/macos/Shared/Generated proto/browser_bridge.proto",
+		"specta:bridge": "cargo run -p euro-bridge-protocol --features codegen -- --generate_specta && cargo run -p euro-native-messaging -- --generate_specta",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
@@ -84,7 +85,7 @@
 		"svelte-eslint-parser": "^1.6.0",
 		"tailwindcss": "catalog:",
 		"ts-proto": "^2.11.6",
-		"turbo": "^2.9.6",
+		"turbo": "^2.9.8",
 		"typescript-eslint": "^8.59.0",
 		"web-ext": "^8.10.0"
 	},
