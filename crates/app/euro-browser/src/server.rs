@@ -1,93 +1,87 @@
-use super::proto::{
-    EventFrame, Frame, RequestFrame, ResponseFrame, browser_bridge_server::BrowserBridge,
-    browser_bridge_server::BrowserBridgeServer, frame::Kind as FrameKind,
-};
-use dashmap::DashMap;
-use std::collections::HashMap;
-use std::net::ToSocketAddrs;
-use std::pin::Pin;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
-use tokio::sync::{OnceCell, RwLock, broadcast, mpsc, oneshot, watch};
-use tokio_stream::{Stream, wrappers::ReceiverStream};
-use tonic::{Request, Response, Status, transport::Server};
 
-pub const BROWSER_BRIDGE_PORT: &str = "1431";
+use axum::Router;
+use axum::extract::ConnectInfo;
+use axum::extract::State;
+use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgrade, close_code};
+use axum::response::IntoResponse;
+use axum::routing::get;
+use dashmap::DashMap;
+use euro_bridge_protocol::{
+    BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, EventFrame, Frame, FrameKind,
+    RegisterFrame, RequestFrame, ResponseFrame,
+};
+use futures_util::{SinkExt, StreamExt};
+use tokio::net::TcpListener;
+use tokio::sync::{OnceCell, broadcast, mpsc, oneshot, watch};
 
-static GLOBAL_SERVICE: OnceCell<BrowserBridgeService> = OnceCell::const_new();
+use crate::process_name::get_process_name;
+
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
+const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
+const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
+const OUTBOUND_QUEUE_SIZE: usize = 32;
+
+static GLOBAL_SERVICE: OnceCell<BridgeService> = OnceCell::const_new();
 static SERVER_STARTED: AtomicBool = AtomicBool::new(false);
 static FRAME_HANDLER_STARTED: AtomicBool = AtomicBool::new(false);
 static SHUTDOWN_TX: OnceCell<watch::Sender<bool>> = OnceCell::const_new();
 
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
-
-struct PendingRequest {
-    sender: oneshot::Sender<Frame>,
-}
-
-impl std::fmt::Debug for PendingRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PendingRequest")
-            .field("sender", &"oneshot::Sender<Frame>")
-            .finish()
-    }
-}
-
-impl PendingRequest {
-    fn new(sender: oneshot::Sender<Frame>) -> Self {
-        Self { sender }
-    }
-
-    fn send(self, frame: Frame) -> Result<(), ()> {
-        if self.sender.send(frame).is_err() {
-            tracing::error!("Failed to send frame to waiting request");
-        }
-        Ok(())
-    }
-}
-
+/// A WebSocket-connected bridge client (typically a browser
+/// native-messaging host).
 #[derive(Debug)]
-pub struct RegisteredMessenger {
-    pub tx: mpsc::Sender<Result<Frame, Status>>,
+pub struct RegisteredClient {
+    /// Outbound queue for frames the desktop wants to send to this
+    /// client. The connection's writer task drains this onto the
+    /// websocket sink.
+    pub tx: mpsc::Sender<Frame>,
     pub host_pid: u32,
-    pub browser_pid: u32,
-    pub browser_name: String,
+    pub app_pid: u32,
+    pub app_name: String,
 }
 
-/// Lightweight summary of a registered native messenger, broadcast on the
-/// registrations channel so subscribers can react to connect/disconnect
-/// transitions without taking a read lock on the registry.
+/// Lightweight summary of a registered client, broadcast on the
+/// registrations / disconnects channels so subscribers can react to
+/// connect/disconnect transitions without reading the registry.
 #[derive(Debug, Clone)]
 pub struct RegistrationEvent {
-    pub browser_pid: u32,
-    pub browser_name: String,
+    pub app_pid: u32,
+    pub app_name: String,
 }
 
+/// In-process bridge service. A single instance is shared via
+/// [`BridgeService::get_or_init`]; clones are cheap because all state
+/// lives behind `Arc`s and tokio channels.
 #[derive(Clone)]
-pub struct BrowserBridgeService {
-    pub registry: Arc<RwLock<HashMap<u32, RegisteredMessenger>>>,
-    pub app_from_tx: broadcast::Sender<Frame>,
-    pub frames_from_messengers_tx: broadcast::Sender<(u32, Frame)>,
+pub struct BridgeService {
+    registry: Arc<DashMap<u32, RegisteredClient>>,
+    frames_from_clients_tx: broadcast::Sender<(u32, Frame)>,
     events_tx: broadcast::Sender<(u32, EventFrame)>,
     registrations_tx: broadcast::Sender<RegistrationEvent>,
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
-    pending_requests: Arc<DashMap<u32, PendingRequest>>,
+    pending_requests: Arc<DashMap<u32, oneshot::Sender<Frame>>>,
     request_id_counter: Arc<AtomicU32>,
 }
 
-impl BrowserBridgeService {
+impl Default for BridgeService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BridgeService {
     pub fn new() -> Self {
-        let (app_from_tx, _) = broadcast::channel(100);
-        let (frames_from_messengers_tx, _) = broadcast::channel(100);
+        let (frames_from_clients_tx, _) = broadcast::channel(100);
         let (events_tx, _) = broadcast::channel(100);
         let (registrations_tx, _) = broadcast::channel(32);
         let (disconnects_tx, _) = broadcast::channel(32);
 
         Self {
-            registry: Arc::new(RwLock::new(HashMap::new())),
-            app_from_tx,
-            frames_from_messengers_tx,
+            registry: Arc::new(DashMap::new()),
+            frames_from_clients_tx,
             events_tx,
             registrations_tx,
             disconnects_tx,
@@ -96,111 +90,89 @@ impl BrowserBridgeService {
         }
     }
 
+    pub async fn get_or_init() -> &'static BridgeService {
+        let service = GLOBAL_SERVICE
+            .get_or_init(|| async { BridgeService::new() })
+            .await;
+        service.start_frame_handler();
+        service
+    }
+
+    /// Spawn the dispatch loop that turns inbound client frames into
+    /// resolved request futures and broadcast events. Idempotent.
     pub fn start_frame_handler(&self) {
         if FRAME_HANDLER_STARTED.swap(true, Ordering::SeqCst) {
             return;
         }
 
         let pending_requests = Arc::clone(&self.pending_requests);
-        let frames_from_messengers_tx = self.frames_from_messengers_tx.clone();
         let events_tx = self.events_tx.clone();
-        let mut frames_rx = frames_from_messengers_tx.subscribe();
+        let mut frames_rx = self.frames_from_clients_tx.subscribe();
 
         tokio::spawn(async move {
             tracing::debug!("Frame handler task started");
             loop {
-                let (browser_pid, frame) = match frames_rx.recv().await {
+                let (app_pid, frame) = match frames_rx.recv().await {
                     Ok(val) => val,
                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("Frame handler lagged by {} frames, resuming", n);
+                        tracing::warn!("Frame handler lagged by {n} frames, resuming");
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
                 };
-                let kind = match &frame.kind {
-                    Some(k) => k.clone(),
-                    None => {
-                        tracing::warn!(
-                            "Received frame with no kind from browser PID {}",
-                            browser_pid
-                        );
-                        continue;
-                    }
-                };
 
-                match kind {
-                    FrameKind::Request(req_frame) => {
-                        tracing::debug!(
-                            "Received request frame from browser PID {}: id={}, action={}",
-                            browser_pid,
-                            req_frame.id,
-                            req_frame.action
-                        );
+                match frame.kind {
+                    FrameKind::Request(req) => {
                         tracing::warn!(
-                            "Received unsupported request from browser extension: action={}",
-                            req_frame.action
+                            "Received unsupported request from client: app_pid={app_pid}, action={}",
+                            req.action
                         );
                     }
-                    FrameKind::Response(resp_frame) => {
-                        if let Some((_, pending_request)) = pending_requests.remove(&resp_frame.id)
-                        {
-                            let frame = Frame {
-                                kind: Some(FrameKind::Response(resp_frame.clone())),
-                            };
-                            if let Err(err) = pending_request.send(frame) {
-                                tracing::warn!(
-                                    "Failed to send frame to waiting request: {:?}",
-                                    err
+                    FrameKind::Response(resp) => {
+                        let id = resp.id;
+                        if let Some((_, sender)) = pending_requests.remove(&id) {
+                            if sender.send(Frame::from(resp)).is_err() {
+                                tracing::debug!(
+                                    "Pending request {id} was dropped before response arrived"
                                 );
                             }
                         } else {
                             tracing::debug!(
-                                "Received frame with no pending request: id={} action={}",
-                                resp_frame.id,
-                                resp_frame.action,
+                                "Received response for unknown request id={id}, action={}",
+                                resp.action
                             );
                         }
                     }
-                    FrameKind::Event(evt_frame) => {
-                        tracing::debug!(
-                            "Received event frame from browser PID {}: action={}",
-                            browser_pid,
-                            evt_frame.action
+                    FrameKind::Event(evt) => {
+                        if events_tx.send((app_pid, evt)).is_err() {
+                            tracing::trace!(
+                                "No event subscribers for event from app_pid={app_pid}"
+                            );
+                        }
+                    }
+                    FrameKind::Error(err) => {
+                        let id = err.id;
+                        tracing::warn!(
+                            "Received error frame from app_pid={app_pid}: id={id}, message={}",
+                            err.message
                         );
-                        if let Err(e) = events_tx.send((browser_pid, evt_frame)) {
+                        if let Some((_, sender)) = pending_requests.remove(&id)
+                            && sender.send(Frame::from(err)).is_err()
+                        {
                             tracing::debug!(
-                                "No event subscribers for event frame from browser PID {}: {}",
-                                browser_pid,
-                                e
+                                "Pending request {id} was dropped before error arrived"
                             );
                         }
                     }
-                    FrameKind::Error(err_frame) => {
-                        tracing::error!(
-                            "Received error frame: id={}, message={}",
-                            err_frame.id,
-                            err_frame.message
-                        );
-                        if let Some((_, pending_request)) = pending_requests.remove(&err_frame.id) {
-                            let frame = Frame {
-                                kind: Some(FrameKind::Error(err_frame)),
-                            };
-                            if let Err(err) = pending_request.send(frame) {
-                                tracing::warn!(
-                                    "Failed to send error frame to waiting request: {:?}",
-                                    err
-                                );
-                            }
-                        }
-                    }
-                    FrameKind::Cancel(cancel_frame) => {
-                        tracing::debug!("Received cancel frame: id={}", cancel_frame.id);
-                        if pending_requests.remove(&cancel_frame.id).is_some() {
-                            tracing::debug!("Cancelled pending request: id={}", cancel_frame.id);
+                    FrameKind::Cancel(cancel) => {
+                        if pending_requests.remove(&cancel.id).is_some() {
+                            tracing::debug!("Cancelled pending request id={}", cancel.id);
                         }
                     }
                     FrameKind::Register(_) => {
-                        tracing::debug!("Received register frame (should be handled by server)");
+                        tracing::warn!(
+                            "Received Register frame outside the handshake from app_pid={app_pid}"
+                        );
                     }
                 }
             }
@@ -208,335 +180,485 @@ impl BrowserBridgeService {
         });
     }
 
-    pub async fn get_or_init() -> &'static BrowserBridgeService {
-        let service = GLOBAL_SERVICE
-            .get_or_init(|| async { BrowserBridgeService::new() })
-            .await;
-        service.start_frame_handler();
-        service
-    }
-
+    /// Bind and serve the bridge on `{BRIDGE_HOST}:{BRIDGE_PORT}`. The
+    /// server task runs in the background; this method returns once the
+    /// listener is ready (or immediately if the server is already
+    /// running).
     pub async fn start_server(&self) {
         if SERVER_STARTED
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
         {
-            tracing::debug!("Browser Bridge gRPC server already running");
+            tracing::debug!("Bridge WebSocket server already running");
             return;
         }
 
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
         let _ = SHUTDOWN_TX.set(shutdown_tx);
 
-        let service_clone = self.clone();
+        let app = Router::new()
+            .route(BRIDGE_PATH, get(ws_upgrade))
+            .with_state(self.clone());
+
+        let bind_addr: SocketAddr = (
+            BRIDGE_HOST
+                .parse::<std::net::IpAddr>()
+                .expect("valid loopback ip"),
+            BRIDGE_PORT,
+        )
+            .into();
+        let listener = match TcpListener::bind(bind_addr).await {
+            Ok(listener) => listener,
+            Err(err) => {
+                tracing::error!("Failed to bind bridge WebSocket server on {bind_addr}: {err}");
+                SERVER_STARTED.store(false, Ordering::SeqCst);
+                return;
+            }
+        };
+
+        tracing::info!("Bridge WebSocket server listening on {bind_addr}{BRIDGE_PATH}");
 
         tokio::spawn(async move {
-            let addr = format!("[::1]:{}", BROWSER_BRIDGE_PORT)
-                .to_socket_addrs()
-                .expect("Invalid server address")
-                .next()
-                .expect("No valid socket address");
-
-            tracing::info!("Starting Browser Bridge gRPC server at {}", addr);
-
-            let server = Server::builder()
-                .add_service(BrowserBridgeServer::new(service_clone))
-                .serve_with_shutdown(addr, async move {
-                    loop {
-                        if shutdown_rx.changed().await.is_err() {
-                            break;
-                        }
-                        if *shutdown_rx.borrow() {
-                            tracing::info!(
-                                "Received shutdown signal for Browser Bridge gRPC server"
-                            );
-                            break;
-                        }
+            let serve = axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<SocketAddr>(),
+            )
+            .with_graceful_shutdown(async move {
+                while shutdown_rx.changed().await.is_ok() {
+                    if *shutdown_rx.borrow() {
+                        tracing::info!("Bridge WebSocket server received shutdown signal");
+                        break;
                     }
-                });
+                }
+            });
 
-            if let Err(e) = server.await {
-                tracing::error!("Browser Bridge gRPC server error: {}", e);
+            if let Err(err) = serve.await {
+                tracing::error!("Bridge WebSocket server error: {err}");
             }
 
             SERVER_STARTED.store(false, Ordering::SeqCst);
-            tracing::info!("Browser Bridge gRPC server ended");
+            tracing::info!("Bridge WebSocket server stopped");
         });
     }
 
     pub async fn stop_server() {
         if !SERVER_STARTED.load(Ordering::SeqCst) {
-            tracing::debug!("Browser Bridge gRPC server is not running");
+            tracing::debug!("Bridge WebSocket server is not running");
             return;
         }
 
         if let Some(tx) = SHUTDOWN_TX.get() {
-            tracing::info!("Sending shutdown signal to Browser Bridge gRPC server");
+            tracing::info!("Sending shutdown signal to bridge WebSocket server");
             let _ = tx.send(true);
         }
-    }
-
-    pub fn subscribe_to_frames(&self) -> broadcast::Receiver<(u32, Frame)> {
-        self.frames_from_messengers_tx.subscribe()
-    }
-
-    pub fn subscribe_to_events(&self) -> broadcast::Receiver<(u32, EventFrame)> {
-        self.events_tx.subscribe()
-    }
-
-    /// Receive a [`RegistrationEvent`] every time a native messenger
-    /// registers. Symmetric with [`Self::subscribe_to_disconnects`] —
-    /// subscribers can therefore observe the full lifecycle of a messenger
-    /// without polling the registry.
-    pub fn subscribe_to_registrations(&self) -> broadcast::Receiver<RegistrationEvent> {
-        self.registrations_tx.subscribe()
-    }
-
-    pub fn subscribe_to_disconnects(&self) -> broadcast::Receiver<RegistrationEvent> {
-        self.disconnects_tx.subscribe()
-    }
-
-    pub async fn is_registered(&self, browser_pid: u32) -> bool {
-        let registry = self.registry.read().await;
-        registry.contains_key(&browser_pid)
-    }
-
-    pub async fn get_registered_pids(&self) -> Vec<u32> {
-        let registry = self.registry.read().await;
-        registry.keys().copied().collect()
-    }
-
-    pub async fn send_to_browser(&self, browser_pid: u32, frame: Frame) -> Result<(), Status> {
-        let registry = self.registry.read().await;
-        if let Some(messenger) = registry.get(&browser_pid) {
-            messenger
-                .tx
-                .send(Ok(frame))
-                .await
-                .map_err(|e| Status::internal(format!("Failed to send frame: {}", e)))
-        } else {
-            Err(Status::not_found(format!(
-                "No messenger registered for browser PID {}",
-                browser_pid
-            )))
-        }
-    }
-
-    pub async fn send_request(
-        &self,
-        browser_pid: u32,
-        action: &str,
-        payload: Option<String>,
-    ) -> Result<ResponseFrame, Status> {
-        let request_id = self.request_id_counter.fetch_add(1, Ordering::SeqCst);
-        let (tx, rx) = oneshot::channel();
-
-        self.pending_requests
-            .insert(request_id, PendingRequest::new(tx));
-
-        let request_frame = RequestFrame {
-            id: request_id,
-            action: action.to_string(),
-            payload,
-        };
-
-        tracing::debug!(
-            "Sending request frame: id={}, action={}, browser_pid={}",
-            request_id,
-            action,
-            browser_pid
-        );
-
-        let frame = Frame {
-            kind: Some(FrameKind::Request(request_frame)),
-        };
-
-        if let Err(e) = self.send_to_browser(browser_pid, frame).await {
-            self.pending_requests.remove(&request_id);
-            return Err(e);
-        }
-
-        match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
-            Ok(Ok(frame)) => match frame.kind {
-                Some(FrameKind::Response(response_frame)) => {
-                    tracing::debug!("Received response for request {}", request_id);
-                    Ok(response_frame)
-                }
-                Some(FrameKind::Error(error_frame)) => Err(Status::internal(format!(
-                    "Browser error: {}",
-                    error_frame.message
-                ))),
-                _ => Err(Status::internal("Unexpected frame kind in response")),
-            },
-            Ok(Err(_)) => {
-                tracing::error!("Response channel closed for request {}", request_id);
-                Err(Status::internal("Response channel closed"))
-            }
-            Err(_) => {
-                tracing::error!("Timeout waiting for response to request {}", request_id);
-                self.pending_requests.remove(&request_id);
-                Err(Status::deadline_exceeded("Request timeout"))
-            }
-        }
-    }
-
-    pub async fn get_metadata(&self, browser_pid: u32) -> Result<ResponseFrame, Status> {
-        self.send_request(browser_pid, "GET_METADATA", None).await
-    }
-
-    pub async fn find_pid_by_browser_name(&self, browser_name: &str) -> Option<u32> {
-        let registry = self.registry.read().await;
-        registry
-            .values()
-            .find(|m| m.browser_name == browser_name)
-            .map(|m| m.browser_pid)
-    }
-
-    pub async fn connection_count(&self) -> usize {
-        let registry = self.registry.read().await;
-        registry.len()
     }
 
     pub fn is_server_running() -> bool {
         SERVER_STARTED.load(Ordering::SeqCst)
     }
-}
 
-impl Default for BrowserBridgeService {
-    fn default() -> Self {
-        Self::new()
+    /// Receive an [`EventFrame`] every time a client pushes one. The
+    /// `u32` is the `app_pid` it came from.
+    pub fn subscribe_to_events(&self) -> broadcast::Receiver<(u32, EventFrame)> {
+        self.events_tx.subscribe()
+    }
+
+    /// Receive a [`RegistrationEvent`] every time a client registers.
+    pub fn subscribe_to_registrations(&self) -> broadcast::Receiver<RegistrationEvent> {
+        self.registrations_tx.subscribe()
+    }
+
+    /// Receive a [`RegistrationEvent`] every time a client disconnects.
+    pub fn subscribe_to_disconnects(&self) -> broadcast::Receiver<RegistrationEvent> {
+        self.disconnects_tx.subscribe()
+    }
+
+    pub fn connection_count(&self) -> usize {
+        self.registry.len()
+    }
+
+    pub fn find_pid_by_app_name(&self, app_name: &str) -> Option<u32> {
+        self.registry
+            .iter()
+            .find(|entry| entry.value().app_name == app_name)
+            .map(|entry| entry.value().app_pid)
+    }
+
+    /// Send a request to `app_pid` and await a correlated response.
+    /// Times out after [`DEFAULT_REQUEST_TIMEOUT`]; on timeout a
+    /// `Cancel` frame is sent so the client can drop any work it
+    /// started.
+    pub async fn send_request(
+        &self,
+        app_pid: u32,
+        action: &str,
+        payload: Option<String>,
+    ) -> Result<ResponseFrame, BridgeError> {
+        let request_id = self.request_id_counter.fetch_add(1, Ordering::SeqCst);
+        let (tx, rx) = oneshot::channel();
+        self.pending_requests.insert(request_id, tx);
+
+        let request = Frame::from(RequestFrame {
+            id: request_id,
+            action: action.to_string(),
+            payload,
+        });
+
+        tracing::debug!("Sending request to app_pid={app_pid}: id={request_id}, action={action}");
+
+        if let Err(err) = self.send_to_client(app_pid, request).await {
+            self.pending_requests.remove(&request_id);
+            return Err(err);
+        }
+
+        match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
+            Ok(Ok(frame)) => match frame.kind {
+                FrameKind::Response(resp) => Ok(resp),
+                FrameKind::Error(err) => Err(BridgeError::Client {
+                    message: err.message,
+                    details: err.details,
+                }),
+                other => Err(BridgeError::UnexpectedFrame(frame_kind_label(&other))),
+            },
+            Ok(Err(_)) => {
+                self.pending_requests.remove(&request_id);
+                Err(BridgeError::ChannelClosed)
+            }
+            Err(_) => {
+                self.pending_requests.remove(&request_id);
+                let cancel = Frame::from(CancelFrame { id: request_id });
+                if let Err(err) = self.send_to_client(app_pid, cancel).await {
+                    tracing::debug!(
+                        "Failed to send Cancel for timed-out request {request_id}: {err}"
+                    );
+                }
+                Err(BridgeError::Timeout)
+            }
+        }
+    }
+
+    pub async fn get_metadata(&self, app_pid: u32) -> Result<ResponseFrame, BridgeError> {
+        self.send_request(app_pid, "GET_METADATA", None).await
+    }
+
+    async fn send_to_client(&self, app_pid: u32, frame: Frame) -> Result<(), BridgeError> {
+        let tx = self
+            .registry
+            .get(&app_pid)
+            .map(|entry| entry.value().tx.clone())
+            .ok_or(BridgeError::NotFound { app_pid })?;
+        tx.send(frame)
+            .await
+            .map_err(|err| BridgeError::Send(err.to_string()))
     }
 }
 
-#[tonic::async_trait]
-impl BrowserBridge for BrowserBridgeService {
-    type OpenStream = Pin<Box<dyn Stream<Item = Result<Frame, Status>> + Send + 'static>>;
+fn frame_kind_label(kind: &FrameKind) -> &'static str {
+    match kind {
+        FrameKind::Request(_) => "Request",
+        FrameKind::Response(_) => "Response",
+        FrameKind::Event(_) => "Event",
+        FrameKind::Error(_) => "Error",
+        FrameKind::Cancel(_) => "Cancel",
+        FrameKind::Register(_) => "Register",
+    }
+}
 
-    async fn open(
-        &self,
-        request: Request<tonic::Streaming<Frame>>,
-    ) -> Result<Response<Self::OpenStream>, Status> {
-        tracing::info!("Received first browser open request");
-        let mut inbound = request.into_inner();
+async fn ws_upgrade(
+    State(service): State<BridgeService>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    upgrade: WebSocketUpgrade,
+) -> impl IntoResponse {
+    if !peer.ip().is_loopback() {
+        tracing::warn!("Rejecting bridge connection from non-loopback peer: {peer}");
+        return (
+            axum::http::StatusCode::FORBIDDEN,
+            "bridge only accepts loopback connections",
+        )
+            .into_response();
+    }
 
-        let first_frame = inbound.message().await.map_err(|e| {
-            tracing::error!("Failed to receive the Register frame as first frame: {}", e);
-            Status::internal("Failed to receive the Register frame as first frame")
-        })?;
+    upgrade
+        .max_message_size(16 * 1024 * 1024)
+        .max_frame_size(16 * 1024 * 1024)
+        .on_upgrade(move |socket| handle_socket(service, socket, peer))
+}
 
-        let Some(frame) = first_frame else {
-            tracing::error!("Received an unexpected frame type as the first frame");
-            return Err(Status::internal(
-                "Received an unexpected frame type as the first frame",
-            ));
-        };
+async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAddr) {
+    let (mut sink, mut stream) = socket.split();
 
-        let Some(FrameKind::Register(register_frame)) = frame.kind else {
-            tracing::error!("Received an unexpected frame type as the first frame");
-            return Err(Status::internal(
-                "Received an unexpected frame type as the first frame",
-            ));
-        };
-
-        let browser_pid = register_frame.browser_pid;
-        let host_pid = register_frame.host_pid;
-        let browser_name = crate::process_name::get_process_name(browser_pid)
-            .unwrap_or_else(|| format!("unknown_{}", browser_pid));
-
-        let (tx_to_client, rx_to_client) = mpsc::channel::<Result<Frame, Status>>(32);
-
-        {
-            let mut registry = self.registry.write().await;
-            registry.insert(
-                browser_pid,
-                RegisteredMessenger {
-                    tx: tx_to_client.clone(),
-                    host_pid,
-                    browser_pid,
-                    browser_name: browser_name.clone(),
-                },
-            );
-            tracing::debug!(
-                "Registered browser {:?} with browser_pid: {} and host_pid: {}. Total registered browsers: {}",
-                browser_name,
-                browser_pid,
-                host_pid,
-                registry.len()
-            );
+    let register = match read_register_frame(&mut stream).await {
+        Ok(frame) => frame,
+        Err(err) => {
+            tracing::warn!("Bridge handshake failed from {peer}: {err}");
+            let _ = sink
+                .send(Message::Close(Some(CloseFrame {
+                    code: close_code::PROTOCOL,
+                    reason: Utf8Bytes::from_static("expected Register frame"),
+                })))
+                .await;
+            return;
         }
+    };
 
-        let _ = self.registrations_tx.send(RegistrationEvent {
-            browser_pid,
-            browser_name: browser_name.clone(),
+    let app_pid = register.app_pid;
+    let host_pid = register.host_pid;
+    let app_name = get_process_name(app_pid).unwrap_or_else(|| format!("unknown_{app_pid}"));
+
+    let (outbound_tx, outbound_rx) = mpsc::channel::<Frame>(OUTBOUND_QUEUE_SIZE);
+
+    if let Some(prev) = service.registry.insert(
+        app_pid,
+        RegisteredClient {
+            tx: outbound_tx.clone(),
+            host_pid,
+            app_pid,
+            app_name: app_name.clone(),
+        },
+    ) {
+        tracing::warn!(
+            "Replacing existing registration for app_pid={app_pid} (previous host_pid={})",
+            prev.host_pid
+        );
+    }
+
+    tracing::info!(
+        "Bridge client registered: app_pid={app_pid} host_pid={host_pid} app_name={app_name:?} (peer={peer})"
+    );
+
+    let _ = service.registrations_tx.send(RegistrationEvent {
+        app_pid,
+        app_name: app_name.clone(),
+    });
+
+    let writer = tokio::spawn(writer_task(sink, outbound_rx));
+    reader_loop(&service, &mut stream, app_pid).await;
+
+    drop(outbound_tx);
+
+    if let Some((_, removed)) = service
+        .registry
+        .remove_if(&app_pid, |_, client| client.host_pid == host_pid)
+    {
+        let _ = service.disconnects_tx.send(RegistrationEvent {
+            app_pid,
+            app_name: removed.app_name,
         });
+        tracing::info!(
+            "Bridge client unregistered: app_pid={app_pid} host_pid={host_pid} (remaining={})",
+            service.registry.len()
+        );
+    } else {
+        tracing::warn!(
+            "Did not unregister app_pid={app_pid}: registration was replaced by host_pid={host_pid} or already removed"
+        );
+    }
 
-        let registry = self.registry.clone();
-        let frames_tx = self.frames_from_messengers_tx.clone();
-        let disconnects_tx = self.disconnects_tx.clone();
-        let browser_name_for_spawn = browser_name.clone();
+    if let Err(err) = writer.await {
+        tracing::debug!("Writer task for app_pid={app_pid} ended: {err}");
+    }
+}
 
-        tokio::spawn(async move {
-            tracing::info!(
-                "gRPC client connected, starting forward task: Eurora -> Native Messenger -> Chrome"
-            );
-            loop {
-                match inbound.message().await {
-                    Ok(Some(frame)) => {
-                        tracing::info!(
-                            "Received frame from native messenger browser_pid={}",
-                            browser_pid
-                        );
-                        if let Err(e) = frames_tx.send((browser_pid, frame)) {
-                            tracing::warn!(
-                                "Failed to broadcast frame from browser PID {}: {}",
-                                browser_pid,
-                                e
-                            );
-                        }
+async fn read_register_frame<S>(stream: &mut S) -> Result<RegisterFrame, String>
+where
+    S: futures_util::Stream<Item = Result<Message, axum::Error>> + Unpin,
+{
+    let next = tokio::time::timeout(FIRST_FRAME_TIMEOUT, stream.next())
+        .await
+        .map_err(|_| "timed out waiting for Register frame".to_string())?;
+
+    let message = next
+        .ok_or_else(|| "client disconnected before sending Register frame".to_string())?
+        .map_err(|err| format!("websocket error during handshake: {err}"))?;
+
+    let payload: Utf8Bytes = match message {
+        Message::Text(t) => t,
+        Message::Close(_) => return Err("client closed connection during handshake".into()),
+        other => {
+            return Err(format!(
+                "expected Text Register frame, got {}",
+                message_label(&other)
+            ));
+        }
+    };
+
+    let frame: Frame = serde_json::from_str(payload.as_str())
+        .map_err(|err| format!("invalid Register JSON: {err}"))?;
+
+    match frame.kind {
+        FrameKind::Register(register) => Ok(register),
+        other => Err(format!(
+            "first frame must be Register, got {}",
+            frame_kind_label(&other)
+        )),
+    }
+}
+
+async fn writer_task(
+    mut sink: futures_util::stream::SplitSink<WebSocket, Message>,
+    mut outbound_rx: mpsc::Receiver<Frame>,
+) {
+    let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    // Skip the immediate first tick.
+    heartbeat.tick().await;
+
+    loop {
+        tokio::select! {
+            biased;
+            frame = outbound_rx.recv() => {
+                let Some(frame) = frame else { break };
+                let json = match serde_json::to_string(&frame) {
+                    Ok(json) => json,
+                    Err(err) => {
+                        tracing::error!("Failed to serialize outbound frame: {err}");
+                        continue;
                     }
-                    Ok(None) => {
-                        tracing::info!(
-                            "Native messenger disconnected (browser_pid={})",
-                            browser_pid
-                        );
-                        break;
-                    }
-                    Err(e) => {
-                        tracing::error!(
-                            "Error receiving frame from native messenger (browser_pid={}): {}",
-                            browser_pid,
-                            e
-                        );
-                        break;
-                    }
+                };
+                if let Err(err) = sink.send(Message::Text(json.into())).await {
+                    tracing::debug!("Failed to write outbound frame: {err}");
+                    break;
                 }
             }
-
-            let mut registry = registry.write().await;
-            if registry
-                .get(&browser_pid)
-                .is_some_and(|m| m.host_pid == host_pid)
-            {
-                registry.remove(&browser_pid);
-                let _ = disconnects_tx.send(RegistrationEvent {
-                    browser_pid,
-                    browser_name: browser_name_for_spawn.clone(),
-                });
-                tracing::info!(
-                    "Unregistered native messenger for browser PID {} and host PID {}. Remaining: {}",
-                    browser_pid,
-                    host_pid,
-                    registry.len()
-                );
-            } else {
-                tracing::warn!(
-                    "Failed to unregister native messenger: browser_pid={} host_pid={} not found or mismatch",
-                    browser_pid,
-                    host_pid
-                );
+            _ = heartbeat.tick() => {
+                if let Err(err) = sink.send(Message::Ping(Default::default())).await {
+                    tracing::debug!("Heartbeat ping failed: {err}");
+                    break;
+                }
             }
-        });
-        let out_stream = ReceiverStream::new(rx_to_client);
-        Ok(Response::new(Box::pin(out_stream) as Self::OpenStream))
+        }
+    }
+
+    let _ = sink
+        .send(Message::Close(Some(CloseFrame {
+            code: close_code::NORMAL,
+            reason: Utf8Bytes::from_static("server closing connection"),
+        })))
+        .await;
+}
+
+async fn reader_loop<S>(service: &BridgeService, stream: &mut S, app_pid: u32)
+where
+    S: futures_util::Stream<Item = Result<Message, axum::Error>> + Unpin,
+{
+    while let Some(message) = stream.next().await {
+        let message = match message {
+            Ok(m) => m,
+            Err(err) => {
+                tracing::debug!("Websocket error from app_pid={app_pid}: {err}");
+                break;
+            }
+        };
+
+        match message {
+            Message::Text(text) => match serde_json::from_str::<Frame>(text.as_str()) {
+                Ok(frame) => {
+                    if let Err(err) = service.frames_from_clients_tx.send((app_pid, frame)) {
+                        tracing::trace!(
+                            "No subscribers for inbound frame from app_pid={app_pid}: {err}"
+                        );
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!("Failed to parse inbound frame from app_pid={app_pid}: {err}");
+                }
+            },
+            Message::Binary(_) => {
+                tracing::warn!("Ignoring unexpected binary frame from app_pid={app_pid}");
+            }
+            Message::Ping(_) | Message::Pong(_) => {
+                // axum auto-responds to Ping with Pong; nothing to do.
+            }
+            Message::Close(frame) => {
+                tracing::debug!("Client app_pid={app_pid} closed connection: {frame:?}");
+                break;
+            }
+        }
+    }
+}
+
+fn message_label(message: &Message) -> &'static str {
+    match message {
+        Message::Text(_) => "Text",
+        Message::Binary(_) => "Binary",
+        Message::Ping(_) => "Ping",
+        Message::Pong(_) => "Pong",
+        Message::Close(_) => "Close",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use euro_bridge_protocol::EventFrame;
+    use tokio::time::timeout;
+
+    #[test]
+    fn frame_kind_label_covers_all_variants() {
+        assert_eq!(
+            frame_kind_label(&FrameKind::Cancel(CancelFrame { id: 1 })),
+            "Cancel"
+        );
+        assert_eq!(
+            frame_kind_label(&FrameKind::Event(EventFrame {
+                action: "X".into(),
+                payload: None,
+            })),
+            "Event"
+        );
+    }
+
+    #[tokio::test]
+    async fn send_request_returns_not_found_when_client_missing() {
+        let service = BridgeService::new();
+        let result = service.send_request(42, "GET_METADATA", None).await;
+        assert!(matches!(result, Err(BridgeError::NotFound { app_pid: 42 })));
+    }
+
+    #[tokio::test]
+    async fn send_request_resolves_when_response_arrives() {
+        let service = BridgeService::new();
+        service.start_frame_handler();
+
+        let (outbound_tx, mut outbound_rx) = mpsc::channel::<Frame>(8);
+        service.registry.insert(
+            7,
+            RegisteredClient {
+                tx: outbound_tx,
+                host_pid: 1,
+                app_pid: 7,
+                app_name: "test".into(),
+            },
+        );
+
+        let svc = service.clone();
+        let request_handle = tokio::spawn(async move { svc.send_request(7, "PING", None).await });
+
+        let outbound = timeout(Duration::from_secs(1), outbound_rx.recv())
+            .await
+            .expect("outbound frame")
+            .expect("frame present");
+        let FrameKind::Request(req) = outbound.kind else {
+            panic!("expected Request frame");
+        };
+
+        service
+            .frames_from_clients_tx
+            .send((
+                7,
+                Frame::from(ResponseFrame {
+                    id: req.id,
+                    action: req.action,
+                    payload: Some("pong".into()),
+                }),
+            ))
+            .expect("broadcast send");
+
+        let response = timeout(Duration::from_secs(1), request_handle)
+            .await
+            .expect("request future")
+            .expect("join")
+            .expect("response");
+        assert_eq!(response.payload.as_deref(), Some("pong"));
     }
 }

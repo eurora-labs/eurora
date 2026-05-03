@@ -44,8 +44,8 @@ impl TimelineManager {
     pub async fn start(&mut self) -> TimelineResult<()> {
         tracing::debug!("Starting timeline manager");
 
-        tracing::info!("Starting browser bridge gRPC server");
-        euro_browser::start_browser_bridge_server().await;
+        tracing::info!("Starting bridge WebSocket server");
+        euro_browser::start_bridge_server().await;
 
         self.collector.start().await
     }
@@ -53,8 +53,8 @@ impl TimelineManager {
     pub async fn stop(&mut self) -> TimelineResult<()> {
         tracing::debug!("Stopping timeline manager");
 
-        tracing::info!("Stopping browser bridge gRPC server");
-        euro_browser::stop_browser_bridge_server().await;
+        tracing::info!("Stopping bridge WebSocket server");
+        euro_browser::stop_bridge_server().await;
 
         tracing::info!("Timeline manager stopped");
 

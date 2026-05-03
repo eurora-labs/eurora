@@ -406,7 +406,7 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
     };
 
     tauri::async_runtime::spawn(async move {
-        let service = euro_browser::BrowserBridgeService::get_or_init().await;
+        let service = euro_browser::BridgeService::get_or_init().await;
         let mut registrations_rx = service.subscribe_to_registrations();
         let mut disconnects_rx = service.subscribe_to_disconnects();
 
@@ -417,7 +417,7 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
                         Ok(reg) => {
                             let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
                                 .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.browser_name,
+                                    process_name: reg.app_name,
                                     connected: true,
                                 });
                         }
@@ -434,7 +434,7 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
                         Ok(reg) => {
                             let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
                                 .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.browser_name,
+                                    process_name: reg.app_name,
                                     connected: false,
                                 });
                         }

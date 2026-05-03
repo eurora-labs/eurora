@@ -1,8 +1,5 @@
 use async_trait::async_trait;
-pub use euro_browser::{
-    BrowserBridgeServer, BrowserBridgeService, EventFrame, Frame, FrameKind, RequestFrame,
-    ResponseFrame,
-};
+pub use euro_browser::{BridgeService, EventFrame, Frame, FrameKind, RequestFrame, ResponseFrame};
 use euro_native_messaging::NativeMessage;
 use euro_process::Browser;
 use focus_tracker::FocusedWindow;
@@ -29,7 +26,7 @@ pub struct BrowserStrategy {
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
 
     #[serde(skip)]
-    bridge_service: Option<&'static BrowserBridgeService>,
+    bridge_service: Option<&'static BridgeService>,
 
     #[serde(skip)]
     event_subscription_handle: Option<Arc<tokio::task::JoinHandle<()>>>,
@@ -49,7 +46,7 @@ pub struct BrowserStrategy {
 
 impl BrowserStrategy {
     async fn initialize_service(&mut self) -> ActivityResult<()> {
-        let service = BrowserBridgeService::get_or_init().await;
+        let service = BridgeService::get_or_init().await;
         self.bridge_service = Some(service);
         Ok(())
     }
@@ -163,10 +160,7 @@ impl BrowserStrategy {
         Ok(())
     }
 
-    async fn fetch_asset(
-        service: &BrowserBridgeService,
-        browser_pid: u32,
-    ) -> Option<ActivityAsset> {
+    async fn fetch_asset(service: &BridgeService, browser_pid: u32) -> Option<ActivityAsset> {
         let response = service
             .send_request(browser_pid, "GET_ASSETS", None)
             .await
@@ -176,10 +170,7 @@ impl BrowserStrategy {
         ActivityAsset::try_from(native_message).ok()
     }
 
-    async fn fetch_snapshot(
-        service: &BrowserBridgeService,
-        browser_pid: u32,
-    ) -> Option<ActivitySnapshot> {
+    async fn fetch_snapshot(service: &BridgeService, browser_pid: u32) -> Option<ActivitySnapshot> {
         let response = service
             .send_request(browser_pid, "GET_SNAPSHOT", None)
             .await
@@ -191,7 +182,7 @@ impl BrowserStrategy {
 
     async fn resolve_messenger_pid(&self, process_name: &str, fallback_pid: u32) -> u32 {
         if let Some(service) = &self.bridge_service
-            && let Some(pid) = service.find_pid_by_browser_name(process_name).await
+            && let Some(pid) = service.find_pid_by_app_name(process_name)
         {
             return pid;
         }
