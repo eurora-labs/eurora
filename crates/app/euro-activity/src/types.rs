@@ -2,6 +2,7 @@ use agent_chain_core::messages::ContentBlocks;
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use euro_native_messaging::NativeMessage;
+use euro_office::WordAsset;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use url::Url;
@@ -28,6 +29,7 @@ pub enum ActivityAsset {
     YoutubeAsset,
     ArticleAsset,
     TwitterAsset,
+    WordAsset,
     DefaultAsset,
 }
 

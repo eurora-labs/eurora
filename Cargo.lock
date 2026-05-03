@@ -3566,6 +3566,7 @@ dependencies = [
  "euro-browser",
  "euro-encrypt",
  "euro-native-messaging",
+ "euro-office",
  "euro-process",
  "focus-tracker",
  "humantime-serde",
@@ -3759,10 +3760,14 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "euro-bridge-protocol",
+ "euro-browser",
+ "euro-process",
  "serde",
  "serde_json",
  "specta",
  "specta-typescript",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
