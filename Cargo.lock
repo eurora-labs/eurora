@@ -3754,6 +3754,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-office"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "euro-bridge-protocol",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+]
+
+[[package]]
 name = "euro-process"
 version = "0.0.0"
 dependencies = [
