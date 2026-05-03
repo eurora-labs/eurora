@@ -6,7 +6,7 @@
 	"description": "Eurora Microsoft Office add-in. Headless Shared Runtime that bridges Word into the Eurora desktop over a local WebSocket.",
 	"scripts": {
 		"dev": "vite",
-		"build": "vite build",
+		"build": "vite build && node scripts/copy-bundle-extras.mjs",
 		"preview": "vite preview",
 		"render-manifest": "node scripts/render-manifest.mjs",
 		"start": "pnpm render-manifest && office-addin-debugging start manifest.dev.xml desktop",
