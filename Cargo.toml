@@ -83,6 +83,7 @@ euro-thread = { path = "crates/app/euro-thread" }
 euro-timeline = { path = "crates/app/euro-timeline" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
+euro-office = { path = "crates/app/euro-office" }
 focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "1.0.0" }
 futures = "0.3.31"
