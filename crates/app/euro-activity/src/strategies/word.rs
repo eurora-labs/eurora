@@ -64,7 +64,7 @@ impl WordStrategy {
     }
 
     async fn initialize_service(&mut self) -> ActivityResult<()> {
-        let service = BridgeService::get_or_init().await;
+        let service = BridgeService::get_or_init();
         self.bridge_service = Some(service);
         Ok(())
     }

@@ -6,20 +6,20 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 description = "Wire protocol shared between the Eurora desktop app and connected clients (browser native-messaging hosts, Office.js add-ins, ...)."
 
 [dependencies]
+dirs = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 specta = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 
 anyhow = { workspace = true, optional = true }
 specta-swift = { version = "0.0.1", optional = true }
-specta-typescript = { version = "0.0.10", optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
 
 [features]
 default = []
-codegen = ["dep:anyhow", "dep:specta-swift", "dep:specta-typescript"]
+codegen = ["dep:anyhow", "dep:specta-swift"]
 
 [[bin]]
 name = "euro-bridge-protocol"

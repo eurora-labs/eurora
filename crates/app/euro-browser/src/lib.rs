@@ -2,16 +2,27 @@ mod process_name;
 pub mod server;
 
 pub use euro_bridge_protocol::{
-    BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, ErrorFrame, EventFrame, Frame,
-    FrameKind, RegisterFrame, RequestFrame, ResponseFrame, bridge_url, bridge_url_for,
+    BRIDGE_BIND_IP, BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BRIDGE_SCHEME, BridgeError, CancelFrame,
+    ErrorFrame, EventFrame, Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
+    bridge_ca_path, bridge_data_dir, bridge_url, bridge_url_for, eurora_data_root,
 };
-pub use server::{BridgeService, RegisteredClient, RegistrationEvent};
+pub use server::{
+    BoundServer, BridgeService, RegisteredClient, RegistrationEvent, TlsMaterial,
+    install_default_crypto_provider,
+};
 
-/// Initialize and start the browser bridge WebSocket server. Idempotent —
-/// safe to call multiple times. Returns the resolved local address on
-/// success, or the bind error if the listener can't be opened.
-pub async fn start_bridge_server() -> Result<std::net::SocketAddr, std::io::Error> {
-    BridgeService::get_or_init().await.start_server().await
+/// Bind the bridge WebSocket listener on its well-known port and return
+/// the [`BoundServer`] handle whose [`serve`](BoundServer::serve) future
+/// drives the accept loop. The kernel socket is in `LISTEN` state by
+/// the time this returns, so spawning `serve()` afterwards is sufficient
+/// to expose the listener — clients can no longer race the bind.
+///
+/// Requires [`BridgeService::configure_tls`] to have been called first;
+/// returns [`BridgeError::TlsNotConfigured`] otherwise. Returns
+/// [`BridgeError::AlreadyRunning`] if a previous serve loop is still
+/// registered.
+pub async fn bind_bridge_server() -> Result<BoundServer, BridgeError> {
+    BridgeService::get_or_init().bind().await
 }
 
 /// Signal the running bridge server to shut down and wait for it to

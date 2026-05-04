@@ -22,6 +22,23 @@ pub enum FrameKind {
     Register(RegisterFrame),
 }
 
+impl FrameKind {
+    /// Stable string label for the variant. Used in log lines and error
+    /// messages where Debug-formatting the entire payload would be
+    /// noisy. The labels match the externally-tagged JSON discriminator,
+    /// so they're identical to the wire form.
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            FrameKind::Request(_) => "Request",
+            FrameKind::Response(_) => "Response",
+            FrameKind::Event(_) => "Event",
+            FrameKind::Error(_) => "Error",
+            FrameKind::Cancel(_) => "Cancel",
+            FrameKind::Register(_) => "Register",
+        }
+    }
+}
+
 /// Desktop-initiated request to a connected client.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct RequestFrame {
@@ -238,6 +255,56 @@ mod tests {
         assert_eq!(register.host_pid, 1);
         assert_eq!(register.app_pid, 2);
         assert!(register.app_kind.is_none());
+    }
+
+    #[test]
+    fn variant_name_returns_stable_label_for_each_kind() {
+        let cases: [(FrameKind, &str); 6] = [
+            (
+                FrameKind::Request(RequestFrame {
+                    id: 1,
+                    action: "X".into(),
+                    payload: None,
+                }),
+                "Request",
+            ),
+            (
+                FrameKind::Response(ResponseFrame {
+                    id: 1,
+                    action: "X".into(),
+                    payload: None,
+                }),
+                "Response",
+            ),
+            (
+                FrameKind::Event(EventFrame {
+                    action: "X".into(),
+                    payload: None,
+                }),
+                "Event",
+            ),
+            (
+                FrameKind::Error(ErrorFrame {
+                    id: 1,
+                    code: 0,
+                    message: "x".into(),
+                    details: None,
+                }),
+                "Error",
+            ),
+            (FrameKind::Cancel(CancelFrame { id: 1 }), "Cancel"),
+            (
+                FrameKind::Register(RegisterFrame {
+                    host_pid: 0,
+                    app_pid: 0,
+                    app_kind: None,
+                }),
+                "Register",
+            ),
+        ];
+        for (kind, expected) in cases {
+            assert_eq!(kind.variant_name(), expected);
+        }
     }
 
     #[test]

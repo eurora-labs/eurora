@@ -8,41 +8,66 @@
 //! — no `NativeMessage` envelope.
 //!
 //! Each test binds the bridge to an ephemeral loopback port via
-//! `start_server_on(([127, 0, 0, 1], 0).into())` so the suite never
-//! collides with a locally-running desktop.
+//! `BridgeService::bind_on(([127, 0, 0, 1], 0).into())` against a
+//! freshly minted test CA, so the suite never collides with a
+//! locally-running desktop and never touches the user's keychain.
+
+mod common;
 
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use euro_browser::{BridgeService, Frame, FrameKind, RegisterFrame, ResponseFrame, bridge_url_for};
+use euro_browser::{
+    BridgeService, Frame, FrameKind, RegisterFrame, ResponseFrame, bridge_url_for,
+    install_default_crypto_provider,
+};
 use euro_office::{ACTION_GET_ASSETS, MICROSOFT_WORD_KIND, WordDocumentAsset, fetch_word_asset};
 use futures_util::{SinkExt, StreamExt};
 use tokio::time::timeout;
 use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::Message as TMessage;
 
 type ClientWs = WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 const WAIT: Duration = Duration::from_secs(2);
 
-async fn start_ephemeral_bridge() -> (BridgeService, SocketAddr) {
+async fn start_ephemeral_bridge() -> (BridgeService, SocketAddr, common::TestChain) {
+    install_default_crypto_provider();
+    let chain = common::mint_localhost_chain();
     let service = BridgeService::new();
-    let addr = service
-        .start_server_on(([127, 0, 0, 1], 0).into())
+    service.configure_tls(chain.material.clone());
+    let bound = service
+        .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("bind ephemeral bridge");
-    (service, addr)
+    let addr = bound.local_addr();
+    tokio::spawn(async move {
+        if let Err(err) = bound.serve().await {
+            eprintln!("ephemeral bridge serve loop ended: {err}");
+        }
+    });
+    (service, addr, chain)
 }
 
-/// Connect a tungstenite client, register as the Word add-in with
-/// `app_pid`, and wait for the bridge to surface the registration.
-async fn connect_word_addin(service: &BridgeService, addr: SocketAddr, app_pid: u32) -> ClientWs {
+/// Connect a tungstenite client over rustls, register as the Word
+/// add-in with `app_pid`, and wait for the bridge to surface the
+/// registration.
+async fn connect_word_addin(
+    service: &BridgeService,
+    addr: SocketAddr,
+    chain: &common::TestChain,
+    app_pid: u32,
+) -> ClientWs {
     let mut registrations = service.subscribe_to_registrations();
 
     let url = bridge_url_for(addr);
-    let (mut ws, _) = tokio_tungstenite::connect_async(&url)
-        .await
-        .expect("connect to bridge");
+    let request = url.into_client_request().expect("build request");
+    let connector = common::client_connector(&chain.ca_pem);
+    let (mut ws, _) =
+        tokio_tungstenite::connect_async_tls_with_config(request, None, false, Some(connector))
+            .await
+            .expect("connect to bridge over rustls");
 
     let register = serde_json::to_string(&Frame::from(RegisterFrame {
         host_pid: 0,
@@ -79,9 +104,9 @@ async fn next_frame(ws: &mut ClientWs) -> Frame {
 
 #[tokio::test]
 async fn fetch_word_asset_round_trips_through_a_real_websocket() {
-    let (service, addr) = start_ephemeral_bridge().await;
+    let (service, addr, chain) = start_ephemeral_bridge().await;
     let app_pid = 0xC0FFEE;
-    let mut ws = connect_word_addin(&service, addr, app_pid).await;
+    let mut ws = connect_word_addin(&service, addr, &chain, app_pid).await;
 
     let asset = WordDocumentAsset {
         document_name: "Quarterly Report.docx".into(),
@@ -127,7 +152,7 @@ async fn fetch_word_asset_round_trips_through_a_real_websocket() {
 
 #[tokio::test]
 async fn fetch_word_asset_returns_none_when_no_addin_is_connected() {
-    let (service, _addr) = start_ephemeral_bridge().await;
+    let (service, _addr, _chain) = start_ephemeral_bridge().await;
     assert!(fetch_word_asset(&service).await.is_none());
     service.stop_server().await;
 }
@@ -137,9 +162,9 @@ async fn fetch_word_asset_returns_none_when_no_addin_is_connected() {
 /// and returns `None` so the next collection tick can try again.
 #[tokio::test]
 async fn fetch_word_asset_returns_none_when_payload_is_malformed() {
-    let (service, addr) = start_ephemeral_bridge().await;
+    let (service, addr, chain) = start_ephemeral_bridge().await;
     let app_pid = 0xBADF00D;
-    let mut ws = connect_word_addin(&service, addr, app_pid).await;
+    let mut ws = connect_word_addin(&service, addr, &chain, app_pid).await;
 
     let mock = tokio::spawn(async move {
         let frame = next_frame(&mut ws).await;
@@ -173,10 +198,10 @@ async fn fetch_word_asset_returns_none_when_payload_is_malformed() {
 /// limitation.
 #[tokio::test]
 async fn fetch_word_asset_picks_first_registered_client() {
-    let (service, addr) = start_ephemeral_bridge().await;
+    let (service, addr, chain) = start_ephemeral_bridge().await;
 
-    let mut ws_a = connect_word_addin(&service, addr, 1001).await;
-    let mut ws_b = connect_word_addin(&service, addr, 1002).await;
+    let mut ws_a = connect_word_addin(&service, addr, &chain, 1001).await;
+    let mut ws_b = connect_word_addin(&service, addr, &chain, 1002).await;
 
     let asset = WordDocumentAsset {
         document_name: "A.docx".into(),

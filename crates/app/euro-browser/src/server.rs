@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::Duration;
 
 use axum::Router;
@@ -9,15 +10,15 @@ use axum::extract::State;
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgrade, close_code};
 use axum::response::IntoResponse;
 use axum::routing::get;
+use axum_server::Handle as AxumHandle;
+use axum_server::tls_rustls::RustlsConfig;
 use dashmap::DashMap;
 use euro_bridge_protocol::{
-    BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, EventFrame, Frame, FrameKind,
-    RegisterFrame, RequestFrame, ResponseFrame,
+    BRIDGE_BIND_IP, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, ErrorFrame, EventFrame,
+    Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
 };
 use futures_util::{SinkExt, StreamExt};
-use tokio::net::TcpListener;
-use tokio::sync::{Mutex, OnceCell, broadcast, mpsc, oneshot, watch};
-use tokio::task::JoinHandle;
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::process_name::get_process_name;
 
@@ -25,8 +26,38 @@ const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 const OUTBOUND_QUEUE_SIZE: usize = 32;
+/// Time we let in-flight connections drain on shutdown before forcing
+/// the listener closed.
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
-static GLOBAL_SERVICE: OnceCell<BridgeService> = OnceCell::const_new();
+static GLOBAL_SERVICE: OnceLock<BridgeService> = OnceLock::new();
+
+/// Idempotently install the rustls process-wide crypto provider. Safe
+/// to call multiple times and from multiple threads — only the first
+/// call has effect. If a provider has already been installed (by us or
+/// by another crate in the process), this logs at debug level and
+/// leaves the existing provider in place. Must be called before any
+/// rustls/axum-server work runs in the process; convention is "once at
+/// the top of `main`".
+pub fn install_default_crypto_provider() {
+    if rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .is_err()
+    {
+        tracing::debug!(
+            "rustls default crypto provider was already installed; leaving existing provider in place"
+        );
+    }
+}
+
+/// Server-side TLS material. The bridge requires this to be configured
+/// before [`BridgeService::bind`] is called — there is no plaintext
+/// fallback.
+#[derive(Clone, Debug)]
+pub struct TlsMaterial {
+    pub cert_path: PathBuf,
+    pub key_path: PathBuf,
+}
 
 /// A WebSocket-connected bridge client (typically a browser
 /// native-messaging host or an Office add-in runtime).
@@ -55,10 +86,163 @@ pub struct RegistrationEvent {
     pub app_kind: Option<String>,
 }
 
+/// Bookkeeping for a bridge listener that the service owns. Held
+/// inside the service's `server` mutex; keyed off the listener's
+/// lifetime — a slot is populated as soon as [`BridgeService::bind_on`]
+/// hands out a [`BoundServer`] and stays populated until that server
+/// is either served and stopped, or dropped without serving.
 struct ServerHandle {
-    shutdown_tx: watch::Sender<bool>,
-    task: JoinHandle<()>,
+    state: ServerState,
     local_addr: SocketAddr,
+}
+
+enum ServerState {
+    /// `bind_on` returned a [`BoundServer`] but no one has called
+    /// [`BoundServer::serve`] on it yet (or the BoundServer was
+    /// dropped without serving — Drop clears the slot before that
+    /// becomes observable).
+    Bound,
+    /// A serve loop is running. `axum_handle` is what
+    /// [`BridgeService::stop_server`] uses to trigger graceful
+    /// shutdown; `done` is the one-shot signal flipped by `serve`
+    /// when its accept loop exits, awaited by `stop_server` to drain
+    /// in-flight connections. `done` becomes `None` once a stopper
+    /// has taken it.
+    Serving {
+        axum_handle: AxumHandle,
+        done: Option<oneshot::Receiver<()>>,
+    },
+}
+
+/// A bridge listener whose kernel socket is in `LISTEN` state but whose
+/// accept loop has not started yet. Returned by
+/// [`BridgeService::bind`] / [`BridgeService::bind_on`]; consumed by
+/// [`BoundServer::serve`].
+///
+/// The split between bind and serve makes the "port is open" guarantee
+/// observable in the type system: a caller that holds a `BoundServer`
+/// has already passed the bind, regardless of whether anyone is polling
+/// the accept loop yet. Dropping a `BoundServer` without serving
+/// releases the socket and clears the service's bookkeeping — useful
+/// in tests but a programming bug in production paths, hence `#[must_use]`.
+#[must_use = "BoundServer drops the listening socket if not served"]
+pub struct BoundServer {
+    service: BridgeService,
+    /// `None` only between `serve()` consuming the listener and the
+    /// struct being dropped — Drop uses this to detect "served vs
+    /// abandoned" so it knows whether to clear the slot.
+    listener: Option<std::net::TcpListener>,
+    tls: Option<RustlsConfig>,
+    local_addr: SocketAddr,
+}
+
+impl std::fmt::Debug for BoundServer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BoundServer")
+            .field("local_addr", &self.local_addr)
+            .finish_non_exhaustive()
+    }
+}
+
+impl BoundServer {
+    /// Address the listener is bound to. Stable across the bind/serve
+    /// transition.
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr
+    }
+
+    /// Run the accept loop until the owning service is asked to stop
+    /// (via [`BridgeService::stop_server`]) or the loop exits with an
+    /// error.
+    ///
+    /// This future drives the accept loop directly; the typical startup
+    /// pattern is `tokio::spawn(bound.serve())`. Awaiting it inline
+    /// blocks until the loop ends.
+    pub async fn serve(mut self) -> Result<(), BridgeError> {
+        // Both fields are populated by `bind_on` and only taken here.
+        // `serve` consumes `self`, so a second call is statically
+        // impossible.
+        let listener = self.listener.take().unwrap();
+        let tls = self.tls.take().unwrap();
+        let service = self.service.clone();
+        let local_addr = self.local_addr;
+        // Drop early so the Drop impl runs before we hand off control —
+        // it sees `listener` is `None` and leaves the slot alone.
+        drop(self);
+
+        let axum_handle = AxumHandle::new();
+        let (done_tx, done_rx) = oneshot::channel::<()>();
+
+        {
+            let mut guard = service.server.lock().expect("server slot poisoned");
+            let slot = guard
+                .as_mut()
+                .expect("BoundServer outlives its service slot");
+            match &slot.state {
+                ServerState::Bound => {
+                    slot.state = ServerState::Serving {
+                        axum_handle: axum_handle.clone(),
+                        done: Some(done_rx),
+                    };
+                }
+                ServerState::Serving { .. } => {
+                    return Err(BridgeError::AlreadyRunning { local_addr });
+                }
+            }
+        }
+
+        let app = Router::new()
+            .route(BRIDGE_PATH, get(ws_upgrade))
+            .with_state(service.clone());
+
+        let result = axum_server::from_tcp_rustls(listener, tls)
+            .handle(axum_handle)
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .await;
+
+        // Clear the slot before signalling done so a follow-up `bind`
+        // observes a clean state immediately.
+        {
+            let mut guard = service.server.lock().expect("server slot poisoned");
+            *guard = None;
+        }
+        let _ = done_tx.send(());
+
+        match result {
+            Ok(()) => {
+                tracing::info!(%local_addr, "Bridge WebSocket server stopped");
+                Ok(())
+            }
+            Err(source) => {
+                tracing::error!(%local_addr, error = %source, "Bridge WebSocket server error");
+                Err(BridgeError::Serve { source })
+            }
+        }
+    }
+}
+
+impl Drop for BoundServer {
+    fn drop(&mut self) {
+        // If `serve` ran, it took the listener and TLS config and is
+        // responsible for clearing the slot. If we still hold them, the
+        // BoundServer is being abandoned — release the slot so the
+        // service is rebindable.
+        if self.listener.is_none() {
+            return;
+        }
+        match self.service.server.lock() {
+            Ok(mut guard) => {
+                if matches!(guard.as_ref(), Some(handle) if matches!(handle.state, ServerState::Bound))
+                {
+                    *guard = None;
+                }
+            }
+            Err(_) => tracing::warn!(
+                local_addr = %self.local_addr,
+                "Bridge server slot poisoned while dropping unserved BoundServer",
+            ),
+        }
+    }
 }
 
 /// In-process bridge service. A single instance is shared via
@@ -71,9 +255,10 @@ pub struct BridgeService {
     events_tx: broadcast::Sender<(u32, EventFrame)>,
     registrations_tx: broadcast::Sender<RegistrationEvent>,
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
-    pending_requests: Arc<DashMap<u32, oneshot::Sender<Frame>>>,
+    pending_requests: Arc<DashMap<u32, oneshot::Sender<Result<ResponseFrame, ErrorFrame>>>>,
     request_id_counter: Arc<AtomicU32>,
-    server: Arc<Mutex<Option<ServerHandle>>>,
+    server: Arc<StdMutex<Option<ServerHandle>>>,
+    tls: Arc<OnceLock<TlsMaterial>>,
 }
 
 impl Default for BridgeService {
@@ -83,10 +268,11 @@ impl Default for BridgeService {
 }
 
 impl BridgeService {
-    /// Build a new service and spawn its frame-dispatch task. The
-    /// dispatch task runs for the lifetime of the service (it exits
-    /// when the inbound broadcast sender is dropped, i.e. when the
-    /// last clone of this service is gone).
+    /// Build a new service and spawn its frame-dispatch task. Must be
+    /// called from within a tokio runtime: the dispatch task runs for
+    /// the lifetime of the service (it exits when the inbound broadcast
+    /// sender is dropped, i.e. when the last clone of this service is
+    /// gone).
     pub fn new() -> Self {
         let (frames_from_clients_tx, _) = broadcast::channel(100);
         let (events_tx, _) = broadcast::channel(100);
@@ -101,23 +287,59 @@ impl BridgeService {
             disconnects_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
-            server: Arc::new(Mutex::new(None)),
+            server: Arc::new(StdMutex::new(None)),
+            tls: Arc::new(OnceLock::new()),
         };
         service.spawn_frame_handler();
         service
     }
 
-    pub async fn get_or_init() -> &'static BridgeService {
-        GLOBAL_SERVICE
-            .get_or_init(|| async { BridgeService::new() })
-            .await
+    /// Get the process-wide bridge service, constructing it on first
+    /// call. Must be called from within a tokio runtime context (the
+    /// initializer spawns the frame-dispatch task).
+    pub fn get_or_init() -> &'static BridgeService {
+        GLOBAL_SERVICE.get_or_init(BridgeService::new)
     }
 
-    /// Returns the global service if [`get_or_init`] has been called at
-    /// least once, otherwise `None`. Useful for shutdown paths that
-    /// shouldn't accidentally bring the service into existence.
+    /// Returns the global service if [`get_or_init`](Self::get_or_init)
+    /// has been called at least once, otherwise `None`. Useful for
+    /// shutdown paths that shouldn't accidentally bring the service
+    /// into existence.
     pub fn get() -> Option<&'static BridgeService> {
         GLOBAL_SERVICE.get()
+    }
+
+    /// Configure the TLS material the bridge listener will use. Must
+    /// be called before [`bind`](BridgeService::bind) /
+    /// [`bind_on`](BridgeService::bind_on). First writer wins —
+    /// subsequent calls with a different material are logged and
+    /// dropped, since changing certs while the server runs would race
+    /// the listener.
+    pub fn configure_tls(&self, material: TlsMaterial) {
+        match self.tls.set(material.clone()) {
+            Ok(()) => tracing::debug!(
+                cert_path = %material.cert_path.display(),
+                key_path = %material.key_path.display(),
+                "Bridge TLS material configured",
+            ),
+            Err(_) => {
+                let existing = self
+                    .tls
+                    .get()
+                    .expect("set returned Err so OnceLock is populated");
+                if existing.cert_path != material.cert_path
+                    || existing.key_path != material.key_path
+                {
+                    tracing::warn!(
+                        existing_cert = %existing.cert_path.display(),
+                        existing_key = %existing.key_path.display(),
+                        attempted_cert = %material.cert_path.display(),
+                        attempted_key = %material.key_path.display(),
+                        "Bridge TLS material already configured; ignoring later attempt to reconfigure with different material",
+                    );
+                }
+            }
+        }
     }
 
     fn spawn_frame_handler(&self) {
@@ -130,8 +352,8 @@ impl BridgeService {
             loop {
                 let (app_pid, frame) = match frames_rx.recv().await {
                     Ok(val) => val,
-                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("Frame handler lagged by {n} frames, resuming");
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(skipped, "Frame handler lagged, resuming");
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
@@ -140,55 +362,57 @@ impl BridgeService {
                 match frame.kind {
                     FrameKind::Request(req) => {
                         tracing::warn!(
-                            "Received unsupported request from client: app_pid={app_pid}, action={}",
-                            req.action
+                            app_pid,
+                            action = %req.action,
+                            "Received unsupported request from client",
                         );
                     }
                     FrameKind::Response(resp) => {
                         let id = resp.id;
                         if let Some((_, sender)) = pending_requests.remove(&id) {
-                            if sender.send(Frame::from(resp)).is_err() {
+                            if sender.send(Ok(resp)).is_err() {
                                 tracing::debug!(
-                                    "Pending request {id} was dropped before response arrived"
+                                    request_id = id,
+                                    "Pending request was dropped before response arrived",
                                 );
                             }
                         } else {
                             tracing::debug!(
-                                "Received response for unknown request id={id}, action={}",
-                                resp.action
+                                request_id = id,
+                                action = %resp.action,
+                                "Received response for unknown request id",
                             );
                         }
                     }
                     FrameKind::Event(evt) => {
                         if events_tx.send((app_pid, evt)).is_err() {
-                            tracing::trace!(
-                                "No event subscribers for event from app_pid={app_pid}"
-                            );
+                            tracing::trace!(app_pid, "No event subscribers for inbound event");
                         }
                     }
                     FrameKind::Error(err) => {
                         let id = err.id;
                         tracing::warn!(
-                            "Received error frame from app_pid={app_pid}: id={id}, message={}",
-                            err.message
+                            app_pid,
+                            request_id = id,
+                            message = %err.message,
+                            "Received error frame from client",
                         );
                         if let Some((_, sender)) = pending_requests.remove(&id)
-                            && sender.send(Frame::from(err)).is_err()
+                            && sender.send(Err(err)).is_err()
                         {
                             tracing::debug!(
-                                "Pending request {id} was dropped before error arrived"
+                                request_id = id,
+                                "Pending request was dropped before error arrived",
                             );
                         }
                     }
                     FrameKind::Cancel(cancel) => {
                         if pending_requests.remove(&cancel.id).is_some() {
-                            tracing::debug!("Cancelled pending request id={}", cancel.id);
+                            tracing::debug!(request_id = cancel.id, "Cancelled pending request");
                         }
                     }
                     FrameKind::Register(_) => {
-                        tracing::warn!(
-                            "Received Register frame outside the handshake from app_pid={app_pid}"
-                        );
+                        tracing::warn!(app_pid, "Received Register frame outside the handshake",);
                     }
                 }
             }
@@ -196,108 +420,155 @@ impl BridgeService {
         });
     }
 
-    /// Bind and serve the bridge on `{BRIDGE_HOST}:{BRIDGE_PORT}` and
-    /// return the resolved local address. Equivalent to
-    /// [`start_server_on`] with the well-known address.
-    pub async fn start_server(&self) -> Result<SocketAddr, std::io::Error> {
-        let bind_addr: SocketAddr = (
-            BRIDGE_HOST
-                .parse::<std::net::IpAddr>()
-                .expect("valid loopback ip"),
-            BRIDGE_PORT,
-        )
-            .into();
-        self.start_server_on(bind_addr).await
+    /// Bind the bridge listener on the well-known
+    /// `{BRIDGE_BIND_IP}:{BRIDGE_PORT}`. Equivalent to [`bind_on`] with
+    /// that address.
+    ///
+    /// [`bind_on`]: BridgeService::bind_on
+    pub async fn bind(&self) -> Result<BoundServer, BridgeError> {
+        self.bind_on((BRIDGE_BIND_IP, BRIDGE_PORT).into()).await
     }
 
-    /// Bind and serve the bridge on `bind_addr`. Use port `0` to let
-    /// the OS pick an ephemeral port; the returned [`SocketAddr`] is
-    /// the resolved one (with the chosen port filled in). The listener
-    /// is bound before this returns; the accept loop runs in the
-    /// background. Calling again while the server is already running
-    /// is a no-op that returns the existing local address. If a
-    /// previous server task ended (e.g. the process panicked), it is
-    /// reaped and a fresh server is started.
-    pub async fn start_server_on(
-        &self,
-        bind_addr: SocketAddr,
-    ) -> Result<SocketAddr, std::io::Error> {
-        let mut guard = self.server.lock().await;
+    /// Bind the bridge listener on `bind_addr` and return a
+    /// [`BoundServer`] whose [`serve`](BoundServer::serve) method runs
+    /// the accept loop. Use port `0` to let the OS pick an ephemeral
+    /// port; the bound socket address is available via
+    /// [`BoundServer::local_addr`] before serving begins.
+    ///
+    /// The kernel socket is in `LISTEN` state by the time this returns,
+    /// so clients dialing the address can never race the bind.
+    /// Requires [`configure_tls`](BridgeService::configure_tls) to have
+    /// been called first; returns [`BridgeError::TlsNotConfigured`]
+    /// otherwise.
+    ///
+    /// If a previous accept loop is still registered on the service,
+    /// returns [`BridgeError::AlreadyRunning`] — callers that want
+    /// "ensure running" semantics should check
+    /// [`local_addr`](BridgeService::local_addr) first.
+    pub async fn bind_on(&self, bind_addr: SocketAddr) -> Result<BoundServer, BridgeError> {
+        let material = self.tls.get().ok_or(BridgeError::TlsNotConfigured)?.clone();
 
-        if let Some(handle) = guard.as_ref()
-            && handle.task.is_finished()
-        {
-            tracing::warn!("Reaping bridge server task that exited unexpectedly; restarting");
-            *guard = None;
-        }
-
-        if let Some(handle) = guard.as_ref() {
-            tracing::debug!("Bridge WebSocket server already running");
-            return Ok(handle.local_addr);
-        }
-
-        let listener = TcpListener::bind(bind_addr).await?;
-        let local_addr = listener.local_addr()?;
-        tracing::info!("Bridge WebSocket server listening on {local_addr}{BRIDGE_PATH}");
-
-        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
-        let app = Router::new()
-            .route(BRIDGE_PATH, get(ws_upgrade))
-            .with_state(self.clone());
-
-        let task = tokio::spawn(async move {
-            let serve = axum::serve(
-                listener,
-                app.into_make_service_with_connect_info::<SocketAddr>(),
-            )
-            .with_graceful_shutdown(async move {
-                let _ = shutdown_rx.wait_for(|v| *v).await;
-                tracing::info!("Bridge WebSocket server received shutdown signal");
-            });
-
-            if let Err(err) = serve.await {
-                tracing::error!("Bridge WebSocket server error: {err}");
+        // axum-server's `from_tcp_rustls` adopts an already-bound
+        // `std::net::TcpListener`, which is exactly the shape we want:
+        // the `local_addr` is observable here, and the kernel socket is
+        // accepting connections before the caller ever sees the
+        // `BoundServer`.
+        //
+        // Reserve the slot synchronously around the TCP bind so two
+        // concurrent callers can't both succeed. The slot stays
+        // populated through the async TLS load below; on failure we
+        // roll it back.
+        let listener = {
+            let mut guard = self.server.lock().expect("server slot poisoned");
+            if let Some(handle) = guard.as_ref() {
+                return Err(BridgeError::AlreadyRunning {
+                    local_addr: handle.local_addr,
+                });
             }
+            let listener =
+                std::net::TcpListener::bind(bind_addr).map_err(|source| BridgeError::Bind {
+                    addr: bind_addr,
+                    source,
+                })?;
+            listener
+                .set_nonblocking(true)
+                .map_err(|source| BridgeError::Bind {
+                    addr: bind_addr,
+                    source,
+                })?;
+            let local_addr = listener.local_addr().map_err(|source| BridgeError::Bind {
+                addr: bind_addr,
+                source,
+            })?;
+            *guard = Some(ServerHandle {
+                state: ServerState::Bound,
+                local_addr,
+            });
+            listener
+        };
+        let local_addr = listener
+            .local_addr()
+            .expect("local_addr was readable above");
 
-            tracing::info!("Bridge WebSocket server stopped");
-        });
+        let tls = match RustlsConfig::from_pem_file(&material.cert_path, &material.key_path).await {
+            Ok(tls) => tls,
+            Err(source) => {
+                // Roll back the slot reservation so the service is
+                // bindable again.
+                let mut guard = self.server.lock().expect("server slot poisoned");
+                *guard = None;
+                return Err(BridgeError::TlsLoad {
+                    cert_path: material.cert_path.clone(),
+                    key_path: material.key_path.clone(),
+                    source,
+                });
+            }
+        };
 
-        *guard = Some(ServerHandle {
-            shutdown_tx,
-            task,
+        tracing::info!(
+            %local_addr,
+            cert_path = %material.cert_path.display(),
+            key_path = %material.key_path.display(),
+            url = %format_args!("wss://{local_addr}{BRIDGE_PATH}"),
+            "Bridge transport bound (TLS / wss)",
+        );
+
+        Ok(BoundServer {
+            service: self.clone(),
+            listener: Some(listener),
+            tls: Some(tls),
             local_addr,
-        });
-        Ok(local_addr)
+        })
     }
 
-    /// Address the running server is bound to, or `None` if the server
-    /// is not currently running. Useful for tests that bind to an
-    /// ephemeral port and need the resolved address to dial.
-    pub async fn local_addr(&self) -> Option<SocketAddr> {
+    /// Address the listener is bound to, or `None` if no listener is
+    /// currently registered. Becomes `Some` as soon as
+    /// [`bind_on`](BridgeService::bind_on) returns a [`BoundServer`]
+    /// (whether or not its `serve()` has been polled yet) and stays
+    /// `Some` until the listener is dropped or the serve loop ends.
+    pub fn local_addr(&self) -> Option<SocketAddr> {
         self.server
             .lock()
-            .await
+            .expect("server slot poisoned")
             .as_ref()
             .map(|handle| handle.local_addr)
     }
 
     /// Signal the running server to shut down, then wait for the
     /// accept loop and any in-flight connections to fully terminate.
-    /// No-op if the server isn't running. The lock is held across the
-    /// wait so a concurrent [`start_server`] doesn't race the listener
-    /// for the port.
+    /// No-op if no serve loop is running (including the case where a
+    /// [`BoundServer`] has been issued but never served).
+    ///
+    /// A concurrent [`bind`](BridgeService::bind) during shutdown sees
+    /// the slot still populated and returns
+    /// [`BridgeError::AlreadyRunning`] until the loop fully exits and
+    /// `serve` clears the slot.
     pub async fn stop_server(&self) {
-        let mut guard = self.server.lock().await;
-        let Some(handle) = guard.take() else {
-            tracing::debug!("Bridge WebSocket server is not running");
-            return;
+        let (axum_handle, done) = {
+            let mut guard = self.server.lock().expect("server slot poisoned");
+            let Some(slot) = guard.as_mut() else {
+                tracing::debug!("Bridge WebSocket server is not running");
+                return;
+            };
+            match &mut slot.state {
+                ServerState::Bound => {
+                    tracing::debug!(
+                        "Bridge listener is bound but no serve loop is running; nothing to stop"
+                    );
+                    return;
+                }
+                ServerState::Serving { axum_handle, done } => (axum_handle.clone(), done.take()),
+            }
         };
 
         tracing::info!("Sending shutdown signal to bridge WebSocket server");
-        let _ = handle.shutdown_tx.send(true);
+        axum_handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
 
-        if let Err(err) = handle.task.await {
-            tracing::warn!("Bridge WebSocket server task ended unexpectedly: {err}");
+        if let Some(done) = done {
+            // The sender is dropped (or fired) by `serve` exactly once
+            // when its accept loop ends; either outcome means the loop
+            // has stopped, so we don't distinguish them.
+            let _ = done.await;
         }
     }
 
@@ -350,7 +621,7 @@ impl BridgeService {
         action: &str,
         payload: Option<String>,
     ) -> Result<ResponseFrame, BridgeError> {
-        let request_id = self.request_id_counter.fetch_add(1, Ordering::SeqCst);
+        let request_id = self.request_id_counter.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         self.pending_requests.insert(request_id, tx);
 
@@ -360,7 +631,7 @@ impl BridgeService {
             payload,
         });
 
-        tracing::debug!("Sending request to app_pid={app_pid}: id={request_id}, action={action}");
+        tracing::debug!(app_pid, request_id, action, "Sending bridge request");
 
         if let Err(err) = self.send_to_client(app_pid, request).await {
             self.pending_requests.remove(&request_id);
@@ -368,14 +639,11 @@ impl BridgeService {
         }
 
         match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
-            Ok(Ok(frame)) => match frame.kind {
-                FrameKind::Response(resp) => Ok(resp),
-                FrameKind::Error(err) => Err(BridgeError::Client {
-                    message: err.message,
-                    details: err.details,
-                }),
-                other => Err(BridgeError::UnexpectedFrame(frame_kind_label(&other))),
-            },
+            Ok(Ok(Ok(resp))) => Ok(resp),
+            Ok(Ok(Err(err))) => Err(BridgeError::Client {
+                message: err.message,
+                details: err.details,
+            }),
             Ok(Err(_)) => {
                 self.pending_requests.remove(&request_id);
                 Err(BridgeError::ChannelClosed)
@@ -385,16 +653,14 @@ impl BridgeService {
                 let cancel = Frame::from(CancelFrame { id: request_id });
                 if let Err(err) = self.send_to_client(app_pid, cancel).await {
                     tracing::debug!(
-                        "Failed to send Cancel for timed-out request {request_id}: {err}"
+                        request_id,
+                        error = %err,
+                        "Failed to send Cancel for timed-out request",
                     );
                 }
                 Err(BridgeError::Timeout)
             }
         }
-    }
-
-    pub async fn get_metadata(&self, app_pid: u32) -> Result<ResponseFrame, BridgeError> {
-        self.send_request(app_pid, "GET_METADATA", None).await
     }
 
     async fn send_to_client(&self, app_pid: u32, frame: Frame) -> Result<(), BridgeError> {
@@ -409,24 +675,13 @@ impl BridgeService {
     }
 }
 
-fn frame_kind_label(kind: &FrameKind) -> &'static str {
-    match kind {
-        FrameKind::Request(_) => "Request",
-        FrameKind::Response(_) => "Response",
-        FrameKind::Event(_) => "Event",
-        FrameKind::Error(_) => "Error",
-        FrameKind::Cancel(_) => "Cancel",
-        FrameKind::Register(_) => "Register",
-    }
-}
-
 async fn ws_upgrade(
     State(service): State<BridgeService>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     upgrade: WebSocketUpgrade,
 ) -> impl IntoResponse {
     if !peer.ip().is_loopback() {
-        tracing::warn!("Rejecting bridge connection from non-loopback peer: {peer}");
+        tracing::warn!(%peer, "Rejecting bridge connection from non-loopback peer");
         return (
             axum::http::StatusCode::FORBIDDEN,
             "bridge only accepts loopback connections",
@@ -446,7 +701,7 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
     let register = match read_register_frame(&mut stream).await {
         Ok(frame) => frame,
         Err(err) => {
-            tracing::warn!("Bridge handshake failed from {peer}: {err}");
+            tracing::warn!(%peer, error = %err, "Bridge handshake failed");
             let _ = sink
                 .send(Message::Close(Some(CloseFrame {
                     code: close_code::PROTOCOL,
@@ -478,13 +733,19 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
         },
     ) {
         tracing::warn!(
-            "Replacing existing registration for app_pid={app_pid} (previous host_pid={})",
-            prev.host_pid
+            app_pid,
+            previous_host_pid = prev.host_pid,
+            "Replacing existing registration for app_pid",
         );
     }
 
     tracing::info!(
-        "Bridge client registered: app_pid={app_pid} host_pid={host_pid} app_name={app_name:?} app_kind={app_kind:?} (peer={peer})"
+        app_pid,
+        host_pid,
+        app_name = %app_name,
+        ?app_kind,
+        %peer,
+        "Bridge client registered",
     );
 
     let _ = service.registrations_tx.send(RegistrationEvent {
@@ -508,17 +769,21 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
             app_kind: removed.app_kind,
         });
         tracing::info!(
-            "Bridge client unregistered: app_pid={app_pid} host_pid={host_pid} (remaining={})",
-            service.registry.len()
+            app_pid,
+            host_pid,
+            remaining = service.registry.len(),
+            "Bridge client unregistered",
         );
     } else {
         tracing::warn!(
-            "Did not unregister app_pid={app_pid}: registration was replaced by host_pid={host_pid} or already removed"
+            app_pid,
+            host_pid,
+            "Did not unregister: registration was replaced or already removed",
         );
     }
 
     if let Err(err) = writer.await {
-        tracing::debug!("Writer task for app_pid={app_pid} ended: {err}");
+        tracing::debug!(app_pid, error = %err, "Writer task ended");
     }
 }
 
@@ -552,7 +817,7 @@ where
         FrameKind::Register(register) => Ok(register),
         other => Err(format!(
             "first frame must be Register, got {}",
-            frame_kind_label(&other)
+            other.variant_name()
         )),
     }
 }
@@ -574,18 +839,18 @@ async fn writer_task(
                 let json = match serde_json::to_string(&frame) {
                     Ok(json) => json,
                     Err(err) => {
-                        tracing::error!("Failed to serialize outbound frame: {err}");
+                        tracing::error!(error = %err, "Failed to serialize outbound frame");
                         continue;
                     }
                 };
                 if let Err(err) = sink.send(Message::Text(json.into())).await {
-                    tracing::debug!("Failed to write outbound frame: {err}");
+                    tracing::debug!(error = %err, "Failed to write outbound frame");
                     break;
                 }
             }
             _ = heartbeat.tick() => {
                 if let Err(err) = sink.send(Message::Ping(Default::default())).await {
-                    tracing::debug!("Heartbeat ping failed: {err}");
+                    tracing::debug!(error = %err, "Heartbeat ping failed");
                     break;
                 }
             }
@@ -608,7 +873,7 @@ where
         let message = match message {
             Ok(m) => m,
             Err(err) => {
-                tracing::debug!("Websocket error from app_pid={app_pid}: {err}");
+                tracing::debug!(app_pid, error = %err, "Websocket error from client");
                 break;
             }
         };
@@ -618,22 +883,28 @@ where
                 Ok(frame) => {
                     if let Err(err) = service.frames_from_clients_tx.send((app_pid, frame)) {
                         tracing::trace!(
-                            "No subscribers for inbound frame from app_pid={app_pid}: {err}"
+                            app_pid,
+                            error = %err,
+                            "No subscribers for inbound frame",
                         );
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("Failed to parse inbound frame from app_pid={app_pid}: {err}");
+                    tracing::warn!(
+                        app_pid,
+                        error = %err,
+                        "Failed to parse inbound frame",
+                    );
                 }
             },
             Message::Binary(_) => {
-                tracing::warn!("Ignoring unexpected binary frame from app_pid={app_pid}");
+                tracing::warn!(app_pid, "Ignoring unexpected binary frame");
             }
             Message::Ping(_) | Message::Pong(_) => {
                 // axum auto-responds to Ping with Pong; nothing to do.
             }
             Message::Close(frame) => {
-                tracing::debug!("Client app_pid={app_pid} closed connection: {frame:?}");
+                tracing::debug!(app_pid, ?frame, "Client closed connection");
                 break;
             }
         }
@@ -653,23 +924,7 @@ fn message_label(message: &Message) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use euro_bridge_protocol::EventFrame;
     use tokio::time::timeout;
-
-    #[test]
-    fn frame_kind_label_covers_all_variants() {
-        assert_eq!(
-            frame_kind_label(&FrameKind::Cancel(CancelFrame { id: 1 })),
-            "Cancel"
-        );
-        assert_eq!(
-            frame_kind_label(&FrameKind::Event(EventFrame {
-                action: "X".into(),
-                payload: None,
-            })),
-            "Event"
-        );
-    }
 
     #[tokio::test]
     async fn send_request_returns_not_found_when_client_missing() {
@@ -726,6 +981,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn send_request_surfaces_client_error_frame() {
+        let service = BridgeService::new();
+
+        let (outbound_tx, mut outbound_rx) = mpsc::channel::<Frame>(8);
+        service.registry.insert(
+            9,
+            RegisteredClient {
+                tx: outbound_tx,
+                host_pid: 1,
+                app_pid: 9,
+                app_name: "test".into(),
+                app_kind: None,
+            },
+        );
+
+        let svc = service.clone();
+        let request_handle = tokio::spawn(async move { svc.send_request(9, "PING", None).await });
+
+        let outbound = timeout(Duration::from_secs(1), outbound_rx.recv())
+            .await
+            .expect("outbound frame")
+            .expect("frame present");
+        let FrameKind::Request(req) = outbound.kind else {
+            panic!("expected Request frame");
+        };
+
+        service
+            .frames_from_clients_tx
+            .send((
+                9,
+                Frame::from(ErrorFrame {
+                    id: req.id,
+                    code: 42,
+                    message: "boom".into(),
+                    details: Some("trace".into()),
+                }),
+            ))
+            .expect("broadcast send");
+
+        let result = timeout(Duration::from_secs(1), request_handle)
+            .await
+            .expect("request future")
+            .expect("join");
+        match result {
+            Err(BridgeError::Client { message, details }) => {
+                assert_eq!(message, "boom");
+                assert_eq!(details.as_deref(), Some("trace"));
+            }
+            other => panic!("expected Client error, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn find_clients_by_kind_returns_only_matching_clients() {
         let service = BridgeService::new();
         let (tx, _rx) = mpsc::channel::<Frame>(8);
@@ -765,5 +1073,15 @@ mod tests {
         found.sort_unstable();
         assert_eq!(found, vec![10, 12]);
         assert!(service.find_clients_by_kind("safari").is_empty());
+    }
+
+    #[tokio::test]
+    async fn bind_without_tls_fails_loudly() {
+        let service = BridgeService::new();
+        let err = service
+            .bind_on(([127, 0, 0, 1], 0).into())
+            .await
+            .expect_err("bind must fail without TLS material");
+        assert!(matches!(err, BridgeError::TlsNotConfigured));
     }
 }
