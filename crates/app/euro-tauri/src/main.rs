@@ -244,6 +244,57 @@ fn install_office_word_addin(app: &tauri::App) {
     }
 }
 
+/// Mint (or rotate) the bridge TLS chain, install the CA into the
+/// per-user OS root store, and configure the bridge service so the
+/// listener will pick the cert/key up when `start_bridge_server` runs.
+///
+/// Failures here are *non-fatal* — the desktop logs and continues.
+/// Without TLS material the bridge `start_server` call will return
+/// `BridgeError::TlsNotConfigured`; without trust-store install the
+/// add-in's WebView2 will surface a cert error. Both modes are no
+/// worse than the plaintext channel this replaces.
+fn provision_bridge_tls(app: &tauri::App) {
+    use euro_tauri::office_addin::bridge_certs;
+
+    let certs = match bridge_certs::ensure(app.handle()) {
+        Ok(c) => c,
+        Err(err) => {
+            tracing::error!(
+                "Failed to provision bridge TLS material: {err}; \
+                 the Office add-in and native-messaging host will not be able to connect"
+            );
+            return;
+        }
+    };
+
+    match bridge_certs::ensure_trusted(&certs.ca_path) {
+        bridge_certs::TrustOutcome::Installed => {
+            tracing::info!("Installed Eurora bridge CA into per-user root store")
+        }
+        bridge_certs::TrustOutcome::AlreadyTrusted => {
+            tracing::debug!("Eurora bridge CA already trusted in per-user root store")
+        }
+        bridge_certs::TrustOutcome::Skipped => {
+            tracing::debug!("CA trust install not applicable on this OS")
+        }
+        bridge_certs::TrustOutcome::Failed(reason) => tracing::warn!(
+            "Failed to install bridge CA into per-user root store: {reason}; \
+             the Office add-in may show a cert warning until this is resolved"
+        ),
+    }
+
+    let service = tauri::async_runtime::block_on(euro_browser::BridgeService::get_or_init());
+    service.configure_tls(euro_browser::TlsMaterial {
+        cert_path: certs.cert_path.clone(),
+        key_path: certs.key_path.clone(),
+    });
+    tracing::debug!(
+        "Configured bridge service with TLS material at {} / {}",
+        certs.cert_path.display(),
+        certs.key_path.display()
+    );
+}
+
 fn init_encryption(data_dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(debug_assertions)]
     let main_key = euro_encrypt::MainKey::from_bytes([
@@ -501,6 +552,12 @@ fn build_router() -> Router<tauri::Wry> {
 fn main() {
     dotenv().ok();
 
+    // Install rustls' default crypto provider before any TLS code runs.
+    // Required because both `axum-server` (the bridge listener) and
+    // `tokio-rustls` (downstream rustls clients) panic if the provider
+    // is unset and rustls's auto-selection is ambiguous.
+    euro_browser::install_default_crypto_provider();
+
     #[cfg(debug_assertions)]
     {
         use keyring::{mock, set_default_credential_builder};
@@ -525,6 +582,7 @@ fn main() {
                 .setup(move |tauri_app| {
                     install_native_messaging_manifests(tauri_app);
                     install_office_word_addin(tauri_app);
+                    provision_bridge_tls(tauri_app);
 
                     let data_dir = tauri_app.path().app_data_dir()?;
                     init_encryption(data_dir)?;

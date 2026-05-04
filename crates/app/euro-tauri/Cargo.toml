@@ -42,6 +42,7 @@ dotenv = { workspace = true }
 euro-activity = { workspace = true }
 euro-auth = { workspace = true }
 euro-browser = { workspace = true }
+euro-bridge-protocol = { workspace = true }
 euro-encrypt = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }
@@ -55,7 +56,10 @@ futures = { workspace = true }
 keyring = { workspace = true }
 parking_lot = { workspace = true }
 proto-gen = { workspace = true }
+rcgen = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
+rustls-pemfile = { workspace = true }
+sha1 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
@@ -79,12 +83,14 @@ tauri-plugin-window-state = "2"
 # taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 taurpc = { workspace = true }
 # The features here optimize for performance.
+time = { workspace = true }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"
 thiserror = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
+x509-parser = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
