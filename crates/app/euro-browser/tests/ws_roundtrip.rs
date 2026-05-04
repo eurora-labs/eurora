@@ -3,10 +3,10 @@
 //! entrypoint so the upgrade path, registration, dispatch, and
 //! shutdown are exercised together.
 //!
-//! Each test binds to an ephemeral port via `start_server_on` and
-//! generates a fresh CA + `localhost` leaf into a tempdir, so the
-//! suite can run alongside (or in parallel with) anything that holds
-//! the well-known bridge port.
+//! Each test binds to an ephemeral port via `BridgeService::bind_on`,
+//! spawns the accept loop, and generates a fresh CA + `localhost` leaf
+//! into a tempdir, so the suite can run alongside (or in parallel
+//! with) anything that holds the well-known bridge port.
 
 mod common;
 
@@ -23,17 +23,24 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::Message as TMessage;
 
 /// Bind the bridge to an ephemeral loopback port for the duration of a
-/// single test. Returns the live service, the bound socket address, and
-/// the test trust chain (kept alive on the stack so cert files survive).
+/// single test and spawn its accept loop. Returns the live service, the
+/// bound socket address, and the test trust chain (kept alive on the
+/// stack so cert files survive).
 async fn start_ephemeral_bridge() -> (BridgeService, SocketAddr, common::TestChain) {
     install_default_crypto_provider();
     let chain = common::mint_localhost_chain();
     let service = BridgeService::new();
     service.configure_tls(chain.material.clone());
-    let addr = service
-        .start_server_on(([127, 0, 0, 1], 0).into())
+    let bound = service
+        .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("bind ephemeral bridge");
+    let addr = bound.local_addr();
+    tokio::spawn(async move {
+        if let Err(err) = bound.serve().await {
+            eprintln!("ephemeral bridge serve loop ended: {err}");
+        }
+    });
     (service, addr, chain)
 }
 
@@ -206,51 +213,105 @@ async fn server_can_be_stopped_and_restarted() {
     let service = BridgeService::new();
     service.configure_tls(chain.material.clone());
 
-    let first_addr = service
-        .start_server_on(([127, 0, 0, 1], 0).into())
+    let bound = service
+        .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("first bind");
-    assert_eq!(service.local_addr().await, Some(first_addr));
-    service.stop_server().await;
-    assert_eq!(service.local_addr().await, None);
+    let first_addr = bound.local_addr();
+    let serve_handle = tokio::spawn({
+        let bound = bound;
+        async move { bound.serve().await }
+    });
+    assert_eq!(service.local_addr(), Some(first_addr));
 
-    // After a clean stop the listener must be free, and a second
-    // start_server must succeed without leaking the previous shutdown
-    // signal. We deliberately request a fresh ephemeral port — the OS
-    // may or may not hand back the same one, and the test should not
-    // depend on it.
-    let second_addr = service
-        .start_server_on(([127, 0, 0, 1], 0).into())
+    service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
+    assert_eq!(service.local_addr(), None);
+
+    // After a clean stop the listener must be free, and a second bind
+    // must succeed without leaking the previous shutdown signal. We
+    // deliberately request a fresh ephemeral port — the OS may or may
+    // not hand back the same one, and the test should not depend on it.
+    let bound = service
+        .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("second bind");
+    let second_addr = bound.local_addr();
+    let serve_handle = tokio::spawn(async move { bound.serve().await });
 
     let mut ws = connect_test_client(second_addr, &chain).await;
     ws.close(None).await.unwrap();
 
     service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
 }
 
-/// Re-binding while already running must be a no-op that surfaces the
-/// existing local address, not a spurious bind error.
+/// Calling `bind_on` while a serve loop is already registered must
+/// surface the conflict explicitly so callers can decide whether to
+/// reuse the running listener or treat it as an error. Silent no-op
+/// behaviour was the symptom that motivated the bind/serve split.
 #[tokio::test]
-async fn start_server_on_is_idempotent() {
+async fn bind_on_rejects_double_bind() {
     install_default_crypto_provider();
     let chain = common::mint_localhost_chain();
     let service = BridgeService::new();
     service.configure_tls(chain.material);
 
-    let first = service
-        .start_server_on(([127, 0, 0, 1], 0).into())
+    let bound = service
+        .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("first bind");
+    let addr = bound.local_addr();
+    let serve_handle = tokio::spawn(async move { bound.serve().await });
 
-    // Asking for a different port while running must still return the
-    // currently-bound address rather than rebinding.
-    let second = service
-        .start_server_on(([127, 0, 0, 1], 0).into())
+    let err = service
+        .bind_on(([127, 0, 0, 1], 0).into())
         .await
-        .expect("second call returns running addr");
-    assert_eq!(first, second);
+        .expect_err("second bind must be rejected");
+    match err {
+        BridgeError::AlreadyRunning { local_addr } => assert_eq!(local_addr, addr),
+        other => panic!("expected AlreadyRunning, got {other:?}"),
+    }
 
     service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
+}
+
+/// Regression: the kernel socket must already be in `LISTEN` state by
+/// the time `bind_on` returns. A `TcpStream::connect` against the bound
+/// address must succeed even before the `serve()` future has been
+/// polled — this is the property the bind/serve split exists to
+/// guarantee, and it's what eliminates the slow-first-connect race the
+/// add-in used to hit.
+#[tokio::test]
+async fn bind_on_returns_with_port_in_listen_state() {
+    install_default_crypto_provider();
+    let chain = common::mint_localhost_chain();
+    let service = BridgeService::new();
+    service.configure_tls(chain.material);
+
+    let bound = service
+        .bind_on(([127, 0, 0, 1], 0).into())
+        .await
+        .expect("bind");
+    let addr = bound.local_addr();
+
+    // No serve() yet. The TCP connection itself must still complete —
+    // we don't try to do a TLS handshake because nothing is accepting
+    // application data, just observe that the SYN gets ACK'd.
+    let stream = tokio::task::spawn_blocking(move || std::net::TcpStream::connect(addr))
+        .await
+        .expect("join");
+    stream.expect("port is in LISTEN before serve() is polled");
+
+    drop(bound);
 }

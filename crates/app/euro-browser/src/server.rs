@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use axum::Router;
@@ -18,8 +18,7 @@ use euro_bridge_protocol::{
     FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
 };
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::{Mutex, OnceCell, broadcast, mpsc, oneshot};
-use tokio::task::JoinHandle;
+use tokio::sync::{OnceCell, broadcast, mpsc, oneshot};
 
 use crate::process_name::get_process_name;
 
@@ -43,8 +42,8 @@ pub fn install_default_crypto_provider() {
 }
 
 /// Server-side TLS material. The bridge requires this to be configured
-/// before [`BridgeService::start_server`] is called — there is no
-/// plaintext fallback.
+/// before [`BridgeService::bind`] is called — there is no plaintext
+/// fallback.
 #[derive(Clone, Debug)]
 pub struct TlsMaterial {
     pub cert_path: PathBuf,
@@ -78,10 +77,163 @@ pub struct RegistrationEvent {
     pub app_kind: Option<String>,
 }
 
+/// Bookkeeping for a bridge listener that the service owns. Held
+/// inside the service's `server` mutex; keyed off the listener's
+/// lifetime — a slot is populated as soon as [`BridgeService::bind_on`]
+/// hands out a [`BoundServer`] and stays populated until that server
+/// is either served and stopped, or dropped without serving.
 struct ServerHandle {
-    handle: AxumHandle,
-    task: JoinHandle<()>,
+    state: ServerState,
     local_addr: SocketAddr,
+}
+
+enum ServerState {
+    /// `bind_on` returned a [`BoundServer`] but no one has called
+    /// [`BoundServer::serve`] on it yet (or the BoundServer was
+    /// dropped without serving — Drop clears the slot before that
+    /// becomes observable).
+    Bound,
+    /// A serve loop is running. `axum_handle` is what
+    /// [`BridgeService::stop_server`] uses to trigger graceful
+    /// shutdown; `done` is the one-shot signal flipped by `serve`
+    /// when its accept loop exits, awaited by `stop_server` to drain
+    /// in-flight connections. `done` becomes `None` once a stopper
+    /// has taken it.
+    Serving {
+        axum_handle: AxumHandle,
+        done: Option<oneshot::Receiver<()>>,
+    },
+}
+
+/// A bridge listener whose kernel socket is in `LISTEN` state but whose
+/// accept loop has not started yet. Returned by
+/// [`BridgeService::bind`] / [`BridgeService::bind_on`]; consumed by
+/// [`BoundServer::serve`].
+///
+/// The split between bind and serve makes the "port is open" guarantee
+/// observable in the type system: a caller that holds a `BoundServer`
+/// has already passed the bind, regardless of whether anyone is polling
+/// the accept loop yet. Dropping a `BoundServer` without serving
+/// releases the socket and clears the service's bookkeeping — useful
+/// in tests but a programming bug in production paths, hence `#[must_use]`.
+#[must_use = "BoundServer drops the listening socket if not served"]
+pub struct BoundServer {
+    service: BridgeService,
+    /// `None` only between `serve()` consuming the listener and the
+    /// struct being dropped — Drop uses this to detect "served vs
+    /// abandoned" so it knows whether to clear the slot.
+    listener: Option<std::net::TcpListener>,
+    tls: Option<RustlsConfig>,
+    local_addr: SocketAddr,
+}
+
+impl std::fmt::Debug for BoundServer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BoundServer")
+            .field("local_addr", &self.local_addr)
+            .finish_non_exhaustive()
+    }
+}
+
+impl BoundServer {
+    /// Address the listener is bound to. Stable across the bind/serve
+    /// transition.
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr
+    }
+
+    /// Run the accept loop until the owning service is asked to stop
+    /// (via [`BridgeService::stop_server`]) or the loop exits with an
+    /// error.
+    ///
+    /// This future drives the accept loop directly; the typical startup
+    /// pattern is `tokio::spawn(bound.serve())`. Awaiting it inline
+    /// blocks until the loop ends.
+    pub async fn serve(mut self) -> Result<(), BridgeError> {
+        let listener = self
+            .listener
+            .take()
+            .expect("BoundServer::serve called twice");
+        let tls = self.tls.take().expect("BoundServer::serve called twice");
+        let service = self.service.clone();
+        let local_addr = self.local_addr;
+        // Drop early so the Drop impl runs before we hand off control —
+        // it sees `listener` is `None` and leaves the slot alone.
+        drop(self);
+
+        let axum_handle = AxumHandle::new();
+        let (done_tx, done_rx) = oneshot::channel::<()>();
+
+        {
+            let mut guard = service.server.lock().expect("server slot poisoned");
+            let slot = guard
+                .as_mut()
+                .expect("BoundServer outlives its service slot");
+            match &slot.state {
+                ServerState::Bound => {
+                    slot.state = ServerState::Serving {
+                        axum_handle: axum_handle.clone(),
+                        done: Some(done_rx),
+                    };
+                }
+                ServerState::Serving { .. } => {
+                    return Err(BridgeError::AlreadyRunning { local_addr });
+                }
+            }
+        }
+
+        let app = Router::new()
+            .route(BRIDGE_PATH, get(ws_upgrade))
+            .with_state(service.clone());
+
+        let result = axum_server::from_tcp_rustls(listener, tls)
+            .handle(axum_handle)
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .await;
+
+        // Clear the slot before signalling done so a follow-up `bind`
+        // observes a clean state immediately.
+        {
+            let mut guard = service.server.lock().expect("server slot poisoned");
+            *guard = None;
+        }
+        let _ = done_tx.send(());
+
+        match result {
+            Ok(()) => {
+                tracing::info!("Bridge WebSocket server stopped");
+                Ok(())
+            }
+            Err(source) => {
+                tracing::error!("Bridge WebSocket server error: {source}");
+                Err(BridgeError::Serve { source })
+            }
+        }
+    }
+}
+
+impl Drop for BoundServer {
+    fn drop(&mut self) {
+        // If `serve` ran, it took the listener and TLS config and is
+        // responsible for clearing the slot. If we still hold them, the
+        // BoundServer is being abandoned — release the slot so the
+        // service is rebindable.
+        if self.listener.is_none() {
+            return;
+        }
+        match self.service.server.lock() {
+            Ok(mut guard) => {
+                if matches!(guard.as_ref(), Some(handle) if matches!(handle.state, ServerState::Bound))
+                {
+                    *guard = None;
+                }
+            }
+            Err(_) => tracing::warn!(
+                "Bridge server slot poisoned while dropping unserved BoundServer at {}",
+                self.local_addr,
+            ),
+        }
+    }
 }
 
 /// In-process bridge service. A single instance is shared via
@@ -96,7 +248,7 @@ pub struct BridgeService {
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
     pending_requests: Arc<DashMap<u32, oneshot::Sender<Frame>>>,
     request_id_counter: Arc<AtomicU32>,
-    server: Arc<Mutex<Option<ServerHandle>>>,
+    server: Arc<StdMutex<Option<ServerHandle>>>,
     tls: Arc<OnceCell<TlsMaterial>>,
 }
 
@@ -125,7 +277,7 @@ impl BridgeService {
             disconnects_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
-            server: Arc::new(Mutex::new(None)),
+            server: Arc::new(StdMutex::new(None)),
             tls: Arc::new(OnceCell::new()),
         };
         service.spawn_frame_handler();
@@ -146,10 +298,11 @@ impl BridgeService {
     }
 
     /// Configure the TLS material the bridge listener will use. Must
-    /// be called before [`start_server`] / [`start_server_on`]. First
-    /// writer wins — subsequent calls with a different material are
-    /// logged and dropped, since changing certs while the server runs
-    /// would race the listener.
+    /// be called before [`bind`](BridgeService::bind) /
+    /// [`bind_on`](BridgeService::bind_on). First writer wins —
+    /// subsequent calls with a different material are logged and
+    /// dropped, since changing certs while the server runs would race
+    /// the listener.
     pub fn configure_tls(&self, material: TlsMaterial) {
         match self.tls.set(material.clone()) {
             Ok(()) => tracing::debug!(
@@ -252,129 +405,149 @@ impl BridgeService {
         });
     }
 
-    /// Bind and serve the bridge on the well-known
-    /// `{BRIDGE_BIND_IP}:{BRIDGE_PORT}` and return the resolved local
-    /// address. Equivalent to [`start_server_on`] with the well-known
-    /// address. Requires [`configure_tls`] to have been called first;
-    /// returns [`BridgeError::TlsNotConfigured`] otherwise.
-    pub async fn start_server(&self) -> Result<SocketAddr, BridgeError> {
-        let bind_addr: SocketAddr = (BRIDGE_BIND_IP, BRIDGE_PORT).into();
-        self.start_server_on(bind_addr).await
+    /// Bind the bridge listener on the well-known
+    /// `{BRIDGE_BIND_IP}:{BRIDGE_PORT}`. Equivalent to [`bind_on`] with
+    /// that address.
+    ///
+    /// [`bind_on`]: BridgeService::bind_on
+    pub async fn bind(&self) -> Result<BoundServer, BridgeError> {
+        self.bind_on((BRIDGE_BIND_IP, BRIDGE_PORT).into()).await
     }
 
-    /// Bind and serve the bridge on `bind_addr`. Use port `0` to let
-    /// the OS pick an ephemeral port; the returned [`SocketAddr`] is
-    /// the resolved one (with the chosen port filled in). The listener
-    /// is bound before this returns; the accept loop runs in the
-    /// background. Calling again while the server is already running
-    /// is a no-op that returns the existing local address. If a
-    /// previous server task ended (e.g. the process panicked), it is
-    /// reaped and a fresh server is started.
-    pub async fn start_server_on(&self, bind_addr: SocketAddr) -> Result<SocketAddr, BridgeError> {
-        let mut guard = self.server.lock().await;
-
-        if let Some(handle) = guard.as_ref()
-            && handle.task.is_finished()
-        {
-            tracing::warn!("Reaping bridge server task that exited unexpectedly; restarting");
-            *guard = None;
-        }
-
-        if let Some(handle) = guard.as_ref() {
-            tracing::debug!("Bridge WebSocket server already running");
-            return Ok(handle.local_addr);
-        }
-
+    /// Bind the bridge listener on `bind_addr` and return a
+    /// [`BoundServer`] whose [`serve`](BoundServer::serve) method runs
+    /// the accept loop. Use port `0` to let the OS pick an ephemeral
+    /// port; the bound socket address is available via
+    /// [`BoundServer::local_addr`] before serving begins.
+    ///
+    /// The kernel socket is in `LISTEN` state by the time this returns,
+    /// so clients dialing the address can never race the bind.
+    /// Requires [`configure_tls`](BridgeService::configure_tls) to have
+    /// been called first; returns [`BridgeError::TlsNotConfigured`]
+    /// otherwise.
+    ///
+    /// If a previous accept loop is still registered on the service,
+    /// returns [`BridgeError::AlreadyRunning`] — callers that want
+    /// "ensure running" semantics should check
+    /// [`local_addr`](BridgeService::local_addr) first.
+    pub async fn bind_on(&self, bind_addr: SocketAddr) -> Result<BoundServer, BridgeError> {
         let material = self.tls.get().ok_or(BridgeError::TlsNotConfigured)?.clone();
 
-        // Bind synchronously so the listening port exists before this
-        // function returns. axum-server's `from_tcp_rustls` adopts an
-        // already-bound `std::net::TcpListener`, which is exactly the
-        // shape we need: the `local_addr` is observable, and clients
-        // racing the bind no longer see ECONNREFUSED.
-        let std_listener =
-            std::net::TcpListener::bind(bind_addr).map_err(|source| BridgeError::Bind {
-                addr: bind_addr,
-                source,
-            })?;
-        std_listener
-            .set_nonblocking(true)
-            .map_err(|source| BridgeError::Bind {
-                addr: bind_addr,
-                source,
-            })?;
-        let local_addr = std_listener
-            .local_addr()
-            .map_err(|source| BridgeError::Bind {
-                addr: bind_addr,
-                source,
-            })?;
-
-        let tls_config = RustlsConfig::from_pem_file(&material.cert_path, &material.key_path)
-            .await
-            .map_err(|source| BridgeError::TlsLoad {
-                cert_path: material.cert_path.clone(),
-                key_path: material.key_path.clone(),
-                source,
-            })?;
-
-        tracing::info!("Bridge WebSocket server listening on wss://{local_addr}{BRIDGE_PATH}");
-
-        let app = Router::new()
-            .route(BRIDGE_PATH, get(ws_upgrade))
-            .with_state(self.clone());
-
-        let handle = AxumHandle::new();
-        let server_handle = handle.clone();
-
-        let task = tokio::spawn(async move {
-            let serve = axum_server::from_tcp_rustls(std_listener, tls_config)
-                .handle(server_handle)
-                .serve(app.into_make_service_with_connect_info::<SocketAddr>());
-
-            if let Err(err) = serve.await {
-                tracing::error!("Bridge WebSocket server error: {err}");
+        // axum-server's `from_tcp_rustls` adopts an already-bound
+        // `std::net::TcpListener`, which is exactly the shape we want:
+        // the `local_addr` is observable here, and the kernel socket is
+        // accepting connections before the caller ever sees the
+        // `BoundServer`.
+        //
+        // Reserve the slot synchronously around the TCP bind so two
+        // concurrent callers can't both succeed. The slot stays
+        // populated through the async TLS load below; on failure we
+        // roll it back.
+        let listener = {
+            let mut guard = self.server.lock().expect("server slot poisoned");
+            if let Some(handle) = guard.as_ref() {
+                return Err(BridgeError::AlreadyRunning {
+                    local_addr: handle.local_addr,
+                });
             }
+            let listener =
+                std::net::TcpListener::bind(bind_addr).map_err(|source| BridgeError::Bind {
+                    addr: bind_addr,
+                    source,
+                })?;
+            listener
+                .set_nonblocking(true)
+                .map_err(|source| BridgeError::Bind {
+                    addr: bind_addr,
+                    source,
+                })?;
+            let local_addr = listener.local_addr().map_err(|source| BridgeError::Bind {
+                addr: bind_addr,
+                source,
+            })?;
+            *guard = Some(ServerHandle {
+                state: ServerState::Bound,
+                local_addr,
+            });
+            listener
+        };
+        let local_addr = listener
+            .local_addr()
+            .expect("local_addr was readable above");
 
-            tracing::info!("Bridge WebSocket server stopped");
-        });
+        let tls = match RustlsConfig::from_pem_file(&material.cert_path, &material.key_path).await {
+            Ok(tls) => tls,
+            Err(source) => {
+                // Roll back the slot reservation so the service is
+                // bindable again.
+                let mut guard = self.server.lock().expect("server slot poisoned");
+                *guard = None;
+                return Err(BridgeError::TlsLoad {
+                    cert_path: material.cert_path.clone(),
+                    key_path: material.key_path.clone(),
+                    source,
+                });
+            }
+        };
 
-        *guard = Some(ServerHandle {
-            handle,
-            task,
+        tracing::info!("Bridge WebSocket listener bound on wss://{local_addr}{BRIDGE_PATH}");
+
+        Ok(BoundServer {
+            service: self.clone(),
+            listener: Some(listener),
+            tls: Some(tls),
             local_addr,
-        });
-        Ok(local_addr)
+        })
     }
 
-    /// Address the running server is bound to, or `None` if the server
-    /// is not currently running. Useful for tests that bind to an
-    /// ephemeral port and need the resolved address to dial.
-    pub async fn local_addr(&self) -> Option<SocketAddr> {
+    /// Address the listener is bound to, or `None` if no listener is
+    /// currently registered. Becomes `Some` as soon as
+    /// [`bind_on`](BridgeService::bind_on) returns a [`BoundServer`]
+    /// (whether or not its `serve()` has been polled yet) and stays
+    /// `Some` until the listener is dropped or the serve loop ends.
+    pub fn local_addr(&self) -> Option<SocketAddr> {
         self.server
             .lock()
-            .await
+            .expect("server slot poisoned")
             .as_ref()
             .map(|handle| handle.local_addr)
     }
 
     /// Signal the running server to shut down, then wait for the
     /// accept loop and any in-flight connections to fully terminate.
-    /// No-op if the server isn't running. The lock is held across the
-    /// wait so a concurrent [`start_server`] doesn't race the listener
-    /// for the port.
+    /// No-op if no serve loop is running (including the case where a
+    /// [`BoundServer`] has been issued but never served).
+    ///
+    /// A concurrent [`bind`](BridgeService::bind) during shutdown sees
+    /// the slot still populated and returns
+    /// [`BridgeError::AlreadyRunning`] until the loop fully exits and
+    /// `serve` clears the slot.
     pub async fn stop_server(&self) {
-        let mut guard = self.server.lock().await;
-        let Some(handle) = guard.take() else {
-            tracing::debug!("Bridge WebSocket server is not running");
-            return;
+        let (axum_handle, done) = {
+            let mut guard = self.server.lock().expect("server slot poisoned");
+            let Some(slot) = guard.as_mut() else {
+                tracing::debug!("Bridge WebSocket server is not running");
+                return;
+            };
+            match &mut slot.state {
+                ServerState::Bound => {
+                    tracing::debug!(
+                        "Bridge listener is bound but no serve loop is running; nothing to stop"
+                    );
+                    return;
+                }
+                ServerState::Serving { axum_handle, done } => (axum_handle.clone(), done.take()),
+            }
         };
 
         tracing::info!("Sending shutdown signal to bridge WebSocket server");
-        handle.handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
+        axum_handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
 
-        if let Err(err) = handle.task.await {
-            tracing::warn!("Bridge WebSocket server task ended unexpectedly: {err}");
+        if let Some(done) = done {
+            // The sender is dropped (or fired) by `serve` exactly once
+            // when its accept loop ends; either outcome means the loop
+            // has stopped, so we don't distinguish them.
+            let _ = done.await;
         }
     }
 
@@ -845,12 +1018,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_server_without_tls_fails_loudly() {
+    async fn bind_without_tls_fails_loudly() {
         let service = BridgeService::new();
         let err = service
-            .start_server_on(([127, 0, 0, 1], 0).into())
+            .bind_on(([127, 0, 0, 1], 0).into())
             .await
-            .expect_err("start_server must fail without TLS material");
+            .expect_err("bind must fail without TLS material");
         assert!(matches!(err, BridgeError::TlsNotConfigured));
     }
 }

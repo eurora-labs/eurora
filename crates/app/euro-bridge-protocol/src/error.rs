@@ -38,18 +38,34 @@ pub enum BridgeError {
     #[error("failed to deliver frame to client: {0}")]
     Send(String),
 
-    /// `start_server` was called before TLS material was configured
-    /// on the service. The bridge requires TLS — there is no plaintext
-    /// fallback — so this is an unrecoverable configuration error
-    /// rather than a runtime failure.
+    /// `BridgeService::bind` was called before TLS material was
+    /// configured on the service. The bridge requires TLS — there is no
+    /// plaintext fallback — so this is an unrecoverable configuration
+    /// error rather than a runtime failure.
     #[error("bridge TLS material not configured; call BridgeService::configure_tls first")]
     TlsNotConfigured,
+
+    /// `BridgeService::bind` was called while the listener was already
+    /// running. Surfaced explicitly (rather than silently no-op'd) so
+    /// callers that want "ensure running" semantics check
+    /// [`BridgeService::local_addr`] first and the lifecycle stays
+    /// observable in logs.
+    #[error("bridge listener already running on {local_addr}")]
+    AlreadyRunning { local_addr: SocketAddr },
 
     /// The OS refused to bind the requested address (port already in
     /// use, IPv6 disabled, sandbox restriction, …).
     #[error("failed to bind bridge listener on {addr}: {source}")]
     Bind {
         addr: SocketAddr,
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// The accept loop terminated with an unrecoverable error (TLS
+    /// handshake panic, listener vanished, …).
+    #[error("bridge serve loop ended with error: {source}")]
+    Serve {
         #[source]
         source: std::io::Error,
     },
