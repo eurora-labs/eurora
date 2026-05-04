@@ -9,8 +9,8 @@
 use anyhow::{Context, Result};
 use euro_bridge_protocol::type_collection;
 use specta_swift::{NamingConvention, SerdeMode, Swift};
-use std::fs;
 use std::process::ExitCode;
+use std::{env, fs};
 
 const SWIFT_OUT: &str = "apps/macos/Shared/BridgeProtocol.swift";
 

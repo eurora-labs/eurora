@@ -19,6 +19,21 @@ pub mod bridge_certs;
 mod install;
 mod manifest;
 
+cfg_select! {
+    target_os = "macos" => {
+        mod macos;
+        use macos as platform;
+    }
+    target_os = "windows" => {
+        mod windows;
+        use windows as platform;
+    }
+    _ => {
+        mod linux;
+        use linux as platform;
+    }
+}
+
 use std::path::PathBuf;
 
 use thiserror::Error;
