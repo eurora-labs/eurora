@@ -25,6 +25,8 @@ use std::fs;
 use std::io::Write as _;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 use std::process::{Command, Output};
 
 use rcgen::{

@@ -283,11 +283,17 @@ fn provision_bridge_tls(app: &tauri::App) {
         ),
     }
 
-    let service = tauri::async_runtime::block_on(euro_browser::BridgeService::get_or_init());
-    service.configure_tls(euro_browser::TlsMaterial {
+    let (tx, rx) = std::sync::mpsc::sync_channel::<()>(1);
+    let material = euro_browser::TlsMaterial {
         cert_path: certs.cert_path.clone(),
         key_path: certs.key_path.clone(),
+    };
+    tauri::async_runtime::spawn(async move {
+        let service = euro_browser::BridgeService::get_or_init().await;
+        service.configure_tls(material);
+        let _ = tx.send(());
     });
+    let _ = rx.recv();
     tracing::debug!(
         "Configured bridge service with TLS material at {} / {}",
         certs.cert_path.display(),
@@ -301,22 +307,32 @@ fn provision_bridge_tls(app: &tauri::App) {
 /// is in `LISTEN` state, so the very first add-in or native-messaging
 /// connect can no longer race the bind with `ECONNREFUSED`.
 ///
-/// `block_on` is appropriate here for the same reason it's used in
-/// `provision_bridge_tls`: Tauri's `setup` callback is synchronous, the
-/// bind itself is fast (one `TcpListener::bind`, one PEM read), and the
-/// accept loop runs in a spawned task once the bind has succeeded.
+/// We can't use `tauri::async_runtime::block_on` here: `setup` is
+/// already running inside the tokio runtime context, and nested
+/// `block_on` panics with "Cannot start a runtime from within a
+/// runtime". Instead, spawn the bind+serve task and synchronously wait
+/// on a `std::sync::mpsc` channel for the bind result before returning.
 fn bind_and_serve_bridge() -> Result<(), Box<dyn std::error::Error>> {
-    let bound = tauri::async_runtime::block_on(euro_browser::bind_bridge_server())?;
-    let local_addr = bound.local_addr();
+    let (tx, rx) =
+        std::sync::mpsc::sync_channel::<Result<std::net::SocketAddr, euro_browser::BridgeError>>(1);
+    tauri::async_runtime::spawn(async move {
+        match euro_browser::bind_bridge_server().await {
+            Ok(bound) => {
+                let _ = tx.send(Ok(bound.local_addr()));
+                if let Err(err) = bound.serve().await {
+                    tracing::error!("Bridge accept loop ended with error: {err}");
+                }
+            }
+            Err(err) => {
+                let _ = tx.send(Err(err));
+            }
+        }
+    });
+    let local_addr = rx.recv()??;
     tracing::info!(
         "Bridge listener bound at wss://{local_addr}{}",
         euro_browser::BRIDGE_PATH
     );
-    tauri::async_runtime::spawn(async move {
-        if let Err(err) = bound.serve().await {
-            tracing::error!("Bridge accept loop ended with error: {err}");
-        }
-    });
     Ok(())
 }
 
@@ -704,7 +720,12 @@ fn main() {
                 .expect("Failed to build tauri app")
                 .run(|_app_handle, event| {
                     if matches!(event, tauri::RunEvent::Exit) {
-                        tauri::async_runtime::block_on(euro_browser::stop_bridge_server());
+                        let (tx, rx) = std::sync::mpsc::sync_channel::<()>(1);
+                        tauri::async_runtime::spawn(async move {
+                            euro_browser::stop_bridge_server().await;
+                            let _ = tx.send(());
+                        });
+                        let _ = rx.recv();
                     }
                 });
         });
