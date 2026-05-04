@@ -139,8 +139,8 @@ impl From<sqlx::Error> for DbError {
             }
             sqlx::Error::PoolTimedOut => Self::Pool("Connection pool timed out".to_string()),
             sqlx::Error::PoolClosed => Self::Pool("Connection pool is closed".to_string()),
-            sqlx::Error::Io(_) => Self::Connection("IO error".to_string()),
-            sqlx::Error::Tls(_) => Self::Connection("TLS error".to_string()),
+            sqlx::Error::Io(e) => Self::Connection(format!("IO error: {e}")),
+            sqlx::Error::Tls(e) => Self::Connection(format!("TLS error: {e}")),
             other => Self::Database(other),
         }
     }
