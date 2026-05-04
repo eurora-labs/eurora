@@ -8,10 +8,15 @@ const runtimeRoot = fileURLToPath(new URL('./src/runtime', import.meta.url));
 const srcRoot = fileURLToPath(new URL('./src', import.meta.url));
 
 export default defineConfig(async ({ command }) => {
-	const httpsOptions =
-		command === 'serve'
-			? await devCerts.getHttpsServerOptions().catch(() => undefined)
-			: undefined;
+	let httpsOptions: Awaited<ReturnType<typeof devCerts.getHttpsServerOptions>> | undefined;
+	if (command === 'serve') {
+		// The Office add-in manifest hard-codes https://localhost:3000, so Word's
+		// WebView2 will fail with chrome-error://chromewebdata/ unless the dev CA
+		// is installed in the OS trust store. ensureCertificatesAreInstalled
+		// generates the cert if missing and prompts for elevation to trust it.
+		await devCerts.ensureCertificatesAreInstalled();
+		httpsOptions = await devCerts.getHttpsServerOptions();
+	}
 
 	return {
 		root: runtimeRoot,
