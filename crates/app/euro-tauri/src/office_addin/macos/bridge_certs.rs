@@ -71,11 +71,10 @@ fn converge_install(keychain: &Path, ca_path: &Path, existing: &[String]) -> Tru
         return TrustOutcome::NoChange;
     }
 
-    if !already_present {
-        if let Err(reason) = add_trusted_cert(keychain, ca_path) {
+    if !already_present
+        && let Err(reason) = add_trusted_cert(keychain, ca_path) {
             return TrustOutcome::Failed(reason);
         }
-    }
 
     let mut stale_removed = 0;
     for thumbprint in stale {
