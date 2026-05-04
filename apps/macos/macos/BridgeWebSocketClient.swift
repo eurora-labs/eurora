@@ -8,11 +8,21 @@ public protocol BridgeWebSocketClientDelegate: AnyObject {
     func bridgeWebSocketClient(_ client: BridgeWebSocketClient, didReceive frame: Frame)
 }
 
-/// WebSocket client that connects the macOS launcher to the desktop bridge
-/// (`ws://127.0.0.1:1431/bridge`). Mirrors the role of the Rust
-/// `euro-native-messaging` host: send a `Register` frame on connect, replay
-/// any cached `ASSETS`/`SNAPSHOT` events, then pump frames in both directions
-/// until the connection drops, at which point we back off and reconnect.
+/// WebSocket client that connects the macOS launcher to the desktop
+/// bridge over `wss://localhost:1431/bridge`. Mirrors the role of the
+/// Rust `euro-native-messaging` host: send a `Register` frame on
+/// connect, replay any cached `ASSETS`/`SNAPSHOT` events, then pump
+/// frames in both directions until the connection drops, at which
+/// point we back off and reconnect.
+///
+/// TLS trust is delegated to the system. The desktop installs the
+/// per-user bridge CA into the login keychain via `security
+/// add-trusted-cert`, and `URLSessionWebSocketTask` validates the leaf
+/// certificate through `trustd` like any other HTTPS connection — no
+/// in-process pinning, no custom `URLSessionDelegate` challenge handler.
+/// Connection attempts that fire before the user has approved the
+/// keychain trust prompt fail with a TLS error; the reconnect loop
+/// keeps retrying until it succeeds.
 @available(macOS 13.0, *)
 public final class BridgeWebSocketClient: @unchecked Sendable {
 
@@ -84,7 +94,8 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         }
         shouldRun = true
         let task = Task { [weak self] in
-            await self?.runConnectLoop()
+            guard let self else { return }
+            await self.runConnectLoop()
         }
         connectionTask = task
         stateLock.unlock()
@@ -211,7 +222,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
             disconnectError = error
             if !Task.isCancelled {
                 logger.info(
-                    "Bridge stream ended: \(String(describing: error), privacy: .public)"
+                    "Bridge stream ended: \(self.describeFailure(error), privacy: .public)"
                 )
             }
         }
@@ -289,9 +300,9 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
             return
         }
         task.send(.string(json)) { [weak self] error in
-            if let error {
-                self?.logger.warning(
-                    "Bridge send error: \(error.localizedDescription, privacy: .public)"
+            if let error, let self {
+                self.logger.warning(
+                    "Bridge send error: \(self.describeFailure(error), privacy: .public)"
                 )
             }
         }
@@ -312,7 +323,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
             return true
         } catch {
             logger.warning(
-                "Bridge send error: \(error.localizedDescription, privacy: .public)"
+                "Bridge send error: \(self.describeFailure(error), privacy: .public)"
             )
             return false
         }
@@ -355,6 +366,38 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         await MainActor.run { [weak self] in
             guard let self else { return }
             delegate?.bridgeWebSocketClientDidConnect(self)
+        }
+    }
+
+    // MARK: - Diagnostics
+
+    /// Render a transport-layer failure for logging. Under the wss
+    /// transport the load-bearing failure modes are TLS-specific (the
+    /// bridge CA hasn't been trusted yet, the leaf cert is outside its
+    /// validity window) or "desktop bridge not yet listening"; surfacing
+    /// each as a tailored hint over `URLError`'s generic
+    /// `localizedDescription` saves real triage time, especially on
+    /// first-run installs where the user hasn't yet authenticated the
+    /// `security add-trusted-cert` prompt.
+    private func describeFailure(_ error: Error) -> String {
+        guard let urlError = error as? URLError else {
+            return error.localizedDescription
+        }
+        let detail = urlError.localizedDescription
+        switch urlError.code {
+        case .cannotConnectToHost, .cannotFindHost, .networkConnectionLost,
+             .notConnectedToInternet, .timedOut:
+            return "desktop bridge not reachable at \(self.url.absoluteString) — \(detail)"
+        case .secureConnectionFailed,
+             .serverCertificateUntrusted,
+             .serverCertificateHasUnknownRoot:
+            return "bridge CA not yet trusted in the login keychain — desktop trust install pending or declined: \(detail)"
+        case .serverCertificateHasBadDate, .serverCertificateNotYetValid:
+            return "bridge certificate is outside its validity window — desktop will rotate on next launch: \(detail)"
+        case .clientCertificateRejected, .clientCertificateRequired:
+            return "bridge unexpectedly requested a client certificate: \(detail)"
+        default:
+            return detail
         }
     }
 }
