@@ -165,6 +165,8 @@ export default ts.config(
 			'!**/.storybook',
 			'target/',
 			'crates/',
+			'apps/browser/manifest/**',
+			'apps/browser/scripts/**',
 			'packages/ui/storybook-static',
 			'packages/ui/.storybook',
 			'packages/ui/src/stories',

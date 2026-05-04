@@ -77,11 +77,11 @@ pnpm --filter @eurora/office-addin start
 
 ### Cleaning up a stale dev install
 
-Anyone who ran `pnpm dev:desktop` *before* the dev-sideload env var existed
+Anyone who ran `pnpm dev:desktop` _before_ the dev-sideload env var existed
 has a leftover `com.eurora.word.xml` and `HKCU\…\WEF\TrustedCatalogs` subkey
 (Windows) or `~/Library/Containers/com.microsoft.Word/Data/Documents/wef/`
 file (macOS) that Word still picks up — even with the new env var set, since
-the desktop now skips both install *and* uninstall in dev mode. Wipe it
+the desktop now skips both install _and_ uninstall in dev mode. Wipe it
 with:
 
 ```sh
