@@ -28,11 +28,6 @@ pub enum BridgeError {
         details: Option<String>,
     },
 
-    /// Router delivered something other than a `Response` or `Error`
-    /// frame in reply slot — protocol violation by the client.
-    #[error("unexpected frame in response slot: expected Response or Error, got {0}")]
-    UnexpectedFrame(&'static str),
-
     /// The frame could not be delivered to the client's outbound
     /// queue.
     #[error("failed to deliver frame to client: {0}")]

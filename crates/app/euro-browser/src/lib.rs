@@ -22,7 +22,7 @@ pub use server::{
 /// [`BridgeError::AlreadyRunning`] if a previous serve loop is still
 /// registered.
 pub async fn bind_bridge_server() -> Result<BoundServer, BridgeError> {
-    BridgeService::get_or_init().await.bind().await
+    BridgeService::get_or_init().bind().await
 }
 
 /// Signal the running bridge server to shut down and wait for it to
