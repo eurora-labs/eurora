@@ -35,28 +35,61 @@ local development, `pnpm render-manifest` writes `manifest.dev.xml` pointing at
 
 ## Local development
 
+The fastest way to iterate on the add-in alongside the dev desktop is the
+combined runner:
+
 ```sh
-# 1. Install workspace deps (from repo root)
-pnpm install
+# From the repo root, after `pnpm install` and (if Rust types changed)
+# `pnpm specta:office`:
+pnpm dev:word
+```
 
-# 2. Generate bindings (only needed when Rust types change)
-pnpm specta:office
+This runs two processes side by side, with prefixed log output:
 
-# 3. Start the HTTPS dev server (uses office-addin-dev-certs)
-pnpm --filter @eurora/office-addin dev
+- **`addin`** — Vite HTTPS dev server on `https://localhost:3000` plus
+  `office-addin-debugging start manifest.dev.xml desktop`, which sideloads
+  the rendered `manifest.dev.xml` into Word's developer-tools list.
+- **`desktop`** — `pnpm dev:desktop` with `EURORA_OFFICE_ADDIN_DEV_SIDELOAD=1`
+  exported. The desktop's bundled-install path (`install_for_app` in
+  `crates/app/euro-tauri/src/office_addin/install.rs`) sees that env var and
+  skips the Office catalog entirely, so the only "Eurora" add-in Word sees is
+  the live, hot-reloadable Vite one.
 
-# 4. Render the dev manifest and sideload it into Word
+Edits under `src/` rebuild and reload in Word's WebView2 host without
+re-sideloading. The first run of the dev server may prompt to install a local
+CA certificate via `office-addin-dev-certs`; accept once and Word will trust
+the loopback URL.
+
+To stop:
+
+- `Ctrl+C` the `pnpm dev:word` process — that tears down both halves.
+- If `office-addin-debugging` left state behind (rare), run
+  `pnpm --filter @eurora/office-addin stop`.
+
+### Add-in only (desktop already running)
+
+If you've already got the desktop running elsewhere with
+`EURORA_OFFICE_ADDIN_DEV_SIDELOAD=1` set, you can drive just the add-in side:
+
+```sh
 pnpm --filter @eurora/office-addin start
 ```
 
-The first run of the dev server may prompt to install a local CA certificate via
-`office-addin-dev-certs`; accept once and Word will trust the loopback URL.
+### Cleaning up a stale dev install
 
-To stop the sideloaded add-in:
+Anyone who ran `pnpm dev:desktop` *before* the dev-sideload env var existed
+has a leftover `com.eurora.word.xml` and `HKCU\…\WEF\TrustedCatalogs` subkey
+(Windows) or `~/Library/Containers/com.microsoft.Word/Data/Documents/wef/`
+file (macOS) that Word still picks up — even with the new env var set, since
+the desktop now skips both install *and* uninstall in dev mode. Wipe it
+with:
 
 ```sh
-pnpm --filter @eurora/office-addin stop
+pnpm office-addin:clean
 ```
+
+Restart Word for the change to take effect. The command is idempotent and
+safe to run when nothing is installed.
 
 ## Production build
 

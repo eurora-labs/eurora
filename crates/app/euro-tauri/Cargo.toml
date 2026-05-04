@@ -23,6 +23,11 @@ name = "euro-tauri"
 path = "src/main.rs"
 test = false
 
+[[bin]]
+name = "office-addin-clean"
+path = "src/bin/office-addin-clean.rs"
+test = false
+
 [dependencies]
 agent-chain-core = { workspace = true, features = ["prost"] }
 auth-core = { workspace = true, features = ["specta"] }
