@@ -296,7 +296,7 @@ fn provision_bridge_tls(app: &tauri::App) {
         key_path: certs.key_path.clone(),
     };
     tauri::async_runtime::spawn(async move {
-        let service = euro_browser::BridgeService::get_or_init().await;
+        let service = euro_browser::BridgeService::get_or_init();
         service.configure_tls(material);
         let _ = tx.send(());
     });
@@ -532,7 +532,7 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
     };
 
     tauri::async_runtime::spawn(async move {
-        let service = euro_browser::BridgeService::get_or_init().await;
+        let service = euro_browser::BridgeService::get_or_init();
         let mut registrations_rx = service.subscribe_to_registrations();
         let mut disconnects_rx = service.subscribe_to_disconnects();
 

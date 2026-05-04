@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::Duration;
 
 use axum::Router;
@@ -14,11 +14,11 @@ use axum_server::Handle as AxumHandle;
 use axum_server::tls_rustls::RustlsConfig;
 use dashmap::DashMap;
 use euro_bridge_protocol::{
-    BRIDGE_BIND_IP, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, EventFrame, Frame,
-    FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
+    BRIDGE_BIND_IP, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, ErrorFrame, EventFrame,
+    Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
 };
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::{OnceCell, broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::process_name::get_process_name;
 
@@ -30,15 +30,24 @@ const OUTBOUND_QUEUE_SIZE: usize = 32;
 /// the listener closed.
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
-static GLOBAL_SERVICE: OnceCell<BridgeService> = OnceCell::const_new();
+static GLOBAL_SERVICE: OnceLock<BridgeService> = OnceLock::new();
 
 /// Idempotently install the rustls process-wide crypto provider. Safe
 /// to call multiple times and from multiple threads — only the first
-/// call has effect, subsequent calls return `Err` from rustls and we
-/// drop it. Must be called before any rustls/axum-server work runs in
-/// the process; convention is "once at the top of `main`".
+/// call has effect. If a provider has already been installed (by us or
+/// by another crate in the process), this logs at debug level and
+/// leaves the existing provider in place. Must be called before any
+/// rustls/axum-server work runs in the process; convention is "once at
+/// the top of `main`".
 pub fn install_default_crypto_provider() {
-    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    if rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .is_err()
+    {
+        tracing::debug!(
+            "rustls default crypto provider was already installed; leaving existing provider in place"
+        );
+    }
 }
 
 /// Server-side TLS material. The bridge requires this to be configured
@@ -150,11 +159,11 @@ impl BoundServer {
     /// pattern is `tokio::spawn(bound.serve())`. Awaiting it inline
     /// blocks until the loop ends.
     pub async fn serve(mut self) -> Result<(), BridgeError> {
-        let listener = self
-            .listener
-            .take()
-            .expect("BoundServer::serve called twice");
-        let tls = self.tls.take().expect("BoundServer::serve called twice");
+        // Both fields are populated by `bind_on` and only taken here.
+        // `serve` consumes `self`, so a second call is statically
+        // impossible.
+        let listener = self.listener.take().unwrap();
+        let tls = self.tls.take().unwrap();
         let service = self.service.clone();
         let local_addr = self.local_addr;
         // Drop early so the Drop impl runs before we hand off control —
@@ -201,11 +210,11 @@ impl BoundServer {
 
         match result {
             Ok(()) => {
-                tracing::info!("Bridge WebSocket server stopped");
+                tracing::info!(%local_addr, "Bridge WebSocket server stopped");
                 Ok(())
             }
             Err(source) => {
-                tracing::error!("Bridge WebSocket server error: {source}");
+                tracing::error!(%local_addr, error = %source, "Bridge WebSocket server error");
                 Err(BridgeError::Serve { source })
             }
         }
@@ -229,8 +238,8 @@ impl Drop for BoundServer {
                 }
             }
             Err(_) => tracing::warn!(
-                "Bridge server slot poisoned while dropping unserved BoundServer at {}",
-                self.local_addr,
+                local_addr = %self.local_addr,
+                "Bridge server slot poisoned while dropping unserved BoundServer",
             ),
         }
     }
@@ -246,10 +255,10 @@ pub struct BridgeService {
     events_tx: broadcast::Sender<(u32, EventFrame)>,
     registrations_tx: broadcast::Sender<RegistrationEvent>,
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
-    pending_requests: Arc<DashMap<u32, oneshot::Sender<Frame>>>,
+    pending_requests: Arc<DashMap<u32, oneshot::Sender<Result<ResponseFrame, ErrorFrame>>>>,
     request_id_counter: Arc<AtomicU32>,
     server: Arc<StdMutex<Option<ServerHandle>>>,
-    tls: Arc<OnceCell<TlsMaterial>>,
+    tls: Arc<OnceLock<TlsMaterial>>,
 }
 
 impl Default for BridgeService {
@@ -259,10 +268,11 @@ impl Default for BridgeService {
 }
 
 impl BridgeService {
-    /// Build a new service and spawn its frame-dispatch task. The
-    /// dispatch task runs for the lifetime of the service (it exits
-    /// when the inbound broadcast sender is dropped, i.e. when the
-    /// last clone of this service is gone).
+    /// Build a new service and spawn its frame-dispatch task. Must be
+    /// called from within a tokio runtime: the dispatch task runs for
+    /// the lifetime of the service (it exits when the inbound broadcast
+    /// sender is dropped, i.e. when the last clone of this service is
+    /// gone).
     pub fn new() -> Self {
         let (frames_from_clients_tx, _) = broadcast::channel(100);
         let (events_tx, _) = broadcast::channel(100);
@@ -278,21 +288,23 @@ impl BridgeService {
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             server: Arc::new(StdMutex::new(None)),
-            tls: Arc::new(OnceCell::new()),
+            tls: Arc::new(OnceLock::new()),
         };
         service.spawn_frame_handler();
         service
     }
 
-    pub async fn get_or_init() -> &'static BridgeService {
-        GLOBAL_SERVICE
-            .get_or_init(|| async { BridgeService::new() })
-            .await
+    /// Get the process-wide bridge service, constructing it on first
+    /// call. Must be called from within a tokio runtime context (the
+    /// initializer spawns the frame-dispatch task).
+    pub fn get_or_init() -> &'static BridgeService {
+        GLOBAL_SERVICE.get_or_init(BridgeService::new)
     }
 
-    /// Returns the global service if [`get_or_init`] has been called at
-    /// least once, otherwise `None`. Useful for shutdown paths that
-    /// shouldn't accidentally bring the service into existence.
+    /// Returns the global service if [`get_or_init`](Self::get_or_init)
+    /// has been called at least once, otherwise `None`. Useful for
+    /// shutdown paths that shouldn't accidentally bring the service
+    /// into existence.
     pub fn get() -> Option<&'static BridgeService> {
         GLOBAL_SERVICE.get()
     }
@@ -306,23 +318,24 @@ impl BridgeService {
     pub fn configure_tls(&self, material: TlsMaterial) {
         match self.tls.set(material.clone()) {
             Ok(()) => tracing::debug!(
-                "Bridge TLS material configured (cert={}, key={})",
-                material.cert_path.display(),
-                material.key_path.display()
+                cert_path = %material.cert_path.display(),
+                key_path = %material.key_path.display(),
+                "Bridge TLS material configured",
             ),
             Err(_) => {
                 let existing = self
                     .tls
                     .get()
-                    .expect("set returned Err so OnceCell is populated");
+                    .expect("set returned Err so OnceLock is populated");
                 if existing.cert_path != material.cert_path
                     || existing.key_path != material.key_path
                 {
                     tracing::warn!(
-                        "Bridge TLS material already configured (cert={}, key={}); \
-                         ignoring later attempt to reconfigure with different material",
-                        existing.cert_path.display(),
-                        existing.key_path.display()
+                        existing_cert = %existing.cert_path.display(),
+                        existing_key = %existing.key_path.display(),
+                        attempted_cert = %material.cert_path.display(),
+                        attempted_key = %material.key_path.display(),
+                        "Bridge TLS material already configured; ignoring later attempt to reconfigure with different material",
                     );
                 }
             }
@@ -339,8 +352,8 @@ impl BridgeService {
             loop {
                 let (app_pid, frame) = match frames_rx.recv().await {
                     Ok(val) => val,
-                    Err(broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("Frame handler lagged by {n} frames, resuming");
+                    Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                        tracing::warn!(skipped, "Frame handler lagged, resuming");
                         continue;
                     }
                     Err(broadcast::error::RecvError::Closed) => break,
@@ -349,55 +362,57 @@ impl BridgeService {
                 match frame.kind {
                     FrameKind::Request(req) => {
                         tracing::warn!(
-                            "Received unsupported request from client: app_pid={app_pid}, action={}",
-                            req.action
+                            app_pid,
+                            action = %req.action,
+                            "Received unsupported request from client",
                         );
                     }
                     FrameKind::Response(resp) => {
                         let id = resp.id;
                         if let Some((_, sender)) = pending_requests.remove(&id) {
-                            if sender.send(Frame::from(resp)).is_err() {
+                            if sender.send(Ok(resp)).is_err() {
                                 tracing::debug!(
-                                    "Pending request {id} was dropped before response arrived"
+                                    request_id = id,
+                                    "Pending request was dropped before response arrived",
                                 );
                             }
                         } else {
                             tracing::debug!(
-                                "Received response for unknown request id={id}, action={}",
-                                resp.action
+                                request_id = id,
+                                action = %resp.action,
+                                "Received response for unknown request id",
                             );
                         }
                     }
                     FrameKind::Event(evt) => {
                         if events_tx.send((app_pid, evt)).is_err() {
-                            tracing::trace!(
-                                "No event subscribers for event from app_pid={app_pid}"
-                            );
+                            tracing::trace!(app_pid, "No event subscribers for inbound event");
                         }
                     }
                     FrameKind::Error(err) => {
                         let id = err.id;
                         tracing::warn!(
-                            "Received error frame from app_pid={app_pid}: id={id}, message={}",
-                            err.message
+                            app_pid,
+                            request_id = id,
+                            message = %err.message,
+                            "Received error frame from client",
                         );
                         if let Some((_, sender)) = pending_requests.remove(&id)
-                            && sender.send(Frame::from(err)).is_err()
+                            && sender.send(Err(err)).is_err()
                         {
                             tracing::debug!(
-                                "Pending request {id} was dropped before error arrived"
+                                request_id = id,
+                                "Pending request was dropped before error arrived",
                             );
                         }
                     }
                     FrameKind::Cancel(cancel) => {
                         if pending_requests.remove(&cancel.id).is_some() {
-                            tracing::debug!("Cancelled pending request id={}", cancel.id);
+                            tracing::debug!(request_id = cancel.id, "Cancelled pending request");
                         }
                     }
                     FrameKind::Register(_) => {
-                        tracing::warn!(
-                            "Received Register frame outside the handshake from app_pid={app_pid}"
-                        );
+                        tracing::warn!(app_pid, "Received Register frame outside the handshake",);
                     }
                 }
             }
@@ -491,10 +506,11 @@ impl BridgeService {
         };
 
         tracing::info!(
-            "Bridge transport: TLS (wss) — listener bound at wss://{local_addr}{BRIDGE_PATH}, \
-             cert={}, key={}",
-            material.cert_path.display(),
-            material.key_path.display()
+            %local_addr,
+            cert_path = %material.cert_path.display(),
+            key_path = %material.key_path.display(),
+            url = %format_args!("wss://{local_addr}{BRIDGE_PATH}"),
+            "Bridge transport bound (TLS / wss)",
         );
 
         Ok(BoundServer {
@@ -605,7 +621,7 @@ impl BridgeService {
         action: &str,
         payload: Option<String>,
     ) -> Result<ResponseFrame, BridgeError> {
-        let request_id = self.request_id_counter.fetch_add(1, Ordering::SeqCst);
+        let request_id = self.request_id_counter.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         self.pending_requests.insert(request_id, tx);
 
@@ -615,7 +631,7 @@ impl BridgeService {
             payload,
         });
 
-        tracing::debug!("Sending request to app_pid={app_pid}: id={request_id}, action={action}");
+        tracing::debug!(app_pid, request_id, action, "Sending bridge request");
 
         if let Err(err) = self.send_to_client(app_pid, request).await {
             self.pending_requests.remove(&request_id);
@@ -623,14 +639,11 @@ impl BridgeService {
         }
 
         match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
-            Ok(Ok(frame)) => match frame.kind {
-                FrameKind::Response(resp) => Ok(resp),
-                FrameKind::Error(err) => Err(BridgeError::Client {
-                    message: err.message,
-                    details: err.details,
-                }),
-                other => Err(BridgeError::UnexpectedFrame(frame_kind_label(&other))),
-            },
+            Ok(Ok(Ok(resp))) => Ok(resp),
+            Ok(Ok(Err(err))) => Err(BridgeError::Client {
+                message: err.message,
+                details: err.details,
+            }),
             Ok(Err(_)) => {
                 self.pending_requests.remove(&request_id);
                 Err(BridgeError::ChannelClosed)
@@ -640,16 +653,14 @@ impl BridgeService {
                 let cancel = Frame::from(CancelFrame { id: request_id });
                 if let Err(err) = self.send_to_client(app_pid, cancel).await {
                     tracing::debug!(
-                        "Failed to send Cancel for timed-out request {request_id}: {err}"
+                        request_id,
+                        error = %err,
+                        "Failed to send Cancel for timed-out request",
                     );
                 }
                 Err(BridgeError::Timeout)
             }
         }
-    }
-
-    pub async fn get_metadata(&self, app_pid: u32) -> Result<ResponseFrame, BridgeError> {
-        self.send_request(app_pid, "GET_METADATA", None).await
     }
 
     async fn send_to_client(&self, app_pid: u32, frame: Frame) -> Result<(), BridgeError> {
@@ -664,24 +675,13 @@ impl BridgeService {
     }
 }
 
-fn frame_kind_label(kind: &FrameKind) -> &'static str {
-    match kind {
-        FrameKind::Request(_) => "Request",
-        FrameKind::Response(_) => "Response",
-        FrameKind::Event(_) => "Event",
-        FrameKind::Error(_) => "Error",
-        FrameKind::Cancel(_) => "Cancel",
-        FrameKind::Register(_) => "Register",
-    }
-}
-
 async fn ws_upgrade(
     State(service): State<BridgeService>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     upgrade: WebSocketUpgrade,
 ) -> impl IntoResponse {
     if !peer.ip().is_loopback() {
-        tracing::warn!("Rejecting bridge connection from non-loopback peer: {peer}");
+        tracing::warn!(%peer, "Rejecting bridge connection from non-loopback peer");
         return (
             axum::http::StatusCode::FORBIDDEN,
             "bridge only accepts loopback connections",
@@ -701,7 +701,7 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
     let register = match read_register_frame(&mut stream).await {
         Ok(frame) => frame,
         Err(err) => {
-            tracing::warn!("Bridge handshake failed from {peer}: {err}");
+            tracing::warn!(%peer, error = %err, "Bridge handshake failed");
             let _ = sink
                 .send(Message::Close(Some(CloseFrame {
                     code: close_code::PROTOCOL,
@@ -733,13 +733,19 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
         },
     ) {
         tracing::warn!(
-            "Replacing existing registration for app_pid={app_pid} (previous host_pid={})",
-            prev.host_pid
+            app_pid,
+            previous_host_pid = prev.host_pid,
+            "Replacing existing registration for app_pid",
         );
     }
 
     tracing::info!(
-        "Bridge client registered: app_pid={app_pid} host_pid={host_pid} app_name={app_name:?} app_kind={app_kind:?} (peer={peer})"
+        app_pid,
+        host_pid,
+        app_name = %app_name,
+        ?app_kind,
+        %peer,
+        "Bridge client registered",
     );
 
     let _ = service.registrations_tx.send(RegistrationEvent {
@@ -763,17 +769,21 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
             app_kind: removed.app_kind,
         });
         tracing::info!(
-            "Bridge client unregistered: app_pid={app_pid} host_pid={host_pid} (remaining={})",
-            service.registry.len()
+            app_pid,
+            host_pid,
+            remaining = service.registry.len(),
+            "Bridge client unregistered",
         );
     } else {
         tracing::warn!(
-            "Did not unregister app_pid={app_pid}: registration was replaced by host_pid={host_pid} or already removed"
+            app_pid,
+            host_pid,
+            "Did not unregister: registration was replaced or already removed",
         );
     }
 
     if let Err(err) = writer.await {
-        tracing::debug!("Writer task for app_pid={app_pid} ended: {err}");
+        tracing::debug!(app_pid, error = %err, "Writer task ended");
     }
 }
 
@@ -807,7 +817,7 @@ where
         FrameKind::Register(register) => Ok(register),
         other => Err(format!(
             "first frame must be Register, got {}",
-            frame_kind_label(&other)
+            other.variant_name()
         )),
     }
 }
@@ -829,18 +839,18 @@ async fn writer_task(
                 let json = match serde_json::to_string(&frame) {
                     Ok(json) => json,
                     Err(err) => {
-                        tracing::error!("Failed to serialize outbound frame: {err}");
+                        tracing::error!(error = %err, "Failed to serialize outbound frame");
                         continue;
                     }
                 };
                 if let Err(err) = sink.send(Message::Text(json.into())).await {
-                    tracing::debug!("Failed to write outbound frame: {err}");
+                    tracing::debug!(error = %err, "Failed to write outbound frame");
                     break;
                 }
             }
             _ = heartbeat.tick() => {
                 if let Err(err) = sink.send(Message::Ping(Default::default())).await {
-                    tracing::debug!("Heartbeat ping failed: {err}");
+                    tracing::debug!(error = %err, "Heartbeat ping failed");
                     break;
                 }
             }
@@ -863,7 +873,7 @@ where
         let message = match message {
             Ok(m) => m,
             Err(err) => {
-                tracing::debug!("Websocket error from app_pid={app_pid}: {err}");
+                tracing::debug!(app_pid, error = %err, "Websocket error from client");
                 break;
             }
         };
@@ -873,22 +883,28 @@ where
                 Ok(frame) => {
                     if let Err(err) = service.frames_from_clients_tx.send((app_pid, frame)) {
                         tracing::trace!(
-                            "No subscribers for inbound frame from app_pid={app_pid}: {err}"
+                            app_pid,
+                            error = %err,
+                            "No subscribers for inbound frame",
                         );
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("Failed to parse inbound frame from app_pid={app_pid}: {err}");
+                    tracing::warn!(
+                        app_pid,
+                        error = %err,
+                        "Failed to parse inbound frame",
+                    );
                 }
             },
             Message::Binary(_) => {
-                tracing::warn!("Ignoring unexpected binary frame from app_pid={app_pid}");
+                tracing::warn!(app_pid, "Ignoring unexpected binary frame");
             }
             Message::Ping(_) | Message::Pong(_) => {
                 // axum auto-responds to Ping with Pong; nothing to do.
             }
             Message::Close(frame) => {
-                tracing::debug!("Client app_pid={app_pid} closed connection: {frame:?}");
+                tracing::debug!(app_pid, ?frame, "Client closed connection");
                 break;
             }
         }
@@ -908,23 +924,7 @@ fn message_label(message: &Message) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use euro_bridge_protocol::EventFrame;
     use tokio::time::timeout;
-
-    #[test]
-    fn frame_kind_label_covers_all_variants() {
-        assert_eq!(
-            frame_kind_label(&FrameKind::Cancel(CancelFrame { id: 1 })),
-            "Cancel"
-        );
-        assert_eq!(
-            frame_kind_label(&FrameKind::Event(EventFrame {
-                action: "X".into(),
-                payload: None,
-            })),
-            "Event"
-        );
-    }
 
     #[tokio::test]
     async fn send_request_returns_not_found_when_client_missing() {
@@ -978,6 +978,59 @@ mod tests {
             .expect("join")
             .expect("response");
         assert_eq!(response.payload.as_deref(), Some("pong"));
+    }
+
+    #[tokio::test]
+    async fn send_request_surfaces_client_error_frame() {
+        let service = BridgeService::new();
+
+        let (outbound_tx, mut outbound_rx) = mpsc::channel::<Frame>(8);
+        service.registry.insert(
+            9,
+            RegisteredClient {
+                tx: outbound_tx,
+                host_pid: 1,
+                app_pid: 9,
+                app_name: "test".into(),
+                app_kind: None,
+            },
+        );
+
+        let svc = service.clone();
+        let request_handle = tokio::spawn(async move { svc.send_request(9, "PING", None).await });
+
+        let outbound = timeout(Duration::from_secs(1), outbound_rx.recv())
+            .await
+            .expect("outbound frame")
+            .expect("frame present");
+        let FrameKind::Request(req) = outbound.kind else {
+            panic!("expected Request frame");
+        };
+
+        service
+            .frames_from_clients_tx
+            .send((
+                9,
+                Frame::from(ErrorFrame {
+                    id: req.id,
+                    code: 42,
+                    message: "boom".into(),
+                    details: Some("trace".into()),
+                }),
+            ))
+            .expect("broadcast send");
+
+        let result = timeout(Duration::from_secs(1), request_handle)
+            .await
+            .expect("request future")
+            .expect("join");
+        match result {
+            Err(BridgeError::Client { message, details }) => {
+                assert_eq!(message, "boom");
+                assert_eq!(details.as_deref(), Some("trace"));
+            }
+            other => panic!("expected Client error, got {other:?}"),
+        }
     }
 
     #[tokio::test]
