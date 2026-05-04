@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -9,14 +10,15 @@ use axum::extract::State;
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgrade, close_code};
 use axum::response::IntoResponse;
 use axum::routing::get;
+use axum_server::Handle as AxumHandle;
+use axum_server::tls_rustls::RustlsConfig;
 use dashmap::DashMap;
 use euro_bridge_protocol::{
-    BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, EventFrame, Frame, FrameKind,
-    RegisterFrame, RequestFrame, ResponseFrame,
+    BRIDGE_BIND_IP, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, EventFrame, Frame,
+    FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
 };
 use futures_util::{SinkExt, StreamExt};
-use tokio::net::TcpListener;
-use tokio::sync::{Mutex, OnceCell, broadcast, mpsc, oneshot, watch};
+use tokio::sync::{Mutex, OnceCell, broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::process_name::get_process_name;
@@ -25,8 +27,29 @@ const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 const OUTBOUND_QUEUE_SIZE: usize = 32;
+/// Time we let in-flight connections drain on shutdown before forcing
+/// the listener closed.
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 static GLOBAL_SERVICE: OnceCell<BridgeService> = OnceCell::const_new();
+
+/// Idempotently install the rustls process-wide crypto provider. Safe
+/// to call multiple times and from multiple threads — only the first
+/// call has effect, subsequent calls return `Err` from rustls and we
+/// drop it. Must be called before any rustls/axum-server work runs in
+/// the process; convention is "once at the top of `main`".
+pub fn install_default_crypto_provider() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+}
+
+/// Server-side TLS material. The bridge requires this to be configured
+/// before [`BridgeService::start_server`] is called — there is no
+/// plaintext fallback.
+#[derive(Clone, Debug)]
+pub struct TlsMaterial {
+    pub cert_path: PathBuf,
+    pub key_path: PathBuf,
+}
 
 /// A WebSocket-connected bridge client (typically a browser
 /// native-messaging host or an Office add-in runtime).
@@ -56,7 +79,7 @@ pub struct RegistrationEvent {
 }
 
 struct ServerHandle {
-    shutdown_tx: watch::Sender<bool>,
+    handle: AxumHandle,
     task: JoinHandle<()>,
     local_addr: SocketAddr,
 }
@@ -74,6 +97,7 @@ pub struct BridgeService {
     pending_requests: Arc<DashMap<u32, oneshot::Sender<Frame>>>,
     request_id_counter: Arc<AtomicU32>,
     server: Arc<Mutex<Option<ServerHandle>>>,
+    tls: Arc<OnceCell<TlsMaterial>>,
 }
 
 impl Default for BridgeService {
@@ -102,6 +126,7 @@ impl BridgeService {
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             server: Arc::new(Mutex::new(None)),
+            tls: Arc::new(OnceCell::new()),
         };
         service.spawn_frame_handler();
         service
@@ -118,6 +143,37 @@ impl BridgeService {
     /// shouldn't accidentally bring the service into existence.
     pub fn get() -> Option<&'static BridgeService> {
         GLOBAL_SERVICE.get()
+    }
+
+    /// Configure the TLS material the bridge listener will use. Must
+    /// be called before [`start_server`] / [`start_server_on`]. First
+    /// writer wins — subsequent calls with a different material are
+    /// logged and dropped, since changing certs while the server runs
+    /// would race the listener.
+    pub fn configure_tls(&self, material: TlsMaterial) {
+        match self.tls.set(material.clone()) {
+            Ok(()) => tracing::debug!(
+                "Bridge TLS material configured (cert={}, key={})",
+                material.cert_path.display(),
+                material.key_path.display()
+            ),
+            Err(_) => {
+                let existing = self
+                    .tls
+                    .get()
+                    .expect("set returned Err so OnceCell is populated");
+                if existing.cert_path != material.cert_path
+                    || existing.key_path != material.key_path
+                {
+                    tracing::warn!(
+                        "Bridge TLS material already configured (cert={}, key={}); \
+                         ignoring later attempt to reconfigure with different material",
+                        existing.cert_path.display(),
+                        existing.key_path.display()
+                    );
+                }
+            }
+        }
     }
 
     fn spawn_frame_handler(&self) {
@@ -196,17 +252,13 @@ impl BridgeService {
         });
     }
 
-    /// Bind and serve the bridge on `{BRIDGE_HOST}:{BRIDGE_PORT}` and
-    /// return the resolved local address. Equivalent to
-    /// [`start_server_on`] with the well-known address.
-    pub async fn start_server(&self) -> Result<SocketAddr, std::io::Error> {
-        let bind_addr: SocketAddr = (
-            BRIDGE_HOST
-                .parse::<std::net::IpAddr>()
-                .expect("valid loopback ip"),
-            BRIDGE_PORT,
-        )
-            .into();
+    /// Bind and serve the bridge on the well-known
+    /// `{BRIDGE_BIND_IP}:{BRIDGE_PORT}` and return the resolved local
+    /// address. Equivalent to [`start_server_on`] with the well-known
+    /// address. Requires [`configure_tls`] to have been called first;
+    /// returns [`BridgeError::TlsNotConfigured`] otherwise.
+    pub async fn start_server(&self) -> Result<SocketAddr, BridgeError> {
+        let bind_addr: SocketAddr = (BRIDGE_BIND_IP, BRIDGE_PORT).into();
         self.start_server_on(bind_addr).await
     }
 
@@ -218,10 +270,7 @@ impl BridgeService {
     /// is a no-op that returns the existing local address. If a
     /// previous server task ended (e.g. the process panicked), it is
     /// reaped and a fresh server is started.
-    pub async fn start_server_on(
-        &self,
-        bind_addr: SocketAddr,
-    ) -> Result<SocketAddr, std::io::Error> {
+    pub async fn start_server_on(&self, bind_addr: SocketAddr) -> Result<SocketAddr, BridgeError> {
         let mut guard = self.server.lock().await;
 
         if let Some(handle) = guard.as_ref()
@@ -236,24 +285,52 @@ impl BridgeService {
             return Ok(handle.local_addr);
         }
 
-        let listener = TcpListener::bind(bind_addr).await?;
-        let local_addr = listener.local_addr()?;
-        tracing::info!("Bridge WebSocket server listening on {local_addr}{BRIDGE_PATH}");
+        let material = self.tls.get().ok_or(BridgeError::TlsNotConfigured)?.clone();
 
-        let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
+        // Bind synchronously so the listening port exists before this
+        // function returns. axum-server's `from_tcp_rustls` adopts an
+        // already-bound `std::net::TcpListener`, which is exactly the
+        // shape we need: the `local_addr` is observable, and clients
+        // racing the bind no longer see ECONNREFUSED.
+        let std_listener =
+            std::net::TcpListener::bind(bind_addr).map_err(|source| BridgeError::Bind {
+                addr: bind_addr,
+                source,
+            })?;
+        std_listener
+            .set_nonblocking(true)
+            .map_err(|source| BridgeError::Bind {
+                addr: bind_addr,
+                source,
+            })?;
+        let local_addr = std_listener
+            .local_addr()
+            .map_err(|source| BridgeError::Bind {
+                addr: bind_addr,
+                source,
+            })?;
+
+        let tls_config = RustlsConfig::from_pem_file(&material.cert_path, &material.key_path)
+            .await
+            .map_err(|source| BridgeError::TlsLoad {
+                cert_path: material.cert_path.clone(),
+                key_path: material.key_path.clone(),
+                source,
+            })?;
+
+        tracing::info!("Bridge WebSocket server listening on wss://{local_addr}{BRIDGE_PATH}");
+
         let app = Router::new()
             .route(BRIDGE_PATH, get(ws_upgrade))
             .with_state(self.clone());
 
+        let handle = AxumHandle::new();
+        let server_handle = handle.clone();
+
         let task = tokio::spawn(async move {
-            let serve = axum::serve(
-                listener,
-                app.into_make_service_with_connect_info::<SocketAddr>(),
-            )
-            .with_graceful_shutdown(async move {
-                let _ = shutdown_rx.wait_for(|v| *v).await;
-                tracing::info!("Bridge WebSocket server received shutdown signal");
-            });
+            let serve = axum_server::from_tcp_rustls(std_listener, tls_config)
+                .handle(server_handle)
+                .serve(app.into_make_service_with_connect_info::<SocketAddr>());
 
             if let Err(err) = serve.await {
                 tracing::error!("Bridge WebSocket server error: {err}");
@@ -263,7 +340,7 @@ impl BridgeService {
         });
 
         *guard = Some(ServerHandle {
-            shutdown_tx,
+            handle,
             task,
             local_addr,
         });
@@ -294,7 +371,7 @@ impl BridgeService {
         };
 
         tracing::info!("Sending shutdown signal to bridge WebSocket server");
-        let _ = handle.shutdown_tx.send(true);
+        handle.handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
 
         if let Err(err) = handle.task.await {
             tracing::warn!("Bridge WebSocket server task ended unexpectedly: {err}");
@@ -765,5 +842,15 @@ mod tests {
         found.sort_unstable();
         assert_eq!(found, vec![10, 12]);
         assert!(service.find_clients_by_kind("safari").is_empty());
+    }
+
+    #[tokio::test]
+    async fn start_server_without_tls_fails_loudly() {
+        let service = BridgeService::new();
+        let err = service
+            .start_server_on(([127, 0, 0, 1], 0).into())
+            .await
+            .expect_err("start_server must fail without TLS material");
+        assert!(matches!(err, BridgeError::TlsNotConfigured));
     }
 }

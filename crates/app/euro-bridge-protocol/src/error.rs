@@ -1,7 +1,9 @@
+use std::net::SocketAddr;
+use std::path::PathBuf;
+
 use thiserror::Error;
 
-/// Errors surfaced by the bridge service to its callers. Replaces the
-/// `tonic::Status` values that the gRPC-era API returned.
+/// Errors surfaced by the bridge service to its callers.
 #[derive(Debug, Error)]
 pub enum BridgeError {
     /// No client is registered for the requested `app_pid`.
@@ -35,4 +37,35 @@ pub enum BridgeError {
     /// queue.
     #[error("failed to deliver frame to client: {0}")]
     Send(String),
+
+    /// `start_server` was called before TLS material was configured
+    /// on the service. The bridge requires TLS — there is no plaintext
+    /// fallback — so this is an unrecoverable configuration error
+    /// rather than a runtime failure.
+    #[error("bridge TLS material not configured; call BridgeService::configure_tls first")]
+    TlsNotConfigured,
+
+    /// The OS refused to bind the requested address (port already in
+    /// use, IPv6 disabled, sandbox restriction, …).
+    #[error("failed to bind bridge listener on {addr}: {source}")]
+    Bind {
+        addr: SocketAddr,
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// The TLS material on disk could not be loaded into a rustls
+    /// config. Typical causes: cert/key out of sync, bad PEM, key
+    /// algorithm mismatch with what aws-lc-rs accepts.
+    #[error(
+        "failed to load bridge TLS material (cert={}, key={}): {source}",
+        cert_path.display(),
+        key_path.display()
+    )]
+    TlsLoad {
+        cert_path: PathBuf,
+        key_path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
 }

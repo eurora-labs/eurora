@@ -140,25 +140,33 @@ pub fn uninstall_for_app<R: Runtime>(_app: &AppHandle<R>) -> Result<()> {
 /// Result of a standalone uninstall, surfaced to the CLI for user-facing logs.
 #[derive(Debug, Clone)]
 pub enum UninstallOutcome {
-    /// Removed the manifest file (and on Windows, the trusted-catalog subkey).
-    /// The path is the manifest file location for reporting purposes — the
-    /// file may or may not have existed before the call (the operation is
-    /// idempotent).
-    Cleaned { manifest_path: PathBuf },
+    /// Removed the manifest file (and on Windows, the trusted-catalog subkey),
+    /// the bridge TLS material under `<data_dir>/Eurora/bridge/`, and the
+    /// bridge CA from the per-user OS root store. The contained path is the
+    /// manifest file location for reporting purposes — the file may or may
+    /// not have existed before the call (the operation is idempotent).
+    Cleaned {
+        manifest_path: PathBuf,
+        ca_trust: super::bridge_certs::TrustOutcome,
+    },
     /// Linux/other: nothing to clean — Word does not run natively here.
     SkippedUnsupportedOs,
 }
 
-/// Remove every artifact `install_for_app` could have written, without
-/// requiring a Tauri runtime. Idempotent: safe to run when nothing is
-/// installed.
+/// Remove every artifact `install_for_app` and `bridge_certs::ensure`
+/// could have written, without requiring a Tauri runtime. Idempotent:
+/// safe to run when nothing is installed.
 pub fn uninstall_standalone() -> Result<UninstallOutcome> {
     #[cfg(target_os = "macos")]
     {
         let home = dirs::home_dir().ok_or(Error::DirsLookup { kind: "home_dir" })?;
         let manifest_path = macos_documents_dir(&home).join("wef").join(MANIFEST_FILE);
         uninstall_macos_at(&home)?;
-        Ok(UninstallOutcome::Cleaned { manifest_path })
+        let ca_trust = uninstall_bridge_artifacts()?;
+        Ok(UninstallOutcome::Cleaned {
+            manifest_path,
+            ca_trust,
+        })
     }
 
     #[cfg(target_os = "windows")]
@@ -167,13 +175,40 @@ pub fn uninstall_standalone() -> Result<UninstallOutcome> {
         let manifest_path = windows_manifest_dir(&appdata).join(MANIFEST_FILE);
         uninstall_windows_files(&appdata)?;
         deregister_trusted_catalog(TRUSTED_CATALOG_GUID)?;
-        Ok(UninstallOutcome::Cleaned { manifest_path })
+        let ca_trust = uninstall_bridge_artifacts()?;
+        Ok(UninstallOutcome::Cleaned {
+            manifest_path,
+            ca_trust,
+        })
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Ok(UninstallOutcome::SkippedUnsupportedOs)
     }
+}
+
+/// Untrust the bridge CA (if installed) and remove the bridge data
+/// directory. Returns the trust-store outcome; bubbles I/O errors from
+/// directory removal. Idempotent.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+fn uninstall_bridge_artifacts() -> Result<super::bridge_certs::TrustOutcome> {
+    let bridge_dir =
+        euro_bridge_protocol::bridge_data_dir().ok_or(Error::DirsLookup { kind: "data_dir" })?;
+    let ca_path = bridge_dir.join(euro_bridge_protocol::BRIDGE_CA_FILENAME);
+    let trust = if ca_path.exists() {
+        super::bridge_certs::ensure_untrusted(&ca_path)
+    } else {
+        super::bridge_certs::TrustOutcome::AlreadyTrusted
+    };
+    if bridge_dir.exists() {
+        fs::remove_dir_all(&bridge_dir).map_err(|source| Error::Io {
+            action: "removing",
+            path: bridge_dir.clone(),
+            source,
+        })?;
+    }
+    Ok(trust)
 }
 
 // ---------------------------------------------------------------------------

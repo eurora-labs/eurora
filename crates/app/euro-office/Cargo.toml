@@ -20,8 +20,14 @@ specta-typescript = { version = "0.0.10", optional = true }
 
 [dev-dependencies]
 futures-util = { workspace = true }
+rcgen = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
+time = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tokio-rustls = { workspace = true }
 tokio-tungstenite = { workspace = true }
 
 [features]

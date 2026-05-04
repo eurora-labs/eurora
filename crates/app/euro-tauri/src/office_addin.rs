@@ -1,6 +1,6 @@
 //! Bundled Office add-in support for the desktop app.
 //!
-//! Two responsibilities:
+//! Three responsibilities:
 //!
 //! - **Manifest rendering** ([`render_manifest_for_app`]) — locate the bundled
 //!   add-in tree under `resource_dir()`, load or generate the stable per-install
@@ -9,7 +9,13 @@
 //! - **Catalog deployment** ([`install_for_app`] / [`uninstall_for_app`]) — drop
 //!   the rendered manifest into the per-OS Office catalog (macOS WEF directory,
 //!   Windows trusted-catalog registry) so Word picks it up on its next launch.
+//! - **TLS bridge material** ([`bridge_certs`]) — mint and persist the local
+//!   `Eurora Local Bridge CA` plus a `localhost` leaf, install the CA into the
+//!   per-user OS root store, and tear them down on uninstall. The Word add-in
+//!   (and the native-messaging host) connect over `wss://localhost:1431/bridge`
+//!   using this trust chain.
 
+pub mod bridge_certs;
 mod install;
 mod manifest;
 
@@ -60,6 +66,12 @@ pub enum Error {
         #[source]
         source: std::io::Error,
     },
+
+    #[error("failed to generate bridge certificate: {0}")]
+    CertGenerate(#[from] rcgen::Error),
+
+    #[error("failed to parse bridge certificate at {path}: {reason}")]
+    CertParse { path: PathBuf, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
