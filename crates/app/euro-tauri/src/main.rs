@@ -229,6 +229,10 @@ fn install_office_word_addin(app: &tauri::App) {
             "Microsoft Word has not been launched on this account; \
              deferring Office add-in install until next desktop launch"
         ),
+        Ok(InstallOutcome::SkippedDevSideload) => tracing::info!(
+            "Office add-in install skipped: EURORA_OFFICE_ADDIN_DEV_SIDELOAD is set, \
+             deferring to the Vite-served add-in"
+        ),
         Ok(InstallOutcome::SkippedUnsupportedOs) => {
             tracing::debug!("Office add-in install not applicable on this OS");
         }

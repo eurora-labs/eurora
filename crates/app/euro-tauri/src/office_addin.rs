@@ -17,7 +17,9 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
-pub use install::{InstallOutcome, install_for_app, uninstall_for_app};
+pub use install::{
+    InstallOutcome, UninstallOutcome, install_for_app, uninstall_for_app, uninstall_standalone,
+};
 pub use manifest::render_manifest_for_app;
 
 #[derive(Debug, Error)]
@@ -27,6 +29,9 @@ pub enum Error {
         kind: &'static str,
         source: tauri::Error,
     },
+
+    #[error("could not resolve {kind} via the dirs crate")]
+    DirsLookup { kind: &'static str },
 
     #[error("office add-in resource not found: {0}")]
     MissingResource(PathBuf),
