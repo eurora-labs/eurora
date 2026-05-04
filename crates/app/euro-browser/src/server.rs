@@ -94,6 +94,16 @@ pub struct RegistrationEvent {
 struct ServerHandle {
     state: ServerState,
     local_addr: SocketAddr,
+    /// Created in [`BridgeService::bind_on`] so [`BridgeService::stop_server`]
+    /// can always signal shutdown — even when a spawned `serve` task hasn't
+    /// been polled yet. axum-server stores the shutdown flag on an
+    /// `AtomicBool`, so a pre-notified handle causes the accept loop to
+    /// exit on its first iteration when serve eventually runs.
+    axum_handle: AxumHandle,
+    /// Fires when the slot is fully cleared — either by `serve` completing
+    /// or by an unserved [`BoundServer`] being dropped. `None` once a
+    /// `stop_server` caller has taken it.
+    done: Option<oneshot::Receiver<()>>,
 }
 
 enum ServerState {
@@ -102,16 +112,8 @@ enum ServerState {
     /// dropped without serving — Drop clears the slot before that
     /// becomes observable).
     Bound,
-    /// A serve loop is running. `axum_handle` is what
-    /// [`BridgeService::stop_server`] uses to trigger graceful
-    /// shutdown; `done` is the one-shot signal flipped by `serve`
-    /// when its accept loop exits, awaited by `stop_server` to drain
-    /// in-flight connections. `done` becomes `None` once a stopper
-    /// has taken it.
-    Serving {
-        axum_handle: AxumHandle,
-        done: Option<oneshot::Receiver<()>>,
-    },
+    /// A serve loop is running.
+    Serving,
 }
 
 /// A bridge listener whose kernel socket is in `LISTEN` state but whose
@@ -134,6 +136,11 @@ pub struct BoundServer {
     listener: Option<std::net::TcpListener>,
     tls: Option<RustlsConfig>,
     local_addr: SocketAddr,
+    /// Fires the slot's `done` receiver. Taken by `serve` and fired after
+    /// the accept loop exits; otherwise fired by Drop when this struct is
+    /// abandoned without serving so any in-flight `stop_server` waiter is
+    /// unblocked.
+    done_tx: Option<oneshot::Sender<()>>,
 }
 
 impl std::fmt::Debug for BoundServer {
@@ -159,37 +166,33 @@ impl BoundServer {
     /// pattern is `tokio::spawn(bound.serve())`. Awaiting it inline
     /// blocks until the loop ends.
     pub async fn serve(mut self) -> Result<(), BridgeError> {
-        // Both fields are populated by `bind_on` and only taken here.
+        // All three fields are populated by `bind_on` and only taken here.
         // `serve` consumes `self`, so a second call is statically
         // impossible.
         let listener = self.listener.take().unwrap();
         let tls = self.tls.take().unwrap();
+        let done_tx = self.done_tx.take().unwrap();
         let service = self.service.clone();
         let local_addr = self.local_addr;
         // Drop early so the Drop impl runs before we hand off control —
         // it sees `listener` is `None` and leaves the slot alone.
         drop(self);
 
-        let axum_handle = AxumHandle::new();
-        let (done_tx, done_rx) = oneshot::channel::<()>();
-
-        {
+        let axum_handle = {
             let mut guard = service.server.lock().expect("server slot poisoned");
             let slot = guard
                 .as_mut()
                 .expect("BoundServer outlives its service slot");
-            match &slot.state {
+            match slot.state {
                 ServerState::Bound => {
-                    slot.state = ServerState::Serving {
-                        axum_handle: axum_handle.clone(),
-                        done: Some(done_rx),
-                    };
+                    slot.state = ServerState::Serving;
+                    slot.axum_handle.clone()
                 }
-                ServerState::Serving { .. } => {
+                ServerState::Serving => {
                     return Err(BridgeError::AlreadyRunning { local_addr });
                 }
             }
-        }
+        };
 
         let app = Router::new()
             .route(BRIDGE_PATH, get(ws_upgrade))
@@ -241,6 +244,12 @@ impl Drop for BoundServer {
                 local_addr = %self.local_addr,
                 "Bridge server slot poisoned while dropping unserved BoundServer",
             ),
+        }
+        // Wake any `stop_server` caller waiting on `done`. The receiver
+        // may have already been dropped along with the slot above, in
+        // which case `send` returns `Err` and we ignore it.
+        if let Some(done_tx) = self.done_tx.take() {
+            let _ = done_tx.send(());
         }
     }
 }
@@ -458,7 +467,7 @@ impl BridgeService {
         // concurrent callers can't both succeed. The slot stays
         // populated through the async TLS load below; on failure we
         // roll it back.
-        let listener = {
+        let (listener, done_tx) = {
             let mut guard = self.server.lock().expect("server slot poisoned");
             if let Some(handle) = guard.as_ref() {
                 return Err(BridgeError::AlreadyRunning {
@@ -480,11 +489,15 @@ impl BridgeService {
                 addr: bind_addr,
                 source,
             })?;
+            let axum_handle = AxumHandle::new();
+            let (done_tx, done_rx) = oneshot::channel::<()>();
             *guard = Some(ServerHandle {
                 state: ServerState::Bound,
                 local_addr,
+                axum_handle,
+                done: Some(done_rx),
             });
-            listener
+            (listener, done_tx)
         };
         let local_addr = listener
             .local_addr()
@@ -518,6 +531,7 @@ impl BridgeService {
             listener: Some(listener),
             tls: Some(tls),
             local_addr,
+            done_tx: Some(done_tx),
         })
     }
 
@@ -536,13 +550,21 @@ impl BridgeService {
 
     /// Signal the running server to shut down, then wait for the
     /// accept loop and any in-flight connections to fully terminate.
-    /// No-op if no serve loop is running (including the case where a
-    /// [`BoundServer`] has been issued but never served).
+    /// No-op if no listener is currently registered.
+    ///
+    /// Calling this while the slot is in [`ServerState::Bound`] (i.e. a
+    /// [`BoundServer`] was issued but its `serve()` future hasn't been
+    /// polled yet) pre-notifies the axum handle: when `serve` eventually
+    /// runs, its accept loop sees the shutdown flag on the first
+    /// iteration and exits immediately. This is what makes the typical
+    /// `bind_on` → `tokio::spawn(serve)` → `stop_server` sequence
+    /// cancellation-safe under a current-thread runtime, where the
+    /// spawned `serve` may not have had a chance to run yet.
     ///
     /// A concurrent [`bind`](BridgeService::bind) during shutdown sees
     /// the slot still populated and returns
-    /// [`BridgeError::AlreadyRunning`] until the loop fully exits and
-    /// `serve` clears the slot.
+    /// [`BridgeError::AlreadyRunning`] until the slot is cleared (by
+    /// `serve` ending or the unserved [`BoundServer`] being dropped).
     pub async fn stop_server(&self) {
         let (axum_handle, done) = {
             let mut guard = self.server.lock().expect("server slot poisoned");
@@ -550,24 +572,17 @@ impl BridgeService {
                 tracing::debug!("Bridge WebSocket server is not running");
                 return;
             };
-            match &mut slot.state {
-                ServerState::Bound => {
-                    tracing::debug!(
-                        "Bridge listener is bound but no serve loop is running; nothing to stop"
-                    );
-                    return;
-                }
-                ServerState::Serving { axum_handle, done } => (axum_handle.clone(), done.take()),
-            }
+            (slot.axum_handle.clone(), slot.done.take())
         };
 
         tracing::info!("Sending shutdown signal to bridge WebSocket server");
         axum_handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
 
         if let Some(done) = done {
-            // The sender is dropped (or fired) by `serve` exactly once
-            // when its accept loop ends; either outcome means the loop
-            // has stopped, so we don't distinguish them.
+            // Fired by `serve` when its accept loop ends, or by
+            // `BoundServer::drop` when an unserved listener is
+            // abandoned — either way the slot is gone by the time we
+            // wake up.
             let _ = done.await;
         }
     }

@@ -3855,6 +3855,7 @@ name = "euro-office"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "bon",
  "euro-bridge-protocol",
  "euro-browser",
  "euro-process",

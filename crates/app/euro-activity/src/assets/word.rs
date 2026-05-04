@@ -90,7 +90,11 @@ mod tests {
 
     #[test]
     fn construct_messages_emits_one_json_block() {
-        let asset = WordAsset::new("test-id".into(), "Test Doc".into(), "Some content.".into());
+        let asset = WordAsset::builder()
+            .id("test-id")
+            .document_name("Test Doc")
+            .text("Some content.")
+            .build();
 
         let blocks = AssetFunctionality::construct_messages(&asset);
         assert_eq!(blocks.len(), 1);
@@ -99,7 +103,11 @@ mod tests {
 
     #[test]
     fn metadata_accessors_use_document_name() {
-        let asset = WordAsset::new("test-id".into(), "Notes.docx".into(), "body".into());
+        let asset = WordAsset::builder()
+            .id("test-id")
+            .document_name("Notes.docx")
+            .text("body")
+            .build();
         assert_eq!(asset.get_id(), "test-id");
         assert_eq!(asset.get_name(), "Notes.docx");
         assert_eq!(asset.get_icon(), Some("word"));

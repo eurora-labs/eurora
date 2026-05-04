@@ -6,6 +6,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 description = "Asset types and TypeScript bindings for the Eurora Office add-in (Word today; Excel/PowerPoint planned)."
 
 [dependencies]
+bon = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-browser = { workspace = true }
 euro-process = { workspace = true }
