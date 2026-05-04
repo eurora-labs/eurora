@@ -295,6 +295,31 @@ fn provision_bridge_tls(app: &tauri::App) {
     );
 }
 
+/// Bind the bridge listener synchronously inside Tauri's `setup` and
+/// spawn the accept loop in the background. The synchronous bind is the
+/// load-bearing piece: by the time `setup` returns, the kernel socket
+/// is in `LISTEN` state, so the very first add-in or native-messaging
+/// connect can no longer race the bind with `ECONNREFUSED`.
+///
+/// `block_on` is appropriate here for the same reason it's used in
+/// `provision_bridge_tls`: Tauri's `setup` callback is synchronous, the
+/// bind itself is fast (one `TcpListener::bind`, one PEM read), and the
+/// accept loop runs in a spawned task once the bind has succeeded.
+fn bind_and_serve_bridge() -> Result<(), Box<dyn std::error::Error>> {
+    let bound = tauri::async_runtime::block_on(euro_browser::bind_bridge_server())?;
+    let local_addr = bound.local_addr();
+    tracing::info!(
+        "Bridge listener bound at wss://{local_addr}{}",
+        euro_browser::BRIDGE_PATH
+    );
+    tauri::async_runtime::spawn(async move {
+        if let Err(err) = bound.serve().await {
+            tracing::error!("Bridge accept loop ended with error: {err}");
+        }
+    });
+    Ok(())
+}
+
 fn init_encryption(data_dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(debug_assertions)]
     let main_key = euro_encrypt::MainKey::from_bytes([
@@ -583,6 +608,7 @@ fn main() {
                     install_native_messaging_manifests(tauri_app);
                     install_office_word_addin(tauri_app);
                     provision_bridge_tls(tauri_app);
+                    bind_and_serve_bridge()?;
 
                     let data_dir = tauri_app.path().app_data_dir()?;
                     init_encryption(data_dir)?;
@@ -676,6 +702,10 @@ fn main() {
                 .invoke_handler(router.into_handler())
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
-                .run(|_app_handle, _event| {});
+                .run(|_app_handle, event| {
+                    if matches!(event, tauri::RunEvent::Exit) {
+                        tauri::async_runtime::block_on(euro_browser::stop_bridge_server());
+                    }
+                });
         });
 }

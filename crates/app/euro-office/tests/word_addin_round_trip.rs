@@ -8,9 +8,9 @@
 //! — no `NativeMessage` envelope.
 //!
 //! Each test binds the bridge to an ephemeral loopback port via
-//! `start_server_on(([127, 0, 0, 1], 0).into())` against a freshly
-//! minted test CA, so the suite never collides with a locally-running
-//! desktop and never touches the user's keychain.
+//! `BridgeService::bind_on(([127, 0, 0, 1], 0).into())` against a
+//! freshly minted test CA, so the suite never collides with a
+//! locally-running desktop and never touches the user's keychain.
 
 mod common;
 
@@ -37,10 +37,16 @@ async fn start_ephemeral_bridge() -> (BridgeService, SocketAddr, common::TestCha
     let chain = common::mint_localhost_chain();
     let service = BridgeService::new();
     service.configure_tls(chain.material.clone());
-    let addr = service
-        .start_server_on(([127, 0, 0, 1], 0).into())
+    let bound = service
+        .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("bind ephemeral bridge");
+    let addr = bound.local_addr();
+    tokio::spawn(async move {
+        if let Err(err) = bound.serve().await {
+            eprintln!("ephemeral bridge serve loop ended: {err}");
+        }
+    });
     (service, addr, chain)
 }
 
