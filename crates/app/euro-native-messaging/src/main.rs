@@ -172,7 +172,12 @@ async fn run_bridge_session(
             let connector = tls::build_connector().ok_or_else(|| {
                 "bridge CA not yet provisioned by the desktop; will retry".to_string()
             })?;
-            tracing::info!("Connecting to bridge at {url}");
+            let ca_path = euro_bridge_protocol::bridge_ca_path()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "<unknown>".into());
+            tracing::info!(
+                "Bridge transport: TLS (wss) — connecting to {url} with pinned CA at {ca_path}"
+            );
             let request = url.into_client_request().map_err(
                 |err: tokio_tungstenite::tungstenite::Error| format!("invalid bridge URL: {err}"),
             )?;

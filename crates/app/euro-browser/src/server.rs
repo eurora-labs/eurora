@@ -490,7 +490,12 @@ impl BridgeService {
             }
         };
 
-        tracing::info!("Bridge WebSocket listener bound on wss://{local_addr}{BRIDGE_PATH}");
+        tracing::info!(
+            "Bridge transport: TLS (wss) — listener bound at wss://{local_addr}{BRIDGE_PATH}, \
+             cert={}, key={}",
+            material.cert_path.display(),
+            material.key_path.display()
+        );
 
         Ok(BoundServer {
             service: self.clone(),
