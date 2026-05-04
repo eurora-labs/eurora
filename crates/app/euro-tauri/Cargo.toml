@@ -53,6 +53,7 @@ euro-timeline = { workspace = true }
 euro-user = { workspace = true }
 euro-vision = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 keyring = { workspace = true }
 parking_lot = { workspace = true }
 proto-gen = { workspace = true }
@@ -82,6 +83,7 @@ tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
 # taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 taurpc = { workspace = true }
+tempfile = { workspace = true }
 # The features here optimize for performance.
 time = { workspace = true }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
@@ -94,9 +96,6 @@ x509-parser = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-
-[dev-dependencies]
-tempfile = { workspace = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10.1"

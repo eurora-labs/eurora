@@ -114,19 +114,15 @@ pub fn uninstall_standalone() -> Result<UninstallOutcome> {
     }
 }
 
-/// Untrust the bridge CA (if installed) and remove the bridge data
-/// directory. Returns the trust-store outcome; bubbles I/O errors from
-/// directory removal. Idempotent.
+/// Untrust every bridge CA (current and any prior rotations) and
+/// remove the bridge data directory. Returns the trust-store outcome;
+/// bubbles I/O errors from directory removal. Idempotent — safe to
+/// run when nothing is installed.
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 fn uninstall_bridge_artifacts() -> Result<super::bridge_certs::TrustOutcome> {
     let bridge_dir =
         euro_bridge_protocol::bridge_data_dir().ok_or(Error::DirsLookup { kind: "data_dir" })?;
-    let ca_path = bridge_dir.join(euro_bridge_protocol::BRIDGE_CA_FILENAME);
-    let trust = if ca_path.exists() {
-        super::bridge_certs::ensure_untrusted(&ca_path)
-    } else {
-        super::bridge_certs::TrustOutcome::AlreadyTrusted
-    };
+    let trust = super::bridge_certs::ensure_untrusted();
     if bridge_dir.exists() {
         fs::remove_dir_all(&bridge_dir).map_err(|source| Error::Io {
             action: "removing",

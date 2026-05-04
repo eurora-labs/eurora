@@ -268,10 +268,17 @@ fn provision_bridge_tls(app: &tauri::App) {
     };
 
     match bridge_certs::ensure_trusted(&certs.ca_path) {
-        bridge_certs::TrustOutcome::Installed => {
+        bridge_certs::TrustOutcome::Installed { stale_removed: 0 } => {
             tracing::info!("Installed Eurora bridge CA into per-user root store")
         }
-        bridge_certs::TrustOutcome::AlreadyTrusted => {
+        bridge_certs::TrustOutcome::Installed { stale_removed } => tracing::info!(
+            "Installed Eurora bridge CA into per-user root store \
+             and pruned {stale_removed} stale rotation(s)"
+        ),
+        bridge_certs::TrustOutcome::Untrusted { removed } => {
+            tracing::warn!("Unexpected Untrusted outcome from ensure_trusted (removed={removed})")
+        }
+        bridge_certs::TrustOutcome::NoChange => {
             tracing::debug!("Eurora bridge CA already trusted in per-user root store")
         }
         bridge_certs::TrustOutcome::Skipped => {
