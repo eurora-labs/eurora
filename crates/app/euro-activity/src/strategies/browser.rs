@@ -46,7 +46,7 @@ pub struct BrowserStrategy {
 
 impl BrowserStrategy {
     async fn initialize_service(&mut self) -> ActivityResult<()> {
-        let service = BridgeService::get_or_init().await;
+        let service = BridgeService::get_or_init();
         self.bridge_service = Some(service);
         Ok(())
     }
@@ -391,7 +391,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         }
 
         let response_frame = service
-            .get_metadata(browser_pid)
+            .send_request(browser_pid, "GET_METADATA", None)
             .await
             .map_err(|e| ActivityError::invalid_data(format!("Failed to get metadata: {}", e)))?;
 

@@ -4,7 +4,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 use uuid::Uuid;
@@ -196,10 +195,16 @@ fn path_to_file_url(path: &Path, as_directory: bool) -> Result<String> {
 
 /// Pad a semver `x.y.z` to Office's mandatory 4-part `x.y.z.w` form.
 /// Inputs already in 4-part form are returned unchanged. Anything else
-/// (non-numeric, wrong arity, pre-release suffix) is rejected.
+/// — non-numeric components, wrong arity, prerelease suffix
+/// (`1.2.3-rc.1`), or build metadata (`1.2.3+sha.abc`) — is rejected.
+///
+/// Prereleases are rejected rather than coerced because Office has no
+/// representation for them, and silent stripping would make a `-rc.1`
+/// build look identical in the deployed manifest to its eventual GA.
+/// Release tooling is expected to set a 4-part numeric version
+/// explicitly.
 fn office_version(raw: &str) -> Result<String> {
-    let core = raw.split('-').next().unwrap_or(raw);
-    let parts: Vec<&str> = core.split('.').collect();
+    let parts: Vec<&str> = raw.split('.').collect();
     let valid_arity = matches!(parts.len(), 3 | 4);
     let all_numeric = parts
         .iter()
@@ -207,13 +212,15 @@ fn office_version(raw: &str) -> Result<String> {
     if !valid_arity || !all_numeric {
         return Err(Error::Version {
             value: raw.to_owned(),
-            reason: "expected `x.y.z` or `x.y.z.w` with numeric components".to_owned(),
+            reason: "expected `x.y.z` or `x.y.z.w` with numeric components; \
+                 prerelease and build-metadata suffixes are not allowed"
+                .to_owned(),
         });
     }
     if parts.len() == 4 {
-        Ok(core.to_owned())
+        Ok(raw.to_owned())
     } else {
-        Ok(format!("{core}.0"))
+        Ok(format!("{raw}.0"))
     }
 }
 
@@ -320,8 +327,19 @@ mod tests {
     }
 
     #[test]
-    fn office_version_strips_prerelease_then_pads() {
-        assert_eq!(office_version("1.2.3-rc.1").unwrap(), "1.2.3.0");
+    fn office_version_rejects_prerelease_and_build_metadata() {
+        for candidate in [
+            "1.2.3-rc.1",
+            "1.2.3-0.3.7",
+            "1.2.3+build.5",
+            "1.2.3-rc.1+build.5",
+        ] {
+            let err = office_version(candidate).unwrap_err();
+            assert!(
+                matches!(&err, Error::Version { value, .. } if value == candidate),
+                "{candidate}: {err}"
+            );
+        }
     }
 
     #[test]

@@ -470,7 +470,7 @@ impl SystemApi for SystemApiImpl {
     }
 
     async fn get_browser_connection_count(self) -> Result<usize, String> {
-        let service = euro_browser::BridgeService::get_or_init().await;
+        let service = euro_browser::BridgeService::get_or_init();
         Ok(service.connection_count())
     }
 
@@ -487,7 +487,7 @@ impl SystemApi for SystemApiImpl {
         if process_name.is_empty() {
             return Ok(false);
         }
-        let service = euro_browser::BridgeService::get_or_init().await;
+        let service = euro_browser::BridgeService::get_or_init();
         Ok(service.find_pid_by_app_name(&process_name).is_some())
     }
 

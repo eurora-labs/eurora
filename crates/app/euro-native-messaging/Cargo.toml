@@ -14,6 +14,8 @@ euro-process = { workspace = true }
 futures-util = { workspace = true }
 image = { workspace = true, features = ["default"] }
 resvg = { version = "0.47" }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = [
@@ -26,6 +28,7 @@ specta-typescript = { version = "0.0.10" }
 strum_macros = { workspace = true }
 tiny-skia = "0.12"
 tokio = { workspace = true, features = ["full"] }
+tokio-rustls = { workspace = true }
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
@@ -33,6 +36,10 @@ usvg = { version = "0.47", default-features = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
+
+[dev-dependencies]
+rcgen = { workspace = true }
+tempfile = { workspace = true }
 
 [lints.clippy]
 all = "deny"

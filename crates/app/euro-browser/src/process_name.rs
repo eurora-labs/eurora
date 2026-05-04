@@ -4,8 +4,6 @@ pub fn get_process_name(pid: u32) -> Option<String> {
 
 #[cfg(target_os = "windows")]
 fn get_process_name_impl(pid: u32) -> Option<String> {
-    use std::mem::MaybeUninit;
-
     #[repr(C)]
     #[allow(non_snake_case)]
     struct PROCESSENTRY32W {
@@ -32,34 +30,37 @@ fn get_process_name_impl(pid: u32) -> Option<String> {
     const TH32CS_SNAPPROCESS: u32 = 0x00000002;
     const INVALID_HANDLE_VALUE: isize = -1;
 
+    // SAFETY: All FFI calls match the documented Win32 signatures.
+    // `entry` is zero-initialized (the struct is plain-data with no
+    // niches) and `dwSize` is set to its declared size before the
+    // first ToolHelp call, as the API requires.
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snapshot == INVALID_HANDLE_VALUE {
             return None;
         }
 
-        let mut entry: MaybeUninit<PROCESSENTRY32W> = MaybeUninit::uninit();
-        (*entry.as_mut_ptr()).dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
 
-        if Process32FirstW(snapshot, entry.as_mut_ptr()) == 0 {
+        if Process32FirstW(snapshot, &mut entry) == 0 {
             CloseHandle(snapshot);
             return None;
         }
 
         loop {
-            let entry_ref = entry.assume_init_ref();
-            if entry_ref.th32ProcessID == pid {
-                let name_raw = &entry_ref.szExeFile;
-                let name_len = name_raw
+            if entry.th32ProcessID == pid {
+                let name_len = entry
+                    .szExeFile
                     .iter()
                     .position(|&c| c == 0)
-                    .unwrap_or(name_raw.len());
-                let name = String::from_utf16_lossy(&name_raw[..name_len]);
+                    .unwrap_or(entry.szExeFile.len());
+                let name = String::from_utf16_lossy(&entry.szExeFile[..name_len]);
                 CloseHandle(snapshot);
                 return Some(name);
             }
 
-            if Process32NextW(snapshot, entry.as_mut_ptr()) == 0 {
+            if Process32NextW(snapshot, &mut entry) == 0 {
                 break;
             }
         }
@@ -84,6 +85,9 @@ fn get_process_name_impl(pid: u32) -> Option<String> {
         fn proc_pidpath(pid: i32, buffer: *mut u8, buffersize: u32) -> i32;
     }
     let mut buf = [0u8; 4096];
+    // SAFETY: `proc_pidpath` writes at most `buf.len()` bytes into the
+    // provided buffer and returns the number written, or a non-positive
+    // value on failure.
     let ret = unsafe { proc_pidpath(pid as i32, buf.as_mut_ptr(), buf.len() as u32) };
     if ret > 0 {
         std::str::from_utf8(&buf[..ret as usize])
@@ -93,4 +97,9 @@ fn get_process_name_impl(pid: u32) -> Option<String> {
     } else {
         None
     }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+fn get_process_name_impl(_pid: u32) -> Option<String> {
+    None
 }

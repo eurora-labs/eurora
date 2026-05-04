@@ -141,7 +141,7 @@ don't reach (real Office, real OS catalog state, real reconnect).
    Windows (WebView2 host) and macOS (WKWebView host) before shipping.
    Office.js loads behave subtly differently between the two
    runtimes (timing of `Office.onReady`, secure-context handling for
-   `ws://127.0.0.1`); steps 3–5 must pass on each.
+   `wss://localhost`); steps 3–5 must pass on each.
 
 If the add-in fails to register on macOS the first time the desktop
 launches, see also `InstallOutcome::SkippedHostNotPresent` — Word's
