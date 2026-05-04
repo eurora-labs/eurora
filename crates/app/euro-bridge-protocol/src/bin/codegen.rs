@@ -6,17 +6,12 @@
 //! cargo run -p euro-bridge-protocol --features codegen -- --generate_specta
 //! ```
 
-use std::env;
-use std::fs;
-use std::path::Path;
-use std::process::ExitCode;
-
 use anyhow::{Context, Result};
 use euro_bridge_protocol::type_collection;
 use specta_swift::{NamingConvention, SerdeMode, Swift};
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use std::fs;
+use std::process::ExitCode;
 
-const TYPESCRIPT_OUT: &str = "apps/browser/src/shared/content/bridge-protocol.ts";
 const SWIFT_OUT: &str = "apps/macos/Shared/BridgeProtocol.swift";
 
 fn main() -> ExitCode {
@@ -26,7 +21,6 @@ fn main() -> ExitCode {
     match args.next().as_deref() {
         Some("--generate_specta") => match generate_bindings() {
             Ok(()) => {
-                println!("wrote {TYPESCRIPT_OUT}");
                 println!("wrote {SWIFT_OUT}");
                 ExitCode::SUCCESS
             }
@@ -44,11 +38,6 @@ fn main() -> ExitCode {
 
 fn generate_bindings() -> Result<()> {
     let types = type_collection();
-
-    Typescript::default()
-        .bigint(BigIntExportBehavior::Fail)
-        .export_to(Path::new(TYPESCRIPT_OUT), &types)
-        .context("exporting TypeScript bindings")?;
 
     let swift = Swift::default()
         .with_serde(SerdeMode::Both)
