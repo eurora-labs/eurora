@@ -4,7 +4,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 use uuid::Uuid;

@@ -11,9 +11,8 @@
 //!   used everywhere because WebView2's TLS stack accepts them and they
 //!   keep handshakes small.
 //! - [`ensure_trusted`] adds the CA to the *user's* root store (no UAC,
-//!   no admin/sudo). On reruns it pre-checks the store via the
-//!   per-OS query tool and returns [`TrustOutcome::AlreadyTrusted`] so
-//!   re-install never re-prompts the user.
+//!   no admin/sudo). The platform backend is responsible for making
+//!   reruns idempotent so re-install never re-prompts the user.
 //!
 //! Every transition flows through `tracing` so the desktop's existing
 //! log discipline (info on success, warn on recoverable failure)
@@ -26,7 +25,7 @@ use std::io::Write as _;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::{Path, PathBuf};
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::process::{Command, Output};
 
 use rcgen::{
@@ -49,7 +48,10 @@ const CA_KEY_FILENAME: &str = "ca.key";
 const SERVER_CERT_FILENAME: &str = "server.crt";
 const SERVER_KEY_FILENAME: &str = "server.key";
 
-const CA_COMMON_NAME: &str = "Eurora Local Bridge CA";
+/// Subject CN on the bridge CA. Surfaced to platform backends because
+/// macOS keys its keychain queries (`security find-certificate -c`) by
+/// common name.
+pub(super) const CA_COMMON_NAME: &str = "Eurora Local Bridge CA";
 const LEAF_COMMON_NAME: &str = "localhost";
 
 /// CA validity: 10 years. Long enough to outlive most installs, short
@@ -112,6 +114,14 @@ pub enum TrustOutcome {
     /// The OS trust tool failed. The contained string is a single-line
     /// summary suitable for `tracing::warn!`.
     Failed(String),
+}
+
+/// Direction of a trust-store operation. Passed to the platform
+/// backend's `trust_impl` so install and uninstall share one code path.
+#[derive(Clone, Copy)]
+pub(super) enum TrustAction {
+    Install,
+    Untrust,
 }
 
 /// Resolve the bridge directory under Tauri's per-user data dir, mint
@@ -230,7 +240,10 @@ fn validate_existing(certs: &BridgeCerts, now: OffsetDateTime) -> Validity {
     Validity::Ok
 }
 
-fn read_first_certificate_der(pem_bytes: &[u8]) -> Option<Vec<u8>> {
+/// Decode the first PEM certificate in `pem_bytes` to its DER body.
+/// `pub(super)` because the Windows backend computes a SHA-1 thumbprint
+/// over this body for `certutil` keying.
+pub(super) fn read_first_certificate_der(pem_bytes: &[u8]) -> Option<Vec<u8>> {
     let mut reader = std::io::Cursor::new(pem_bytes);
     rustls_pemfile::certs(&mut reader)
         .next()
@@ -359,7 +372,9 @@ fn log_ensure_outcome(outcome: &EnsureOutcome, root: &Path) {
 }
 
 // ---------------------------------------------------------------------------
-// Trust install — per-user, no UAC.
+// Trust install — per-user, no UAC. The platform backend at
+// `super::platform::bridge_certs::trust_impl` owns the actual root-store
+// integration; we only build the `TrustAction` and shape the result.
 // ---------------------------------------------------------------------------
 
 /// Add the bridge CA at `ca_path` to the per-user OS root store.
@@ -367,191 +382,31 @@ fn log_ensure_outcome(outcome: &EnsureOutcome, root: &Path) {
 /// CA is already trusted, so reruns never re-prompt the user. Failures
 /// are non-fatal — the desktop logs and continues.
 pub fn ensure_trusted(ca_path: &Path) -> TrustOutcome {
-    trust_impl(ca_path, TrustAction::Install)
+    super::platform::bridge_certs::trust_impl(ca_path, TrustAction::Install)
 }
 
 /// Symmetric uninstall path. Removes the bridge CA from the per-user
 /// root store. Idempotent.
 pub fn ensure_untrusted(ca_path: &Path) -> TrustOutcome {
-    trust_impl(ca_path, TrustAction::Untrust)
+    super::platform::bridge_certs::trust_impl(ca_path, TrustAction::Untrust)
 }
 
-#[derive(Clone, Copy)]
-enum TrustAction {
-    Install,
-    Untrust,
-}
-
-#[cfg(target_os = "windows")]
-fn trust_impl(ca_path: &Path, action: TrustAction) -> TrustOutcome {
-    let thumbprint = match read_ca_thumbprint(ca_path) {
-        Ok(t) => t,
-        Err(err) => return TrustOutcome::Failed(format!("read CA thumbprint: {err}")),
-    };
-
-    let already_present = certutil_pre_check(&thumbprint);
-    match (action, already_present) {
-        (TrustAction::Install, true) => {
-            tracing::debug!("Bridge CA {thumbprint} already trusted in user root store");
-            return TrustOutcome::AlreadyTrusted;
-        }
-        (TrustAction::Untrust, false) => {
-            tracing::debug!("Bridge CA {thumbprint} already absent from user root store");
-            return TrustOutcome::AlreadyTrusted;
-        }
-        _ => {}
-    }
-
-    let args: Vec<&std::ffi::OsStr> = match action {
-        TrustAction::Install => vec![
-            "-user".as_ref(),
-            "-addstore".as_ref(),
-            "Root".as_ref(),
-            ca_path.as_os_str(),
-        ],
-        TrustAction::Untrust => vec![
-            "-user".as_ref(),
-            "-delstore".as_ref(),
-            "Root".as_ref(),
-            thumbprint.as_ref(),
-        ],
-    };
-
-    match run_quiet("certutil", &args) {
-        Ok(out) if out.status.success() => {
-            tracing::info!(
-                "certutil {:?} succeeded for bridge CA",
-                action_label(action)
-            );
-            TrustOutcome::Installed
-        }
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-            TrustOutcome::Failed(format!(
-                "certutil exit={}: {}",
-                out.status,
-                if !stderr.is_empty() { stderr } else { stdout }
-            ))
-        }
-        Err(err) => TrustOutcome::Failed(format!("certutil invocation: {err}")),
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn certutil_pre_check(thumbprint: &str) -> bool {
-    let args: [&std::ffi::OsStr; 4] = [
-        "-user".as_ref(),
-        "-store".as_ref(),
-        "Root".as_ref(),
-        thumbprint.as_ref(),
-    ];
-    matches!(run_quiet("certutil", &args), Ok(out) if out.status.success())
-}
-
-#[cfg(target_os = "windows")]
-fn read_ca_thumbprint(ca_path: &Path) -> std::result::Result<String, String> {
-    let pem = fs::read(ca_path).map_err(|err| err.to_string())?;
-    let der =
-        read_first_certificate_der(&pem).ok_or_else(|| "no certificate in PEM file".to_string())?;
-    // SHA-1 over the DER body — what `certutil -store Root <thumbprint>`
-    // matches against. SHA-1 is fine for this trust-store keying use:
-    // collisions don't help an attacker since the cert is local-only.
-    use sha1::{Digest, Sha1};
-    let hash = Sha1::digest(&der);
-    let mut hex = String::with_capacity(hash.len() * 2);
-    for byte in hash.iter() {
-        hex.push_str(&format!("{byte:02x}"));
-    }
-    Ok(hex)
-}
-
-#[cfg(target_os = "macos")]
-fn trust_impl(ca_path: &Path, action: TrustAction) -> TrustOutcome {
-    use std::env;
-
-    let keychain = match env::var_os("HOME") {
-        Some(home) => PathBuf::from(home).join("Library/Keychains/login.keychain-db"),
-        None => return TrustOutcome::Failed("HOME is not set".into()),
-    };
-
-    // Pre-check via `security find-certificate`. Returns 0 when the
-    // common-name match exists in the keychain.
-    let already_present = matches!(
-        run_quiet(
-            "security",
-            &[
-                "find-certificate".as_ref(),
-                "-c".as_ref(),
-                CA_COMMON_NAME.as_ref(),
-                keychain.as_os_str(),
-            ],
-        ),
-        Ok(out) if out.status.success()
-    );
-    match (action, already_present) {
-        (TrustAction::Install, true) => return TrustOutcome::AlreadyTrusted,
-        (TrustAction::Untrust, false) => return TrustOutcome::AlreadyTrusted,
-        _ => {}
-    }
-
-    let result = match action {
-        TrustAction::Install => run_quiet(
-            "security",
-            &[
-                "add-trusted-cert".as_ref(),
-                "-k".as_ref(),
-                keychain.as_os_str(),
-                ca_path.as_os_str(),
-            ],
-        ),
-        TrustAction::Untrust => run_quiet(
-            "security",
-            &[
-                "delete-certificate".as_ref(),
-                "-c".as_ref(),
-                CA_COMMON_NAME.as_ref(),
-                keychain.as_os_str(),
-            ],
-        ),
-    };
-
-    match result {
-        Ok(out) if out.status.success() => {
-            tracing::info!(
-                "security {:?} succeeded for bridge CA",
-                action_label(action)
-            );
-            TrustOutcome::Installed
-        }
-        Ok(out) => {
-            let stderr = String::from_utf8_lossy(&out.stderr).trim().to_owned();
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-            TrustOutcome::Failed(format!(
-                "security exit={}: {}",
-                out.status,
-                if !stderr.is_empty() { stderr } else { stdout }
-            ))
-        }
-        Err(err) => TrustOutcome::Failed(format!("security invocation: {err}")),
-    }
-}
-
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn trust_impl(_ca_path: &Path, _action: TrustAction) -> TrustOutcome {
-    TrustOutcome::Skipped
-}
-
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-fn action_label(action: TrustAction) -> &'static str {
+/// "install" / "untrust" string for `tracing` output. Promoted to
+/// `pub(super)` so each platform backend logs with consistent verbs.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub(super) fn action_label(action: TrustAction) -> &'static str {
     match action {
         TrustAction::Install => "install",
         TrustAction::Untrust => "untrust",
     }
 }
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-fn run_quiet(program: &str, args: &[&std::ffi::OsStr]) -> std::io::Result<Output> {
+/// Run a CLI tool, swallowing the console window pop-up on Windows so
+/// trust operations stay invisible to the user. Promoted to
+/// `pub(super)` so the macOS (`security`) and Windows (`certutil`)
+/// backends share one process-launch path.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub(super) fn run_quiet(program: &str, args: &[&std::ffi::OsStr]) -> std::io::Result<Output> {
     let mut cmd = Command::new(program);
     cmd.args(args);
     #[cfg(target_os = "windows")]
