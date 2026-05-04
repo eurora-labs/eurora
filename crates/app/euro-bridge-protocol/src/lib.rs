@@ -17,7 +17,7 @@ mod error;
 mod frame;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub use error::BridgeError;
 pub use frame::{
@@ -49,7 +49,13 @@ pub const BRIDGE_SCHEME: &str = "wss";
 /// sides agree on the path without coordination.
 pub const BRIDGE_CA_FILENAME: &str = "ca.crt";
 
-/// Subdirectory under the platform data dir that holds bridge TLS
+/// Top-level subdirectory under the platform data dir that contains
+/// every Eurora-owned per-user file. All callers that compose paths
+/// under this root must do so via [`eurora_data_root_under`] or
+/// [`eurora_data_root`] so the literal lives in exactly one place.
+pub const EURORA_DATA_SUBDIR: &str = "Eurora";
+
+/// Subdirectory under [`EURORA_DATA_SUBDIR`] that holds bridge TLS
 /// material.
 pub const BRIDGE_DATA_SUBDIR: &str = "bridge";
 
@@ -70,6 +76,22 @@ pub fn bridge_url_for(addr: SocketAddr) -> String {
     )
 }
 
+/// Eurora's per-user data root underneath an arbitrary platform data
+/// dir. Exposed so callers that already hold a resolved data dir
+/// (e.g. Tauri's `app.path().data_dir()`) compose paths through the
+/// same join the `dirs`-based [`eurora_data_root`] uses, rather than
+/// hand-concatenating [`EURORA_DATA_SUBDIR`].
+pub fn eurora_data_root_under(data_dir: &Path) -> PathBuf {
+    data_dir.join(EURORA_DATA_SUBDIR)
+}
+
+/// Directory holding bridge TLS material underneath an arbitrary
+/// platform data dir. Counterpart to [`bridge_data_dir`] for callers
+/// that resolve the platform data dir themselves.
+pub fn bridge_data_dir_under(data_dir: &Path) -> PathBuf {
+    eurora_data_root_under(data_dir).join(BRIDGE_DATA_SUBDIR)
+}
+
 /// Eurora's per-user data root, resolved via the `dirs` crate. Mirrors
 /// the convention used by the Office add-in install code: both Tauri
 /// (`app.path().data_dir()`) and the standalone uninstall CLI converge
@@ -77,14 +99,14 @@ pub fn bridge_url_for(addr: SocketAddr) -> String {
 /// native-messaging host) can derive bridge file locations without
 /// having to be passed through Tauri's runtime.
 pub fn eurora_data_root() -> Option<PathBuf> {
-    dirs::data_dir().map(|root| root.join("Eurora"))
+    dirs::data_dir().map(|root| eurora_data_root_under(&root))
 }
 
 /// Directory holding bridge TLS material. Both the desktop (writer)
 /// and the native-messaging host (reader) resolve this path the same
 /// way so they agree without out-of-band coordination.
 pub fn bridge_data_dir() -> Option<PathBuf> {
-    eurora_data_root().map(|root| root.join(BRIDGE_DATA_SUBDIR))
+    dirs::data_dir().map(|root| bridge_data_dir_under(&root))
 }
 
 /// Path the desktop writes the bridge CA cert to and that other local

@@ -3945,6 +3945,7 @@ dependencies = [
  "euro-user",
  "euro-vision",
  "futures",
+ "hex",
  "keyring",
  "libc",
  "parking_lot",

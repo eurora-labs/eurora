@@ -31,10 +31,19 @@ fn main() -> ExitCode {
             #[cfg(target_os = "windows")]
             println!("Removed HKCU\\Software\\Microsoft\\Office\\16.0\\WEF\\TrustedCatalogs entry");
             match ca_trust {
-                bridge_certs::TrustOutcome::Installed => {
-                    println!("Removed Eurora bridge CA from per-user root store")
+                bridge_certs::TrustOutcome::Untrusted { removed } => {
+                    println!(
+                        "Removed {removed} Eurora bridge CA entr{} from per-user root store",
+                        if removed == 1 { "y" } else { "ies" }
+                    )
                 }
-                bridge_certs::TrustOutcome::AlreadyTrusted => {
+                bridge_certs::TrustOutcome::Installed { stale_removed } => {
+                    eprintln!(
+                        "Warning: unexpected Installed outcome during uninstall \
+                         (stale_removed={stale_removed})"
+                    )
+                }
+                bridge_certs::TrustOutcome::NoChange => {
                     println!("Eurora bridge CA already absent from per-user root store")
                 }
                 bridge_certs::TrustOutcome::Skipped => {

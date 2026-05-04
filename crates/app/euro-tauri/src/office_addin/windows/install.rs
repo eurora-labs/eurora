@@ -102,6 +102,7 @@ fn register_trusted_catalog(guid: &str, url: &str) -> Result<()> {
         .map_err(&registry_err)?;
     key.set_value("Flags", &1u32).map_err(&registry_err)?;
     key.set_value("ShowInMenu", &1u32).map_err(&registry_err)?;
+    tracing::info!("Registered Office trusted catalog under HKCU\\{key_path} -> {url}");
     Ok(())
 }
 
@@ -111,8 +112,14 @@ fn deregister_trusted_catalog(guid: &str) -> Result<()> {
 
     let key_path = format!(r"Software\Microsoft\Office\16.0\WEF\TrustedCatalogs\{guid}");
     match RegKey::predef(HKEY_CURRENT_USER).delete_subkey_all(&key_path) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Ok(()) => {
+            tracing::info!("Removed Office trusted catalog under HKCU\\{key_path}");
+            Ok(())
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            tracing::debug!("No Office trusted catalog at HKCU\\{key_path}; nothing to remove");
+            Ok(())
+        }
         Err(source) => Err(Error::Registry {
             path: key_path,
             source,

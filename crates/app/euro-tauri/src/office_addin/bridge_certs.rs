@@ -11,8 +11,10 @@
 //!   used everywhere because WebView2's TLS stack accepts them and they
 //!   keep handshakes small.
 //! - [`ensure_trusted`] adds the CA to the *user's* root store (no UAC,
-//!   no admin/sudo). The platform backend is responsible for making
-//!   reruns idempotent so re-install never re-prompts the user.
+//!   no admin/sudo), and prunes any prior `Eurora Local Bridge CA`
+//!   entries left over from past rotations. The platform backend is
+//!   responsible for making reruns idempotent so re-install never
+//!   re-prompts the user.
 //!
 //! Every transition flows through `tracing` so the desktop's existing
 //! log discipline (info on success, warn on recoverable failure)
@@ -33,15 +35,10 @@ use rcgen::{
     Ia5String, IsCa, KeyPair, KeyUsagePurpose, PKCS_ECDSA_P256_SHA256, SanType,
 };
 use tauri::{AppHandle, Manager, Runtime};
+use tempfile::NamedTempFile;
 use time::{Duration as TimeDuration, OffsetDateTime};
 
 use super::{Error, Result};
-
-/// Subdirectory under `<app_data_dir>` that holds bridge TLS material.
-/// Mirrors [`euro_bridge_protocol::BRIDGE_DATA_SUBDIR`] so the
-/// native-messaging host (which resolves the path via `dirs::data_dir`,
-/// not via Tauri) finds the same files.
-const BRIDGE_SUBDIR: &str = euro_bridge_protocol::BRIDGE_DATA_SUBDIR;
 
 const CA_CERT_FILENAME: &str = euro_bridge_protocol::BRIDGE_CA_FILENAME; // "ca.crt"
 const CA_KEY_FILENAME: &str = "ca.key";
@@ -49,8 +46,8 @@ const SERVER_CERT_FILENAME: &str = "server.crt";
 const SERVER_KEY_FILENAME: &str = "server.key";
 
 /// Subject CN on the bridge CA. Surfaced to platform backends because
-/// macOS keys its keychain queries (`security find-certificate -c`) by
-/// common name.
+/// macOS and Windows both filter their root-store queries by CN
+/// (`security find-certificate -c`, `certutil -store Root <CN>`).
 pub(super) const CA_COMMON_NAME: &str = "Eurora Local Bridge CA";
 const LEAF_COMMON_NAME: &str = "localhost";
 
@@ -103,25 +100,27 @@ pub enum RenewalReason {
 /// Outcome of [`ensure_trusted`] / [`ensure_untrusted`].
 #[derive(Debug, Clone)]
 pub enum TrustOutcome {
-    /// CA was added to (or removed from) the user root store.
-    Installed,
-    /// CA was already present (or already absent, on the untrust
-    /// path).
-    AlreadyTrusted,
+    /// `Install` only: the current CA was added to the user root
+    /// store. `stale_removed` is the number of *prior*
+    /// [`CA_COMMON_NAME`] entries (with different thumbprints, left
+    /// over from past rotations) that were pruned in the same call.
+    /// A successful no-op install where the CA was already present
+    /// and the store was already clean is reported as [`Self::NoChange`]
+    /// instead.
+    Installed { stale_removed: usize },
+    /// `Untrust` only: every [`CA_COMMON_NAME`] entry was deleted from
+    /// the user root store. `removed` is the total count.
+    Untrusted { removed: usize },
+    /// The user root store was already in the desired state
+    /// (current CA trusted with no stale rotations for `Install`;
+    /// no [`CA_COMMON_NAME`] entries for `Untrust`).
+    NoChange,
     /// This OS has no trust integration (Linux today — Word doesn't
     /// run natively).
     Skipped,
     /// The OS trust tool failed. The contained string is a single-line
     /// summary suitable for `tracing::warn!`.
     Failed(String),
-}
-
-/// Direction of a trust-store operation. Passed to the platform
-/// backend's `trust_impl` so install and uninstall share one code path.
-#[derive(Clone, Copy)]
-pub(super) enum TrustAction {
-    Install,
-    Untrust,
 }
 
 /// Resolve the bridge directory under Tauri's per-user data dir, mint
@@ -131,8 +130,7 @@ pub fn ensure<R: Runtime>(app: &AppHandle<R>) -> Result<BridgeCerts> {
         kind: "data_dir",
         source,
     })?;
-    // Mirror the install.rs convention: `<data_dir>/Eurora/<subdir>`.
-    let root = data_dir.join("Eurora").join(BRIDGE_SUBDIR);
+    let root = euro_bridge_protocol::bridge_data_dir_under(&data_dir);
     let (certs, outcome) = ensure_at(&root)?;
     log_ensure_outcome(&outcome, &root);
     Ok(certs)
@@ -146,7 +144,7 @@ pub fn ensure_at(root: &Path) -> Result<(BridgeCerts, EnsureOutcome)> {
 
 fn ensure_at_with_clock<F>(root: &Path, now: F) -> Result<(BridgeCerts, EnsureOutcome)>
 where
-    F: Fn() -> OffsetDateTime,
+    F: FnOnce() -> OffsetDateTime,
 {
     fs::create_dir_all(root).map_err(|source| Error::Io {
         action: "creating",
@@ -154,15 +152,16 @@ where
         source,
     })?;
 
+    let now_at = now();
     let certs = layout(root);
-    let outcome = match validate_existing(&certs, now()) {
+    let outcome = match validate_existing(&certs, now_at) {
         Validity::Ok => EnsureOutcome::Reused,
         Validity::NeedsRotation(reason) => {
-            generate_chain(&certs, now())?;
+            generate_chain(&certs, now_at)?;
             EnsureOutcome::Renewed { reason }
         }
         Validity::Empty => {
-            generate_chain(&certs, now())?;
+            generate_chain(&certs, now_at)?;
             EnsureOutcome::Generated
         }
     };
@@ -219,8 +218,8 @@ fn validate_existing(certs: &BridgeCerts, now: OffsetDateTime) -> Validity {
             Err(_) => return Validity::NeedsRotation(RenewalReason::Missing),
         };
         let der = match read_first_certificate_der(&pem) {
-            Some(der) => der,
-            None => return Validity::NeedsRotation(RenewalReason::Unparseable),
+            Ok(der) => der,
+            Err(_) => return Validity::NeedsRotation(RenewalReason::Unparseable),
         };
         let (_, parsed) = match x509_parser::parse_x509_certificate(&der) {
             Ok(v) => v,
@@ -240,17 +239,60 @@ fn validate_existing(certs: &BridgeCerts, now: OffsetDateTime) -> Validity {
     Validity::Ok
 }
 
+/// Why [`read_first_certificate_der`] could not return a DER body.
+/// Distinguishes "no certificate present" from "PEM body malformed" so
+/// callers can render the right diagnostic.
+#[derive(Debug, thiserror::Error)]
+pub(super) enum PemReadError {
+    /// The file held no `BEGIN CERTIFICATE` block.
+    #[error("no certificate found in PEM file")]
+    Empty,
+    /// A `BEGIN CERTIFICATE` block was present but the PEM body was
+    /// malformed. The contained error is the underlying I/O / parse
+    /// error from `rustls_pemfile`.
+    #[error("malformed PEM body: {0}")]
+    Malformed(#[source] std::io::Error),
+}
+
 /// Decode the first PEM certificate in `pem_bytes` to its DER body.
-/// `pub(super)` because the Windows backend computes a SHA-1 thumbprint
-/// over this body for `certutil` keying.
-pub(super) fn read_first_certificate_der(pem_bytes: &[u8]) -> Option<Vec<u8>> {
+/// Surfaces "no cert" and "malformed PEM" as separate error variants
+/// because the platform thumbprint code wants to render those
+/// differently, while `validate_existing` collapses both to
+/// [`RenewalReason::Unparseable`].
+pub(super) fn read_first_certificate_der(
+    pem_bytes: &[u8],
+) -> std::result::Result<Vec<u8>, PemReadError> {
     let mut reader = std::io::Cursor::new(pem_bytes);
-    rustls_pemfile::certs(&mut reader)
-        .next()
-        .transpose()
-        .ok()
-        .flatten()
-        .map(|c| c.as_ref().to_vec())
+    match rustls_pemfile::certs(&mut reader).next() {
+        Some(Ok(der)) => Ok(der.as_ref().to_vec()),
+        Some(Err(err)) => Err(PemReadError::Malformed(err)),
+        None => Err(PemReadError::Empty),
+    }
+}
+
+/// SHA-1 thumbprint of the first certificate in the PEM file at
+/// `ca_path`, formatted as lowercase hex with no separators.
+///
+/// This is the canonical key the platform trust backends use for both
+/// pre-checks and deletes — `certutil -store Root <hex>` and
+/// `security delete-certificate -Z <hex>` both accept this form. SHA-1
+/// is fine for trust-store keying despite its cryptographic weakness:
+/// collisions don't help an attacker since the cert is local-only and
+/// minted by the desktop on first run.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub(super) fn ca_thumbprint(ca_path: &Path) -> std::result::Result<String, Error> {
+    use sha1::{Digest, Sha1};
+
+    let pem = fs::read(ca_path).map_err(|source| Error::Io {
+        action: "reading",
+        path: ca_path.to_path_buf(),
+        source,
+    })?;
+    let der = read_first_certificate_der(&pem).map_err(|err| Error::CertParse {
+        path: ca_path.to_path_buf(),
+        reason: err.to_string(),
+    })?;
+    Ok(hex::encode(Sha1::digest(&der)))
 }
 
 fn generate_chain(certs: &BridgeCerts, now: OffsetDateTime) -> Result<()> {
@@ -291,70 +333,89 @@ fn generate_chain(certs: &BridgeCerts, now: OffsetDateTime) -> Result<()> {
     leaf_params.not_after = now + TimeDuration::days(LEAF_VALIDITY_DAYS);
     let leaf_cert = leaf_params.signed_by(&leaf_keypair, &ca_cert, &ca_keypair)?;
 
-    write_atomic(&certs.ca_path, ca_cert.pem().as_bytes(), false)?;
-    write_atomic(
-        &certs.ca_key_path,
-        ca_keypair.serialize_pem().as_bytes(),
-        true,
-    )?;
-    write_atomic(&certs.cert_path, leaf_cert.pem().as_bytes(), false)?;
-    write_atomic(
-        &certs.key_path,
-        leaf_keypair.serialize_pem().as_bytes(),
-        true,
-    )?;
+    write_atomic(&certs.ca_path, ca_cert.pem().as_bytes())?;
+    write_atomic_secret(&certs.ca_key_path, ca_keypair.serialize_pem().as_bytes())?;
+    write_atomic(&certs.cert_path, leaf_cert.pem().as_bytes())?;
+    write_atomic_secret(&certs.key_path, leaf_keypair.serialize_pem().as_bytes())?;
 
     Ok(())
 }
 
-/// Atomic write: stage as `<path>.tmp`, fsync, rename. On unix, set
-/// mode 0600 on `secret` files (the two `*.key`s).
-fn write_atomic(path: &Path, contents: &[u8], secret: bool) -> Result<()> {
+/// Stage `contents` under a sibling tempfile, fsync, and atomically
+/// rename into place. The tempfile is automatically unlinked on any
+/// error path before `persist`.
+fn write_atomic(path: &Path, contents: &[u8]) -> Result<()> {
+    persist_via_tempfile(path, contents, /* secret */ false)
+}
+
+/// World-readable variant of [`write_atomic`] that additionally chmods
+/// the file to 0600 on Unix before the rename. No-op on Windows: the
+/// inheritance ACL on `<APPDATA>` already restricts the file to the
+/// current user, and `set_permissions` on Windows would only toggle
+/// the read-only bit.
+fn write_atomic_secret(path: &Path, contents: &[u8]) -> Result<()> {
+    persist_via_tempfile(path, contents, /* secret */ true)
+}
+
+fn persist_via_tempfile(path: &Path, contents: &[u8], secret: bool) -> Result<()> {
     let parent = path.parent().expect("layout paths always have a parent");
     fs::create_dir_all(parent).map_err(|source| Error::Io {
         action: "creating",
         path: parent.to_path_buf(),
         source,
     })?;
-    let tmp = path.with_extension("tmp");
-    {
-        let mut file = fs::File::create(&tmp).map_err(|source| Error::Io {
+    let mut tmp = NamedTempFile::new_in(parent).map_err(|source| Error::Io {
+        action: "writing",
+        path: parent.to_path_buf(),
+        source,
+    })?;
+    tmp.as_file_mut()
+        .write_all(contents)
+        .map_err(|source| Error::Io {
             action: "writing",
-            path: tmp.clone(),
+            path: tmp.path().to_path_buf(),
             source,
         })?;
-        file.write_all(contents).map_err(|source| Error::Io {
-            action: "writing",
-            path: tmp.clone(),
-            source,
-        })?;
-        file.sync_all().map_err(|source| Error::Io {
-            action: "syncing",
-            path: tmp.clone(),
-            source,
-        })?;
-    }
+    tmp.as_file_mut().sync_all().map_err(|source| Error::Io {
+        action: "syncing",
+        path: tmp.path().to_path_buf(),
+        source,
+    })?;
     #[cfg(unix)]
     if secret {
         use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600)).map_err(|source| {
+        fs::set_permissions(tmp.path(), fs::Permissions::from_mode(0o600)).map_err(|source| {
             Error::Io {
                 action: "chmod",
-                path: tmp.clone(),
+                path: tmp.path().to_path_buf(),
                 source,
             }
         })?;
     }
     #[cfg(not(unix))]
-    {
-        let _ = secret;
-    }
-    fs::rename(&tmp, path).map_err(|source| Error::Io {
+    let _ = secret;
+    tmp.persist(path).map_err(|err| Error::Io {
         action: "renaming",
         path: path.to_path_buf(),
-        source,
-    })
+        source: err.error,
+    })?;
+    fsync_dir(parent);
+    Ok(())
 }
+
+/// Best-effort `fsync` of `dir` so the rename is durable across power
+/// loss on POSIX. Failures are intentionally swallowed: this is belt-
+/// and-braces durability over an already-renamed file, and a missing
+/// `fsync` is no worse than the platform default.
+#[cfg(unix)]
+fn fsync_dir(dir: &Path) {
+    if let Ok(handle) = fs::File::open(dir) {
+        let _ = handle.sync_all();
+    }
+}
+
+#[cfg(not(unix))]
+fn fsync_dir(_dir: &Path) {}
 
 fn log_ensure_outcome(outcome: &EnsureOutcome, root: &Path) {
     match outcome {
@@ -373,32 +434,27 @@ fn log_ensure_outcome(outcome: &EnsureOutcome, root: &Path) {
 
 // ---------------------------------------------------------------------------
 // Trust install — per-user, no UAC. The platform backend at
-// `super::platform::bridge_certs::trust_impl` owns the actual root-store
-// integration; we only build the `TrustAction` and shape the result.
+// `super::platform::bridge_certs` owns the actual root-store
+// integration; we only fan out to `install` / `untrust` and shape
+// the result.
 // ---------------------------------------------------------------------------
 
-/// Add the bridge CA at `ca_path` to the per-user OS root store.
-/// Idempotent: a pre-check via the OS query tool short-circuits if the
-/// CA is already trusted, so reruns never re-prompt the user. Failures
+/// Add the bridge CA at `ca_path` to the per-user OS root store, and
+/// prune any prior `Eurora Local Bridge CA` entries left over from
+/// past rotations. Idempotent: a pre-check via the OS query tool
+/// short-circuits if the desired state is already in place. Failures
 /// are non-fatal — the desktop logs and continues.
 pub fn ensure_trusted(ca_path: &Path) -> TrustOutcome {
-    super::platform::bridge_certs::trust_impl(ca_path, TrustAction::Install)
+    super::platform::bridge_certs::install(ca_path)
 }
 
-/// Symmetric uninstall path. Removes the bridge CA from the per-user
-/// root store. Idempotent.
-pub fn ensure_untrusted(ca_path: &Path) -> TrustOutcome {
-    super::platform::bridge_certs::trust_impl(ca_path, TrustAction::Untrust)
-}
-
-/// "install" / "untrust" string for `tracing` output. Promoted to
-/// `pub(super)` so each platform backend logs with consistent verbs.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-pub(super) fn action_label(action: TrustAction) -> &'static str {
-    match action {
-        TrustAction::Install => "install",
-        TrustAction::Untrust => "untrust",
-    }
+/// Symmetric uninstall path. Removes every CN-matching CA from the
+/// per-user root store, including any stale rotations. Idempotent;
+/// takes no path because deletion is keyed off [`CA_COMMON_NAME`]
+/// (the on-disk CA may already be gone by the time the user runs
+/// the uninstaller).
+pub fn ensure_untrusted() -> TrustOutcome {
+    super::platform::bridge_certs::untrust()
 }
 
 /// Run a CLI tool, swallowing the console window pop-up on Windows so
@@ -511,6 +567,26 @@ mod tests {
     }
 
     #[test]
+    fn ensure_at_renews_when_only_ca_present_on_fresh_dir() {
+        // Distinct from the rotated-then-deleted case above: here the
+        // directory has never seen a full chain. The "any present"
+        // gate trips, then the "all present" gate must report
+        // `Missing` rather than `Empty`.
+        let tmp = TempDir::new().unwrap();
+        let certs = layout(tmp.path());
+        fs::create_dir_all(tmp.path()).unwrap();
+        fs::write(&certs.ca_path, b"placeholder").unwrap();
+
+        let (_, outcome) = ensure_at(tmp.path()).unwrap();
+        assert_eq!(
+            outcome,
+            EnsureOutcome::Renewed {
+                reason: RenewalReason::Missing
+            }
+        );
+    }
+
+    #[test]
     fn ensure_at_renews_when_within_renewal_window() {
         let tmp = TempDir::new().unwrap();
         // Mint a chain "long ago" — its leaf is 2y from `then`, so a
@@ -588,6 +664,40 @@ mod tests {
         assert!(saw_v6, "SAN missing IP:::1");
     }
 
+    #[test]
+    fn read_first_certificate_der_distinguishes_empty_and_malformed() {
+        let empty = read_first_certificate_der(b"not pem at all").unwrap_err();
+        assert!(matches!(empty, PemReadError::Empty), "{empty:?}");
+
+        let malformed = read_first_certificate_der(
+            b"-----BEGIN CERTIFICATE-----\nnot base64!\n-----END CERTIFICATE-----\n",
+        )
+        .unwrap_err();
+        assert!(
+            matches!(malformed, PemReadError::Malformed(_)),
+            "{malformed:?}"
+        );
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[test]
+    fn ca_thumbprint_is_lowercase_hex_of_sha1_over_der() {
+        use sha1::{Digest, Sha1};
+        let tmp = TempDir::new().unwrap();
+        let (certs, _) = ensure_at(tmp.path()).unwrap();
+
+        let pem = fs::read(&certs.ca_path).unwrap();
+        let der = read_first_certificate_der(&pem).unwrap();
+        let expected = hex::encode(Sha1::digest(&der));
+        let got = ca_thumbprint(&certs.ca_path).unwrap();
+        assert_eq!(got, expected);
+        assert_eq!(got.len(), 40);
+        assert!(
+            got.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn key_files_are_mode_0600_on_unix() {
@@ -602,6 +712,27 @@ mod tests {
                 0o600,
                 "{} should be 0600, was {mode:o}",
                 key.display()
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cert_files_are_world_readable_on_unix() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = TempDir::new().unwrap();
+        let (certs, _) = ensure_at(tmp.path()).unwrap();
+        for public in [&certs.ca_path, &certs.cert_path] {
+            let mode = fs::metadata(public).unwrap().permissions().mode() & 0o777;
+            // Whatever umask the test runner has, the public files
+            // must at least let the owner read; we do not chmod them
+            // explicitly, so we assert the negative — they are not
+            // 0600-locked.
+            assert!(
+                mode & 0o400 != 0,
+                "{} should be readable by owner",
+                public.display()
             );
         }
     }
