@@ -1,3 +1,4 @@
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -28,34 +29,28 @@ pub struct WordDocumentAsset {
 /// rest of the activity pipeline can dedupe, store, and reference the
 /// asset independently of the document's title or content.
 ///
+/// Construct via [`WordAsset::builder`]; `id` is optional and defaults
+/// to a freshly allocated v4 UUID. The [`From<WordDocumentAsset>`] impl
+/// is a thin wrapper around the builder for the common "promote a wire
+/// payload" path.
+///
 /// Only the wire shape ([`WordDocumentAsset`]) participates in
 /// TypeScript codegen; this type stays Rust-only.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Builder)]
+#[builder(on(String, into))]
 pub struct WordAsset {
+    #[builder(default = uuid::Uuid::new_v4().to_string())]
     pub id: String,
     pub document_name: String,
     pub text: String,
 }
 
-impl WordAsset {
-    /// Build a [`WordAsset`] from already-known fields, e.g. for tests
-    /// or when reconstructing from storage.
-    pub fn new(id: String, document_name: String, text: String) -> Self {
-        Self {
-            id,
-            document_name,
-            text,
-        }
-    }
-}
-
 impl From<WordDocumentAsset> for WordAsset {
     fn from(wire: WordDocumentAsset) -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            document_name: wire.document_name,
-            text: wire.text,
-        }
+        Self::builder()
+            .document_name(wire.document_name)
+            .text(wire.text)
+            .build()
     }
 }
 
@@ -84,7 +79,7 @@ mod tests {
     }
 
     #[test]
-    fn word_asset_assigns_unique_ids_when_built_from_wire() {
+    fn from_wire_assigns_unique_ids_per_call() {
         let wire = WordDocumentAsset {
             document_name: "Doc.docx".into(),
             text: "body".into(),
@@ -93,18 +88,31 @@ mod tests {
         let a = WordAsset::from(wire.clone());
         let b = WordAsset::from(wire);
 
-        assert_ne!(a.id, b.id, "each wrap must allocate a fresh UUID");
+        assert_ne!(a.id, b.id, "each conversion must allocate a fresh UUID");
         assert_eq!(a.document_name, "Doc.docx");
         assert_eq!(a.text, "body");
     }
 
     #[test]
-    fn word_asset_round_trips() {
-        let asset = WordAsset::new(
-            "11111111-1111-1111-1111-111111111111".into(),
-            "Notes.docx".into(),
-            "Some body text.".into(),
+    fn builder_auto_mints_uuid_when_id_omitted() {
+        let asset = WordAsset::builder()
+            .document_name("Notes.docx")
+            .text("body")
+            .build();
+        assert!(
+            uuid::Uuid::parse_str(&asset.id).is_ok(),
+            "auto-minted id must parse as a UUID, got {:?}",
+            asset.id,
         );
+    }
+
+    #[test]
+    fn word_asset_round_trips() {
+        let asset = WordAsset::builder()
+            .id(uuid::Uuid::nil().to_string())
+            .document_name("Notes.docx")
+            .text("Some body text.")
+            .build();
 
         let json = serde_json::to_string(&asset).expect("serialize");
         let round_tripped: WordAsset = serde_json::from_str(&json).expect("deserialize");
