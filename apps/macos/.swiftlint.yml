@@ -4,3 +4,9 @@ excluded:
     - Pods
     - Carthage
     - Shared/Generated
+
+# Align with SwiftFormat (--commas always) and modern Swift style: multi-line
+# collection literals must end with a trailing comma. Cleaner diffs and avoids
+# the linter/formatter fighting each other.
+trailing_comma:
+    mandatory_comma: true
