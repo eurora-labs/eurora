@@ -11,7 +11,7 @@
 	import type { Snippet } from 'svelte';
 
 	const auth = inject(AUTH_SERVICE);
-	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
+	const { apiUrl: API_URL } = inject(CONFIG_SERVICE);
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID ?? '';
 	const CHECKOUT_REDIRECT = '/pricing?checkout=true';
@@ -44,7 +44,7 @@
 				return;
 			}
 
-			const res = await fetch(`${REST_API_URL}/payment/checkout`, {
+			const res = await fetch(`${API_URL}/payment/checkout`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

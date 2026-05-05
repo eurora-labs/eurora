@@ -3,11 +3,8 @@
 //! This crate is the single source of truth for the JSON contract between
 //! `be-thread-service` (Axum + WebSocket) and `euro-tauri` (reqwest +
 //! tokio-tungstenite), and is also the input to the TypeScript bindings
-//! emitted by the bundled `codegen` binary:
-//!
-//! ```text
-//! cargo run -p thread-core --features codegen --bin thread-core-codegen
-//! ```
+//! emitted by the workspace-level `euro-api-codegen` orchestrator
+//! (`pnpm specta:backend`).
 //!
 //! Types are pure data with `serde` derives; the optional `specta` feature
 //! adds `specta::Type` so the same definitions can be re-exported as TS.

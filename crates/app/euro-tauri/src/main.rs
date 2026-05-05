@@ -447,7 +447,7 @@ fn init_state(
     let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
 
     let thread_manager =
-        euro_thread::ThreadManager::new(endpoint_manager.subscribe(), auth_manager.clone());
+        euro_thread::ThreadManager::new(endpoint_manager.clone(), auth_manager.clone());
     app_handle.manage(SharedThreadManager::new(thread_manager));
 
     let timeline = euro_timeline::TimelineManager::builder()
@@ -673,7 +673,7 @@ fn main() {
                                 || target.starts_with("agent_graph")
                                 || target.starts_with("auth_core")
                                 || target.starts_with("focus_tracker")
-                                || target.starts_with("proto_gen");
+                                || target.starts_with("thread_core");
                             let is_webview = target.starts_with("webview");
                             let is_warning_or_above = *metadata.level() <= tracing::Level::WARN;
                             is_euro_crate || is_common_crate || is_webview || is_warning_or_above

@@ -2,7 +2,7 @@
 name = "activity-core"
 version = "0.0.0"
 edition.workspace = true
-description = "Shared HTTP wire types for the Eurora activity service. Consumed by both the backend (be-activity-service) and the desktop app (euro-activity), and exported as TypeScript bindings via specta."
+description = "Shared HTTP wire types for the Eurora activity service. Consumed by both the backend (be-activity-service) and the desktop app (euro-activity), and exported as TypeScript bindings via the workspace-level `euro-api-codegen` orchestrator."
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
@@ -16,18 +16,9 @@ specta = { workspace = true, optional = true, features = [
   "uuid",
 ] }
 
-anyhow = { workspace = true, optional = true }
-specta-typescript = { version = "0.0.10", optional = true }
-
 [dev-dependencies]
 serde_json = { workspace = true }
 
 [features]
 default = []
 specta = ["dep:specta"]
-codegen = ["specta", "dep:anyhow", "dep:specta-typescript"]
-
-[[bin]]
-name = "activity-core-codegen"
-path = "src/bin/codegen.rs"
-required-features = ["codegen"]

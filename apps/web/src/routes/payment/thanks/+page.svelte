@@ -12,7 +12,7 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	const auth = inject(AUTH_SERVICE);
-	const REST_API_URL = inject(CONFIG_SERVICE).restApiUrl;
+	const API_URL = inject(CONFIG_SERVICE).apiUrl;
 
 	let status = $state<'loading' | 'complete' | 'failed'>('loading');
 	let countdown = $state(5);
@@ -34,7 +34,7 @@
 			await auth.ensureValidToken();
 
 			const res = await fetch(
-				`${REST_API_URL}/payment/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
+				`${API_URL}/payment/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
 				{
 					headers: {
 						Authorization: `Bearer ${auth.accessToken}`,

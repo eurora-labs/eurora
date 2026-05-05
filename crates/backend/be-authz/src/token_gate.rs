@@ -1,12 +1,6 @@
 use axum::http::Method;
 use be_remote_db::{DatabaseManager, DbResult, year_month_key};
-use tonic::Status;
 use uuid::Uuid;
-
-const TOKEN_GATED_METHODS: &[(&str, &str)] = &[
-    ("thread_service.ProtoThreadService", "ChatStream"),
-    ("thread_service.ProtoThreadService", "GenerateThreadTitle"),
-];
 
 /// HTTP routes that consume token budget.
 ///
@@ -17,12 +11,6 @@ const HTTP_TOKEN_GATED_ROUTES: &[(Method, &str)] = &[
     (Method::POST, "/threads/{thread_id}/title"),
     (Method::GET, "/threads/{thread_id}/chat"),
 ];
-
-pub(crate) fn is_token_gated(service_full: &str, method: &str) -> bool {
-    TOKEN_GATED_METHODS
-        .iter()
-        .any(|(s, m)| *s == service_full && *m == method)
-}
 
 /// True if the (method, matched_path) tuple identifies a route whose call
 /// must be rejected when the caller is over their monthly token budget.
@@ -74,9 +62,8 @@ impl<T: TokenUsageRepo> TokenUsageRepo for std::sync::Arc<T> {
 }
 
 /// Outcome of an HTTP token-limit check. Convertible to an axum response
-/// upstream — kept as a dedicated enum (rather than [`tonic::Status`] or an
-/// `axum::http::StatusCode`) so the wire layer can be picked at the call
-/// site without dragging gRPC types into the HTTP path.
+/// upstream — kept as a dedicated enum so the wire layer can be picked at
+/// the call site.
 #[derive(Debug, Clone)]
 pub enum TokenGateError {
     /// Caller has exceeded their monthly budget.
@@ -85,28 +72,7 @@ pub enum TokenGateError {
     Internal,
 }
 
-pub(crate) async fn check_token_limit(
-    db: &impl TokenUsageRepo,
-    user_id: Uuid,
-) -> Result<(), Status> {
-    match check_token_limit_inner(db, user_id).await {
-        Ok(()) => Ok(()),
-        Err(TokenGateError::Exhausted { .. }) => Err(Status::resource_exhausted(
-            "Monthly token limit reached. Please upgrade your plan.",
-        )),
-        Err(TokenGateError::Internal) => Err(Status::internal("Failed to check token limit")),
-    }
-}
-
-/// Same check, surfaced as a [`TokenGateError`] for the HTTP middleware path.
 pub async fn check_token_limit_http(
-    db: &(impl TokenUsageRepo + ?Sized),
-    user_id: Uuid,
-) -> Result<(), TokenGateError> {
-    check_token_limit_inner(db, user_id).await
-}
-
-async fn check_token_limit_inner(
     db: &(impl TokenUsageRepo + ?Sized),
     user_id: Uuid,
 ) -> Result<(), TokenGateError> {
@@ -135,32 +101,30 @@ mod tests {
     use be_remote_db::DbError;
 
     #[test]
-    fn gated_methods_match() {
-        assert!(is_token_gated(
-            "thread_service.ProtoThreadService",
-            "ChatStream"
+    fn http_gated_routes_match() {
+        assert!(is_http_token_gated(
+            &Method::POST,
+            "/threads/{thread_id}/title"
         ));
-        assert!(is_token_gated(
-            "thread_service.ProtoThreadService",
-            "GenerateThreadTitle"
+        assert!(is_http_token_gated(
+            &Method::GET,
+            "/threads/{thread_id}/chat"
         ));
     }
 
     #[test]
-    fn non_gated_methods_pass() {
-        assert!(!is_token_gated(
-            "thread_service.ProtoThreadService",
-            "ListThreads"
+    fn http_non_gated_routes_pass() {
+        assert!(!is_http_token_gated(&Method::GET, "/threads"));
+        assert!(!is_http_token_gated(&Method::POST, "/threads"));
+        assert!(!is_http_token_gated(
+            &Method::GET,
+            "/threads/{thread_id}/messages"
         ));
-        assert!(!is_token_gated(
-            "thread_service.ProtoThreadService",
-            "GetMessages"
+        // Method must match exactly.
+        assert!(!is_http_token_gated(
+            &Method::POST,
+            "/threads/{thread_id}/chat"
         ));
-        assert!(!is_token_gated(
-            "auth_service.ProtoAuthService",
-            "ChatStream"
-        ));
-        assert!(!is_token_gated("", ""));
     }
 
     struct MockRepo {
@@ -204,28 +168,36 @@ mod tests {
     #[tokio::test]
     async fn check_token_limit_enforces_limit() {
         let repo = MockRepo::ok(1000, 1000);
-        let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
-        assert_eq!(err.code(), tonic::Code::ResourceExhausted);
+        assert!(matches!(
+            check_token_limit_http(&repo, Uuid::nil()).await,
+            Err(TokenGateError::Exhausted { .. })
+        ));
 
         let repo = MockRepo::ok(1000, 1500);
-        let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
-        assert_eq!(err.code(), tonic::Code::ResourceExhausted);
+        assert!(matches!(
+            check_token_limit_http(&repo, Uuid::nil()).await,
+            Err(TokenGateError::Exhausted { .. })
+        ));
 
         let repo = MockRepo::ok(1000, 999);
-        assert!(check_token_limit(&repo, Uuid::nil()).await.is_ok());
+        assert!(check_token_limit_http(&repo, Uuid::nil()).await.is_ok());
     }
 
     #[tokio::test]
     async fn check_token_limit_zero_limit_blocks() {
         let repo = MockRepo::ok(0, 0);
-        let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
-        assert_eq!(err.code(), tonic::Code::ResourceExhausted);
+        assert!(matches!(
+            check_token_limit_http(&repo, Uuid::nil()).await,
+            Err(TokenGateError::Exhausted { .. })
+        ));
     }
 
     #[tokio::test]
     async fn check_token_limit_maps_db_error() {
         let repo = MockRepo::err(DbError::connection("db went away"));
-        let err = check_token_limit(&repo, Uuid::nil()).await.unwrap_err();
-        assert_eq!(err.code(), tonic::Code::Internal);
+        assert!(matches!(
+            check_token_limit_http(&repo, Uuid::nil()).await,
+            Err(TokenGateError::Internal)
+        ));
     }
 }

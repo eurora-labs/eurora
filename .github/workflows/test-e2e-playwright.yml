@@ -15,7 +15,7 @@ concurrency:
 
 env:
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
-    VITE_GRPC_API_URL: http://localhost:50051
+    VITE_API_URL: http://localhost:3000
 
 jobs:
     test:

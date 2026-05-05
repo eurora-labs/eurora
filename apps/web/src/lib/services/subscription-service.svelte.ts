@@ -35,7 +35,7 @@ export class SubscriptionService {
 			await this.#auth.ensureValidToken();
 			const token = this.#auth.accessToken;
 
-			const res = await fetch(`${this.#config.restApiUrl}/payment/subscription`, {
+			const res = await fetch(`${this.#config.apiUrl}/payment/subscription`, {
 				headers: { Authorization: `Bearer ${token}` },
 			});
 

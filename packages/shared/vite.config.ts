@@ -43,9 +43,6 @@ export default defineConfig({
 		},
 		outDir: 'dist',
 		sourcemap: true,
-		rollupOptions: {
-			external: [/^@bufbuild\//, /^@connectrpc\//],
-		},
 	},
 	test: {
 		include: ['src/**/*.(test|spec).?(m)[jt]s?(x)'],

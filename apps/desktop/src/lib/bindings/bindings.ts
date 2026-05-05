@@ -18,23 +18,11 @@ export type AccentColor = {
 	icon_bg: string,
 };
 
-export type Annotation = { Citation: ProtoCitation } | { NonStandard: ProtoNonStandardAnnotation };
-
 export type AppSettings = {
 	general: GeneralSettings,
 	telemetry: TelemetrySettings,
 	api: APISettings,
 };
-
-export type BaseMessageWithSibling = {
-	parent_id: string,
-	message: ProtoBaseMessage | null,
-	children: BaseMessageWithSibling[],
-	sibling_index: number,
-	depth: number,
-};
-
-export type Block = { Text: ProtoTextContentBlock } | { InvalidToolCall: ProtoInvalidToolCallBlock } | { Reasoning: ProtoReasoningContentBlock } | { NonStandard: ProtoNonStandardContentBlock } | { Image: ProtoImageContentBlock } | { Video: ProtoVideoContentBlock } | { Audio: ProtoAudioContentBlock } | { PlainText: ProtoPlainTextContentBlock } | { File: ProtoFileContentBlock } | { ToolCall: ProtoToolCallBlock } | { ToolCallChunk: ProtoToolCallChunkBlock } | { ServerToolCall: ProtoServerToolCall } | { ServerToolCallChunk: ProtoServerToolCallChunk } | { ServerToolResult: ProtoServerToolResult };
 
 /**
  *  Push payload describing whether a given browser process currently has a
@@ -47,13 +35,25 @@ export type BrowserExtensionStatus = {
 	connected: boolean,
 };
 
-export type ChatStreamFinalMessage = {
-	messages: BaseMessageWithSibling[],
-};
-
-export type ChatStreamResponse = {
-	payload: Payload | null,
-};
+/**
+ *  Frame sent by the server over the chat WebSocket.
+ * 
+ *  `chunk` carries an `AIMessageChunk` JSON; the client should accumulate
+ *  chunks (using agent-chain's chunk-merge semantics) and replace placeholder
+ *  state with the `final_messages` payload when the turn ends.
+ */
+export type ChatServerMessage = 
+// The user's message has been persisted; clients should display it.
+{ type: "confirmed_human_message"; message: MessageNode } | 
+// One streaming chunk from the AI.
+{ type: "chunk"; chunk: unknown } | 
+/**
+ *  The turn ended successfully; tree positions for everything that was
+ *  persisted during this turn (human + AI + any tool messages).
+ */
+{ type: "final"; messages: MessageNode[] } | 
+// The turn aborted with an error. The connection is closed after this.
+{ type: "error"; kind: string; message: string };
 
 export type Claims = {
 	sub: string,
@@ -84,8 +84,6 @@ export type GeneralSettings = {
 	autostart: boolean,
 };
 
-export type Index = { IntIndex: bigint } | { StrIndex: string };
-
 export type LocalBackendInfo = {
 	grpc_port: number,
 	http_port: number,
@@ -98,274 +96,23 @@ export type LoginToken = {
 	url: string,
 };
 
-export type Message = { Human: ProtoHumanMessage } | { System: ProtoSystemMessage } | { Ai: ProtoAiMessage } | { Tool: ProtoToolMessage } | { Chat: ProtoChatMessage } | { Remove: ProtoRemoveMessage };
-
-export type Payload = { Chunk: ProtoAiMessageChunk } | { FinalMessage: ChatStreamFinalMessage } | { ConfirmedHumanMessage: BaseMessageWithSibling };
-
-export type ProtoAiMessage = {
-	content: ProtoContentBlock[],
-	id: string | null,
-	name: string | null,
-	tool_calls: ProtoToolCall[],
-	invalid_tool_calls: ProtoInvalidToolCall[],
-	usage_metadata: ProtoUsageMetadata | null,
-	additional_kwargs: string | null,
-	response_metadata: string | null,
-};
-
-export type ProtoAiMessageChunk = {
-	content: ProtoContentBlock[],
-	id: string | null,
-	name: string | null,
-	tool_calls: ProtoToolCall[],
-	invalid_tool_calls: ProtoInvalidToolCall[],
-	tool_call_chunks: ProtoToolCallChunk[],
-	usage_metadata: ProtoUsageMetadata | null,
-	additional_kwargs: string | null,
-	response_metadata: string | null,
-	chunk_position: number | null,
-};
-
-export type ProtoAnnotation = {
-	annotation: Annotation | null,
-};
-
-export type ProtoAudioContentBlock = {
-	id: string | null,
-	file_id: string | null,
-	mime_type: string | null,
-	index: ProtoBlockIndex | null,
-	url: string | null,
-	base64: string | null,
-	extras: string | null,
-};
-
-export type ProtoBaseMessage = {
-	message: Message | null,
-};
-
-export type ProtoBlockIndex = {
-	index: Index | null,
-};
-
-export type ProtoChatMessage = {
-	content: ProtoContentBlock[],
-	role: string,
-	id: string | null,
-	name: string | null,
-	additional_kwargs: string | null,
-	response_metadata: string | null,
-};
-
-export type ProtoCitation = {
-	id: string | null,
-	url: string | null,
-	title: string | null,
-	start_index: bigint | null,
-	end_index: bigint | null,
-	cited_text: string | null,
-	extras: string | null,
-};
-
-export type ProtoContentBlock = {
-	block: Block | null,
-};
-
-export type ProtoFileContentBlock = {
-	id: string | null,
-	file_id: string | null,
-	mime_type: string | null,
-	index: ProtoBlockIndex | null,
-	url: string | null,
-	base64: string | null,
-	extras: string | null,
-};
-
-export type ProtoHumanMessage = {
-	content: ProtoContentBlock[],
-	id: string | null,
-	name: string | null,
-	additional_kwargs: string | null,
-	response_metadata: string | null,
-};
-
-export type ProtoImageContentBlock = {
-	id: string | null,
-	file_id: string | null,
-	mime_type: string | null,
-	index: ProtoBlockIndex | null,
-	url: string | null,
-	base64: string | null,
-	extras: string | null,
-};
-
-export type ProtoInputTokenDetails = {
-	audio: bigint | null,
-	cache_creation: bigint | null,
-	cache_read: bigint | null,
-	extra: string | null,
-};
-
-export type ProtoInvalidToolCall = {
-	name: string | null,
-	args: string | null,
-	id: string | null,
-	error: string | null,
-	call_type: string | null,
-};
-
-export type ProtoInvalidToolCallBlock = {
-	id: string | null,
-	name: string | null,
-	args: string | null,
-	error: string | null,
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoNonStandardAnnotation = {
-	id: string | null,
-	value: string,
-};
-
-export type ProtoNonStandardContentBlock = {
-	id: string | null,
-	value: string,
-	index: ProtoBlockIndex | null,
-};
-
-export type ProtoOutputTokenDetails = {
-	audio: bigint | null,
-	reasoning: bigint | null,
-	extra: string | null,
-};
-
-export type ProtoPlainTextContentBlock = {
-	id: string | null,
-	file_id: string | null,
-	mime_type: string,
-	index: ProtoBlockIndex | null,
-	url: string | null,
-	base64: string | null,
-	text: string | null,
-	title: string | null,
-	context: string | null,
-	extras: string | null,
-};
-
-export type ProtoReasoningContentBlock = {
-	id: string | null,
-	reasoning: string | null,
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoRemoveMessage = {
-	id: string,
-	name: string | null,
-	additional_kwargs: string | null,
-	response_metadata: string | null,
-};
-
-export type ProtoServerToolCall = {
-	id: string,
-	name: string,
-	args: string,
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoServerToolCallChunk = {
-	name: string | null,
-	args: string | null,
-	id: string | null,
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoServerToolResult = {
-	id: string | null,
-	tool_call_id: string,
-	status: number,
-	output: string | null,
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoSystemMessage = {
-	content: ProtoContentBlock[],
-	id: string | null,
-	name: string | null,
-	additional_kwargs: string | null,
-	response_metadata: string | null,
-};
-
-export type ProtoTextContentBlock = {
-	id: string | null,
-	text: string,
-	annotations: ProtoAnnotation[],
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoToolCall = {
-	id: string | null,
-	name: string,
-	args: string,
-	call_type: string | null,
-};
-
-export type ProtoToolCallBlock = {
-	id: string | null,
-	name: string,
-	args: string,
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoToolCallChunk = {
-	name: string | null,
-	args: string | null,
-	id: string | null,
-	index: number | null,
-	chunk_type: string | null,
-};
-
-export type ProtoToolCallChunkBlock = {
-	id: string | null,
-	name: string | null,
-	args: string | null,
-	index: ProtoBlockIndex | null,
-	extras: string | null,
-};
-
-export type ProtoToolMessage = {
-	content: ProtoContentBlock[],
-	tool_call_id: string,
-	id: string | null,
-	name: string | null,
-	status: number,
-	artifact: string | null,
-	additional_kwargs: string | null,
-	response_metadata: string | null,
-};
-
-export type ProtoUsageMetadata = {
-	input_tokens: bigint,
-	output_tokens: bigint,
-	total_tokens: bigint,
-	input_token_details: ProtoInputTokenDetails | null,
-	output_token_details: ProtoOutputTokenDetails | null,
-};
-
-export type ProtoVideoContentBlock = {
-	id: string | null,
-	file_id: string | null,
-	mime_type: string | null,
-	index: ProtoBlockIndex | null,
-	url: string | null,
-	base64: string | null,
-	extras: string | null,
+/**
+ *  One node in the message tree returned by message-list endpoints.
+ * 
+ *  `message` is an `agent_chain::AnyMessage` serialized as JSON. We type the
+ *  field as [`serde_json::Value`] so this crate stays free of the agent-chain
+ *  dependency, and override the TypeScript representation to `unknown` so
+ *  the frontend converter narrows it explicitly. The same trick on
+ *  `children` works around `specta-typescript`'s lack of recursive type
+ *  references at this version (it would inline the type and stack-overflow);
+ *  the runtime JSON shape is still a real recursive `MessageNode` tree.
+ */
+export type MessageNode = {
+	parent_id?: string | null,
+	message: unknown,
+	children?: unknown[],
+	sibling_index: number,
+	depth: number,
 };
 
 export type Query = {
@@ -458,7 +205,7 @@ refresh_session: () => Promise<null>,
 register: (email: string, password: string) => Promise<null>, 
 resend_verification_email: () => Promise<null>},
 "chat": {cancel_query: (threadId: string) => Promise<null>, 
-send_query: (threadId: string, channel: TAURI_CHANNEL<ChatStreamResponse>, query: Query) => Promise<null>},
+send_query: (threadId: string, channel: TAURI_CHANNEL<ChatServerMessage>, query: Query) => Promise<null>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "onboarding": {get_browser_extension_download_url: () => Promise<string>},
@@ -500,12 +247,12 @@ save_api_key: (apiKey: string) => Promise<null>},
 current_thread_changed: (thread: Thread) => Promise<void>, 
 delete: (threadId: string) => Promise<null>, 
 generate_title: (threadId: string, content: string) => Promise<Thread>, 
-get_messages: (threadId: string, limit: number, offset: number, allVariants: boolean) => Promise<BaseMessageWithSibling[]>, 
+get_messages: (threadId: string, limit: number, offset: number, allVariants: boolean) => Promise<MessageNode[]>, 
 list: (limit: number, offset: number) => Promise<Thread[]>, 
 new_thread_added: (thread: Thread) => Promise<void>, 
 search_messages: (query: string, limit: number, offset: number) => Promise<SearchMessageResultView[]>, 
 search_threads: (query: string, limit: number, offset: number) => Promise<SearchThreadResultView[]>, 
-switch_branch: (threadId: string, messageId: string, direction: number) => Promise<BaseMessageWithSibling[]>, 
+switch_branch: (threadId: string, messageId: string, direction: number) => Promise<MessageNode[]>, 
 thread_title_changed: (thread: Thread) => Promise<void>},
 "timeline": {list: () => Promise<string[]>, 
 new_app_event: (event: TimelineAppEvent) => Promise<void>, 
