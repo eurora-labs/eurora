@@ -1,24 +1,22 @@
 import { browser } from '$app/environment';
-import { create } from '@bufbuild/protobuf';
-import { EmptySchema } from '@bufbuild/protobuf/wkt';
-import { createClient, type Client } from '@connectrpc/connect';
-import { createGrpcWebTransport } from '@connectrpc/connect-web';
+import { ApiClient, ApiError } from '$lib/api/client.js';
 import { InjectionToken } from '@eurora/shared/context';
-import {
-	AssociateLoginTokenRequestSchema,
-	CheckEmailRequestSchema,
-	LoginRequestSchema,
-	ProtoAuthService,
-	Provider,
-	RefreshTokenRequestSchema,
-	RegisterRequestSchema,
-	VerifyEmailRequestSchema,
-	type TokenResponse,
-} from '@eurora/shared/proto/auth_service_pb.js';
 import * as Sentry from '@sentry/sveltekit';
+import type {
+	AssociateLoginTokenRequest,
+	CheckEmailRequest,
+	CheckEmailResponse,
+	LoginRequest,
+	Provider,
+	RegisterRequest,
+	ThirdPartyAuthUrlRequest,
+	ThirdPartyAuthUrlResponse,
+	TokenResponse,
+	VerifyEmailRequest,
+} from '@eurora/shared/bindings/auth';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
-export type OAuthProvider = 'google' | 'github';
+export type OAuthProvider = Provider;
 
 export interface User {
 	id: string;
@@ -31,7 +29,7 @@ export interface User {
 export type CheckEmailResult =
 	| { status: 'oauth'; provider: OAuthProvider }
 	| { status: 'not_found' }
-	| { status: 'exists' };
+	| { status: 'password' };
 
 const COOKIE_KEYS = {
 	ACCESS_TOKEN: 'eurora_access_token',
@@ -47,33 +45,31 @@ export class AuthService {
 	user = $state<User | null>(null);
 	accessToken = $state<string | null>(null);
 
-	readonly #config: ConfigService;
+	readonly #api: ApiClient;
 	#refreshTokenValue: string | null = null;
 	#expiresAt: number | null = null;
-	#client: Client<typeof ProtoAuthService> | null = null;
 	#refreshInflight: Promise<void> | null = null;
 
 	constructor(config: ConfigService) {
-		this.#config = config;
+		this.#api = new ApiClient(config);
 		if (browser) this.#hydrateFromCookies();
 	}
 
 	async login(email: string, password: string): Promise<void> {
-		const tokens = await this.#grpc.login(
-			create(LoginRequestSchema, {
-				credential: {
-					case: 'emailPassword',
-					value: { login: email, password },
-				},
-			}),
-		);
+		const body: LoginRequest = { kind: 'email_password', login: email, password };
+		const tokens = await this.#api.fetch<TokenResponse, LoginRequest>('/auth/login', { body });
 		this.#setSession(tokens);
 	}
 
 	async register(email: string, password: string, displayName?: string): Promise<void> {
-		const tokens = await this.#grpc.register(
-			create(RegisterRequestSchema, { email, password, displayName }),
-		);
+		const body: RegisterRequest = {
+			email,
+			password,
+			display_name: displayName ?? null,
+		};
+		const tokens = await this.#api.fetch<TokenResponse, RegisterRequest>('/auth/register', {
+			body,
+		});
 		this.#setSession(tokens);
 	}
 
@@ -81,27 +77,25 @@ export class AuthService {
 		provider: OAuthProvider,
 		code: string,
 		state: string,
-		opts?: { loginToken?: string; challengeMethod?: string },
+		opts?: { loginToken?: string },
 	): Promise<void> {
-		const tokens = await this.#grpc.login(
-			create(LoginRequestSchema, {
-				credential: {
-					case: 'thirdParty',
-					value: {
-						provider: toProtoProvider(provider),
-						code,
-						state,
-						loginToken: opts?.loginToken,
-						challengeMethod: opts?.challengeMethod,
-					},
-				},
-			}),
-		);
+		const body: LoginRequest = {
+			kind: 'third_party',
+			provider,
+			code,
+			state,
+			login_token: opts?.loginToken ?? null,
+		};
+		const tokens = await this.#api.fetch<TokenResponse, LoginRequest>('/auth/login', { body });
 		this.#setSession(tokens);
 	}
 
 	async verifyEmail(token: string): Promise<void> {
-		const tokens = await this.#grpc.verifyEmail(create(VerifyEmailRequestSchema, { token }));
+		const body: VerifyEmailRequest = { token };
+		const tokens = await this.#api.fetch<TokenResponse, VerifyEmailRequest>(
+			'/auth/email/verify',
+			{ body },
+		);
 		this.#setSession(tokens);
 	}
 
@@ -110,26 +104,38 @@ export class AuthService {
 		if (!accessToken) {
 			throw new Error('Cannot resend verification email without an active session');
 		}
-		await this.#grpc.resendVerificationEmail(create(EmptySchema), {
-			headers: new Headers({ authorization: `Bearer ${accessToken}` }),
+		await this.#api.fetch<void>('/auth/email/resend-verification', {
+			method: 'POST',
+			bearerToken: accessToken,
 		});
 	}
 
 	async checkEmail(email: string): Promise<CheckEmailResult> {
-		const resp = await this.#grpc.checkEmail(create(CheckEmailRequestSchema, { email }));
-		if (resp.status === 'oauth') {
-			const provider = fromProtoProvider(resp.provider);
-			if (!provider) {
-				throw new Error('Unknown OAuth provider returned for email check');
+		const body: CheckEmailRequest = { email };
+		const resp = await this.#api.fetch<CheckEmailResponse, CheckEmailRequest>(
+			'/auth/email/check',
+			{ body },
+		);
+		switch (resp.status) {
+			case 'oauth': {
+				if (!resp.provider) {
+					throw new Error('Auth service returned `oauth` status without a provider');
+				}
+				return { status: 'oauth', provider: resp.provider };
 			}
-			return { status: 'oauth', provider };
+			case 'not_found':
+				return { status: 'not_found' };
+			case 'password':
+				return { status: 'password' };
 		}
-		if (resp.status === 'not_found') return { status: 'not_found' };
-		return { status: 'exists' };
 	}
 
 	async getOAuthRedirectUrl(provider: OAuthProvider): Promise<string> {
-		const resp = await this.#grpc.getThirdPartyAuthUrl({ provider: toProtoProvider(provider) });
+		const body: ThirdPartyAuthUrlRequest = { provider };
+		const resp = await this.#api.fetch<ThirdPartyAuthUrlResponse, ThirdPartyAuthUrlRequest>(
+			'/auth/oauth/url',
+			{ body },
+		);
 		return resp.url;
 	}
 
@@ -153,10 +159,11 @@ export class AuthService {
 		if (!accessToken) {
 			throw new Error('Cannot associate desktop login without an active session');
 		}
-		await this.#grpc.associateLoginToken(
-			create(AssociateLoginTokenRequestSchema, { codeChallenge: loginToken }),
-			{ headers: new Headers({ authorization: `Bearer ${accessToken}` }) },
-		);
+		const body: AssociateLoginTokenRequest = { code_challenge: loginToken };
+		await this.#api.fetch<void, AssociateLoginTokenRequest>('/auth/login-token/associate', {
+			body,
+			bearerToken: accessToken,
+		});
 		if (browser) {
 			sessionStorage.removeItem('loginToken');
 			sessionStorage.removeItem('challengeMethod');
@@ -197,57 +204,51 @@ export class AuthService {
 		this.#expiresAt = null;
 	}
 
-	get #grpc(): Client<typeof ProtoAuthService> {
-		this.#client ??= createClient(
-			ProtoAuthService,
-			createGrpcWebTransport({
-				baseUrl: this.#config.grpcApiUrl,
-				useBinaryFormat: true,
-			}),
-		);
-		return this.#client;
-	}
-
 	async #refresh(): Promise<void> {
 		if (!this.#refreshTokenValue) {
 			throw new Error('No refresh token available');
 		}
 		try {
-			const tokens = await this.#grpc.refreshToken(create(RefreshTokenRequestSchema, {}));
+			const tokens = await this.#api.fetch<TokenResponse>('/auth/refresh', {
+				method: 'POST',
+				bearerToken: this.#refreshTokenValue,
+			});
 			// Re-derive the user from the new access token: fields like
 			// `emailVerified` can flip mid-session (e.g. user clicks the
 			// verification link in another tab) and we want the cookie + state
 			// to reflect the new claims.
-			const user = userFromAccessToken(tokens.accessToken);
+			const user = userFromAccessToken(tokens.access_token);
 			if (!user) {
 				throw new Error('Invalid refreshed access token');
 			}
 			this.#writeCookies(tokens, user);
 			this.user = user;
-			this.accessToken = tokens.accessToken;
-			this.#refreshTokenValue = tokens.refreshToken;
-			this.#expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
+			this.accessToken = tokens.access_token;
+			this.#refreshTokenValue = tokens.refresh_token;
+			this.#expiresAt = Date.now() + Number(tokens.expires_in) * 1000;
 		} catch (err) {
 			Sentry.captureException(err, { tags: { area: 'auth.refresh' } });
-			this.logout();
+			if (err instanceof ApiError && err.status === 401) {
+				this.logout();
+			}
 			throw err;
 		}
 	}
 
 	#setSession(tokens: TokenResponse): void {
-		const user = userFromAccessToken(tokens.accessToken);
+		const user = userFromAccessToken(tokens.access_token);
 		if (!user) {
 			throw new Error('Invalid access token');
 		}
-		const expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
+		const expiresAt = Date.now() + Number(tokens.expires_in) * 1000;
 
 		this.#writeCookies(tokens, user);
 		Sentry.setUser({ id: user.id });
 
 		this.isAuthenticated = true;
 		this.user = user;
-		this.accessToken = tokens.accessToken;
-		this.#refreshTokenValue = tokens.refreshToken;
+		this.accessToken = tokens.access_token;
+		this.#refreshTokenValue = tokens.refresh_token;
 		this.#expiresAt = expiresAt;
 	}
 
@@ -285,12 +286,12 @@ export class AuthService {
 
 	#writeCookies(tokens: TokenResponse, user: User): void {
 		if (!browser) return;
-		const expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
-		const accessMaxAge = Number(tokens.expiresIn);
+		const expiresAt = Date.now() + Number(tokens.expires_in) * 1000;
+		const accessMaxAge = Number(tokens.expires_in);
 		const sessionMaxAge = accessMaxAge * 10;
 
-		writeCookie(COOKIE_KEYS.ACCESS_TOKEN, tokens.accessToken, accessMaxAge);
-		writeCookie(COOKIE_KEYS.REFRESH_TOKEN, tokens.refreshToken, sessionMaxAge);
+		writeCookie(COOKIE_KEYS.ACCESS_TOKEN, tokens.access_token, accessMaxAge);
+		writeCookie(COOKIE_KEYS.REFRESH_TOKEN, tokens.refresh_token, sessionMaxAge);
 		writeCookie(COOKIE_KEYS.EXPIRES_AT, expiresAt.toString(), sessionMaxAge);
 		writeCookie(COOKIE_KEYS.USER, encodeURIComponent(JSON.stringify(user)), sessionMaxAge);
 	}
@@ -302,16 +303,6 @@ export class AuthService {
 }
 
 export const AUTH_SERVICE = new InjectionToken<AuthService>('AuthService');
-
-function toProtoProvider(provider: OAuthProvider): Provider {
-	return provider === 'google' ? Provider.GOOGLE : Provider.GITHUB;
-}
-
-function fromProtoProvider(provider: Provider | undefined): OAuthProvider | undefined {
-	if (provider === Provider.GOOGLE) return 'google';
-	if (provider === Provider.GITHUB) return 'github';
-	return undefined;
-}
 
 function writeCookie(name: string, value: string, maxAgeSec: number): void {
 	const secure = location.protocol === 'https:' ? '; secure' : '';

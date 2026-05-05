@@ -13,7 +13,7 @@
 
 	const auth = inject(AUTH_SERVICE);
 	const subscription = inject(SUBSCRIPTION_SERVICE);
-	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
+	const { apiUrl: API_URL } = inject(CONFIG_SERVICE);
 
 	let portalLoading = $state(false);
 	let portalError = $state<string | null>(null);
@@ -59,7 +59,7 @@
 		try {
 			await auth.ensureValidToken();
 
-			const res = await fetch(`${REST_API_URL}/payment/portal`, {
+			const res = await fetch(`${API_URL}/payment/portal`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',

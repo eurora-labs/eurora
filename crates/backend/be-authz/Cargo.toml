@@ -4,9 +4,6 @@ version = "0.0.0"
 edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
-[package.metadata.cargo-machete]
-ignored = ["tonic-prost"]
-
 [dependencies]
 async-trait = { workspace = true }
 auth-core = { workspace = true }
@@ -20,8 +17,6 @@ http = "1"
 percent-encoding = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tonic = { workspace = true }
-tonic-prost = { workspace = true }
 tower = { workspace = true, features = ["util"] }
 tracing = { workspace = true }
 uuid = { workspace = true }

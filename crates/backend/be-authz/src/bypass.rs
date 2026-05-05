@@ -1,7 +1,6 @@
 pub(crate) const REST_BYPASS_PREFIXES: &[&str] =
     &["/releases/", "/extensions/", "/download/", "/auth/"];
 pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook", "/health"];
-pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &["grpc.health.v1.Health"];
 
 /// REST paths that still require a valid JWT but do not require
 /// `email_verified` to be true. Distinct from `REST_BYPASS_*`, which skips
@@ -35,10 +34,6 @@ pub fn is_rest_bypass(path: &str) -> bool {
         .iter()
         .any(|prefix| normalized.starts_with(prefix))
         || REST_BYPASS_EXACT.iter().any(|&exact| normalized == exact)
-}
-
-pub fn is_grpc_bypass(service: &str) -> bool {
-    GRPC_BYPASS_SERVICES.contains(&service)
 }
 
 pub fn is_email_verification_exempt(path: &str) -> bool {
@@ -149,17 +144,5 @@ mod tests {
             "/payment/checkout?session=abc"
         ));
         assert!(is_email_verification_exempt("/payment/checkout#x"));
-    }
-
-    #[test]
-    fn grpc_bypass_known_services() {
-        assert!(is_grpc_bypass("grpc.health.v1.Health"));
-    }
-
-    #[test]
-    fn grpc_bypass_rejects_non_matching() {
-        assert!(!is_grpc_bypass("thread_service.ProtoThreadService"));
-        assert!(!is_grpc_bypass("auth_service.ProtoAuthService"));
-        assert!(!is_grpc_bypass(""));
     }
 }

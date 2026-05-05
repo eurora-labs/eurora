@@ -1,13 +1,9 @@
 //! Shared wire types for the Eurora auth HTTP service.
 //!
 //! This crate is the single source of truth for the JSON contract between
-//! `be-auth-service` (Axum) and `euro-auth` (reqwest), and is also the
-//! input to the TypeScript bindings emitted by the bundled `codegen`
-//! binary:
-//!
-//! ```text
-//! cargo run -p auth-core --features codegen --bin auth-core-codegen
-//! ```
+//! `be-auth-service` (Axum) and the desktop / web HTTP clients, and is also
+//! the input to the TypeScript bindings emitted by the workspace-level
+//! `euro-api-codegen` orchestrator (`pnpm specta:backend`).
 //!
 //! Types are pure data with `serde` derives; the optional `specta` feature
 //! adds `specta::Type` so the same definitions can be re-exported as TS.
