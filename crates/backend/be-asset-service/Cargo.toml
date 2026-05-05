@@ -13,6 +13,6 @@ base64 = { workspace = true }
 be-asset = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
-tower-http = { version = "0.6.8", features = ["trace"] }
+tower-http = { workspace = true, features = ["trace"] }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }

@@ -4,6 +4,7 @@ use agent_chain::messages::{ContentBlock, ImageContentBlock, PlainTextContentBlo
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use base64::{Engine as _, engine::general_purpose};
+use be_auth_core::AuthUser;
 use be_remote_db::PaginationParams;
 use thread_core::{
     GetMessagesQuery, GetMessagesResponse, SavePreliminaryContentBlocksRequest,
@@ -11,7 +12,6 @@ use thread_core::{
 };
 use uuid::Uuid;
 
-use crate::auth::AuthUser;
 use crate::conversion::{build_branch_tree, build_full_tree};
 use crate::error::{ThreadServiceError, ThreadServiceResult};
 use crate::service::AppState;

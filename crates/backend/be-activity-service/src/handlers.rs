@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use activity_core::{
-    Activity as WireActivity, InsertActivityRequest, InsertActivityResponse, ListActivitiesQuery,
-    ListActivitiesResponse,
+    Activity as WireActivity, DEFAULT_LIST_LIMIT, InsertActivityRequest, InsertActivityResponse,
+    ListActivitiesQuery, ListActivitiesResponse, MAX_LIST_LIMIT,
 };
 use axum::{
     Json,
@@ -10,17 +10,17 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use be_asset::CreateAssetInput;
+use be_auth_core::AuthUser;
 use be_remote_db::PaginationParams;
+use uuid::Uuid;
 
 use crate::analytics;
-use crate::auth::AuthUser;
 use crate::error::{ActivityResult, ActivityServiceError};
 use crate::service::AppState;
 
-const DEFAULT_LIST_LIMIT: u32 = 20;
-const DEFAULT_LIST_OFFSET: u32 = 0;
+const ICON_MIME_TYPE: &str = "image/png";
 
-#[tracing::instrument(skip(state, user), fields(limit, offset))]
+#[tracing::instrument(skip_all, fields(user_id, limit, offset))]
 pub async fn list_activities(
     State(state): State<Arc<AppState>>,
     user: AuthUser,
@@ -29,9 +29,18 @@ pub async fn list_activities(
     let user_id = user.user_id()?;
 
     let limit = query.limit.unwrap_or(DEFAULT_LIST_LIMIT);
-    let offset = query.offset.unwrap_or(DEFAULT_LIST_OFFSET);
-    tracing::Span::current().record("limit", limit);
-    tracing::Span::current().record("offset", offset);
+    let offset = query.offset.unwrap_or(0);
+
+    if limit > MAX_LIST_LIMIT {
+        return Err(ActivityServiceError::invalid_argument(format!(
+            "limit must be <= {MAX_LIST_LIMIT}"
+        )));
+    }
+
+    let span = tracing::Span::current();
+    span.record("user_id", tracing::field::display(user_id));
+    span.record("limit", limit);
+    span.record("offset", offset);
 
     let activities = state
         .db
@@ -41,20 +50,21 @@ pub async fn list_activities(
         .call()
         .await
         .map_err(|e| {
-            analytics::track_activities_list_failed("database_error");
-            ActivityServiceError::from(e)
+            let err = ActivityServiceError::from(e);
+            analytics::track_activities_list_failed(err.error_kind());
+            err
         })?;
 
     let result_count = activities.len();
-    let activities: Vec<WireActivity> = activities.into_iter().map(db_to_wire).collect();
-
-    tracing::debug!("Listed {} activities", result_count);
+    tracing::debug!(result_count, "Listed activities");
     analytics::track_activities_listed(limit, offset, result_count);
 
-    Ok(Json(ListActivitiesResponse { activities }))
+    Ok(Json(ListActivitiesResponse {
+        activities: activities.into_iter().map(db_to_wire).collect(),
+    }))
 }
 
-#[tracing::instrument(skip(state, user, body), fields(name = %body.name, process_name = %body.process_name))]
+#[tracing::instrument(skip_all, fields(user_id, has_icon, has_ended_at))]
 pub async fn insert_activity(
     State(state): State<Arc<AppState>>,
     user: AuthUser,
@@ -62,78 +72,69 @@ pub async fn insert_activity(
 ) -> ActivityResult<Json<InsertActivityResponse>> {
     let user_id = user.user_id()?;
 
-    let icon_bytes = decode_optional_icon(body.icon_png_base64.as_deref())
-        .inspect_err(|e| analytics::track_activity_insert_failed(e.error_kind()))?;
+    let icon_bytes = decode_optional_icon(body.icon_png_base64.as_deref()).inspect_err(|e| {
+        analytics::track_activity_insert_failed(e.error_kind());
+    })?;
 
-    let process_name = body.process_name.clone();
     let has_icon = icon_bytes.is_some();
     let has_ended_at = body.ended_at.is_some();
+
+    let span = tracing::Span::current();
+    span.record("user_id", tracing::field::display(user_id));
+    span.record("has_icon", has_icon);
+    span.record("has_ended_at", has_ended_at);
+
+    // Upload the icon first so the activity row is the last write. If the
+    // asset upload fails, no activity is created; if the activity insert
+    // fails after a successful upload, we leak an asset blob (cleanable by
+    // a sweeper) but never persist a half-built activity.
+    let activity_id = body.id.unwrap_or_else(Uuid::now_v7);
+    let icon_asset_id = match icon_bytes {
+        Some(content) => Some(
+            state
+                .asset_service
+                .create_asset(
+                    CreateAssetInput {
+                        name: format!("activity-icon-{activity_id}"),
+                        content,
+                        mime_type: ICON_MIME_TYPE.to_string(),
+                        metadata: None,
+                        activity_id: None,
+                    },
+                    user_id,
+                )
+                .await
+                .map_err(|e| {
+                    let err = ActivityServiceError::from(e);
+                    analytics::track_activity_insert_failed(err.error_kind());
+                    err
+                })?
+                .id,
+        ),
+        None => None,
+    };
 
     let activity = state
         .db
         .create_activity()
-        .maybe_id(body.id)
+        .id(activity_id)
         .user_id(user_id)
         .name(body.name)
         .process_name(body.process_name)
         .window_title(body.window_title)
+        .maybe_icon_asset_id(icon_asset_id)
         .started_at(body.started_at)
         .maybe_ended_at(body.ended_at)
         .call()
         .await
         .map_err(|e| {
-            analytics::track_activity_insert_failed("database_error");
-            ActivityServiceError::from(e)
+            let err = ActivityServiceError::from(e);
+            analytics::track_activity_insert_failed(err.error_kind());
+            err
         })?;
 
-    tracing::info!(
-        "Created activity {} at {:?}",
-        activity.id,
-        activity.created_at
-    );
-
-    let icon_asset_id = if let Some(content) = icon_bytes {
-        let asset = state
-            .asset_service
-            .create_asset(
-                CreateAssetInput {
-                    name: "icon".to_string(),
-                    content,
-                    mime_type: "image/png".to_string(),
-                    metadata: None,
-                    activity_id: None,
-                },
-                user_id,
-            )
-            .await
-            .map_err(|e| {
-                analytics::track_activity_insert_failed("asset_error");
-                ActivityServiceError::from(e)
-            })?;
-
-        Some(asset.id)
-    } else {
-        None
-    };
-
-    let activity = if let Some(asset_id) = icon_asset_id {
-        state
-            .db
-            .update_activity()
-            .id(activity.id)
-            .user_id(user_id)
-            .icon_asset_id(asset_id)
-            .call()
-            .await
-            .map_err(|e| {
-                analytics::track_activity_insert_failed("database_error");
-                ActivityServiceError::from(e)
-            })?
-    } else {
-        activity
-    };
-
-    analytics::track_activity_inserted(has_icon, has_ended_at, &process_name);
+    tracing::info!(activity_id = %activity.id, "Created activity");
+    analytics::track_activity_inserted(has_icon, has_ended_at, &activity.process_name);
 
     Ok(Json(InsertActivityResponse {
         activity: db_to_wire(activity),

@@ -213,7 +213,7 @@ mod tests {
             access_token_expiry_hours: 1,
             refresh_token_expiry_days: 7,
             validation,
-            approved_emails: vec![],
+            approved_emails: std::collections::HashSet::new(),
         }
     }
 

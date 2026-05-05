@@ -12,7 +12,6 @@
 //! — handlers in this crate trust that gating has already passed.
 
 mod agent_loop;
-mod auth;
 mod conversion;
 mod describe_image_tool;
 mod error;
@@ -24,7 +23,6 @@ mod tools;
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use axum::Router;
 use axum::routing::{get, post};
 use be_asset::AssetService;
@@ -76,14 +74,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
-/// Convenience constructor mirroring [`be_activity_service::init_activity_service`].
-/// Wires up application state and returns the router ready to merge into the
+/// Wire up application state and return the router ready to merge into the
 /// monolith HTTP pipeline.
-pub fn init_thread_service(
-    db: Arc<DatabaseManager>,
-    asset_service: Arc<AssetService>,
-) -> Result<Router> {
+pub fn init_thread_service(db: Arc<DatabaseManager>, asset_service: Arc<AssetService>) -> Router {
     tracing::debug!("Initializing thread service");
-    let state = Arc::new(AppState::new(db, asset_service));
-    Ok(create_router(state))
+    create_router(Arc::new(AppState::new(db, asset_service)))
 }

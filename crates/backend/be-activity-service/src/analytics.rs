@@ -1,12 +1,4 @@
-use posthog_rs::Event;
-
-fn capture_async(event: Event) {
-    tokio::spawn(async move {
-        if let Err(e) = posthog_rs::capture(event).await {
-            tracing::debug!("Failed to capture posthog event: {}", e);
-        }
-    });
-}
+use be_analytics::{Event, capture_async};
 
 pub fn track_activity_inserted(has_icon: bool, has_ended_at: bool, process_name: &str) {
     let mut event = Event::new_anon("activity_inserted");

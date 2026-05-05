@@ -34,8 +34,9 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
+use be_auth_core::AuthUser;
+
 use crate::agent_loop::run_agent_loop;
-use crate::auth::AuthUser;
 use crate::conversion::{convert_db_message_to_base_message, db_message_to_wire_json};
 use crate::error::{ThreadServiceError, ThreadServiceResult};
 use crate::llm::{LlmContext, prepare_llm_context};

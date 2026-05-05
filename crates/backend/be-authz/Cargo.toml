@@ -24,4 +24,5 @@ uuid = { workspace = true }
 [dev-dependencies]
 jsonwebtoken = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt"] }
-tower-http = { version = "0.6.8", features = ["cors"] }
+tower-http = { workspace = true, features = ["cors"] }
+uuid = { workspace = true, features = ["v4"] }
