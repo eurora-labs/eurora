@@ -1,5 +1,4 @@
-use crate::MAX_FRAME_SIZE;
-use crate::server::Frame;
+use crate::{Frame, MAX_FRAME_SIZE};
 use anyhow::{Context, Result, anyhow, bail};
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use image::{ImageBuffer, Rgba};

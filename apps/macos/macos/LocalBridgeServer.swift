@@ -4,19 +4,28 @@ import os.log
 
 private let kLocalBridgeServerPort: UInt16 = 14311
 
-@available(macOS 15.0, *)
+@available(macOS 13.0, *)
 protocol LocalBridgeServerDelegate: AnyObject {
+    /// Called when a frame arrives on a local extension connection.
+    /// `completion` is called with the reply to send back, or `nil` if no
+    /// reply is needed (e.g. the frame was forwarded to the bridge and the
+    /// reply will arrive asynchronously through `broadcast(frame:)`).
     func localBridgeServer(
         _ server: LocalBridgeServer,
-        didReceiveMessage message: [String: Any],
-        completion: @escaping ([String: Any]?) -> Void
+        didReceive frame: Frame,
+        completion: @escaping (Frame?) -> Void
     )
 }
 
-@available(macOS 15.0, *)
+/// TCP server that the Safari extension uses to talk to the launcher.
+///
+/// The wire format is length-prefixed JSON (4-byte little-endian length,
+/// then a UTF-8 JSON-encoded `Frame`). This is an internal channel between
+/// the extension's `SafariWebExtensionHandler` and the launcher process —
+/// the externally-visible bridge protocol on port 1431 is what carries the
+/// frames the rest of the way to the desktop app.
+@available(macOS 13.0, *)
 class LocalBridgeServer {
-
-    // MARK: - Properties
 
     weak var delegate: LocalBridgeServerDelegate?
 
@@ -27,15 +36,14 @@ class LocalBridgeServer {
     private var connections: [ObjectIdentifier: NWConnection] = [:]
     private var isRunning = false
 
-    // MARK: - Initialization
-
     init() {}
 
     deinit {
-        stopSync()
+        listener?.cancel()
+        for (_, conn) in connections {
+            conn.cancel()
+        }
     }
-
-    // MARK: - Server Control
 
     func start() {
         queue.async { [weak self] in
@@ -49,37 +57,33 @@ class LocalBridgeServer {
         }
     }
 
-    private func stopSync() {
-        listener?.cancel()
-        listener = nil
-        for (_, conn) in connections {
-            conn.cancel()
-        }
-        connections.removeAll()
-        isRunning = false
-    }
-
-    func broadcast(message: [String: Any]) {
-        guard let data = try? JSONSerialization.data(withJSONObject: message, options: []) else {
-            logger.error("Failed to serialize broadcast message")
+    /// Send a frame to every connected extension. Used to forward
+    /// server-pushed events (`Event`) and async deliveries (`Cancel`).
+    func broadcast(frame: Frame) {
+        let data: Data
+        do {
+            data = try frame.encodeJSON()
+        } catch {
+            logger.error("Failed to encode broadcast frame: \(error.localizedDescription, privacy: .public)")
             return
         }
-
-        let framedData = Self.frameMessage(data)
+        let framed = LocalBridgeServer.frame(data)
 
         queue.async { [weak self] in
             guard let self else { return }
             for (_, connection) in self.connections {
-                connection.send(content: framedData, completion: .contentProcessed { error in
+                connection.send(content: framed, completion: .contentProcessed { error in
                     if let error {
-                        self.logger.error("Broadcast send error: \(error.localizedDescription)")
+                        self.logger.error(
+                            "Broadcast send error: \(error.localizedDescription, privacy: .public)"
+                        )
                     }
                 })
             }
         }
     }
 
-    // MARK: - Private: Lifecycle
+    // MARK: - Lifecycle
 
     private func startInternal() {
         guard !isRunning else {
@@ -87,40 +91,40 @@ class LocalBridgeServer {
             return
         }
 
-        do {
-            let parameters = NWParameters.tcp
-            parameters.allowLocalEndpointReuse = true
-            // Restrict to loopback interface for security
-            parameters.requiredInterfaceType = .loopback
+        let parameters = NWParameters.tcp
+        parameters.allowLocalEndpointReuse = true
+        parameters.requiredInterfaceType = .loopback
 
-            let listener = try NWListener(
-                using: parameters,
-                on: NWEndpoint.Port(rawValue: kLocalBridgeServerPort)!
-            )
-
-            listener.stateUpdateHandler = { [weak self] state in
-                self?.handleListenerState(state)
-            }
-
-            listener.newConnectionHandler = { [weak self] connection in
-                self?.handleNewConnection(connection)
-            }
-
-            listener.start(queue: queue)
-            self.listener = listener
-            isRunning = true
-
-            logger.info("Local bridge server starting on port \(kLocalBridgeServerPort)")
-        } catch {
-            logger.error("Failed to create listener: \(error.localizedDescription)")
+        guard let port = NWEndpoint.Port(rawValue: kLocalBridgeServerPort) else {
+            logger.error("Invalid port: \(kLocalBridgeServerPort, privacy: .public)")
+            return
         }
+
+        let listener: NWListener
+        do {
+            listener = try NWListener(using: parameters, on: port)
+        } catch {
+            logger.error("Failed to create listener: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+
+        listener.stateUpdateHandler = { [weak self] state in
+            self?.handleListenerState(state)
+        }
+        listener.newConnectionHandler = { [weak self] connection in
+            self?.handleNewConnection(connection)
+        }
+        listener.start(queue: queue)
+
+        self.listener = listener
+        self.isRunning = true
+        logger.info("Local bridge server starting on port \(kLocalBridgeServerPort, privacy: .public)")
     }
 
     private func stopInternal() {
         guard isRunning else { return }
 
         isRunning = false
-
         listener?.cancel()
         listener = nil
 
@@ -135,24 +139,19 @@ class LocalBridgeServer {
     private func handleListenerState(_ state: NWListener.State) {
         switch state {
         case .ready:
-            logger.info("Local bridge server ready on port \(kLocalBridgeServerPort)")
-
+            logger.info("Local bridge server ready on port \(kLocalBridgeServerPort, privacy: .public)")
         case .failed(let error):
-            logger.error("Local bridge server failed: \(error.localizedDescription)")
-            // Do NOT auto-restart here — the old code restarted on failure, which caused
-            // an infinite loop: port still in use -> restart -> "Address already in use" -> ...
+            logger.error("Local bridge server failed: \(error.localizedDescription, privacy: .public)")
+            // Don't auto-restart — old code looped on "address in use".
             stopInternal()
-
         case .cancelled:
-            logger.info("Local bridge server cancelled")
             isRunning = false
-
         default:
             break
         }
     }
 
-    // MARK: - Private: Connection Handling
+    // MARK: - Per-connection handling
 
     private func handleNewConnection(_ connection: NWConnection) {
         let connId = ObjectIdentifier(connection)
@@ -165,7 +164,7 @@ class LocalBridgeServer {
         connections[connId] = connection
         connection.start(queue: queue)
 
-        receiveMessage(from: connection, connId: connId)
+        receiveLength(from: connection, connId: connId)
     }
 
     private func handleConnectionState(_ connId: ObjectIdentifier, state: NWConnection.State) {
@@ -173,123 +172,117 @@ class LocalBridgeServer {
         case .ready:
             logger.debug("Extension connection ready")
         case .failed(let error):
-            logger.error("Extension connection failed: \(error.localizedDescription)")
+            logger.error("Extension connection failed: \(error.localizedDescription, privacy: .public)")
             connections.removeValue(forKey: connId)
         case .cancelled:
-            logger.debug("Extension connection cancelled")
             connections.removeValue(forKey: connId)
         default:
             break
         }
     }
 
-    // MARK: - Private: Message Framing
+    // MARK: - Length-prefixed framing
 
-    private func receiveMessage(from connection: NWConnection, connId: ObjectIdentifier) {
+    private func receiveLength(from connection: NWConnection, connId: ObjectIdentifier) {
         connection.receive(minimumIncompleteLength: 4, maximumLength: 4) { [weak self] data, _, isComplete, error in
             guard let self else { return }
 
             if let error {
-                self.logger.error("Receive error: \(error.localizedDescription)")
+                self.logger.error("Receive error: \(error.localizedDescription, privacy: .public)")
                 self.connections.removeValue(forKey: connId)
                 return
             }
 
             if isComplete {
-                self.logger.debug("Extension connection closed")
                 self.connections.removeValue(forKey: connId)
                 return
             }
 
             guard let lengthData = data, lengthData.count == 4 else {
                 self.logger.error("Invalid length prefix")
-                self.receiveMessage(from: connection, connId: connId)
+                self.receiveLength(from: connection, connId: connId)
                 return
             }
 
             let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
-
-            guard length > 0 && length < 1024 * 1024 * 1024 else {
-                self.logger.error("Invalid message length: \(length)")
-                self.receiveMessage(from: connection, connId: connId)
+            guard length > 0, Int(length) <= BridgeProtocol.maxFrameSize else {
+                self.logger.error("Invalid message length: \(length, privacy: .public)")
+                self.connections.removeValue(forKey: connId)
                 return
             }
 
-            self.receiveMessageBody(from: connection, connId: connId, length: Int(length))
+            self.receiveBody(from: connection, connId: connId, length: Int(length))
         }
     }
 
-    private func receiveMessageBody(from connection: NWConnection, connId: ObjectIdentifier, length: Int) {
-        let len = length
-        connection.receive(minimumIncompleteLength: len, maximumLength: len) { [weak self] data, _, isComplete, error in
+    private func receiveBody(from connection: NWConnection, connId: ObjectIdentifier, length: Int) {
+        connection.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, isComplete, error in
             guard let self else { return }
 
             if let error {
-                self.logger.error("Receive body error: \(error.localizedDescription)")
+                self.logger.error("Receive body error: \(error.localizedDescription, privacy: .public)")
                 self.connections.removeValue(forKey: connId)
                 return
             }
-
             if isComplete && data == nil {
-                self.logger.debug("Connection closed during body read")
                 self.connections.removeValue(forKey: connId)
                 return
             }
 
-            guard let messageData = data, messageData.count == length else {
+            guard let body = data, body.count == length else {
                 self.logger.error("Incomplete message body")
-                self.receiveMessage(from: connection, connId: connId)
+                self.connections.removeValue(forKey: connId)
                 return
             }
 
-            do {
-                if let message = try JSONSerialization.jsonObject(with: messageData, options: []) as? [String: Any] {
-                    self.handleReceivedMessage(message, from: connection)
-                } else {
-                    self.logger.error("Invalid JSON message format")
-                }
-            } catch {
-                self.logger.error("JSON parse error: \(error.localizedDescription)")
-            }
-
-            self.receiveMessage(from: connection, connId: connId)
+            self.handleBody(body, from: connection)
+            self.receiveLength(from: connection, connId: connId)
         }
     }
 
-    private func handleReceivedMessage(_ message: [String: Any], from connection: NWConnection) {
-        logger.debug("Received message from extension")
+    private func handleBody(_ data: Data, from connection: NWConnection) {
+        let frame: Frame
+        do {
+            frame = try Frame.decode(data)
+        } catch {
+            logger.error("JSON decode error: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        logger.debug("Received from extension: \(frame.summary, privacy: .public)")
 
-        delegate?.localBridgeServer(self, didReceiveMessage: message) { [weak self] response in
-            guard let self, let response else { return }
-            self.sendResponse(response, to: connection)
+        delegate?.localBridgeServer(self, didReceive: frame) { [weak self] reply in
+            guard let self, let reply else { return }
+            self.send(reply, to: connection)
         }
     }
 
-    private func sendResponse(_ response: [String: Any], to connection: NWConnection) {
+    private func send(_ frame: Frame, to connection: NWConnection) {
+        let data: Data
+        do {
+            data = try frame.encodeJSON()
+        } catch {
+            logger.error("Failed to encode reply: \(error.localizedDescription, privacy: .public)")
+            return
+        }
+        let framed = LocalBridgeServer.frame(data)
+
         queue.async { [weak self] in
-            guard let self else { return }
-
-            do {
-                let data = try JSONSerialization.data(withJSONObject: response, options: [])
-                let framedData = Self.frameMessage(data)
-
-                connection.send(content: framedData, completion: .contentProcessed { error in
-                    if let error {
-                        self.logger.error("Failed to send response: \(error.localizedDescription)")
-                    }
-                })
-            } catch {
-                self.logger.error("Failed to serialize response: \(error.localizedDescription)")
-            }
+            connection.send(content: framed, completion: .contentProcessed { error in
+                if let error {
+                    self?.logger.error(
+                        "Failed to send reply: \(error.localizedDescription, privacy: .public)"
+                    )
+                }
+            })
         }
     }
 
-    // MARK: - Static Helpers
+    // MARK: - Helpers
 
-    static func frameMessage(_ data: Data) -> Data {
+    static func frame(_ data: Data) -> Data {
         var length = UInt32(data.count).littleEndian
-        var framedData = Data(bytes: &length, count: 4)
-        framedData.append(data)
-        return framedData
+        var framed = Data(bytes: &length, count: 4)
+        framed.append(data)
+        return framed
     }
 }

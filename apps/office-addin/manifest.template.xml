@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+	xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+	xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+	xsi:type="TaskPaneApp">
+
+	<Id>{{ADDIN_ID}}</Id>
+	<Version>{{VERSION}}</Version>
+	<ProviderName>Eurora Labs</ProviderName>
+	<DefaultLocale>en-US</DefaultLocale>
+	<DisplayName DefaultValue="Eurora" />
+	<Description DefaultValue="Eurora desktop integration for Microsoft Word." />
+	<IconUrl DefaultValue="{{ICON_BASE_URL}}icon-32.png" />
+	<HighResolutionIconUrl DefaultValue="{{ICON_BASE_URL}}icon-80.png" />
+	<SupportUrl DefaultValue="https://eurora-labs.com/support" />
+
+	<AppDomains>
+		<AppDomain>https://appsforoffice.microsoft.com</AppDomain>
+	</AppDomains>
+
+	<Hosts>
+		<Host Name="Document" />
+	</Hosts>
+
+	<DefaultSettings>
+		<SourceLocation DefaultValue="{{SOURCE_LOCATION}}" />
+	</DefaultSettings>
+
+	<Permissions>ReadWriteDocument</Permissions>
+
+	<VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+		<VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+			<Requirements>
+				<bt:Sets DefaultMinVersion="1.3">
+					<bt:Set Name="SharedRuntime" MinVersion="1.1" />
+				</bt:Sets>
+			</Requirements>
+			<Hosts>
+				<Host xsi:type="Document">
+					<Runtimes>
+						<Runtime resid="EuroraRuntime.Url" lifetime="long" />
+					</Runtimes>
+					<DesktopFormFactor>
+						<GetStarted>
+							<Title resid="Eurora.GetStarted.Title" />
+							<Description resid="Eurora.GetStarted.Description" />
+							<LearnMoreUrl resid="Eurora.LearnMore.Url" />
+						</GetStarted>
+						<ExtensionPoint xsi:type="LaunchEvent">
+							<LaunchEvents>
+								<LaunchEvent Type="OnNewDocumentOpened" FunctionName="onDocumentOpened" />
+								<LaunchEvent Type="OnDocumentOpened" FunctionName="onDocumentOpened" />
+							</LaunchEvents>
+							<SourceLocation resid="EuroraRuntime.Url" />
+						</ExtensionPoint>
+					</DesktopFormFactor>
+				</Host>
+			</Hosts>
+			<Resources>
+				<bt:Images>
+					<bt:Image id="Eurora.Icon16" DefaultValue="{{ICON_BASE_URL}}icon-16.png" />
+					<bt:Image id="Eurora.Icon32" DefaultValue="{{ICON_BASE_URL}}icon-32.png" />
+					<bt:Image id="Eurora.Icon80" DefaultValue="{{ICON_BASE_URL}}icon-80.png" />
+				</bt:Images>
+				<bt:Urls>
+					<bt:Url id="EuroraRuntime.Url" DefaultValue="{{SOURCE_LOCATION}}" />
+					<bt:Url id="Eurora.LearnMore.Url" DefaultValue="https://eurora-labs.com" />
+				</bt:Urls>
+				<bt:ShortStrings>
+					<bt:String id="Eurora.DisplayName" DefaultValue="Eurora" />
+					<bt:String id="Eurora.GetStarted.Title" DefaultValue="Eurora is connected" />
+				</bt:ShortStrings>
+				<bt:LongStrings>
+					<bt:String id="Eurora.Description" DefaultValue="Eurora desktop integration for Microsoft Word." />
+					<bt:String id="Eurora.GetStarted.Description" DefaultValue="The Eurora desktop app now sees this document. Open Eurora to capture context from your work." />
+				</bt:LongStrings>
+			</Resources>
+		</VersionOverrides>
+	</VersionOverrides>
+</OfficeApp>

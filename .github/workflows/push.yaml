@@ -94,6 +94,7 @@ jobs:
               run: pnpm proto:typescript
             - run: pnpm build
             - run: pnpm check
+            - run: pnpm check-types
             - run: pnpm test
 
     rust-lint:
@@ -185,6 +186,10 @@ jobs:
               uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
               with:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+              with:
+                  toolchain: stable
             - name: Rust Cache
               uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
               with:
@@ -207,6 +212,10 @@ jobs:
               uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
               with:
                   repo-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+              with:
+                  toolchain: stable
             - name: Rust Cache
               uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
               with:
