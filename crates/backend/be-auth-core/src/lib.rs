@@ -1,7 +1,12 @@
+mod extract;
+
+use std::collections::HashSet;
+
 use anyhow::{Result, anyhow};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation, decode};
 
 pub use auth_core::{Claims, Role};
+pub use extract::{AuthUser, InvalidUserId, MissingClaims};
 
 #[derive(Clone)]
 pub struct JwtConfig {
@@ -16,7 +21,10 @@ pub struct JwtConfig {
 
     pub validation: Validation,
 
-    pub approved_emails: Vec<String>,
+    /// Emails (lower-cased) that should be promoted to a paid tier on
+    /// account creation. Stored as a `HashSet` so the admission check is
+    /// O(1) on every login / registration / refresh.
+    pub approved_emails: HashSet<String>,
 }
 
 impl Default for JwtConfig {
@@ -45,9 +53,9 @@ impl Default for JwtConfig {
             approved_emails: std::env::var("APPROVED_EMAILS")
                 .unwrap_or_default()
                 .split(',')
-                .map(|s| s.trim().to_lowercase().to_string())
+                .map(|s| s.trim().to_ascii_lowercase())
                 .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>(),
+                .collect(),
         }
     }
 }
@@ -74,5 +82,11 @@ impl JwtConfig {
         }
 
         Ok(token_data.claims)
+    }
+
+    /// Returns `true` when `email` (case-insensitively) appears on the
+    /// upgraded-tier allow-list configured via `APPROVED_EMAILS`.
+    pub fn is_approved_email(&self, email: &str) -> bool {
+        self.approved_emails.contains(&email.to_ascii_lowercase())
     }
 }

@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
+use url::Url;
 
 use super::OAuthError;
 
@@ -34,14 +35,6 @@ impl GitHubOAuthConfig {
     }
 }
 
-fn build_http_client() -> Result<reqwest::Client, OAuthError> {
-    reqwest::ClientBuilder::new()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|e| OAuthError::HttpClient(e.to_string()))
-}
-
 #[derive(Deserialize)]
 struct GitHubTokenResponse {
     access_token: Option<String>,
@@ -69,25 +62,38 @@ struct GitHubApiEmail {
 
 pub struct GitHubOAuthClient {
     config: GitHubOAuthConfig,
+    /// Shared HTTP client kept alive for connection pooling.
+    http: reqwest::Client,
+}
+
+fn build_http_client() -> Result<reqwest::Client, OAuthError> {
+    Ok(reqwest::ClientBuilder::new()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(30))
+        .build()?)
 }
 
 impl GitHubOAuthClient {
-    pub fn new(config: GitHubOAuthConfig) -> Self {
-        Self { config }
+    pub fn new(config: GitHubOAuthConfig) -> Result<Self, OAuthError> {
+        let http = build_http_client()?;
+        Ok(Self { config, http })
     }
 
     pub fn redirect_uri(&self) -> &str {
         &self.config.redirect_uri
     }
 
-    pub fn get_authorization_url(&self, state: &str, pkce_challenge: &str) -> String {
-        format!(
-            "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}&state={}&scope=user:email&code_challenge={}&code_challenge_method=S256",
-            url_encode(self.config.client_id.expose_secret()),
-            url_encode(&self.config.redirect_uri),
-            url_encode(state),
-            url_encode(pkce_challenge),
-        )
+    pub fn authorization_url(&self, state: &str, pkce_challenge: &str) -> String {
+        let mut url =
+            Url::parse("https://github.com/login/oauth/authorize").expect("static URL must parse");
+        url.query_pairs_mut()
+            .append_pair("client_id", self.config.client_id.expose_secret())
+            .append_pair("redirect_uri", &self.config.redirect_uri)
+            .append_pair("state", state)
+            .append_pair("scope", "user:email")
+            .append_pair("code_challenge", pkce_challenge)
+            .append_pair("code_challenge_method", "S256");
+        url.into()
     }
 
     pub async fn exchange_code(
@@ -95,9 +101,8 @@ impl GitHubOAuthClient {
         code: &str,
         pkce_verifier: &str,
     ) -> Result<GitHubUserInfo, OAuthError> {
-        let http_client = build_http_client()?;
-
-        let token_resp: GitHubTokenResponse = http_client
+        let token_resp: GitHubTokenResponse = self
+            .http
             .post("https://github.com/login/oauth/access_token")
             .header("Accept", "application/json")
             .form(&[
@@ -108,13 +113,10 @@ impl GitHubOAuthClient {
                 ("code_verifier", pkce_verifier),
             ])
             .send()
-            .await
-            .map_err(|e| OAuthError::CodeExchange(e.to_string()))?
-            .error_for_status()
-            .map_err(|e| OAuthError::CodeExchange(e.to_string()))?
+            .await?
+            .error_for_status()?
             .json()
-            .await
-            .map_err(|e| OAuthError::CodeExchange(e.to_string()))?;
+            .await?;
 
         if let Some(error) = &token_resp.error {
             let desc = token_resp.error_description.as_deref().unwrap_or(error);
@@ -123,12 +125,13 @@ impl GitHubOAuthClient {
 
         let access_token = token_resp
             .access_token
-            .ok_or_else(|| OAuthError::CodeExchange("Missing access_token in response".into()))?;
+            .ok_or(OAuthError::MissingField("access_token"))?;
         let scope = token_resp.scope.unwrap_or_default();
 
-        let user: GitHubApiUser = http_client
+        let user: GitHubApiUser = self
+            .http
             .get("https://api.github.com/user")
-            .header("Authorization", format!("Bearer {}", access_token))
+            .bearer_auth(&access_token)
             .header("User-Agent", "eurora-auth-service")
             .send()
             .await
@@ -139,9 +142,10 @@ impl GitHubOAuthClient {
             .await
             .map_err(|e| OAuthError::UserInfoFetch(e.to_string()))?;
 
-        let emails: Vec<GitHubApiEmail> = http_client
+        let emails: Vec<GitHubApiEmail> = self
+            .http
             .get("https://api.github.com/user/emails")
-            .header("Authorization", format!("Bearer {}", access_token))
+            .bearer_auth(&access_token)
             .header("User-Agent", "eurora-auth-service")
             .send()
             .await
@@ -156,13 +160,13 @@ impl GitHubOAuthClient {
             .iter()
             .find(|e| e.primary && e.verified)
             .or_else(|| emails.iter().find(|e| e.verified))
-            .ok_or(OAuthError::MissingEmail)?;
+            .ok_or(OAuthError::MissingField("verified primary email"))?;
 
         Ok(GitHubUserInfo {
             id: user.id.to_string(),
             email: primary_email.email.clone(),
             verified_email: primary_email.verified,
-            name: user.name.unwrap_or(user.login),
+            display_name: user.name.filter(|s| !s.is_empty()).or(Some(user.login)),
             picture: user.avatar_url,
             access_token: SecretString::from(access_token),
             scope,
@@ -175,12 +179,8 @@ pub struct GitHubUserInfo {
     pub id: String,
     pub email: String,
     pub verified_email: bool,
-    pub name: String,
+    pub display_name: Option<String>,
     pub picture: Option<String>,
     pub access_token: SecretString,
     pub scope: String,
-}
-
-fn url_encode(s: &str) -> String {
-    percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }

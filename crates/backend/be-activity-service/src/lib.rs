@@ -7,14 +7,12 @@
 //! into request extensions by the time a handler runs.
 
 pub mod analytics;
-mod auth;
 mod error;
 mod handlers;
 mod service;
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use axum::{Router, routing::get};
 use be_asset::AssetService;
 use be_remote_db::DatabaseManager;
@@ -39,14 +37,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
-/// Convenience constructor mirroring `be-payment-service::init_payment_service`
-/// and `be-update-service::init_update_service`. Wires up application state
-/// and returns the router ready to merge into the monolith HTTP pipeline.
-pub fn init_activity_service(
-    db: Arc<DatabaseManager>,
-    asset_service: Arc<AssetService>,
-) -> Result<Router> {
+/// Wire up application state and return the router ready to merge into the
+/// monolith HTTP pipeline.
+pub fn init_activity_service(db: Arc<DatabaseManager>, asset_service: Arc<AssetService>) -> Router {
     tracing::debug!("Initializing activity service");
-    let state = Arc::new(AppState::new(db, asset_service));
-    Ok(create_router(state))
+    create_router(Arc::new(AppState::new(db, asset_service)))
 }

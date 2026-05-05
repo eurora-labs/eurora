@@ -162,7 +162,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db_manager.clone(),
         jwt_config.clone(),
         email_service.clone(),
-    )?;
+    )
+    .await?;
 
     let payment_service = match init_payment_service(db_manager.clone()) {
         Ok(svc) => Some(svc),
@@ -189,9 +190,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db_manager.clone(),
         storage.clone(),
     ));
-    let activity_router = init_activity_service(db_manager.clone(), core_asset.clone())?;
+    let activity_router = init_activity_service(db_manager.clone(), core_asset.clone());
     let asset_router = init_asset_service(core_asset.clone());
-    let thread_router = init_thread_service(db_manager.clone(), core_asset.clone())?;
+    let thread_router = init_thread_service(db_manager.clone(), core_asset.clone());
 
     tracing::info!("Starting HTTP server at {}", http_addr);
 

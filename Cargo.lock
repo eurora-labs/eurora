@@ -1540,18 +1540,13 @@ name = "be-activity-service"
 version = "0.0.0"
 dependencies = [
  "activity-core",
- "anyhow",
  "axum",
  "base64 0.22.1",
+ "be-analytics",
  "be-asset",
  "be-auth-core",
- "be-authz",
  "be-remote-db",
  "be-storage",
- "chrono",
- "jsonwebtoken",
- "posthog-rs",
- "serde",
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
@@ -1559,6 +1554,15 @@ dependencies = [
  "tower-http",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "be-analytics"
+version = "0.0.0"
+dependencies = [
+ "posthog-rs",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -1599,7 +1603,12 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "auth-core",
+ "axum",
  "jsonwebtoken",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1615,10 +1624,11 @@ dependencies = [
  "be-remote-db",
  "chacha20poly1305",
  "chrono",
+ "email_address",
  "hex",
+ "hmac 0.12.1",
  "jsonwebtoken",
  "openidconnect",
- "percent-encoding",
  "rand 0.10.1",
  "reqwest 0.12.28",
  "secrecy",
@@ -1630,6 +1640,7 @@ dependencies = [
  "tower",
  "tower-http",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -1720,11 +1731,11 @@ dependencies = [
  "async-stripe-shared",
  "async-stripe-webhook",
  "axum",
+ "be-analytics",
  "be-auth-core",
  "be-remote-db",
  "chrono",
  "jsonwebtoken",
- "posthog-rs",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1806,12 +1817,11 @@ dependencies = [
  "aws-config",
  "aws-sdk-s3",
  "axum",
+ "be-analytics",
  "chrono",
- "posthog-rs",
  "semver",
  "serde",
  "thiserror 2.0.18",
- "tokio",
  "tower",
  "tower-http",
  "tracing",
@@ -3415,6 +3425,15 @@ dependencies = [
  "sec1 0.7.3",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "email_address"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e079f19b08ca6239f47f8ba8509c11cf3ea30095831f7fed61441475edd8c449"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

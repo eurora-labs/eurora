@@ -60,10 +60,19 @@ pub struct InsertActivityResponse {
     pub activity: Activity,
 }
 
+/// Default page size when the client omits `limit`.
+pub const DEFAULT_LIST_LIMIT: u32 = 20;
+
+/// Maximum page size the server will accept. Larger values are rejected with
+/// `400 Bad Request` so the contract is explicit; clients should paginate
+/// rather than rely on silent clamping.
+pub const MAX_LIST_LIMIT: u32 = 100;
+
 /// Query parameters for `GET /activities`.
 ///
-/// Both fields are optional; the server applies its own defaults and clamps
-/// `limit` to its configured maximum.
+/// Both fields are optional. When `limit` is omitted the server falls back to
+/// [`DEFAULT_LIST_LIMIT`]; values greater than [`MAX_LIST_LIMIT`] are rejected
+/// rather than silently clamped.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ListActivitiesQuery {

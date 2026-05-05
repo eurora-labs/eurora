@@ -7,7 +7,8 @@ use thread_core::{
     SearchThreadsQuery, SearchThreadsResponse,
 };
 
-use crate::auth::AuthUser;
+use be_auth_core::AuthUser;
+
 use crate::error::ThreadServiceResult;
 use crate::service::AppState;
 

@@ -15,10 +15,11 @@ be-email-service = { workspace = true }
 be-remote-db = { workspace = true }
 chacha20poly1305 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
+email_address = { workspace = true }
 hex = { workspace = true }
+hmac = { workspace = true }
 jsonwebtoken = { workspace = true }
 openidconnect = { workspace = true }
-percent-encoding = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 secrecy = { workspace = true }
@@ -27,8 +28,9 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-tower-http = { version = "0.6.8", features = ["trace"] }
+tower-http = { workspace = true, features = ["trace"] }
 tracing = { workspace = true }
+url = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 
 [dev-dependencies]

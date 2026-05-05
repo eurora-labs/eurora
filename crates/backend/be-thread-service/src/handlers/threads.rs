@@ -4,6 +4,7 @@ use agent_chain::SystemMessage;
 use agent_chain::messages::AnyMessage;
 use axum::Json;
 use axum::extract::{Path, Query, State};
+use be_auth_core::AuthUser;
 use be_remote_db::PaginationParams;
 use thread_core::{
     CreateThreadRequest, CreateThreadResponse, DeleteThreadResponse, GenerateThreadTitleRequest,
@@ -11,7 +12,6 @@ use thread_core::{
 };
 use uuid::Uuid;
 
-use crate::auth::AuthUser;
 use crate::conversion::{convert_db_message_to_base_message, db_thread_to_wire};
 use crate::error::ThreadServiceResult;
 use crate::service::AppState;

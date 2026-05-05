@@ -1,3 +1,11 @@
+//! [`AuthError`]: the unified error type the service maps onto the
+//! standard JSON envelope ([`auth_core::AuthErrorResponse`]).
+//!
+//! The envelope's `error` discriminator (see
+//! [`auth_core::error_kinds`]) is the contract clients dispatch on.
+//! Internal errors (DB / OAuth / crypto) get logged at error level and
+//! redacted in the public response so internal details never leak.
+
 use auth_core::{AuthErrorResponse, error_kinds};
 use axum::{
     Json,
@@ -14,32 +22,39 @@ pub type AuthResult<T> = std::result::Result<T, AuthError>;
 pub enum AuthError {
     #[error("Missing credentials")]
     MissingCredentials,
+
     #[error("{0}")]
     InvalidInput(String),
 
     #[error("Invalid credentials")]
     InvalidCredentials,
+
     #[error("Missing authorization header")]
     MissingAuthHeader,
+
     #[error("Invalid authorization header format")]
     InvalidAuthHeader,
+
     #[error("Invalid or expired token")]
     InvalidToken,
+
     #[error("Email address is not verified")]
     EmailNotVerified,
 
-    /// The OAuth provider returned an email that is already registered to a
-    /// different identity (password credentials or another OAuth provider).
+    /// The OAuth provider returned an email that is already registered
+    /// to a different identity (password credentials or another OAuth
+    /// provider).
     ///
-    /// Auto-linking is intentionally rejected — the user must first sign in
-    /// with their original method and explicitly link the new provider from
-    /// account settings. The message is deliberately generic to avoid
-    /// disclosing which sign-in methods are attached to the account.
+    /// Auto-linking is intentionally rejected — the user must first
+    /// sign in with their original method and explicitly link the new
+    /// provider from account settings. The message is deliberately
+    /// generic to avoid disclosing which sign-in methods are attached
+    /// to the account.
     #[error("An account with this email already exists under a different sign-in method")]
     OAuthEmailConflict,
 
-    /// Caller is asking for another verification email before the resend
-    /// cooldown has elapsed.
+    /// Caller is asking for another verification email before the
+    /// resend cooldown has elapsed.
     #[error("Please wait before requesting another verification email")]
     VerificationResendCooldown,
 
@@ -48,14 +63,19 @@ pub enum AuthError {
 
     #[error("Password hashing failed: {0}")]
     PasswordHash(String),
+
     #[error("Token generation failed: {0}")]
     TokenGeneration(String),
+
     #[error("Database error: {0}")]
     Database(#[from] be_remote_db::DbError),
+
     #[error("OAuth error: {0}")]
     OAuth(#[from] crate::oauth::OAuthError),
+
     #[error("Crypto error: {0}")]
     Crypto(#[from] CryptoError),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -69,8 +89,7 @@ impl AuthError {
             | AuthError::InvalidAuthHeader
             | AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
             AuthError::EmailNotVerified => StatusCode::FORBIDDEN,
-            AuthError::EmailAlreadyVerified => StatusCode::CONFLICT,
-            AuthError::OAuthEmailConflict => StatusCode::CONFLICT,
+            AuthError::EmailAlreadyVerified | AuthError::OAuthEmailConflict => StatusCode::CONFLICT,
             AuthError::VerificationResendCooldown => StatusCode::TOO_MANY_REQUESTS,
             AuthError::PasswordHash(_)
             | AuthError::TokenGeneration(_)
@@ -81,10 +100,9 @@ impl AuthError {
         }
     }
 
-    /// Stable, machine-readable identifier for the failure mode. Used by
-    /// clients to dispatch on specific errors without parsing free-text
-    /// messages. Mirrors the `reason` channel that the gRPC version
-    /// carried via `google.rpc.ErrorInfo`.
+    /// Stable, machine-readable identifier for the failure mode. Used
+    /// by clients to dispatch on specific errors without parsing
+    /// free-text messages.
     pub fn error_kind(&self) -> &'static str {
         match self {
             AuthError::MissingCredentials | AuthError::InvalidInput(_) => {
@@ -125,7 +143,6 @@ impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let status = self.status();
         let kind = self.error_kind();
-        let detail = self.to_string();
 
         match &self {
             AuthError::PasswordHash(msg) => {
@@ -154,13 +171,13 @@ impl IntoResponse for AuthError {
             | AuthError::InvalidToken
             | AuthError::MissingAuthHeader
             | AuthError::InvalidAuthHeader => {
-                tracing::debug!(error = %detail, "auth-service auth error");
+                tracing::debug!(error = %self, "auth-service auth error");
             }
             AuthError::MissingCredentials
             | AuthError::InvalidInput(_)
             | AuthError::EmailAlreadyVerified
             | AuthError::VerificationResendCooldown => {
-                tracing::debug!(error = %detail, "auth-service client error");
+                tracing::debug!(error = %self, "auth-service client error");
             }
         }
 
