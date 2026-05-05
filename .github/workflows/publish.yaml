@@ -357,10 +357,6 @@ jobs:
                   swift build -c release --package-path /tmp/grpc-swift-protobuf --product protoc-gen-grpc-swift-2
                   sudo cp /tmp/grpc-swift-protobuf/.build/release/protoc-gen-grpc-swift-2 /usr/local/bin/protoc-gen-grpc-swift-2
 
-            - name: Compile Swift Protobuf
-              if: runner.os == 'macOS'
-              run: pnpm proto:swift
-
             - name: Build Safari browser extension
               if: runner.os == 'macOS'
               run: pnpm build:safari
