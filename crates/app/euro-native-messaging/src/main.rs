@@ -163,26 +163,27 @@ async fn run_bridge_session(
     cached_assets: &Arc<Mutex<Option<Frame>>>,
     cached_snapshot: &Arc<Mutex<Option<Frame>>>,
 ) {
-    let socket = (|| async {
-        let request = url.into_client_request().map_err(
-            |err: tokio_tungstenite::tungstenite::Error| format!("invalid bridge URL: {err}"),
-        )?;
-        tokio_tungstenite::connect_async(request)
-            .await
-            .map(|(ws, _)| ws)
-            .map_err(|err| err.to_string())
-    })
-    .retry(
-        ConstantBuilder::default()
-            .with_delay(RECONNECT_INTERVAL)
-            .without_max_times(),
-    )
-    .sleep(tokio::time::sleep)
-    .notify(|err, dur| {
-        tracing::warn!("Failed to connect to bridge: {err}. Retrying in {dur:?}…");
-    })
-    .await
-    .expect("infinite retry never returns Err");
+    let socket =
+        (|| async {
+            let request = url.into_client_request().map_err(
+                |err: tokio_tungstenite::tungstenite::Error| format!("invalid bridge URL: {err}"),
+            )?;
+            tokio_tungstenite::connect_async(request)
+                .await
+                .map(|(ws, _)| ws)
+                .map_err(|err| err.to_string())
+        })
+        .retry(
+            ConstantBuilder::default()
+                .with_delay(RECONNECT_INTERVAL)
+                .without_max_times(),
+        )
+        .sleep(tokio::time::sleep)
+        .notify(|err, dur| {
+            tracing::warn!("Failed to connect to bridge: {err}. Retrying in {dur:?}…");
+        })
+        .await
+        .expect("infinite retry never returns Err");
 
     tracing::info!("Bridge WebSocket connected at {url}; registering");
 

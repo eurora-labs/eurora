@@ -30,11 +30,7 @@ const WAIT: Duration = Duration::from_secs(2);
 /// Connect a tungstenite client over plaintext WS, register as the
 /// Word add-in with `app_pid`, and wait for the bridge to surface the
 /// registration.
-async fn connect_word_addin(
-    service: &BridgeService,
-    addr: SocketAddr,
-    app_pid: u32,
-) -> ClientWs {
+async fn connect_word_addin(service: &BridgeService, addr: SocketAddr, app_pid: u32) -> ClientWs {
     let mut registrations = service.subscribe_to_registrations();
 
     let url = bridge_url_for(addr);
