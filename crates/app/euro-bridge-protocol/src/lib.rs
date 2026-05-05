@@ -2,22 +2,33 @@
 //! clients (browser native-messaging hosts, Office.js add-ins, future
 //! first-party integrations).
 //!
-//! The transport is JSON over a `wss://` WebSocket terminated on a
-//! per-user trust chain provisioned by the desktop on first run. Every
-//! message in either direction is a [`Frame`] whose `kind` discriminator
-//! identifies the payload variant. The JSON shape is deliberately
-//! hand-tuned to match the externally-tagged-enum form already consumed
-//! by the browser extension at
+//! The transport is JSON over a plaintext loopback WebSocket
+//! (`ws://localhost:1431/bridge`). Every message in either direction
+//! is a [`Frame`] whose `kind` discriminator identifies the payload
+//! variant. The JSON shape is deliberately hand-tuned to match the
+//! externally-tagged-enum form already consumed by the browser
+//! extension at
 //! `apps/browser/src/shared/background/native-messenger.ts`.
 //!
 //! TypeScript and Swift bindings are generated from these types via
 //! `cargo run -p euro-bridge-protocol --features codegen -- --generate_specta`.
+//!
+//! ## Transport
+//!
+//! The bridge is loopback-only — the desktop binds [`BRIDGE_BIND_IP`]
+//! (`127.0.0.1`) and rejects non-loopback peers at upgrade time, so
+//! the channel never leaves the kernel. With that constraint in place
+//! we serve plaintext: `ws://` carries no confidentiality cost a local
+//! attacker doesn't already have (they'd need user-level code
+//! execution to sniff loopback, at which point reading on-disk state
+//! is strictly easier than decoding our frames). The
+//! [register-frame token check](`crate::frame::RegisterFrame`) is the
+//! authentication boundary, not TLS.
 
 mod error;
 mod frame;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::{Path, PathBuf};
 
 pub use error::BridgeError;
 pub use frame::{
@@ -25,13 +36,17 @@ pub use frame::{
     ResponseFrame,
 };
 
-/// SNI hostname clients dial. Must match the leaf certificate's DNS SAN —
-/// IP-based SNI is fragile across TLS stacks (notably WebView2) so the
-/// canonical address is hostname-based, not IP-based.
+/// Hostname clients dial. Resolved to [`BRIDGE_BIND_IP`] by the OS
+/// resolver; both Chromium-based hosts (WebView2) and WKWebView treat
+/// `localhost` as a [potentially trustworthy origin][secure-context],
+/// which is what allows an HTTPS-loaded Office add-in to open a
+/// plaintext `ws://localhost` connection without mixed-content blocks.
+///
+/// [secure-context]: https://w3c.github.io/webappsec-secure-contexts/
 pub const BRIDGE_HOST: &str = "localhost";
 
 /// Loopback IP the desktop binds the listener to. Separate from
-/// [`BRIDGE_HOST`] because the SNI hostname is non-routable on its own
+/// [`BRIDGE_HOST`] because the hostname is non-routable on its own
 /// and the listener needs a concrete IP.
 pub const BRIDGE_BIND_IP: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
@@ -41,23 +56,9 @@ pub const BRIDGE_PORT: u16 = 1431;
 /// HTTP path that performs the WebSocket upgrade.
 pub const BRIDGE_PATH: &str = "/bridge";
 
-/// URL scheme. WebSocket-over-TLS only — there is no plaintext fallback.
-pub const BRIDGE_SCHEME: &str = "wss";
-
-/// File name the desktop writes the bridge CA cert under inside
-/// [`bridge_data_dir`]. Shared with the native-messaging host so both
-/// sides agree on the path without coordination.
-pub const BRIDGE_CA_FILENAME: &str = "ca.crt";
-
-/// Top-level subdirectory under the platform data dir that contains
-/// every Eurora-owned per-user file. All callers that compose paths
-/// under this root must do so via [`eurora_data_root_under`] or
-/// [`eurora_data_root`] so the literal lives in exactly one place.
-pub const EURORA_DATA_SUBDIR: &str = "Eurora";
-
-/// Subdirectory under [`EURORA_DATA_SUBDIR`] that holds bridge TLS
-/// material.
-pub const BRIDGE_DATA_SUBDIR: &str = "bridge";
+/// URL scheme. Plaintext WebSocket — see the module-level docs for
+/// the rationale and threat model.
+pub const BRIDGE_SCHEME: &str = "ws";
 
 /// Convenience: full WebSocket URL for connecting to the local bridge
 /// on its well-known port.
@@ -66,53 +67,15 @@ pub fn bridge_url() -> String {
 }
 
 /// Build a bridge WebSocket URL for an arbitrary bound port. Used by
-/// tests that bind the bridge to an ephemeral port (port `0`) and then
-/// need a URL whose SNI hostname still matches the cert's DNS SAN
-/// (`localhost`). The IP component of `addr` is intentionally discarded.
+/// tests that bind the bridge to an ephemeral port (port `0`) and
+/// then need a URL whose hostname routes through the OS resolver to
+/// the loopback interface (`localhost`). The IP component of `addr`
+/// is intentionally discarded.
 pub fn bridge_url_for(addr: SocketAddr) -> String {
     format!(
         "{BRIDGE_SCHEME}://{BRIDGE_HOST}:{}{BRIDGE_PATH}",
         addr.port()
     )
-}
-
-/// Eurora's per-user data root underneath an arbitrary platform data
-/// dir. Exposed so callers that already hold a resolved data dir
-/// (e.g. Tauri's `app.path().data_dir()`) compose paths through the
-/// same join the `dirs`-based [`eurora_data_root`] uses, rather than
-/// hand-concatenating [`EURORA_DATA_SUBDIR`].
-pub fn eurora_data_root_under(data_dir: &Path) -> PathBuf {
-    data_dir.join(EURORA_DATA_SUBDIR)
-}
-
-/// Directory holding bridge TLS material underneath an arbitrary
-/// platform data dir. Counterpart to [`bridge_data_dir`] for callers
-/// that resolve the platform data dir themselves.
-pub fn bridge_data_dir_under(data_dir: &Path) -> PathBuf {
-    eurora_data_root_under(data_dir).join(BRIDGE_DATA_SUBDIR)
-}
-
-/// Eurora's per-user data root, resolved via the `dirs` crate. Mirrors
-/// the convention used by the Office add-in install code: both Tauri
-/// (`app.path().data_dir()`) and the standalone uninstall CLI converge
-/// on the same path here, so cross-process readers (e.g. the
-/// native-messaging host) can derive bridge file locations without
-/// having to be passed through Tauri's runtime.
-pub fn eurora_data_root() -> Option<PathBuf> {
-    dirs::data_dir().map(|root| eurora_data_root_under(&root))
-}
-
-/// Directory holding bridge TLS material. Both the desktop (writer)
-/// and the native-messaging host (reader) resolve this path the same
-/// way so they agree without out-of-band coordination.
-pub fn bridge_data_dir() -> Option<PathBuf> {
-    dirs::data_dir().map(|root| bridge_data_dir_under(&root))
-}
-
-/// Path the desktop writes the bridge CA cert to and that other local
-/// clients (the native-messaging host) read it from.
-pub fn bridge_ca_path() -> Option<PathBuf> {
-    bridge_data_dir().map(|dir| dir.join(BRIDGE_CA_FILENAME))
 }
 
 /// Build the [`specta::TypeCollection`] containing every type that
@@ -129,4 +92,20 @@ pub fn type_collection() -> specta::TypeCollection {
         .register::<ErrorFrame>()
         .register::<CancelFrame>()
         .register::<RegisterFrame>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bridge_url_uses_plaintext_ws() {
+        assert_eq!(bridge_url(), "ws://localhost:1431/bridge");
+    }
+
+    #[test]
+    fn bridge_url_for_uses_supplied_port() {
+        let addr: SocketAddr = "127.0.0.1:54321".parse().unwrap();
+        assert_eq!(bridge_url_for(addr), "ws://localhost:54321/bridge");
+    }
 }
