@@ -204,6 +204,17 @@ cat "$TMP_DIR/tauri.conf.json"
 export VERSION
 export CHANNEL
 
+# The office add-in dist/ must already be on disk before tauri-bundler walks
+# bundle.resources. CI builds it via the upstream "Build office add-in" step;
+# locally, run `pnpm build:office-addin` before invoking this script.
+ADDIN_DIST="$PWD/../apps/office-addin/dist"
+for required in runtime.html manifest.template.xml; do
+	if [ ! -f "$ADDIN_DIST/$required" ]; then
+		error "office add-in dist is missing $required at $ADDIN_DIST. Run 'pnpm build:office-addin' first."
+	fi
+done
+info "Verified office add-in dist at $ADDIN_DIST"
+
 # Create binaries directory for externalBin
 BINARIES_DIR="$PWD/../crates/app/euro-tauri/binaries"
 mkdir -p "$BINARIES_DIR"
