@@ -1,6 +1,7 @@
 pub mod article;
 pub mod default;
 pub mod twitter;
+pub mod word;
 pub mod youtube;
 
 pub use article::ArticleAsset;

@@ -1,0 +1,5 @@
+dist/
+node_modules/
+manifest.dev.xml
+*.tsbuildinfo
+.vite/

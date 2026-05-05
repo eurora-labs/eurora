@@ -405,6 +405,23 @@ jobs:
                   name: sveltekit-build
                   path: ./apps/desktop/build/
 
+            - name: Generate office add-in bindings
+              shell: bash
+              run: pnpm specta:office
+
+            - name: Build office add-in
+              shell: bash
+              run: pnpm --filter @eurora/office-addin run build
+
+            - name: Upload office add-in dist
+              if: matrix.platform == 'ubuntu-22.04' && matrix.target == ''
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: office-addin-${{ github.run_number }}
+                  path: apps/office-addin/dist/
+                  retention-days: 1
+                  if-no-files-found: error
+
             - name: Build binary
               shell: bash
               env:
