@@ -141,7 +141,11 @@ don't reach (real Office, real OS catalog state, real reconnect).
    Windows (WebView2 host) and macOS (WKWebView host) before shipping.
    Office.js loads behave subtly differently between the two
    runtimes (timing of `Office.onReady`, secure-context handling for
-   `wss://localhost`); steps 3–5 must pass on each.
+   `ws://localhost` from the HTTPS-loaded add-in); steps 3–5 must pass
+   on each. The `localhost` carve-out in the W3C Secure Contexts spec
+   is what allows the plaintext WebSocket to coexist with the HTTPS
+   manifest source — see the doc comment on `BRIDGE_HOST` in
+   `crates/app/euro-bridge-protocol/src/lib.rs` for the rationale.
 
 If the add-in fails to register on macOS the first time the desktop
 launches, see also `InstallOutcome::SkippedHostNotPresent` — Word's

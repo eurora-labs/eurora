@@ -26,7 +26,6 @@ protocol LocalBridgeServerDelegate: AnyObject {
 /// frames the rest of the way to the desktop app.
 @available(macOS 13.0, *)
 class LocalBridgeServer {
-
     weak var delegate: LocalBridgeServerDelegate?
 
     private let logger = Logger(subsystem: "com.eurora.macos", category: "LocalBridgeServer")
@@ -71,7 +70,7 @@ class LocalBridgeServer {
 
         queue.async { [weak self] in
             guard let self else { return }
-            for (_, connection) in self.connections {
+            for (_, connection) in connections {
                 connection.send(content: framed, completion: .contentProcessed { error in
                     if let error {
                         self.logger.error(
@@ -117,7 +116,7 @@ class LocalBridgeServer {
         listener.start(queue: queue)
 
         self.listener = listener
-        self.isRunning = true
+        isRunning = true
         logger.info("Local bridge server starting on port \(kLocalBridgeServerPort, privacy: .public)")
     }
 
@@ -140,7 +139,7 @@ class LocalBridgeServer {
         switch state {
         case .ready:
             logger.info("Local bridge server ready on port \(kLocalBridgeServerPort, privacy: .public)")
-        case .failed(let error):
+        case let .failed(error):
             logger.error("Local bridge server failed: \(error.localizedDescription, privacy: .public)")
             // Don't auto-restart — old code looped on "address in use".
             stopInternal()
@@ -171,7 +170,7 @@ class LocalBridgeServer {
         switch state {
         case .ready:
             logger.debug("Extension connection ready")
-        case .failed(let error):
+        case let .failed(error):
             logger.error("Extension connection failed: \(error.localizedDescription, privacy: .public)")
             connections.removeValue(forKey: connId)
         case .cancelled:
@@ -188,55 +187,58 @@ class LocalBridgeServer {
             guard let self else { return }
 
             if let error {
-                self.logger.error("Receive error: \(error.localizedDescription, privacy: .public)")
-                self.connections.removeValue(forKey: connId)
+                logger.error("Receive error: \(error.localizedDescription, privacy: .public)")
+                connections.removeValue(forKey: connId)
                 return
             }
 
             if isComplete {
-                self.connections.removeValue(forKey: connId)
+                connections.removeValue(forKey: connId)
                 return
             }
 
             guard let lengthData = data, lengthData.count == 4 else {
-                self.logger.error("Invalid length prefix")
-                self.receiveLength(from: connection, connId: connId)
+                logger.error("Invalid length prefix")
+                receiveLength(from: connection, connId: connId)
                 return
             }
 
             let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
             guard length > 0, Int(length) <= BridgeProtocol.maxFrameSize else {
-                self.logger.error("Invalid message length: \(length, privacy: .public)")
-                self.connections.removeValue(forKey: connId)
+                logger.error("Invalid message length: \(length, privacy: .public)")
+                connections.removeValue(forKey: connId)
                 return
             }
 
-            self.receiveBody(from: connection, connId: connId, length: Int(length))
+            receiveBody(from: connection, connId: connId, length: Int(length))
         }
     }
 
     private func receiveBody(from connection: NWConnection, connId: ObjectIdentifier, length: Int) {
-        connection.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, isComplete, error in
+        connection.receive(
+            minimumIncompleteLength: length,
+            maximumLength: length
+        ) { [weak self] data, _, isComplete, error in
             guard let self else { return }
 
             if let error {
-                self.logger.error("Receive body error: \(error.localizedDescription, privacy: .public)")
-                self.connections.removeValue(forKey: connId)
+                logger.error("Receive body error: \(error.localizedDescription, privacy: .public)")
+                connections.removeValue(forKey: connId)
                 return
             }
-            if isComplete && data == nil {
-                self.connections.removeValue(forKey: connId)
+            if isComplete, data == nil {
+                connections.removeValue(forKey: connId)
                 return
             }
 
             guard let body = data, body.count == length else {
-                self.logger.error("Incomplete message body")
-                self.connections.removeValue(forKey: connId)
+                logger.error("Incomplete message body")
+                connections.removeValue(forKey: connId)
                 return
             }
 
-            self.handleBody(body, from: connection)
-            self.receiveLength(from: connection, connId: connId)
+            handleBody(body, from: connection)
+            receiveLength(from: connection, connId: connId)
         }
     }
 
@@ -252,7 +254,7 @@ class LocalBridgeServer {
 
         delegate?.localBridgeServer(self, didReceive: frame) { [weak self] reply in
             guard let self, let reply else { return }
-            self.send(reply, to: connection)
+            send(reply, to: connection)
         }
     }
 

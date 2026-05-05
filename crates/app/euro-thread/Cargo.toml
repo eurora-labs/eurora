@@ -17,7 +17,7 @@ thiserror = { workspace = true }
 thread-core = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }
 tokio-stream = { workspace = true }
-tokio-tungstenite = { workspace = true }
+tokio-tungstenite = { workspace = true, features = ["native-tls"] }
 tokio-util = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
