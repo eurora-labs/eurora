@@ -1,11 +1,10 @@
 pub mod parent_pid;
-pub mod tls;
 pub mod types;
 pub mod utils;
 
 pub use euro_bridge_protocol::{
     BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, CancelFrame, ErrorFrame, EventFrame, Frame, FrameKind,
-    RegisterFrame, RequestFrame, ResponseFrame, bridge_ca_path, bridge_url,
+    RegisterFrame, RequestFrame, ResponseFrame, bridge_url,
 };
 pub use types::*;
 

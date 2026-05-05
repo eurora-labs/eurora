@@ -1,12 +1,11 @@
 //! End-to-end test of the bridge WebSocket server with a real
-//! `tokio-tungstenite` client over rustls. Uses the production server
-//! entrypoint so the upgrade path, registration, dispatch, and
+//! `tokio-tungstenite` client over plaintext WS. Uses the production
+//! server entrypoint so the upgrade path, registration, dispatch, and
 //! shutdown are exercised together.
 //!
-//! Each test binds to an ephemeral port via `BridgeService::bind_on`,
-//! spawns the accept loop, and generates a fresh CA + `localhost` leaf
-//! into a tempdir, so the suite can run alongside (or in parallel
-//! with) anything that holds the well-known bridge port.
+//! Each test binds to an ephemeral port via `BridgeService::bind_on`
+//! and spawns the accept loop, so the suite can run alongside (or in
+//! parallel with) anything that holds the well-known bridge port.
 
 mod common;
 
@@ -15,56 +14,29 @@ use std::time::Duration;
 
 use euro_browser::{
     BridgeError, BridgeService, EventFrame, Frame, FrameKind, RegisterFrame, ResponseFrame,
-    bridge_url_for, install_default_crypto_provider,
+    bridge_url_for,
 };
 use futures_util::{SinkExt, StreamExt};
 use tokio::time::timeout;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::Message as TMessage;
 
-/// Bind the bridge to an ephemeral loopback port for the duration of a
-/// single test and spawn its accept loop. Returns the live service, the
-/// bound socket address, and the test trust chain (kept alive on the
-/// stack so cert files survive).
-async fn start_ephemeral_bridge() -> (BridgeService, SocketAddr, common::TestChain) {
-    install_default_crypto_provider();
-    let chain = common::mint_localhost_chain();
-    let service = BridgeService::new();
-    service.configure_tls(chain.material.clone());
-    let bound = service
-        .bind_on(([127, 0, 0, 1], 0).into())
-        .await
-        .expect("bind ephemeral bridge");
-    let addr = bound.local_addr();
-    tokio::spawn(async move {
-        if let Err(err) = bound.serve().await {
-            eprintln!("ephemeral bridge serve loop ended: {err}");
-        }
-    });
-    (service, addr, chain)
-}
-
-/// Connect a tungstenite client to the ephemeral bridge using the test
-/// CA. Returns the open WebSocket stream.
+/// Connect a tungstenite client to the ephemeral bridge over plaintext
+/// WS. Returns the open WebSocket stream.
 async fn connect_test_client(
     addr: SocketAddr,
-    chain: &common::TestChain,
 ) -> tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>> {
     let url = bridge_url_for(addr);
-    let request = url.into_client_request().expect("build request");
-    let connector = common::client_connector(&chain.ca_pem);
-    let (ws, _resp) =
-        tokio_tungstenite::connect_async_tls_with_config(request, None, false, Some(connector))
-            .await
-            .expect("connect over rustls");
+    let (ws, _resp) = tokio_tungstenite::connect_async(url)
+        .await
+        .expect("connect over plaintext ws");
     ws
 }
 
 #[tokio::test]
 async fn round_trip_request_response() {
-    let (service, addr, chain) = start_ephemeral_bridge().await;
+    let (service, addr, serve_handle) = common::start_ephemeral_bridge().await;
 
-    let mut ws = connect_test_client(addr, &chain).await;
+    let mut ws = connect_test_client(addr).await;
 
     let host_pid = 9_999_999;
     let app_pid = std::process::id();
@@ -148,6 +120,10 @@ async fn round_trip_request_response() {
     assert_eq!(disc.app_pid, app_pid);
 
     service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
 }
 
 #[tokio::test]
@@ -163,9 +139,9 @@ async fn send_request_to_unregistered_app_returns_not_found() {
 /// registry, and expose it via `find_clients_by_kind`.
 #[tokio::test]
 async fn register_with_app_kind_is_discoverable() {
-    let (service, addr, chain) = start_ephemeral_bridge().await;
+    let (service, addr, serve_handle) = common::start_ephemeral_bridge().await;
 
-    let mut ws = connect_test_client(addr, &chain).await;
+    let mut ws = connect_test_client(addr).await;
 
     let host_pid = 0;
     let app_pid = 0xC0FFEE;
@@ -204,24 +180,22 @@ async fn register_with_app_kind_is_discoverable() {
     assert!(service.find_clients_by_kind(kind).is_empty());
 
     service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
 }
 
 #[tokio::test]
 async fn server_can_be_stopped_and_restarted() {
-    install_default_crypto_provider();
-    let chain = common::mint_localhost_chain();
     let service = BridgeService::new();
-    service.configure_tls(chain.material.clone());
 
     let bound = service
         .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("first bind");
     let first_addr = bound.local_addr();
-    let serve_handle = tokio::spawn({
-        let bound = bound;
-        async move { bound.serve().await }
-    });
+    let serve_handle = common::spawn_serve(bound);
     assert_eq!(service.local_addr(), Some(first_addr));
 
     service.stop_server().await;
@@ -240,9 +214,9 @@ async fn server_can_be_stopped_and_restarted() {
         .await
         .expect("second bind");
     let second_addr = bound.local_addr();
-    let serve_handle = tokio::spawn(async move { bound.serve().await });
+    let serve_handle = common::spawn_serve(bound);
 
-    let mut ws = connect_test_client(second_addr, &chain).await;
+    let mut ws = connect_test_client(second_addr).await;
     ws.close(None).await.unwrap();
 
     service.stop_server().await;
@@ -258,17 +232,14 @@ async fn server_can_be_stopped_and_restarted() {
 /// behaviour was the symptom that motivated the bind/serve split.
 #[tokio::test]
 async fn bind_on_rejects_double_bind() {
-    install_default_crypto_provider();
-    let chain = common::mint_localhost_chain();
     let service = BridgeService::new();
-    service.configure_tls(chain.material);
 
     let bound = service
         .bind_on(([127, 0, 0, 1], 0).into())
         .await
         .expect("first bind");
     let addr = bound.local_addr();
-    let serve_handle = tokio::spawn(async move { bound.serve().await });
+    let serve_handle = common::spawn_serve(bound);
 
     let err = service
         .bind_on(([127, 0, 0, 1], 0).into())
@@ -294,10 +265,7 @@ async fn bind_on_rejects_double_bind() {
 /// add-in used to hit.
 #[tokio::test]
 async fn bind_on_returns_with_port_in_listen_state() {
-    install_default_crypto_provider();
-    let chain = common::mint_localhost_chain();
     let service = BridgeService::new();
-    service.configure_tls(chain.material);
 
     let bound = service
         .bind_on(([127, 0, 0, 1], 0).into())
@@ -305,9 +273,9 @@ async fn bind_on_returns_with_port_in_listen_state() {
         .expect("bind");
     let addr = bound.local_addr();
 
-    // No serve() yet. The TCP connection itself must still complete —
-    // we don't try to do a TLS handshake because nothing is accepting
-    // application data, just observe that the SYN gets ACK'd.
+    // No serve() yet. The TCP connection itself must still complete:
+    // we only observe that the SYN gets ACK'd, not that anything
+    // accepts application data.
     let stream = tokio::task::spawn_blocking(move || std::net::TcpStream::connect(addr))
         .await
         .expect("join");
