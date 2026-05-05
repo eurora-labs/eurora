@@ -10,7 +10,7 @@ use std::{env, process};
 use anyhow::Result;
 use backon::{ConstantBuilder, Retryable};
 use euro_native_messaging::utils::{generate_typescript_definitions, read_framed, write_framed};
-use euro_native_messaging::{Frame, FrameKind, RegisterFrame, bridge_url, parent_pid, tls};
+use euro_native_messaging::{Frame, FrameKind, RegisterFrame, bridge_url, parent_pid};
 use futures_util::{SinkExt, StreamExt};
 use tokio::io;
 use tokio::sync::{Mutex, broadcast, mpsc};
@@ -46,10 +46,6 @@ fn frame_summary(frame: &Frame) -> String {
 #[tokio::main]
 async fn main() -> Result<()> {
     parent_pid::capture_parent_pid();
-
-    // Install the rustls crypto provider once, before any TLS
-    // handshake runs. Idempotent.
-    tls::install_default_crypto_provider();
 
     #[cfg(debug_assertions)]
     init_debug_logging();
@@ -167,38 +163,28 @@ async fn run_bridge_session(
     cached_assets: &Arc<Mutex<Option<Frame>>>,
     cached_snapshot: &Arc<Mutex<Option<Frame>>>,
 ) {
-    let socket =
-        (|| async {
-            let connector = tls::build_connector().ok_or_else(|| {
-                "bridge CA not yet provisioned by the desktop; will retry".to_string()
-            })?;
-            let ca_path = euro_bridge_protocol::bridge_ca_path()
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|| "<unknown>".into());
-            tracing::info!(
-                "Bridge transport: TLS (wss) — connecting to {url} with pinned CA at {ca_path}"
-            );
-            let request = url.into_client_request().map_err(
-                |err: tokio_tungstenite::tungstenite::Error| format!("invalid bridge URL: {err}"),
-            )?;
-            tokio_tungstenite::connect_async_tls_with_config(request, None, false, Some(connector))
-                .await
-                .map(|(ws, _)| ws)
-                .map_err(|err| err.to_string())
-        })
-        .retry(
-            ConstantBuilder::default()
-                .with_delay(RECONNECT_INTERVAL)
-                .without_max_times(),
-        )
-        .sleep(tokio::time::sleep)
-        .notify(|err, dur| {
-            tracing::warn!("Failed to connect to bridge: {err}. Retrying in {dur:?}…");
-        })
-        .await
-        .expect("infinite retry never returns Err");
+    let socket = (|| async {
+        let request = url.into_client_request().map_err(
+            |err: tokio_tungstenite::tungstenite::Error| format!("invalid bridge URL: {err}"),
+        )?;
+        tokio_tungstenite::connect_async(request)
+            .await
+            .map(|(ws, _)| ws)
+            .map_err(|err| err.to_string())
+    })
+    .retry(
+        ConstantBuilder::default()
+            .with_delay(RECONNECT_INTERVAL)
+            .without_max_times(),
+    )
+    .sleep(tokio::time::sleep)
+    .notify(|err, dur| {
+        tracing::warn!("Failed to connect to bridge: {err}. Retrying in {dur:?}…");
+    })
+    .await
+    .expect("infinite retry never returns Err");
 
-    tracing::info!("Bridge WebSocket connected; registering");
+    tracing::info!("Bridge WebSocket connected at {url}; registering");
 
     let (mut sink, mut stream) = socket.split();
 

@@ -4,12 +4,9 @@ pub mod server;
 pub use euro_bridge_protocol::{
     BRIDGE_BIND_IP, BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BRIDGE_SCHEME, BridgeError, CancelFrame,
     ErrorFrame, EventFrame, Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
-    bridge_ca_path, bridge_data_dir, bridge_url, bridge_url_for, eurora_data_root,
+    bridge_url, bridge_url_for,
 };
-pub use server::{
-    BoundServer, BridgeService, RegisteredClient, RegistrationEvent, TlsMaterial,
-    install_default_crypto_provider,
-};
+pub use server::{BoundServer, BridgeService, RegisteredClient, RegistrationEvent};
 
 /// Bind the bridge WebSocket listener on its well-known port and return
 /// the [`BoundServer`] handle whose [`serve`](BoundServer::serve) future
@@ -17,10 +14,9 @@ pub use server::{
 /// the time this returns, so spawning `serve()` afterwards is sufficient
 /// to expose the listener — clients can no longer race the bind.
 ///
-/// Requires [`BridgeService::configure_tls`] to have been called first;
-/// returns [`BridgeError::TlsNotConfigured`] otherwise. Returns
-/// [`BridgeError::AlreadyRunning`] if a previous serve loop is still
-/// registered.
+/// Returns [`BridgeError::AlreadyRunning`] if a previous serve loop is
+/// still registered, and [`BridgeError::Bind`] if the OS refuses the
+/// bind (typically port already in use).
 pub async fn bind_bridge_server() -> Result<BoundServer, BridgeError> {
     BridgeService::get_or_init().bind().await
 }

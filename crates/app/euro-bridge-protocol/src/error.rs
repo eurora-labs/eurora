@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use std::path::PathBuf;
 
 use thiserror::Error;
 
@@ -33,13 +32,6 @@ pub enum BridgeError {
     #[error("failed to deliver frame to client: {0}")]
     Send(String),
 
-    /// `BridgeService::bind` was called before TLS material was
-    /// configured on the service. The bridge requires TLS — there is no
-    /// plaintext fallback — so this is an unrecoverable configuration
-    /// error rather than a runtime failure.
-    #[error("bridge TLS material not configured; call BridgeService::configure_tls first")]
-    TlsNotConfigured,
-
     /// `BridgeService::bind` was called while the listener was already
     /// running. Surfaced explicitly (rather than silently no-op'd) so
     /// callers that want "ensure running" semantics check
@@ -57,25 +49,9 @@ pub enum BridgeError {
         source: std::io::Error,
     },
 
-    /// The accept loop terminated with an unrecoverable error (TLS
-    /// handshake panic, listener vanished, …).
+    /// The accept loop terminated with an unrecoverable error.
     #[error("bridge serve loop ended with error: {source}")]
     Serve {
-        #[source]
-        source: std::io::Error,
-    },
-
-    /// The TLS material on disk could not be loaded into a rustls
-    /// config. Typical causes: cert/key out of sync, bad PEM, key
-    /// algorithm mismatch with what aws-lc-rs accepts.
-    #[error(
-        "failed to load bridge TLS material (cert={}, key={}): {source}",
-        cert_path.display(),
-        key_path.display()
-    )]
-    TlsLoad {
-        cert_path: PathBuf,
-        key_path: PathBuf,
         #[source]
         source: std::io::Error,
     },
