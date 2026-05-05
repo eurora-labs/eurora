@@ -48,32 +48,32 @@ pub struct ThreadManager {
 
 impl ThreadManager {
     pub fn new(endpoint_manager: Arc<EndpointManager>, auth_manager: AuthManager) -> Self {
+        let http = endpoint_manager.client();
         Self {
             endpoint_manager,
             auth_manager,
-            http: reqwest::Client::new(),
+            http,
         }
     }
 
-    fn url(&self, path: &str) -> String {
-        let base = self.endpoint_manager.current_url();
-        let trimmed = base.trim_end_matches('/');
-        format!("{trimmed}{path}")
+    fn url(&self, path: &str) -> reqwest::Url {
+        self.endpoint_manager.url(path)
     }
 
-    fn ws_url(&self, path: &str) -> Result<String> {
-        let base = self.endpoint_manager.current_url();
-        let trimmed = base.trim_end_matches('/');
-        let scheme_swapped = if let Some(rest) = trimmed.strip_prefix("https://") {
-            format!("wss://{rest}")
-        } else if let Some(rest) = trimmed.strip_prefix("http://") {
-            format!("ws://{rest}")
-        } else {
-            return Err(Error::InvalidUrl(format!(
-                "endpoint URL has no http(s) scheme: {base}"
-            )));
+    fn ws_url(&self, path: &str) -> Result<reqwest::Url> {
+        let mut url = self.endpoint_manager.url(path);
+        let new_scheme = match url.scheme() {
+            "https" => "wss",
+            "http" => "ws",
+            other => {
+                return Err(Error::InvalidUrl(format!(
+                    "endpoint URL has unsupported scheme for WebSocket: {other}"
+                )));
+            }
         };
-        Ok(format!("{scheme_swapped}{path}"))
+        url.set_scheme(new_scheme)
+            .map_err(|()| Error::InvalidUrl(format!("Failed to switch scheme to {new_scheme}")))?;
+        Ok(url)
     }
 
     async fn bearer(&self) -> Result<String> {

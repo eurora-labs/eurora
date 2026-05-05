@@ -30,14 +30,3 @@ tokio = { workspace = true, features = [
   "rt-multi-thread",
   "sync",
 ] }
-tonic = { workspace = true, features = ["channel"] }
-tonic-async-interceptor = "0.14.1"
-tower = { workspace = true }
-tracing = { workspace = true }
-
-[dev-dependencies]
-tracing-subscriber = { workspace = true }
-
-[features]
-default = []
-compat = []  # Enable backward compatibility layer

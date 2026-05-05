@@ -11,14 +11,19 @@ pub use error::{EndpointError, Result};
 
 use std::sync::RwLock;
 
-use tokio::sync::watch;
-use tonic::transport::{Channel, ClientTlsConfig};
+use url::Url;
 
 pub const DEFAULT_API_URL: &str = "https://api.eurora-labs.com";
 
+/// Owns the live backend base URL plus a single shared [`reqwest::Client`].
+///
+/// The client is cheap to clone (internally `Arc`-based) and shares its
+/// connection pool across every consumer that takes one from
+/// [`EndpointManager::client`]. The base URL is parsed up front and
+/// re-validated on every change via [`EndpointManager::set_global_backend_url`].
 pub struct EndpointManager {
-    tx: watch::Sender<Channel>,
-    current_url: RwLock<String>,
+    client: reqwest::Client,
+    base_url: RwLock<Url>,
 }
 
 impl EndpointManager {
@@ -29,12 +34,14 @@ impl EndpointManager {
             initial_url
         };
 
-        let channel = build_channel(url)?;
-        let (tx, _) = watch::channel(channel);
+        let base_url = parse_base_url(url)?;
+        let client = reqwest::Client::builder()
+            .build()
+            .map_err(EndpointError::Build)?;
 
         Ok(Self {
-            tx,
-            current_url: RwLock::new(url.to_owned()),
+            client,
+            base_url: RwLock::new(base_url),
         })
     }
 
@@ -43,38 +50,52 @@ impl EndpointManager {
         Self::new(&url)
     }
 
-    pub fn subscribe(&self) -> watch::Receiver<Channel> {
-        self.tx.subscribe()
-    }
-
     /// Returns the URL the manager is currently pointing at.
     ///
-    /// Used by HTTP consumers (reqwest-based clients) that need the base
-    /// URL rather than a tonic `Channel`. Stays in sync with whatever URL
-    /// `set_global_backend_url` was last called with.
-    pub fn current_url(&self) -> String {
-        self.current_url.read().unwrap().clone()
+    /// Stays in sync with whatever [`EndpointManager::set_global_backend_url`]
+    /// was last called with. Always carries a trailing slash on its path so
+    /// callers can `join` relative paths against it.
+    pub fn current_url(&self) -> Url {
+        self.base_url.read().unwrap().clone()
+    }
+
+    /// Returns a clone of the shared HTTP client. Cloning is essentially free
+    /// (an internal `Arc` bump) and the resulting client shares its
+    /// connection pool with every other clone taken from the same
+    /// [`EndpointManager`].
+    pub fn client(&self) -> reqwest::Client {
+        self.client.clone()
+    }
+
+    /// Build an absolute URL for `path` against the current base URL.
+    ///
+    /// `path` may begin with `/` or not — the base URL is normalised to end
+    /// with `/`, so both forms produce the same absolute URL. Panics only on
+    /// a programmer bug: a `path` containing characters that don't form a
+    /// valid relative URL.
+    pub fn url(&self, path: &str) -> Url {
+        let relative = path.strip_prefix('/').unwrap_or(path);
+        self.current_url()
+            .join(relative)
+            .expect("path forms a valid relative URL against the base")
     }
 
     pub fn set_global_backend_url(&self, url: &str) -> Result<()> {
-        let channel = build_channel(url)?;
-        self.tx
-            .send(channel)
-            .map_err(|_| EndpointError::NoSubscribers)?;
-        *self.current_url.write().unwrap() = url.to_owned();
+        let parsed = parse_base_url(url)?;
+        *self.base_url.write().unwrap() = parsed;
         tracing::info!("Switched API endpoint");
         Ok(())
     }
 }
 
-fn build_channel(url: &str) -> Result<Channel> {
-    let mut endpoint = Channel::from_shared(url.to_owned())
-        .map_err(|e| EndpointError::InvalidUrl(e.to_string()))?;
-
-    if url.starts_with("https://") {
-        let tls = ClientTlsConfig::new().with_enabled_roots();
-        endpoint = endpoint.tls_config(tls).map_err(EndpointError::Tls)?;
+// Normalise the base URL so its path ends with `/`, ensuring `Url::join`
+// treats it as a directory rather than replacing its last segment.
+fn parse_base_url(input: &str) -> Result<Url> {
+    let mut url = Url::parse(input).map_err(EndpointError::InvalidUrl)?;
+    if !url.path().ends_with('/') {
+        let mut path = url.path().to_owned();
+        path.push('/');
+        url.set_path(&path);
     }
-
-    Ok(endpoint.connect_lazy())
+    Ok(url)
 }

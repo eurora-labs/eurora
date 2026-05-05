@@ -13,7 +13,8 @@ use auth_core::{
     ThirdPartyAuthUrlResponse, TokenResponse, VerifyEmailRequest,
 };
 use euro_endpoint::EndpointManager;
-use reqwest::Response;
+use reqwest::{RequestBuilder, Response};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::error::{AuthError, AuthResult};
@@ -27,23 +28,18 @@ pub struct AuthClient {
 impl std::fmt::Debug for AuthClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("AuthClient")
-            .field("base_url", &self.endpoint_manager.current_url())
+            .field("base_url", &self.endpoint_manager.current_url().as_str())
             .finish()
     }
 }
 
 impl AuthClient {
     pub fn new(endpoint_manager: Arc<EndpointManager>) -> Self {
+        let http = endpoint_manager.client();
         Self {
             endpoint_manager,
-            http: reqwest::Client::new(),
+            http,
         }
-    }
-
-    fn url(&self, path: &str) -> String {
-        let base = self.endpoint_manager.current_url();
-        let trimmed = base.trim_end_matches('/');
-        format!("{trimmed}{path}")
     }
 
     pub async fn login_by_password(
@@ -73,18 +69,11 @@ impl AuthClient {
     }
 
     pub async fn refresh_token(&self, refresh_token: impl AsRef<str>) -> AuthResult<TokenResponse> {
-        self.post_empty("/auth/refresh", Some(refresh_token.as_ref()))
-            .await
+        send_typed(self.request("/auth/refresh", Some(refresh_token.as_ref()))).await
     }
 
     pub async fn logout(&self, refresh_token: impl AsRef<str>) -> AuthResult<()> {
-        let response = self
-            .request("/auth/logout", Some(refresh_token.as_ref().to_owned()))
-            .send()
-            .await
-            .map_err(AuthError::from_transport)?;
-        let _: serde_json::Value = decode_or_error(response).await?;
-        Ok(())
+        send_unit(self.request("/auth/logout", Some(refresh_token.as_ref()))).await
     }
 
     pub async fn login_by_login_token(
@@ -106,17 +95,11 @@ impl AuthClient {
         let body = AssociateLoginTokenRequest {
             code_challenge: code_challenge.into(),
         };
-        let response = self
-            .request(
-                "/auth/login-token/associate",
-                Some(access_token.as_ref().to_owned()),
-            )
-            .json(&body)
-            .send()
-            .await
-            .map_err(AuthError::from_transport)?;
-        let _: serde_json::Value = decode_or_error(response).await?;
-        Ok(())
+        send_unit(
+            self.request("/auth/login-token/associate", Some(access_token.as_ref()))
+                .json(&body),
+        )
+        .await
     }
 
     pub async fn check_email(&self, email: impl Into<String>) -> AuthResult<CheckEmailResponse> {
@@ -134,16 +117,11 @@ impl AuthClient {
     }
 
     pub async fn resend_verification_email(&self, access_token: impl AsRef<str>) -> AuthResult<()> {
-        let response = self
-            .request(
-                "/auth/email/resend-verification",
-                Some(access_token.as_ref().to_owned()),
-            )
-            .send()
-            .await
-            .map_err(AuthError::from_transport)?;
-        let _: serde_json::Value = decode_or_error(response).await?;
-        Ok(())
+        send_unit(self.request(
+            "/auth/email/resend-verification",
+            Some(access_token.as_ref()),
+        ))
+        .await
     }
 
     pub async fn third_party_auth_url(
@@ -156,32 +134,14 @@ impl AuthClient {
 
     async fn post_json<B, R>(&self, path: &str, body: &B, bearer: Option<&str>) -> AuthResult<R>
     where
-        B: serde::Serialize + ?Sized,
+        B: Serialize + ?Sized,
         R: DeserializeOwned,
     {
-        let response = self
-            .request(path, bearer.map(str::to_owned))
-            .json(body)
-            .send()
-            .await
-            .map_err(AuthError::from_transport)?;
-        decode_or_error(response).await
+        send_typed(self.request(path, bearer).json(body)).await
     }
 
-    async fn post_empty<R>(&self, path: &str, bearer: Option<&str>) -> AuthResult<R>
-    where
-        R: DeserializeOwned,
-    {
-        let response = self
-            .request(path, bearer.map(str::to_owned))
-            .send()
-            .await
-            .map_err(AuthError::from_transport)?;
-        decode_or_error(response).await
-    }
-
-    fn request(&self, path: &str, bearer: Option<String>) -> reqwest::RequestBuilder {
-        let mut builder = self.http.post(self.url(path));
+    fn request(&self, path: &str, bearer: Option<&str>) -> RequestBuilder {
+        let mut builder = self.http.post(self.endpoint_manager.url(path));
         if let Some(token) = bearer {
             builder = builder.bearer_auth(token);
         }
@@ -189,24 +149,26 @@ impl AuthClient {
     }
 }
 
-async fn decode_or_error<R: DeserializeOwned>(response: Response) -> AuthResult<R> {
+async fn send_typed<R: DeserializeOwned>(builder: RequestBuilder) -> AuthResult<R> {
+    let response = builder.send().await.map_err(AuthError::from_transport)?;
     let status = response.status();
-    if status.is_success() {
-        // Some endpoints return an empty body on success; fall back to
-        // deserializing `null` so callers can use `()` / `serde_json::Value`.
-        let bytes = response.bytes().await.map_err(AuthError::from_transport)?;
-        if bytes.is_empty() {
-            return serde_json::from_slice(b"null").map_err(|e| {
-                AuthError::Transient(anyhow::anyhow!("failed to decode empty response: {e}"))
-            });
-        }
-        return serde_json::from_slice(&bytes).map_err(|e| {
-            AuthError::Transient(anyhow::anyhow!("failed to decode auth response: {e}"))
-        });
+    if !status.is_success() {
+        let body = decode_error_body(response).await;
+        return Err(AuthError::from_http_response(status, body));
     }
+    let bytes = response.bytes().await.map_err(AuthError::from_transport)?;
+    serde_json::from_slice(&bytes)
+        .map_err(|e| AuthError::Transient(anyhow::anyhow!("failed to decode auth response: {e}")))
+}
 
-    let body = decode_error_body(response).await;
-    Err(AuthError::from_http_response(status, body))
+async fn send_unit(builder: RequestBuilder) -> AuthResult<()> {
+    let response = builder.send().await.map_err(AuthError::from_transport)?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = decode_error_body(response).await;
+        return Err(AuthError::from_http_response(status, body));
+    }
+    Ok(())
 }
 
 async fn decode_error_body(response: Response) -> Option<AuthErrorResponse> {

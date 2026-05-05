@@ -47,17 +47,16 @@ pub struct ActivityStorage {
 
 impl ActivityStorage {
     pub fn new(endpoint_manager: Arc<EndpointManager>, auth_manager: AuthManager) -> Self {
+        let http = endpoint_manager.client();
         Self {
             endpoint_manager,
             auth_manager,
-            http: reqwest::Client::new(),
+            http,
         }
     }
 
-    fn url(&self, path: &str) -> String {
-        let base = self.endpoint_manager.current_url();
-        let trimmed = base.trim_end_matches('/');
-        format!("{trimmed}{path}")
+    fn url(&self, path: &str) -> reqwest::Url {
+        self.endpoint_manager.url(path)
     }
 
     async fn bearer(&self) -> ActivityResult<String> {
@@ -83,8 +82,6 @@ impl ActivityStorage {
             None => None,
         };
 
-        // Mirror the legacy gRPC behaviour: send `process_name` as the
-        // `window_title` value when no separate title is plumbed through.
         let request = InsertActivityRequest {
             id: None,
             name: activity.name.clone(),
