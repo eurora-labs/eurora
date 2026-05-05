@@ -5,7 +5,16 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
-	<dict/>
+	<dict>
+		<!-- The launcher dials the desktop bridge over plaintext
+		     ws://localhost:1431/bridge. ATS treats unqualified hostnames
+		     as local resources; NSAllowsLocalNetworking is the narrow,
+		     Apple-blessed knob to permit non-TLS loads to them without
+		     loosening anything else. See BridgeProtocol.swift for the
+		     transport rationale. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>SFSafariWebExtensionConverterVersion</key>
 	<string>26.2</string>
 </dict>

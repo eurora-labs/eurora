@@ -1,0 +1,2 @@
+--exclude Shared/Generated,.build,Packages,Pods,Carthage
+--swiftversion 5.9

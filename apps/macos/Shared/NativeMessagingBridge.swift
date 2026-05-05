@@ -16,17 +16,17 @@ public enum BridgeError: Error, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .bridgeDeallocated:
-            return "Native messaging bridge was deallocated"
+            "Native messaging bridge was deallocated"
         case .notConnected:
-            return "Launcher app is not running"
+            "Launcher app is not running"
         case .disconnected:
-            return "Launcher connection was closed"
+            "Launcher connection was closed"
         case .timeout:
-            return "Request timed out"
+            "Request timed out"
         case .malformedFrame:
-            return "Malformed bridge frame"
-        case .duplicateRequestId(let id):
-            return "Two in-flight requests share id \(id)"
+            "Malformed bridge frame"
+        case let .duplicateRequestId(id):
+            "Two in-flight requests share id \(id)"
         }
     }
 }
@@ -37,7 +37,6 @@ public enum BridgeError: Error, LocalizedError {
 /// originating `RequestFrame`.
 @available(macOS 13.0, *)
 public final class NativeMessagingBridge: @unchecked Sendable {
-
     public static let shared = NativeMessagingBridge()
 
     private let logger = Logger(subsystem: "com.eurora.macos", category: "NativeMessagingBridge")
@@ -110,11 +109,11 @@ public final class NativeMessagingBridge: @unchecked Sendable {
     /// that was originally pushed from the desktop. No reply is awaited.
     public func forward(_ frame: Frame) {
         queue.async { [weak self] in
-            guard let self, let connection = self.connection, self.isConnected else {
+            guard let self, let connection, isConnected else {
                 self?.logger.error("Cannot forward — not connected: \(frame.summary, privacy: .public)")
                 return
             }
-            self.write(frame, on: connection) { error in
+            write(frame, on: connection) { error in
                 if let error {
                     self.logger.error("Forward error: \(error.localizedDescription, privacy: .public)")
                 }
@@ -160,12 +159,12 @@ public final class NativeMessagingBridge: @unchecked Sendable {
             isConnected = true
             isConnecting = false
             receiveLength()
-        case .failed(let error):
+        case let .failed(error):
             logger.error("Connection failed: \(error.localizedDescription, privacy: .public)")
             tearDown()
         case .cancelled:
             tearDown()
-        case .waiting(let error):
+        case let .waiting(error):
             logger.warning("Connection waiting: \(error.localizedDescription, privacy: .public)")
         default:
             break
@@ -192,48 +191,51 @@ public final class NativeMessagingBridge: @unchecked Sendable {
             guard let self else { return }
 
             if let error {
-                self.logger.error("Receive error: \(error.localizedDescription, privacy: .public)")
-                self.tearDown()
+                logger.error("Receive error: \(error.localizedDescription, privacy: .public)")
+                tearDown()
                 return
             }
             if isComplete {
-                self.logger.debug("Server closed connection")
-                self.tearDown()
+                logger.debug("Server closed connection")
+                tearDown()
                 return
             }
             guard let lengthData = data, lengthData.count == 4 else {
-                self.receiveLength()
+                receiveLength()
                 return
             }
             let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).littleEndian }
             guard length > 0, Int(length) <= BridgeProtocol.maxFrameSize else {
-                self.logger.error("Invalid message length: \(length, privacy: .public)")
-                self.tearDown()
+                logger.error("Invalid message length: \(length, privacy: .public)")
+                tearDown()
                 return
             }
-            self.receiveBody(length: Int(length))
+            receiveBody(length: Int(length))
         }
     }
 
     private func receiveBody(length: Int) {
         guard let connection else { return }
-        connection.receive(minimumIncompleteLength: length, maximumLength: length) { [weak self] data, _, isComplete, error in
+        connection.receive(
+            minimumIncompleteLength: length,
+            maximumLength: length
+        ) { [weak self] data, _, isComplete, error in
             guard let self else { return }
             if let error {
-                self.logger.error("Receive body error: \(error.localizedDescription, privacy: .public)")
-                self.tearDown()
+                logger.error("Receive body error: \(error.localizedDescription, privacy: .public)")
+                tearDown()
                 return
             }
-            if isComplete && data == nil {
-                self.tearDown()
+            if isComplete, data == nil {
+                tearDown()
                 return
             }
             guard let body = data, body.count == length else {
-                self.receiveLength()
+                receiveLength()
                 return
             }
-            self.handleBody(body)
-            self.receiveLength()
+            handleBody(body)
+            receiveLength()
         }
     }
 
@@ -246,11 +248,10 @@ public final class NativeMessagingBridge: @unchecked Sendable {
             return
         }
 
-        let id: UInt32?
-        switch frame.kind {
-        case .response(let r): id = r.id
-        case .error(let e): id = e.id
-        default: id = nil
+        let id: UInt32? = switch frame.kind {
+        case let .response(response): response.id
+        case let .error(errorFrame): errorFrame.id
+        default: nil
         }
 
         guard let id, let continuation = removePending(id: id) else {

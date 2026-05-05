@@ -3,7 +3,7 @@ import * as log from '$lib/util/log';
 import { getSessionId } from '$lib/util/session-id';
 import type { Frame, RequestFrame } from '$lib/shared/bindings';
 
-const DEFAULT_URL = 'wss://localhost:1431/bridge';
+const DEFAULT_URL = 'ws://localhost:1431/bridge';
 const DEFAULT_APP_KIND = 'microsoft-word';
 
 export interface BackoffConfig {

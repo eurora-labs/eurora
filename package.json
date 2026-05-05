@@ -48,6 +48,9 @@
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
 		"rustfmt": "cargo +nightly fmt -- --config-path rustfmt-nightly.toml",
+		"swiftlint": "cd apps/macos && swiftlint",
+		"swiftformat": "cd apps/macos && swiftformat --lint .",
+		"swiftformat:fix": "cd apps/macos && swiftformat .",
 		"generate:licenses": "scripts/generate-licenses",
 		"test": "turbo run test --no-daemon",
 		"test:watch": "pnpm --filter @eurora/desktop run test:watch",
@@ -93,7 +96,7 @@
 		"typescript-eslint": "^8.59.0",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@10.33.2",
+	"packageManager": "pnpm@10.33.3",
 	"engines": {
 		"node": ">=20.11"
 	},
