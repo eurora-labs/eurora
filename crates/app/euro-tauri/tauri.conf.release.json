@@ -7,16 +7,17 @@
 	},
 	"bundle": {
 		"active": true,
-		"resources": [
-			"LICENSES-THIRD-PARTY.md",
-			"docker-compose.yml",
-			"hosts/mac.chromium.native-messaging.json",
-			"hosts/mac.edge.native-messaging.json",
-			"hosts/mac.firefox.native-messaging.json",
-			"hosts/linux.chromium.native-messaging.json",
-			"hosts/linux.edge.native-messaging.json",
-			"hosts/linux.firefox.native-messaging.json"
-		],
+		"resources": {
+			"LICENSES-THIRD-PARTY.md": "LICENSES-THIRD-PARTY.md",
+			"docker-compose.yml": "docker-compose.yml",
+			"hosts/mac.chromium.native-messaging.json": "hosts/mac.chromium.native-messaging.json",
+			"hosts/mac.edge.native-messaging.json": "hosts/mac.edge.native-messaging.json",
+			"hosts/mac.firefox.native-messaging.json": "hosts/mac.firefox.native-messaging.json",
+			"hosts/linux.chromium.native-messaging.json": "hosts/linux.chromium.native-messaging.json",
+			"hosts/linux.edge.native-messaging.json": "hosts/linux.edge.native-messaging.json",
+			"hosts/linux.firefox.native-messaging.json": "hosts/linux.firefox.native-messaging.json",
+			"../../../apps/office-addin/dist/": "office-addin/"
+		},
 		"externalBin": [
 			"binaries/euro-native-messaging"
 		],
