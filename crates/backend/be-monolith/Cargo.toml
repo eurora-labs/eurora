@@ -21,9 +21,7 @@ be-thread-service = { workspace = true }
 be-update-service = { workspace = true }
 dotenv = { workspace = true }
 posthog-rs = { workspace = true }
-prost = { workspace = true }
 rustls = { workspace = true, features = ["aws_lc_rs"] }
-proto-gen = { workspace = true }
 sentry = { version = "0.47", default-features = false, features = [
   "backtrace",
   "contexts",
@@ -41,6 +39,3 @@ tonic-web = "0.14.3"
 tower-http = { version = "0.6.8", features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
-
-[build-dependencies]
-tonic-prost-build = { workspace = true }

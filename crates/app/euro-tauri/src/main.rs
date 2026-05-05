@@ -444,14 +444,14 @@ fn init_state(
 
     // Single shared AuthManager so concurrent refreshes from any consumer
     // (thread, timeline, user) coalesce through one refresh lock.
-    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.subscribe());
+    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
 
     let thread_manager =
         euro_thread::ThreadManager::new(endpoint_manager.subscribe(), auth_manager.clone());
     app_handle.manage(SharedThreadManager::new(thread_manager));
 
     let timeline = euro_timeline::TimelineManager::builder()
-        .channel_rx(endpoint_manager.subscribe())
+        .endpoint_manager(endpoint_manager.clone())
         .auth_manager(auth_manager.clone())
         .build()?;
     app_handle.manage(Mutex::new(timeline));

@@ -47,6 +47,15 @@ impl EndpointManager {
         self.tx.subscribe()
     }
 
+    /// Returns the URL the manager is currently pointing at.
+    ///
+    /// Used by HTTP consumers (reqwest-based clients) that need the base
+    /// URL rather than a tonic `Channel`. Stays in sync with whatever URL
+    /// `set_global_backend_url` was last called with.
+    pub fn current_url(&self) -> String {
+        self.current_url.read().unwrap().clone()
+    }
+
     pub fn set_global_backend_url(&self, url: &str) -> Result<()> {
         let channel = build_channel(url)?;
         self.tx

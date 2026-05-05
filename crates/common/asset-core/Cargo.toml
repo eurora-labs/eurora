@@ -1,0 +1,17 @@
+[package]
+name = "asset-core"
+version = "0.0.0"
+edition.workspace = true
+description = "Shared HTTP DTOs for the Eurora asset service"
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+chrono = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+specta = { workspace = true, optional = true, features = ["derive", "chrono", "uuid", "serde_json"] }
+uuid = { workspace = true, features = ["serde"] }
+
+[features]
+default = []
+specta = ["dep:specta"]

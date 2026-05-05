@@ -8,7 +8,10 @@ members = [
   "crates/common/agent-chain-macros",
   "crates/common/agent-graph",
   "crates/common/agent-graph-macros",
+  "crates/common/activity-core",
+  "crates/common/asset-core",
   "crates/common/auth-core",
+  "crates/common/thread-core",
   "crates/common/focus-tracker",
   "crates/common/focus-tracker-core",
   "crates/common/proto-gen",
@@ -31,7 +34,10 @@ argon2 = "0.5"
 async_from = "0.2.0"
 async-stream = "0.3.6"
 async-trait = "0.1.89"
+activity-core = { path = "crates/common/activity-core" }
+asset-core = { path = "crates/common/asset-core" }
 auth-core = { path = "crates/common/auth-core" }
+thread-core = { path = "crates/common/thread-core" }
 axum = "0.8.8"
 axum-server = { version = "0.7", default-features = false, features = ["tls-rustls-no-provider"] }
 backon = "1.6"

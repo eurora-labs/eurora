@@ -1,3 +1,4 @@
+use axum::http::Method;
 use be_remote_db::{DatabaseManager, DbResult, year_month_key};
 use tonic::Status;
 use uuid::Uuid;
@@ -7,14 +8,36 @@ const TOKEN_GATED_METHODS: &[(&str, &str)] = &[
     ("thread_service.ProtoThreadService", "GenerateThreadTitle"),
 ];
 
+/// HTTP routes that consume token budget.
+///
+/// `(http_method, axum_matched_path)`. The `MatchedPath` form is what the
+/// HTTP gate compares against, so the entries must mirror the routes
+/// declared in `be-thread-service::create_router` exactly.
+const HTTP_TOKEN_GATED_ROUTES: &[(Method, &str)] = &[
+    (Method::POST, "/threads/{thread_id}/title"),
+    (Method::GET, "/threads/{thread_id}/chat"),
+];
+
 pub(crate) fn is_token_gated(service_full: &str, method: &str) -> bool {
     TOKEN_GATED_METHODS
         .iter()
         .any(|(s, m)| *s == service_full && *m == method)
 }
 
+/// True if the (method, matched_path) tuple identifies a route whose call
+/// must be rejected when the caller is over their monthly token budget.
+pub fn is_http_token_gated(method: &Method, matched_path: &str) -> bool {
+    HTTP_TOKEN_GATED_ROUTES
+        .iter()
+        .any(|(m, p)| m == method && *p == matched_path)
+}
+
+/// Repository contract for monthly token usage. `DatabaseManager` is the
+/// canonical impl; the trait exists so middleware can be unit-tested with
+/// a mock and so be-monolith doesn't have to leak its DB type into this
+/// crate's public layer surface.
 #[async_trait::async_trait]
-pub(crate) trait TokenUsageRepo: Send + Sync {
+pub trait TokenUsageRepo: Send + Sync {
     async fn get_token_limit_and_usage(
         &self,
         user_id: Uuid,
@@ -50,10 +73,43 @@ impl<T: TokenUsageRepo> TokenUsageRepo for std::sync::Arc<T> {
     }
 }
 
+/// Outcome of an HTTP token-limit check. Convertible to an axum response
+/// upstream — kept as a dedicated enum (rather than [`tonic::Status`] or an
+/// `axum::http::StatusCode`) so the wire layer can be picked at the call
+/// site without dragging gRPC types into the HTTP path.
+#[derive(Debug, Clone)]
+pub enum TokenGateError {
+    /// Caller has exceeded their monthly budget.
+    Exhausted { used: i64, limit: i64 },
+    /// Database lookup failed.
+    Internal,
+}
+
 pub(crate) async fn check_token_limit(
     db: &impl TokenUsageRepo,
     user_id: Uuid,
 ) -> Result<(), Status> {
+    match check_token_limit_inner(db, user_id).await {
+        Ok(()) => Ok(()),
+        Err(TokenGateError::Exhausted { .. }) => Err(Status::resource_exhausted(
+            "Monthly token limit reached. Please upgrade your plan.",
+        )),
+        Err(TokenGateError::Internal) => Err(Status::internal("Failed to check token limit")),
+    }
+}
+
+/// Same check, surfaced as a [`TokenGateError`] for the HTTP middleware path.
+pub async fn check_token_limit_http(
+    db: &(impl TokenUsageRepo + ?Sized),
+    user_id: Uuid,
+) -> Result<(), TokenGateError> {
+    check_token_limit_inner(db, user_id).await
+}
+
+async fn check_token_limit_inner(
+    db: &(impl TokenUsageRepo + ?Sized),
+    user_id: Uuid,
+) -> Result<(), TokenGateError> {
     let now = chrono::Utc::now();
     let year_month = year_month_key(&now);
 
@@ -62,14 +118,12 @@ pub(crate) async fn check_token_limit(
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "Failed to check token limit");
-            Status::internal("Failed to check token limit")
+            TokenGateError::Internal
         })?;
 
     if used >= limit {
         tracing::warn!(used, limit, "Token limit reached");
-        return Err(Status::resource_exhausted(
-            "Monthly token limit reached. Please upgrade your plan.",
-        ));
+        return Err(TokenGateError::Exhausted { used, limit });
     }
 
     Ok(())
@@ -103,7 +157,7 @@ mod tests {
             "GetMessages"
         ));
         assert!(!is_token_gated(
-            "activity_service.ProtoActivityService",
+            "auth_service.ProtoAuthService",
             "ChatStream"
         ));
         assert!(!is_token_gated("", ""));

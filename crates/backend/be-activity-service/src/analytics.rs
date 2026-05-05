@@ -29,3 +29,9 @@ pub fn track_activities_listed(limit: u32, offset: u32, result_count: usize) {
     event.insert_prop("result_count", result_count).ok();
     capture_async(event);
 }
+
+pub fn track_activities_list_failed(error_kind: &str) {
+    let mut event = Event::new_anon("activities_list_failed");
+    event.insert_prop("error_kind", error_kind).ok();
+    capture_async(event);
+}

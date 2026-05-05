@@ -1,9 +1,9 @@
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, Method, header};
-use be_activity_service::{ActivityService, ProtoActivityServiceServer};
-use be_asset_service::{AssetService, ProtoAssetServiceServer};
+use be_activity_service::init_activity_service;
+use be_asset_service::init_asset_service;
 use be_auth_core::JwtConfig;
-use be_auth_service::AuthService;
+use be_auth_service::init_auth_service;
 use be_authz::{
     AuthzState, CasbinAuthz, GrpcAuthzLayer, TrustedProxies, authz_middleware,
     new_auth_failure_rate_limiter, new_health_check_rate_limiter,
@@ -14,7 +14,6 @@ use be_storage::StorageService;
 use be_thread_service::{ProtoThreadServiceServer, ThreadService};
 use be_update_service::init_update_service;
 use dotenv::dotenv;
-use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 use std::{net::SocketAddr, sync::Arc};
 use tonic::transport::Server;
 use tonic_web::GrpcWebLayer;
@@ -96,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
-        .set_serving::<ProtoAuthServiceServer<AuthService>>()
+        .set_serving::<ProtoThreadServiceServer<ThreadService>>()
         .await;
 
     let app_level = if cfg!(debug_assertions) {
@@ -179,7 +178,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let auth_service = AuthService::new(db_manager.clone(), jwt_config.clone(), email_service);
+    let auth_router = init_auth_service(
+        db_manager.clone(),
+        jwt_config.clone(),
+        email_service.clone(),
+    )?;
 
     let payment_service = match init_payment_service(db_manager.clone()) {
         Ok(svc) => Some(svc),
@@ -206,8 +209,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db_manager.clone(),
         storage.clone(),
     ));
-    let activity_service = ActivityService::new(db_manager.clone(), core_asset.clone());
-    let assets_service = AssetService::new(db_manager.clone(), storage.clone());
+    let activity_router = init_activity_service(db_manager.clone(), core_asset.clone())?;
+    let asset_router = init_asset_service(core_asset.clone());
     let thread_service = ThreadService::new(db_manager.clone(), core_asset.clone());
 
     tracing::info!("Starting gRPC server at {}", grpc_addr);
@@ -253,21 +256,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(grpc_authz_layer)
         .add_service(health_service)
         .add_service(
-            ProtoAuthServiceServer::new(auth_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
-                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
-        )
-        .add_service(
-            ProtoActivityServiceServer::new(activity_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
-                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
-        )
-        .add_service(
-            ProtoAssetServiceServer::new(assets_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
-                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
-        )
-        .add_service(
             ProtoThreadServiceServer::new(thread_service)
                 .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
                 .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
@@ -293,6 +281,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // generic "Failed to fetch" instead of the real status.
     let http_router = update_router
         .merge(payment_router)
+        .merge(activity_router)
+        .merge(asset_router)
+        .merge(auth_router)
         .merge(health_route)
         .layer(DefaultBodyLimit::max(HTTP_MAX_BODY_SIZE))
         .layer(axum::middleware::from_fn_with_state(

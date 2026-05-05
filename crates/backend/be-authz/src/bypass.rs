@@ -1,7 +1,7 @@
-pub(crate) const REST_BYPASS_PREFIXES: &[&str] = &["/releases/", "/extensions/", "/download/"];
+pub(crate) const REST_BYPASS_PREFIXES: &[&str] =
+    &["/releases/", "/extensions/", "/download/", "/auth/"];
 pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook", "/health"];
-pub(crate) const GRPC_BYPASS_SERVICES: &[&str] =
-    &["auth_service.ProtoAuthService", "grpc.health.v1.Health"];
+pub(crate) const GRPC_BYPASS_SERVICES: &[&str] = &["grpc.health.v1.Health"];
 
 /// REST paths that still require a valid JWT but do not require
 /// `email_verified` to be true. Distinct from `REST_BYPASS_*`, which skips
@@ -57,6 +57,9 @@ mod tests {
         assert!(is_rest_bypass("/releases/nightly"));
         assert!(is_rest_bypass("/releases/stable/v1.0.0"));
         assert!(is_rest_bypass("/extensions/nightly"));
+        assert!(is_rest_bypass("/auth/login"));
+        assert!(is_rest_bypass("/auth/refresh"));
+        assert!(is_rest_bypass("/auth/email/verify"));
     }
 
     #[test]
@@ -76,6 +79,7 @@ mod tests {
         assert!(!is_rest_bypass("/releases/../payment/checkout"));
         assert!(!is_rest_bypass("/extensions/../admin/users"));
         assert!(!is_rest_bypass("/releases/../../etc/passwd"));
+        assert!(!is_rest_bypass("/auth/../activities"));
     }
 
     #[test]
@@ -149,14 +153,13 @@ mod tests {
 
     #[test]
     fn grpc_bypass_known_services() {
-        assert!(is_grpc_bypass("auth_service.ProtoAuthService"));
         assert!(is_grpc_bypass("grpc.health.v1.Health"));
     }
 
     #[test]
     fn grpc_bypass_rejects_non_matching() {
         assert!(!is_grpc_bypass("thread_service.ProtoThreadService"));
-        assert!(!is_grpc_bypass("ProtoAuthService"));
+        assert!(!is_grpc_bypass("auth_service.ProtoAuthService"));
         assert!(!is_grpc_bypass(""));
     }
 }

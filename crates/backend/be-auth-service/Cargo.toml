@@ -6,8 +6,10 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
 
 [dependencies]
+anyhow = { workspace = true }
 argon2 = { workspace = true }
 auth-core = { workspace = true }
+axum = { workspace = true, features = ["macros"] }
 be-auth-core = { workspace = true }
 be-email-service = { workspace = true }
 be-remote-db = { workspace = true }
@@ -17,19 +19,17 @@ hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 openidconnect = { workspace = true }
 percent-encoding = { workspace = true }
-prost = { workspace = true }
-proto-gen = { workspace = true, features = ["server"] }
 rand = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
-tonic = { workspace = true }
-tonic-types = { workspace = true }
+tower-http = { version = "0.6.8", features = ["trace"] }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
 
-[build-dependencies]
-tonic-prost-build = { workspace = true }
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
