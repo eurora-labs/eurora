@@ -11,7 +11,7 @@ let package = Package(
     name: "EuroraMacOS",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     products: [
         .library(name: "EuroraMacOSLint", targets: ["EuroraMacOSLint"]),
@@ -37,6 +37,9 @@ let package = Package(
             sources: [
                 "Shared",
                 "macos/AppDelegate.swift",
+                "macos/BridgeHeartbeat.swift",
+                "macos/BridgeReplayCache.swift",
+                "macos/BridgeRequestRouter.swift",
                 "macos/BridgeWebSocketClient.swift",
                 "macos/LocalBridgeServer.swift",
                 "macos Extension/SafariWebExtensionHandler.swift",

@@ -22,7 +22,6 @@ public protocol BridgeWebSocketClientDelegate: AnyObject {
 /// retrying on a fixed interval.
 @available(macOS 13.0, *)
 public final class BridgeWebSocketClient: @unchecked Sendable {
-
     public weak var delegate: BridgeWebSocketClientDelegate?
 
     private let logger = Logger(
@@ -40,11 +39,8 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
     private var connectionTask: Task<Void, Never>?
     private var shouldRun = false
 
-    /// Last-seen `ASSETS` and `SNAPSHOT` event frames. We replay these after
-    /// a reconnect so the desktop bridge sees the latest browser state even
-    /// if it restarted while Safari was running.
-    private var cachedAssets: Frame?
-    private var cachedSnapshot: Frame?
+    private let replayCache = BridgeReplayCache()
+    private let heartbeat: BridgeHeartbeat
 
     public var isConnected: Bool {
         stateLock.lock()
@@ -64,6 +60,10 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         self.appKind = appKind
         self.url = url
         self.urlSession = urlSession
+        heartbeat = BridgeHeartbeat(
+            interval: BridgeProtocol.heartbeatInterval,
+            logger: Logger(subsystem: "com.eurora.macos", category: "BridgeHeartbeat")
+        )
     }
 
     deinit {
@@ -92,10 +92,18 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         shouldRun = true
         let task = Task { [weak self] in
             guard let self else { return }
-            await self.runConnectLoop()
+            await runConnectLoop()
         }
         connectionTask = task
         stateLock.unlock()
+
+        // Hoist to a local — `logger.info`'s interpolation captures via an
+        // @escaping @autoclosure, so referencing `url` directly would require
+        // `self.url` (which `swiftformat`'s redundantSelf rule would then strip,
+        // re-breaking the build). Same pattern is used in the other log sites
+        // below.
+        let urlString = url.absoluteString
+        logger.info("Bridge URL: \(urlString, privacy: .public)")
     }
 
     public func stop() {
@@ -132,7 +140,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
     /// Send a frame to the desktop bridge. If we're not currently connected
     /// the frame is dropped; this matches the previous gRPC client behavior.
     public func send(frame: Frame) {
-        cacheReplayableEvent(frame)
+        replayCache.record(frame)
 
         stateLock.lock()
         let task = currentTask
@@ -180,12 +188,11 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         stateLock.lock()
         currentTask = task
         let pid = appPid
-        let assets = cachedAssets
-        let snapshot = cachedSnapshot
         stateLock.unlock()
 
+        let host = hostPid
         logger.info(
-            "Connecting to bridge at \(self.url.absoluteString, privacy: .public): host=\(self.hostPid, privacy: .public), app=\(pid, privacy: .public)"
+            "Connecting to bridge: host=\(host, privacy: .public), app=\(pid, privacy: .public)"
         )
 
         let register = Frame(RegisterFrame(hostPid: hostPid, appPid: pid, appKind: appKind))
@@ -194,20 +201,13 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
             return
         }
 
-        if let assets {
-            logger.info("Replaying cached ASSETS frame")
-            _ = await sendAwait(frame: assets, on: task)
-        }
-        if let snapshot {
-            logger.info("Replaying cached SNAPSHOT frame")
-            _ = await sendAwait(frame: snapshot, on: task)
+        for frame in replayCache.replayables() {
+            logger.info("Replaying cached \(frame.summary, privacy: .public)")
+            _ = await sendAwait(frame: frame, on: task)
         }
 
         await notifyConnected()
-
-        let heartbeat = Task { [weak self, weak task] in
-            await self?.runHeartbeat(task: task)
-        }
+        heartbeat.start(pinging: task)
 
         var disconnectError: Error?
         do {
@@ -218,49 +218,28 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         } catch {
             disconnectError = error
             if !Task.isCancelled {
+                let description = describeFailure(error)
                 logger.info(
-                    "Bridge stream ended: \(self.describeFailure(error), privacy: .public)"
+                    "Bridge stream ended: \(description, privacy: .public)"
                 )
             }
         }
 
-        heartbeat.cancel()
+        heartbeat.stop()
         await teardown(task: task, error: disconnectError)
-    }
-
-    private func runHeartbeat(task: URLSessionWebSocketTask?) async {
-        let interval = BridgeProtocol.heartbeatInterval
-        while !Task.isCancelled {
-            do {
-                try await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
-            } catch {
-                return
-            }
-            guard let task else { return }
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                task.sendPing { [weak self] error in
-                    if let error {
-                        self?.logger.debug(
-                            "Heartbeat ping failed: \(error.localizedDescription, privacy: .public)"
-                        )
-                    }
-                    continuation.resume()
-                }
-            }
-        }
     }
 
     private func handleIncoming(message: URLSessionWebSocketTask.Message) {
         let text: String
         switch message {
-        case .string(let s):
-            text = s
-        case .data(let data):
-            guard let s = String(data: data, encoding: .utf8) else {
+        case let .string(string):
+            text = string
+        case let .data(data):
+            guard let decoded = String(data: data, encoding: .utf8) else {
                 logger.warning("Ignoring non-UTF8 binary frame from bridge")
                 return
             }
-            text = s
+            text = decoded
         @unknown default:
             logger.warning("Ignoring unknown websocket message variant")
             return
@@ -277,7 +256,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         }
 
         logger.debug("Received from bridge: \(frame.summary, privacy: .public)")
-        let delegate = self.delegate
+        let delegate = delegate
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             delegate?.bridgeWebSocketClient(self, didReceive: frame)
@@ -298,8 +277,9 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         }
         task.send(.string(json)) { [weak self] error in
             if let error, let self {
-                self.logger.warning(
-                    "Bridge send error: \(self.describeFailure(error), privacy: .public)"
+                let description = describeFailure(error)
+                logger.warning(
+                    "Bridge send error: \(description, privacy: .public)"
                 )
             }
         }
@@ -319,26 +299,11 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
             try await task.send(.string(json))
             return true
         } catch {
+            let description = describeFailure(error)
             logger.warning(
-                "Bridge send error: \(self.describeFailure(error), privacy: .public)"
+                "Bridge send error: \(description, privacy: .public)"
             )
             return false
-        }
-    }
-
-    private func cacheReplayableEvent(_ frame: Frame) {
-        guard case .event(let event) = frame.kind else { return }
-        switch event.action {
-        case "ASSETS":
-            stateLock.lock()
-            cachedAssets = frame
-            stateLock.unlock()
-        case "SNAPSHOT":
-            stateLock.lock()
-            cachedSnapshot = frame
-            stateLock.unlock()
-        default:
-            break
         }
     }
 
@@ -351,7 +316,7 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
         }
         stateLock.unlock()
 
-        let delegate = self.delegate
+        let delegate = delegate
         await MainActor.run { [weak self] in
             guard let self else { return }
             delegate?.bridgeWebSocketClientDidDisconnect(self, error: error)
@@ -359,29 +324,32 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
     }
 
     private func notifyConnected() async {
-        let delegate = self.delegate
+        let delegate = delegate
         await MainActor.run { [weak self] in
             guard let self else { return }
             delegate?.bridgeWebSocketClientDidConnect(self)
         }
     }
+}
 
-    // MARK: - Diagnostics
+// MARK: - Diagnostics
 
+@available(macOS 13.0, *)
+private extension BridgeWebSocketClient {
     /// Render a transport-layer failure for logging. The dominant
     /// failure mode is "desktop bridge not yet listening" — typically a
     /// startup race where the launcher comes up before the desktop has
     /// bound port 1431. Tagging that case with the dialed URL beats
     /// `URLError`'s generic `localizedDescription` for triage; every
     /// other code falls through.
-    private func describeFailure(_ error: Error) -> String {
+    func describeFailure(_ error: Error) -> String {
         guard let urlError = error as? URLError else {
             return error.localizedDescription
         }
         switch urlError.code {
         case .cannotConnectToHost, .cannotFindHost, .networkConnectionLost,
              .notConnectedToInternet, .timedOut:
-            return "desktop bridge not reachable at \(self.url.absoluteString) — \(urlError.localizedDescription)"
+            return "desktop bridge not reachable at \(url.absoluteString) — \(urlError.localizedDescription)"
         default:
             return urlError.localizedDescription
         }

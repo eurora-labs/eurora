@@ -1,5 +1,5 @@
-import SafariServices
 import os.log
+import SafariServices
 
 private let extensionLogger = Logger(
     subsystem: "com.eurora.macos.extension",
@@ -8,11 +8,10 @@ private let extensionLogger = Logger(
 
 @available(macOS 13.0, *)
 class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
-
     func beginRequest(with context: NSExtensionContext) {
         let request = context.inputItems.first as? NSExtensionItem
         let raw = Self.extractMessage(from: request)
-        let profileStr = Self.extractProfile(from: request).map { $0.uuidString } ?? "none"
+        let profileStr = Self.extractProfile(from: request).map(\.uuidString) ?? "none"
         extensionLogger.debug("Received native message (profile: \(profileStr, privacy: .public))")
 
         guard let raw else {
@@ -37,7 +36,7 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             NativeMessagingBridge.shared.forward(frame)
             Self.completeWithStatus(context: context, status: "forwarded")
 
-        case .request(let request):
+        case let .request(request):
             NativeMessagingBridge.shared.ensureConnected()
             Task {
                 do {
@@ -85,13 +84,12 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
     }
 
     private static func decodeFrame(from raw: Any) throws -> Frame {
-        let data: Data
-        if let frameData = raw as? Data {
-            data = frameData
+        let data: Data = if let frameData = raw as? Data {
+            frameData
         } else if let string = raw as? String, let stringData = string.data(using: .utf8) {
-            data = stringData
+            stringData
         } else {
-            data = try JSONSerialization.data(withJSONObject: raw, options: [])
+            try JSONSerialization.data(withJSONObject: raw, options: [])
         }
         return try Frame.decode(data)
     }
