@@ -2,15 +2,19 @@ import Foundation
 
 /// Wire-protocol constants shared with the Rust `euro-bridge-protocol` crate.
 public enum BridgeProtocol {
-    /// SNI hostname the launcher dials. Must match the bridge leaf
-    /// certificate's DNS SAN; IP-based SNI is fragile across TLS stacks,
-    /// so the canonical address is hostname-based, not IP-based. Mirrors
-    /// `BRIDGE_HOST` on the Rust side.
+    /// Hostname the launcher dials. The OS resolver routes this to the
+    /// loopback interface where the desktop binds the listener, so the
+    /// channel never leaves the kernel. Mirrors `BRIDGE_HOST` on the
+    /// Rust side; kept as a hostname (not `127.0.0.1`) so every
+    /// component in the workspace canonicalizes to the same string.
     public static let host = "localhost"
 
-    /// URL scheme. WebSocket-over-TLS only — there is no plaintext
-    /// fallback. Mirrors `BRIDGE_SCHEME` on the Rust side.
-    public static let scheme = "wss"
+    /// URL scheme. Plaintext WebSocket — the bridge is loopback-only
+    /// and rejects non-loopback peers at upgrade time, so `ws://`
+    /// carries no confidentiality cost a local attacker doesn't already
+    /// have. The `Register` frame is the authentication boundary, not
+    /// TLS. Mirrors `BRIDGE_SCHEME` on the Rust side.
+    public static let scheme = "ws"
 
     /// Port the desktop bridge listens on.
     public static let port: UInt16 = 1431
@@ -18,14 +22,7 @@ public enum BridgeProtocol {
     /// HTTP path that performs the WebSocket upgrade.
     public static let path = "/bridge"
 
-    /// Full WebSocket URL for connecting to the local bridge. The leaf
-    /// certificate served at this endpoint is signed by a per-user CA
-    /// that the desktop installs into the login keychain via `security
-    /// add-trusted-cert` on first run; `URLSessionWebSocketTask` then
-    /// validates it through the system's standard `trustd` evaluation
-    /// path. Connection attempts that fire before the keychain trust
-    /// install completes fail with a TLS error and are retried by the
-    /// client's reconnect loop.
+    /// Full WebSocket URL for connecting to the local bridge.
     public static var url: URL {
         guard let url = URL(string: "\(scheme)://\(host):\(port)\(path)") else {
             fatalError("invalid bridge URL — scheme/host/port/path are constants")

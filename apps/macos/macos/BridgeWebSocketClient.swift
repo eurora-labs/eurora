@@ -9,20 +9,17 @@ public protocol BridgeWebSocketClientDelegate: AnyObject {
 }
 
 /// WebSocket client that connects the macOS launcher to the desktop
-/// bridge over `wss://localhost:1431/bridge`. Mirrors the role of the
+/// bridge over `ws://localhost:1431/bridge`. Mirrors the role of the
 /// Rust `euro-native-messaging` host: send a `Register` frame on
 /// connect, replay any cached `ASSETS`/`SNAPSHOT` events, then pump
 /// frames in both directions until the connection drops, at which
 /// point we back off and reconnect.
 ///
-/// TLS trust is delegated to the system. The desktop installs the
-/// per-user bridge CA into the login keychain via `security
-/// add-trusted-cert`, and `URLSessionWebSocketTask` validates the leaf
-/// certificate through `trustd` like any other HTTPS connection — no
-/// in-process pinning, no custom `URLSessionDelegate` challenge handler.
-/// Connection attempts that fire before the user has approved the
-/// keychain trust prompt fail with a TLS error; the reconnect loop
-/// keeps retrying until it succeeds.
+/// The bridge is plaintext and loopback-only — see `BridgeProtocol`
+/// for the transport rationale. The first-run failure mode is "desktop
+/// hasn't bound the listener yet" rather than "user hasn't approved
+/// the keychain trust prompt"; the reconnect loop handles either by
+/// retrying on a fixed interval.
 @available(macOS 13.0, *)
 public final class BridgeWebSocketClient: @unchecked Sendable {
 
@@ -371,33 +368,22 @@ public final class BridgeWebSocketClient: @unchecked Sendable {
 
     // MARK: - Diagnostics
 
-    /// Render a transport-layer failure for logging. Under the wss
-    /// transport the load-bearing failure modes are TLS-specific (the
-    /// bridge CA hasn't been trusted yet, the leaf cert is outside its
-    /// validity window) or "desktop bridge not yet listening"; surfacing
-    /// each as a tailored hint over `URLError`'s generic
-    /// `localizedDescription` saves real triage time, especially on
-    /// first-run installs where the user hasn't yet authenticated the
-    /// `security add-trusted-cert` prompt.
+    /// Render a transport-layer failure for logging. The dominant
+    /// failure mode is "desktop bridge not yet listening" — typically a
+    /// startup race where the launcher comes up before the desktop has
+    /// bound port 1431. Tagging that case with the dialed URL beats
+    /// `URLError`'s generic `localizedDescription` for triage; every
+    /// other code falls through.
     private func describeFailure(_ error: Error) -> String {
         guard let urlError = error as? URLError else {
             return error.localizedDescription
         }
-        let detail = urlError.localizedDescription
         switch urlError.code {
         case .cannotConnectToHost, .cannotFindHost, .networkConnectionLost,
              .notConnectedToInternet, .timedOut:
-            return "desktop bridge not reachable at \(self.url.absoluteString) — \(detail)"
-        case .secureConnectionFailed,
-             .serverCertificateUntrusted,
-             .serverCertificateHasUnknownRoot:
-            return "bridge CA not yet trusted in the login keychain — desktop trust install pending or declined: \(detail)"
-        case .serverCertificateHasBadDate, .serverCertificateNotYetValid:
-            return "bridge certificate is outside its validity window — desktop will rotate on next launch: \(detail)"
-        case .clientCertificateRejected, .clientCertificateRequired:
-            return "bridge unexpectedly requested a client certificate: \(detail)"
+            return "desktop bridge not reachable at \(self.url.absoluteString) — \(urlError.localizedDescription)"
         default:
-            return detail
+            return urlError.localizedDescription
         }
     }
 }
