@@ -43,7 +43,7 @@ public enum FrameKind {
 
 /// Mandatory first frame on every connection. Identifies the host
 /// process (the bridge) and the application process being represented.
-/// 
+///
 /// `app_pid` is the OS PID for clients that have one (browsers via the
 /// native-messaging host, the macOS launcher representing Safari).
 /// Sandboxed clients without access to a real PID — Office.js add-ins
@@ -77,6 +77,7 @@ public struct ResponseFrame: Codable {
 }
 
 // MARK: - FrameKind Codable Implementation
+
 extension FrameKind: Codable {
     private enum CodingKeys: String, CodingKey {
         case request = "Request"
@@ -99,34 +100,34 @@ extension FrameKind: Codable {
         }
         switch key {
         case .request:
-            self = .request(try container.decode(RequestFrame.self, forKey: .request))
+            self = try .request(container.decode(RequestFrame.self, forKey: .request))
         case .response:
-            self = .response(try container.decode(ResponseFrame.self, forKey: .response))
+            self = try .response(container.decode(ResponseFrame.self, forKey: .response))
         case .event:
-            self = .event(try container.decode(EventFrame.self, forKey: .event))
+            self = try .event(container.decode(EventFrame.self, forKey: .event))
         case .error:
-            self = .error(try container.decode(ErrorFrame.self, forKey: .error))
+            self = try .error(container.decode(ErrorFrame.self, forKey: .error))
         case .cancel:
-            self = .cancel(try container.decode(CancelFrame.self, forKey: .cancel))
+            self = try .cancel(container.decode(CancelFrame.self, forKey: .cancel))
         case .register:
-            self = .register(try container.decode(RegisterFrame.self, forKey: .register))
+            self = try .register(container.decode(RegisterFrame.self, forKey: .register))
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .request(let value):
+        case let .request(value):
             try container.encode(value, forKey: .request)
-        case .response(let value):
+        case let .response(value):
             try container.encode(value, forKey: .response)
-        case .event(let value):
+        case let .event(value):
             try container.encode(value, forKey: .event)
-        case .error(let value):
+        case let .error(value):
             try container.encode(value, forKey: .error)
-        case .cancel(let value):
+        case let .cancel(value):
             try container.encode(value, forKey: .cancel)
-        case .register(let value):
+        case let .register(value):
             try container.encode(value, forKey: .register)
         }
     }

@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::Duration;
@@ -11,11 +10,10 @@ use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgr
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum_server::Handle as AxumHandle;
-use axum_server::tls_rustls::RustlsConfig;
 use dashmap::DashMap;
 use euro_bridge_protocol::{
     BRIDGE_BIND_IP, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, ErrorFrame, EventFrame,
-    Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
+    Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame, bridge_url_for,
 };
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -31,33 +29,6 @@ const OUTBOUND_QUEUE_SIZE: usize = 32;
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 static GLOBAL_SERVICE: OnceLock<BridgeService> = OnceLock::new();
-
-/// Idempotently install the rustls process-wide crypto provider. Safe
-/// to call multiple times and from multiple threads — only the first
-/// call has effect. If a provider has already been installed (by us or
-/// by another crate in the process), this logs at debug level and
-/// leaves the existing provider in place. Must be called before any
-/// rustls/axum-server work runs in the process; convention is "once at
-/// the top of `main`".
-pub fn install_default_crypto_provider() {
-    if rustls::crypto::aws_lc_rs::default_provider()
-        .install_default()
-        .is_err()
-    {
-        tracing::debug!(
-            "rustls default crypto provider was already installed; leaving existing provider in place"
-        );
-    }
-}
-
-/// Server-side TLS material. The bridge requires this to be configured
-/// before [`BridgeService::bind`] is called — there is no plaintext
-/// fallback.
-#[derive(Clone, Debug)]
-pub struct TlsMaterial {
-    pub cert_path: PathBuf,
-    pub key_path: PathBuf,
-}
 
 /// A WebSocket-connected bridge client (typically a browser
 /// native-messaging host or an Office add-in runtime).
@@ -134,7 +105,6 @@ pub struct BoundServer {
     /// struct being dropped — Drop uses this to detect "served vs
     /// abandoned" so it knows whether to clear the slot.
     listener: Option<std::net::TcpListener>,
-    tls: Option<RustlsConfig>,
     local_addr: SocketAddr,
     /// Fires the slot's `done` receiver. Taken by `serve` and fired after
     /// the accept loop exits; otherwise fired by Drop when this struct is
@@ -166,11 +136,10 @@ impl BoundServer {
     /// pattern is `tokio::spawn(bound.serve())`. Awaiting it inline
     /// blocks until the loop ends.
     pub async fn serve(mut self) -> Result<(), BridgeError> {
-        // All three fields are populated by `bind_on` and only taken here.
+        // Both fields are populated by `bind_on` and only taken here.
         // `serve` consumes `self`, so a second call is statically
         // impossible.
         let listener = self.listener.take().unwrap();
-        let tls = self.tls.take().unwrap();
         let done_tx = self.done_tx.take().unwrap();
         let service = self.service.clone();
         let local_addr = self.local_addr;
@@ -198,7 +167,7 @@ impl BoundServer {
             .route(BRIDGE_PATH, get(ws_upgrade))
             .with_state(service.clone());
 
-        let result = axum_server::from_tcp_rustls(listener, tls)
+        let result = axum_server::from_tcp(listener)
             .handle(axum_handle)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await;
@@ -226,10 +195,10 @@ impl BoundServer {
 
 impl Drop for BoundServer {
     fn drop(&mut self) {
-        // If `serve` ran, it took the listener and TLS config and is
-        // responsible for clearing the slot. If we still hold them, the
-        // BoundServer is being abandoned — release the slot so the
-        // service is rebindable.
+        // If `serve` ran, it took the listener and is responsible for
+        // clearing the slot. If we still hold it, the BoundServer is
+        // being abandoned — release the slot so the service is
+        // rebindable.
         if self.listener.is_none() {
             return;
         }
@@ -267,7 +236,6 @@ pub struct BridgeService {
     pending_requests: Arc<DashMap<u32, oneshot::Sender<Result<ResponseFrame, ErrorFrame>>>>,
     request_id_counter: Arc<AtomicU32>,
     server: Arc<StdMutex<Option<ServerHandle>>>,
-    tls: Arc<OnceLock<TlsMaterial>>,
 }
 
 impl Default for BridgeService {
@@ -297,7 +265,6 @@ impl BridgeService {
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             server: Arc::new(StdMutex::new(None)),
-            tls: Arc::new(OnceLock::new()),
         };
         service.spawn_frame_handler();
         service
@@ -316,39 +283,6 @@ impl BridgeService {
     /// into existence.
     pub fn get() -> Option<&'static BridgeService> {
         GLOBAL_SERVICE.get()
-    }
-
-    /// Configure the TLS material the bridge listener will use. Must
-    /// be called before [`bind`](BridgeService::bind) /
-    /// [`bind_on`](BridgeService::bind_on). First writer wins —
-    /// subsequent calls with a different material are logged and
-    /// dropped, since changing certs while the server runs would race
-    /// the listener.
-    pub fn configure_tls(&self, material: TlsMaterial) {
-        match self.tls.set(material.clone()) {
-            Ok(()) => tracing::debug!(
-                cert_path = %material.cert_path.display(),
-                key_path = %material.key_path.display(),
-                "Bridge TLS material configured",
-            ),
-            Err(_) => {
-                let existing = self
-                    .tls
-                    .get()
-                    .expect("set returned Err so OnceLock is populated");
-                if existing.cert_path != material.cert_path
-                    || existing.key_path != material.key_path
-                {
-                    tracing::warn!(
-                        existing_cert = %existing.cert_path.display(),
-                        existing_key = %existing.key_path.display(),
-                        attempted_cert = %material.cert_path.display(),
-                        attempted_key = %material.key_path.display(),
-                        "Bridge TLS material already configured; ignoring later attempt to reconfigure with different material",
-                    );
-                }
-            }
-        }
     }
 
     fn spawn_frame_handler(&self) {
@@ -446,90 +380,60 @@ impl BridgeService {
     ///
     /// The kernel socket is in `LISTEN` state by the time this returns,
     /// so clients dialing the address can never race the bind.
-    /// Requires [`configure_tls`](BridgeService::configure_tls) to have
-    /// been called first; returns [`BridgeError::TlsNotConfigured`]
-    /// otherwise.
     ///
     /// If a previous accept loop is still registered on the service,
     /// returns [`BridgeError::AlreadyRunning`] — callers that want
     /// "ensure running" semantics should check
     /// [`local_addr`](BridgeService::local_addr) first.
     pub async fn bind_on(&self, bind_addr: SocketAddr) -> Result<BoundServer, BridgeError> {
-        let material = self.tls.get().ok_or(BridgeError::TlsNotConfigured)?.clone();
-
-        // axum-server's `from_tcp_rustls` adopts an already-bound
+        // axum-server's `from_tcp` adopts an already-bound
         // `std::net::TcpListener`, which is exactly the shape we want:
         // the `local_addr` is observable here, and the kernel socket is
         // accepting connections before the caller ever sees the
         // `BoundServer`.
         //
         // Reserve the slot synchronously around the TCP bind so two
-        // concurrent callers can't both succeed. The slot stays
-        // populated through the async TLS load below; on failure we
-        // roll it back.
-        let (listener, done_tx) = {
-            let mut guard = self.server.lock().expect("server slot poisoned");
-            if let Some(handle) = guard.as_ref() {
-                return Err(BridgeError::AlreadyRunning {
-                    local_addr: handle.local_addr,
-                });
-            }
-            let listener =
-                std::net::TcpListener::bind(bind_addr).map_err(|source| BridgeError::Bind {
-                    addr: bind_addr,
-                    source,
-                })?;
-            listener
-                .set_nonblocking(true)
-                .map_err(|source| BridgeError::Bind {
-                    addr: bind_addr,
-                    source,
-                })?;
-            let local_addr = listener.local_addr().map_err(|source| BridgeError::Bind {
+        // concurrent callers can't both succeed.
+        let mut guard = self.server.lock().expect("server slot poisoned");
+        if let Some(handle) = guard.as_ref() {
+            return Err(BridgeError::AlreadyRunning {
+                local_addr: handle.local_addr,
+            });
+        }
+        let listener =
+            std::net::TcpListener::bind(bind_addr).map_err(|source| BridgeError::Bind {
                 addr: bind_addr,
                 source,
             })?;
-            let axum_handle = AxumHandle::new();
-            let (done_tx, done_rx) = oneshot::channel::<()>();
-            *guard = Some(ServerHandle {
-                state: ServerState::Bound,
-                local_addr,
-                axum_handle,
-                done: Some(done_rx),
-            });
-            (listener, done_tx)
-        };
-        let local_addr = listener
-            .local_addr()
-            .expect("local_addr was readable above");
-
-        let tls = match RustlsConfig::from_pem_file(&material.cert_path, &material.key_path).await {
-            Ok(tls) => tls,
-            Err(source) => {
-                // Roll back the slot reservation so the service is
-                // bindable again.
-                let mut guard = self.server.lock().expect("server slot poisoned");
-                *guard = None;
-                return Err(BridgeError::TlsLoad {
-                    cert_path: material.cert_path.clone(),
-                    key_path: material.key_path.clone(),
-                    source,
-                });
-            }
-        };
+        listener
+            .set_nonblocking(true)
+            .map_err(|source| BridgeError::Bind {
+                addr: bind_addr,
+                source,
+            })?;
+        let local_addr = listener.local_addr().map_err(|source| BridgeError::Bind {
+            addr: bind_addr,
+            source,
+        })?;
+        let axum_handle = AxumHandle::new();
+        let (done_tx, done_rx) = oneshot::channel::<()>();
+        *guard = Some(ServerHandle {
+            state: ServerState::Bound,
+            local_addr,
+            axum_handle,
+            done: Some(done_rx),
+        });
+        drop(guard);
 
         tracing::info!(
             %local_addr,
-            cert_path = %material.cert_path.display(),
-            key_path = %material.key_path.display(),
-            url = %format_args!("wss://{local_addr}{BRIDGE_PATH}"),
-            "Bridge transport bound (TLS / wss)",
+            url = %bridge_url_for(local_addr),
+            "Bridge transport bound (plaintext / ws)",
         );
 
         Ok(BoundServer {
             service: self.clone(),
             listener: Some(listener),
-            tls: Some(tls),
             local_addr,
             done_tx: Some(done_tx),
         })
@@ -1088,15 +992,5 @@ mod tests {
         found.sort_unstable();
         assert_eq!(found, vec![10, 12]);
         assert!(service.find_clients_by_kind("safari").is_empty());
-    }
-
-    #[tokio::test]
-    async fn bind_without_tls_fails_loudly() {
-        let service = BridgeService::new();
-        let err = service
-            .bind_on(([127, 0, 0, 1], 0).into())
-            .await
-            .expect_err("bind must fail without TLS material");
-        assert!(matches!(err, BridgeError::TlsNotConfigured));
     }
 }

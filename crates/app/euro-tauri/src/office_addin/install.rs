@@ -60,15 +60,11 @@ pub enum InstallOutcome {
 /// Result of a standalone uninstall, surfaced to the CLI for user-facing logs.
 #[derive(Debug, Clone)]
 pub enum UninstallOutcome {
-    /// Removed the manifest file (and on Windows, the trusted-catalog subkey),
-    /// the bridge TLS material under `<data_dir>/Eurora/bridge/`, and the
-    /// bridge CA from the per-user OS root store. The contained path is the
-    /// manifest file location for reporting purposes — the file may or may
-    /// not have existed before the call (the operation is idempotent).
-    Cleaned {
-        manifest_path: PathBuf,
-        ca_trust: super::bridge_certs::TrustOutcome,
-    },
+    /// Removed the manifest file (and on Windows, the trusted-catalog subkey).
+    /// The contained path is the manifest file location for reporting purposes
+    /// — the file may or may not have existed before the call (the operation
+    /// is idempotent).
+    Cleaned { manifest_path: PathBuf },
     /// Linux/other: nothing to clean — Word does not run natively here.
     SkippedUnsupportedOs,
 }
@@ -97,40 +93,17 @@ pub fn uninstall_for_app<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     super::platform::install::uninstall_for_app(app)
 }
 
-/// Remove every artifact `install_for_app` and `bridge_certs::ensure`
-/// could have written, without requiring a Tauri runtime. Idempotent:
-/// safe to run when nothing is installed.
+/// Remove every artifact `install_for_app` could have written, without
+/// requiring a Tauri runtime. Idempotent: safe to run when nothing is
+/// installed.
 pub fn uninstall_standalone() -> Result<UninstallOutcome> {
     cfg_select! {
         any(target_os = "macos", target_os = "windows") => {
             let manifest_path = super::platform::install::uninstall_standalone()?;
-            let ca_trust = uninstall_bridge_artifacts()?;
-            Ok(UninstallOutcome::Cleaned {
-                manifest_path,
-                ca_trust,
-            })
+            Ok(UninstallOutcome::Cleaned { manifest_path })
         }
         _ => Ok(UninstallOutcome::SkippedUnsupportedOs),
     }
-}
-
-/// Untrust every bridge CA (current and any prior rotations) and
-/// remove the bridge data directory. Returns the trust-store outcome;
-/// bubbles I/O errors from directory removal. Idempotent — safe to
-/// run when nothing is installed.
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-fn uninstall_bridge_artifacts() -> Result<super::bridge_certs::TrustOutcome> {
-    let bridge_dir =
-        euro_bridge_protocol::bridge_data_dir().ok_or(Error::DirsLookup { kind: "data_dir" })?;
-    let trust = super::bridge_certs::ensure_untrusted();
-    if bridge_dir.exists() {
-        fs::remove_dir_all(&bridge_dir).map_err(|source| Error::Io {
-            action: "removing",
-            path: bridge_dir.clone(),
-            source,
-        })?;
-    }
-    Ok(trust)
 }
 
 /// Idempotent file removal: missing-file errors collapse to `Ok(())`.
