@@ -1,0 +1,165 @@
+//! Shared wire types for the Eurora activity HTTP service.
+//!
+//! This crate is the single source of truth for the JSON contract between
+//! `be-activity-service` (Axum) and `euro-activity` (reqwest), and is also
+//! the input to the TypeScript bindings emitted by the bundled `codegen`
+//! binary:
+//!
+//! ```text
+//! cargo run -p activity-core --features codegen --bin activity-core-codegen
+//! ```
+//!
+//! Types are pure data with `serde` derives; the optional `specta` feature
+//! adds `specta::Type` so the same definitions can be re-exported as TS.
+//! No HTTP, database, or gRPC dependencies live here on purpose — pulling
+//! this crate into a leaf binary must not drag in transport plumbing.
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+#[cfg(feature = "specta")]
+use specta::Type;
+
+/// A persisted activity row as returned to the client.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct Activity {
+    pub id: Uuid,
+    pub name: String,
+    pub process_name: String,
+    pub window_title: String,
+    pub icon_asset_id: Option<Uuid>,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Request body for `POST /activities`.
+///
+/// `icon_png_base64` carries an optional PNG icon as standard-base64. We
+/// take JSON-with-base64 instead of `multipart/form-data` so the wire shape
+/// stays specta-friendly; in practice icons are app-launcher size (a few
+/// hundred bytes to ~50 KB), well under the monolith's 2 MiB body limit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct InsertActivityRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Uuid>,
+    pub name: String,
+    pub process_name: String,
+    pub window_title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_png_base64: Option<String>,
+    pub started_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_at: Option<DateTime<Utc>>,
+}
+
+/// Response body for `POST /activities`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct InsertActivityResponse {
+    pub activity: Activity,
+}
+
+/// Query parameters for `GET /activities`.
+///
+/// Both fields are optional; the server applies its own defaults and clamps
+/// `limit` to its configured maximum.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct ListActivitiesQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub offset: Option<u32>,
+}
+
+/// Response body for `GET /activities`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct ListActivitiesResponse {
+    pub activities: Vec<Activity>,
+}
+
+/// JSON error body returned by the activity service on non-2xx responses.
+///
+/// Mirrors the shape used by `be-update-service` so the desktop client can
+/// decode failures uniformly across HTTP services.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct ActivityErrorResponse {
+    pub error: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+}
+
+/// Build a [`specta::TypeCollection`] containing every activity wire type
+/// the desktop app needs. Used by the codegen binary to emit `activity.ts`.
+#[cfg(feature = "specta")]
+pub fn type_collection() -> specta::TypeCollection {
+    specta::TypeCollection::default()
+        .register::<Activity>()
+        .register::<InsertActivityRequest>()
+        .register::<InsertActivityResponse>()
+        .register::<ListActivitiesQuery>()
+        .register::<ListActivitiesResponse>()
+        .register::<ActivityErrorResponse>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn insert_request_round_trips_with_optional_fields_omitted() {
+        let req = InsertActivityRequest {
+            id: None,
+            name: "name".into(),
+            process_name: "proc".into(),
+            window_title: "title".into(),
+            icon_png_base64: None,
+            started_at: Utc::now(),
+            ended_at: None,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(!json.contains("\"id\""));
+        assert!(!json.contains("\"icon_png_base64\""));
+        assert!(!json.contains("\"ended_at\""));
+        let back: InsertActivityRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.name, req.name);
+    }
+
+    #[test]
+    fn list_query_defaults_to_all_none() {
+        let q: ListActivitiesQuery = serde_json::from_str("{}").unwrap();
+        assert!(q.limit.is_none());
+        assert!(q.offset.is_none());
+    }
+
+    #[cfg(feature = "specta")]
+    #[test]
+    fn type_collection_contains_all_wire_types() {
+        let types = type_collection();
+        let names: Vec<String> = types
+            .into_unsorted_iter()
+            .map(|ndt| ndt.name().to_string())
+            .collect();
+        for expected in [
+            "Activity",
+            "InsertActivityRequest",
+            "InsertActivityResponse",
+            "ListActivitiesQuery",
+            "ListActivitiesResponse",
+            "ActivityErrorResponse",
+        ] {
+            assert!(
+                names.iter().any(|n| n == expected),
+                "missing {expected} from collection: {names:?}"
+            );
+        }
+    }
+}

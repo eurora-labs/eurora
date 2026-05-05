@@ -4,6 +4,7 @@ mod claims;
 mod enforcer;
 mod error;
 mod grpc_layer;
+mod http_token_gate;
 mod rate_limit;
 mod token_gate;
 
@@ -13,7 +14,9 @@ pub use claims::{extract_claims, parse_user_id};
 pub use enforcer::CasbinAuthz;
 pub use error::AuthzError;
 pub use grpc_layer::GrpcAuthzLayer;
+pub use http_token_gate::{HttpTokenGateState, http_token_gate_middleware};
 pub use rate_limit::{
     AuthFailureRateLimiter, HealthCheckRateLimiter, TrustedProxies, extract_client_ip,
     new_auth_failure_rate_limiter, new_health_check_rate_limiter,
 };
+pub use token_gate::{TokenGateError, TokenUsageRepo};

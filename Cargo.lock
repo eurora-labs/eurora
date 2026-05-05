@@ -25,6 +25,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618"
 
 [[package]]
+name = "activity-core"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "uuid",
+]
+
+[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -549,6 +562,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "asset-core"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "specta",
+ "uuid",
+]
+
+[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -882,8 +906,11 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "auth-core"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "serde",
+ "serde_json",
  "specta",
+ "specta-typescript",
 ]
 
 [[package]]
@@ -1559,20 +1586,24 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 name = "be-activity-service"
 version = "0.0.0"
 dependencies = [
+ "activity-core",
+ "anyhow",
+ "axum",
+ "base64 0.22.1",
  "be-asset",
+ "be-auth-core",
  "be-authz",
  "be-remote-db",
  "be-storage",
  "chrono",
+ "jsonwebtoken",
  "posthog-rs",
- "prost",
- "prost-types",
- "proto-gen",
+ "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tokio",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
+ "tower",
+ "tower-http",
  "tracing",
  "uuid",
 ]
@@ -1581,13 +1612,12 @@ dependencies = [
 name = "be-asset"
 version = "0.0.0"
 dependencies = [
+ "asset-core",
  "base64 0.22.1",
  "be-remote-db",
  "be-storage",
  "chrono",
  "hex",
- "prost-types",
- "proto-gen",
  "serde_json",
  "thiserror 2.0.18",
  "tracing",
@@ -1598,18 +1628,16 @@ dependencies = [
 name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
+ "asset-core",
+ "auth-core",
+ "axum",
+ "base64 0.22.1",
  "be-asset",
- "be-authz",
- "be-remote-db",
- "be-storage",
- "prost",
- "prost-types",
- "proto-gen",
+ "serde",
  "thiserror 2.0.18",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
+ "tower-http",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1625,8 +1653,10 @@ dependencies = [
 name = "be-auth-service"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "argon2",
  "auth-core",
+ "axum",
  "be-auth-core",
  "be-email-service",
  "be-remote-db",
@@ -1636,18 +1666,16 @@ dependencies = [
  "jsonwebtoken",
  "openidconnect",
  "percent-encoding",
- "prost",
- "proto-gen",
  "rand 0.10.1",
  "reqwest 0.12.28",
  "secrecy",
  "serde",
+ "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.18",
  "tokio",
- "tonic",
- "tonic-prost-build",
- "tonic-types",
+ "tower",
+ "tower-http",
  "tracing",
  "uuid",
 ]
@@ -1721,14 +1749,11 @@ dependencies = [
  "be-update-service",
  "dotenv",
  "posthog-rs",
- "prost",
- "proto-gen",
  "rustls 0.23.39",
  "sentry",
  "tokio",
  "tonic",
  "tonic-health",
- "tonic-prost-build",
  "tonic-web",
  "tower-http",
  "tracing",
@@ -1803,25 +1828,27 @@ version = "0.0.0"
 dependencies = [
  "agent-chain",
  "agent-chain-core",
+ "anyhow",
+ "axum",
  "base64 0.22.1",
  "be-asset",
+ "be-auth-core",
  "be-authz",
  "be-remote-db",
  "be-storage",
  "bon",
  "chrono",
- "prost",
- "prost-types",
- "proto-gen",
+ "futures",
  "reqwest 0.12.28",
+ "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "thread-core",
  "tokio",
  "tokio-stream",
  "tokio-util",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
+ "tower",
+ "tower-http",
  "tracing",
  "uuid",
 ]
@@ -3640,8 +3667,10 @@ dependencies = [
 name = "euro-activity"
 version = "0.0.0"
 dependencies = [
+ "activity-core",
  "agent-chain-core",
  "anyhow",
+ "asset-core",
  "async-trait",
  "base64 0.22.1",
  "chrono",
@@ -3649,16 +3678,16 @@ dependencies = [
  "euro-auth",
  "euro-browser",
  "euro-encrypt",
+ "euro-endpoint",
  "euro-native-messaging",
  "euro-office",
  "euro-process",
+ "euro-secret",
  "focus-tracker",
  "humantime-serde",
  "image",
- "prost",
- "prost-types",
- "proto-gen",
  "regex",
+ "reqwest 0.12.28",
  "resvg",
  "serde",
  "serde_json",
@@ -3667,8 +3696,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tiny-skia 0.12.0",
  "tokio",
- "tonic",
- "tonic-prost-build",
  "tracing",
  "url",
  "usvg",
@@ -3683,21 +3710,20 @@ dependencies = [
  "auth-core",
  "base64 0.22.1",
  "chrono",
+ "euro-endpoint",
  "euro-secret",
  "humantime-serde",
  "jsonwebtoken",
- "prost",
- "prost-types",
- "proto-gen",
  "rand 0.10.1",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
  "specta",
  "thiserror 2.0.18",
  "tokio",
  "tonic",
  "tonic-async-interceptor",
- "tonic-prost",
- "tonic-prost-build",
  "tower",
  "tracing",
  "tracing-subscriber",
@@ -4021,13 +4047,13 @@ dependencies = [
  "euro-activity",
  "euro-auth",
  "euro-browser",
+ "euro-endpoint",
  "focus-tracker",
  "image",
  "rustls 0.23.39",
  "serde",
  "thiserror 2.0.18",
  "tokio",
- "tonic",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -11757,6 +11783,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "thread-core"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "uuid",
+]
+
+[[package]]
 name = "thread_local"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12218,17 +12257,6 @@ dependencies = [
  "syn 2.0.117",
  "tempfile",
  "tonic-build",
-]
-
-[[package]]
-name = "tonic-types"
-version = "0.14.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a875a902255423d34c1f20838ab374126db8eb41625b7947a1d54113b0b7399"
-dependencies = [
- "prost",
- "prost-types",
- "tonic",
 ]
 
 [[package]]
