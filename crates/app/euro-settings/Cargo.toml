@@ -17,3 +17,6 @@ serde_json_lenient = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
