@@ -1,5 +1,8 @@
-import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
-import type { ChatStreamResponse, Query } from '$lib/bindings/bindings.js';
+import {
+	toChatStreamEvent,
+	toMessageNodes,
+} from '@eurora/chat/services/converters/message-converter';
+import type { Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
@@ -66,8 +69,8 @@ export class ThreadService implements IThreadService {
 		};
 	}
 
-	async generateTitle(threadId: string, content: string): Promise<Thread> {
-		const raw = await this.taurpc.thread.generate_title(threadId, content);
+	async generateTitle(threadId: string): Promise<Thread> {
+		const raw = await this.taurpc.thread.generate_title(threadId);
 		if (!raw.id) {
 			throw new Error('Backend returned thread without id');
 		}
@@ -124,8 +127,17 @@ export class ThreadService implements IThreadService {
 			resolve = null;
 		}
 
-		function onEvent(response: ChatStreamResponse) {
-			buffer.push(toChatStreamEvent(response));
+		// The Tauri channel emits raw JSON wire frames (`ChatServerMessage`);
+		// the converter is responsible for narrowing them. An `Error` variant
+		// throws inside the converter, which we propagate to the consumer via
+		// the existing `error` channel.
+		function onEvent(response: unknown) {
+			try {
+				buffer.push(toChatStreamEvent(response));
+			} catch (e) {
+				error = e;
+				finished = true;
+			}
 			notify();
 		}
 

@@ -1,5 +1,8 @@
-import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
-import type { ChatStreamResponse, ContextChip, Query } from '$lib/bindings/bindings.js';
+import {
+	toChatStreamEvent,
+	toMessageNodes,
+} from '@eurora/chat/services/converters/message-converter';
+import type { ContextChip, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { AssetChip, MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
@@ -41,7 +44,12 @@ export class ThreadService implements IThreadService {
 		offset: number,
 		allVariants: boolean,
 	): Promise<MessageNode[]> {
-		const raw = await this.taurpc.thread.get_messages(threadId, limit, offset, allVariants);
+		const raw = (await this.taurpc.thread.get_messages(
+			threadId,
+			limit,
+			offset,
+			allVariants,
+		)) as unknown[];
 		return toMessageNodes(raw);
 	}
 
@@ -50,7 +58,11 @@ export class ThreadService implements IThreadService {
 		messageId: string,
 		direction: number,
 	): Promise<MessageNode[]> {
-		const raw = await this.taurpc.thread.switch_branch(threadId, messageId, direction);
+		const raw = (await this.taurpc.thread.switch_branch(
+			threadId,
+			messageId,
+			direction,
+		)) as unknown[];
 		return toMessageNodes(raw);
 	}
 
@@ -68,8 +80,8 @@ export class ThreadService implements IThreadService {
 		};
 	}
 
-	async generateTitle(threadId: string, content: string): Promise<Thread> {
-		const raw = await this.taurpc.thread.generate_title(threadId, content);
+	async generateTitle(threadId: string): Promise<Thread> {
+		const raw = await this.taurpc.thread.generate_title(threadId);
 		return {
 			id: raw.id!,
 			title: raw.title,
@@ -124,8 +136,17 @@ export class ThreadService implements IThreadService {
 			resolve = null;
 		}
 
-		function onEvent(response: ChatStreamResponse) {
-			buffer.push(toChatStreamEvent(response));
+		// The Tauri channel emits raw JSON wire frames (`ChatServerMessage`);
+		// the converter is responsible for narrowing them. An `Error` variant
+		// throws inside the converter, which we propagate to the consumer via
+		// the existing `error` channel.
+		function onEvent(response: unknown) {
+			try {
+				buffer.push(toChatStreamEvent(response));
+			} catch (e) {
+				error = e;
+				finished = true;
+			}
 			notify();
 		}
 

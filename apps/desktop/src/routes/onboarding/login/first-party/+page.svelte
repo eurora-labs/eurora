@@ -23,7 +23,11 @@
 			}
 			clearInterval(intervalId!);
 			taurpc.system.focus_main_window().catch(() => {});
-			goto('/onboarding/login/first-party/browser-extension');
+			if (user.emailVerified) {
+				goto('/');
+			} else {
+				goto('/onboarding/login/verify-email?redirect=/');
+			}
 		}, 5000);
 	}
 

@@ -1,25 +1,8 @@
+import { ApiClient } from '$lib/api/client.js';
 import {
 	toChatStreamEvent,
 	toMessageNodes,
-	toThread,
-} from '$lib/services/converters/message-converter.js';
-import { createAuthedTransport } from '$lib/services/grpc-transport.js';
-import { create, type MessageInitShape } from '@bufbuild/protobuf';
-import { createClient, type Client } from '@connectrpc/connect';
-import { ProtoContentBlockSchema } from '@eurora/shared/proto/agent_chain_pb.js';
-import {
-	ChatStreamRequestSchema,
-	CreateThreadRequestSchema,
-	DeleteThreadRequestSchema,
-	GenerateThreadTitleRequestSchema,
-	GetMessagesRequestSchema,
-	ListThreadsRequestSchema,
-	ProtoThreadService,
-	SearchMessagesRequestSchema,
-	SearchThreadsRequestSchema,
-	SwitchBranchRequestSchema,
-} from '@eurora/shared/proto/thread_service_pb.js';
-import type { AuthService } from '$lib/services/auth-service.svelte.js';
+} from '@eurora/chat/services/converters/message-converter';
 import type { AssetChip, MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
@@ -29,23 +12,44 @@ import type {
 	IThreadService,
 	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
+import type {
+	ChatClientMessage,
+	ChatSendRequest,
+	CreateThreadRequest,
+	CreateThreadResponse,
+	GenerateThreadTitleRequest,
+	GenerateThreadTitleResponse,
+	GetMessagesResponse,
+	ListThreadsResponse,
+	SearchMessagesResponse,
+	SearchThreadsResponse,
+	SwitchBranchRequest,
+	Thread as WireThread,
+} from '@eurora/shared/bindings/thread';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
+/**
+ * SPA-side thread service. CRUD goes over REST (JSON, cookie auth, transparent
+ * 401-refresh via [`ApiClient`]); chat streaming opens a WebSocket to
+ * `/threads/{id}/chat` and yields the `ChatServerMessage` envelopes through
+ * the shared message converter.
+ *
+ * Same-origin/same-site cookies are sent automatically with the WebSocket
+ * upgrade handshake, so no token plumbing is needed here. CSRF protection
+ * applies to mutating HTTP requests only — the upgrade is a GET.
+ */
 export class ThreadService implements IThreadService {
-	readonly #config: ConfigService;
-	readonly #auth: AuthService;
-	#client: Client<typeof ProtoThreadService> | null = null;
+	readonly #api: ApiClient;
 
-	constructor(config: ConfigService, auth: AuthService) {
-		this.#config = config;
-		this.#auth = auth;
+	constructor(config: ConfigService) {
+		this.#api = new ApiClient(config);
 	}
 
 	async listThreads(limit: number, offset: number): Promise<Thread[]> {
-		const resp = await this.#grpc.listThreads(
-			create(ListThreadsRequestSchema, { limit, offset }),
-		);
-		return resp.threads.map((t) => toThread(t));
+		const resp = await this.#api.fetch<ListThreadsResponse>('/threads', {
+			query: { limit, offset },
+		});
+		return resp.threads.map(toDomainThread);
 	}
 
 	async getMessages(
@@ -54,10 +58,10 @@ export class ThreadService implements IThreadService {
 		offset: number,
 		allVariants: boolean,
 	): Promise<MessageNode[]> {
-		const resp = await this.#grpc.getMessages(
-			create(GetMessagesRequestSchema, { threadId, limit, offset, allVariants }),
-		);
-		return toMessageNodes(resp.messages);
+		const resp = await this.#api.fetch<GetMessagesResponse>(`/threads/${threadId}/messages`, {
+			query: { limit, offset, all_variants: allVariants },
+		});
+		return toMessageNodes(resp.messages as unknown[]);
 	}
 
 	async switchBranch(
@@ -65,28 +69,31 @@ export class ThreadService implements IThreadService {
 		messageId: string,
 		direction: BranchDirection,
 	): Promise<MessageNode[]> {
-		const resp = await this.#grpc.switchBranch(
-			create(SwitchBranchRequestSchema, { threadId, messageId, direction }),
+		const body: SwitchBranchRequest = { message_id: messageId, direction };
+		const resp = await this.#api.fetch<GetMessagesResponse, SwitchBranchRequest>(
+			`/threads/${threadId}/messages/switch-branch`,
+			{ body },
 		);
-		return toMessageNodes(resp.messages);
+		return toMessageNodes(resp.messages as unknown[]);
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
-		await this.#grpc.deleteThread(create(DeleteThreadRequestSchema, { threadId }));
+		await this.#api.fetch<void>(`/threads/${threadId}`, { method: 'DELETE' });
 	}
 
 	async createThread(): Promise<Thread> {
-		const resp = await this.#grpc.createThread(
-			create(CreateThreadRequestSchema, { title: '' }),
-		);
-		return toThread(resp.thread);
+		const resp = await this.#api.fetch<CreateThreadResponse, CreateThreadRequest>('/threads', {
+			body: {},
+		});
+		return toDomainThread(resp.thread);
 	}
 
-	async generateTitle(threadId: string, content: string): Promise<Thread> {
-		const resp = await this.#grpc.generateThreadTitle(
-			create(GenerateThreadTitleRequestSchema, { threadId, content }),
+	async generateTitle(threadId: string): Promise<Thread> {
+		const resp = await this.#api.fetch<GenerateThreadTitleResponse, GenerateThreadTitleRequest>(
+			`/threads/${threadId}/title`,
+			{ body: {} },
 		);
-		return toThread(resp.thread);
+		return toDomainThread(resp.thread);
 	}
 
 	async searchThreads(
@@ -94,9 +101,9 @@ export class ThreadService implements IThreadService {
 		limit: number,
 		offset: number,
 	): Promise<ThreadSearchResult[]> {
-		const resp = await this.#grpc.searchThreads(
-			create(SearchThreadsRequestSchema, { query, limit, offset }),
-		);
+		const resp = await this.#api.fetch<SearchThreadsResponse>('/threads/search', {
+			query: { q: query, limit, offset },
+		});
 		return resp.results.map((r) => ({ id: r.id, title: r.title, rank: r.rank }));
 	}
 
@@ -105,13 +112,13 @@ export class ThreadService implements IThreadService {
 		limit: number,
 		offset: number,
 	): Promise<MessageSearchResult[]> {
-		const resp = await this.#grpc.searchMessages(
-			create(SearchMessagesRequestSchema, { query, limit, offset }),
-		);
+		const resp = await this.#api.fetch<SearchMessagesResponse>('/threads/messages/search', {
+			query: { q: query, limit, offset },
+		});
 		return resp.results.map((r) => ({
 			id: r.id,
-			threadId: r.threadId,
-			messageType: r.messageType,
+			threadId: r.thread_id,
+			messageType: r.message_type,
 			snippet: r.snippet,
 			rank: r.rank,
 		}));
@@ -122,36 +129,122 @@ export class ThreadService implements IThreadService {
 		text: string,
 		options: SendMessageOptions = {},
 	): AsyncIterable<ChatStreamEvent> {
-		const { parentMessageId, signal, assetChips } = options;
-		const request = create(ChatStreamRequestSchema, {
-			threadId,
-			contentBlocks: [textContentBlock(text)],
-			parentMessageId: parentMessageId ?? undefined,
-			assetChipsJson: serializeAssetChips(assetChips),
+		const { parentMessageId, signal, assetChips, preservedAssetChips } = options;
+		const ws = new WebSocket(deriveWsUrl(this.#api.baseUrl, `/threads/${threadId}/chat`));
+
+		const buffer: ChatStreamEvent[] = [];
+		let resolve: ((value: void) => void) | null = null;
+		let finished = false;
+		let error: unknown = null;
+
+		function notify() {
+			resolve?.();
+			resolve = null;
+		}
+
+		ws.addEventListener('open', () => {
+			const frame: ChatClientMessage = {
+				type: 'send',
+				...buildSendRequest(text, parentMessageId, preservedAssetChips ?? assetChips),
+			};
+			ws.send(JSON.stringify(frame));
 		});
 
-		const stream = this.#grpc.chatStream(request, { signal });
-		for await (const response of stream) {
-			yield toChatStreamEvent(response);
-		}
-	}
+		ws.addEventListener('message', (ev: MessageEvent<string>) => {
+			try {
+				buffer.push(toChatStreamEvent(JSON.parse(ev.data)));
+			} catch (e) {
+				error = e;
+				finished = true;
+			}
+			notify();
+		});
 
-	get #grpc(): Client<typeof ProtoThreadService> {
-		this.#client ??= createClient(
-			ProtoThreadService,
-			createAuthedTransport(this.#config, this.#auth),
-		);
-		return this.#client;
+		ws.addEventListener('error', () => {
+			error = new Error('Chat WebSocket error');
+			finished = true;
+			notify();
+		});
+
+		ws.addEventListener('close', () => {
+			finished = true;
+			notify();
+		});
+
+		function onAbort() {
+			if (ws.readyState === WebSocket.OPEN) {
+				try {
+					const cancel: ChatClientMessage = { type: 'cancel' };
+					ws.send(JSON.stringify(cancel));
+				} catch {
+					// Already closing — nothing to do.
+				}
+			}
+			try {
+				ws.close();
+			} catch {
+				// Already closed.
+			}
+			notify();
+		}
+		signal?.addEventListener('abort', onAbort, { once: true });
+
+		try {
+			while (true) {
+				while (buffer.length > 0) {
+					if (signal?.aborted) return;
+					yield buffer.shift()!;
+				}
+				if (finished) break;
+				if (signal?.aborted) return;
+				await new Promise<void>((r) => {
+					resolve = r;
+				});
+			}
+
+			while (buffer.length > 0) yield buffer.shift()!;
+			if (error) throw error;
+		} finally {
+			signal?.removeEventListener('abort', onAbort);
+			if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
+				try {
+					ws.close();
+				} catch {
+					// Already closed.
+				}
+			}
+		}
 	}
 }
 
-function textContentBlock(text: string): MessageInitShape<typeof ProtoContentBlockSchema> {
+function toDomainThread(raw: WireThread): Thread {
 	return {
-		block: { case: 'text', value: { text, annotations: [] } },
+		id: raw.id,
+		title: raw.title,
+		createdAt: raw.created_at,
+		updatedAt: raw.updated_at,
 	};
 }
 
-function serializeAssetChips(chips: AssetChip[] | undefined): string | undefined {
-	if (!chips || chips.length === 0) return undefined;
-	return JSON.stringify(chips);
+function buildSendRequest(
+	text: string,
+	parentMessageId: string | null | undefined,
+	assetChips: AssetChip[] | undefined,
+): ChatSendRequest {
+	const chips = assetChips ?? [];
+	return {
+		content_blocks: [{ type: 'text', text }],
+		parent_message_id: parentMessageId ?? null,
+		asset_chips_json: chips.length > 0 ? JSON.stringify(chips) : null,
+	};
+}
+
+function deriveWsUrl(apiUrl: string, path: string): string {
+	const u = new URL(path, ensureTrailingSlash(apiUrl));
+	u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+	return u.toString();
+}
+
+function ensureTrailingSlash(url: string): string {
+	return url.endsWith('/') ? url : `${url}/`;
 }

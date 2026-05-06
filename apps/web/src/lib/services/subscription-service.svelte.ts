@@ -1,6 +1,6 @@
+import { ApiClient } from '$lib/api/client.js';
 import { InjectionToken } from '@eurora/shared/context';
 import * as Sentry from '@sentry/sveltekit';
-import type { AuthService } from '$lib/services/auth-service.svelte.js';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
 export interface SubscriptionStatus {
@@ -17,12 +17,10 @@ export class SubscriptionService {
 	error = $state<string | null>(null);
 	fetched = $state(false);
 
-	readonly #auth: AuthService;
-	readonly #config: ConfigService;
+	readonly #api: ApiClient;
 
-	constructor(auth: AuthService, config: ConfigService) {
-		this.#auth = auth;
-		this.#config = config;
+	constructor(config: ConfigService) {
+		this.#api = new ApiClient(config);
 	}
 
 	async fetch(force = false): Promise<void> {
@@ -32,19 +30,7 @@ export class SubscriptionService {
 		this.error = null;
 
 		try {
-			await this.#auth.ensureValidToken();
-			const token = this.#auth.accessToken;
-
-			const res = await fetch(`${this.#config.restApiUrl}/payment/subscription`, {
-				headers: { Authorization: `Bearer ${token}` },
-			});
-
-			if (!res.ok) {
-				const body = await res.json().catch(() => null);
-				throw new Error(body?.error ?? `Failed to load subscription (${res.status})`);
-			}
-
-			const data: SubscriptionStatus = await res.json();
+			const data = await this.#api.fetch<SubscriptionStatus>('/payment/subscription');
 			this.data = data.subscription_id ? data : null;
 			this.error = null;
 			this.fetched = true;

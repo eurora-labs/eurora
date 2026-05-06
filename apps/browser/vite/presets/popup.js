@@ -2,7 +2,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export async function popupConfig({ browser }) {
-	return await defineConfig({
+	return defineConfig({
 		define: {
 			__BROWSER__: JSON.stringify(browser),
 		},

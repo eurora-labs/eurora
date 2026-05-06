@@ -79,8 +79,6 @@ pub trait SystemApi {
         ollama_model: String,
     ) -> Result<LocalBackendInfo, String>;
 
-    async fn get_browser_connection_count() -> Result<usize, String>;
-
     async fn get_browser_extension_url(process_name: String) -> Result<Option<String>, String>;
 
     async fn is_browser_extension_connected(process_name: String) -> Result<bool, String>;
@@ -467,11 +465,6 @@ impl SystemApi for SystemApiImpl {
             http_port,
             postgres_port,
         })
-    }
-
-    async fn get_browser_connection_count(self) -> Result<usize, String> {
-        let service = euro_browser::BridgeService::get_or_init();
-        Ok(service.connection_count())
     }
 
     async fn get_browser_extension_url(

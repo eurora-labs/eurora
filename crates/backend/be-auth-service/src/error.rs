@@ -1,133 +1,232 @@
-use crate::crypto::CryptoError;
+//! [`AuthError`]: the unified error type the service maps onto the
+//! standard JSON envelope ([`auth_core::AuthErrorResponse`]).
+//!
+//! The envelope's `error` discriminator (see
+//! [`auth_core::error_kinds`]) is the contract clients dispatch on.
+//! Internal errors (DB / OAuth / crypto) get logged at error level and
+//! redacted in the public response so internal details never leak.
+
+use auth_core::{AuthErrorResponse, error_kinds};
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use thiserror::Error;
-use tonic_types::{ErrorDetails, StatusExt};
 
-/// gRPC error domain for auth-service structured error details.
-///
-/// Clients dispatch on the `reason` field attached via `google.rpc.ErrorInfo`
-/// rather than on free-form status messages.
-pub const AUTH_ERROR_DOMAIN: &str = "auth.eurora-labs.com";
+use crate::crypto::CryptoError;
 
-/// Reason code for [`AuthError::OAuthEmailConflict`]. Stable across releases.
-pub const OAUTH_EMAIL_CONFLICT_REASON: &str = "OAUTH_EMAIL_CONFLICT";
+pub type AuthResult<T> = std::result::Result<T, AuthError>;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("Missing credentials")]
     MissingCredentials,
+
     #[error("{0}")]
     InvalidInput(String),
 
     #[error("Invalid credentials")]
     InvalidCredentials,
+
     #[error("Missing authorization header")]
     MissingAuthHeader,
+
     #[error("Invalid authorization header format")]
     InvalidAuthHeader,
+
     #[error("Invalid or expired token")]
     InvalidToken,
+
     #[error("Email address is not verified")]
     EmailNotVerified,
 
-    /// The OAuth provider returned an email that is already registered to a
-    /// different identity (password credentials or another OAuth provider).
+    /// The OAuth provider returned an email that is already registered
+    /// to a different identity (password credentials or another OAuth
+    /// provider).
     ///
-    /// Auto-linking is intentionally rejected — the user must first sign in
-    /// with their original method and explicitly link the new provider from
-    /// account settings. The message is deliberately generic to avoid
-    /// disclosing which sign-in methods are attached to the account.
+    /// Auto-linking is intentionally rejected — the user must first
+    /// sign in with their original method and explicitly link the new
+    /// provider from account settings. The message is deliberately
+    /// generic to avoid disclosing which sign-in methods are attached
+    /// to the account.
     #[error("An account with this email already exists under a different sign-in method")]
     OAuthEmailConflict,
 
+    /// Caller is asking for another verification email before the
+    /// resend cooldown has elapsed.
+    #[error("Please wait before requesting another verification email")]
+    VerificationResendCooldown,
+
+    #[error("Email is already verified")]
+    EmailAlreadyVerified,
+
     #[error("Password hashing failed: {0}")]
     PasswordHash(String),
+
     #[error("Token generation failed: {0}")]
     TokenGeneration(String),
+
     #[error("Database error: {0}")]
     Database(#[from] be_remote_db::DbError),
+
     #[error("OAuth error: {0}")]
     OAuth(#[from] crate::oauth::OAuthError),
+
     #[error("Crypto error: {0}")]
     Crypto(#[from] CryptoError),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
 
-impl From<AuthError> for tonic::Status {
-    fn from(err: AuthError) -> Self {
-        match err {
-            AuthError::MissingCredentials | AuthError::InvalidInput(_) => {
-                tonic::Status::invalid_argument(err.to_string())
-            }
-
+impl AuthError {
+    fn status(&self) -> StatusCode {
+        match self {
+            AuthError::MissingCredentials | AuthError::InvalidInput(_) => StatusCode::BAD_REQUEST,
             AuthError::InvalidCredentials
             | AuthError::MissingAuthHeader
             | AuthError::InvalidAuthHeader
-            | AuthError::InvalidToken
-            | AuthError::EmailNotVerified => tonic::Status::unauthenticated(err.to_string()),
+            | AuthError::InvalidToken => StatusCode::UNAUTHORIZED,
+            AuthError::EmailNotVerified => StatusCode::FORBIDDEN,
+            AuthError::EmailAlreadyVerified | AuthError::OAuthEmailConflict => StatusCode::CONFLICT,
+            AuthError::VerificationResendCooldown => StatusCode::TOO_MANY_REQUESTS,
+            AuthError::PasswordHash(_)
+            | AuthError::TokenGeneration(_)
+            | AuthError::Database(_)
+            | AuthError::OAuth(_)
+            | AuthError::Crypto(_)
+            | AuthError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
 
+    /// Stable, machine-readable identifier for the failure mode. Used
+    /// by clients to dispatch on specific errors without parsing
+    /// free-text messages.
+    pub fn error_kind(&self) -> &'static str {
+        match self {
+            AuthError::MissingCredentials | AuthError::InvalidInput(_) => {
+                error_kinds::INVALID_ARGUMENT
+            }
+            AuthError::InvalidCredentials
+            | AuthError::MissingAuthHeader
+            | AuthError::InvalidAuthHeader
+            | AuthError::InvalidToken => error_kinds::UNAUTHENTICATED,
+            AuthError::EmailNotVerified => error_kinds::EMAIL_NOT_VERIFIED,
+            AuthError::EmailAlreadyVerified => "email_already_verified",
+            AuthError::OAuthEmailConflict => error_kinds::OAUTH_EMAIL_CONFLICT,
+            AuthError::VerificationResendCooldown => error_kinds::RATE_LIMITED,
+            AuthError::PasswordHash(_)
+            | AuthError::TokenGeneration(_)
+            | AuthError::Database(_)
+            | AuthError::OAuth(_)
+            | AuthError::Crypto(_)
+            | AuthError::Internal(_) => error_kinds::INTERNAL_ERROR,
+        }
+    }
+
+    /// Public-facing message: never leaks internal details.
+    fn client_message(&self) -> String {
+        match self {
+            AuthError::PasswordHash(_) => "Authentication error".to_string(),
+            AuthError::TokenGeneration(_) => "Token generation error".to_string(),
+            AuthError::Database(_) => "Internal database error".to_string(),
+            AuthError::OAuth(_) => "OAuth authentication error".to_string(),
+            AuthError::Crypto(_) => "Internal security error".to_string(),
+            AuthError::Internal(_) => "Internal error".to_string(),
+            other => other.to_string(),
+        }
+    }
+}
+
+impl IntoResponse for AuthError {
+    fn into_response(self) -> Response {
+        let status = self.status();
+        let kind = self.error_kind();
+
+        match &self {
+            AuthError::PasswordHash(msg) => {
+                tracing::error!(error = %msg, "password hashing error");
+            }
+            AuthError::TokenGeneration(msg) => {
+                tracing::error!(error = %msg, "token generation error");
+            }
+            AuthError::Database(e) => {
+                tracing::error!(error = %e, "auth-service database error");
+            }
+            AuthError::OAuth(e) => {
+                tracing::error!(error = %e, "auth-service oauth error");
+            }
+            AuthError::Crypto(e) => {
+                tracing::error!(error = %e, "auth-service crypto error");
+            }
+            AuthError::Internal(msg) => {
+                tracing::error!(error = %msg, "auth-service internal error");
+            }
             AuthError::OAuthEmailConflict => {
-                let details = ErrorDetails::with_error_info(
-                    OAUTH_EMAIL_CONFLICT_REASON,
-                    AUTH_ERROR_DOMAIN,
-                    std::collections::HashMap::<String, String>::new(),
-                );
-                tonic::Status::with_error_details(
-                    tonic::Code::FailedPrecondition,
-                    err.to_string(),
-                    details,
-                )
+                tracing::warn!("oauth login rejected: email already registered");
             }
-
-            AuthError::PasswordHash(ref msg) => {
-                tracing::error!("Password hashing error: {msg}");
-                tonic::Status::internal("Authentication error")
+            AuthError::EmailNotVerified
+            | AuthError::InvalidCredentials
+            | AuthError::InvalidToken
+            | AuthError::MissingAuthHeader
+            | AuthError::InvalidAuthHeader => {
+                tracing::debug!(error = %self, "auth-service auth error");
             }
-            AuthError::TokenGeneration(ref msg) => {
-                tracing::error!("Token generation error: {msg}");
-                tonic::Status::internal("Token generation error")
-            }
-            AuthError::Database(ref e) => {
-                tracing::error!("Database error: {e}");
-                tonic::Status::internal("Internal database error")
-            }
-            AuthError::OAuth(ref e) => {
-                tracing::error!("OAuth error: {e}");
-                tonic::Status::internal("OAuth authentication error")
-            }
-            AuthError::Crypto(ref e) => {
-                tracing::error!("Crypto error: {e}");
-                tonic::Status::internal("Internal security error")
-            }
-            AuthError::Internal(ref msg) => {
-                tracing::error!("Internal error: {msg}");
-                tonic::Status::internal("Internal error")
+            AuthError::MissingCredentials
+            | AuthError::InvalidInput(_)
+            | AuthError::EmailAlreadyVerified
+            | AuthError::VerificationResendCooldown => {
+                tracing::debug!(error = %self, "auth-service client error");
             }
         }
+
+        let body = AuthErrorResponse {
+            error: kind.to_owned(),
+            message: self.client_message(),
+            details: None,
+        };
+
+        (status, Json(body)).into_response()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tonic_types::StatusExt;
 
     #[test]
-    fn oauth_email_conflict_maps_to_failed_precondition_with_error_info() {
-        let status: tonic::Status = AuthError::OAuthEmailConflict.into();
+    fn oauth_email_conflict_uses_stable_kind() {
+        let err = AuthError::OAuthEmailConflict;
+        assert_eq!(err.error_kind(), "oauth_email_conflict");
+        assert_eq!(err.status(), StatusCode::CONFLICT);
+    }
 
-        assert_eq!(status.code(), tonic::Code::FailedPrecondition);
+    #[test]
+    fn invalid_credentials_maps_to_401() {
+        let err = AuthError::InvalidCredentials;
+        assert_eq!(err.error_kind(), "unauthenticated");
+        assert_eq!(err.status(), StatusCode::UNAUTHORIZED);
+    }
 
-        let info = status
-            .get_error_details()
-            .error_info()
-            .cloned()
-            .expect("error info attached");
-        assert_eq!(info.reason, OAUTH_EMAIL_CONFLICT_REASON);
-        assert_eq!(info.domain, AUTH_ERROR_DOMAIN);
-        assert!(
-            info.metadata.is_empty(),
-            "metadata must not leak account composition"
-        );
+    #[test]
+    fn email_not_verified_maps_to_403_with_kind() {
+        let err = AuthError::EmailNotVerified;
+        assert_eq!(err.error_kind(), "email_not_verified");
+        assert_eq!(err.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn internal_errors_dont_leak_detail() {
+        let err = AuthError::Database(be_remote_db::DbError::not_found("user"));
+        assert_eq!(err.client_message(), "Internal database error");
+        assert_eq!(err.error_kind(), "internal_error");
+    }
+
+    #[test]
+    fn invalid_input_passes_message_through() {
+        let err = AuthError::InvalidInput("Email already taken".to_string());
+        assert_eq!(err.error_kind(), "invalid_argument");
+        assert_eq!(err.client_message(), "Email already taken");
     }
 }

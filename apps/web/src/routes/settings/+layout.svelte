@@ -86,7 +86,7 @@
 					<div class="mb-4 flex flex-col overflow-hidden py-1 px-2">
 						<span class="flex items-center gap-1.5 leading-tight">
 							<span class="truncate text-sm font-medium"
-								>{auth.user.name || 'User'}</span
+								>{auth.user.display_name || 'User'}</span
 							>
 							<a
 								href="/settings"

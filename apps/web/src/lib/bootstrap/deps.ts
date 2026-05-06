@@ -11,18 +11,14 @@ import { CONFIG_SERVICE, ConfigService } from '@eurora/shared/config/config-serv
 import { provideAll } from '@eurora/shared/context';
 
 export function initDependencies() {
-	const config = new ConfigService(
-		import.meta.env.VITE_GRPC_API_URL,
-		import.meta.env.VITE_REST_API_URL ?? import.meta.env.VITE_GRPC_API_URL,
-	);
-	const auth = new AuthService(config);
-	const threadClient = new ThreadService(config, auth);
+	const config = new ConfigService(import.meta.env.VITE_API_URL);
+	const threadClient = new ThreadService(config);
 
 	provideAll([
 		[CONFIG_SERVICE, config],
-		[AUTH_SERVICE, auth],
+		[AUTH_SERVICE, new AuthService(config)],
 		[DOWNLOAD_SERVICE, new DownloadService(config)],
-		[SUBSCRIPTION_SERVICE, new SubscriptionService(auth, config)],
+		[SUBSCRIPTION_SERVICE, new SubscriptionService(config)],
 		[THREAD_SERVICE, threadClient],
 		[CHAT_SERVICE, new ChatService(threadClient)],
 	]);

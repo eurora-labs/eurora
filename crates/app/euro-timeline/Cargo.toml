@@ -13,6 +13,7 @@ chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
 euro-auth = { workspace = true }
 euro-browser = { workspace = true }
+euro-endpoint = { workspace = true }
 focus-tracker = { workspace = true }
 image = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -23,7 +24,6 @@ tokio = { workspace = true, features = [
   "sync",
   "time",
 ] }
-tonic = { workspace = true, features = ["channel"] }
 tracing = { workspace = true }
 
 [dev-dependencies]

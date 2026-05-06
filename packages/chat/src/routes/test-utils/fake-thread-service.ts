@@ -144,7 +144,7 @@ export class FakeThreadService implements IThreadService {
 		return thread;
 	}
 
-	async generateTitle(threadId: string, _content: string): Promise<Thread> {
+	async generateTitle(threadId: string): Promise<Thread> {
 		const thread = this.threads.find((t) => t.id === threadId);
 		if (!thread) throw new Error('Thread not found');
 		return { ...thread, title: `Generated title for ${threadId}` };

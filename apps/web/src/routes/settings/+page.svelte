@@ -42,7 +42,7 @@
 </script>
 
 <svelte:head>
-	<title>{auth.user?.name || 'User'} - Eurora Labs</title>
+	<title>{auth.user?.display_name || 'User'} - Eurora Labs</title>
 </svelte:head>
 
 {#if auth.user}

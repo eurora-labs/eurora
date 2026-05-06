@@ -1,8 +1,9 @@
 use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
-use agent_chain_core::proto::ChatStreamResponse;
-use futures::StreamExt;
+use serde_json::Value;
 use tauri::{Manager, Runtime, ipc::Channel};
+use thread_core::{ChatSendRequest, ChatServerMessage};
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::shared_types::{ActiveStreamTokens, SharedThreadManager};
@@ -19,7 +20,7 @@ pub trait ChatApi {
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ChatStreamResponse>,
+        channel: Channel<ChatServerMessage>,
         query: Query,
     ) -> Result<(), String>;
 
@@ -38,7 +39,7 @@ impl ChatApi for ChatApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        channel: Channel<ChatStreamResponse>,
+        channel: Channel<ChatServerMessage>,
         query: Query,
     ) -> Result<(), String> {
         let thread_state: tauri::State<SharedThreadManager> = app_handle
@@ -48,8 +49,17 @@ impl ChatApi for ChatApiImpl {
             .try_state()
             .ok_or(AppError::Unavailable("Active stream tokens"))?;
 
-        // For mobile, we skip the timeline/asset management that the desktop does.
-        // Just build content blocks from the user's text.
+        let thread_uuid =
+            Uuid::parse_str(&thread_id).map_err(|e| format!("Invalid thread_id: {e}"))?;
+        let parent_message_uuid = match query.parent_message_id.as_deref() {
+            Some(s) if !s.is_empty() => {
+                Some(Uuid::parse_str(s).map_err(|e| format!("Invalid parent_message_id: {e}"))?)
+            }
+            _ => None,
+        };
+
+        // Mobile skips the timeline/asset management that the desktop does;
+        // just wrap the user's text as a single content block.
         let user_text_block: ContentBlock =
             TextContentBlock::builder().text(&query.text).build().into();
         let mut context_blocks = ContentBlocks::new();
@@ -61,54 +71,37 @@ impl ChatApi for ChatApiImpl {
             .await
             .insert(thread_id.clone(), cancel.clone());
 
-        let mut stream = {
-            let mut thread_manager = thread_state.lock().await;
-            thread_manager
-                .chat_stream(
-                    thread_id.clone(),
-                    context_blocks,
-                    query.parent_message_id.clone(),
-                    None,
-                    cancel.clone(),
-                )
-                .await
-                .map_err(|e| format!("Failed to create chat stream: {e}"))?
+        let request = ChatSendRequest {
+            content_blocks: content_blocks_to_json(&context_blocks),
+            parent_message_id: parent_message_uuid,
+            asset_chips_json: None,
         };
 
-        let stream_future = async {
-            match stream.next().await {
-                Some(Ok(first)) => {
-                    if let Err(e) = channel.send(first) {
-                        return Err(format!("Failed to send confirmed human message: {e}"));
-                    }
-                }
-                Some(Err(e)) => return Err(format!("Stream error: {e}")),
-                None => return Ok(()),
-            }
+        let mut rx = thread_state
+            .chat_stream(thread_uuid, request, cancel.clone())
+            .await
+            .map_err(|e| format!("Failed to open chat stream: {e}"))?;
 
-            loop {
-                tokio::select! {
-                    biased;
-                    () = cancel.cancelled() => {
-                        tracing::debug!("Stream cancelled for thread {thread_id}");
-                        drop(stream);
-                        return Ok(());
-                    }
-                    item = stream.next() => {
-                        match item {
-                            Some(Ok(response)) => {
-                                if let Err(e) = channel.send(response) {
-                                    return Err(format!("Failed to send response chunk: {e}"));
-                                }
-                            }
-                            Some(Err(e)) => {
-                                return Err(format!("Stream error: {e}"));
-                            }
-                            None => return Ok(()),
+        let stream_future = async {
+            while let Some(item) = rx.recv().await {
+                match item {
+                    Ok(event) => {
+                        let is_terminal = matches!(
+                            &event,
+                            ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
+                        );
+                        if let Err(e) = channel.send(event) {
+                            return Err(format!("Failed to forward chat event: {e}"));
+                        }
+                        if is_terminal {
+                            return Ok(());
                         }
                     }
+                    Err(euro_thread::Error::Cancelled) => return Ok(()),
+                    Err(e) => return Err(format!("Stream error: {e}")),
                 }
             }
+            Ok(())
         };
 
         let timeout = std::time::Duration::from_secs(300);
@@ -143,4 +136,11 @@ impl ChatApi for ChatApiImpl {
 
         Ok(())
     }
+}
+
+fn content_blocks_to_json(blocks: &ContentBlocks) -> Vec<Value> {
+    blocks
+        .iter()
+        .filter_map(|b| serde_json::to_value(b).ok())
+        .collect()
 }
