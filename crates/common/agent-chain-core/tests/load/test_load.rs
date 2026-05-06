@@ -301,7 +301,8 @@ fn test_reviver_constructor_deserialization() {
             } else {
                 assert_eq!(content[0]["text"], "hello");
             }
-            assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+            // Bare-message JSON no longer carries the discriminant.
+            assert!(v.get("type").is_none());
         }
         RevivedValue::Constructor(info) => {
             assert_eq!(info.name, "AIMessage");
@@ -389,7 +390,8 @@ fn test_reviver_with_import_mapping() {
             } else {
                 assert_eq!(content[0]["text"], "hello");
             }
-            assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+            // Bare-message JSON no longer carries the discriminant.
+            assert!(v.get("type").is_none());
         }
         RevivedValue::Constructor(info) => {
             assert!(info.path.contains(&"langchain_core".to_string()));
@@ -885,7 +887,8 @@ fn test_reviver_constructor_with_empty_kwargs() {
             assert_eq!(info.name, "AIMessage");
         }
         RevivedValue::Value(v) => {
-            assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+            // Bare-message JSON no longer carries the discriminant.
+            assert!(v.get("type").is_none());
         }
         _ => panic!("Expected Constructor or Value"),
     }
@@ -910,7 +913,8 @@ fn test_reviver_constructor_missing_kwargs_key() {
             assert_eq!(info.name, "AIMessage");
         }
         RevivedValue::Value(v) => {
-            assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+            // Bare-message JSON no longer carries the discriminant.
+            assert!(v.get("type").is_none());
         }
         _ => panic!("Expected Constructor or Value"),
     }
@@ -1088,7 +1092,8 @@ fn test_reviver_langchain_core_direct_namespace() {
         RevivedValue::Value(v) => {
             let content = v.get("content").unwrap();
             assert!(content.is_string() || content.is_array());
-            assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+            // Bare-message JSON no longer carries the discriminant.
+            assert!(v.get("type").is_none());
         }
         RevivedValue::Constructor(info) => {
             assert_eq!(info.name, "AIMessage");
@@ -1456,7 +1461,8 @@ fn test_reviver_constructor_with_mapping_old_schema() {
         RevivedValue::Value(v) => {
             let content = v.get("content").unwrap();
             assert!(content.is_string() || content.is_array());
-            assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+            // Bare-message JSON no longer carries the discriminant.
+            assert!(v.get("type").is_none());
         }
         RevivedValue::Constructor(info) => {
             assert_eq!(info.name, "AIMessage");
@@ -1587,7 +1593,9 @@ fn test_round_trip_human_message() {
 
     let content = loaded.get("content").unwrap();
     assert_eq!(content[0]["text"], "What is the meaning of life?");
-    assert_eq!(loaded.get("type").and_then(|v| v.as_str()), Some("human"));
+    // Bare-message JSON no longer carries the discriminant — that lives only
+    // on AnyMessage. The reviver returns the raw struct shape.
+    assert!(loaded.get("type").is_none());
 }
 
 #[test]
@@ -1600,7 +1608,8 @@ fn test_round_trip_ai_message() {
 
     let content = loaded.get("content").unwrap();
     assert_eq!(content[0]["text"], "42");
-    assert_eq!(loaded.get("type").and_then(|v| v.as_str()), Some("ai"));
+    // See `test_round_trip_human_message` — bare-message JSON has no "type".
+    assert!(loaded.get("type").is_none());
 }
 
 #[test]
@@ -1615,7 +1624,8 @@ fn test_round_trip_system_message() {
 
     let content = loaded.get("content").unwrap();
     assert_eq!(content[0]["text"], "You are a helpful assistant.");
-    assert_eq!(loaded.get("type").and_then(|v| v.as_str()), Some("system"));
+    // See `test_round_trip_human_message` — bare-message JSON has no "type".
+    assert!(loaded.get("type").is_none());
 }
 
 #[test]

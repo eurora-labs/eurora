@@ -1,9 +1,6 @@
 use bon::bon;
-use serde::de::{self, MapAccess, Visitor};
-use serde::ser::SerializeMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt;
 
 #[cfg(feature = "specta")]
 use specta_typescript::Unknown;
@@ -12,24 +9,28 @@ use super::base::{
     AnyMessage, BaseMessage, BaseMessageChunk, MergeableContent, get_msg_title_repr,
     merge_content_complex,
 };
-use super::content::{ContentBlock, ContentBlocks, TextContentBlock};
+use super::content::{ContentBlock, ContentBlocks};
 use super::tool::{
     InvalidToolCall, ToolCall, ToolCallChunk, default_tool_chunk_parser, default_tool_parser,
     invalid_tool_call, tool_call,
 };
+use crate::load::Serializable;
 use crate::utils::base::{LC_AUTO_PREFIX, LC_ID_PREFIX};
 use crate::utils::json::parse_partial_json;
 use crate::utils::merge::{merge_dicts, merge_lists};
 use crate::utils::usage::dict_int_op;
 
+#[cfg(feature = "specta")]
+type JsonObjectTs = HashMap<String, Unknown>;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InputTokenDetails {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_creation: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_read: Option<i64>,
     #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
     pub extra: HashMap<String, i64>,
@@ -38,9 +39,9 @@ pub struct InputTokenDetails {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct OutputTokenDetails {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<i64>,
     #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
     pub extra: HashMap<String, i64>,
@@ -52,9 +53,9 @@ pub struct UsageMetadata {
     pub input_tokens: i64,
     pub output_tokens: i64,
     pub total_tokens: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_token_details: Option<InputTokenDetails>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_token_details: Option<OutputTokenDetails>,
 }
 
@@ -127,18 +128,26 @@ impl UsageMetadata {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AIMessage {
+    #[serde(default)]
     pub content: ContentBlocks,
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
+    #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,
-    #[cfg_attr(feature = "specta", specta(type = Unknown))]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[cfg_attr(feature = "specta", specta(type = Unknown))]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -172,103 +181,6 @@ impl BaseMessage for AIMessage {
     }
 }
 
-impl Serialize for AIMessage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut field_count = 6;
-        if self.name.is_some() {
-            field_count += 1;
-        }
-        if self.usage_metadata.is_some() {
-            field_count += 1;
-        }
-        field_count += 1;
-
-        let mut map = serializer.serialize_map(Some(field_count))?;
-
-        map.serialize_entry("type", "ai")?;
-        map.serialize_entry("content", &self.content)?;
-        map.serialize_entry("id", &self.id)?;
-        if self.name.is_some() {
-            map.serialize_entry("name", &self.name)?;
-        }
-        map.serialize_entry("tool_calls", &self.tool_calls)?;
-        map.serialize_entry("invalid_tool_calls", &self.invalid_tool_calls)?;
-        if self.usage_metadata.is_some() {
-            map.serialize_entry("usage_metadata", &self.usage_metadata)?;
-        }
-        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
-        map.serialize_entry("response_metadata", &self.response_metadata)?;
-
-        map.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for AIMessage {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct AIMessageVisitor;
-
-        impl<'de> Visitor<'de> for AIMessageVisitor {
-            type Value = AIMessage;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("an AIMessage object")
-            }
-
-            fn visit_map<M>(self, mut map: M) -> Result<AIMessage, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut content: Option<ContentBlocks> = None;
-                let mut id: Option<String> = None;
-                let mut name: Option<String> = None;
-                let mut tool_calls: Option<Vec<ToolCall>> = None;
-                let mut invalid_tool_calls: Option<Vec<InvalidToolCall>> = None;
-                let mut usage_metadata: Option<Option<UsageMetadata>> = None;
-                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
-                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "content" => content = Some(map.next_value()?),
-                        "id" => id = map.next_value()?,
-                        "name" => name = map.next_value()?,
-                        "tool_calls" => tool_calls = Some(map.next_value()?),
-                        "invalid_tool_calls" => invalid_tool_calls = Some(map.next_value()?),
-                        "usage_metadata" => usage_metadata = Some(map.next_value()?),
-                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
-                        "response_metadata" => response_metadata = Some(map.next_value()?),
-                        "type" => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                        _ => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                    }
-                }
-
-                Ok(AIMessage {
-                    content: content.unwrap_or_default(),
-                    id,
-                    name,
-                    tool_calls: tool_calls.unwrap_or_default(),
-                    invalid_tool_calls: invalid_tool_calls.unwrap_or_default(),
-                    usage_metadata: usage_metadata.unwrap_or(None),
-                    additional_kwargs: additional_kwargs.unwrap_or_default(),
-                    response_metadata: response_metadata.unwrap_or_default(),
-                })
-            }
-        }
-
-        deserializer.deserialize_map(AIMessageVisitor)
-    }
-}
-
 #[bon]
 impl AIMessage {
     #[builder]
@@ -297,7 +209,7 @@ impl AIMessage {
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
         let blocks: ContentBlocks = content_list
             .into_iter()
-            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .map(ContentBlock::from_value_or_non_standard)
             .collect();
         Self::builder().content(blocks).build()
     }
@@ -307,10 +219,7 @@ impl AIMessage {
     }
 
     pub fn content_list(&self) -> Vec<serde_json::Value> {
-        self.content
-            .iter()
-            .filter_map(|block| serde_json::to_value(block).ok())
-            .collect()
+        self.content.as_json_values()
     }
 
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
@@ -375,90 +284,9 @@ impl AIMessage {
             }
         };
 
-        use super::content::{
-            AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
-            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
-            VideoContentBlock,
-        };
-
         blocks_json
             .into_iter()
-            .map(|v| {
-                let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                let result = match block_type {
-                    "text" => serde_json::from_value::<TextContentBlock>(v.clone())
-                        .map(ContentBlock::Text),
-                    "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
-                        .map(ContentBlock::Reasoning),
-                    "tool_call" => serde_json::from_value::<ToolCallBlock>(v.clone())
-                        .map(ContentBlock::ToolCall),
-                    "invalid_tool_call" => {
-                        serde_json::from_value::<InvalidToolCallBlock>(v.clone())
-                            .map(ContentBlock::InvalidToolCall)
-                    }
-                    "tool_call_chunk" => serde_json::from_value::<ToolCallChunkBlock>(v.clone())
-                        .map(ContentBlock::ToolCallChunk),
-                    "image" => serde_json::from_value::<ImageContentBlock>(v.clone())
-                        .map(ContentBlock::Image),
-                    "audio" => serde_json::from_value::<AudioContentBlock>(v.clone())
-                        .map(ContentBlock::Audio),
-                    "video" => serde_json::from_value::<VideoContentBlock>(v.clone())
-                        .map(ContentBlock::Video),
-                    "file" => serde_json::from_value::<FileContentBlock>(v.clone())
-                        .map(ContentBlock::File),
-                    "text-plain" => serde_json::from_value::<PlainTextContentBlock>(v.clone())
-                        .map(ContentBlock::PlainText),
-                    "server_tool_call" => serde_json::from_value::<ServerToolCall>(v.clone())
-                        .map(ContentBlock::ServerToolCall),
-                    "server_tool_call_chunk" => {
-                        serde_json::from_value::<ServerToolCallChunk>(v.clone())
-                            .map(ContentBlock::ServerToolCallChunk)
-                    }
-                    "server_tool_result" => serde_json::from_value::<ServerToolResult>(v.clone())
-                        .map(ContentBlock::ServerToolResult),
-                    "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
-                        .map(ContentBlock::NonStandard),
-                    _ => {
-                        tracing::warn!(
-                            block_type = %block_type,
-                            json = %v,
-                            "Unknown block type in AIMessage::content_blocks, treating as non_standard"
-                        );
-                        serde_json::from_value::<NonStandardContentBlock>(v.clone())
-                            .map(ContentBlock::NonStandard)
-                    }
-                };
-
-                result.unwrap_or_else(|e| {
-                    tracing::warn!(
-                        block_type = %block_type,
-                        error = %e,
-                        json = %v,
-                        "Failed to deserialize ContentBlock in AIMessage::content_blocks, wrapping as non_standard"
-                    );
-                    let mut error_value = std::collections::HashMap::new();
-                    error_value.insert(
-                        "original_json".to_string(),
-                        v.clone(),
-                    );
-                    error_value.insert(
-                        "deserialization_error".to_string(),
-                        serde_json::Value::String(e.to_string()),
-                    );
-                    error_value.insert(
-                        "original_type".to_string(),
-                        serde_json::Value::String(block_type.to_string()),
-                    );
-                    ContentBlock::NonStandard(NonStandardContentBlock {
-                        id: None,
-                        value: error_value,
-                        index: v.get("index").and_then(|i| {
-                            serde_json::from_value(i.clone()).ok()
-                        }),
-                    })
-                })
-            })
+            .map(ContentBlock::from_value_or_non_standard)
             .collect()
     }
 
@@ -566,131 +394,31 @@ pub enum ChunkPosition {
     Last,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AIMessageChunk {
+    #[serde(default)]
     pub content: ContentBlocks,
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
+    #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
+    #[serde(default)]
     pub tool_call_chunks: Vec<ToolCallChunk>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,
-    #[cfg_attr(feature = "specta", specta(type = Unknown))]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
-    #[cfg_attr(feature = "specta", specta(type = Unknown))]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub response_metadata: HashMap<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chunk_position: Option<ChunkPosition>,
-}
-
-impl Serialize for AIMessageChunk {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut field_count = 7;
-        if self.name.is_some() {
-            field_count += 1;
-        }
-        if self.usage_metadata.is_some() {
-            field_count += 1;
-        }
-        if self.chunk_position.is_some() {
-            field_count += 1;
-        }
-        field_count += 1;
-
-        let mut map = serializer.serialize_map(Some(field_count))?;
-
-        map.serialize_entry("type", "AIMessageChunk")?;
-        map.serialize_entry("content", &self.content)?;
-        map.serialize_entry("id", &self.id)?;
-        if self.name.is_some() {
-            map.serialize_entry("name", &self.name)?;
-        }
-        map.serialize_entry("tool_calls", &self.tool_calls)?;
-        map.serialize_entry("invalid_tool_calls", &self.invalid_tool_calls)?;
-        map.serialize_entry("tool_call_chunks", &self.tool_call_chunks)?;
-        if self.usage_metadata.is_some() {
-            map.serialize_entry("usage_metadata", &self.usage_metadata)?;
-        }
-        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
-        map.serialize_entry("response_metadata", &self.response_metadata)?;
-        if self.chunk_position.is_some() {
-            map.serialize_entry("chunk_position", &self.chunk_position)?;
-        }
-
-        map.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for AIMessageChunk {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct AIMessageChunkVisitor;
-
-        impl<'de> Visitor<'de> for AIMessageChunkVisitor {
-            type Value = AIMessageChunk;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("an AIMessageChunk object")
-            }
-
-            fn visit_map<M>(self, mut map: M) -> Result<AIMessageChunk, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut content: Option<ContentBlocks> = None;
-                let mut id: Option<String> = None;
-                let mut name: Option<String> = None;
-                let mut tool_calls: Option<Vec<ToolCall>> = None;
-                let mut invalid_tool_calls: Option<Vec<InvalidToolCall>> = None;
-                let mut tool_call_chunks: Option<Vec<ToolCallChunk>> = None;
-                let mut usage_metadata: Option<Option<UsageMetadata>> = None;
-                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
-                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
-                let mut chunk_position: Option<Option<ChunkPosition>> = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "content" => content = Some(map.next_value()?),
-                        "id" => id = map.next_value()?,
-                        "name" => name = map.next_value()?,
-                        "tool_calls" => tool_calls = Some(map.next_value()?),
-                        "invalid_tool_calls" => invalid_tool_calls = Some(map.next_value()?),
-                        "tool_call_chunks" => tool_call_chunks = Some(map.next_value()?),
-                        "usage_metadata" => usage_metadata = Some(map.next_value()?),
-                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
-                        "response_metadata" => response_metadata = Some(map.next_value()?),
-                        "chunk_position" => chunk_position = Some(map.next_value()?),
-                        "type" => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                        _ => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                    }
-                }
-
-                Ok(AIMessageChunk {
-                    content: content.unwrap_or_default(),
-                    id,
-                    name,
-                    tool_calls: tool_calls.unwrap_or_default(),
-                    invalid_tool_calls: invalid_tool_calls.unwrap_or_default(),
-                    tool_call_chunks: tool_call_chunks.unwrap_or_default(),
-                    usage_metadata: usage_metadata.unwrap_or(None),
-                    additional_kwargs: additional_kwargs.unwrap_or_default(),
-                    response_metadata: response_metadata.unwrap_or_default(),
-                    chunk_position: chunk_position.unwrap_or(None),
-                })
-            }
-        }
-
-        deserializer.deserialize_map(AIMessageChunkVisitor)
-    }
 }
 
 #[bon]
@@ -725,7 +453,7 @@ impl AIMessageChunk {
     pub fn with_content_list(content_list: Vec<serde_json::Value>) -> Self {
         let blocks: ContentBlocks = content_list
             .into_iter()
-            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .map(ContentBlock::from_value_or_non_standard)
             .collect();
         Self::builder().content(blocks).build()
     }
@@ -735,10 +463,7 @@ impl AIMessageChunk {
     }
 
     pub fn content_list(&self) -> Vec<serde_json::Value> {
-        self.content
-            .iter()
-            .filter_map(|block| serde_json::to_value(block).ok())
-            .collect()
+        self.content.as_json_values()
     }
 
     pub fn content_blocks(&self) -> Vec<ContentBlock> {
@@ -833,90 +558,9 @@ impl AIMessageChunk {
             }
         };
 
-        use super::content::{
-            AudioContentBlock, FileContentBlock, ImageContentBlock, InvalidToolCallBlock,
-            NonStandardContentBlock, PlainTextContentBlock, ReasoningContentBlock, ServerToolCall,
-            ServerToolCallChunk, ServerToolResult, ToolCallBlock, ToolCallChunkBlock,
-            VideoContentBlock,
-        };
-
         blocks_json
             .into_iter()
-            .map(|v| {
-                let block_type = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                let result = match block_type {
-                    "text" => serde_json::from_value::<TextContentBlock>(v.clone())
-                        .map(ContentBlock::Text),
-                    "reasoning" => serde_json::from_value::<ReasoningContentBlock>(v.clone())
-                        .map(ContentBlock::Reasoning),
-                    "tool_call" => serde_json::from_value::<ToolCallBlock>(v.clone())
-                        .map(ContentBlock::ToolCall),
-                    "invalid_tool_call" => {
-                        serde_json::from_value::<InvalidToolCallBlock>(v.clone())
-                            .map(ContentBlock::InvalidToolCall)
-                    }
-                    "tool_call_chunk" => serde_json::from_value::<ToolCallChunkBlock>(v.clone())
-                        .map(ContentBlock::ToolCallChunk),
-                    "image" => serde_json::from_value::<ImageContentBlock>(v.clone())
-                        .map(ContentBlock::Image),
-                    "audio" => serde_json::from_value::<AudioContentBlock>(v.clone())
-                        .map(ContentBlock::Audio),
-                    "video" => serde_json::from_value::<VideoContentBlock>(v.clone())
-                        .map(ContentBlock::Video),
-                    "file" => serde_json::from_value::<FileContentBlock>(v.clone())
-                        .map(ContentBlock::File),
-                    "text-plain" => serde_json::from_value::<PlainTextContentBlock>(v.clone())
-                        .map(ContentBlock::PlainText),
-                    "server_tool_call" => serde_json::from_value::<ServerToolCall>(v.clone())
-                        .map(ContentBlock::ServerToolCall),
-                    "server_tool_call_chunk" => {
-                        serde_json::from_value::<ServerToolCallChunk>(v.clone())
-                            .map(ContentBlock::ServerToolCallChunk)
-                    }
-                    "server_tool_result" => serde_json::from_value::<ServerToolResult>(v.clone())
-                        .map(ContentBlock::ServerToolResult),
-                    "non_standard" => serde_json::from_value::<NonStandardContentBlock>(v.clone())
-                        .map(ContentBlock::NonStandard),
-                    _ => {
-                        tracing::warn!(
-                            block_type = %block_type,
-                            json = %v,
-                            "Unknown block type in AIMessageChunk::content_blocks, treating as non_standard"
-                        );
-                        serde_json::from_value::<NonStandardContentBlock>(v.clone())
-                            .map(ContentBlock::NonStandard)
-                    }
-                };
-
-                result.unwrap_or_else(|e| {
-                    tracing::warn!(
-                        block_type = %block_type,
-                        error = %e,
-                        json = %v,
-                        "Failed to deserialize ContentBlock in AIMessageChunk::content_blocks, wrapping as non_standard"
-                    );
-                    let mut error_value = std::collections::HashMap::new();
-                    error_value.insert(
-                        "original_json".to_string(),
-                        v.clone(),
-                    );
-                    error_value.insert(
-                        "deserialization_error".to_string(),
-                        serde_json::Value::String(e.to_string()),
-                    );
-                    error_value.insert(
-                        "original_type".to_string(),
-                        serde_json::Value::String(block_type.to_string()),
-                    );
-                    ContentBlock::NonStandard(NonStandardContentBlock {
-                        id: None,
-                        value: error_value,
-                        index: v.get("index").and_then(|i| {
-                            serde_json::from_value(i.clone()).ok()
-                        }),
-                    })
-                })
-            })
+            .map(ContentBlock::from_value_or_non_standard)
             .collect()
     }
 
@@ -1016,11 +660,7 @@ impl AIMessageChunk {
                 .and_then(|v| v.as_str())
                 == Some("v1")
         {
-            let mut content_list: Vec<serde_json::Value> = self
-                .content
-                .iter()
-                .filter_map(|block| serde_json::to_value(block).ok())
-                .collect();
+            let mut content_list = self.content.as_json_values();
 
             let id_to_tc: HashMap<String, serde_json::Value> = self
                 .tool_calls
@@ -1060,7 +700,7 @@ impl AIMessageChunk {
             if changed {
                 self.content = content_list
                     .into_iter()
-                    .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+                    .map(ContentBlock::from_value_or_non_standard)
                     .collect();
             }
         }
@@ -1080,11 +720,7 @@ impl AIMessageChunk {
             return;
         }
 
-        let mut content_list: Vec<serde_json::Value> = self
-            .content
-            .iter()
-            .filter_map(|block| serde_json::to_value(block).ok())
-            .collect();
+        let mut content_list = self.content.as_json_values();
 
         let mut changed = false;
         for block in &mut content_list {
@@ -1103,7 +739,7 @@ impl AIMessageChunk {
         if changed {
             self.content = content_list
                 .into_iter()
-                .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+                .map(ContentBlock::from_value_or_non_standard)
                 .collect();
         }
     }
@@ -1154,11 +790,7 @@ fn merge_message_content(first: &ContentBlocks, others: &[&ContentBlocks]) -> Co
         {
             return MergeableContent::Text(t.text.clone());
         }
-        let values: Vec<serde_json::Value> = cb
-            .iter()
-            .filter_map(|block| serde_json::to_value(block).ok())
-            .collect();
-        MergeableContent::List(values)
+        MergeableContent::List(cb.as_json_values())
     };
 
     let first_mergeable = to_mergeable(first);
@@ -1171,7 +803,7 @@ fn merge_message_content(first: &ContentBlocks, others: &[&ContentBlocks]) -> Co
         MergeableContent::Text(s) => ContentBlocks::from(s.as_str()),
         MergeableContent::List(values) => values
             .into_iter()
-            .filter_map(|v| serde_json::from_value::<ContentBlock>(v).ok())
+            .map(ContentBlock::from_value_or_non_standard)
             .collect(),
     }
 }
@@ -1340,7 +972,7 @@ impl BaseMessageChunk for AIMessageChunk {
         self.id = Some(id);
     }
     fn message_type(&self) -> &'static str {
-        "AIMessageChunk"
+        "ai_chunk"
     }
     fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         &self.additional_kwargs
@@ -1486,8 +1118,6 @@ pub fn backwards_compat_tool_calls(
 
     (tool_calls, invalid_tool_calls, tool_call_chunks)
 }
-
-use crate::load::Serializable;
 
 impl Serializable for AIMessage {
     fn is_lc_serializable() -> bool {

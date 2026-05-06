@@ -6,6 +6,8 @@ mod test_content;
 mod test_human;
 mod test_imports;
 mod test_modifier;
+mod test_specta_contract;
 mod test_system;
 mod test_tool;
 mod test_utils;
+mod test_wire_format;

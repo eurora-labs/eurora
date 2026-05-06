@@ -1,7 +1,7 @@
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    ToolMessage, ToolMessageChunk, ToolOutputMixin, ToolStatus, default_tool_chunk_parser,
-    default_tool_parser, invalid_tool_call, tool_call, tool_call_chunk,
+    AnyMessage, MergeError, ToolMessage, ToolMessageChunk, ToolOutputMixin, ToolStatus,
+    default_tool_chunk_parser, default_tool_parser, invalid_tool_call, tool_call, tool_call_chunk,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -114,7 +114,9 @@ fn test_serialization_roundtrip() {
         .build();
 
     let serialized = serde_json::to_value(&msg).unwrap();
-    assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "tool");
+    assert!(serialized.get("type").is_none());
+    let wrapped = serde_json::to_value(AnyMessage::ToolMessage(msg.clone())).unwrap();
+    assert_eq!(wrapped.get("type").unwrap().as_str().unwrap(), "tool");
 
     let deserialized: ToolMessage = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.content, "Result: 42");
@@ -142,7 +144,7 @@ fn test_chunk_init_basic() {
         .build();
     assert_eq!(chunk.content, "Result");
     assert_eq!(chunk.tool_call_id, "call-123");
-    assert_eq!(chunk.message_type(), "ToolMessageChunk");
+    assert_eq!(chunk.message_type(), "tool_chunk");
 }
 
 #[test]
@@ -151,7 +153,7 @@ fn test_chunk_type_is_tool_message_chunk() {
         .content("Test")
         .tool_call_id("call-123")
         .build();
-    assert_eq!(chunk.message_type(), "ToolMessageChunk");
+    assert_eq!(chunk.message_type(), "tool_chunk");
 }
 
 #[test]
@@ -173,7 +175,6 @@ fn test_chunk_add_same_tool_call_id_chunks() {
 }
 
 #[test]
-#[should_panic(expected = "Cannot concatenate")]
 fn test_chunk_add_different_tool_call_id_raises_error() {
     let chunk1 = ToolMessageChunk::builder()
         .content("Hello")
@@ -183,7 +184,9 @@ fn test_chunk_add_different_tool_call_id_raises_error() {
         .content(" world")
         .tool_call_id("call-456")
         .build();
-    let _result = chunk1 + chunk2;
+
+    let err = chunk1.try_concat(&chunk2).unwrap_err();
+    assert!(matches!(err, MergeError::MismatchedToolCallId { .. }));
 }
 
 #[test]
@@ -261,10 +264,7 @@ fn test_chunk_serialization_roundtrip() {
         .build();
 
     let serialized = serde_json::to_value(&chunk).unwrap();
-    assert_eq!(
-        serialized.get("type").unwrap().as_str().unwrap(),
-        "ToolMessageChunk"
-    );
+    assert!(serialized.get("type").is_none());
 
     let deserialized: ToolMessageChunk = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.content, "Result");
@@ -655,7 +655,9 @@ fn test_serialization_roundtrip_with_artifact_and_error_status() {
         .build();
 
     let serialized = serde_json::to_value(&msg).unwrap();
-    assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "tool");
+    assert!(serialized.get("type").is_none());
+    let wrapped = serde_json::to_value(AnyMessage::ToolMessage(msg.clone())).unwrap();
+    assert_eq!(wrapped.get("type").unwrap().as_str().unwrap(), "tool");
 
     let deserialized: ToolMessage = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.content, "Tool execution failed");

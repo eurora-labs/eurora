@@ -1556,5 +1556,9 @@ async fn test_structured_output_with_raw_serializes_message() {
 
     let raw = &result["raw"];
     assert_eq!(raw["content"][0]["text"], "some content");
-    assert_eq!(raw["type"], "ai");
+    // `raw` is `serde_json::to_value(&AIMessage)` — bare-message JSON omits
+    // the "type" discriminant (it lives on AnyMessage now).
+    assert!(raw.get("type").is_none());
+    // The fields that *do* live on the struct are still there.
+    assert!(raw.get("tool_calls").is_some());
 }

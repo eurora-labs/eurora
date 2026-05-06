@@ -1,6 +1,7 @@
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    ChatMessage, ChatMessageChunk, ContentBlock, ContentBlocks, HumanMessageChunk, TextContentBlock,
+    AnyMessage, ChatMessage, ChatMessageChunk, ContentBlock, ContentBlocks, HumanMessageChunk,
+    MergeError, TextContentBlock,
 };
 
 #[test]
@@ -105,7 +106,9 @@ fn test_serialization_roundtrip() {
         .build();
 
     let serialized = serde_json::to_value(&msg).unwrap();
-    assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "chat");
+    assert!(serialized.get("type").is_none());
+    let wrapped = serde_json::to_value(AnyMessage::ChatMessage(msg.clone())).unwrap();
+    assert_eq!(wrapped.get("type").unwrap().as_str().unwrap(), "chat");
 
     let deserialized: ChatMessage = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.content.as_text(), "Hello");
@@ -165,7 +168,7 @@ fn test_chunk_init_basic() {
         .build();
     assert_eq!(chunk.content.as_text(), "Hello");
     assert_eq!(chunk.role, "user");
-    assert_eq!(chunk.message_type(), "ChatMessageChunk");
+    assert_eq!(chunk.message_type(), "chat_chunk");
 }
 
 #[test]
@@ -174,7 +177,7 @@ fn test_chunk_type_is_chat_message_chunk() {
         .content("Test")
         .role("user")
         .build();
-    assert_eq!(chunk.message_type(), "ChatMessageChunk");
+    assert_eq!(chunk.message_type(), "chat_chunk");
 }
 
 #[test]
@@ -204,7 +207,6 @@ fn test_chunk_add_same_role_chunks() {
 }
 
 #[test]
-#[should_panic(expected = "Cannot concatenate")]
 fn test_chunk_add_different_role_chunks_raises_error() {
     let chunk1 = ChatMessageChunk::builder()
         .content("Hello")
@@ -214,7 +216,10 @@ fn test_chunk_add_different_role_chunks_raises_error() {
         .content(" world")
         .role("assistant")
         .build();
-    let _result = chunk1 + chunk2;
+
+    // try_concat surfaces the mismatch as a typed error rather than panicking.
+    let err = chunk1.try_concat(&chunk2).unwrap_err();
+    assert!(matches!(err, MergeError::MismatchedRole { .. }));
 }
 
 #[test]
@@ -368,10 +373,7 @@ fn test_chunk_serialization_roundtrip() {
         .build();
 
     let serialized = serde_json::to_value(&chunk).unwrap();
-    assert_eq!(
-        serialized.get("type").unwrap().as_str().unwrap(),
-        "ChatMessageChunk"
-    );
+    assert!(serialized.get("type").is_none());
 
     let deserialized: ChatMessageChunk = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.content.as_text(), "Hello");
@@ -476,7 +478,7 @@ fn test_model_dump_includes_role() {
         .content("Hello")
         .role("moderator")
         .build();
-    let dumped = serde_json::to_value(&msg).unwrap();
+    let dumped = serde_json::to_value(AnyMessage::ChatMessage(msg)).unwrap();
     assert_eq!(dumped.get("role").unwrap().as_str().unwrap(), "moderator");
     assert_eq!(dumped["content"][0]["text"], "Hello");
     assert_eq!(dumped.get("type").unwrap().as_str().unwrap(), "chat");
