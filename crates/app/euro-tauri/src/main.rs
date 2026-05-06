@@ -9,7 +9,7 @@ use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::{AccentColor, TimelineAppEvent};
 use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
-    WindowState, create_window,
+    MAIN_WINDOW_LABEL, WindowState, create_window,
     procedures::{
         auth_procedures::{AuthApi, AuthApiImpl},
         chat_procedures::{ChatApi, ChatApiImpl},
@@ -24,6 +24,7 @@ use euro_tauri::{
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
     shared_types::{ActiveStreamTokens, SharedThreadManager},
+    show_and_focus_main,
 };
 use euro_timeline::TimelineManager;
 use tauri::{
@@ -329,18 +330,14 @@ fn setup_tray(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
         .icon(icon)
         .menu(&menu)
         .show_menu_on_left_click(true)
-        .on_menu_event(move |app, event| {
-            if event.id == "quit" {
-                app.exit(0);
-            }
-            if event.id == "open" {
-                if let Some(main_window) = app_handle.get_webview_window("main") {
-                    let _ = main_window.unminimize();
-                    let _ = main_window.show();
-                } else {
-                    tracing::error!("Main window not found");
+        .on_menu_event(move |app, event| match event.id.as_ref() {
+            "quit" => app.exit(0),
+            "open" => {
+                if let Err(e) = show_and_focus_main(&app_handle) {
+                    tracing::error!("Failed to show main window from tray: {e}");
                 }
             }
+            other => tracing::warn!("Unhandled tray menu event: {other}"),
         })
         .build(tauri_app)?;
 
@@ -351,7 +348,7 @@ fn setup_main_window(
     tauri_app: &mut tauri::App,
     started_by_autostart: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let main_window = create_window(tauri_app.handle(), "main", String::new())?;
+    let main_window = create_window(tauri_app.handle(), MAIN_WINDOW_LABEL, String::new())?;
 
     if started_by_autostart {
         let _ = main_window.hide();
@@ -360,7 +357,7 @@ fn setup_main_window(
     let handle = tauri_app.handle().clone();
     main_window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-            if let Some(w) = handle.get_webview_window("main") {
+            if let Some(w) = handle.get_webview_window(MAIN_WINDOW_LABEL) {
                 let _ = w.minimize();
             }
             api.prevent_close();
@@ -456,31 +453,41 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
     });
 }
 
-/// Forward native-messenger registration / disconnect lifecycle events from
-/// the browser bridge to the frontend as `browser_extension_status_changed`
-/// events. The UI uses these to flip the "install extension" affordance the
-/// moment a messenger connects, without polling.
+/// Forward bridge registry changes — native-messenger registrations,
+/// disconnects, and bundled-extension state reports — to the frontend as
+/// `browser_extension_status_changed` events.
+///
+/// All three signals are routed through the same resolver
+/// (`resolve_browser_extension_state`) so the frontend sees a single
+/// consistent `BrowserExtensionState` per browser, regardless of which
+/// signal triggered the recompute. The UI uses these to update the
+/// extension affordance without polling.
 fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
     use euro_tauri::procedures::system_procedures::{
-        BrowserExtensionStatus, TauRpcSystemApiEventTrigger,
+        BrowserExtensionStatus, SAFARI_BRIDGE_APP_KIND, TauRpcSystemApiEventTrigger,
+        resolve_browser_extension_state,
     };
 
     tauri::async_runtime::spawn(async move {
         let service = euro_browser::BridgeService::get_or_init();
         let mut registrations_rx = service.subscribe_to_registrations();
         let mut disconnects_rx = service.subscribe_to_disconnects();
+        let mut extension_states_rx = service.subscribe_to_extension_states();
+
+        let emit = |process_name: String| {
+            let state = resolve_browser_extension_state(&process_name);
+            let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
+                .browser_extension_status_changed(BrowserExtensionStatus {
+                    process_name,
+                    state,
+                });
+        };
 
         loop {
             tokio::select! {
                 event = registrations_rx.recv() => {
                     match event {
-                        Ok(reg) => {
-                            let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
-                                .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.app_name,
-                                    connected: true,
-                                });
-                        }
+                        Ok(reg) => emit(reg.app_name),
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                             tracing::warn!(
                                 "Browser registration subscription lagged by {n} events"
@@ -491,16 +498,28 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
                 }
                 event = disconnects_rx.recv() => {
                     match event {
-                        Ok(reg) => {
-                            let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
-                                .browser_extension_status_changed(BrowserExtensionStatus {
-                                    process_name: reg.app_name,
-                                    connected: false,
-                                });
-                        }
+                        Ok(reg) => emit(reg.app_name),
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                             tracing::warn!(
                                 "Browser disconnect subscription lagged by {n} events"
+                            );
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+                event = extension_states_rx.recv() => {
+                    match event {
+                        Ok(update) => {
+                            // The bundled-state channel is keyed by `app_kind`;
+                            // map it back to the focused-window process name
+                            // the frontend filters on.
+                            if update.app_kind == SAFARI_BRIDGE_APP_KIND {
+                                emit(euro_process::Browser::Safari.process_name().to_owned());
+                            }
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!(
+                                "Bundled extension state subscription lagged by {n} events"
                             );
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
@@ -653,10 +672,8 @@ fn main() {
                 )
                 .plugin(tauri_plugin_shell::init())
                 .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-                    if let Some(window) = app.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.unminimize();
-                        let _ = window.set_focus();
+                    if let Err(e) = show_and_focus_main(app) {
+                        tracing::error!("Failed to show main window for second instance: {e}");
                     }
                 }))
                 .on_window_event(|window, event| match event {

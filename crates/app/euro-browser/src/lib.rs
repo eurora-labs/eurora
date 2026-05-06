@@ -6,7 +6,10 @@ pub use euro_bridge_protocol::{
     ErrorFrame, EventFrame, Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
     bridge_url, bridge_url_for,
 };
-pub use server::{BoundServer, BridgeService, RegisteredClient, RegistrationEvent};
+pub use server::{
+    BoundServer, BridgeService, BundledExtensionState, EXTENSION_STATE_EVENT,
+    ExtensionStatePayload, ExtensionStateUpdate, RegisteredClient, RegistrationEvent,
+};
 
 /// Bind the bridge WebSocket listener on its well-known port and return
 /// the [`BoundServer`] handle whose [`serve`](BoundServer::serve) future
