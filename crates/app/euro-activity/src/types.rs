@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
 use euro_native_messaging::NativeMessage;
 use euro_office::WordAsset;
+use euro_pdf::PdfAsset;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use url::Url;
@@ -30,6 +31,7 @@ pub enum ActivityAsset {
     ArticleAsset,
     TwitterAsset,
     WordAsset,
+    PdfAsset,
     DefaultAsset,
 }
 
