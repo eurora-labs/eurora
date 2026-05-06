@@ -36,16 +36,19 @@ use tauri::{
 use taurpc::Router;
 use tokio::sync::Mutex;
 
-fn install_native_messaging_manifests(app: &tauri::App) {
+/// Returns `true` when the on-disk messenger binary was replaced during
+/// this call. Callers use that signal to open the bridge's browser-purge
+/// window so stale messengers from the previous session are cleared out
+/// when they reconnect.
+fn install_native_messaging_manifests(app: &tauri::App) -> bool {
     #[cfg(target_os = "windows")]
     {
         let _ = app;
+        false
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        #[cfg(target_os = "linux")]
-        use std::os::unix::fs::PermissionsExt;
         use std::path::PathBuf;
 
         let resource_dir = match app.path().resource_dir() {
@@ -54,7 +57,7 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 tracing::warn!(
                     "Could not resolve resource dir, skipping native messaging manifest install: {e}"
                 );
-                return;
+                return false;
             }
         };
 
@@ -63,25 +66,48 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 Some(dir) => dir.join("euro-native-messaging"),
                 None => {
                     tracing::warn!("Could not resolve parent directory of current exe");
-                    return;
+                    return false;
                 }
             },
 
             Err(e) => {
                 tracing::warn!("Could not resolve current exe path: {e}");
-                return;
+                return false;
             }
         };
 
         #[cfg(target_os = "macos")]
         let manifest_binary_path = binary_path.to_string_lossy().to_string();
+        #[cfg(target_os = "macos")]
+        let messenger_replaced = false;
 
         #[cfg(target_os = "linux")]
-        let manifest_binary_path = {
+        let (manifest_binary_path, messenger_replaced) = {
+            use euro_tauri::native_messaging::{InstallOutcome, install_messenger_binary};
+
             let home = dirs::home_dir().unwrap_or_default();
-            home.join(".eurora/native-messaging/euro-native-messaging")
-                .to_string_lossy()
-                .to_string()
+            let dest = home.join(".eurora/native-messaging/euro-native-messaging");
+            let replaced = match install_messenger_binary(&binary_path, &dest) {
+                Ok(InstallOutcome::Replaced) => {
+                    tracing::info!("Installed native messaging binary at {}", dest.display());
+                    true
+                }
+                Ok(InstallOutcome::Unchanged) => {
+                    tracing::debug!(
+                        "Native messaging binary at {} is already up to date",
+                        dest.display()
+                    );
+                    false
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Could not install native messaging binary to {}: {e}",
+                        dest.display()
+                    );
+                    false
+                }
+            };
+            (dest.to_string_lossy().to_string(), replaced)
         };
 
         #[cfg(target_os = "macos")]
@@ -114,35 +140,6 @@ fn install_native_messaging_manifests(app: &tauri::App) {
         #[cfg(target_os = "linux")]
         let manifest_configs: Vec<(&str, Vec<PathBuf>)> = {
             let home = dirs::home_dir().unwrap_or_default();
-
-            let native_messaging_dir = home.join(".eurora/native-messaging");
-            if let Err(e) = std::fs::create_dir_all(&native_messaging_dir) {
-                tracing::warn!(
-                    "Could not create native messaging directory {}: {e}",
-                    native_messaging_dir.display()
-                );
-            } else {
-                let dest = native_messaging_dir.join("euro-native-messaging");
-                match std::fs::copy(&binary_path, &dest) {
-                    Ok(_) => {
-                        if let Err(e) = std::fs::set_permissions(
-                            &dest,
-                            <std::fs::Permissions as PermissionsExt>::from_mode(0o755),
-                        ) {
-                            tracing::warn!(
-                                "Could not set executable permission on {}: {e}",
-                                dest.display()
-                            );
-                        }
-                        tracing::info!("Copied native messaging binary to {}", dest.display());
-                    }
-                    Err(e) => tracing::warn!(
-                        "Could not copy native messaging binary to {}: {e}",
-                        dest.display()
-                    ),
-                }
-            }
-
             vec![
                 (
                     "hosts/linux.chromium.native-messaging.json",
@@ -214,6 +211,8 @@ fn install_native_messaging_manifests(app: &tauri::App) {
                 }
             }
         }
+
+        messenger_replaced
     }
 }
 
@@ -599,9 +598,27 @@ fn main() {
                 .plugin(tauri_plugin_clipboard_manager::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .setup(move |tauri_app| {
-                    install_native_messaging_manifests(tauri_app);
+                    let messenger_replaced = install_native_messaging_manifests(tauri_app);
                     install_office_word_addin(tauri_app);
                     bind_and_serve_bridge()?;
+
+                    // We just dropped a fresh messenger binary on disk. Any
+                    // browser messengers from the previous desktop session
+                    // are sitting in their reconnect-backoff loop and will
+                    // hit the new bridge in the next couple of seconds.
+                    // Open a short window during which they're sent
+                    // Shutdown so the browser respawns them from the new
+                    // binary. Three seconds is well above the messenger's
+                    // 2-second reconnect interval and well below the
+                    // browser extension's 5-second respawn delay, so a
+                    // messenger that lands inside the window won't be
+                    // followed by another that also lands inside it.
+                    if messenger_replaced {
+                        const MESSENGER_PURGE_WINDOW: std::time::Duration =
+                            std::time::Duration::from_secs(3);
+                        euro_browser::BridgeService::get_or_init()
+                            .open_browser_purge_window(MESSENGER_PURGE_WINDOW);
+                    }
 
                     let data_dir = tauri_app.path().app_data_dir()?;
                     init_encryption(data_dir)?;
