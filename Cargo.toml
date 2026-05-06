@@ -14,6 +14,7 @@ members = [
   "crates/common/thread-core",
   "crates/common/focus-tracker",
   "crates/common/focus-tracker-core",
+  "crates/common/pdf-core",
 ]
 
 [workspace.package]
@@ -93,6 +94,7 @@ euro-timeline = { path = "crates/app/euro-timeline" }
 euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
 euro-office = { path = "crates/app/euro-office" }
+euro-pdf = { path = "crates/app/euro-pdf" }
 focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "1.0.0" }
 futures = "0.3.31"
@@ -110,6 +112,8 @@ keyring = "3.6.3"
 once_cell = "1.21"
 openidconnect = "4"
 parking_lot = "0.12.5"
+pdf-core = { path = "crates/common/pdf-core" }
+pdf-inspector = { git = "https://github.com/firecrawl/pdf-inspector", rev = "88844d18be9983c5d5f70cc23abe33f07b35dc6c" }
 percent-encoding = "2"
 posthog-rs = "0.4.2"
 # prompt-kit = { path = "crates/common/prompt-kit" }

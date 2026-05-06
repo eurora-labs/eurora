@@ -14,7 +14,7 @@
 	import { open as openExternal } from '@tauri-apps/plugin-shell';
 	import { onMount, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import type { ContextChip } from '$lib/bindings/bindings.js';
+	import type { BrowserExtensionState, ContextChip } from '$lib/bindings/bindings.js';
 
 	let { data } = $props();
 
@@ -29,13 +29,8 @@
 	const focusedProcessName = $derived(latestTimelineItem?.process_name ?? '');
 	const focusedProcessId = $derived(latestTimelineItem?.process_id ?? 0);
 
-	let extensionUrl = $state<string | null>(null);
-	let extensionConnected = $state(false);
+	let extensionState = $state<BrowserExtensionState | null>(null);
 	let unlistenStatus: (() => void) | null = null;
-
-	const showInstallExtension = $derived(
-		!!extensionUrl && !extensionConnected && focusedProcessName !== '',
-	);
 
 	$effect(() => {
 		if (threadId) {
@@ -54,20 +49,16 @@
 
 	$effect(() => {
 		const processName = focusedProcessName;
-		extensionUrl = null;
-		extensionConnected = false;
+		extensionState = null;
 		if (!processName) return;
 
 		// Capture the current process name so racing responses from a previous
 		// focused process can't overwrite state for the current one.
-		Promise.all([
-			taurpc.system.get_browser_extension_url(processName),
-			taurpc.system.is_browser_extension_connected(processName),
-		])
-			.then(([url, connected]) => {
+		taurpc.system
+			.get_browser_extension_state(processName)
+			.then((state) => {
 				if (focusedProcessName !== processName) return;
-				extensionUrl = url;
-				extensionConnected = connected;
+				extensionState = state;
 			})
 			.catch((e) => {
 				if (focusedProcessName !== processName) return;
@@ -98,14 +89,12 @@
 		chatService.viewMode = 'list';
 	}
 
-	async function installExtension() {
-		const url = extensionUrl;
+	async function installExtension(installUrl: string) {
 		const pid = focusedProcessId;
-		if (!url) return;
 
 		try {
 			if (pid > 0) {
-				await taurpc.system.open_url_in_browser(pid, url);
+				await taurpc.system.open_url_in_browser(pid, installUrl);
 				return;
 			}
 		} catch (err) {
@@ -117,9 +106,17 @@
 		}
 
 		try {
-			await openExternal(url);
+			await openExternal(installUrl);
 		} catch (err) {
 			toast.error(`Failed to open extension page: ${err}`);
+		}
+	}
+
+	async function openExtensionSettings() {
+		try {
+			await taurpc.system.open_browser_extension_settings(focusedProcessName);
+		} catch (err) {
+			toast.error(`Failed to open extension settings: ${err}`);
 		}
 	}
 
@@ -142,7 +139,7 @@
 		taurpc.system.browser_extension_status_changed
 			.on((status) => {
 				if (status.process_name !== focusedProcessName) return;
-				extensionConnected = status.connected;
+				extensionState = status.state;
 			})
 			.then((unlisten) => {
 				unlistenStatus = unlisten;
@@ -174,9 +171,27 @@
 				<Empty.Title>No messages yet</Empty.Title>
 			{/if}
 		</Empty.Header>
-		{#if showInstallExtension}
-			<Button variant="outline" size="sm" onclick={installExtension}>
+		{#if extensionState?.kind === 'not_installed'}
+			{@const installUrl = extensionState.install_url}
+			<Button variant="outline" size="sm" onclick={() => installExtension(installUrl)}>
 				Install Eurora extension
+				<ExternalLink class="size-4" />
+			</Button>
+		{:else if extensionState?.kind === 'disabled'}
+			<Empty.Description>
+				The Eurora extension is installed in Safari but currently turned off.
+			</Empty.Description>
+			<Button variant="outline" size="sm" onclick={openExtensionSettings}>
+				Enable Eurora in Safari
+				<ExternalLink class="size-4" />
+			</Button>
+		{:else if extensionState?.kind === 'not_discovered'}
+			<Empty.Description>
+				Open Eurora once on this Mac, then enable the extension in Safari → Settings →
+				Extensions.
+			</Empty.Description>
+			<Button variant="outline" size="sm" onclick={openExtensionSettings}>
+				Open Safari Extension Settings
 				<ExternalLink class="size-4" />
 			</Button>
 		{/if}

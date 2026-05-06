@@ -16,9 +16,15 @@ use euro_bridge_protocol::{
     Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame, ShutdownFrame, bridge_url_for,
 };
 use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::process_name::get_process_name;
+
+/// `EventFrame.action` clients send to publish a fresh
+/// [`BundledExtensionState`] to the desktop. Payload is JSON-encoded
+/// [`ExtensionStatePayload`].
+pub const EXTENSION_STATE_EVENT: &str = "EXTENSION_STATE_CHANGED";
 
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
@@ -55,6 +61,59 @@ pub struct RegistrationEvent {
     pub app_pid: u32,
     pub app_name: String,
     pub app_kind: Option<String>,
+}
+
+/// State of an extension that ships bundled with its host application —
+/// today, the Safari Web Extension wrapped by the macOS launcher, but the
+/// shape generalizes to any future bundled integration.
+///
+/// Browsers that distribute via a public store (Chrome Web Store, AMO,
+/// Edge Add-ons) don't use this — for those, "extension is connected to
+/// the bridge" is itself a sufficient signal that the extension is both
+/// installed and enabled. Bundled extensions need an out-of-band probe
+/// because the host app may run with the extension turned off in the
+/// browser's settings, in which case the extension never connects but is
+/// nevertheless installed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BundledExtensionState {
+    /// The extension is installed and enabled in the host browser. The
+    /// content-side connection may still race ahead of or behind the
+    /// browser actually launching it.
+    Enabled,
+    /// The extension is installed but disabled in the host browser's
+    /// settings. The user must enable it manually — there is no API to
+    /// flip this state programmatically.
+    Disabled,
+    /// The host browser has no record of the extension. Typically the
+    /// containing app has never been launched on this machine, so Safari
+    /// hasn't indexed the bundled `.appex`.
+    NotDiscovered,
+    /// Probe failed or the publisher hasn't reported yet. Treated as a
+    /// transient unknown — the UI should fall back to a generic affordance.
+    Unknown,
+}
+
+/// Wire payload of the [`EXTENSION_STATE_EVENT`] event. Clients serialize
+/// this as JSON into `EventFrame.payload`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionStatePayload {
+    /// Logical client identifier (matches `RegisterFrame.app_kind`). The
+    /// desktop indexes bundled-extension state by this key, so a single
+    /// publisher can report state for the kind it represents (e.g. a
+    /// macOS launcher reporting `"safari"`).
+    pub app_kind: String,
+    pub state: BundledExtensionState,
+}
+
+/// Broadcast on the extension-state channel whenever a client publishes a
+/// fresh [`BundledExtensionState`]. Subscribers receive the *latest known*
+/// state for that `app_kind`; duplicate values are not deduplicated here
+/// because the publisher is expected to send only on transitions.
+#[derive(Debug, Clone)]
+pub struct ExtensionStateUpdate {
+    pub app_kind: String,
+    pub state: BundledExtensionState,
 }
 
 /// Bookkeeping for a bridge listener that the service owns. Held
@@ -229,10 +288,16 @@ impl Drop for BoundServer {
 #[derive(Clone)]
 pub struct BridgeService {
     registry: Arc<DashMap<u32, RegisteredClient>>,
+    /// Latest [`BundledExtensionState`] per `app_kind`. Populated when a
+    /// client publishes [`EXTENSION_STATE_EVENT`]; cleared on the
+    /// publisher's disconnect so the desktop doesn't keep serving stale
+    /// state across launcher restarts.
+    extension_states: Arc<DashMap<String, BundledExtensionState>>,
     frames_from_clients_tx: broadcast::Sender<(u32, Frame)>,
     events_tx: broadcast::Sender<(u32, EventFrame)>,
     registrations_tx: broadcast::Sender<RegistrationEvent>,
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
+    extension_states_tx: broadcast::Sender<ExtensionStateUpdate>,
     pending_requests: Arc<DashMap<u32, oneshot::Sender<Result<ResponseFrame, ErrorFrame>>>>,
     request_id_counter: Arc<AtomicU32>,
     server: Arc<StdMutex<Option<ServerHandle>>>,
@@ -264,13 +329,16 @@ impl BridgeService {
         let (events_tx, _) = broadcast::channel(100);
         let (registrations_tx, _) = broadcast::channel(32);
         let (disconnects_tx, _) = broadcast::channel(32);
+        let (extension_states_tx, _) = broadcast::channel(32);
 
         let service = Self {
             registry: Arc::new(DashMap::new()),
+            extension_states: Arc::new(DashMap::new()),
             frames_from_clients_tx,
             events_tx,
             registrations_tx,
             disconnects_tx,
+            extension_states_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             server: Arc::new(StdMutex::new(None)),
@@ -299,6 +367,8 @@ impl BridgeService {
     fn spawn_frame_handler(&self) {
         let pending_requests = Arc::clone(&self.pending_requests);
         let events_tx = self.events_tx.clone();
+        let extension_states = Arc::clone(&self.extension_states);
+        let extension_states_tx = self.extension_states_tx.clone();
         let mut frames_rx = self.frames_from_clients_tx.subscribe();
 
         tokio::spawn(async move {
@@ -339,6 +409,17 @@ impl BridgeService {
                         }
                     }
                     FrameKind::Event(evt) => {
+                        if evt.action == EXTENSION_STATE_EVENT {
+                            handle_extension_state_event(
+                                app_pid,
+                                &evt,
+                                &extension_states,
+                                &extension_states_tx,
+                            );
+                            // Fall through: also broadcast on the generic event
+                            // channel so subscribers that want raw frames still
+                            // see it.
+                        }
                         if events_tx.send((app_pid, evt)).is_err() {
                             tracing::trace!(app_pid, "No event subscribers for inbound event");
                         }
@@ -574,6 +655,21 @@ impl BridgeService {
         self.disconnects_tx.subscribe()
     }
 
+    /// Receive a [`ExtensionStateUpdate`] every time a client publishes a
+    /// fresh [`BundledExtensionState`] via [`EXTENSION_STATE_EVENT`].
+    pub fn subscribe_to_extension_states(&self) -> broadcast::Receiver<ExtensionStateUpdate> {
+        self.extension_states_tx.subscribe()
+    }
+
+    /// Latest [`BundledExtensionState`] published for `app_kind`, or
+    /// [`BundledExtensionState::Unknown`] if no client has reported one yet
+    /// (or the publisher has disconnected since).
+    pub fn bundled_extension_state(&self, app_kind: &str) -> BundledExtensionState {
+        self.extension_states
+            .get(app_kind)
+            .map_or(BundledExtensionState::Unknown, |entry| *entry.value())
+    }
+
     pub fn connection_count(&self) -> usize {
         self.registry.len()
     }
@@ -583,6 +679,15 @@ impl BridgeService {
             .iter()
             .find(|entry| entry.value().app_name == app_name)
             .map(|entry| entry.value().app_pid)
+    }
+
+    /// Return whether any client is currently connected for the given
+    /// `app_name`. Cheaper than [`find_pid_by_app_name`] for callers that
+    /// only need a presence test.
+    pub fn is_connected_by_app_name(&self, app_name: &str) -> bool {
+        self.registry
+            .iter()
+            .any(|entry| entry.value().app_name == app_name)
     }
 
     /// Return the `app_pid`s of every currently-registered client whose
@@ -774,6 +879,18 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
         .registry
         .remove_if(&app_pid, |_, client| client.host_pid == host_pid)
     {
+        // Drop any bundled-extension state this client owned. Without this
+        // the desktop would keep serving the last value forever — fine while
+        // the publisher is alive, but misleading after the launcher exits or
+        // crashes.
+        if let Some(kind) = removed.app_kind.as_deref()
+            && service.extension_states.remove(kind).is_some()
+        {
+            let _ = service.extension_states_tx.send(ExtensionStateUpdate {
+                app_kind: kind.to_owned(),
+                state: BundledExtensionState::Unknown,
+            });
+        }
         let _ = service.disconnects_tx.send(RegistrationEvent {
             app_pid,
             app_name: removed.app_name,
@@ -920,6 +1037,55 @@ where
             }
         }
     }
+}
+
+/// Decode an [`EXTENSION_STATE_EVENT`] payload, store it in
+/// `extension_states`, and broadcast the update. Malformed payloads are
+/// dropped with a warning — clients are expected to send valid JSON
+/// matching [`ExtensionStatePayload`], and the wrong shape is a publisher
+/// bug rather than something the desktop should paper over.
+fn handle_extension_state_event(
+    app_pid: u32,
+    evt: &EventFrame,
+    extension_states: &DashMap<String, BundledExtensionState>,
+    extension_states_tx: &broadcast::Sender<ExtensionStateUpdate>,
+) {
+    let Some(payload_str) = evt.payload.as_deref() else {
+        tracing::warn!(app_pid, "EXTENSION_STATE_CHANGED event missing payload");
+        return;
+    };
+    let payload: ExtensionStatePayload = match serde_json::from_str(payload_str) {
+        Ok(payload) => payload,
+        Err(err) => {
+            tracing::warn!(
+                app_pid,
+                error = %err,
+                "EXTENSION_STATE_CHANGED payload was not valid JSON",
+            );
+            return;
+        }
+    };
+
+    // Only emit on transitions to keep subscribers from churning on
+    // duplicate ticks. Publishers (e.g. the macOS launcher's 1-Hz Safari
+    // poll) intentionally re-send the current state on each tick to be
+    // robust to dropped frames; deduplicating here is the right place to
+    // absorb that.
+    let prev = extension_states.insert(payload.app_kind.clone(), payload.state);
+    if prev == Some(payload.state) {
+        return;
+    }
+
+    tracing::debug!(
+        app_pid,
+        app_kind = %payload.app_kind,
+        state = ?payload.state,
+        "Bundled extension state updated",
+    );
+    let _ = extension_states_tx.send(ExtensionStateUpdate {
+        app_kind: payload.app_kind,
+        state: payload.state,
+    });
 }
 
 fn message_label(message: &Message) -> &'static str {
@@ -1233,5 +1399,114 @@ mod tests {
         found.sort_unstable();
         assert_eq!(found, vec![10, 12]);
         assert!(service.find_clients_by_kind("safari").is_empty());
+    }
+
+    #[tokio::test]
+    async fn extension_state_event_updates_state_and_broadcasts() {
+        let service = BridgeService::new();
+        let mut updates = service.subscribe_to_extension_states();
+
+        assert_eq!(
+            service.bundled_extension_state("safari"),
+            BundledExtensionState::Unknown,
+        );
+
+        let payload = serde_json::to_string(&ExtensionStatePayload {
+            app_kind: "safari".into(),
+            state: BundledExtensionState::Disabled,
+        })
+        .unwrap();
+        service
+            .frames_from_clients_tx
+            .send((
+                42,
+                Frame::from(EventFrame {
+                    action: EXTENSION_STATE_EVENT.into(),
+                    payload: Some(payload),
+                }),
+            ))
+            .expect("broadcast send");
+
+        let update = timeout(Duration::from_secs(1), updates.recv())
+            .await
+            .expect("update arrives")
+            .expect("recv");
+        assert_eq!(update.app_kind, "safari");
+        assert_eq!(update.state, BundledExtensionState::Disabled);
+        assert_eq!(
+            service.bundled_extension_state("safari"),
+            BundledExtensionState::Disabled,
+        );
+    }
+
+    #[tokio::test]
+    async fn duplicate_extension_state_is_deduplicated() {
+        let service = BridgeService::new();
+        let mut updates = service.subscribe_to_extension_states();
+
+        let payload = serde_json::to_string(&ExtensionStatePayload {
+            app_kind: "safari".into(),
+            state: BundledExtensionState::Enabled,
+        })
+        .unwrap();
+
+        for _ in 0..3 {
+            service
+                .frames_from_clients_tx
+                .send((
+                    1,
+                    Frame::from(EventFrame {
+                        action: EXTENSION_STATE_EVENT.into(),
+                        payload: Some(payload.clone()),
+                    }),
+                ))
+                .expect("broadcast send");
+        }
+
+        let first = timeout(Duration::from_secs(1), updates.recv())
+            .await
+            .expect("first update")
+            .expect("recv");
+        assert_eq!(first.state, BundledExtensionState::Enabled);
+
+        let second = timeout(Duration::from_millis(200), updates.recv()).await;
+        assert!(
+            second.is_err(),
+            "expected no further updates for repeated state, got {second:?}",
+        );
+    }
+
+    #[tokio::test]
+    async fn malformed_extension_state_payload_is_ignored() {
+        let service = BridgeService::new();
+        service
+            .frames_from_clients_tx
+            .send((
+                1,
+                Frame::from(EventFrame {
+                    action: EXTENSION_STATE_EVENT.into(),
+                    payload: Some("not json".into()),
+                }),
+            ))
+            .expect("broadcast send");
+
+        // Give the handler a beat to (not) process the bad frame.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(
+            service.bundled_extension_state("safari"),
+            BundledExtensionState::Unknown,
+        );
+    }
+
+    #[test]
+    fn bundled_extension_state_serializes_snake_case() {
+        for (state, expected) in [
+            (BundledExtensionState::Enabled, "\"enabled\""),
+            (BundledExtensionState::Disabled, "\"disabled\""),
+            (BundledExtensionState::NotDiscovered, "\"not_discovered\""),
+            (BundledExtensionState::Unknown, "\"unknown\""),
+        ] {
+            assert_eq!(serde_json::to_string(&state).unwrap(), expected);
+        }
     }
 }
