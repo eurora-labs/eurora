@@ -110,8 +110,8 @@ pub fn create(
 #[cfg(target_os = "windows")]
 fn apply_windows_corner_rounding(window: &tauri::WebviewWindow) {
     use windows::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
-        DWM_WINDOW_CORNER_PREFERENCE,
+        DWM_WINDOW_CORNER_PREFERENCE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+        DwmSetWindowAttribute,
     };
 
     let Ok(hwnd) = window.hwnd() else { return };

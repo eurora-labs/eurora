@@ -67,11 +67,7 @@
 	carries the attribute. Interactive controls (Tabs, Min/Max/Close) omit
 	it so they remain clickable.
 -->
-<div
-	data-tauri-drag-region
-	class="titlebar bg-background"
-	class:titlebar-mac={isMac}
->
+<div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
 	<div data-tauri-drag-region class="titlebar-fill"></div>
 	<div data-tauri-drag-region class="titlebar-content">
 		{#if hasMessages}
@@ -115,7 +111,6 @@
 			>
 		{/if}
 	</div>
-	<div data-tauri-drag-region class="titlebar-fill"></div>
 	{#if !isMac}
 		<div class="window-controls">
 			<Button
@@ -177,10 +172,10 @@
 	.titlebar-content {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		min-width: 0;
 		height: 100%;
 		padding: 0 0.5rem;
-		min-width: 0;
+		gap: 0.5rem;
 	}
 
 	.window-controls {
