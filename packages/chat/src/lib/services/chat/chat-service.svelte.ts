@@ -117,7 +117,7 @@ export class ChatService {
 	async loadMessages(threadId: string): Promise<void> {
 		let entry = this.threadIndex.get(threadId);
 		if (!entry) {
-			entry = new ThreadMessages({ id: threadId, title: '' });
+			entry = new ThreadMessages(makeStubThread(threadId));
 			this.threadIndex.set(threadId, entry);
 		}
 		if (entry.loading || entry.loaded || entry.streamingMessageId) return;
@@ -223,7 +223,7 @@ export class ChatService {
 		this.viewMode = 'list';
 
 		const threadId = `transient-${crypto.randomUUID()}`;
-		const entry = new ThreadMessages({ id: threadId, title: '' });
+		const entry = new ThreadMessages(makeStubThread(threadId));
 		entry.isTransient = true;
 		entry.loaded = true;
 
@@ -231,56 +231,8 @@ export class ChatService {
 		const aiId = `local-${crypto.randomUUID()}`;
 
 		entry.messages = [
-			{
-				parentId: null,
-				message: {
-					type: 'human',
-					content: [
-						{
-							type: 'text',
-							id: null,
-							text: userText,
-							annotations: [],
-							index: null,
-							extras: null,
-						},
-					],
-					id: humanId,
-					name: null,
-					additionalKwargs: null,
-					responseMetadata: null,
-					assetChips: [],
-				},
-				children: [],
-				siblingIndex: 0,
-				depth: 0,
-			},
-			{
-				parentId: humanId,
-				message: {
-					type: 'ai',
-					content: [
-						{
-							type: 'text',
-							id: null,
-							text: aiText,
-							annotations: [],
-							index: null,
-							extras: null,
-						},
-					],
-					id: aiId,
-					name: null,
-					toolCalls: [],
-					invalidToolCalls: [],
-					usageMetadata: null,
-					additionalKwargs: null,
-					responseMetadata: null,
-				},
-				children: [],
-				siblingIndex: 0,
-				depth: 0,
-			},
+			makeHumanNode(humanId, null, userText, []),
+			makeAiNode(aiId, humanId, aiText),
 		];
 
 		this.threadIndex.set(threadId, entry);
@@ -299,9 +251,9 @@ export class ChatService {
 		if (nodeIndex < 0) return;
 
 		const original = entry.messages[nodeIndex];
-		const parentId = original.parentId;
+		const parentId = original.parent_id ?? null;
 		const preservedAssetChips =
-			original.message.type === 'human' ? original.message.assetChips : [];
+			original.message.type === 'human' ? extractAssetChips(original.message) : [];
 
 		entry.messages = entry.messages.slice(0, nodeIndex);
 		this.appendPlaceholders(entry, text, preservedAssetChips);
@@ -379,8 +331,8 @@ export class ChatService {
 					const confirmed = event.message;
 					entry.messages = entry.messages.map((node) => {
 						if (node.message.id === tempHumanId) return confirmed;
-						if (node.parentId === tempHumanId)
-							return { ...node, parentId: confirmed.message.id };
+						if (node.parent_id === tempHumanId)
+							return { ...node, parent_id: confirmed.message.id };
 						return node;
 					});
 					this.abortController = abortController;
@@ -407,28 +359,12 @@ export class ChatService {
 					onFirstChunk = undefined;
 				}
 
-				if (chunk.additionalKwargs) {
-					try {
-						const kwargs = JSON.parse(chunk.additionalKwargs);
-						if (kwargs.reasoning_content) {
-							const existing = aiMessage.content.find((b) => b.type === 'reasoning');
-							if (existing && existing.type === 'reasoning') {
-								existing.reasoning =
-									(existing.reasoning ?? '') + kwargs.reasoning_content;
-							} else {
-								aiMessage.content.push({
-									type: 'reasoning',
-									id: null,
-									reasoning: kwargs.reasoning_content,
-									index: null,
-									extras: null,
-								});
-							}
-						}
-					} catch {
-						// Ignore malformed additional_kwargs JSON
-					}
-				}
+				// Mirror agent-chain's `extract_reasoning_from_additional_kwargs`:
+				// providers like DeepSeek, Ollama, XAI emit reasoning in
+				// additional_kwargs. Accumulate it on the AI message's kwargs
+				// (the wire shape) so the UI can render it without inventing a
+				// fake `reasoning` content block.
+				appendReasoningKwargs(aiMessage, chunk);
 
 				for (const block of chunk.content) {
 					if (block.type === 'text') {
@@ -486,47 +422,8 @@ export class ChatService {
 
 		entry.messages = [
 			...entry.messages,
-			{
-				parentId: null,
-				message: {
-					type: 'human',
-					content: [
-						{
-							type: 'text',
-							id: null,
-							text,
-							annotations: [],
-							index: null,
-							extras: null,
-						},
-					],
-					id: humanId,
-					name: null,
-					additionalKwargs: null,
-					responseMetadata: null,
-					assetChips,
-				},
-				children: [],
-				siblingIndex: 0,
-				depth: 0,
-			},
-			{
-				parentId: humanId,
-				message: {
-					type: 'ai',
-					content: [],
-					id: aiId,
-					name: null,
-					toolCalls: [],
-					invalidToolCalls: [],
-					usageMetadata: null,
-					additionalKwargs: null,
-					responseMetadata: null,
-				},
-				children: [],
-				siblingIndex: 0,
-				depth: 0,
-			},
+			makeHumanNode(humanId, null, text, assetChips),
+			makeAiNode(aiId, humanId, ''),
 		];
 		entry.streamingMessageId = aiId;
 	}
@@ -552,21 +449,134 @@ function buildTreeFromBranch(messages: MessageNode[]): MessageNode[] {
 
 	const nodeMap = new Map<string, MessageNode>();
 	for (const msg of messages) {
-		nodeMap.set(msg.message.id, { ...msg, children: [] });
+		const id = msg.message.id ?? '';
+		nodeMap.set(id, { ...msg, children: [] });
 	}
 
 	const roots: MessageNode[] = [];
 	for (const msg of messages) {
-		const node = nodeMap.get(msg.message.id)!;
-		const parent = msg.parentId ? nodeMap.get(msg.parentId) : undefined;
+		const id = msg.message.id ?? '';
+		const node = nodeMap.get(id)!;
+		const parent = msg.parent_id ? nodeMap.get(msg.parent_id) : undefined;
 		if (parent) {
-			parent.children.push(node);
+			parent.children = [...(parent.children ?? []), node];
 		} else {
 			roots.push(node);
 		}
 	}
 
 	return roots;
+}
+
+function makeHumanNode(
+	id: string,
+	parentId: string | null,
+	text: string,
+	assetChips: AssetChip[],
+): MessageNode {
+	return {
+		parent_id: parentId,
+		message: {
+			type: 'human',
+			content:
+				text.length > 0
+					? [
+							{
+								type: 'text',
+								text,
+								id: null,
+								annotations: null,
+								index: null,
+								extras: null,
+							},
+						]
+					: [],
+			id,
+			name: null,
+			additional_kwargs: assetChips.length > 0 ? { asset_chips: assetChips } : {},
+			response_metadata: {},
+		},
+		children: [],
+		sibling_index: 0,
+		depth: 0,
+	};
+}
+
+function makeAiNode(id: string, parentId: string | null, text: string): MessageNode {
+	return {
+		parent_id: parentId,
+		message: {
+			type: 'ai',
+			content: text
+				? [{ type: 'text', text, id: null, annotations: null, index: null, extras: null }]
+				: [],
+			id,
+			name: null,
+			tool_calls: [],
+			invalid_tool_calls: [],
+			usage_metadata: null,
+			additional_kwargs: {},
+			response_metadata: {},
+		},
+		children: [],
+		sibling_index: 0,
+		depth: 0,
+	};
+}
+
+function makeStubThread(id: string): Thread {
+	const now = new Date().toISOString();
+	return {
+		id,
+		user_id: '',
+		title: '',
+		created_at: now,
+		updated_at: now,
+	} as Thread;
+}
+
+function appendReasoningKwargs(
+	aiMessage: MessageNode['message'],
+	chunk: { additional_kwargs?: unknown },
+): void {
+	if (aiMessage.type !== 'ai') return;
+	const incoming = chunk.additional_kwargs;
+	if (!isObject(incoming)) return;
+	const reasoning =
+		typeof incoming.reasoning_content === 'string' ? incoming.reasoning_content : null;
+	if (reasoning === null || reasoning.length === 0) return;
+	const kwargs = isObject(aiMessage.additional_kwargs)
+		? (aiMessage.additional_kwargs as Record<string, unknown>)
+		: {};
+	const previous = typeof kwargs.reasoning_content === 'string' ? kwargs.reasoning_content : '';
+	kwargs.reasoning_content = previous + reasoning;
+	(aiMessage as { additional_kwargs: unknown }).additional_kwargs = kwargs;
+}
+
+function isObject(v: unknown): v is Record<string, unknown> {
+	return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function extractAssetChips(message: MessageNode['message']): AssetChip[] {
+	if (message.type !== 'human') return [];
+	const kwargs = message.additional_kwargs;
+	if (!isObject(kwargs)) return [];
+	const raw = kwargs.asset_chips;
+	if (!Array.isArray(raw)) return [];
+	const chips: AssetChip[] = [];
+	for (const entry of raw) {
+		if (!isObject(entry)) continue;
+		const id = typeof entry.id === 'string' ? entry.id : null;
+		const name = typeof entry.name === 'string' ? entry.name : null;
+		if (id === null || name === null) continue;
+		chips.push({
+			id,
+			name,
+			icon: typeof entry.icon === 'string' ? entry.icon : null,
+			domain: typeof entry.domain === 'string' ? entry.domain : null,
+		});
+	}
+	return chips;
 }
 
 export const CHAT_SERVICE = new InjectionToken<ChatService>('ChatService');

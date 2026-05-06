@@ -10,6 +10,7 @@
 
 <script lang="ts">
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
+	import { getAssetChipsFromMessage, getReasoningFromMessage } from '$lib/utils/asset-chips.js';
 	import { getTextContent } from '$lib/utils/message-content.js';
 	import { middleTruncate } from '$lib/utils/text.js';
 	import { inject } from '@eurora/shared/context';
@@ -65,9 +66,7 @@
 	}
 
 	function getReasoningContent(node: MessageNode): string {
-		return getContentBlocks(node)
-			.map((b) => (b.type === 'reasoning' ? (b.reasoning ?? '') : ''))
-			.join('');
+		return getReasoningFromMessage(node.message);
 	}
 
 	function isUser(node: MessageNode): boolean {
@@ -75,11 +74,11 @@
 	}
 
 	function getMessageId(node: MessageNode): string {
-		return node.message.id;
+		return node.message.id ?? '';
 	}
 
 	function getAssetChips(node: MessageNode): AssetChip[] {
-		return node.message.type === 'human' ? node.message.assetChips : [];
+		return getAssetChipsFromMessage(node.message);
 	}
 
 	function handleCopy(content: string, messageId: string) {
@@ -124,11 +123,12 @@
 </script>
 
 {#snippet siblingNav(node: MessageNode)}
-	{#if node.children.length > 1}
+	{@const children = node.children ?? []}
+	{#if children.length > 1}
 		{@const activeId = getMessageId(node)}
 		<Message.Action
 			tooltip="Previous"
-			disabled={node.siblingIndex === 0}
+			disabled={node.sibling_index === 0}
 			onclick={() => {
 				if (activeId && chatService.activeThreadId)
 					chatService.switchBranch(chatService.activeThreadId, activeId, -1);
@@ -137,11 +137,11 @@
 			<ChevronLeftIcon />
 		</Message.Action>
 		<span class="text-muted-foreground flex items-center text-xs">
-			{node.siblingIndex + 1} / {node.children.length}
+			{node.sibling_index + 1} / {children.length}
 		</span>
 		<Message.Action
 			tooltip="Next"
-			disabled={node.siblingIndex === node.children.length - 1}
+			disabled={node.sibling_index === children.length - 1}
 			onclick={() => {
 				if (activeId && chatService.activeThreadId)
 					chatService.switchBranch(chatService.activeThreadId, activeId, 1);

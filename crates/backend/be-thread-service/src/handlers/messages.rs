@@ -133,12 +133,7 @@ pub async fn save_preliminary_content_blocks(
         )));
     }
 
-    let blocks: Vec<ContentBlock> = body
-        .content_blocks
-        .into_iter()
-        .map(serde_json::from_value::<ContentBlock>)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| ThreadServiceError::invalid_argument(format!("Invalid content block: {e}")))?;
+    let blocks = body.content_blocks;
 
     state
         .db
@@ -204,16 +199,8 @@ pub async fn save_preliminary_content_blocks(
         }
     }
 
-    let projected: Vec<serde_json::Value> = result_blocks
-        .into_iter()
-        .map(|b| serde_json::to_value(&b))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| {
-            ThreadServiceError::Internal(format!("Failed to serialize content block: {e}"))
-        })?;
-
     Ok(Json(SavePreliminaryContentBlocksResponse {
-        content_blocks: projected,
+        content_blocks: result_blocks,
     }))
 }
 

@@ -39,10 +39,11 @@
 				fakeService.threads = [
 					{
 						id: threadId,
+						user_id: '',
 						title: 'Test Thread',
-						createdAt: new Date().toISOString(),
-						updatedAt: new Date().toISOString(),
-					},
+						created_at: new Date().toISOString(),
+						updated_at: new Date().toISOString(),
+					} as never,
 				];
 				fakeService.messagesByThread.set(threadId, messages);
 				await chatService.loadThreads(20, 0);
@@ -55,10 +56,11 @@
 				fakeService.threads = [
 					{
 						id: threadId,
+						user_id: '',
 						title: 'Test Thread',
-						createdAt: new Date().toISOString(),
-						updatedAt: new Date().toISOString(),
-					},
+						created_at: new Date().toISOString(),
+						updated_at: new Date().toISOString(),
+					} as never,
 				];
 				fakeService.messagesByThread.set(threadId, []);
 				await chatService.loadThreads(20, 0);
@@ -92,7 +94,7 @@
 						type: 'text',
 						id: null,
 						text,
-						annotations: [],
+						annotations: null,
 						index: null,
 						extras: null,
 					});
@@ -109,10 +111,11 @@
 				if (!fakeService.threads.find((t) => t.id === threadId)) {
 					fakeService.threads.push({
 						id: threadId,
+						user_id: '',
 						title: `Thread ${threadId}`,
-						createdAt: new Date().toISOString(),
-						updatedAt: new Date().toISOString(),
-					});
+						created_at: new Date().toISOString(),
+						updated_at: new Date().toISOString(),
+					} as never);
 				}
 				fakeService.messagesByThread.set(threadId, messages);
 				await chatService.loadThreads(20, 0);
@@ -130,9 +133,9 @@
 				entry.messages = [
 					...entry.messages,
 					makeMessageNode(humanId, 'human', text, {
-						parentId: lastMsg?.message.id ?? null,
+						parent_id: lastMsg?.message.id ?? null,
 					}),
-					makeMessageNode(aiId, 'ai', '', { parentId: humanId }),
+					makeMessageNode(aiId, 'ai', '', { parent_id: humanId }),
 				];
 				entry.streamingMessageId = aiId;
 				await tick();

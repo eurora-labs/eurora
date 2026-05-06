@@ -5,6 +5,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 
+#[cfg(feature = "specta")]
+use specta_typescript::Unknown;
+
 use super::base::{
     AnyMessage, BaseMessage, BaseMessageChunk, get_msg_title_repr, is_interactive_env,
 };
@@ -24,9 +27,11 @@ fn deserialize_tool_call_id(value: &serde_json::Value) -> String {
 pub trait ToolOutputMixin {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolCall {
     pub id: Option<String>,
     pub name: String,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub args: serde_json::Value,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub call_type: Option<String>,
@@ -51,6 +56,7 @@ impl ToolCall {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolCallChunk {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -84,6 +90,7 @@ impl ToolCallChunk {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InvalidToolCall {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
@@ -117,14 +124,18 @@ impl InvalidToolCall {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolMessage {
     pub content: ContentBlocks,
     pub tool_call_id: String,
     pub id: Option<String>,
     pub name: Option<String>,
     pub status: ToolStatus,
+    #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub artifact: Option<serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -259,6 +270,7 @@ impl<'de> Deserialize<'de> for ToolMessage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum ToolStatus {
     #[default]
@@ -354,14 +366,18 @@ impl ToolMessage {
 impl ToolOutputMixin for ToolMessage {}
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolMessageChunk {
     pub content: ContentBlocks,
     pub tool_call_id: String,
     pub id: Option<String>,
     pub name: Option<String>,
     pub status: ToolStatus,
+    #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub artifact: Option<serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 

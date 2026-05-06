@@ -25,7 +25,9 @@
 
 	const threadId = $derived(chatService.activeThreadId);
 	const thread = $derived(chatService.activeThread);
-	const activeMessageIds = $derived(new Set(thread?.messages.map((n) => n.message.id) ?? []));
+	const activeMessageIds = $derived(
+		new Set(thread?.messages.map((n) => n.message.id ?? '') ?? []),
+	);
 
 	$effect(() => {
 		if (threadId && !thread?.fullTree && !thread?.fullTreeLoading) {
@@ -106,8 +108,9 @@
 			for (let i = 0; i < siblings.length; i++) {
 				const node = siblings[i];
 				const y = startY + i * NODE_Y_GAP;
-				yPositions.set(node.message.id, y);
-				layoutSubtree(node.children, y);
+				const id = node.message.id ?? '';
+				yPositions.set(id, y);
+				layoutSubtree(node.children ?? [], y);
 			}
 		}
 
@@ -115,8 +118,9 @@
 
 		function addNodes(siblings: MessageNode[], parentId: string | null): void {
 			for (const node of siblings) {
-				const id = node.message.id;
-				const hasChildren = node.children.length > 0;
+				const id = node.message.id ?? '';
+				const children = node.children ?? [];
+				const hasChildren = children.length > 0;
 				const hasSiblings = siblings.length > 1;
 
 				nodes.push({
@@ -130,7 +134,7 @@
 						role: node.message.type === 'human' ? 'user' : 'assistant',
 						content: getTextContent(node),
 						siblingLabel: hasSiblings
-							? `${node.siblingIndex + 1} / ${siblings.length}`
+							? `${node.sibling_index + 1} / ${siblings.length}`
 							: undefined,
 						handles: { target: true, source: hasChildren },
 						ondblclick: onMessageDblClick ? () => onMessageDblClick(id) : undefined,
@@ -146,7 +150,7 @@
 					type: active ? 'animated' : 'temporary',
 				});
 
-				addNodes(node.children, id);
+				addNodes(children, id);
 			}
 		}
 

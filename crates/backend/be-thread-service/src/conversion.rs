@@ -3,16 +3,11 @@
 //! Three jobs:
 //!
 //! 1. Translate `be_remote_db::Thread` rows into [`thread_core::Thread`].
-//! 2. Translate `be_remote_db::Message` rows into the [`agent_chain::AnyMessage`]
-//!    JSON value carried by [`thread_core::MessageNode::message`].
+//! 2. Translate `be_remote_db::Message` rows into [`AnyMessage`] (carried
+//!    typed by [`thread_core::MessageNode::message`]).
 //! 3. Build [`MessageNode`] trees from the two row shapes the database
 //!    layer hands us (`BranchMessageRow` for active-branch+siblings views,
 //!    flat `Message` for the all-variants view).
-//!
-//! Anywhere we need the JSON form of an `AnyMessage` we delegate to its
-//! existing `serde::Serialize` impl rather than poking at fields by hand —
-//! that way the wire format tracks the agent-chain crate exactly, including
-//! its embedded `"type"` discriminator.
 
 use std::collections::HashMap;
 
@@ -84,17 +79,6 @@ pub fn convert_db_message_to_base_message(db_message: Message) -> ThreadServiceR
     }
 }
 
-/// Serialize a database row to the JSON shape carried over the wire.
-///
-/// Failures here are invariant violations (a freshly-built `AnyMessage` must
-/// always serialize), so they're treated as internal errors rather than
-/// surfaced to the caller.
-pub fn db_message_to_wire_json(message: Message) -> ThreadServiceResult<Value> {
-    let any = convert_db_message_to_base_message(message)?;
-    serde_json::to_value(&any)
-        .map_err(|e| ThreadServiceError::Internal(format!("Failed to serialize message: {e}")))
-}
-
 fn parse_content_blocks(value: Value) -> ContentBlocks {
     serde_json::from_value(value).unwrap_or_default()
 }
@@ -117,7 +101,15 @@ fn parse_tool_calls(tool_calls: &Option<Value>) -> ThreadServiceResult<Vec<ToolC
 /// full set of alternatives (including the active one). The resulting `Vec`
 /// is the spine of the active branch ordered by depth.
 pub fn build_branch_tree(rows: Vec<BranchMessageRow>) -> ThreadServiceResult<Vec<MessageNode>> {
-    let mut result: Vec<MessageNode> = Vec::new();
+    struct Group {
+        parent_id: Option<Uuid>,
+        depth: i32,
+        active_index: i32,
+        active_message: Option<AnyMessage>,
+        children: Vec<MessageNode>,
+    }
+
+    let mut groups: Vec<Group> = Vec::new();
     let mut current_branch_id: Option<Uuid> = None;
 
     for row in rows {
@@ -125,39 +117,54 @@ pub fn build_branch_tree(rows: Vec<BranchMessageRow>) -> ThreadServiceResult<Vec
         let parent_id = row.message.parent_message_id;
         let depth = row.branch_depth;
         let sibling_index = row.sibling_index as i32;
-        let message_value = db_message_to_wire_json(row.message)?;
+        let message = convert_db_message_to_base_message(row.message)?;
 
         let sibling = MessageNode {
             parent_id,
-            message: message_value,
+            message: message.clone(),
             children: vec![],
             sibling_index,
             depth,
         };
 
-        let is_new_group = current_branch_id != Some(row.branch_message_id);
-        if is_new_group {
+        if current_branch_id != Some(row.branch_message_id) {
             current_branch_id = Some(row.branch_message_id);
-            result.push(MessageNode {
+            groups.push(Group {
                 parent_id,
-                message: Value::Null,
-                children: vec![],
-                sibling_index: 0,
                 depth,
+                active_index: 0,
+                active_message: None,
+                children: Vec::new(),
             });
         }
 
-        let group = result
+        let group = groups
             .last_mut()
             .expect("group always exists after push above");
         if is_active {
-            group.sibling_index = group.children.len() as i32;
-            group.message = sibling.message.clone();
+            group.active_index = group.children.len() as i32;
+            group.active_message = Some(message);
         }
         group.children.push(sibling);
     }
 
-    Ok(result)
+    groups
+        .into_iter()
+        .map(|g| {
+            let message = g.active_message.ok_or_else(|| {
+                ThreadServiceError::Internal(
+                    "Branch group missing active sibling message".to_string(),
+                )
+            })?;
+            Ok(MessageNode {
+                parent_id: g.parent_id,
+                message,
+                children: g.children,
+                sibling_index: g.active_index,
+                depth: g.depth,
+            })
+        })
+        .collect()
 }
 
 /// Build the full message tree (every variant of every branch) from a flat
@@ -188,7 +195,7 @@ fn build_subtree(
             let children = build_subtree(Some(msg.id), children_by_parent, depth + 1)?;
             Ok(MessageNode {
                 parent_id: msg.parent_message_id,
-                message: db_message_to_wire_json(msg.clone())?,
+                message: convert_db_message_to_base_message(msg.clone())?,
                 children,
                 sibling_index: idx as i32,
                 depth,

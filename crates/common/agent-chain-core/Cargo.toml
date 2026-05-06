@@ -49,6 +49,11 @@ tokio = { version = "1", features = ["sync"] }
 tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4", "v5", "v7"] }
+specta = { workspace = true, optional = true, features = ["derive"] }
+# `specta-typescript` provides the `Unknown` marker used to escape from
+# `serde_json::Value`'s recursive built-in `Type` impl on every map/value
+# field that crosses the wire.
+specta-typescript = { version = "0.0.10", optional = true }
 
 [dev-dependencies]
 serial_test = "3"
@@ -59,3 +64,4 @@ tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread", "time"] 
 default = []
 graphviz = ["graphviz-rust"]
 tiktoken = ["tiktoken-rs"]
+specta = ["dep:specta", "dep:specta-typescript"]

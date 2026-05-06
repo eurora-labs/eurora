@@ -1,7 +1,6 @@
 use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
 use euro_activity::types::ContextChip;
 use euro_timeline::TimelineManager;
-use serde_json::Value;
 use tauri::{Manager, Runtime, ipc::Channel};
 use thread_core::{ChatSendRequest, ChatServerMessage};
 use tokio::sync::Mutex;
@@ -124,13 +123,12 @@ impl ChatApi for ChatApiImpl {
         all_blocks.extend(snapshot_blocks.into_inner());
 
         if !all_blocks.is_empty() {
-            let blocks_json = content_blocks_to_json(&all_blocks);
             match thread_state
-                .save_preliminary_content_blocks(thread_uuid, blocks_json)
+                .save_preliminary_content_blocks(thread_uuid, all_blocks.into_inner())
                 .await
             {
                 Ok(returned) => {
-                    context_blocks = json_to_content_blocks(returned);
+                    context_blocks = ContentBlocks::from(returned);
                 }
                 Err(e) => tracing::warn!("Failed to save preliminary blocks: {e}"),
             }
@@ -147,7 +145,7 @@ impl ChatApi for ChatApiImpl {
             .insert(thread_id.clone(), cancel.clone());
 
         let request = ChatSendRequest {
-            content_blocks: content_blocks_to_json(&context_blocks),
+            content_blocks: context_blocks.into_inner(),
             parent_message_id: parent_message_uuid,
             asset_chips_json,
         };
@@ -216,35 +214,4 @@ impl ChatApi for ChatApiImpl {
 
         Ok(())
     }
-}
-
-fn content_blocks_to_json(blocks: &ContentBlocks) -> Vec<Value> {
-    blocks
-        .iter()
-        .filter_map(|block| match serde_json::to_value(block) {
-            Ok(v) => Some(v),
-            Err(e) => {
-                tracing::warn!("Failed to serialize content block: {e}");
-                None
-            }
-        })
-        .collect()
-}
-
-fn json_to_content_blocks(values: Vec<Value>) -> ContentBlocks {
-    values
-        .into_iter()
-        .filter_map(
-            |v| match serde_json::from_value::<ContentBlock>(v.clone()) {
-                Ok(block) => Some(block),
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to deserialize content block from server response: {e}; raw={v}"
-                    );
-                    None
-                }
-            },
-        )
-        .collect::<Vec<_>>()
-        .into()
 }

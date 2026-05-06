@@ -1,8 +1,5 @@
 import { ApiClient } from '$lib/api/client.js';
-import {
-	toChatStreamEvent,
-	toMessageNodes,
-} from '@eurora/chat/services/converters/message-converter';
+import { fromChatServerMessage } from '@eurora/chat/models/streaming';
 import type { AssetChip, MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
@@ -15,6 +12,7 @@ import type {
 import type {
 	ChatClientMessage,
 	ChatSendRequest,
+	ChatServerMessage,
 	CreateThreadRequest,
 	CreateThreadResponse,
 	GenerateThreadTitleRequest,
@@ -24,7 +22,6 @@ import type {
 	SearchMessagesResponse,
 	SearchThreadsResponse,
 	SwitchBranchRequest,
-	Thread as WireThread,
 } from '@eurora/shared/bindings/thread';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
@@ -49,7 +46,7 @@ export class ThreadService implements IThreadService {
 		const resp = await this.#api.fetch<ListThreadsResponse>('/threads', {
 			query: { limit, offset },
 		});
-		return resp.threads.map(toDomainThread);
+		return resp.threads;
 	}
 
 	async getMessages(
@@ -61,7 +58,7 @@ export class ThreadService implements IThreadService {
 		const resp = await this.#api.fetch<GetMessagesResponse>(`/threads/${threadId}/messages`, {
 			query: { limit, offset, all_variants: allVariants },
 		});
-		return toMessageNodes(resp.messages as unknown[]);
+		return resp.messages;
 	}
 
 	async switchBranch(
@@ -74,7 +71,7 @@ export class ThreadService implements IThreadService {
 			`/threads/${threadId}/messages/switch-branch`,
 			{ body },
 		);
-		return toMessageNodes(resp.messages as unknown[]);
+		return resp.messages;
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
@@ -85,7 +82,7 @@ export class ThreadService implements IThreadService {
 		const resp = await this.#api.fetch<CreateThreadResponse, CreateThreadRequest>('/threads', {
 			body: {},
 		});
-		return toDomainThread(resp.thread);
+		return resp.thread;
 	}
 
 	async generateTitle(threadId: string): Promise<Thread> {
@@ -93,7 +90,7 @@ export class ThreadService implements IThreadService {
 			`/threads/${threadId}/title`,
 			{ body: {} },
 		);
-		return toDomainThread(resp.thread);
+		return resp.thread;
 	}
 
 	async searchThreads(
@@ -104,7 +101,7 @@ export class ThreadService implements IThreadService {
 		const resp = await this.#api.fetch<SearchThreadsResponse>('/threads/search', {
 			query: { q: query, limit, offset },
 		});
-		return resp.results.map((r) => ({ id: r.id, title: r.title, rank: r.rank }));
+		return resp.results;
 	}
 
 	async searchMessages(
@@ -115,13 +112,7 @@ export class ThreadService implements IThreadService {
 		const resp = await this.#api.fetch<SearchMessagesResponse>('/threads/messages/search', {
 			query: { q: query, limit, offset },
 		});
-		return resp.results.map((r) => ({
-			id: r.id,
-			threadId: r.thread_id,
-			messageType: r.message_type,
-			snippet: r.snippet,
-			rank: r.rank,
-		}));
+		return resp.results;
 	}
 
 	async *sendMessage(
@@ -152,7 +143,8 @@ export class ThreadService implements IThreadService {
 
 		ws.addEventListener('message', (ev: MessageEvent<string>) => {
 			try {
-				buffer.push(toChatStreamEvent(JSON.parse(ev.data)));
+				const frame = JSON.parse(ev.data) as ChatServerMessage;
+				buffer.push(fromChatServerMessage(frame));
 			} catch (e) {
 				error = e;
 				finished = true;
@@ -217,15 +209,6 @@ export class ThreadService implements IThreadService {
 	}
 }
 
-function toDomainThread(raw: WireThread): Thread {
-	return {
-		id: raw.id,
-		title: raw.title,
-		createdAt: raw.created_at,
-		updatedAt: raw.updated_at,
-	};
-}
-
 function buildSendRequest(
 	text: string,
 	parentMessageId: string | null | undefined,
@@ -233,7 +216,9 @@ function buildSendRequest(
 ): ChatSendRequest {
 	const chips = assetChips ?? [];
 	return {
-		content_blocks: [{ type: 'text', text }],
+		content_blocks: [
+			{ type: 'text', text, id: null, annotations: null, index: null, extras: null },
+		],
 		parent_message_id: parentMessageId ?? null,
 		asset_chips_json: chips.length > 0 ? JSON.stringify(chips) : null,
 	};

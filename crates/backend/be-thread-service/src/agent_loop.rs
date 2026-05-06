@@ -18,7 +18,7 @@ use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::conversion::db_message_to_wire_json;
+use crate::conversion::convert_db_message_to_base_message;
 
 /// Appended as a system message on the forced-synthesis turn so the model
 /// understands why its tools have been taken away.
@@ -143,22 +143,18 @@ async fn run_round(
         }
         acc.absorb(&chunk);
 
-        let chunk_value = match serde_json::to_value(&chunk) {
-            Ok(v) => v,
-            Err(e) => {
-                tracing::error!("Failed to serialize AI chunk: {e}");
-                continue;
-            }
-        };
+        let outbound_chunk = chunk.clone();
 
         // Move tool calls out of the chunk into our running list. Done after
-        // the borrow above releases so we don't have to clone.
+        // the clone above so the streamed chunk keeps the tool calls visible.
         if !chunk.tool_calls.is_empty() {
             tool_calls.append(&mut chunk.tool_calls);
         }
 
         if tx
-            .send(ChatServerMessage::Chunk { chunk: chunk_value })
+            .send(ChatServerMessage::Chunk {
+                chunk: outbound_chunk,
+            })
             .await
             .is_err()
         {
@@ -326,7 +322,7 @@ async fn finalize(
         return;
     }
 
-    let ai_node = match db_message_to_wire_json(ai_message) {
+    let ai_node = match convert_db_message_to_base_message(ai_message) {
         Ok(message) => MessageNode {
             parent_id: Some(human_message_id),
             message,

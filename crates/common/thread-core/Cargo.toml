@@ -6,6 +6,7 @@ description = "Shared HTTP/WebSocket wire types for the Eurora thread service. C
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+agent-chain-core = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -15,13 +16,8 @@ specta = { workspace = true, optional = true, features = [
   "derive",
   "chrono",
   "uuid",
-  "serde_json",
 ] }
-# `specta-typescript` exports the `Unknown` marker type used by `#[specta(type =
-# Unknown)]` attributes inside the wire-type definitions, so it must be
-# available whenever the `specta` feature is on.
-specta-typescript = { version = "0.0.10", optional = true }
 
 [features]
 default = []
-specta = ["dep:specta", "dep:specta-typescript"]
+specta = ["dep:specta", "agent-chain-core/specta"]
