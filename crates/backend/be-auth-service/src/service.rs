@@ -9,23 +9,67 @@
 
 use std::sync::Arc;
 
+use auth_core::{Claims, Role, TokenResponse, UserInfo};
 use be_auth_core::JwtConfig;
 use be_email_service::EmailService;
 use be_remote_db::DatabaseManager;
+use uuid::Uuid;
 
+use crate::cookies::CookieConfig;
 use crate::error::{AuthError, AuthResult};
 use crate::oauth::github::GitHubOAuthClient;
 use crate::oauth::google::GoogleOAuthClient;
 use crate::oauth::{OAuthError, github, google};
 
+/// A freshly minted session: the bearer-mode token envelope alongside
+/// the public user profile. Handlers serialise one or the other (or
+/// both, with the access token going to a cookie) depending on
+/// [`crate::cookies::AuthMode`].
+pub struct MintedSession {
+    pub tokens: TokenResponse,
+    pub user: UserInfo,
+}
+
+impl MintedSession {
+    pub(crate) fn new(tokens: TokenResponse, user: UserInfo) -> Self {
+        Self { tokens, user }
+    }
+}
+
+pub(crate) fn user_info_from_row(
+    user: &be_remote_db::User,
+    role: Role,
+    email_verified: bool,
+) -> UserInfo {
+    UserInfo {
+        id: user.id.to_string(),
+        email: user.email.clone(),
+        display_name: user.display_name.clone(),
+        email_verified,
+        role,
+    }
+}
+
+pub(crate) fn user_info_from_claims(claims: &Claims) -> AuthResult<UserInfo> {
+    Uuid::parse_str(&claims.sub).map_err(|_| AuthError::InvalidToken)?;
+    Ok(UserInfo {
+        id: claims.sub.clone(),
+        email: claims.email.clone(),
+        display_name: claims.display_name.clone(),
+        email_verified: claims.email_verified,
+        role: claims.role.clone(),
+    })
+}
+
 /// Shared state injected into Axum handlers via `State<Arc<AppState>>`.
 pub struct AppState {
     pub auth: AuthService,
+    pub cookies: CookieConfig,
 }
 
 impl AppState {
-    pub fn new(auth: AuthService) -> Self {
-        Self { auth }
+    pub fn new(auth: AuthService, cookies: CookieConfig) -> Self {
+        Self { auth, cookies }
     }
 }
 

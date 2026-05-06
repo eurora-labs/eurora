@@ -15,7 +15,6 @@ use euro_tauri::{
         chat_procedures::{ChatApi, ChatApiImpl},
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
-        onboarding_procedures::{OnboardingApi, OnboardingApiImpl},
         payment_procedures::{PaymentApi, PaymentApiImpl},
         prompt_procedures::{PromptApi, PromptApiImpl},
         settings_procedures::{SettingsApi, SettingsApiImpl},
@@ -528,7 +527,6 @@ fn build_router() -> Router<tauri::Wry> {
         .merge(SystemApiImpl.into_handler())
         .merge(ContextChipApiImpl.into_handler())
         .merge(PromptApiImpl.into_handler())
-        .merge(OnboardingApiImpl.into_handler())
         .merge(PaymentApiImpl.into_handler())
         .merge(ChatApiImpl.into_handler())
 }

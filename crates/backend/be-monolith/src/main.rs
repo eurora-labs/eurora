@@ -1,12 +1,13 @@
 use axum::extract::DefaultBodyLimit;
-use axum::http::{HeaderValue, Method, header};
+use axum::http::{HeaderName, HeaderValue, Method, header};
 use be_activity_service::init_activity_service;
 use be_asset_service::init_asset_service;
 use be_auth_core::JwtConfig;
-use be_auth_service::init_auth_service;
+use be_auth_service::{CookieConfig, init_auth_service};
 use be_authz::{
-    AuthzState, CasbinAuthz, HttpTokenGateState, TrustedProxies, authz_middleware,
-    http_token_gate_middleware, new_auth_failure_rate_limiter, new_health_check_rate_limiter,
+    AuthzState, CasbinAuthz, CsrfConfig, HttpTokenGateState, TrustedProxies, authz_middleware,
+    csrf_middleware, http_token_gate_middleware, new_auth_failure_rate_limiter,
+    new_health_check_rate_limiter,
 };
 use be_payment_service::{PaymentService, init_payment_service};
 use be_remote_db::DatabaseManager;
@@ -44,7 +45,15 @@ fn build_cors() -> CorsLayer {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT])
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+            // SPA echoes the eu_csrf cookie value here for the
+            // double-submit CSRF check. Must be in the CORS allowlist
+            // or the browser strips it on cross-origin requests.
+            HeaderName::from_static("x-csrf-token"),
+        ])
         .allow_credentials(true)
 }
 
@@ -158,10 +167,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    let cookie_config = CookieConfig::from_env();
+    let csrf_config = Arc::new(CsrfConfig::from_env());
+
     let auth_router = init_auth_service(
         db_manager.clone(),
         jwt_config.clone(),
         email_service.clone(),
+        cookie_config.clone(),
     )
     .await?;
 
@@ -240,8 +253,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Inner → outer:
     //   1. http_token_gate  — runs *after* authz so claims are already in
     //      request extensions; only inspects token-gated routes.
-    //   2. authz_middleware — verifies JWT and inserts Claims.
-    //   3. CORS             — must be outermost so 401/403/429 short-circuit
+    //   2. authz_middleware — verifies JWT (Authorization header or
+    //      eu_access cookie) and inserts Claims.
+    //   3. csrf_middleware  — runs before authz so a forged request
+    //      with the cookie attached is rejected before we even look at
+    //      the JWT. Bearer-mode (desktop / mobile) requests bypass it.
+    //   4. CORS             — must be outermost so 401/403/429 short-circuit
     //      responses still carry `Access-Control-*` headers; otherwise the
     //      browser surfaces the failure as a generic "Failed to fetch"
     //      instead of the real status.
@@ -260,6 +277,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(axum::middleware::from_fn_with_state(
             authz_state,
             authz_middleware,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            csrf_config,
+            csrf_middleware,
         ))
         .layer(build_cors());
 

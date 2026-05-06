@@ -12,6 +12,7 @@
 //! [`be_auth_core::JwtConfig`].
 
 pub mod auth;
+pub mod cookies;
 pub mod crypto;
 mod email_check;
 mod email_verification;
@@ -31,12 +32,18 @@ mod tokens;
 use std::sync::Arc;
 
 use anyhow::Result;
-use axum::{Router, routing::post};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use be_auth_core::JwtConfig;
 use be_email_service::EmailService;
 use be_remote_db::DatabaseManager;
 use tower_http::trace::TraceLayer;
 
+pub use cookies::{
+    ACCESS_COOKIE, AuthMode, CSRF_COOKIE, CSRF_HEADER, CookieConfig, REFRESH_COOKIE,
+};
 pub use error::{AuthError, AuthResult};
 pub use service::{AppState, AuthService, AuthServiceConfig, build_oauth_clients};
 
@@ -77,6 +84,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/auth/register", post(handlers::register))
         .route("/auth/refresh", post(handlers::refresh))
         .route("/auth/logout", post(handlers::logout))
+        .route("/auth/me", get(handlers::me))
         .route("/auth/oauth/url", post(handlers::oauth_url))
         .route(
             "/auth/login-token/exchange",
@@ -105,10 +113,11 @@ pub async fn init_auth_service(
     db: Arc<DatabaseManager>,
     jwt_config: JwtConfig,
     email_service: Option<Arc<EmailService>>,
+    cookie_config: CookieConfig,
 ) -> Result<Router> {
     tracing::debug!("Initializing auth service");
     let oauth_clients = build_oauth_clients().await?;
     let auth = AuthService::new(db, jwt_config, email_service, oauth_clients);
-    let state = Arc::new(AppState::new(auth));
+    let state = Arc::new(AppState::new(auth, cookie_config));
     Ok(create_router(state))
 }

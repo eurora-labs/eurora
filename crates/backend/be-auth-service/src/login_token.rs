@@ -17,12 +17,12 @@ use uuid::Uuid;
 
 use crate::LOGIN_TOKEN_EXPIRY_MINUTES;
 use crate::error::{AuthError, AuthResult};
-use crate::service::AuthService;
+use crate::service::{AuthService, MintedSession, user_info_from_row};
 use crate::tokens::{generate_jwt_pair, sha256_token};
 
 impl AuthService {
     /// Exchange a PKCE verifier for a session token pair.
-    pub async fn login_by_login_token(&self, code_verifier: &str) -> AuthResult<TokenResponse> {
+    pub async fn login_by_login_token(&self, code_verifier: &str) -> AuthResult<MintedSession> {
         if code_verifier.is_empty() {
             return Err(AuthError::InvalidInput("Login token is required".into()));
         }
@@ -65,7 +65,7 @@ impl AuthService {
             user.id,
             &user.email,
             user.display_name.clone(),
-            role,
+            role.clone(),
             user.email_verified,
         )?;
 
@@ -87,11 +87,13 @@ impl AuthService {
                 }
             })?;
 
-        Ok(TokenResponse {
+        let tokens = TokenResponse {
             access_token: pair.access_token,
             refresh_token: pair.refresh_token,
             expires_in: self.jwt_config().access_token_expiry_hours * 3600,
-        })
+        };
+        let user_info = user_info_from_row(&user, role, user.email_verified);
+        Ok(MintedSession::new(tokens, user_info))
     }
 
     /// Public: link a code-challenge (already in the device's hands)

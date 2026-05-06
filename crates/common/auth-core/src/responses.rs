@@ -3,9 +3,11 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "specta")]
 use specta::Type;
 
-use crate::Provider;
+use crate::{Provider, Role};
 
-/// Standard JSON response for endpoints that mint a session.
+/// Bearer-mode session response, used by non-browser clients (desktop /
+/// mobile) that send `Authorization: Bearer …` and need the tokens in
+/// the JSON body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct TokenResponse {
@@ -13,6 +15,40 @@ pub struct TokenResponse {
     pub refresh_token: String,
     /// Lifetime of `access_token` in seconds.
     pub expires_in: i64,
+}
+
+/// Public-facing user profile. Mirrors the subset of [`crate::Claims`]
+/// the SPA renders; never carries the JWT itself.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct UserInfo {
+    pub id: String,
+    pub email: String,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    pub email_verified: bool,
+    pub role: Role,
+}
+
+/// Cookie-mode session response. Tokens are delivered via `Set-Cookie`
+/// (HttpOnly access + refresh, plus the JS-readable CSRF cookie); the
+/// JSON body carries only the user profile so a compromised renderer
+/// cannot read the access token off the response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct UserResponse {
+    pub user: UserInfo,
+}
+
+/// Wire-level union returned by every endpoint that mints a session.
+/// `untagged` so existing desktop clients keep deserialising into
+/// [`TokenResponse`] while the SPA sees the cookie-only [`UserResponse`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+#[serde(untagged)]
+pub enum AuthSuccessResponse {
+    Bearer(TokenResponse),
+    Cookie(UserResponse),
 }
 
 /// Response body for `POST /auth/oauth/url`.
@@ -95,5 +131,47 @@ mod tests {
         assert!(!json.contains("details"));
         let back: AuthErrorResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(back.error, "oauth_email_conflict");
+    }
+
+    #[test]
+    fn auth_success_bearer_decodes_into_token_response() {
+        // Wire compatibility: a desktop client deserialising the
+        // bearer-mode JSON directly into `TokenResponse` must succeed,
+        // because the untagged `AuthSuccessResponse::Bearer` variant
+        // serialises with no tag wrapper.
+        let payload = AuthSuccessResponse::Bearer(TokenResponse {
+            access_token: "access".into(),
+            refresh_token: "refresh".into(),
+            expires_in: 3600,
+        });
+        let json = serde_json::to_string(&payload).unwrap();
+        let decoded: TokenResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.access_token, "access");
+        assert_eq!(decoded.expires_in, 3600);
+    }
+
+    #[test]
+    fn auth_success_cookie_round_trips() {
+        let payload = AuthSuccessResponse::Cookie(UserResponse {
+            user: UserInfo {
+                id: "00000000-0000-0000-0000-000000000000".into(),
+                email: "u@example.com".into(),
+                display_name: Some("U".into()),
+                email_verified: true,
+                role: crate::Role::Free,
+            },
+        });
+        let json = serde_json::to_string(&payload).unwrap();
+        // Cookie variant must not echo any token fields.
+        assert!(!json.contains("access_token"));
+        assert!(!json.contains("refresh_token"));
+        assert!(json.contains("\"user\""));
+        let decoded: AuthSuccessResponse = serde_json::from_str(&json).unwrap();
+        match decoded {
+            AuthSuccessResponse::Cookie(resp) => {
+                assert_eq!(resp.user.email, "u@example.com");
+            }
+            AuthSuccessResponse::Bearer(_) => panic!("expected cookie variant"),
+        }
     }
 }

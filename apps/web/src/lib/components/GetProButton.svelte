@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { ApiClient, ApiError } from '$lib/api/client.js';
 	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
@@ -11,7 +12,7 @@
 	import type { Snippet } from 'svelte';
 
 	const auth = inject(AUTH_SERVICE);
-	const { apiUrl: API_URL } = inject(CONFIG_SERVICE);
+	const api = new ApiClient(inject(CONFIG_SERVICE));
 
 	const STRIPE_PRO_PRICE_ID = import.meta.env.VITE_STRIPE_PRO_PRICE_ID ?? '';
 	const CHECKOUT_REDIRECT = '/pricing?checkout=true';
@@ -39,36 +40,19 @@
 		loading = true;
 
 		try {
-			if (!(await auth.ensureValidToken())) {
-				goto('/login?redirect=' + encodeURIComponent(CHECKOUT_REDIRECT));
-				return;
-			}
-
-			const res = await fetch(`${API_URL}/payment/checkout`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${auth.accessToken}`,
-				},
-				body: JSON.stringify({
-					price_id: STRIPE_PRO_PRICE_ID,
-				}),
-			});
-
-			const body = (await res.json().catch(() => null)) as {
-				url?: string;
-				error?: string;
-			} | null;
-
-			if (!res.ok) {
-				throw new Error(body?.error ?? `Checkout failed (${res.status})`);
-			}
-
+			const body = await api.fetch<{ url?: string }, { price_id: string }>(
+				'/payment/checkout',
+				{ body: { price_id: STRIPE_PRO_PRICE_ID } },
+			);
 			if (!body?.url) {
 				throw new Error('Checkout response missing redirect URL');
 			}
 			window.location.href = body.url;
 		} catch (err) {
+			if (err instanceof ApiError && err.status === 401) {
+				goto('/login?redirect=' + encodeURIComponent(CHECKOUT_REDIRECT));
+				return;
+			}
 			Sentry.captureException(err, {
 				tags: { area: 'payment.checkout' },
 				extra: { priceId: STRIPE_PRO_PRICE_ID },

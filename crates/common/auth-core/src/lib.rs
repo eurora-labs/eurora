@@ -23,8 +23,8 @@ pub use requests::{
     RegisterRequest, ThirdPartyAuthUrlRequest, VerifyEmailRequest,
 };
 pub use responses::{
-    AuthErrorResponse, CheckEmailResponse, CheckEmailStatus, ThirdPartyAuthUrlResponse,
-    TokenResponse,
+    AuthErrorResponse, AuthSuccessResponse, CheckEmailResponse, CheckEmailStatus,
+    ThirdPartyAuthUrlResponse, TokenResponse, UserInfo, UserResponse,
 };
 
 /// Build a [`specta::TypeCollection`] containing every auth wire type
@@ -47,6 +47,9 @@ pub fn type_collection() -> specta::TypeCollection {
         .register::<CheckEmailStatus>()
         .register::<VerifyEmailRequest>()
         .register::<TokenResponse>()
+        .register::<UserInfo>()
+        .register::<UserResponse>()
+        .register::<AuthSuccessResponse>()
         .register::<AuthErrorResponse>()
 }
 
@@ -75,6 +78,9 @@ mod tests {
             "CheckEmailStatus",
             "VerifyEmailRequest",
             "TokenResponse",
+            "UserInfo",
+            "UserResponse",
+            "AuthSuccessResponse",
             "AuthErrorResponse",
         ] {
             assert!(

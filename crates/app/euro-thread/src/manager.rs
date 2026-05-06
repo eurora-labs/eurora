@@ -201,8 +201,8 @@ impl ThreadManager {
         Ok(response.messages)
     }
 
-    pub async fn generate_thread_title(&self, thread_id: Uuid, content: String) -> Result<Thread> {
-        let body = GenerateThreadTitleRequest { content };
+    pub async fn generate_thread_title(&self, thread_id: Uuid) -> Result<Thread> {
+        let body = GenerateThreadTitleRequest::default();
         let response: GenerateThreadTitleResponse = self
             .post_json(&format!("/threads/{thread_id}/title"), &body)
             .await?;

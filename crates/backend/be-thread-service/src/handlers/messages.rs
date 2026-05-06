@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use agent_chain::messages::{ContentBlock, ImageContentBlock, PlainTextContentBlock};
+use agent_chain::messages::ContentBlock;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use base64::{Engine as _, engine::general_purpose};
@@ -127,14 +127,6 @@ pub async fn save_preliminary_content_blocks(
 ) -> ThreadServiceResult<Json<SavePreliminaryContentBlocksResponse>> {
     let user_id = user.user_id()?;
 
-    state
-        .db
-        .get_thread()
-        .id(thread_id)
-        .user_id(user_id)
-        .call()
-        .await?;
-
     if body.content_blocks.len() > MAX_PRELIMINARY_BLOCKS {
         return Err(ThreadServiceError::invalid_argument(format!(
             "Too many content blocks (max {MAX_PRELIMINARY_BLOCKS})"
@@ -148,12 +140,22 @@ pub async fn save_preliminary_content_blocks(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| ThreadServiceError::invalid_argument(format!("Invalid content block: {e}")))?;
 
+    state
+        .db
+        .get_thread()
+        .id(thread_id)
+        .user_id(user_id)
+        .call()
+        .await?;
+
     let mut result_blocks: Vec<ContentBlock> = Vec::with_capacity(blocks.len());
     for block in blocks {
         match block {
-            ContentBlock::PlainText(plain) if plain.text.is_some() => {
-                let text = plain.text.as_ref().expect("checked above");
-                let content = text.as_bytes().to_vec();
+            ContentBlock::PlainText(mut plain) => {
+                let Some(text) = plain.text.take() else {
+                    result_blocks.push(ContentBlock::PlainText(plain));
+                    continue;
+                };
                 let name = plain
                     .title
                     .clone()
@@ -162,25 +164,24 @@ pub async fn save_preliminary_content_blocks(
                 let (asset_id, storage_uri) = upload_block_content(
                     &state,
                     &name,
-                    &content,
+                    text.as_bytes(),
                     &plain.mime_type,
                     &plain.extras,
                     user_id,
                 )
                 .await?;
 
-                let mutated = PlainTextContentBlock {
-                    text: None,
-                    file_id: Some(asset_id),
-                    url: Some(storage_uri),
-                    ..plain
-                };
-                result_blocks.push(ContentBlock::PlainText(mutated));
+                plain.file_id = Some(asset_id);
+                plain.url = Some(storage_uri);
+                result_blocks.push(ContentBlock::PlainText(plain));
             }
-            ContentBlock::Image(image) if image.base64.is_some() => {
-                let b64 = image.base64.as_ref().expect("checked above");
+            ContentBlock::Image(mut image) => {
+                let Some(b64) = image.base64.take() else {
+                    result_blocks.push(ContentBlock::Image(image));
+                    continue;
+                };
                 let content = general_purpose::STANDARD
-                    .decode(b64)
+                    .decode(&b64)
                     .map_err(|e| ThreadServiceError::invalid_base64("image.base64", e))?;
                 let mime = image
                     .mime_type
@@ -195,13 +196,9 @@ pub async fn save_preliminary_content_blocks(
                     upload_block_content(&state, &name, &content, &mime, &image.extras, user_id)
                         .await?;
 
-                let mutated = ImageContentBlock {
-                    base64: None,
-                    file_id: Some(asset_id),
-                    url: Some(storage_uri),
-                    ..image
-                };
-                result_blocks.push(ContentBlock::Image(mutated));
+                image.file_id = Some(asset_id);
+                image.url = Some(storage_uri);
+                result_blocks.push(ContentBlock::Image(image));
             }
             other => result_blocks.push(other),
         }
@@ -228,6 +225,10 @@ async fn upload_block_content(
     extras: &Option<std::collections::HashMap<String, serde_json::Value>>,
     user_id: Uuid,
 ) -> ThreadServiceResult<(String, String)> {
+    let metadata = extras.as_ref().map(|map| {
+        serde_json::Value::Object(map.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+    });
+
     let asset = state
         .asset_service
         .create_asset(
@@ -235,9 +236,7 @@ async fn upload_block_content(
                 name: name.to_string(),
                 content: content.to_vec(),
                 mime_type: mime_type.to_string(),
-                metadata: extras
-                    .as_ref()
-                    .map(|e| serde_json::to_value(e).unwrap_or(serde_json::Value::Null)),
+                metadata,
                 activity_id: None,
             },
             user_id,

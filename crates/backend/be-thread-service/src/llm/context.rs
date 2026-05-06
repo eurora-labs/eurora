@@ -1,10 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use agent_chain::messages::ContentBlock;
 use agent_chain::{AnyMessage, BaseChatModel, BaseTool, SystemMessage, language_models::ToolLike};
 use base64::{Engine as _, engine::general_purpose};
 use be_asset::AssetService;
+use be_storage::StorageService;
+use futures::stream::{self, StreamExt};
 
 use crate::describe_image_tool::{self, DescribeImageTool};
 use crate::error::ThreadServiceError;
@@ -96,63 +98,113 @@ pub async fn prepare_llm_context(
     })
 }
 
+/// Concurrent download fan-out. Storage backends are typically remote (S3),
+/// so serial downloads multiply per-asset latency; 8 in-flight balances
+/// throughput against connection pressure.
+const ASSET_DOWNLOAD_CONCURRENCY: usize = 8;
+
 async fn resolve_plain_text_blocks(asset_service: &AssetService, messages: &mut [AnyMessage]) {
-    let storage = asset_service.storage();
-    for message in messages.iter_mut() {
-        let content = match message {
-            AnyMessage::HumanMessage(m) => &mut m.content,
-            AnyMessage::SystemMessage(m) => &mut m.content,
+    let mut urls: HashSet<String> = HashSet::new();
+    for_each_resolve_block(messages, |block| {
+        if let ContentBlock::PlainText(pt) = block
+            && pt.text.is_none()
+            && let Some(url) = pt.url.as_deref()
+        {
+            urls.insert(url.to_string());
+        }
+    });
+
+    let downloaded = download_many(asset_service.storage(), urls, "plain-text").await;
+
+    for_each_resolve_block_mut(messages, |block| {
+        let ContentBlock::PlainText(pt) = block else {
+            return;
+        };
+        if pt.text.is_some() {
+            return;
+        }
+        let Some(url) = pt.url.as_deref() else {
+            return;
+        };
+        if let Some(bytes) = downloaded.get(url) {
+            pt.text = Some(String::from_utf8_lossy(bytes).into_owned());
+        }
+    });
+}
+
+async fn resolve_image_blocks(asset_service: &AssetService, messages: &mut [AnyMessage]) {
+    let mut urls: HashSet<String> = HashSet::new();
+    for_each_resolve_block(messages, |block| {
+        if let ContentBlock::Image(img) = block
+            && img.base64.is_none()
+            && let Some(url) = img.url.as_deref()
+        {
+            urls.insert(url.to_string());
+        }
+    });
+
+    let downloaded = download_many(asset_service.storage(), urls, "image").await;
+
+    for_each_resolve_block_mut(messages, |block| {
+        let ContentBlock::Image(img) = block else {
+            return;
+        };
+        if img.base64.is_some() {
+            return;
+        }
+        let Some(url) = img.url.as_deref() else {
+            return;
+        };
+        if let Some(bytes) = downloaded.get(url) {
+            img.base64 = Some(general_purpose::STANDARD.encode(bytes));
+            img.url = None;
+        }
+    });
+}
+
+fn for_each_resolve_block(messages: &[AnyMessage], mut f: impl FnMut(&ContentBlock)) {
+    for message in messages {
+        let blocks: &[ContentBlock] = match message {
+            AnyMessage::HumanMessage(m) => &m.content,
+            AnyMessage::SystemMessage(m) => &m.content,
             _ => continue,
         };
-        for block in content.iter_mut() {
-            let ContentBlock::PlainText(pt) = block else {
-                continue;
-            };
-            if pt.text.is_some() {
-                continue;
-            }
-            let Some(url) = pt.url.as_deref() else {
-                continue;
-            };
-            match storage.download(url).await {
-                Ok(bytes) => {
-                    pt.text = Some(String::from_utf8_lossy(&bytes).into_owned());
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to download plain-text asset {url}: {e}");
-                }
-            }
+        for block in blocks {
+            f(block);
         }
     }
 }
 
-async fn resolve_image_blocks(asset_service: &AssetService, messages: &mut [AnyMessage]) {
-    let storage = asset_service.storage();
-    for message in messages.iter_mut() {
-        let content = match message {
+fn for_each_resolve_block_mut(messages: &mut [AnyMessage], mut f: impl FnMut(&mut ContentBlock)) {
+    for message in messages {
+        let blocks: &mut [ContentBlock] = match message {
             AnyMessage::HumanMessage(m) => &mut m.content,
             AnyMessage::SystemMessage(m) => &mut m.content,
             _ => continue,
         };
-        for block in content.iter_mut() {
-            let ContentBlock::Image(img) = block else {
-                continue;
-            };
-            if img.base64.is_some() {
-                continue;
-            }
-            let Some(url) = img.url.as_deref() else {
-                continue;
-            };
-            match storage.download(url).await {
-                Ok(bytes) => {
-                    img.base64 = Some(general_purpose::STANDARD.encode(&bytes));
-                    img.url = None;
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to download image asset {url}: {e}");
-                }
-            }
+        for block in blocks {
+            f(block);
         }
     }
+}
+
+async fn download_many(
+    storage: &StorageService,
+    urls: HashSet<String>,
+    label: &'static str,
+) -> HashMap<String, Vec<u8>> {
+    stream::iter(urls)
+        .map(|url| async move {
+            match storage.download(&url).await {
+                Ok(bytes) => Some((url, bytes)),
+                Err(e) => {
+                    tracing::warn!("Failed to download {label} asset {url}: {e}");
+                    None
+                }
+            }
+        })
+        .buffer_unordered(ASSET_DOWNLOAD_CONCURRENCY)
+        .filter_map(|opt| async move { opt })
+        .collect()
+        .await
 }

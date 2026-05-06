@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
+	import { ApiClient } from '$lib/api/client.js';
 	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -11,8 +11,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { onDestroy, onMount } from 'svelte';
 
-	const auth = inject(AUTH_SERVICE);
-	const API_URL = inject(CONFIG_SERVICE).apiUrl;
+	const api = new ApiClient(inject(CONFIG_SERVICE));
 
 	let status = $state<'loading' | 'complete' | 'failed'>('loading');
 	let countdown = $state(5);
@@ -31,23 +30,9 @@
 		}
 
 		try {
-			await auth.ensureValidToken();
-
-			const res = await fetch(
-				`${API_URL}/payment/checkout-status?session_id=${encodeURIComponent(sessionId)}`,
-				{
-					headers: {
-						Authorization: `Bearer ${auth.accessToken}`,
-					},
-				},
-			);
-
-			if (!res.ok) {
-				status = 'failed';
-				return;
-			}
-
-			const data = await res.json();
+			const data = await api.fetch<{ status: string }>('/payment/checkout-status', {
+				query: { session_id: sessionId },
+			});
 			status = data.status === 'complete' ? 'complete' : 'failed';
 
 			if (status === 'complete') {

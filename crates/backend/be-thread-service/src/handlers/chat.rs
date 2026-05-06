@@ -200,32 +200,15 @@ async fn run_turn(
     tx: mpsc::Sender<ChatServerMessage>,
     cancel: CancellationToken,
 ) -> ThreadServiceResult<()> {
-    let is_edit = request.parent_message_id.is_some();
-    let parent_id = request.parent_message_id;
-
-    // For an edit, rewind the active leaf to the edit's parent. If the
-    // request didn't supply a parent we treat this as a re-roll of the very
-    // first human message and look it up.
-    if is_edit {
-        let effective_parent = if parent_id.is_some() {
-            parent_id
-        } else {
-            let first_message = state
-                .db
-                .list_messages()
-                .thread_id(thread_id)
-                .user_id(user_id)
-                .params(PaginationParams::new(0, 1, "ASC"))
-                .call()
-                .await?;
-            first_message.first().and_then(|msg| msg.parent_message_id)
-        };
+    // An explicit parent means this turn is an edit or re-roll: rewind the
+    // active leaf to that parent so the new human message branches off it.
+    if let Some(parent_id) = request.parent_message_id {
         state
             .db
             .set_active_leaf()
             .id(thread_id)
             .user_id(user_id)
-            .maybe_active_leaf_id(effective_parent)
+            .active_leaf_id(parent_id)
             .call()
             .await?;
     }
@@ -269,14 +252,26 @@ async fn run_turn(
         .additional_kwargs(human_additional_kwargs)
         .build();
 
-    messages.push(human_message.clone().into());
-
+    // Serialize the persistable form of the human message *before* the
+    // borrow of `human_message.content` is released to `prepare_llm_context`
+    // — that way we don't have to hold the message past the LLM-context call.
     let content = serde_json::to_value(&human_message.content)
         .map_err(|e| ThreadServiceError::Internal(format!("Failed to serialize content: {e}")))?;
     let additional_kwargs =
         serde_json::to_value(&human_message.additional_kwargs).map_err(|e| {
             ThreadServiceError::Internal(format!("Failed to serialize additional_kwargs: {e}"))
         })?;
+
+    messages.push(human_message.into());
+
+    // Prepare the LLM context *before* persisting the human message so that
+    // a context-prep failure doesn't leave a half-completed turn (a human
+    // row with no AI response) in the thread history.
+    let LlmContext {
+        messages: llm_messages,
+        chat_model,
+        tools,
+    } = prepare_llm_context(&state.providers, &state.asset_service, messages).await?;
 
     let human_db_message = state
         .db
@@ -288,12 +283,6 @@ async fn run_turn(
         .additional_kwargs(additional_kwargs)
         .call()
         .await?;
-
-    let LlmContext {
-        messages: llm_messages,
-        chat_model,
-        tools,
-    } = prepare_llm_context(&state.providers, &state.asset_service, messages).await?;
 
     let human_message_id = human_db_message.id;
     let human_parent_id = human_db_message.parent_message_id;

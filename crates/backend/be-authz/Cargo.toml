@@ -8,6 +8,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 async-trait = { workspace = true }
 auth-core = { workspace = true }
 axum = { workspace = true }
+axum-extra = { workspace = true }
 be-auth-core = { workspace = true }
 be-remote-db = { workspace = true }
 casbin = { workspace = true }
