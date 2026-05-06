@@ -47,7 +47,6 @@ fn session_response(
         AuthMode::Cookie => {
             let access_max_age = session.tokens.expires_in;
             let refresh_max_age = state.jwt_config().refresh_token_expiry_days * 86_400;
-            let csrf = cookies::new_csrf_token();
             let jar = jar
                 .add(cookies::access_cookie(
                     &state.cookies,
@@ -58,8 +57,7 @@ fn session_response(
                     &state.cookies,
                     session.tokens.refresh_token,
                     refresh_max_age,
-                ))
-                .add(cookies::csrf_cookie(&state.cookies, csrf, refresh_max_age));
+                ));
             (
                 jar,
                 Json(AuthSuccessResponse::Cookie(UserResponse {
