@@ -1,21 +1,10 @@
+import { applyAccent, clearAccent } from '$lib/services/accent.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { AccentColor, TimelineAppEvent } from '$lib/bindings/bindings.js';
+import type { TimelineAppEvent } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
+import type { AppearanceService } from '$lib/services/appearance-service.svelte.js';
 
 const RECENT_LIMIT = 5;
-
-const ACCENT_VARIABLES = [
-	'--primary',
-	'--primary-foreground',
-	'--ring',
-	'--accent',
-	'--accent-foreground',
-	'--sidebar-primary',
-	'--sidebar-primary-foreground',
-	'--sidebar-ring',
-	'--sidebar-accent',
-	'--sidebar-accent-foreground',
-] as const;
 
 export class TimelineService {
 	recent: TimelineAppEvent[] = $state([]);
@@ -24,10 +13,12 @@ export class TimelineService {
 	);
 
 	private readonly taurpc: TaurpcService;
+	private readonly appearance: AppearanceService;
 	private readonly unlisteners: Promise<() => void>[] = [];
 
-	constructor(taurpc: TaurpcService) {
+	constructor(taurpc: TaurpcService, appearance: AppearanceService) {
 		this.taurpc = taurpc;
+		this.appearance = appearance;
 	}
 
 	init() {
@@ -35,7 +26,11 @@ export class TimelineService {
 			this.taurpc.timeline.new_app_event.on((event) => {
 				const next = [...this.recent, event];
 				this.recent = next.length > RECENT_LIMIT ? next.slice(-RECENT_LIMIT) : next;
-				applyAccent(event.accent);
+				if (this.appearance.dynamicAccent && event.accent) {
+					applyAccent(event.accent);
+				} else {
+					clearAccent();
+				}
 			}),
 		);
 	}
@@ -47,33 +42,6 @@ export class TimelineService {
 			p.then((unlisten) => unlisten());
 		}
 		this.unlisteners.length = 0;
-	}
-}
-
-function applyAccent(accent: AccentColor | null) {
-	if (typeof document === 'undefined') return;
-	if (!accent) {
-		clearAccent();
-		return;
-	}
-	const root = document.documentElement.style;
-	root.setProperty('--primary', accent.hex);
-	root.setProperty('--primary-foreground', accent.on_hex);
-	root.setProperty('--ring', accent.hex);
-	root.setProperty('--accent', accent.hex);
-	root.setProperty('--accent-foreground', accent.on_hex);
-	root.setProperty('--sidebar-primary', accent.hex);
-	root.setProperty('--sidebar-primary-foreground', accent.on_hex);
-	root.setProperty('--sidebar-ring', accent.hex);
-	root.setProperty('--sidebar-accent', accent.hex);
-	root.setProperty('--sidebar-accent-foreground', accent.on_hex);
-}
-
-function clearAccent() {
-	if (typeof document === 'undefined') return;
-	const root = document.documentElement.style;
-	for (const variable of ACCENT_VARIABLES) {
-		root.removeProperty(variable);
 	}
 }
 
