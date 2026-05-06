@@ -8,9 +8,9 @@
  * The wire types come from the workspace-level `*-core` crates via the
  * `pnpm specta:backend` codegen step (see `packages/shared/src/lib/bindings`).
  *
- * Mutating requests (anything not GET/HEAD/OPTIONS) automatically echo
- * the JS-readable `eu_csrf` cookie back as `X-CSRF-Token` for the
- * backend's double-submit CSRF check.
+ * CSRF protection is enforced by the backend through an Origin
+ * allowlist plus `SameSite=Lax` on the session cookies — the SPA does
+ * not need to attach any CSRF token header.
  *
  * On a 401 the client transparently calls `POST /auth/refresh` once and
  * replays the original request. Concurrent 401s share a single refresh
@@ -54,8 +54,6 @@ export interface ApiRequestInit<TBody> {
 	skipAuthRefresh?: boolean;
 }
 
-const CSRF_COOKIE = 'eu_csrf';
-const CSRF_HEADER = 'X-CSRF-Token';
 const REFRESH_PATH = '/auth/refresh';
 
 /**
@@ -114,10 +112,6 @@ export class ApiClient {
 		if (hasBody) headers.set('Content-Type', 'application/json');
 
 		const method = init.method ?? (hasBody ? 'POST' : 'GET');
-		if (isMutating(method)) {
-			const csrf = readCsrfCookie();
-			if (csrf) headers.set(CSRF_HEADER, csrf);
-		}
 
 		return await fetch(url, {
 			method,
@@ -156,18 +150,6 @@ export class ApiClient {
 			});
 		return await this.#refreshInflight;
 	}
-}
-
-function isMutating(method: string): boolean {
-	const m = method.toUpperCase();
-	return m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS';
-}
-
-function readCsrfCookie(): string | null {
-	if (typeof document === 'undefined') return null;
-	const escaped = CSRF_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
-	return match ? decodeURIComponent(match[1]) : null;
 }
 
 function joinPath(base: string, path: string): string {

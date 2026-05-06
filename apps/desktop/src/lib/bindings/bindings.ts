@@ -38,32 +38,18 @@ export type BrowserExtensionStatus = {
 /**
  *  Frame sent by the server over the chat WebSocket.
  * 
- *  Both [`ConfirmedHumanMessage`](ChatServerMessage::ConfirmedHumanMessage) and
- *  [`Final`](ChatServerMessage::Final) carry a *complete active branch* —
- *  every depth of the active conversation projected through `build_branch_tree`,
- *  so each node's `children` enumerate the sibling variants at that depth and
- *  `sibling_index` records which one is active. Clients should replace their
- *  active-branch state wholesale with `messages`; sibling-navigator UI
- *  depends on this metadata being current.
- * 
- *  `chunk` carries an `AIMessageChunk` JSON; clients accumulate chunks (using
- *  agent-chain's chunk-merge semantics) into an optimistic AI placeholder
- *  appended after the confirmed human, and discard that placeholder when the
- *  `Final` frame arrives.
+ *  `chunk` carries an `AIMessageChunk` JSON; the client should accumulate
+ *  chunks (using agent-chain's chunk-merge semantics) and replace placeholder
+ *  state with the `final_messages` payload when the turn ends.
  */
 export type ChatServerMessage = 
-/**
- *  The user's turn has been persisted. `messages` is the active branch
- *  from the thread root through the new human leaf, including sibling
- *  alternatives at every depth.
- */
-{ type: "confirmed_human_message"; messages: MessageNode[] } | 
+// The user's message has been persisted; clients should display it.
+{ type: "confirmed_human_message"; message: MessageNode } | 
 // One streaming chunk from the AI.
 { type: "chunk"; chunk: unknown } | 
 /**
- *  The turn ended successfully. `messages` is the active branch from the
- *  thread root through the freshly-persisted AI leaf, including sibling
- *  alternatives at every depth.
+ *  The turn ended successfully; tree positions for everything that was
+ *  persisted during this turn (human + AI + any tool messages).
  */
 { type: "final"; messages: MessageNode[] } | 
 // The turn aborted with an error. The connection is closed after this.
