@@ -5,13 +5,15 @@
 	import ResizeHandles from '$lib/components/ResizeHandles.svelte';
 	import Titlebar from '$lib/components/Titlebar.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
+	import { APPEARANCE_SERVICE } from '$lib/services/appearance-service.svelte.js';
+	import { GENERAL_SERVICE } from '$lib/services/general-service.svelte.js';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { platform } from '@tauri-apps/plugin-os';
-	import { ModeWatcher, setMode } from 'mode-watcher';
+	import { ModeWatcher } from 'mode-watcher';
 	import { onMount } from 'svelte';
 
 	// Set platform class synchronously (before first render) so CSS
@@ -26,12 +28,16 @@
 	const userService = inject(USER_SERVICE);
 	userService.init();
 
+	const appearanceService = inject(APPEARANCE_SERVICE);
+	appearanceService.init();
+
+	const generalService = inject(GENERAL_SERVICE);
+	generalService.init();
+
 	const timelineService = inject(TIMELINE_SERVICE);
 	timelineService.init();
 
 	onMount(() => {
-		setMode('dark');
-
 		// All urls open in a separate browser window
 		document.addEventListener('click', handleUrls);
 
@@ -63,7 +69,7 @@
 	}
 </script>
 
-<ModeWatcher defaultMode="dark" track={false} />
+<ModeWatcher defaultMode="system" />
 
 <div
 	class="app-shell relative flex flex-col h-screen overflow-hidden {currentPlatform === 'linux'
