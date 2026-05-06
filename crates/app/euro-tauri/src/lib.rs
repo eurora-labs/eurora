@@ -7,9 +7,12 @@
 
 pub mod browser_launcher;
 pub mod error;
+pub mod native_messaging;
 pub mod office_addin;
 pub mod procedures;
 pub mod shared_types;
 pub mod util;
 pub mod window;
-pub use window::{create as create_window, state::WindowState};
+pub use window::{
+    MAIN_WINDOW_LABEL, create as create_window, show_and_focus_main, state::WindowState,
+};

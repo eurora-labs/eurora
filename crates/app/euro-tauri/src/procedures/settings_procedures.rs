@@ -1,4 +1,6 @@
-use euro_settings::{APISettings, AppSettings, GeneralSettings, TelemetrySettings};
+use euro_settings::{
+    APISettings, AppSettings, AppearanceSettings, GeneralSettings, TelemetrySettings,
+};
 use tauri::{Manager, Runtime};
 
 use crate::error::ResultExt;
@@ -36,6 +38,15 @@ pub trait SettingsApi {
         app_handle: tauri::AppHandle<R>,
         api_settings: APISettings,
     ) -> Result<APISettings, String>;
+
+    async fn get_appearance_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<AppearanceSettings, String>;
+
+    async fn set_appearance_settings<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        appearance_settings: AppearanceSettings,
+    ) -> Result<AppearanceSettings, String>;
 }
 #[derive(Clone)]
 pub struct SettingsApiImpl;
@@ -137,5 +148,31 @@ impl SettingsApi for SettingsApiImpl {
         }
 
         Ok(settings.api.clone())
+    }
+
+    async fn get_appearance_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<AppearanceSettings, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+
+        Ok(settings.appearance.clone())
+    }
+
+    async fn set_appearance_settings<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        appearance_settings: AppearanceSettings,
+    ) -> Result<AppearanceSettings, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
+        settings.appearance = appearance_settings;
+        settings
+            .save_to_default_path()
+            .ctx("Failed to persist appearance settings")?;
+
+        Ok(settings.appearance.clone())
     }
 }

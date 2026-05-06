@@ -20,6 +20,7 @@ pub enum FrameKind {
     Error(ErrorFrame),
     Cancel(CancelFrame),
     Register(RegisterFrame),
+    Shutdown(ShutdownFrame),
 }
 
 impl FrameKind {
@@ -35,6 +36,7 @@ impl FrameKind {
             FrameKind::Error(_) => "Error",
             FrameKind::Cancel(_) => "Cancel",
             FrameKind::Register(_) => "Register",
+            FrameKind::Shutdown(_) => "Shutdown",
         }
     }
 }
@@ -151,6 +153,25 @@ impl From<RegisterFrame> for Frame {
     }
 }
 
+/// Desktop-initiated request that the receiving client (currently:
+/// browser native-messaging hosts) terminate cleanly. Sent when the
+/// desktop has just installed an updated messenger binary on disk and
+/// wants stale connections to drop so the browser respawns from the new
+/// binary. The `reason` is informational only (logged by the recipient).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct ShutdownFrame {
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+impl From<ShutdownFrame> for Frame {
+    fn from(value: ShutdownFrame) -> Self {
+        Self {
+            kind: FrameKind::Shutdown(value),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,8 +279,45 @@ mod tests {
     }
 
     #[test]
+    fn shutdown_frame_round_trips_through_externally_tagged_json() {
+        let frame = Frame::from(ShutdownFrame {
+            reason: Some("messenger binary was just replaced".into()),
+        });
+
+        let json = serde_json::to_value(&frame).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "kind": {
+                    "Shutdown": {
+                        "reason": "messenger binary was just replaced",
+                    }
+                }
+            }),
+        );
+
+        let round_tripped: Frame = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(round_tripped, frame);
+    }
+
+    #[test]
+    fn shutdown_frame_accepts_missing_reason() {
+        let json = serde_json::json!({
+            "kind": {
+                "Shutdown": {}
+            }
+        });
+
+        let frame: Frame = serde_json::from_value(json).expect("deserialize");
+        let FrameKind::Shutdown(shutdown) = frame.kind else {
+            panic!("expected shutdown frame");
+        };
+        assert!(shutdown.reason.is_none());
+    }
+
+    #[test]
     fn variant_name_returns_stable_label_for_each_kind() {
-        let cases: [(FrameKind, &str); 6] = [
+        let cases: [(FrameKind, &str); 7] = [
             (
                 FrameKind::Request(RequestFrame {
                     id: 1,
@@ -300,6 +358,10 @@ mod tests {
                     app_kind: None,
                 }),
                 "Register",
+            ),
+            (
+                FrameKind::Shutdown(ShutdownFrame { reason: None }),
+                "Shutdown",
             ),
         ];
         for (kind, expected) in cases {

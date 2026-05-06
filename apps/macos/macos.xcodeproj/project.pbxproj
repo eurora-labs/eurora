@@ -20,6 +20,7 @@
 		65BD000B2F40000100000011 /* BridgeHeartbeat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BD000A2F40000100000010 /* BridgeHeartbeat.swift */; };
 		65BD000D2F40000100000013 /* BridgeReplayCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BD000C2F40000100000012 /* BridgeReplayCache.swift */; };
 		65BD000F2F40000100000015 /* BridgeRequestRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BD000E2F40000100000014 /* BridgeRequestRouter.swift */; };
+		65BD00112F40000100000017 /* SafariExtensionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BD00102F40000100000016 /* SafariExtensionMonitor.swift */; };
 		65BD00032F40000100000003 /* BridgeProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BD00022F40000100000003 /* BridgeProtocol.swift */; };
 		65BD00052F40000100000005 /* BridgeProtocolExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BD00042F40000100000005 /* BridgeProtocolExtensions.swift */; };
 		65BD00072F40000100000007 /* BridgeProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65BD00022F40000100000003 /* BridgeProtocol.swift */; };
@@ -77,6 +78,7 @@
 		65BD000A2F40000100000010 /* BridgeHeartbeat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeHeartbeat.swift; sourceTree = "<group>"; };
 		65BD000C2F40000100000012 /* BridgeReplayCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeReplayCache.swift; sourceTree = "<group>"; };
 		65BD000E2F40000100000014 /* BridgeRequestRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeRequestRouter.swift; sourceTree = "<group>"; };
+		65BD00102F40000100000016 /* SafariExtensionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariExtensionMonitor.swift; sourceTree = "<group>"; };
 		65BD00022F40000100000003 /* BridgeProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BridgeProtocol.swift; path = Shared/BridgeProtocol.swift; sourceTree = SOURCE_ROOT; };
 		65BD00042F40000100000005 /* BridgeProtocolExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BridgeProtocolExtensions.swift; path = Shared/BridgeProtocolExtensions.swift; sourceTree = SOURCE_ROOT; };
 		659A98312F35FA4C0086B5D5 /* script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = script.js; path = ../../browser/dist/safari/script.js; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 				65BD000E2F40000100000014 /* BridgeRequestRouter.swift */,
 				65BD00002F40000100000001 /* BridgeWebSocketClient.swift */,
 				6557CFCA2F35151300ACCFF3 /* LocalBridgeServer.swift */,
+				65BD00102F40000100000016 /* SafariExtensionMonitor.swift */,
 				653D3CD92F335387008D09DC /* macos.entitlements */,
 				654B71E52F332FE600A08DFD /* AppDelegate.swift */,
 				654B71F32F332FE600A08DFD /* Main.storyboard */,
@@ -315,6 +318,7 @@
 				65BD000F2F40000100000015 /* BridgeRequestRouter.swift in Sources */,
 				65BD00012F40000100000001 /* BridgeWebSocketClient.swift in Sources */,
 				6557CFCB2F35151E00ACCFF3 /* LocalBridgeServer.swift in Sources */,
+				65BD00112F40000100000017 /* SafariExtensionMonitor.swift in Sources */,
 				654B71E62F332FE600A08DFD /* AppDelegate.swift in Sources */,
 				653D3CD72F3336DA008D09DC /* NativeMessagingBridge.swift in Sources */,
 			);

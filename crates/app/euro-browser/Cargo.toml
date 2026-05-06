@@ -10,6 +10,7 @@ axum-server = { workspace = true }
 dashmap = "6.1.0"
 euro-bridge-protocol = { workspace = true }
 futures-util = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = [
   "macros",

@@ -2,6 +2,8 @@ use std::net::TcpListener;
 use std::path::PathBuf;
 
 use euro_activity::ContextChip;
+use euro_browser::BundledExtensionState;
+use euro_process::{Browser, BrowserStore};
 use euro_timeline::TimelineManager;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -11,6 +13,18 @@ use tokio::sync::Mutex;
 
 use crate::error::ResultExt;
 use crate::shared_types::SharedEndpointManager;
+
+/// `RequestFrame.action` the desktop sends to the macOS launcher to
+/// deep-link the user into Safari's extension settings. Mirrors the
+/// constant on the Swift side; kept here rather than in
+/// `euro-bridge-protocol` because only this crate originates the request.
+pub const OPEN_BROWSER_EXTENSION_SETTINGS_ACTION: &str = "OPEN_BROWSER_EXTENSION_SETTINGS";
+
+/// Logical client identifier the macOS launcher registers with on the
+/// bridge — the `app_kind` field of its `RegisterFrame` and the key its
+/// [`BundledExtensionState`] reports use. Mirrors the Swift launcher's
+/// `appKind` value passed to `BridgeWebSocketClient`.
+pub const SAFARI_BRIDGE_APP_KIND: &str = "safari";
 
 #[cfg(target_os = "macos")]
 fn find_outermost_app_bundle() -> Option<PathBuf> {
@@ -39,14 +53,54 @@ pub struct LocalBackendInfo {
     pub postgres_port: u16,
 }
 
-/// Push payload describing whether a given browser process currently has a
-/// native messenger connected. Emitted whenever the browser bridge registry
-/// transitions (a messenger registers or disconnects). The frontend uses
-/// this to update the "install extension" affordance without polling.
+/// What the desktop frontend should render for a given browser when its
+/// Eurora extension isn't currently driving messages back to the app.
+///
+/// Resolution combines two signals — whether a native messenger is
+/// registered on the bridge for that browser, and (for browsers whose
+/// extension ships bundled with a host app) the latest
+/// [`BundledExtensionState`] the host has published. The variants are
+/// ordered from "everything works" to "we don't recognize this process".
+///
+/// Snake-case Specta tags so the externally-tagged JSON matches what the
+/// existing TS bindings file consumes for tagged unions elsewhere in the
+/// app (`{ "kind": "not_installed", "install_url": "…" }`).
+#[derive(Clone, Debug, Serialize, Deserialize, Type, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum BrowserExtensionState {
+    /// Extension is connected to the bridge. The frontend should render
+    /// no install affordance for this browser.
+    Connected,
+    /// No client is registered for this browser, but the extension is
+    /// distributed via a public store. The frontend should offer to open
+    /// `install_url` in the focused browser.
+    NotInstalled { install_url: String },
+    /// The extension is installed but the user has it disabled in the
+    /// browser's settings. Bundled browsers (Safari) only — there is no
+    /// API to flip this state programmatically, so the frontend should
+    /// deep-link the user into the relevant settings page.
+    Disabled,
+    /// The browser has no record of the bundled extension. Typically
+    /// means the host app has never been launched on this machine.
+    NotDiscovered,
+    /// We can't determine the extension's state right now. The frontend
+    /// should hide the affordance entirely rather than showing stale or
+    /// misleading guidance.
+    Unknown,
+    /// Process name doesn't match any browser Eurora knows about. The
+    /// frontend should hide the affordance.
+    Unsupported,
+}
+
+/// Push payload describing the current [`BrowserExtensionState`] for a
+/// given browser process. Emitted whenever the underlying signal
+/// transitions — a native messenger registers/disconnects, or a bundled
+/// host publishes a fresh state. The frontend uses this to update the
+/// install affordance without polling.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 pub struct BrowserExtensionStatus {
     pub process_name: String,
-    pub connected: bool,
+    pub state: BrowserExtensionState,
 }
 
 #[taurpc::procedures(path = "system")]
@@ -79,9 +133,11 @@ pub trait SystemApi {
         ollama_model: String,
     ) -> Result<LocalBackendInfo, String>;
 
-    async fn get_browser_extension_url(process_name: String) -> Result<Option<String>, String>;
+    async fn get_browser_extension_state(
+        process_name: String,
+    ) -> Result<BrowserExtensionState, String>;
 
-    async fn is_browser_extension_connected(process_name: String) -> Result<bool, String>;
+    async fn open_browser_extension_settings(process_name: String) -> Result<(), String>;
 
     async fn open_url_in_browser(process_id: u32, url: String) -> Result<(), String>;
 
@@ -89,6 +145,82 @@ pub trait SystemApi {
     async fn browser_extension_status_changed(status: BrowserExtensionStatus);
 
     async fn focus_main_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
+}
+
+/// Authoritative resolver behind [`SystemApi::get_browser_extension_state`]
+/// and the push-event side of [`spawn_browser_status_bridge`]. Pure
+/// function over the bridge registry, the bundled-extension state map,
+/// and the [`Browser`] catalog — no I/O — so it's straightforward to
+/// unit-test and reuse from the event loop.
+pub fn resolve_browser_extension_state(process_name: &str) -> BrowserExtensionState {
+    let Some(browser) = Browser::from_process_name(process_name) else {
+        return BrowserExtensionState::Unsupported;
+    };
+    let bridge = euro_browser::BridgeService::get_or_init();
+
+    match browser.store() {
+        BrowserStore::Bundled => resolve_bundled_state(browser, bridge),
+        store => {
+            // For store-distributed browsers, "is the extension connected"
+            // is itself the question — a disabled extension simply stops
+            // talking to the native messaging host, indistinguishable from
+            // not being installed at all.
+            if bridge.is_connected_by_app_name(process_name) {
+                BrowserExtensionState::Connected
+            } else if let Some(install_url) = store.extension_url() {
+                BrowserExtensionState::NotInstalled {
+                    install_url: install_url.to_owned(),
+                }
+            } else {
+                BrowserExtensionState::Unknown
+            }
+        }
+    }
+}
+
+fn resolve_bundled_state(
+    browser: Browser,
+    bridge: &euro_browser::BridgeService,
+) -> BrowserExtensionState {
+    // Today the only bundled host is the macOS Safari launcher. Other
+    // `BrowserStore::Bundled` browsers (PaleMoon) have no first-party host
+    // app, so we have no signal — surface that explicitly rather than
+    // pretending Safari's "Disabled" maps onto them.
+    if browser != Browser::Safari {
+        return BrowserExtensionState::Unknown;
+    }
+    match bridge.bundled_extension_state(SAFARI_BRIDGE_APP_KIND) {
+        BundledExtensionState::Enabled => BrowserExtensionState::Connected,
+        BundledExtensionState::Disabled => BrowserExtensionState::Disabled,
+        BundledExtensionState::NotDiscovered => BrowserExtensionState::NotDiscovered,
+        BundledExtensionState::Unknown => BrowserExtensionState::Unknown,
+    }
+}
+
+#[cfg(target_os = "macos")]
+async fn open_safari_extension_settings() -> Result<(), String> {
+    use euro_bridge_protocol::BridgeError;
+
+    let bridge = euro_browser::BridgeService::get_or_init();
+    let pid = bridge
+        .find_pid_by_app_name(SAFARI_BRIDGE_APP_KIND)
+        .ok_or_else(|| "Safari launcher is not connected".to_string())?;
+
+    match bridge
+        .send_request(pid, OPEN_BROWSER_EXTENSION_SETTINGS_ACTION, None)
+        .await
+    {
+        Ok(_) => Ok(()),
+        Err(BridgeError::Client { message, .. }) => Err(format!(
+            "Launcher refused to open Safari settings: {message}"
+        )),
+        Err(err) => Err(format!("Bridge error opening Safari settings: {err}")),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+async fn open_safari_extension_settings() -> Result<(), String> {
+    Err("Safari is only supported on macOS".to_string())
 }
 
 fn resolve_docker_compose_path<R: Runtime>(
@@ -467,21 +599,28 @@ impl SystemApi for SystemApiImpl {
         })
     }
 
-    async fn get_browser_extension_url(
+    async fn get_browser_extension_state(
         self,
         process_name: String,
-    ) -> Result<Option<String>, String> {
-        Ok(euro_process::Browser::from_process_name(&process_name)
-            .and_then(|browser| browser.store().extension_url())
-            .map(str::to_owned))
+    ) -> Result<BrowserExtensionState, String> {
+        Ok(resolve_browser_extension_state(&process_name))
     }
 
-    async fn is_browser_extension_connected(self, process_name: String) -> Result<bool, String> {
-        if process_name.is_empty() {
-            return Ok(false);
+    async fn open_browser_extension_settings(self, process_name: String) -> Result<(), String> {
+        let browser = Browser::from_process_name(&process_name)
+            .ok_or_else(|| format!("Unsupported browser: {process_name:?}"))?;
+        match browser {
+            Browser::Safari => open_safari_extension_settings().await,
+            // No other browser exposes a stable deep-link to its extension
+            // settings page, and store-distributed extensions can't be in
+            // an "installed-but-disabled" state from the desktop's
+            // perspective anyway (a disabled extension stops connecting,
+            // which we surface as `NotInstalled`). Failing loudly here is
+            // cheaper than silently hiding a frontend bug.
+            other => Err(format!(
+                "open_browser_extension_settings is not supported for {other:?}"
+            )),
         }
-        let service = euro_browser::BridgeService::get_or_init();
-        Ok(service.find_pid_by_app_name(&process_name).is_some())
     }
 
     async fn open_url_in_browser(self, process_id: u32, url: String) -> Result<(), String> {
@@ -492,12 +631,6 @@ impl SystemApi for SystemApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
     ) -> Result<(), String> {
-        let window = app_handle
-            .get_webview_window("main")
-            .ok_or_else(|| "Main window not found".to_string())?;
-        window.show().map_err(|e| e.to_string())?;
-        window.unminimize().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-        Ok(())
+        crate::window::show_and_focus_main(&app_handle).map_err(|e| e.to_string())
     }
 }

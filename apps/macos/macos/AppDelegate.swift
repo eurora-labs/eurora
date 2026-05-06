@@ -5,7 +5,7 @@ import ServiceManagement
 
 @main
 @available(macOS 13.0, *)
-class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegate, LocalBridgeServerDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "com.eurora.macos", category: "AppDelegate")
 
     private let extensionBundleIdentifier = "com.eurora-labs.eurora.macos.extension"
@@ -21,6 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegat
     private var bridgeClient: BridgeWebSocketClient?
     private var localBridgeServer: LocalBridgeServer?
     private var requestRouter: BridgeRequestRouter?
+    private var extensionMonitor: SafariExtensionMonitor?
 
     func applicationDidFinishLaunching(_: Notification) {
         logger.info("Eurora launcher starting")
@@ -56,9 +57,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegat
         requestRouter = BridgeRequestRouter { [weak client] frame in
             client?.send(frame: frame)
         }
+
+        let monitor = SafariExtensionMonitor(
+            extensionBundleIdentifier: extensionBundleIdentifier,
+            safariBundleIdentifiers: safariBundleIdentifiers
+        ) { [weak client] state in
+            guard let client else { return }
+            client.send(frame: makeExtensionStateEvent(state: state))
+        }
+        extensionMonitor = monitor
     }
 
     func applicationWillTerminate(_: Notification) {
+        extensionMonitor?.stop()
+        extensionMonitor = nil
         bridgeClient?.stop()
         bridgeClient = nil
         localBridgeServer?.stop()
@@ -183,9 +195,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegat
             safariBundleIdentifiers.contains($0.bundleIdentifier ?? "")
         }?.processIdentifier
     }
+}
 
-    // MARK: - BridgeWebSocketClientDelegate
+// MARK: - BridgeWebSocketClientDelegate
 
+@available(macOS 13.0, *)
+extension AppDelegate: BridgeWebSocketClientDelegate {
     func bridgeWebSocketClientDidConnect(_: BridgeWebSocketClient) {
         logger.info("Connected to desktop bridge")
     }
@@ -212,6 +227,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegat
         case let .error(errorFrame):
             requestRouter?.deliverToExtensionRequest(id: errorFrame.id, frame: frame)
         case let .request(request):
+            // Some desktop-originated requests target the launcher itself
+            // (open Safari settings, etc.) rather than the extension. We
+            // intercept those before the router would buffer them for the
+            // extension to poll.
+            if handleLauncherRequest(request) {
+                return
+            }
             requestRouter?.storeServerRequest(id: request.id, frame: frame)
         case .event, .cancel:
             localBridgeServer?.broadcast(frame: frame)
@@ -220,8 +242,94 @@ class AppDelegate: NSObject, NSApplicationDelegate, BridgeWebSocketClientDelegat
         }
     }
 
-    // MARK: - LocalBridgeServerDelegate
+    /// Handle requests addressed to the launcher itself rather than the
+    /// Safari extension. Returns `true` if the request was recognized and
+    /// answered (or rejected) here; `false` otherwise so the caller can
+    /// fall through to the extension-poll buffer.
+    private func handleLauncherRequest(_ request: RequestFrame) -> Bool {
+        switch request.action {
+        case BridgeAction.openBrowserExtensionSettings:
+            openSafariExtensionSettings(requestId: request.id)
+            return true
+        default:
+            return false
+        }
+    }
 
+    private func openSafariExtensionSettings(requestId: UInt32) {
+        SFSafariApplication.showPreferencesForExtension(
+            withIdentifier: extensionBundleIdentifier
+        ) { [weak self] error in
+            guard let self else { return }
+            if let error {
+                // `showPreferencesForExtension` is documented to deep-link
+                // into Safari Settings → Extensions, but in practice it
+                // returns SFErrorDomain.noExtensionFound (code 1) for some
+                // legitimately-installed Web Extensions depending on macOS
+                // version and how Safari indexed the .appex. Fall back to
+                // just bringing Safari to the front — the desktop UI already
+                // tells the user the next step is "Settings → Extensions".
+                logger.warning(
+                    """
+                    showPreferencesForExtension failed \
+                    (\(error.localizedDescription, privacy: .public)); \
+                    falling back to launching Safari
+                    """
+                )
+                launchSafari(requestId: requestId, originalError: error)
+            } else {
+                replyExtensionSettingsSuccess(requestId: requestId)
+            }
+        }
+    }
+
+    private func launchSafari(requestId: UInt32, originalError: Error) {
+        let primarySafariBundleId = safariBundleIdentifiers.first ?? "com.apple.Safari"
+        guard let safariURL = NSWorkspace.shared.urlForApplication(
+            withBundleIdentifier: primarySafariBundleId
+        ) else {
+            logger.error(
+                "Could not locate Safari bundle (\(primarySafariBundleId, privacy: .public))"
+            )
+            bridgeClient?.send(frame: Frame(ErrorFrame(
+                id: requestId, message: originalError.localizedDescription
+            )))
+            return
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        NSWorkspace.shared.openApplication(at: safariURL, configuration: config) { [weak self] _, openError in
+            guard let self else { return }
+            if let openError {
+                logger.error(
+                    "Failed to launch Safari: \(openError.localizedDescription, privacy: .public)"
+                )
+                // Surface the *original* SafariServices error to the desktop
+                // — that's the actionable detail; the launch failure is just
+                // "we couldn't even fall back."
+                bridgeClient?.send(frame: Frame(ErrorFrame(
+                    id: requestId, message: originalError.localizedDescription
+                )))
+            } else {
+                replyExtensionSettingsSuccess(requestId: requestId)
+            }
+        }
+    }
+
+    private func replyExtensionSettingsSuccess(requestId: UInt32) {
+        bridgeClient?.send(frame: Frame(ResponseFrame(
+            id: requestId,
+            action: BridgeAction.openBrowserExtensionSettings,
+            payload: nil
+        )))
+    }
+}
+
+// MARK: - LocalBridgeServerDelegate
+
+@available(macOS 13.0, *)
+extension AppDelegate: LocalBridgeServerDelegate {
     func localBridgeServer(
         _: LocalBridgeServer,
         didReceive frame: Frame,

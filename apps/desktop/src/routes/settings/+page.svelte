@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { type GeneralSettings } from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import FirstPartyLogin from '$lib/components/FirstPartyLogin.svelte';
+	import { GENERAL_SERVICE } from '$lib/services/general-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
@@ -9,25 +8,18 @@
 	import { Label } from '@eurora/ui/components/label/index';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import { Switch } from '@eurora/ui/components/switch/index';
-	import { onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const user = inject(USER_SERVICE);
+	const general = inject(GENERAL_SERVICE);
 
-	let generalSettings = $state<GeneralSettings | null>(null);
-	let autostartEnabled = $state(false);
-
-	async function saveSettings() {
-		await taurpc.settings.set_general_settings({
-			...generalSettings,
-			autostart: autostartEnabled,
-		});
+	async function onAutostartChange(checked: boolean) {
+		try {
+			await general.setAutostart(checked);
+		} catch (error) {
+			toast.error(`Failed to update startup preference: ${error}`);
+		}
 	}
-
-	onMount(async () => {
-		generalSettings = await taurpc.settings.get_general_settings();
-		autostartEnabled = generalSettings.autostart;
-	});
 </script>
 
 <div class="flex flex-col gap-8">
@@ -64,7 +56,11 @@
 		<Separator />
 		<div class="flex items-center justify-between">
 			<Label for="autostart" class="text-sm">Launch at startup</Label>
-			<Switch id="autostart" bind:checked={autostartEnabled} onCheckedChange={saveSettings} />
+			<Switch
+				id="autostart"
+				checked={general.autostart}
+				onCheckedChange={onAutostartChange}
+			/>
 		</div>
 	</section>
 </div>

@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::extract::ConnectInfo;
@@ -13,12 +13,18 @@ use axum_server::Handle as AxumHandle;
 use dashmap::DashMap;
 use euro_bridge_protocol::{
     BRIDGE_BIND_IP, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, ErrorFrame, EventFrame,
-    Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame, bridge_url_for,
+    Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame, ShutdownFrame, bridge_url_for,
 };
 use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::process_name::get_process_name;
+
+/// `EventFrame.action` clients send to publish a fresh
+/// [`BundledExtensionState`] to the desktop. Payload is JSON-encoded
+/// [`ExtensionStatePayload`].
+pub const EXTENSION_STATE_EVENT: &str = "EXTENSION_STATE_CHANGED";
 
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
@@ -55,6 +61,59 @@ pub struct RegistrationEvent {
     pub app_pid: u32,
     pub app_name: String,
     pub app_kind: Option<String>,
+}
+
+/// State of an extension that ships bundled with its host application —
+/// today, the Safari Web Extension wrapped by the macOS launcher, but the
+/// shape generalizes to any future bundled integration.
+///
+/// Browsers that distribute via a public store (Chrome Web Store, AMO,
+/// Edge Add-ons) don't use this — for those, "extension is connected to
+/// the bridge" is itself a sufficient signal that the extension is both
+/// installed and enabled. Bundled extensions need an out-of-band probe
+/// because the host app may run with the extension turned off in the
+/// browser's settings, in which case the extension never connects but is
+/// nevertheless installed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BundledExtensionState {
+    /// The extension is installed and enabled in the host browser. The
+    /// content-side connection may still race ahead of or behind the
+    /// browser actually launching it.
+    Enabled,
+    /// The extension is installed but disabled in the host browser's
+    /// settings. The user must enable it manually — there is no API to
+    /// flip this state programmatically.
+    Disabled,
+    /// The host browser has no record of the extension. Typically the
+    /// containing app has never been launched on this machine, so Safari
+    /// hasn't indexed the bundled `.appex`.
+    NotDiscovered,
+    /// Probe failed or the publisher hasn't reported yet. Treated as a
+    /// transient unknown — the UI should fall back to a generic affordance.
+    Unknown,
+}
+
+/// Wire payload of the [`EXTENSION_STATE_EVENT`] event. Clients serialize
+/// this as JSON into `EventFrame.payload`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionStatePayload {
+    /// Logical client identifier (matches `RegisterFrame.app_kind`). The
+    /// desktop indexes bundled-extension state by this key, so a single
+    /// publisher can report state for the kind it represents (e.g. a
+    /// macOS launcher reporting `"safari"`).
+    pub app_kind: String,
+    pub state: BundledExtensionState,
+}
+
+/// Broadcast on the extension-state channel whenever a client publishes a
+/// fresh [`BundledExtensionState`]. Subscribers receive the *latest known*
+/// state for that `app_kind`; duplicate values are not deduplicated here
+/// because the publisher is expected to send only on transitions.
+#[derive(Debug, Clone)]
+pub struct ExtensionStateUpdate {
+    pub app_kind: String,
+    pub state: BundledExtensionState,
 }
 
 /// Bookkeeping for a bridge listener that the service owns. Held
@@ -229,13 +288,28 @@ impl Drop for BoundServer {
 #[derive(Clone)]
 pub struct BridgeService {
     registry: Arc<DashMap<u32, RegisteredClient>>,
+    /// Latest [`BundledExtensionState`] per `app_kind`. Populated when a
+    /// client publishes [`EXTENSION_STATE_EVENT`]; cleared on the
+    /// publisher's disconnect so the desktop doesn't keep serving stale
+    /// state across launcher restarts.
+    extension_states: Arc<DashMap<String, BundledExtensionState>>,
     frames_from_clients_tx: broadcast::Sender<(u32, Frame)>,
     events_tx: broadcast::Sender<(u32, EventFrame)>,
     registrations_tx: broadcast::Sender<RegistrationEvent>,
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
+    extension_states_tx: broadcast::Sender<ExtensionStateUpdate>,
     pending_requests: Arc<DashMap<u32, oneshot::Sender<Result<ResponseFrame, ErrorFrame>>>>,
     request_id_counter: Arc<AtomicU32>,
     server: Arc<StdMutex<Option<ServerHandle>>>,
+    /// Browser-purge deadline. While `Instant::now() < purge_until`,
+    /// every newly-registering browser client (`app_kind == None`) is
+    /// sent a [`ShutdownFrame`] right after the handshake. Stored as
+    /// nanoseconds since [`Self::anchor`] in an atomic so the per-
+    /// connection check is lock-free; `0` means "no window open".
+    purge_until_nanos: Arc<AtomicU64>,
+    /// Monotonic anchor used to convert [`Instant`]s to/from the
+    /// nanoseconds stored in [`Self::purge_until_nanos`].
+    anchor: Instant,
 }
 
 impl Default for BridgeService {
@@ -255,16 +329,21 @@ impl BridgeService {
         let (events_tx, _) = broadcast::channel(100);
         let (registrations_tx, _) = broadcast::channel(32);
         let (disconnects_tx, _) = broadcast::channel(32);
+        let (extension_states_tx, _) = broadcast::channel(32);
 
         let service = Self {
             registry: Arc::new(DashMap::new()),
+            extension_states: Arc::new(DashMap::new()),
             frames_from_clients_tx,
             events_tx,
             registrations_tx,
             disconnects_tx,
+            extension_states_tx,
             pending_requests: Arc::new(DashMap::new()),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             server: Arc::new(StdMutex::new(None)),
+            purge_until_nanos: Arc::new(AtomicU64::new(0)),
+            anchor: Instant::now(),
         };
         service.spawn_frame_handler();
         service
@@ -288,6 +367,8 @@ impl BridgeService {
     fn spawn_frame_handler(&self) {
         let pending_requests = Arc::clone(&self.pending_requests);
         let events_tx = self.events_tx.clone();
+        let extension_states = Arc::clone(&self.extension_states);
+        let extension_states_tx = self.extension_states_tx.clone();
         let mut frames_rx = self.frames_from_clients_tx.subscribe();
 
         tokio::spawn(async move {
@@ -328,6 +409,17 @@ impl BridgeService {
                         }
                     }
                     FrameKind::Event(evt) => {
+                        if evt.action == EXTENSION_STATE_EVENT {
+                            handle_extension_state_event(
+                                app_pid,
+                                &evt,
+                                &extension_states,
+                                &extension_states_tx,
+                            );
+                            // Fall through: also broadcast on the generic event
+                            // channel so subscribers that want raw frames still
+                            // see it.
+                        }
                         if events_tx.send((app_pid, evt)).is_err() {
                             tracing::trace!(app_pid, "No event subscribers for inbound event");
                         }
@@ -356,6 +448,12 @@ impl BridgeService {
                     }
                     FrameKind::Register(_) => {
                         tracing::warn!(app_pid, "Received Register frame outside the handshake",);
+                    }
+                    FrameKind::Shutdown(_) => {
+                        tracing::warn!(
+                            app_pid,
+                            "Received Shutdown frame from client; only the desktop may send this",
+                        );
                     }
                 }
             }
@@ -491,6 +589,56 @@ impl BridgeService {
         }
     }
 
+    /// Open a window during which every newly-registering browser
+    /// messenger (`app_kind == None`) is sent a [`ShutdownFrame`]
+    /// immediately after the handshake.
+    ///
+    /// Used by the desktop right after it has replaced the messenger
+    /// binary on disk: the previous-session messengers that are sitting
+    /// in their reconnect-backoff loop reconnect to the new bridge, land
+    /// inside this window, and are cleared out so the browser respawns
+    /// them from the new binary. After the window closes, normal
+    /// operation resumes — newly-spawned messengers register and stay
+    /// connected.
+    ///
+    /// The Word add-in (`app_kind == Some("microsoft-word")`) is never
+    /// shut down by this mechanism; its sandboxed runtime can't be
+    /// respawned the same way as a native-messaging host.
+    ///
+    /// Calling this while a window is already open extends the deadline
+    /// only if the new deadline is later than the existing one.
+    pub fn open_browser_purge_window(&self, duration: Duration) {
+        let new_deadline = self.instant_to_nanos(Instant::now() + duration);
+        // `fetch_max` keeps the later deadline if a window is already
+        // open. Two concurrent callers always converge on the latest
+        // requested deadline without ever shrinking it.
+        self.purge_until_nanos
+            .fetch_max(new_deadline, Ordering::Relaxed);
+        tracing::info!(
+            duration_ms = duration.as_millis(),
+            "Opened browser-messenger purge window",
+        );
+    }
+
+    /// Returns `true` while a purge window is active. Lock-free.
+    fn is_in_purge_window(&self) -> bool {
+        let deadline = self.purge_until_nanos.load(Ordering::Relaxed);
+        if deadline == 0 {
+            return false;
+        }
+        self.instant_to_nanos(Instant::now()) < deadline
+    }
+
+    /// Convert an [`Instant`] to nanoseconds since [`Self::anchor`].
+    /// Saturates at `u64::MAX`; clamps below the anchor to `1` so the
+    /// "no window" sentinel of `0` is never collided with.
+    fn instant_to_nanos(&self, when: Instant) -> u64 {
+        when.checked_duration_since(self.anchor)
+            .map(|d| d.as_nanos().min(u64::MAX as u128) as u64)
+            .map(|n| n.max(1))
+            .unwrap_or(1)
+    }
+
     /// Receive an [`EventFrame`] every time a client pushes one. The
     /// `u32` is the `app_pid` it came from.
     pub fn subscribe_to_events(&self) -> broadcast::Receiver<(u32, EventFrame)> {
@@ -507,6 +655,21 @@ impl BridgeService {
         self.disconnects_tx.subscribe()
     }
 
+    /// Receive a [`ExtensionStateUpdate`] every time a client publishes a
+    /// fresh [`BundledExtensionState`] via [`EXTENSION_STATE_EVENT`].
+    pub fn subscribe_to_extension_states(&self) -> broadcast::Receiver<ExtensionStateUpdate> {
+        self.extension_states_tx.subscribe()
+    }
+
+    /// Latest [`BundledExtensionState`] published for `app_kind`, or
+    /// [`BundledExtensionState::Unknown`] if no client has reported one yet
+    /// (or the publisher has disconnected since).
+    pub fn bundled_extension_state(&self, app_kind: &str) -> BundledExtensionState {
+        self.extension_states
+            .get(app_kind)
+            .map_or(BundledExtensionState::Unknown, |entry| *entry.value())
+    }
+
     pub fn connection_count(&self) -> usize {
         self.registry.len()
     }
@@ -516,6 +679,15 @@ impl BridgeService {
             .iter()
             .find(|entry| entry.value().app_name == app_name)
             .map(|entry| entry.value().app_pid)
+    }
+
+    /// Return whether any client is currently connected for the given
+    /// `app_name`. Cheaper than [`find_pid_by_app_name`] for callers that
+    /// only need a presence test.
+    pub fn is_connected_by_app_name(&self, app_name: &str) -> bool {
+        self.registry
+            .iter()
+            .any(|entry| entry.value().app_name == app_name)
     }
 
     /// Return the `app_pid`s of every currently-registered client whose
@@ -673,6 +845,31 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
         app_kind: app_kind.clone(),
     });
 
+    // Browser messengers reconnecting from the previous desktop session
+    // land here right after the new bridge binds. While the purge window
+    // is open, ask them to exit so the browser respawns them from the
+    // freshly-installed binary. The Word add-in is exempt — see
+    // `open_browser_purge_window`.
+    if app_kind.is_none() && service.is_in_purge_window() {
+        let shutdown = Frame::from(ShutdownFrame {
+            reason: Some("desktop installed an updated messenger binary".into()),
+        });
+        if let Err(err) = outbound_tx.send(shutdown).await {
+            tracing::debug!(
+                app_pid,
+                host_pid,
+                error = %err,
+                "Failed to enqueue Shutdown for stale browser messenger",
+            );
+        } else {
+            tracing::info!(
+                app_pid,
+                host_pid,
+                "Sent Shutdown to stale browser messenger",
+            );
+        }
+    }
+
     let writer = tokio::spawn(writer_task(sink, outbound_rx));
     reader_loop(&service, &mut stream, app_pid).await;
 
@@ -682,6 +879,18 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
         .registry
         .remove_if(&app_pid, |_, client| client.host_pid == host_pid)
     {
+        // Drop any bundled-extension state this client owned. Without this
+        // the desktop would keep serving the last value forever — fine while
+        // the publisher is alive, but misleading after the launcher exits or
+        // crashes.
+        if let Some(kind) = removed.app_kind.as_deref()
+            && service.extension_states.remove(kind).is_some()
+        {
+            let _ = service.extension_states_tx.send(ExtensionStateUpdate {
+                app_kind: kind.to_owned(),
+                state: BundledExtensionState::Unknown,
+            });
+        }
         let _ = service.disconnects_tx.send(RegistrationEvent {
             app_pid,
             app_name: removed.app_name,
@@ -830,6 +1039,55 @@ where
     }
 }
 
+/// Decode an [`EXTENSION_STATE_EVENT`] payload, store it in
+/// `extension_states`, and broadcast the update. Malformed payloads are
+/// dropped with a warning — clients are expected to send valid JSON
+/// matching [`ExtensionStatePayload`], and the wrong shape is a publisher
+/// bug rather than something the desktop should paper over.
+fn handle_extension_state_event(
+    app_pid: u32,
+    evt: &EventFrame,
+    extension_states: &DashMap<String, BundledExtensionState>,
+    extension_states_tx: &broadcast::Sender<ExtensionStateUpdate>,
+) {
+    let Some(payload_str) = evt.payload.as_deref() else {
+        tracing::warn!(app_pid, "EXTENSION_STATE_CHANGED event missing payload");
+        return;
+    };
+    let payload: ExtensionStatePayload = match serde_json::from_str(payload_str) {
+        Ok(payload) => payload,
+        Err(err) => {
+            tracing::warn!(
+                app_pid,
+                error = %err,
+                "EXTENSION_STATE_CHANGED payload was not valid JSON",
+            );
+            return;
+        }
+    };
+
+    // Only emit on transitions to keep subscribers from churning on
+    // duplicate ticks. Publishers (e.g. the macOS launcher's 1-Hz Safari
+    // poll) intentionally re-send the current state on each tick to be
+    // robust to dropped frames; deduplicating here is the right place to
+    // absorb that.
+    let prev = extension_states.insert(payload.app_kind.clone(), payload.state);
+    if prev == Some(payload.state) {
+        return;
+    }
+
+    tracing::debug!(
+        app_pid,
+        app_kind = %payload.app_kind,
+        state = ?payload.state,
+        "Bundled extension state updated",
+    );
+    let _ = extension_states_tx.send(ExtensionStateUpdate {
+        app_kind: payload.app_kind,
+        state: payload.state,
+    });
+}
+
 fn message_label(message: &Message) -> &'static str {
     match message {
         Message::Text(_) => "Text",
@@ -952,6 +1210,155 @@ mod tests {
         }
     }
 
+    mod purge_window {
+        use super::*;
+        use euro_bridge_protocol::bridge_url_for;
+        use futures_util::{SinkExt, StreamExt};
+        use tokio_tungstenite::tungstenite::Message as WsMessage;
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+        /// Bind on an ephemeral port and start serving. Returns the
+        /// service plus the URL clients should dial. The serve task is
+        /// detached; the test relies on `tokio` runtime teardown to
+        /// reap it once the test exits.
+        async fn spawn_serving_bridge() -> (BridgeService, String) {
+            let service = BridgeService::new();
+            let bound = service
+                .bind_on(([127, 0, 0, 1], 0).into())
+                .await
+                .expect("bind");
+            let url = bridge_url_for(bound.local_addr());
+            tokio::spawn(async move {
+                let _ = bound.serve().await;
+            });
+            (service, url)
+        }
+
+        async fn dial(
+            url: &str,
+        ) -> tokio_tungstenite::WebSocketStream<
+            tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+        > {
+            let request = url.into_client_request().expect("client request");
+            let (socket, _) = tokio_tungstenite::connect_async(request)
+                .await
+                .expect("connect");
+            socket
+        }
+
+        async fn send_register<S>(socket: &mut S, host_pid: u32, app_pid: u32, kind: Option<&str>)
+        where
+            S: SinkExt<WsMessage, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
+        {
+            let frame = Frame::from(RegisterFrame {
+                host_pid,
+                app_pid,
+                app_kind: kind.map(str::to_string),
+            });
+            let json = serde_json::to_string(&frame).expect("serialize");
+            socket
+                .send(WsMessage::Text(json.into()))
+                .await
+                .expect("send Register");
+        }
+
+        async fn next_text_frame<S>(socket: &mut S) -> Option<Frame>
+        where
+            S: StreamExt<Item = Result<WsMessage, tokio_tungstenite::tungstenite::Error>> + Unpin,
+        {
+            let result = timeout(Duration::from_millis(500), socket.next()).await;
+            match result {
+                Ok(Some(Ok(WsMessage::Text(text)))) => {
+                    Some(serde_json::from_str(text.as_str()).expect("frame json"))
+                }
+                _ => None,
+            }
+        }
+
+        #[tokio::test]
+        async fn shutdowns_browser_client_within_window() {
+            let (service, url) = spawn_serving_bridge().await;
+            service.open_browser_purge_window(Duration::from_secs(1));
+
+            let mut socket = dial(&url).await;
+            send_register(&mut socket, 1234, 5678, None).await;
+
+            let frame = next_text_frame(&mut socket)
+                .await
+                .expect("expected Shutdown frame on outbound");
+            assert!(
+                matches!(frame.kind, FrameKind::Shutdown(_)),
+                "expected Shutdown, got {:?}",
+                frame.kind
+            );
+        }
+
+        #[tokio::test]
+        async fn does_not_shutdown_office_addin_within_window() {
+            let (service, url) = spawn_serving_bridge().await;
+            service.open_browser_purge_window(Duration::from_secs(1));
+
+            let mut socket = dial(&url).await;
+            send_register(&mut socket, 1234, 5678, Some("microsoft-word")).await;
+
+            let frame = next_text_frame(&mut socket).await;
+            assert!(
+                frame.is_none(),
+                "did not expect any frame for office add-in, got {frame:?}",
+            );
+        }
+
+        #[tokio::test]
+        async fn does_not_shutdown_browser_after_window_closes() {
+            let (service, url) = spawn_serving_bridge().await;
+            service.open_browser_purge_window(Duration::from_millis(50));
+            tokio::time::sleep(Duration::from_millis(150)).await;
+
+            let mut socket = dial(&url).await;
+            send_register(&mut socket, 1234, 5678, None).await;
+
+            let frame = next_text_frame(&mut socket).await;
+            assert!(
+                frame.is_none(),
+                "expected no Shutdown after window closed, got {frame:?}",
+            );
+        }
+
+        #[tokio::test]
+        async fn no_window_open_means_no_shutdown() {
+            let (_service, url) = spawn_serving_bridge().await;
+
+            let mut socket = dial(&url).await;
+            send_register(&mut socket, 1234, 5678, None).await;
+
+            let frame = next_text_frame(&mut socket).await;
+            assert!(
+                frame.is_none(),
+                "expected no Shutdown without an open window, got {frame:?}",
+            );
+        }
+
+        #[tokio::test]
+        async fn open_window_extends_but_never_shrinks_deadline() {
+            let service = BridgeService::new();
+            service.open_browser_purge_window(Duration::from_secs(60));
+            let long_deadline = service.purge_until_nanos.load(Ordering::Relaxed);
+            assert!(long_deadline > 0);
+
+            // A shorter window must not retract the longer deadline.
+            service.open_browser_purge_window(Duration::from_millis(10));
+            assert_eq!(
+                service.purge_until_nanos.load(Ordering::Relaxed),
+                long_deadline,
+                "shorter window should not retract a longer one",
+            );
+            assert!(
+                service.is_in_purge_window(),
+                "longer window should still be active",
+            );
+        }
+    }
+
     #[tokio::test]
     async fn find_clients_by_kind_returns_only_matching_clients() {
         let service = BridgeService::new();
@@ -992,5 +1399,114 @@ mod tests {
         found.sort_unstable();
         assert_eq!(found, vec![10, 12]);
         assert!(service.find_clients_by_kind("safari").is_empty());
+    }
+
+    #[tokio::test]
+    async fn extension_state_event_updates_state_and_broadcasts() {
+        let service = BridgeService::new();
+        let mut updates = service.subscribe_to_extension_states();
+
+        assert_eq!(
+            service.bundled_extension_state("safari"),
+            BundledExtensionState::Unknown,
+        );
+
+        let payload = serde_json::to_string(&ExtensionStatePayload {
+            app_kind: "safari".into(),
+            state: BundledExtensionState::Disabled,
+        })
+        .unwrap();
+        service
+            .frames_from_clients_tx
+            .send((
+                42,
+                Frame::from(EventFrame {
+                    action: EXTENSION_STATE_EVENT.into(),
+                    payload: Some(payload),
+                }),
+            ))
+            .expect("broadcast send");
+
+        let update = timeout(Duration::from_secs(1), updates.recv())
+            .await
+            .expect("update arrives")
+            .expect("recv");
+        assert_eq!(update.app_kind, "safari");
+        assert_eq!(update.state, BundledExtensionState::Disabled);
+        assert_eq!(
+            service.bundled_extension_state("safari"),
+            BundledExtensionState::Disabled,
+        );
+    }
+
+    #[tokio::test]
+    async fn duplicate_extension_state_is_deduplicated() {
+        let service = BridgeService::new();
+        let mut updates = service.subscribe_to_extension_states();
+
+        let payload = serde_json::to_string(&ExtensionStatePayload {
+            app_kind: "safari".into(),
+            state: BundledExtensionState::Enabled,
+        })
+        .unwrap();
+
+        for _ in 0..3 {
+            service
+                .frames_from_clients_tx
+                .send((
+                    1,
+                    Frame::from(EventFrame {
+                        action: EXTENSION_STATE_EVENT.into(),
+                        payload: Some(payload.clone()),
+                    }),
+                ))
+                .expect("broadcast send");
+        }
+
+        let first = timeout(Duration::from_secs(1), updates.recv())
+            .await
+            .expect("first update")
+            .expect("recv");
+        assert_eq!(first.state, BundledExtensionState::Enabled);
+
+        let second = timeout(Duration::from_millis(200), updates.recv()).await;
+        assert!(
+            second.is_err(),
+            "expected no further updates for repeated state, got {second:?}",
+        );
+    }
+
+    #[tokio::test]
+    async fn malformed_extension_state_payload_is_ignored() {
+        let service = BridgeService::new();
+        service
+            .frames_from_clients_tx
+            .send((
+                1,
+                Frame::from(EventFrame {
+                    action: EXTENSION_STATE_EVENT.into(),
+                    payload: Some("not json".into()),
+                }),
+            ))
+            .expect("broadcast send");
+
+        // Give the handler a beat to (not) process the bad frame.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(
+            service.bundled_extension_state("safari"),
+            BundledExtensionState::Unknown,
+        );
+    }
+
+    #[test]
+    fn bundled_extension_state_serializes_snake_case() {
+        for (state, expected) in [
+            (BundledExtensionState::Enabled, "\"enabled\""),
+            (BundledExtensionState::Disabled, "\"disabled\""),
+            (BundledExtensionState::NotDiscovered, "\"not_discovered\""),
+            (BundledExtensionState::Unknown, "\"unknown\""),
+        ] {
+            assert_eq!(serde_json::to_string(&state).unwrap(), expected);
+        }
     }
 }

@@ -23,6 +23,7 @@ euro-encrypt = { workspace = true }
 euro-endpoint = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-office = { workspace = true }
+euro-pdf = { workspace = true }
 euro-process = { workspace = true }
 euro-secret = { workspace = true }
 focus-tracker = { workspace = true }

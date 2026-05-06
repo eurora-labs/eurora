@@ -31,9 +31,9 @@ pub struct UserInfo {
 }
 
 /// Cookie-mode session response. Tokens are delivered via `Set-Cookie`
-/// (HttpOnly access + refresh, plus the JS-readable CSRF cookie); the
-/// JSON body carries only the user profile so a compromised renderer
-/// cannot read the access token off the response.
+/// (HttpOnly access + refresh); the JSON body carries only the user
+/// profile so a compromised renderer cannot read the access token off
+/// the response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct UserResponse {

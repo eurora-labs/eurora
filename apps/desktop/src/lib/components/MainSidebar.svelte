@@ -125,6 +125,8 @@
 				</Button>
 			{/if}
 
+			<div data-tauri-drag-region class="flex-1 self-stretch"></div>
+
 			{#if sidebarState.open}
 				<Sidebar.Trigger />
 			{/if}

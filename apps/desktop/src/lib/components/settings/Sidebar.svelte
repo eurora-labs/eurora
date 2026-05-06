@@ -15,6 +15,7 @@
 	import BoltIcon from '@lucide/svelte/icons/bolt';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import MailIcon from '@lucide/svelte/icons/mail';
+	import PaletteIcon from '@lucide/svelte/icons/palette';
 	import ServerIcon from '@lucide/svelte/icons/server';
 
 	let contactDialogOpen = $state(false);
@@ -24,6 +25,11 @@
 			title: 'General',
 			url: '/settings',
 			icon: BoltIcon,
+		},
+		{
+			title: 'Appearance',
+			url: '/settings/appearance',
+			icon: PaletteIcon,
 		},
 		{
 			title: 'API',

@@ -17,7 +17,9 @@ pub use error::{ActivityError, ActivityResult};
 pub use snapshots::{ArticleSnapshot, DefaultSnapshot, YoutubeSnapshot};
 pub use storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
 pub use strategies::ActivityStrategy;
-pub use strategies::{ActivityReport, BrowserStrategy, DefaultStrategy, NoStrategy};
+pub use strategies::{
+    ActivityReport, BrowserStrategy, DefaultStrategy, NoStrategy, PreviewStrategy,
+};
 pub use types::{Activity, ActivityAsset, ActivitySnapshot, AssetFunctionality, ContextChip};
 
 #[cfg(test)]

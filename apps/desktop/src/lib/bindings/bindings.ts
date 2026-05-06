@@ -22,17 +22,74 @@ export type AppSettings = {
 	general: GeneralSettings,
 	telemetry: TelemetrySettings,
 	api: APISettings,
+	appearance: AppearanceSettings,
+};
+
+export type AppearanceSettings = {
+	theme: Theme,
+	dynamicAccent: boolean,
 };
 
 /**
- *  Push payload describing whether a given browser process currently has a
- *  native messenger connected. Emitted whenever the browser bridge registry
- *  transitions (a messenger registers or disconnects). The frontend uses
- *  this to update the "install extension" affordance without polling.
+ *  What the desktop frontend should render for a given browser when its
+ *  Eurora extension isn't currently driving messages back to the app.
+ * 
+ *  Resolution combines two signals — whether a native messenger is
+ *  registered on the bridge for that browser, and (for browsers whose
+ *  extension ships bundled with a host app) the latest
+ *  [`BundledExtensionState`] the host has published. The variants are
+ *  ordered from "everything works" to "we don't recognize this process".
+ * 
+ *  Snake-case Specta tags so the externally-tagged JSON matches what the
+ *  existing TS bindings file consumes for tagged unions elsewhere in the
+ *  app (`{ "kind": "not_installed", "install_url": "…" }`).
+ */
+export type BrowserExtensionState = 
+/**
+ *  Extension is connected to the bridge. The frontend should render
+ *  no install affordance for this browser.
+ */
+{ kind: "connected" } | 
+/**
+ *  No client is registered for this browser, but the extension is
+ *  distributed via a public store. The frontend should offer to open
+ *  `install_url` in the focused browser.
+ */
+{ kind: "not_installed"; install_url: string } | 
+/**
+ *  The extension is installed but the user has it disabled in the
+ *  browser's settings. Bundled browsers (Safari) only — there is no
+ *  API to flip this state programmatically, so the frontend should
+ *  deep-link the user into the relevant settings page.
+ */
+{ kind: "disabled" } | 
+/**
+ *  The browser has no record of the bundled extension. Typically
+ *  means the host app has never been launched on this machine.
+ */
+{ kind: "not_discovered" } | 
+/**
+ *  We can't determine the extension's state right now. The frontend
+ *  should hide the affordance entirely rather than showing stale or
+ *  misleading guidance.
+ */
+{ kind: "unknown" } | 
+/**
+ *  Process name doesn't match any browser Eurora knows about. The
+ *  frontend should hide the affordance.
+ */
+{ kind: "unsupported" };
+
+/**
+ *  Push payload describing the current [`BrowserExtensionState`] for a
+ *  given browser process. Emitted whenever the underlying signal
+ *  transitions — a native messenger registers/disconnects, or a bundled
+ *  host publishes a fresh state. The frontend uses this to update the
+ *  install affordance without polling.
  */
 export type BrowserExtensionStatus = {
 	process_name: string,
-	connected: boolean,
+	state: BrowserExtensionState,
 };
 
 /**
@@ -146,6 +203,8 @@ export type TelemetrySettings = {
 	distinctId: string | null,
 };
 
+export type Theme = "system" | "light" | "dark";
+
 export type Thread = {
 	id: string | null,
 	title: string,
@@ -177,7 +236,7 @@ export type UpdateInfo = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_extension_url":["process_name"],"get_docker_compose_path":[],"install_update":[],"is_browser_extension_connected":["process_name"],"list_activities":[],"open_url_in_browser":["process_id","url"],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_appearance_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_appearance_settings":["appearance_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_extension_state":["process_name"],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"open_browser_extension_settings":["process_name"],"open_url_in_browser":["process_id","url"],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -217,9 +276,11 @@ switch_to_ollama: (baseUrl: string, model: string) => Promise<null>,
 switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
 "settings": {get_all_settings: () => Promise<AppSettings>, 
 get_api_settings: () => Promise<APISettings>, 
+get_appearance_settings: () => Promise<AppearanceSettings>, 
 get_general_settings: () => Promise<GeneralSettings>, 
 get_telemetry_settings: () => Promise<TelemetrySettings>, 
 set_api_settings: (apiSettings: APISettings) => Promise<APISettings>, 
+set_appearance_settings: (appearanceSettings: AppearanceSettings) => Promise<AppearanceSettings>, 
 set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSettings>, 
 set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
 "system": {browser_extension_status_changed: (status: BrowserExtensionStatus) => Promise<void>, 
@@ -230,11 +291,11 @@ check_for_update: () => Promise<{
 } | null>, 
 check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 focus_main_window: () => Promise<null>, 
-get_browser_extension_url: (processName: string) => Promise<string | null>, 
+get_browser_extension_state: (processName: string) => Promise<BrowserExtensionState>, 
 get_docker_compose_path: () => Promise<string>, 
 install_update: () => Promise<null>, 
-is_browser_extension_connected: (processName: string) => Promise<boolean>, 
 list_activities: () => Promise<ContextChip[]>, 
+open_browser_extension_settings: (processName: string) => Promise<null>, 
 open_url_in_browser: (processId: number, url: string) => Promise<null>, 
 quit: () => Promise<null>, 
 request_accessibility_permission: () => Promise<null>, 

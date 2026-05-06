@@ -11,8 +11,8 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const SCRAPE_TIMEOUT: Duration = Duration::from_secs(60);
 const CRAWL_POLL_INTERVAL: Duration = Duration::from_secs(2);
 const CRAWL_TIMEOUT: Duration = Duration::from_secs(120);
-const MAX_SCRAPE_CHARS: usize = 30_000;
-const MAX_CRAWL_CHARS: usize = 50_000;
+const MAX_SCRAPE_BYTES: usize = 30_000;
+const MAX_CRAWL_BYTES: usize = 50_000;
 const MAX_CRAWL_PAGES: u64 = 10;
 
 static HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
@@ -138,7 +138,7 @@ fn format_crawl_results(body: &Value) -> String {
     }
 
     let mut output = format!("Crawled {} pages:\n", data.len());
-    let mut total_chars = 0;
+    let mut total_bytes = 0;
 
     for (index, page) in data.iter().enumerate() {
         let url = page
@@ -159,16 +159,16 @@ fn format_crawl_results(body: &Value) -> String {
             url
         );
         output.push_str(&header);
-        total_chars += header.len();
+        total_bytes += header.len();
 
         if let Some(markdown) = page.get("markdown").and_then(|v| v.as_str()) {
-            let remaining = MAX_CRAWL_CHARS.saturating_sub(total_chars);
+            let remaining = MAX_CRAWL_BYTES.saturating_sub(total_bytes);
             if remaining == 0 {
                 output.push_str("[Remaining pages omitted — content limit reached]\n");
                 break;
             }
             let content = truncate_content(markdown, remaining);
-            total_chars += content.len();
+            total_bytes += content.len();
             output.push_str(&content);
             output.push('\n');
         }
@@ -177,12 +177,15 @@ fn format_crawl_results(body: &Value) -> String {
     output
 }
 
-fn truncate_content(content: &str, max_chars: usize) -> String {
-    if content.len() <= max_chars {
+fn truncate_content(content: &str, max_bytes: usize) -> String {
+    if content.len() <= max_bytes {
         return content.to_string();
     }
 
-    let safe_end = floor_char_boundary(content, max_chars);
+    let safe_end = (0..=max_bytes)
+        .rev()
+        .find(|&i| content.is_char_boundary(i))
+        .expect("byte index 0 is always a UTF-8 char boundary");
     let truncated = &content[..safe_end];
     let cut_point = truncated
         .rfind("\n\n")
@@ -194,19 +197,6 @@ fn truncate_content(content: &str, max_chars: usize) -> String {
         &content[..cut_point],
         (cut_point as f64 / content.len() as f64) * 100.0
     )
-}
-
-/// Largest index `≤ index` that lies on a UTF-8 character boundary. Mirrors
-/// `str::floor_char_boundary` (currently nightly-only).
-fn floor_char_boundary(s: &str, index: usize) -> usize {
-    if index >= s.len() {
-        return s.len();
-    }
-    let mut i = index;
-    while !s.is_char_boundary(i) {
-        i -= 1;
-    }
-    i
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +271,7 @@ async fn firecrawl_scrape(url: String) -> Result<String> {
             Error::ToolException("Scrape response did not contain markdown content".into())
         })?;
 
-    Ok(truncate_content(markdown, MAX_SCRAPE_CHARS))
+    Ok(truncate_content(markdown, MAX_SCRAPE_BYTES))
 }
 
 /// Discover all URLs on a website. Returns a list of pages found on the site.
@@ -569,6 +559,20 @@ mod tests {
         let truncated = truncate_content(&content, 5);
         assert!(truncated.is_char_boundary(0));
         assert!(truncated.contains("[Content truncated"));
+    }
+
+    #[test]
+    fn test_truncate_content_multibyte_char_straddles_limit() {
+        // Regression for the production panic: scraped Wikipedia content
+        // where a single 2-byte codepoint ('ć') straddled `max_bytes`.
+        // 'ć' is two bytes; placing it at offset 29_999 means it occupies
+        // bytes 29_999..30_001, so `max_bytes = 30_000` lands inside it.
+        // The truncated prefix contains no '\n', exercising the
+        // `unwrap_or(safe_end)` fallback path.
+        let content = format!("{}ć{}", "a".repeat(29_999), "x".repeat(2_000));
+        let truncated = truncate_content(&content, 30_000);
+        assert!(truncated.contains("[Content truncated"));
+        assert!(!truncated.contains('ć'));
     }
 
     #[test]

@@ -31,11 +31,10 @@ export type CheckEmailResult =
  * Browser-side auth state.
  *
  * The session lives entirely in `HttpOnly` cookies set by the backend
- * (`eu_access`, `eu_refresh`) plus a JS-readable CSRF cookie
- * (`eu_csrf`); this class never touches token values directly. The
- * SPA only needs to know "who is logged in" — that comes from
- * `GET /auth/me` on boot and from the `UserResponse` body returned
- * by the session-minting endpoints.
+ * (`eu_access`, `eu_refresh`); this class never touches token values
+ * directly. The SPA only needs to know "who is logged in" — that
+ * comes from `GET /auth/me` on boot and from the `UserResponse` body
+ * returned by the session-minting endpoints.
  */
 export class AuthService {
 	isAuthenticated = $state(false);
