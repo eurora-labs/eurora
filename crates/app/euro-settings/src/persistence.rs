@@ -108,11 +108,8 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("settings.json");
         // Pre-`appearance` users have config files lacking the section.
-        std::fs::write(
-            &path,
-            r#"{"general": {"autostart": false}}"#,
-        )
-        .expect("write legacy settings");
+        std::fs::write(&path, r#"{"general": {"autostart": false}}"#)
+            .expect("write legacy settings");
 
         let loaded = AppSettings::load(&path).expect("load legacy settings");
         assert!(!loaded.general.autostart);

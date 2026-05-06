@@ -11,12 +11,33 @@
 	border-color: var(--color-border, currentcolor);
 }
 
+/*
+ * Per-platform window chrome.
+ *
+ * --titlebar-height : height of our custom titlebar.
+ * --shell-radius    : corner radius of the visible app shell. The OS rounds
+ *                     macOS and Windows 11 windows for us; only Linux needs
+ *                     the app to draw its own corners.
+ *
+ * On Linux the window is borderless and transparent; the system compositor
+ * (Mutter/KWin) draws the shadow when Tauri's `shadow(true)` hint is set.
+ */
 :root {
 	--titlebar-height: 36px;
+	--shell-radius: 0px;
 }
 
 body.macos-app {
 	--titlebar-height: 28px;
+}
+
+body.windows-app {
+	--titlebar-height: 32px;
+}
+
+body.linux-app {
+	--titlebar-height: 36px;
+	--shell-radius: 12px;
 }
 
 body.macos-app [data-slot='sidebar-inner'] {
