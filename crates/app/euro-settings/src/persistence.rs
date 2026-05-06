@@ -91,3 +91,44 @@ impl AppSettings {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AppearanceSettings, Theme};
+
+    #[test]
+    fn embedded_defaults_parse_into_app_settings() {
+        let settings = AppSettings::defaults();
+        assert_eq!(settings.appearance, AppearanceSettings::default());
+    }
+
+    #[test]
+    fn legacy_settings_file_without_appearance_section_loads_with_defaults() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        // Pre-`appearance` users have config files lacking the section.
+        std::fs::write(&path, r#"{"general": {"autostart": false}}"#)
+            .expect("write legacy settings");
+
+        let loaded = AppSettings::load(&path).expect("load legacy settings");
+        assert!(!loaded.general.autostart);
+        assert_eq!(loaded.appearance, AppearanceSettings::default());
+    }
+
+    #[test]
+    fn appearance_round_trips_through_save_and_load() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, "{}\n").expect("seed empty settings");
+
+        let mut settings = AppSettings::load(&path).expect("load defaults");
+        settings.appearance.theme = Theme::Light;
+        settings.appearance.dynamic_accent = false;
+        settings.save(&path).expect("save");
+
+        let reloaded = AppSettings::load(&path).expect("reload");
+        assert_eq!(reloaded.appearance.theme, Theme::Light);
+        assert!(!reloaded.appearance.dynamic_accent);
+    }
+}

@@ -981,12 +981,10 @@ jobs:
     create-git-tag:
         needs: [build-sveltekit, publish-tauri]
         runs-on: ubuntu-latest
-        permissions:
-            contents: write # Required for creating and pushing git tags
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
+                  token: ${{ secrets.RELEASE_PAT }}
                   persist-credentials: true
             - name: Create git tag
               shell: bash

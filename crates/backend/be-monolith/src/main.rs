@@ -1,13 +1,13 @@
 use axum::extract::DefaultBodyLimit;
-use axum::http::{HeaderName, HeaderValue, Method, header};
+use axum::http::{HeaderValue, Method, header};
 use be_activity_service::init_activity_service;
 use be_asset_service::init_asset_service;
 use be_auth_core::JwtConfig;
 use be_auth_service::{CookieConfig, init_auth_service};
 use be_authz::{
-    AuthzState, CasbinAuthz, CsrfConfig, HttpTokenGateState, TrustedProxies, authz_middleware,
-    csrf_middleware, http_token_gate_middleware, new_auth_failure_rate_limiter,
-    new_health_check_rate_limiter,
+    AuthzState, CasbinAuthz, HttpTokenGateState, OriginGuardConfig, TrustedProxies,
+    authz_middleware, http_token_gate_middleware, new_auth_failure_rate_limiter,
+    new_health_check_rate_limiter, origin_guard_middleware, web_origins_from_env,
 };
 use be_payment_service::{PaymentService, init_payment_service};
 use be_remote_db::DatabaseManager;
@@ -24,25 +24,9 @@ use tracing_subscriber::util::SubscriberInitExt;
 const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
 fn build_cors() -> CorsLayer {
-    const PROD_ORIGINS: &str = "https://www.eurora-labs.com,https://api.eurora-labs.com";
-    const DEV_ORIGINS: &str = "http://localhost:5173,http://localhost:3000";
-
-    let default_origins = if cfg!(debug_assertions) {
-        DEV_ORIGINS
-    } else {
-        PROD_ORIGINS
-    };
-
-    let allowed: Vec<HeaderValue> = std::env::var("CORS_ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| default_origins.into())
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                return None;
-            }
-            s.parse::<HeaderValue>().ok()
-        })
+    let allowed: Vec<HeaderValue> = web_origins_from_env()
+        .into_iter()
+        .filter_map(|s| s.parse::<HeaderValue>().ok())
         .collect();
 
     CorsLayer::new()
@@ -54,15 +38,7 @@ fn build_cors() -> CorsLayer {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers([
-            header::AUTHORIZATION,
-            header::CONTENT_TYPE,
-            header::ACCEPT,
-            // SPA echoes the eu_csrf cookie value here for the
-            // double-submit CSRF check. Must be in the CORS allowlist
-            // or the browser strips it on cross-origin requests.
-            HeaderName::from_static("x-csrf-token"),
-        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT])
         .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
 }
@@ -178,7 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let cookie_config = CookieConfig::from_env();
-    let csrf_config = Arc::new(CsrfConfig::from_env());
+    let origin_guard_config = Arc::new(OriginGuardConfig::from_env());
 
     let auth_router = init_auth_service(
         db_manager.clone(),
@@ -261,14 +237,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Layer order matters: the last `.layer()` call is the OUTERMOST wrapper.
     //
     // Inner → outer:
-    //   1. http_token_gate  — runs *after* authz so claims are already in
+    //   1. http_token_gate    — runs *after* authz so claims are already in
     //      request extensions; only inspects token-gated routes.
-    //   2. authz_middleware — verifies JWT (Authorization header or
+    //   2. authz_middleware   — verifies JWT (Authorization header or
     //      eu_access cookie) and inserts Claims.
-    //   3. csrf_middleware  — runs before authz so a forged request
-    //      with the cookie attached is rejected before we even look at
-    //      the JWT. Bearer-mode (desktop / mobile) requests bypass it.
-    //   4. CORS             — must be outermost so 401/403/429 short-circuit
+    //   3. origin_guard       — runs before authz so a forged cross-origin
+    //      request with the session cookie attached is rejected before we
+    //      even look at the JWT. Bearer-mode (desktop / mobile) and
+    //      same-origin server-to-server callers bypass it.
+    //   4. CORS               — must be outermost so 401/403/429 short-circuit
     //      responses still carry `Access-Control-*` headers; otherwise the
     //      browser surfaces the failure as a generic "Failed to fetch"
     //      instead of the real status.
@@ -289,8 +266,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             authz_middleware,
         ))
         .layer(axum::middleware::from_fn_with_state(
-            csrf_config,
-            csrf_middleware,
+            origin_guard_config,
+            origin_guard_middleware,
         ))
         .layer(build_cors());
 

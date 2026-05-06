@@ -11,7 +11,6 @@ argon2 = { workspace = true }
 auth-core = { workspace = true }
 axum = { workspace = true, features = ["macros"] }
 axum-extra = { workspace = true }
-base64 = { workspace = true }
 be-auth-core = { workspace = true }
 be-email-service = { workspace = true }
 be-remote-db = { workspace = true }

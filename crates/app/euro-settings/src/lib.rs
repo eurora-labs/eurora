@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 mod api_settings;
+mod appearance_settings;
 mod general_settings;
 mod json;
 mod persistence;
@@ -9,6 +10,7 @@ mod telemetry_settings;
 mod watch;
 
 pub use api_settings::APISettings;
+pub use appearance_settings::{AppearanceSettings, Theme};
 pub use general_settings::GeneralSettings;
 pub use telemetry_settings::TelemetrySettings;
 
@@ -18,4 +20,5 @@ pub struct AppSettings {
     pub general: GeneralSettings,
     pub telemetry: TelemetrySettings,
     pub api: APISettings,
+    pub appearance: AppearanceSettings,
 }

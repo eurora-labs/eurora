@@ -56,7 +56,7 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.10" }
-tauri = { version = "2.10.2", features = ["tray-icon"] }
+tauri = { version = "2.11.1", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-dialog = "2"
@@ -90,6 +90,7 @@ core-foundation = "0.10.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.56"
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

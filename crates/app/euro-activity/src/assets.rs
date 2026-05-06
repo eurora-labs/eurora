@@ -1,5 +1,6 @@
 pub mod article;
 pub mod default;
+pub mod pdf;
 pub mod twitter;
 pub mod word;
 pub mod youtube;

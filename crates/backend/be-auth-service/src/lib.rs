@@ -41,9 +41,7 @@ use be_email_service::EmailService;
 use be_remote_db::DatabaseManager;
 use tower_http::trace::TraceLayer;
 
-pub use cookies::{
-    ACCESS_COOKIE, AuthMode, CSRF_COOKIE, CSRF_HEADER, CookieConfig, REFRESH_COOKIE,
-};
+pub use cookies::{ACCESS_COOKIE, AuthMode, CookieConfig, REFRESH_COOKIE};
 pub use error::{AuthError, AuthResult};
 pub use service::{AppState, AuthService, AuthServiceConfig, build_oauth_clients};
 

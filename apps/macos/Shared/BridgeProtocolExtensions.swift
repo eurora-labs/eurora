@@ -127,6 +127,74 @@ public enum BridgeProtocolError: Error, LocalizedError {
     }
 }
 
+/// String constants that pin both ends of the bridge to the same wire
+/// vocabulary. Mirrors the constants on the Rust side
+/// (`euro_browser::EXTENSION_STATE_EVENT`, `OPEN_BROWSER_EXTENSION_SETTINGS_ACTION`);
+/// the build can't enforce that automatically, so these values are
+/// duplicated by hand and a regression here is caught at runtime by the
+/// frame-handler tests.
+public enum BridgeAction {
+    /// `EventFrame.action` the launcher publishes to inform the desktop
+    /// of a Safari extension state transition. Payload is JSON-encoded
+    /// `ExtensionStateEventPayload`.
+    public static let extensionStateChanged = "EXTENSION_STATE_CHANGED"
+
+    /// `RequestFrame.action` the desktop sends to deep-link into Safari's
+    /// extension settings. The launcher responds with an empty `Response`
+    /// on success or an `Error` if `SFSafariApplication` rejected the
+    /// call.
+    public static let openBrowserExtensionSettings = "OPEN_BROWSER_EXTENSION_SETTINGS"
+}
+
+/// Logical client identifier the launcher registers with on the bridge.
+/// Mirrors `euro_tauri`'s `SAFARI_BRIDGE_APP_KIND` constant; pinned here
+/// because it appears in both `RegisterFrame.appKind` and every
+/// `ExtensionStateEventPayload.appKind` we publish.
+public let kSafariBridgeAppKind = "safari"
+
+/// Mirrors `euro_browser::BundledExtensionState` on the Rust side.
+/// Encoded as a snake-case string in the `state` field of the
+/// [`BridgeAction.extensionStateChanged`] event payload.
+public enum BundledExtensionState: String, Codable {
+    case enabled
+    case disabled
+    case notDiscovered = "not_discovered"
+    case unknown
+}
+
+/// Wire payload of [`BridgeAction.extensionStateChanged`]. Serialized as
+/// JSON into `EventFrame.payload`.
+public struct ExtensionStateEventPayload: Codable {
+    public let appKind: String
+    public let state: BundledExtensionState
+
+    private enum CodingKeys: String, CodingKey {
+        case appKind = "app_kind"
+        case state
+    }
+
+    public init(appKind: String, state: BundledExtensionState) {
+        self.appKind = appKind
+        self.state = state
+    }
+}
+
+/// Build an `EventFrame` reporting the current Safari extension state.
+/// Encoding errors here are theoretically impossible — the payload is a
+/// fixed shape — but JSON encoding is fallible by signature, so we fall
+/// back to an empty payload rather than crashing the launcher.
+public func makeExtensionStateEvent(state: BundledExtensionState) -> Frame {
+    let payload = ExtensionStateEventPayload(appKind: kSafariBridgeAppKind, state: state)
+    let payloadJson: String?
+    do {
+        let data = try BridgeProtocol.encoder.encode(payload)
+        payloadJson = String(data: data, encoding: .utf8)
+    } catch {
+        payloadJson = nil
+    }
+    return Frame(EventFrame(action: BridgeAction.extensionStateChanged, payload: payloadJson))
+}
+
 public extension FrameKind {
     /// Short label for logging. Mirrors `frame_kind_label` on the Rust side.
     var label: String {

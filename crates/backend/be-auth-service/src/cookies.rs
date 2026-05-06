@@ -1,11 +1,12 @@
 //! Cookie config + helpers for the web (cookie-mode) auth flow.
 //!
 //! The SPA never holds tokens in JS: the access JWT lives in
-//! `eu_access` (HttpOnly), the refresh JWT in `eu_refresh` (HttpOnly,
-//! path-scoped to `/auth`), and a separate JS-readable random
-//! `eu_csrf` cookie underwrites the double-submit CSRF defense. This
-//! module owns the names, attributes, and `Set-Cookie` builders so
-//! every handler emits a consistent shape.
+//! `eu_access` (HttpOnly), and the refresh JWT in `eu_refresh`
+//! (HttpOnly, path-scoped to `/auth`). CSRF is handled by the
+//! origin-allowlist middleware in `be-authz` plus `SameSite=Lax` on
+//! these cookies — no separate CSRF token cookie is needed. This
+//! module owns the cookie names, attributes, and `Set-Cookie` builders
+//! so every handler emits a consistent shape.
 //!
 //! Desktop / mobile clients use the legacy bearer flow and never see
 //! these cookies — see [`AuthMode`] for the dispatch.
@@ -13,13 +14,11 @@
 use std::collections::HashSet;
 
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use rand::Rng;
+use be_auth_core::web_origins_from_env;
 use time::Duration as TimeDuration;
 
 pub const ACCESS_COOKIE: &str = "eu_access";
 pub const REFRESH_COOKIE: &str = "eu_refresh";
-pub const CSRF_COOKIE: &str = "eu_csrf";
 
 /// Path attribute for the access cookie. Sent with every request to
 /// the API host so any service (asset, activity, …) can authenticate.
@@ -29,10 +28,6 @@ pub const ACCESS_COOKIE_PATH: &str = "/";
 /// refresh token is only attached to refresh / logout requests, not
 /// the rest of the API surface.
 pub const REFRESH_COOKIE_PATH: &str = "/auth";
-
-/// HTTP header the SPA echoes the CSRF cookie back into for the
-/// double-submit check.
-pub const CSRF_HEADER: &str = "x-csrf-token";
 
 /// Runtime configuration for cookie attributes. Built once at
 /// startup so individual handlers don't re-read env vars.
@@ -50,7 +45,7 @@ pub struct CookieConfig {
     /// Set of browser origins (`scheme://host[:port]`) the SPA is
     /// served from. A request whose `Origin` matches one of these
     /// triggers cookie-mode auth; any other request is treated as
-    /// bearer-mode. The set is also consulted by the CSRF guard.
+    /// bearer-mode.
     pub web_origins: HashSet<String>,
 }
 
@@ -66,18 +61,10 @@ impl CookieConfig {
             .map(|v| !v.eq_ignore_ascii_case("false"))
             .unwrap_or(true);
 
-        let web_origins: HashSet<String> = std::env::var("WEB_ALLOWED_ORIGINS")
-            .or_else(|_| std::env::var("CORS_ALLOWED_ORIGINS"))
-            .unwrap_or_else(|_| "https://www.eurora-labs.com".into())
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-
         Self {
             domain,
             secure,
-            web_origins,
+            web_origins: web_origins_from_env(),
         }
     }
 
@@ -86,25 +73,10 @@ impl CookieConfig {
     }
 }
 
-/// Generate a fresh CSRF token: 256 bits of OS randomness, base64-url
-/// encoded so it can travel in headers without escaping.
-pub fn new_csrf_token() -> String {
-    let mut bytes = [0u8; 32];
-    rand::rng().fill_bytes(&mut bytes);
-    URL_SAFE_NO_PAD.encode(bytes)
-}
-
 /// Build the access-token cookie. `max_age_secs` should match the
 /// JWT's `exp - iat`.
 pub fn access_cookie(cfg: &CookieConfig, value: String, max_age_secs: i64) -> Cookie<'static> {
-    base_cookie(
-        cfg,
-        ACCESS_COOKIE,
-        value,
-        ACCESS_COOKIE_PATH,
-        max_age_secs,
-        true,
-    )
+    base_cookie(cfg, ACCESS_COOKIE, value, ACCESS_COOKIE_PATH, max_age_secs)
 }
 
 /// Build the refresh-token cookie. Path-scoped to `/auth`.
@@ -115,20 +87,6 @@ pub fn refresh_cookie(cfg: &CookieConfig, value: String, max_age_secs: i64) -> C
         value,
         REFRESH_COOKIE_PATH,
         max_age_secs,
-        true,
-    )
-}
-
-/// Build the CSRF cookie. Crucially **not** HttpOnly — the SPA reads
-/// it and echoes the value back as `X-CSRF-Token` for double-submit.
-pub fn csrf_cookie(cfg: &CookieConfig, value: String, max_age_secs: i64) -> Cookie<'static> {
-    base_cookie(
-        cfg,
-        CSRF_COOKIE,
-        value,
-        ACCESS_COOKIE_PATH,
-        max_age_secs,
-        false,
     )
 }
 
@@ -136,7 +94,6 @@ pub fn csrf_cookie(cfg: &CookieConfig, value: String, max_age_secs: i64) -> Cook
 pub fn clear_all(cfg: &CookieConfig, jar: CookieJar) -> CookieJar {
     jar.add(removal_cookie(cfg, ACCESS_COOKIE, ACCESS_COOKIE_PATH))
         .add(removal_cookie(cfg, REFRESH_COOKIE, REFRESH_COOKIE_PATH))
-        .add(removal_cookie(cfg, CSRF_COOKIE, ACCESS_COOKIE_PATH))
 }
 
 fn base_cookie(
@@ -145,12 +102,11 @@ fn base_cookie(
     value: String,
     path: &'static str,
     max_age_secs: i64,
-    http_only: bool,
 ) -> Cookie<'static> {
     let mut cookie = Cookie::build((name, value))
         .path(path)
         .secure(cfg.secure)
-        .http_only(http_only)
+        .http_only(true)
         .same_site(SameSite::Lax)
         .max_age(TimeDuration::seconds(max_age_secs))
         .build();
@@ -164,7 +120,7 @@ fn removal_cookie(cfg: &CookieConfig, name: &'static str, path: &'static str) ->
     let mut cookie = Cookie::build((name, ""))
         .path(path)
         .secure(cfg.secure)
-        .http_only(name != CSRF_COOKIE)
+        .http_only(true)
         .same_site(SameSite::Lax)
         .max_age(TimeDuration::ZERO)
         .build();
@@ -250,17 +206,6 @@ mod tests {
     }
 
     #[test]
-    fn csrf_token_is_url_safe() {
-        let token = new_csrf_token();
-        for byte in token.bytes() {
-            assert!(
-                byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_',
-                "non-url-safe byte {byte:?} in {token}"
-            );
-        }
-    }
-
-    #[test]
     fn access_cookie_is_http_only_and_path_root() {
         let cfg = config_with_origin("https://www.eurora-labs.com");
         let cookie = access_cookie(&cfg, "tok".into(), 3600);
@@ -277,13 +222,5 @@ mod tests {
         let cookie = refresh_cookie(&cfg, "tok".into(), 7 * 24 * 3600);
         assert_eq!(cookie.path(), Some(REFRESH_COOKIE_PATH));
         assert_eq!(cookie.http_only(), Some(true));
-    }
-
-    #[test]
-    fn csrf_cookie_is_not_http_only() {
-        let cfg = config_with_origin("https://www.eurora-labs.com");
-        let cookie = csrf_cookie(&cfg, "tok".into(), 3600);
-        assert_eq!(cookie.name(), CSRF_COOKIE);
-        assert_eq!(cookie.http_only(), Some(false));
     }
 }

@@ -1,4 +1,5 @@
 mod extract;
+mod web_origins;
 
 use std::collections::HashSet;
 
@@ -7,6 +8,9 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation, decode};
 
 pub use auth_core::{Claims, Role};
 pub use extract::{AuthUser, InvalidUserId, MissingClaims};
+pub use web_origins::{
+    WEB_ALLOWED_ORIGINS_ENV, default_web_origins, parse_web_origins, web_origins_from_env,
+};
 
 #[derive(Clone)]
 pub struct JwtConfig {

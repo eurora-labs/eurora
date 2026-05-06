@@ -14,15 +14,33 @@ REPLACED=0
 replace_binary() {
 	local target="$1"
 	local source="$2"
-	if [[ -f "$target" ]]; then
-		if ! cp "$source" "$target" 2>/dev/null; then
-			echo "  Error: It appears some browser extensions are using the target binary, disable them first" >&2
-			exit 1
-		fi
-		chmod 755 "$target"
-		echo "  Replaced: $target"
-		REPLACED=$((REPLACED + 1))
+	if [[ ! -f "$target" ]]; then
+		return
 	fi
+
+	# Atomically replace the destination via a sibling temp file + rename(2).
+	# An in-place `cp` would open the target with O_TRUNC and fail with
+	# ETXTBSY ("text file busy") whenever a browser extension is currently
+	# running this messenger. `mv` over the same filesystem is rename(2),
+	# which leaves the running process's inode untouched and swaps the
+	# directory entry atomically.
+	local tmp
+	tmp="$(mktemp "${target}.XXXXXX")"
+
+	if ! cp "$source" "$tmp"; then
+		rm -f "$tmp"
+		echo "  Error: failed to write temp file next to $target" >&2
+		exit 1
+	fi
+	chmod 755 "$tmp"
+	if ! mv -f "$tmp" "$target"; then
+		rm -f "$tmp"
+		echo "  Error: failed to rename $tmp into $target" >&2
+		exit 1
+	fi
+
+	echo "  Replaced: $target"
+	REPLACED=$((REPLACED + 1))
 }
 
 case "$OS" in
