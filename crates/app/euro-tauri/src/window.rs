@@ -58,6 +58,10 @@ pub fn create(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
+    // Linux CSD: we draw our own decorations (rounded corners + shadow in CSS),
+    // so the window is decoration-less and transparent. `shadow(true)` is a
+    // hint that some compositors (Mutter) honor for borderless windows; the
+    // visual fallback comes from the CSS box-shadow on the app shell.
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
@@ -67,6 +71,7 @@ pub fn create(
     .title(handle.package_info().name.clone())
     .decorations(false)
     .transparent(true)
+    .shadow(true)
     .disable_drag_drop_handler()
     .min_inner_size(800.0, 600.0)
     .inner_size(1160.0, 720.0)
@@ -88,11 +93,43 @@ pub fn create(
     .resizable(true)
     .title(handle.package_info().name.clone())
     .decorations(false)
+    .shadow(true)
     .disable_drag_drop_handler()
     .min_inner_size(800.0, 600.0)
     .inner_size(1160.0, 720.0)
     .build()?;
+
+    // Opt the borderless window back into the Windows 11 system corner
+    // rounding and drop shadow that `decorations(false)` otherwise removes.
+    // No-op on Windows 10 (the DWM ignores unknown attribute values).
+    apply_windows_corner_rounding(&window);
+
     Ok(window)
+}
+
+#[cfg(target_os = "windows")]
+fn apply_windows_corner_rounding(window: &tauri::WebviewWindow) {
+    use windows::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+        DWM_WINDOW_CORNER_PREFERENCE,
+    };
+
+    let Ok(hwnd) = window.hwnd() else { return };
+    let preference: DWM_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND;
+    // SAFETY: `hwnd` is a live HWND owned by Tauri for the lifetime of the
+    // window, and we hand DWM a pointer to a `DWM_WINDOW_CORNER_PREFERENCE`
+    // value of the matching size — exactly what the attribute expects.
+    let result = unsafe {
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &preference as *const _ as *const _,
+            std::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
+        )
+    };
+    if let Err(error) = result {
+        tracing::warn!(?error, "DwmSetWindowAttribute(corner_preference) failed");
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -101,6 +138,10 @@ pub fn create(
     label: &str,
     window_relative_url: String,
 ) -> tauri::Result<tauri::WebviewWindow> {
+    // macOS keeps native window decorations: AppKit rounds the window,
+    // draws the system shadow, and manages edge resize. We only ask it to
+    // hide the title text and use the overlay style so our custom titlebar
+    // can render under the traffic lights.
     let window = tauri::WebviewWindowBuilder::new(
         handle,
         label,
@@ -113,6 +154,10 @@ pub fn create(
     .hidden_title(true)
     .disable_drag_drop_handler()
     .title_bar_style(tauri::TitleBarStyle::Overlay)
+    // Vertically center the traffic lights inside the 28px custom titlebar
+    // (lights are 12px tall → 8px top inset). Horizontal 12px matches the
+    // standard inset AppKit uses for unified-style windows.
+    .traffic_light_position(tauri::LogicalPosition::new(12.0, 8.0))
     .build()?;
     Ok(window)
 }

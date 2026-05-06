@@ -4051,6 +4051,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "windows",
  "winreg 0.56.0",
 ]
 
