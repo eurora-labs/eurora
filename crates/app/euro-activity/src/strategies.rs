@@ -10,12 +10,14 @@ use url::Url;
 pub mod browser;
 pub mod default;
 pub mod no_strategy;
+pub mod preview;
 pub mod word;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
 use euro_native_messaging::NativeMetadata;
 pub use no_strategy::NoStrategy;
+pub use preview::PreviewStrategy;
 pub use word::WordStrategy;
 
 use crate::{
@@ -75,6 +77,7 @@ impl From<NativeMetadata> for StrategyMetadata {
 pub enum ActivityStrategy {
     BrowserStrategy,
     WordStrategy,
+    PreviewStrategy,
     DefaultStrategy,
     NoStrategy,
 }
@@ -85,8 +88,9 @@ impl ActivityStrategy {
     /// Strategies are tried in priority order: [`NoStrategy`] suppresses
     /// tracking for Eurora's own processes, [`BrowserStrategy`] handles
     /// known browsers, [`WordStrategy`] handles the Microsoft Word
-    /// integration, and any other process falls through to
-    /// [`DefaultStrategy`].
+    /// integration, [`PreviewStrategy`] handles macOS Preview.app (and
+    /// is a no-op on other targets), and any other process falls through
+    /// to [`DefaultStrategy`].
     pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
         if NoStrategy::matches_process(process_name) {
             return NoStrategy::create().await;
@@ -96,6 +100,9 @@ impl ActivityStrategy {
         }
         if WordStrategy::matches_process(process_name) {
             return WordStrategy::create().await;
+        }
+        if PreviewStrategy::matches_process(process_name) {
+            return PreviewStrategy::create().await;
         }
         Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
     }
