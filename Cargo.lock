@@ -1642,7 +1642,6 @@ dependencies = [
  "auth-core",
  "axum",
  "axum-extra",
- "base64 0.22.1",
  "be-auth-core",
  "be-email-service",
  "be-remote-db",
