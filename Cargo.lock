@@ -285,6 +285,8 @@ dependencies = [
  "sha1 0.10.6",
  "sha2 0.10.9",
  "simsimd",
+ "specta",
+ "specta-typescript",
  "tempfile",
  "thiserror 2.0.18",
  "tiktoken-rs",
@@ -4059,6 +4061,7 @@ dependencies = [
 name = "euro-thread"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-core",
  "chrono",
  "euro-auth",
  "euro-endpoint",
@@ -11439,11 +11442,11 @@ dependencies = [
 name = "thread-core"
 version = "0.0.0"
 dependencies = [
+ "agent-chain-core",
  "chrono",
  "serde",
  "serde_json",
  "specta",
- "specta-typescript",
  "uuid",
 ]
 

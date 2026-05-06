@@ -1,30 +1,24 @@
-import type { ContentBlock } from '$lib/models/content-blocks/index.js';
-import type { InvalidToolCall, ToolCall, UsageMetadata } from '$lib/models/messages/ai-message.js';
-import type { MessageNode } from '$lib/models/messages/index.js';
+import type {
+	AIMessageChunk,
+	ChatServerMessage,
+	MessageNode,
+} from '@eurora/shared/bindings/thread';
 
-export interface ToolCallChunk {
-	name: string | null;
-	args: string | null;
-	id: string | null;
-	index: number | null;
-	chunkType: string | null;
-}
+export type AiMessageChunk = AIMessageChunk;
+export type ToolCallChunk = AIMessageChunk['tool_call_chunks'][number];
 
-export interface AiMessageChunk {
-	content: ContentBlock[];
-	id: string | null;
-	name: string | null;
-	toolCalls: ToolCall[];
-	invalidToolCalls: InvalidToolCall[];
-	toolCallChunks: ToolCallChunk[];
-	usageMetadata: UsageMetadata | null;
-	additionalKwargs: string | null;
-	responseMetadata: string | null;
+// Re-shape `ChatServerMessage` for consumers — the converter used to fold the
+// `confirmed_human_message` and `error` variants into a single discriminated
+// union. The error variant is now thrown as an exception inside the stream
+// pipeline; consumers only see successful frames here.
+export interface StreamConfirmedHumanMessage {
+	type: 'confirmed_human';
+	message: MessageNode;
 }
 
 export interface StreamChunk {
 	type: 'chunk';
-	chunk: AiMessageChunk;
+	chunk: AIMessageChunk;
 }
 
 export interface StreamFinalMessage {
@@ -32,9 +26,17 @@ export interface StreamFinalMessage {
 	messages: MessageNode[];
 }
 
-export interface StreamConfirmedHumanMessage {
-	type: 'confirmed_human';
-	message: MessageNode;
-}
+export type ChatStreamEvent = StreamConfirmedHumanMessage | StreamChunk | StreamFinalMessage;
 
-export type ChatStreamEvent = StreamChunk | StreamFinalMessage | StreamConfirmedHumanMessage;
+export function fromChatServerMessage(frame: ChatServerMessage): ChatStreamEvent {
+	switch (frame.type) {
+		case 'confirmed_human_message':
+			return { type: 'confirmed_human', message: frame.message };
+		case 'chunk':
+			return { type: 'chunk', chunk: frame.chunk };
+		case 'final':
+			return { type: 'final', messages: frame.messages };
+		case 'error':
+			throw new Error(`${frame.kind}: ${frame.message}`);
+	}
+}

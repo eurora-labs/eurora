@@ -10,23 +10,17 @@
 //! adds `specta::Type` so the same definitions can be re-exported as TS.
 //! No HTTP, database, gRPC, or LLM dependencies live here on purpose.
 //!
-//! Where rich `agent-chain` payloads cross the wire (message bodies, content
-//! blocks, AI message chunks), they are typed as [`serde_json::Value`]. They
-//! are produced/consumed via `agent-chain`'s existing `serde` impls on the
-//! Rust side; on the TypeScript side the existing `message-converter` layer
-//! consumes them as opaque JSON and yields typed domain models. Embedding the
-//! agent-chain types directly here would require draping specta over the
-//! crate's hand-rolled serde, which is out of scope for the wire contract.
+//! Rich `agent-chain` payloads (message bodies, content blocks, AI message
+//! chunks) are typed end-to-end via the `agent-chain-core` types so the
+//! TypeScript bindings emit proper discriminated unions instead of `unknown`.
 
+use agent_chain_core::messages::{AIMessageChunk, AnyMessage, ContentBlock};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use uuid::Uuid;
 
 #[cfg(feature = "specta")]
 use specta::Type;
-#[cfg(feature = "specta")]
-use specta_typescript::Unknown;
 
 /// A persisted thread row as returned to the client.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -86,23 +80,13 @@ pub struct GetThreadResponse {
 pub struct DeleteThreadResponse {}
 
 /// One node in the message tree returned by message-list endpoints.
-///
-/// `message` is an `agent_chain::AnyMessage` serialized as JSON. We type the
-/// field as [`serde_json::Value`] so this crate stays free of the agent-chain
-/// dependency, and override the TypeScript representation to `unknown` so
-/// the frontend converter narrows it explicitly. The same trick on
-/// `children` works around `specta-typescript`'s lack of recursive type
-/// references at this version (it would inline the type and stack-overflow);
-/// the runtime JSON shape is still a real recursive `MessageNode` tree.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct MessageNode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<Uuid>,
-    #[cfg_attr(feature = "specta", specta(type = Unknown))]
-    pub message: Value,
+    pub message: AnyMessage,
     #[serde(default)]
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
     pub children: Vec<MessageNode>,
     pub sibling_index: i32,
     pub depth: i32,
@@ -220,16 +204,14 @@ pub struct SearchMessageResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct SavePreliminaryContentBlocksRequest {
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
-    pub content_blocks: Vec<Value>,
+    pub content_blocks: Vec<ContentBlock>,
 }
 
 /// Response body for `POST /threads/{thread_id}/preliminary-blocks`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct SavePreliminaryContentBlocksResponse {
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
-    pub content_blocks: Vec<Value>,
+    pub content_blocks: Vec<ContentBlock>,
 }
 
 /// Frame sent by the client over the chat WebSocket.
@@ -248,14 +230,12 @@ pub enum ChatClientMessage {
 
 /// Payload of a [`ChatClientMessage::Send`] frame.
 ///
-/// `content_blocks` carries a `Vec<agent_chain::ContentBlock>` as JSON. When
-/// `parent_message_id` is present the turn is interpreted as an edit of an
-/// existing branch; the service rewinds `active_leaf` accordingly.
+/// When `parent_message_id` is present the turn is interpreted as an edit of
+/// an existing branch; the service rewinds `active_leaf` accordingly.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ChatSendRequest {
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
-    pub content_blocks: Vec<Value>,
+    pub content_blocks: Vec<ContentBlock>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_message_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -264,9 +244,9 @@ pub struct ChatSendRequest {
 
 /// Frame sent by the server over the chat WebSocket.
 ///
-/// `chunk` carries an `AIMessageChunk` JSON; the client should accumulate
-/// chunks (using agent-chain's chunk-merge semantics) and replace placeholder
-/// state with the `final_messages` payload when the turn ends.
+/// Clients should accumulate `Chunk` payloads (using agent-chain's chunk-merge
+/// semantics) and replace placeholder state with the `Final.messages` payload
+/// when the turn ends.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -274,10 +254,7 @@ pub enum ChatServerMessage {
     /// The user's message has been persisted; clients should display it.
     ConfirmedHumanMessage { message: MessageNode },
     /// One streaming chunk from the AI.
-    Chunk {
-        #[cfg_attr(feature = "specta", specta(type = Unknown))]
-        chunk: Value,
-    },
+    Chunk { chunk: AIMessageChunk },
     /// The turn ended successfully; tree positions for everything that was
     /// persisted during this turn (human + AI + any tool messages).
     Final { messages: Vec<MessageNode> },
@@ -333,7 +310,6 @@ pub fn type_collection() -> specta::TypeCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn create_thread_request_omits_optional_title() {
@@ -353,11 +329,31 @@ mod tests {
         assert_eq!(q, back);
     }
 
+    fn sample_human_message() -> AnyMessage {
+        AnyMessage::HumanMessage(
+            agent_chain_core::messages::HumanMessage::builder()
+                .content("hi")
+                .build(),
+        )
+    }
+
+    fn sample_text_block() -> ContentBlock {
+        ContentBlock::Text(
+            agent_chain_core::messages::TextContentBlock::builder()
+                .text("hi")
+                .build(),
+        )
+    }
+
+    fn sample_ai_chunk() -> AIMessageChunk {
+        AIMessageChunk::builder().content("").build()
+    }
+
     #[test]
     fn message_node_round_trips() {
         let node = MessageNode {
             parent_id: Some(Uuid::nil()),
-            message: json!({"type": "human", "content": [{"type": "text", "text": "hi"}]}),
+            message: sample_human_message(),
             children: vec![],
             sibling_index: 0,
             depth: 0,
@@ -370,7 +366,7 @@ mod tests {
     #[test]
     fn chat_client_message_serializes_send_with_tag() {
         let m = ChatClientMessage::Send(ChatSendRequest {
-            content_blocks: vec![json!({"type": "text", "text": "hi"})],
+            content_blocks: vec![sample_text_block()],
             parent_message_id: None,
             asset_chips_json: None,
         });
@@ -391,13 +387,15 @@ mod tests {
             ChatServerMessage::ConfirmedHumanMessage {
                 message: MessageNode {
                     parent_id: None,
-                    message: json!({}),
+                    message: sample_human_message(),
                     children: vec![],
                     sibling_index: 0,
                     depth: 0,
                 },
             },
-            ChatServerMessage::Chunk { chunk: json!({}) },
+            ChatServerMessage::Chunk {
+                chunk: sample_ai_chunk(),
+            },
             ChatServerMessage::Final { messages: vec![] },
             ChatServerMessage::Error {
                 kind: "internal".into(),

@@ -5,6 +5,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 
+#[cfg(feature = "specta")]
+use specta_typescript::Unknown;
+
 use super::base::{
     AnyMessage, BaseMessage, BaseMessageChunk, get_msg_title_repr, is_interactive_env,
 };
@@ -14,11 +17,14 @@ use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists};
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct HumanMessage {
     pub content: ContentBlocks,
     pub id: Option<String>,
     pub name: Option<String>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -283,11 +289,14 @@ impl HumanMessage {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct HumanMessageChunk {
     pub content: ContentBlocks,
     pub id: Option<String>,
     pub name: Option<String>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 

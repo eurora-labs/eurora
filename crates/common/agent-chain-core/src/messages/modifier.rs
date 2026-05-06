@@ -4,19 +4,25 @@ use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+#[cfg(feature = "specta")]
+use specta_typescript::Unknown;
+
 use super::base::{BaseMessage, get_msg_title_repr, is_interactive_env};
 use super::content::{ContentBlock, ContentBlocks};
 
 static EMPTY_CONTENT_BLOCKS: LazyLock<ContentBlocks> = LazyLock::new(ContentBlocks::new);
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct RemoveMessage {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
     #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 

@@ -131,11 +131,11 @@
 				{#each messageResults as message}
 					<Command.Item
 						value="msg-{message.id}"
-						onSelect={() => selectThread(message.threadId)}
+						onSelect={() => selectThread(message.thread_id)}
 					>
 						<MessageSquareIcon class="size-4 text-foreground" />
 						<div class="flex flex-col gap-0.5 min-w-0">
-							<span class="text-xs">{message.messageType}</span>
+							<span class="text-xs">{message.message_type}</span>
 							<span class="line-clamp-2 text-sm"
 								>{@html sanitizeSnippet(message.snippet)}</span
 							>

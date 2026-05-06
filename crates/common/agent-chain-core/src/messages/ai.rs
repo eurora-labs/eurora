@@ -5,6 +5,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fmt;
 
+#[cfg(feature = "specta")]
+use specta_typescript::Unknown;
+
 use super::base::{
     AnyMessage, BaseMessage, BaseMessageChunk, MergeableContent, get_msg_title_repr,
     merge_content_complex,
@@ -20,6 +23,7 @@ use crate::utils::merge::{merge_dicts, merge_lists};
 use crate::utils::usage::dict_int_op;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InputTokenDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<i64>,
@@ -32,6 +36,7 @@ pub struct InputTokenDetails {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct OutputTokenDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio: Option<i64>,
@@ -42,6 +47,7 @@ pub struct OutputTokenDetails {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct UsageMetadata {
     pub input_tokens: i64,
     pub output_tokens: i64,
@@ -122,6 +128,7 @@ impl UsageMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AIMessage {
     pub content: ContentBlocks,
     pub id: Option<String>,
@@ -129,7 +136,9 @@ pub struct AIMessage {
     pub tool_calls: Vec<ToolCall>,
     pub invalid_tool_calls: Vec<InvalidToolCall>,
     pub usage_metadata: Option<UsageMetadata>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -551,12 +560,14 @@ fn format_tool_calls_repr(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum ChunkPosition {
     Last,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AIMessageChunk {
     pub content: ContentBlocks,
     pub id: Option<String>,
@@ -565,7 +576,9 @@ pub struct AIMessageChunk {
     pub invalid_tool_calls: Vec<InvalidToolCall>,
     pub tool_call_chunks: Vec<ToolCallChunk>,
     pub usage_metadata: Option<UsageMetadata>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub response_metadata: HashMap<String, serde_json::Value>,
     pub chunk_position: Option<ChunkPosition>,
 }

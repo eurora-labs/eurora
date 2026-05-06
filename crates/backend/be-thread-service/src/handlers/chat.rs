@@ -37,7 +37,7 @@ use uuid::Uuid;
 use be_auth_core::AuthUser;
 
 use crate::agent_loop::run_agent_loop;
-use crate::conversion::{convert_db_message_to_base_message, db_message_to_wire_json};
+use crate::conversion::convert_db_message_to_base_message;
 use crate::error::{ThreadServiceError, ThreadServiceResult};
 use crate::llm::{LlmContext, prepare_llm_context};
 use crate::service::AppState;
@@ -233,12 +233,7 @@ async fn run_turn(
         })
         .collect();
 
-    let content_blocks: Vec<ContentBlock> = request
-        .content_blocks
-        .into_iter()
-        .map(serde_json::from_value::<ContentBlock>)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| ThreadServiceError::invalid_argument(format!("Invalid content block: {e}")))?;
+    let content_blocks: Vec<ContentBlock> = request.content_blocks;
 
     let mut human_additional_kwargs: HashMap<String, Value> = HashMap::new();
     if let Some(ref chips_json) = request.asset_chips_json
@@ -288,7 +283,7 @@ async fn run_turn(
     let human_parent_id = human_db_message.parent_message_id;
     let human_node = MessageNode {
         parent_id: human_parent_id,
-        message: db_message_to_wire_json(human_db_message)?,
+        message: convert_db_message_to_base_message(human_db_message)?,
         children: vec![],
         sibling_index: 0,
         depth: 0,

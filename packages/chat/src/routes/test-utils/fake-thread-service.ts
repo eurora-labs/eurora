@@ -13,13 +13,15 @@ let nextId = 1;
 
 function makeThread(overrides?: Partial<Thread>): Thread {
 	const id = `thread-${nextId++}`;
+	const now = new Date().toISOString();
 	return {
 		id,
+		user_id: '',
 		title: `Thread ${id}`,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
+		created_at: now,
+		updated_at: now,
 		...overrides,
-	};
+	} as Thread;
 }
 
 export function makeMessageNode(
@@ -30,11 +32,11 @@ export function makeMessageNode(
 ): MessageNode {
 	const content: ContentBlock[] =
 		text.length > 0
-			? [{ type: 'text', id: null, text, annotations: [], index: null, extras: null }]
+			? [{ type: 'text', id: null, text, annotations: null, index: null, extras: null }]
 			: [];
 
 	const base: MessageNode = {
-		parentId: null,
+		parent_id: null,
 		message:
 			type === 'human'
 				? {
@@ -42,23 +44,22 @@ export function makeMessageNode(
 						content,
 						id,
 						name: null,
-						additionalKwargs: null,
-						responseMetadata: null,
-						assetChips: [],
+						additional_kwargs: {},
+						response_metadata: {},
 					}
 				: {
 						type: 'ai',
 						content,
 						id,
 						name: null,
-						toolCalls: [],
-						invalidToolCalls: [],
-						usageMetadata: null,
-						additionalKwargs: null,
-						responseMetadata: null,
+						tool_calls: [],
+						invalid_tool_calls: [],
+						usage_metadata: null,
+						additional_kwargs: {},
+						response_metadata: {},
 					},
 		children: [],
-		siblingIndex: 0,
+		sibling_index: 0,
 		depth: 0,
 	};
 	return { ...base, ...overrides };
@@ -69,23 +70,30 @@ export function makeReasoningNode(id: string, reasoning: string, text: string): 
 		{ type: 'reasoning', id: null, reasoning, index: null, extras: null },
 	];
 	if (text) {
-		content.push({ type: 'text', id: null, text, annotations: [], index: null, extras: null });
+		content.push({
+			type: 'text',
+			id: null,
+			text,
+			annotations: null,
+			index: null,
+			extras: null,
+		});
 	}
 	return {
-		parentId: null,
+		parent_id: null,
 		message: {
 			type: 'ai',
 			content,
 			id,
 			name: null,
-			toolCalls: [],
-			invalidToolCalls: [],
-			usageMetadata: null,
-			additionalKwargs: null,
-			responseMetadata: null,
+			tool_calls: [],
+			invalid_tool_calls: [],
+			usage_metadata: null,
+			additional_kwargs: {},
+			response_metadata: {},
 		},
 		children: [],
-		siblingIndex: 0,
+		sibling_index: 0,
 		depth: 0,
 	};
 }
@@ -160,7 +168,7 @@ export class FakeThreadService implements IThreadService {
 		return this.threads
 			.filter((t) => t.title.toLowerCase().includes(needle))
 			.slice(offset, offset + limit)
-			.map((t) => ({ id: t.id, title: t.title, rank: 1 }));
+			.map((t) => ({ id: t.id, title: t.title, rank: 1, updated_at: t.updated_at }));
 	}
 
 	async searchMessages(

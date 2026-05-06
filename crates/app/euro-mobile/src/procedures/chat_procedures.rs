@@ -1,5 +1,4 @@
 use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
-use serde_json::Value;
 use tauri::{Manager, Runtime, ipc::Channel};
 use thread_core::{ChatSendRequest, ChatServerMessage};
 use tokio_util::sync::CancellationToken;
@@ -72,7 +71,7 @@ impl ChatApi for ChatApiImpl {
             .insert(thread_id.clone(), cancel.clone());
 
         let request = ChatSendRequest {
-            content_blocks: content_blocks_to_json(&context_blocks),
+            content_blocks: context_blocks.into_inner(),
             parent_message_id: parent_message_uuid,
             asset_chips_json: None,
         };
@@ -136,11 +135,4 @@ impl ChatApi for ChatApiImpl {
 
         Ok(())
     }
-}
-
-fn content_blocks_to_json(blocks: &ContentBlocks) -> Vec<Value> {
-    blocks
-        .iter()
-        .filter_map(|b| serde_json::to_value(b).ok())
-        .collect()
 }

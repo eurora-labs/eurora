@@ -241,8 +241,8 @@ impl ThreadManager {
     pub async fn save_preliminary_content_blocks(
         &self,
         thread_id: Uuid,
-        content_blocks: Vec<serde_json::Value>,
-    ) -> Result<Vec<serde_json::Value>> {
+        content_blocks: Vec<agent_chain_core::messages::ContentBlock>,
+    ) -> Result<Vec<agent_chain_core::messages::ContentBlock>> {
         let body = SavePreliminaryContentBlocksRequest { content_blocks };
         let response: SavePreliminaryContentBlocksResponse = self
             .post_json(&format!("/threads/{thread_id}/preliminary-blocks"), &body)

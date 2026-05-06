@@ -32,10 +32,11 @@
 				fakeService.threads = [
 					{
 						id: threadId,
+						user_id: '',
 						title: 'Test Thread',
-						createdAt: new Date().toISOString(),
-						updatedAt: new Date().toISOString(),
-					},
+						created_at: new Date().toISOString(),
+						updated_at: new Date().toISOString(),
+					} as never,
 				];
 				fakeService.messagesByThread.set(threadId, [
 					makeMessageNode('msg-1', 'human', 'Hello'),
@@ -49,10 +50,11 @@
 				fakeService.threads = [
 					{
 						id: threadId,
+						user_id: '',
 						title: 'Test Thread',
-						createdAt: new Date().toISOString(),
-						updatedAt: new Date().toISOString(),
-					},
+						created_at: new Date().toISOString(),
+						updated_at: new Date().toISOString(),
+					} as never,
 				];
 				fakeService.messagesByThread.set(threadId, []);
 				await chatService.loadThreads(20, 0);

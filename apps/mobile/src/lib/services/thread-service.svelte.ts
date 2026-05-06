@@ -1,10 +1,6 @@
-import {
-	toChatStreamEvent,
-	toMessageNodes,
-} from '@eurora/chat/services/converters/message-converter';
+import { fromChatServerMessage } from '@eurora/chat/models/streaming';
 import type { Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
 import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
@@ -13,6 +9,11 @@ import type {
 	IThreadService,
 	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
+import type {
+	ChatServerMessage,
+	MessageNode,
+	Thread as WireThread,
+} from '@eurora/shared/bindings/thread';
 
 export class ThreadService implements IThreadService {
 	private readonly taurpc: TaurpcService;
@@ -22,15 +23,7 @@ export class ThreadService implements IThreadService {
 	}
 
 	async listThreads(limit: number, offset: number): Promise<Thread[]> {
-		return (await this.taurpc.thread.list(limit, offset)).map(
-			(thread) =>
-				({
-					id: thread.id,
-					title: thread.title,
-					createdAt: thread.created_at,
-					updatedAt: thread.updated_at,
-				}) as Thread,
-		);
+		return (await this.taurpc.thread.list(limit, offset)) as unknown as Thread[];
 	}
 
 	async getMessages(
@@ -39,8 +32,12 @@ export class ThreadService implements IThreadService {
 		offset: number,
 		allVariants: boolean,
 	): Promise<MessageNode[]> {
-		const raw = await this.taurpc.thread.get_messages(threadId, limit, offset, allVariants);
-		return toMessageNodes(raw);
+		return (await this.taurpc.thread.get_messages(
+			threadId,
+			limit,
+			offset,
+			allVariants,
+		)) as unknown as MessageNode[];
 	}
 
 	async switchBranch(
@@ -48,8 +45,11 @@ export class ThreadService implements IThreadService {
 		messageId: string,
 		direction: BranchDirection,
 	): Promise<MessageNode[]> {
-		const raw = await this.taurpc.thread.switch_branch(threadId, messageId, direction);
-		return toMessageNodes(raw);
+		return (await this.taurpc.thread.switch_branch(
+			threadId,
+			messageId,
+			direction,
+		)) as unknown as MessageNode[];
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
@@ -57,29 +57,11 @@ export class ThreadService implements IThreadService {
 	}
 
 	async createThread(): Promise<Thread> {
-		const raw = await this.taurpc.thread.create();
-		if (!raw.id) {
-			throw new Error('Backend returned thread without id');
-		}
-		return {
-			id: raw.id,
-			title: raw.title,
-			createdAt: raw.created_at,
-			updatedAt: raw.updated_at,
-		};
+		return (await this.taurpc.thread.create()) as unknown as WireThread;
 	}
 
 	async generateTitle(threadId: string): Promise<Thread> {
-		const raw = await this.taurpc.thread.generate_title(threadId);
-		if (!raw.id) {
-			throw new Error('Backend returned thread without id');
-		}
-		return {
-			id: raw.id,
-			title: raw.title,
-			createdAt: raw.created_at,
-			updatedAt: raw.updated_at,
-		};
+		return (await this.taurpc.thread.generate_title(threadId)) as unknown as WireThread;
 	}
 
 	async searchThreads(
@@ -87,8 +69,11 @@ export class ThreadService implements IThreadService {
 		limit: number,
 		offset: number,
 	): Promise<ThreadSearchResult[]> {
-		const raw = await this.taurpc.thread.search_threads(query, limit, offset);
-		return raw.map((r) => ({ id: r.id, title: r.title, rank: r.rank }));
+		return (await this.taurpc.thread.search_threads(
+			query,
+			limit,
+			offset,
+		)) as unknown as ThreadSearchResult[];
 	}
 
 	async searchMessages(
@@ -96,14 +81,11 @@ export class ThreadService implements IThreadService {
 		limit: number,
 		offset: number,
 	): Promise<MessageSearchResult[]> {
-		const raw = await this.taurpc.thread.search_messages(query, limit, offset);
-		return raw.map((r) => ({
-			id: r.id,
-			threadId: r.thread_id,
-			messageType: r.message_type,
-			snippet: r.snippet,
-			rank: r.rank,
-		}));
+		return (await this.taurpc.thread.search_messages(
+			query,
+			limit,
+			offset,
+		)) as unknown as MessageSearchResult[];
 	}
 
 	async *sendMessage(
@@ -127,13 +109,12 @@ export class ThreadService implements IThreadService {
 			resolve = null;
 		}
 
-		// The Tauri channel emits raw JSON wire frames (`ChatServerMessage`);
-		// the converter is responsible for narrowing them. An `Error` variant
-		// throws inside the converter, which we propagate to the consumer via
-		// the existing `error` channel.
+		// Until taurpc regenerates its local bindings (which happens at app
+		// runtime, not at `cargo check`), the channel callback's type still
+		// reflects the pre-typing wire shape, so we narrow via `unknown`.
 		function onEvent(response: unknown) {
 			try {
-				buffer.push(toChatStreamEvent(response));
+				buffer.push(fromChatServerMessage(response as ChatServerMessage));
 			} catch (e) {
 				error = e;
 				finished = true;

@@ -21,7 +21,7 @@
 	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
 	const activeThread = $derived(chatService.activeThread?.thread);
 	const threadTitle = $derived(activeThread?.title ?? 'New Chat');
-	const threadDateIso = $derived(activeThread?.createdAt ?? new Date().toISOString());
+	const threadDateIso = $derived(activeThread?.created_at ?? new Date().toISOString());
 
 	const dateFormatter = new Intl.DateTimeFormat('en', {
 		month: 'short',

@@ -52,8 +52,8 @@ pub fn parse_web_origins(raw: &str) -> HashSet<String> {
 /// Read and parse `WEB_ALLOWED_ORIGINS`, falling back to
 /// [`default_web_origins`].
 pub fn web_origins_from_env() -> HashSet<String> {
-    let raw = std::env::var(WEB_ALLOWED_ORIGINS_ENV)
-        .unwrap_or_else(|_| default_web_origins().to_owned());
+    let raw =
+        std::env::var(WEB_ALLOWED_ORIGINS_ENV).unwrap_or_else(|_| default_web_origins().to_owned());
     parse_web_origins(&raw)
 }
 

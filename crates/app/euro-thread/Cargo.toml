@@ -5,6 +5,7 @@ edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+agent-chain-core = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 euro-auth = { workspace = true }
 euro-endpoint = { workspace = true }
