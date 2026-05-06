@@ -1,7 +1,7 @@
 use agent_chain_core::load::Serializable;
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk, ImageContentBlock,
+    AnyMessage, ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk, ImageContentBlock,
     SystemMessageChunk, TextContentBlock,
 };
 
@@ -80,8 +80,15 @@ fn test_serialization_roundtrip() {
         .additional_kwargs(additional_kwargs)
         .build();
 
+    // Bare-message JSON does NOT carry the discriminant; the tag lives on the
+    // AnyMessage union only.
     let serialized = serde_json::to_value(&msg).unwrap();
-    assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "human");
+    assert!(serialized.get("type").is_none());
+    assert_eq!(serialized["content"][0]["text"], "Hello");
+
+    // Wrapping in AnyMessage adds "type": "human".
+    let wrapped = serde_json::to_value(AnyMessage::HumanMessage(msg.clone())).unwrap();
+    assert_eq!(wrapped.get("type").unwrap().as_str().unwrap(), "human");
 
     let deserialized: HumanMessage = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.content.as_text(), "Hello");
@@ -109,13 +116,13 @@ fn test_empty_content() {
 fn test_chunk_init_basic() {
     let chunk = HumanMessageChunk::builder().content("Hello").build();
     assert_eq!(chunk.content.as_text(), "Hello");
-    assert_eq!(chunk.message_type(), "HumanMessageChunk");
+    assert_eq!(chunk.message_type(), "human_chunk");
 }
 
 #[test]
 fn test_chunk_type_is_human_message_chunk() {
     let chunk = HumanMessageChunk::builder().content("Test").build();
-    assert_eq!(chunk.message_type(), "HumanMessageChunk");
+    assert_eq!(chunk.message_type(), "human_chunk");
 }
 
 #[test]
@@ -217,11 +224,9 @@ fn test_chunk_serialization_roundtrip() {
         .name("user1".to_string())
         .build();
 
+    // Bare-chunk JSON omits "type"; the discriminant lives on AnyMessageChunk.
     let serialized = serde_json::to_value(&chunk).unwrap();
-    assert_eq!(
-        serialized.get("type").unwrap().as_str().unwrap(),
-        "HumanMessageChunk"
-    );
+    assert!(serialized.get("type").is_none());
 
     let deserialized: HumanMessageChunk = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.content.as_text(), "Hello");
@@ -447,7 +452,7 @@ fn test_model_dump_exact_keys_and_values() {
         .id("msg-001".to_string())
         .name("alice".to_string())
         .build();
-    let dumped = serde_json::to_value(&msg).unwrap();
+    let dumped = serde_json::to_value(AnyMessage::HumanMessage(msg)).unwrap();
     assert_eq!(dumped["content"][0]["text"], "Hello world");
     assert_eq!(dumped["type"], "human");
     assert_eq!(dumped["name"], "alice");
@@ -459,7 +464,7 @@ fn test_model_dump_exact_keys_and_values() {
 #[test]
 fn test_model_dump_default_values() {
     let msg = HumanMessage::builder().content("Test").build();
-    let dumped = serde_json::to_value(&msg).unwrap();
+    let dumped = serde_json::to_value(AnyMessage::HumanMessage(msg)).unwrap();
     assert_eq!(dumped["content"][0]["text"], "Test");
     assert_eq!(dumped["type"], "human");
     assert!(dumped["id"].is_null());

@@ -1,6 +1,6 @@
 use agent_chain_core::messages::BaseMessage;
 use agent_chain_core::messages::{
-    ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk, SystemMessage,
+    AnyMessage, ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk, SystemMessage,
     SystemMessageChunk, TextContentBlock,
 };
 
@@ -80,7 +80,9 @@ fn test_serialization_roundtrip() {
         .build();
 
     let serialized = serde_json::to_value(&msg).unwrap();
-    assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "system");
+    assert!(serialized.get("type").is_none());
+    let wrapped = serde_json::to_value(AnyMessage::SystemMessage(msg.clone())).unwrap();
+    assert_eq!(wrapped.get("type").unwrap().as_str().unwrap(), "system");
 
     let deserialized: SystemMessage = serde_json::from_value(serialized).unwrap();
     assert!(deserialized.content == "You are a helpful assistant.");
@@ -128,13 +130,13 @@ fn test_chunk_init_basic() {
         .content("Instructions")
         .build();
     assert!(chunk.content == "Instructions");
-    assert_eq!(chunk.message_type(), "SystemMessageChunk");
+    assert_eq!(chunk.message_type(), "system_chunk");
 }
 
 #[test]
 fn test_chunk_type_is_system_message_chunk() {
     let chunk = SystemMessageChunk::builder().content("Test").build();
-    assert_eq!(chunk.message_type(), "SystemMessageChunk");
+    assert_eq!(chunk.message_type(), "system_chunk");
 }
 
 #[test]
@@ -237,10 +239,7 @@ fn test_chunk_serialization_roundtrip() {
         .build();
 
     let serialized = serde_json::to_value(&chunk).unwrap();
-    assert_eq!(
-        serialized.get("type").unwrap().as_str().unwrap(),
-        "SystemMessageChunk"
-    );
+    assert!(serialized.get("type").is_none());
 
     let deserialized: SystemMessageChunk = serde_json::from_value(serialized).unwrap();
     assert!(deserialized.content == "Instructions");
@@ -521,7 +520,7 @@ fn test_model_dump_exact_keys_and_values() {
         .maybe_id(Some("sys-001".to_string()))
         .maybe_name(Some("prompt".to_string()))
         .build();
-    let dumped = serde_json::to_value(&msg).unwrap();
+    let dumped = serde_json::to_value(AnyMessage::SystemMessage(msg)).unwrap();
     assert_eq!(dumped["content"][0]["text"], "Be helpful");
     assert_eq!(dumped["type"], "system");
     assert_eq!(dumped["name"], "prompt");
@@ -533,7 +532,7 @@ fn test_model_dump_exact_keys_and_values() {
 #[test]
 fn test_model_dump_default_values() {
     let msg = SystemMessage::builder().content("Instructions").build();
-    let dumped = serde_json::to_value(&msg).unwrap();
+    let dumped = serde_json::to_value(AnyMessage::SystemMessage(msg)).unwrap();
     assert_eq!(dumped["content"][0]["text"], "Instructions");
     assert_eq!(dumped["type"], "system");
     assert!(dumped.get("name").is_none() || dumped["name"].is_null());

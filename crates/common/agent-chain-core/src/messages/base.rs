@@ -23,8 +23,14 @@ pub trait BaseMessage {
     fn response_metadata(&self) -> &HashMap<String, serde_json::Value>;
 }
 
+/// Tagged union of every message variant. Wire format is internally tagged on
+/// the `type` field — `{"type": "human", "content": ..., ...}` etc. The inner
+/// per-variant structs (`HumanMessage`, `AIMessage`, ...) deliberately do NOT
+/// carry their own `type` field; the discriminant is added at the union level
+/// and only there. This keeps the Rust types and the specta-generated TS types
+/// in lockstep with the actual JSON shape.
 #[enum_dispatch(BaseMessage)]
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type")]
 pub enum AnyMessage {
@@ -40,22 +46,6 @@ pub enum AnyMessage {
     ChatMessage(ChatMessage),
     #[serde(rename = "remove")]
     RemoveMessage(RemoveMessage),
-}
-
-impl Serialize for AnyMessage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            AnyMessage::HumanMessage(m) => m.serialize(serializer),
-            AnyMessage::SystemMessage(m) => m.serialize(serializer),
-            AnyMessage::AIMessage(m) => m.serialize(serializer),
-            AnyMessage::ToolMessage(m) => m.serialize(serializer),
-            AnyMessage::ChatMessage(m) => m.serialize(serializer),
-            AnyMessage::RemoveMessage(m) => m.serialize(serializer),
-        }
-    }
 }
 
 impl AnyMessage {
@@ -110,69 +100,76 @@ pub trait BaseMessageChunk {
     fn to_message(&self) -> AnyMessage;
 }
 
+/// Tagged union of every chunk variant. Variants carry the same chunk-style
+/// `type` value the consumer sees on the wire (`"ai_chunk"`, `"human_chunk"`,
+/// ...) — symmetric with [`AnyMessage`]'s `"ai"`, `"human"`, ... and a clean
+/// snake_case scheme across the board.
 #[enum_dispatch(BaseMessageChunk)]
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type")]
 pub enum AnyMessageChunk {
+    #[serde(rename = "ai_chunk")]
     AIMessageChunk(AIMessageChunk),
+    #[serde(rename = "human_chunk")]
     HumanMessageChunk(HumanMessageChunk),
+    #[serde(rename = "system_chunk")]
     SystemMessageChunk(SystemMessageChunk),
+    #[serde(rename = "tool_chunk")]
     ToolMessageChunk(ToolMessageChunk),
+    #[serde(rename = "chat_chunk")]
     ChatMessageChunk(ChatMessageChunk),
-}
-
-impl Serialize for AnyMessageChunk {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            AnyMessageChunk::AIMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::HumanMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::SystemMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::ToolMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::ChatMessageChunk(m) => m.serialize(serializer),
-        }
-    }
 }
 
 impl AnyMessageChunk {
     pub fn text(&self) -> String {
         self.content().to_string()
     }
-}
 
-impl std::ops::Add for AnyMessageChunk {
-    type Output = AnyMessageChunk;
-
-    fn add(self, other: AnyMessageChunk) -> AnyMessageChunk {
+    /// Concatenate two chunks of the same variant. Returns
+    /// [`MergeError::MismatchedVariant`] across variants and propagates per-variant
+    /// merge failures (e.g. mismatched chat role / tool_call_id).
+    pub fn try_concat(self, other: Self) -> Result<Self, MergeError> {
         match (self, other) {
             (AnyMessageChunk::AIMessageChunk(a), AnyMessageChunk::AIMessageChunk(b)) => {
-                AnyMessageChunk::AIMessageChunk(a + b)
+                Ok(AnyMessageChunk::AIMessageChunk(a + b))
             }
             (AnyMessageChunk::HumanMessageChunk(a), AnyMessageChunk::HumanMessageChunk(b)) => {
-                AnyMessageChunk::HumanMessageChunk(a + b)
+                Ok(AnyMessageChunk::HumanMessageChunk(a + b))
             }
             (AnyMessageChunk::SystemMessageChunk(a), AnyMessageChunk::SystemMessageChunk(b)) => {
-                AnyMessageChunk::SystemMessageChunk(a + b)
+                Ok(AnyMessageChunk::SystemMessageChunk(a + b))
             }
             (AnyMessageChunk::ToolMessageChunk(a), AnyMessageChunk::ToolMessageChunk(b)) => {
-                AnyMessageChunk::ToolMessageChunk(a + b)
+                a.try_concat(&b).map(AnyMessageChunk::ToolMessageChunk)
             }
             (AnyMessageChunk::ChatMessageChunk(a), AnyMessageChunk::ChatMessageChunk(b)) => {
-                AnyMessageChunk::ChatMessageChunk(a + b)
+                a.try_concat(&b).map(AnyMessageChunk::ChatMessageChunk)
             }
-            (left, right) => {
-                panic!(
-                    "unsupported operand type(s) for +: \"{}\" and \"{}\"",
-                    left.message_type(),
-                    right.message_type()
-                );
-            }
+            (left, right) => Err(MergeError::MismatchedVariant {
+                left: left.message_type(),
+                right: right.message_type(),
+            }),
         }
     }
+}
+
+/// Errors returned when merging chunks. Used by the chunk types whose `concat`
+/// is not total (`ChatMessageChunk` requires identical `role`,
+/// `ToolMessageChunk` requires identical `tool_call_id`) and by
+/// [`AnyMessageChunk::try_concat`] for cross-variant pairs.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum MergeError {
+    #[error("cannot merge chunks of different variants: {left} vs {right}")]
+    MismatchedVariant {
+        left: &'static str,
+        right: &'static str,
+    },
+    #[error("cannot merge ChatMessageChunks with different roles: {left:?} vs {right:?}")]
+    MismatchedRole { left: String, right: String },
+    #[error("cannot merge ToolMessageChunks with different tool_call_id: {left:?} vs {right:?}")]
+    MismatchedToolCallId { left: String, right: String },
 }
 
 impl From<&str> for AnyMessage {
@@ -331,6 +328,10 @@ pub fn merge_content_vec(first: Vec<Value>, second: Vec<Value>) -> Vec<Value> {
     result
 }
 
+/// Wrap a message into the `{ "type": <kind>, "data": { ... } }` envelope used
+/// by langchain-style dump/load. Internally `serde_json::to_value(msg)` already
+/// emits the discriminant via the `AnyMessage` enum's internal tag, so we strip
+/// it from the inner data to avoid duplication and let the wrapper carry it.
 pub fn message_to_dict(message: &AnyMessage) -> Value {
     let mut data = serde_json::to_value(message).unwrap_or_default();
 

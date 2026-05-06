@@ -89,13 +89,20 @@ impl Serializable for ChatGenerationChunk {
 impl Add for ChatGenerationChunk {
     type Output = ChatGenerationChunk;
 
+    /// Combine two streaming chunks. Stream consumers always feed homogeneous
+    /// chunks here; if the underlying message variants disagree (or a Chat /
+    /// Tool sub-mismatch is detected) we surface that as a panic with the
+    /// underlying [`crate::messages::MergeError`] — that's a programming bug
+    /// in the caller, not a recoverable runtime condition.
     fn add(self, other: ChatGenerationChunk) -> Self::Output {
         let generation_info =
             super::merge_generation_info(self.generation_info, other.generation_info);
 
         let self_chunk = crate::messages::AnyMessageChunk::from(&self.message);
         let other_chunk = crate::messages::AnyMessageChunk::from(&other.message);
-        let merged_chunk = self_chunk + other_chunk;
+        let merged_chunk = self_chunk
+            .try_concat(other_chunk)
+            .expect("merging incompatible ChatGenerationChunks");
         let merged_message = merged_chunk.to_message();
 
         ChatGenerationChunk {

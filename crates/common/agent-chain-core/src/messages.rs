@@ -15,10 +15,11 @@ pub use ai::{
 };
 
 pub use base::{
-    AnyMessage, AnyMessageChunk, BaseMessage, BaseMessageChunk, HasId, MergeableContent,
-    extract_reasoning_from_additional_kwargs, get_bolded_text, get_msg_title_repr,
-    is_interactive_env, merge_content, merge_content_complex, merge_content_vec,
-    message_to_dict as base_message_to_dict, messages_to_dict as base_messages_to_dict,
+    AnyMessage, AnyMessageChunk, BaseMessage, BaseMessageChunk, HasId, MergeError,
+    MergeableContent, extract_reasoning_from_additional_kwargs, get_bolded_text,
+    get_msg_title_repr, is_interactive_env, merge_content, merge_content_complex,
+    merge_content_vec, message_to_dict as base_message_to_dict,
+    messages_to_dict as base_messages_to_dict,
 };
 
 pub use chat::{ChatMessage, ChatMessageChunk};
