@@ -1,10 +1,7 @@
-use crate::error::ResultExt;
 use crate::shared_types::SharedThreadManager;
-use chrono::{TimeZone, Utc};
-use euro_thread::ListThreadsRequest;
-use proto_gen::agent_chain::BaseMessageWithSibling;
-use proto_gen::thread::CreateThreadRequest;
 use tauri::{Manager, Runtime};
+use thread_core::MessageNode;
+use uuid::Uuid;
 
 #[taurpc::ipc_type]
 pub struct Thread {
@@ -38,19 +35,18 @@ pub trait ThreadApi {
         limit: u32,
         offset: u32,
         all_variants: bool,
-    ) -> Result<Vec<BaseMessageWithSibling>, String>;
+    ) -> Result<Vec<MessageNode>, String>;
 
     async fn switch_branch<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         message_id: String,
         direction: i32,
-    ) -> Result<Vec<BaseMessageWithSibling>, String>;
+    ) -> Result<Vec<MessageNode>, String>;
 
     async fn generate_title<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        content: String,
     ) -> Result<Thread, String>;
 }
 
@@ -60,6 +56,10 @@ fn thread_manager<R: Runtime>(
     app_handle
         .try_state::<SharedThreadManager>()
         .ok_or_else(|| "Thread manager not available".to_string())
+}
+
+fn parse_uuid(field: &str, value: &str) -> Result<Uuid, String> {
+    Uuid::parse_str(value).map_err(|e| format!("Invalid {field}: {e}"))
 }
 
 #[derive(Clone)]
@@ -73,27 +73,18 @@ impl ThreadApi for ThreadApiImpl {
         limit: u32,
         offset: u32,
     ) -> Result<Vec<Thread>, String> {
-        let thread_state = thread_manager(&app_handle)?;
-        let thread_manager = thread_state.lock().await;
-
-        let threads = thread_manager
-            .list_threads(ListThreadsRequest { limit, offset })
+        let manager = thread_manager(&app_handle)?;
+        let threads = manager
+            .list_threads(limit, offset)
             .await
             .map_err(|e| e.to_string())?;
-
-        Ok(threads.into_iter().map(|thread| thread.into()).collect())
+        Ok(threads.into_iter().map(Thread::from).collect())
     }
 
     async fn create<R: Runtime>(self, app_handle: tauri::AppHandle<R>) -> Result<Thread, String> {
-        let thread_state = thread_manager(&app_handle)?;
-        let thread_manager = thread_state.lock().await;
-        let thread = thread_manager
-            .create(CreateThreadRequest {
-                title: "New Chat".to_string(),
-            })
-            .await
-            .map_err(|e| e.to_string())?;
-        Ok(thread.into())
+        let manager = thread_manager(&app_handle)?;
+        let thread = manager.create(None).await.map_err(|e| e.to_string())?;
+        Ok(Thread::from(thread))
     }
 
     async fn delete<R: Runtime>(
@@ -101,12 +92,9 @@ impl ThreadApi for ThreadApiImpl {
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
     ) -> Result<(), String> {
-        let thread_state = thread_manager(&app_handle)?;
-        let thread_manager = thread_state.lock().await;
-        thread_manager
-            .delete_thread(thread_id)
-            .await
-            .map_err(|e| e.to_string())
+        let manager = thread_manager(&app_handle)?;
+        let id = parse_uuid("thread_id", &thread_id)?;
+        manager.delete_thread(id).await.map_err(|e| e.to_string())
     }
 
     async fn get_messages<R: Runtime>(
@@ -116,14 +104,13 @@ impl ThreadApi for ThreadApiImpl {
         limit: u32,
         offset: u32,
         all_variants: bool,
-    ) -> Result<Vec<BaseMessageWithSibling>, String> {
-        let thread_state = thread_manager(&app_handle)?;
-        let thread_manager = thread_state.lock().await;
-        let response = thread_manager
-            .get_messages(thread_id, limit, offset, all_variants)
+    ) -> Result<Vec<MessageNode>, String> {
+        let manager = thread_manager(&app_handle)?;
+        let id = parse_uuid("thread_id", &thread_id)?;
+        manager
+            .get_messages(id, limit, offset, all_variants)
             .await
-            .ctx("Failed to get messages")?;
-        Ok(response.messages)
+            .map_err(|e| e.to_string())
     }
 
     async fn switch_branch<R: Runtime>(
@@ -132,58 +119,38 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         message_id: String,
         direction: i32,
-    ) -> Result<Vec<BaseMessageWithSibling>, String> {
-        let thread_state = thread_manager(&app_handle)?;
-        let thread_manager = thread_state.lock().await;
-        let response = thread_manager
+    ) -> Result<Vec<MessageNode>, String> {
+        let manager = thread_manager(&app_handle)?;
+        let thread_id = parse_uuid("thread_id", &thread_id)?;
+        let message_id = parse_uuid("message_id", &message_id)?;
+        manager
             .switch_branch(thread_id, message_id, direction)
             .await
-            .map_err(|e| e.to_string())?;
-
-        Ok(response.messages)
+            .map_err(|e| e.to_string())
     }
 
     async fn generate_title<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        content: String,
     ) -> Result<Thread, String> {
-        let thread_state = thread_manager(&app_handle)?;
-        let thread_manager = thread_state.lock().await;
-        let thread = thread_manager
-            .generate_thread_title(thread_id, content)
+        let manager = thread_manager(&app_handle)?;
+        let id = parse_uuid("thread_id", &thread_id)?;
+        let thread = manager
+            .generate_thread_title(id)
             .await
             .map_err(|e| e.to_string())?;
-        Ok(thread.into())
+        Ok(Thread::from(thread))
     }
 }
 
-impl From<proto_gen::thread::ProtoThread> for Thread {
-    fn from(thread: proto_gen::thread::ProtoThread) -> Self {
-        let created_at = thread
-            .created_at
-            .map(|ts| {
-                Utc.timestamp_opt(ts.seconds, ts.nanos as u32)
-                    .single()
-                    .unwrap_or_default()
-                    .to_rfc3339()
-            })
-            .unwrap_or_default();
-        let updated_at = thread
-            .updated_at
-            .map(|ts| {
-                Utc.timestamp_opt(ts.seconds, ts.nanos as u32)
-                    .single()
-                    .unwrap_or_default()
-                    .to_rfc3339()
-            })
-            .unwrap_or_default();
-        Thread {
-            id: thread.id.into(),
+impl From<thread_core::Thread> for Thread {
+    fn from(thread: thread_core::Thread) -> Self {
+        Self {
+            id: Some(thread.id.to_string()),
             title: thread.title,
-            created_at,
-            updated_at,
+            created_at: thread.created_at.to_rfc3339(),
+            updated_at: thread.updated_at.to_rfc3339(),
         }
     }
 }

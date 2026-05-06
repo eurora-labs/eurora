@@ -203,7 +203,7 @@ export class ChatService {
 
 		const onFirstChunk = isNewThread
 			? () => {
-					this.threadClient.generateTitle(threadId, text).then((updated) => {
+					this.threadClient.generateTitle(threadId).then((updated) => {
 						this.updateThread(updated);
 					});
 				}

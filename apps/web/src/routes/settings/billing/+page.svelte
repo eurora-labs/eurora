@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
+	import { ApiClient } from '$lib/api/client.js';
 	import { SUBSCRIPTION_SERVICE } from '$lib/services/subscription-service.svelte.js';
 	import { CONFIG_SERVICE } from '@eurora/shared/config/config-service';
 	import { inject } from '@eurora/shared/context';
@@ -11,9 +11,8 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import * as Sentry from '@sentry/sveltekit';
 
-	const auth = inject(AUTH_SERVICE);
 	const subscription = inject(SUBSCRIPTION_SERVICE);
-	const { restApiUrl: REST_API_URL } = inject(CONFIG_SERVICE);
+	const api = new ApiClient(inject(CONFIG_SERVICE));
 
 	let portalLoading = $state(false);
 	let portalError = $state<string | null>(null);
@@ -57,22 +56,9 @@
 		portalError = null;
 
 		try {
-			await auth.ensureValidToken();
-
-			const res = await fetch(`${REST_API_URL}/payment/portal`, {
+			const { url } = await api.fetch<{ url: string }>('/payment/portal', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${auth.accessToken}`,
-				},
 			});
-
-			if (!res.ok) {
-				const body = await res.json().catch(() => null);
-				throw new Error(body?.error ?? `Failed to open billing portal (${res.status})`);
-			}
-
-			const { url } = await res.json();
 			window.location.href = url;
 		} catch (err) {
 			Sentry.captureException(err, { tags: { area: 'payment.portal' } });

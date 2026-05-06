@@ -36,12 +36,11 @@
 		}
 
 		const loginToken = sessionStorage.getItem('loginToken') ?? undefined;
-		const challengeMethod = sessionStorage.getItem('challengeMethod') ?? undefined;
 		if (loginToken) sessionStorage.removeItem('loginToken');
-		if (challengeMethod) sessionStorage.removeItem('challengeMethod');
+		sessionStorage.removeItem('challengeMethod');
 
 		try {
-			await auth.loginWithOAuth(provider, code, state, { loginToken, challengeMethod });
+			await auth.loginWithOAuth(provider, code, state, { loginToken });
 
 			if (loginToken) {
 				const deviceRedirectUri = sessionStorage.getItem('deviceRedirectUri');

@@ -10,16 +10,15 @@ use agent_chain::{
     language_models::{ToolChoice, ToolLike},
     messages::{AIMessageChunk, ToolCall, ToolMessage, ToolStatus},
 };
-use agent_chain_core::proto::{
-    BaseMessageWithSibling, ChatStreamFinalMessage, ChatStreamResponse,
-    chat_stream_response::Payload,
-};
 use be_remote_db::{DatabaseManager, MessageType};
+use serde_json::Value;
+use thread_core::{ChatServerMessage, MessageNode};
 use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
-use tonic::Status;
 use uuid::Uuid;
+
+use crate::conversion::db_message_to_wire_json;
 
 /// Appended as a system message on the forced-synthesis turn so the model
 /// understands why its tools have been taken away.
@@ -28,9 +27,6 @@ Based on the information you have gathered so far, provide your complete final a
 user now. Do not request additional tools.";
 
 /// Running totals of an AI response as it is streamed across one or more LLM rounds.
-///
-/// Text and reasoning accumulate in separate buffers so they can be stored as
-/// distinct content blocks. Token counts aggregate across every round.
 #[derive(Default)]
 struct ChatAccumulator {
     content: String,
@@ -43,11 +39,6 @@ struct ChatAccumulator {
 }
 
 impl ChatAccumulator {
-    /// Fold one streamed chunk's reasoning and token counts into the running totals.
-    ///
-    /// Text content is committed separately by the round runner via
-    /// [`Self::push_content`] once the round concludes, because the caller needs
-    /// the per-round text in isolation to construct the next `AIMessage`.
     fn absorb(&mut self, chunk: &AIMessageChunk) {
         if let Some(reasoning) = chunk
             .additional_kwargs
@@ -77,7 +68,7 @@ impl ChatAccumulator {
         !self.content.is_empty() || !self.reasoning.is_empty()
     }
 
-    fn to_content_value(&self) -> serde_json::Value {
+    fn to_content_value(&self) -> Value {
         let mut blocks = Vec::new();
         if !self.reasoning.is_empty() {
             blocks.push(serde_json::json!({"type": "reasoning", "reasoning": self.reasoning}));
@@ -85,36 +76,33 @@ impl ChatAccumulator {
         if !self.content.is_empty() {
             blocks.push(serde_json::json!({"type": "text", "text": self.content}));
         }
-        serde_json::Value::Array(blocks)
+        Value::Array(blocks)
     }
 }
 
 /// Outcome of a single streaming round.
 struct RoundResult {
-    /// Text produced during this round only (excludes earlier rounds).
     content: String,
-    /// Tool calls the model emitted at the end of the round.
     tool_calls: Vec<ToolCall>,
-    /// True if cancellation fired or the receiver was dropped before the
-    /// provider's stream completed.
     cancelled: bool,
 }
 
-/// Stream one round from `chat_model`, forward every chunk to the caller,
-/// and fold non-content state into `acc`. Cancellation is honored both before
-/// the stream opens and while it is in flight.
 async fn run_round(
     chat_model: &(dyn BaseChatModel + Send + Sync),
-    messages: Vec<AnyMessage>,
-    tx: &mpsc::Sender<Result<ChatStreamResponse, Status>>,
+    messages: &[AnyMessage],
+    tx: &mpsc::Sender<ChatServerMessage>,
     token: &CancellationToken,
     acc: &mut ChatAccumulator,
-) -> Result<RoundResult, Status> {
+) -> Result<RoundResult, String> {
+    // `BaseChatModel::stream` takes ownership of its message vec, so we must
+    // clone here. The clone is bounded by the chat history length and the
+    // tool-call budget; if this becomes a hotspot, push the slice through
+    // the trait instead.
     let provider_stream = tokio::select! {
-        result = chat_model.stream(messages, None, None) => {
+        result = chat_model.stream(messages.to_vec(), None, None) => {
             result.map_err(|e| {
                 tracing::error!("Error starting chat stream: {e}");
-                Status::internal(e.to_string())
+                e.to_string()
             })?
         }
         () = token.cancelled() => {
@@ -147,21 +135,30 @@ async fn run_round(
 
         let Some(result) = next else { break };
 
-        let chunk = result.map_err(|e| Status::internal(e.to_string()))?;
+        let mut chunk = result.map_err(|e| e.to_string())?;
 
         let chunk_text = chunk.content.to_string();
         if !chunk_text.is_empty() {
             round_content.push_str(&chunk_text);
         }
         acc.absorb(&chunk);
+
+        let chunk_value = match serde_json::to_value(&chunk) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!("Failed to serialize AI chunk: {e}");
+                continue;
+            }
+        };
+
+        // Move tool calls out of the chunk into our running list. Done after
+        // the borrow above releases so we don't have to clone.
         if !chunk.tool_calls.is_empty() {
-            tool_calls.extend(chunk.tool_calls.iter().cloned());
+            tool_calls.append(&mut chunk.tool_calls);
         }
 
         if tx
-            .send(Ok(ChatStreamResponse {
-                payload: Some(Payload::Chunk(chunk.into())),
-            }))
+            .send(ChatServerMessage::Chunk { chunk: chunk_value })
             .await
             .is_err()
         {
@@ -183,16 +180,11 @@ async fn run_round(
     })
 }
 
-/// Outcome of running all tool calls produced at the end of a round.
 enum ToolExecOutcome {
-    /// Every call was dispatched and produced a message.
     Completed(Vec<AnyMessage>),
-    /// Cancellation fired mid-execution; the partial list of completed tool
-    /// messages is returned so they can still be appended to the conversation.
     Cancelled(Vec<AnyMessage>),
 }
 
-/// Invoke each tool call serially, respecting cancellation between calls.
 async fn execute_tool_calls(
     tools: &HashMap<String, Arc<dyn BaseTool>>,
     calls: Vec<ToolCall>,
@@ -233,16 +225,11 @@ async fn execute_tool_calls(
     ToolExecOutcome::Completed(results)
 }
 
-/// Run one final streaming round with tools disabled via `tool_choice=none`,
-/// giving the model one last chance to produce a text answer from the tool
-/// results it has already gathered.
-///
-/// Returns `true` if cancellation fired during synthesis.
 async fn run_forced_synthesis(
     chat_model: &(dyn BaseChatModel + Send + Sync),
     tool_likes: &[ToolLike],
     base_messages: &[AnyMessage],
-    tx: &mpsc::Sender<Result<ChatStreamResponse, Status>>,
+    tx: &mpsc::Sender<ChatServerMessage>,
     token: &CancellationToken,
     acc: &mut ChatAccumulator,
 ) -> agent_chain::Result<bool> {
@@ -259,16 +246,13 @@ async fn run_forced_synthesis(
             .into(),
     );
 
-    let result = run_round(&*synthesis_model, synthesis_messages, tx, token, acc)
+    let result = run_round(&*synthesis_model, &synthesis_messages, tx, token, acc)
         .await
-        .map_err(|s| agent_chain::Error::other(s.to_string()))?;
+        .map_err(agent_chain::Error::other)?;
 
-    // Any tool calls emitted during synthesis are intentionally discarded:
-    // the budget is spent, and `tool_choice=none` should have prevented them.
     Ok(result.cancelled)
 }
 
-/// Persist the accumulated AI message and associated token usage.
 async fn save_accumulated_message(
     db: &DatabaseManager,
     thread_id: Uuid,
@@ -313,10 +297,8 @@ async fn save_accumulated_message(
     Some(ai_message)
 }
 
-/// Persist the accumulated message and emit the terminal `FinalMessage`
-/// envelope to the caller. Nothing is sent for empty responses.
 async fn finalize(
-    tx: &mpsc::Sender<Result<ChatStreamResponse, Status>>,
+    tx: &mpsc::Sender<ChatServerMessage>,
     db: &DatabaseManager,
     thread_id: Uuid,
     user_id: Uuid,
@@ -331,7 +313,10 @@ async fn finalize(
     let Some(ai_message) = save_accumulated_message(db, thread_id, user_id, acc).await else {
         if !cancelled {
             let _ = tx
-                .send(Err(Status::internal("Failed to save AI message")))
+                .send(ChatServerMessage::Error {
+                    kind: "internal_error".to_string(),
+                    message: "Failed to save AI message".to_string(),
+                })
                 .await;
         }
         return;
@@ -341,30 +326,34 @@ async fn finalize(
         return;
     }
 
-    let ai_proto = BaseMessageWithSibling {
-        parent_id: human_message_id.to_string(),
-        message: Some(ai_message.into()),
-        children: vec![],
-        sibling_index: 0,
-        depth: 0,
+    let ai_node = match db_message_to_wire_json(ai_message) {
+        Ok(message) => MessageNode {
+            parent_id: Some(human_message_id),
+            message,
+            children: vec![],
+            sibling_index: 0,
+            depth: 0,
+        },
+        Err(e) => {
+            tracing::error!("Failed to project AI message for final frame: {e}");
+            return;
+        }
     };
 
     let _ = tx
-        .send(Ok(ChatStreamResponse {
-            payload: Some(Payload::FinalMessage(ChatStreamFinalMessage {
-                messages: vec![ai_proto],
-            })),
-        }))
+        .send(ChatServerMessage::Final {
+            messages: vec![ai_node],
+        })
         .await;
 }
 
-/// Run the full agent loop: up to `max_tool_rounds` tool-using rounds, followed
-/// by a forced-synthesis round if the budget is exhausted with pending tool
-/// calls. Streamed chunks are forwarded to `tx` live; the aggregated AI
-/// message is persisted on completion and a `FinalMessage` envelope is sent.
+/// Run the full agent loop: up to `max_tool_rounds` tool-using rounds,
+/// followed by a forced-synthesis round if the budget is exhausted with
+/// pending tool calls. Streamed chunks and the terminal `Final` envelope are
+/// forwarded to `tx`. The aggregated AI message is persisted on completion.
 #[bon::builder]
 pub async fn run_agent_loop(
-    tx: mpsc::Sender<Result<ChatStreamResponse, Status>>,
+    tx: mpsc::Sender<ChatServerMessage>,
     token: CancellationToken,
     db: Arc<DatabaseManager>,
     chat_model: Arc<dyn BaseChatModel + Send + Sync>,
@@ -380,10 +369,15 @@ pub async fn run_agent_loop(
     let mut budget_exhausted = false;
 
     for round in 0..max_tool_rounds {
-        let result = match run_round(&*chat_model, messages.clone(), &tx, &token, &mut acc).await {
+        let result = match run_round(&*chat_model, &messages, &tx, &token, &mut acc).await {
             Ok(r) => r,
-            Err(status) => {
-                let _ = tx.send(Err(status)).await;
+            Err(detail) => {
+                let _ = tx
+                    .send(ChatServerMessage::Error {
+                        kind: "internal_error".to_string(),
+                        message: detail,
+                    })
+                    .await;
                 return;
             }
         };
@@ -393,7 +387,6 @@ pub async fn run_agent_loop(
             break;
         }
         if result.tool_calls.is_empty() {
-            // Model produced a final answer on its own.
             break;
         }
 

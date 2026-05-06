@@ -1,17 +1,14 @@
+use activity_core::{ActivityErrorResponse, InsertActivityRequest, InsertActivityResponse};
+use asset_core::{Asset, CreateAssetRequest};
 use async_trait::async_trait;
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
-use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
-use prost_types::Timestamp;
-use proto_gen::activity::{
-    ActivityResponse, InsertActivityRequest,
-    proto_activity_service_client::ProtoActivityServiceClient,
-};
-use proto_gen::asset::{CreateAssetRequest, proto_asset_service_client::ProtoAssetServiceClient};
+use euro_auth::AuthManager;
+use euro_endpoint::EndpointManager;
+use euro_secret::ExposeSecret;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use std::{io::Cursor, path::PathBuf};
-use tokio::sync::watch;
-use tonic::Status;
-use tonic::transport::Channel;
+use std::{io::Cursor, path::PathBuf, sync::Arc};
 
 use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
 
@@ -36,70 +33,84 @@ pub trait SaveableAsset {
     fn get_display_name(&self) -> String;
 }
 
+/// HTTP client wrapper used to persist activities and their assets.
+///
+/// Both the activity write path (`POST /activities`) and the asset write
+/// path (`POST /v1/assets`) talk JSON over HTTPS. A single `AuthManager`
+/// drives token refresh for both, and a single `EndpointManager` provides
+/// the shared base URL so config changes flip both endpoints in lock-step.
 pub struct ActivityStorage {
-    channel_rx: watch::Receiver<Channel>,
+    endpoint_manager: Arc<EndpointManager>,
     auth_manager: AuthManager,
+    http: reqwest::Client,
 }
 
 impl ActivityStorage {
-    pub fn new(channel_rx: watch::Receiver<Channel>, auth_manager: AuthManager) -> Self {
+    pub fn new(endpoint_manager: Arc<EndpointManager>, auth_manager: AuthManager) -> Self {
+        let http = endpoint_manager.client();
         Self {
-            channel_rx,
+            endpoint_manager,
             auth_manager,
+            http,
         }
     }
 
-    fn activity_client(&self) -> ProtoActivityServiceClient<AuthedChannel> {
-        let channel = self.channel_rx.borrow().clone();
-        let authed = build_authed_channel(channel, self.auth_manager.clone());
-        ProtoActivityServiceClient::new(authed)
-            .max_decoding_message_size(1024 * 1024 * 1024)
-            .max_encoding_message_size(1024 * 1024 * 1024)
+    fn url(&self, path: &str) -> reqwest::Url {
+        self.endpoint_manager.url(path)
     }
 
-    fn asset_client(&self) -> ProtoAssetServiceClient<AuthedChannel> {
-        let channel = self.channel_rx.borrow().clone();
-        let authed = build_authed_channel(channel, self.auth_manager.clone());
-        ProtoAssetServiceClient::new(authed)
-            .max_decoding_message_size(1024 * 1024 * 1024)
-            .max_encoding_message_size(1024 * 1024 * 1024)
+    async fn bearer(&self) -> ActivityResult<String> {
+        let token = self
+            .auth_manager
+            .get_or_refresh_access_token()
+            .await
+            .map_err(|e| ActivityError::network(format!("Failed to acquire access token: {e}")))?;
+        Ok(format!("Bearer {}", token.expose_secret()))
     }
 
     pub async fn save_activity_to_service(
         &self,
         activity: &Activity,
-    ) -> ActivityResult<ActivityResponse> {
-        let mut client = self.activity_client();
-        let icon = match &activity.icon {
+    ) -> ActivityResult<InsertActivityResponse> {
+        let icon_png_base64 = match activity.icon.as_ref() {
             Some(icon) => {
                 let mut bytes: Vec<u8> = Vec::new();
                 icon.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
                     .map_err(ActivityError::Image)?;
-                Some(bytes)
+                Some(BASE64_STANDARD.encode(&bytes))
             }
             None => None,
         };
-        let response = client
-            .insert_activity(InsertActivityRequest {
-                id: None,
-                name: activity.name.clone(),
-                process_name: activity.process_name.clone(),
-                window_title: activity.process_name.clone(),
-                icon,
-                started_at: Some(Timestamp {
-                    seconds: activity.start.timestamp(),
-                    nanos: activity.start.timestamp_subsec_nanos() as i32,
-                }),
-                ended_at: None,
-            })
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to insert activity: {}", e);
-                Status::internal("Failed to insert activity")
-            })
-            .expect("Failed to insert activity");
 
-        Ok(response.into_inner())
+        let request = InsertActivityRequest {
+            id: None,
+            name: activity.name.clone(),
+            process_name: activity.process_name.clone(),
+            window_title: activity.process_name.clone(),
+            icon_png_base64,
+            started_at: activity.start,
+            ended_at: None,
+        };
+
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .post(self.url("/activities"))
+            .header("Authorization", bearer)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| ActivityError::network(format!("activity request failed: {e}")))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(map_http_error_response(status, response).await);
+        }
+
+        let body: InsertActivityResponse = response.json().await.map_err(|e| {
+            ActivityError::network(format!("Failed to decode activity response: {e}"))
+        })?;
+        Ok(body)
     }
 
     pub async fn save_assets_to_service_by_ids(
@@ -121,8 +132,6 @@ impl ActivityStorage {
         &self,
         asset: &ActivityAsset,
     ) -> ActivityResult<SavedAssetInfo> {
-        let mut client = self.asset_client();
-
         let bytes = serde_json::to_vec(asset)?;
         let file_size = bytes.len() as u64;
 
@@ -132,32 +141,54 @@ impl ActivityStorage {
             "display_name": asset.get_display_name(),
         });
 
-        let request = tonic::Request::new(CreateAssetRequest {
+        let request = CreateAssetRequest {
             name: asset.get_display_name(),
-            content: bytes,
+            content: BASE64_STANDARD.encode(&bytes),
             mime_type: "application/json".to_string(),
-            metadata: Some(metadata.to_string()),
+            metadata: Some(metadata),
             activity_id: None,
-        });
+        };
 
-        let response = client
-            .create_asset(request)
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .post(self.url("/v1/assets"))
+            .header("Authorization", bearer)
+            .json(&request)
+            .send()
             .await
-            .map_err(|e| ActivityError::Network(format!("gRPC call failed: {}", e)))?;
+            .map_err(|e| ActivityError::network(format!("asset request failed: {e}")))?;
 
-        let asset_response = response.into_inner();
-        let created_asset = asset_response
-            .asset
-            .ok_or_else(|| ActivityError::Network("No asset returned from service".to_string()))?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(map_http_error_response(status, response).await);
+        }
 
-        tracing::debug!("Asset saved with ID: {}", created_asset.id);
+        let created: Asset = response
+            .json()
+            .await
+            .map_err(|e| ActivityError::network(format!("Failed to decode asset response: {e}")))?;
+
+        tracing::debug!("Asset saved with ID: {}", created.id);
 
         Ok(SavedAssetInfo {
-            file_path: PathBuf::from(&created_asset.storage_uri),
-            absolute_path: PathBuf::from(&created_asset.storage_uri),
-            content_hash: created_asset.checksum_sha256,
+            file_path: PathBuf::from(&created.storage_uri),
+            absolute_path: PathBuf::from(&created.storage_uri),
+            content_hash: created.checksum_sha256,
             file_size,
             saved_at: chrono::Utc::now(),
         })
+    }
+}
+
+async fn map_http_error_response(status: StatusCode, response: reqwest::Response) -> ActivityError {
+    let body_text = response.text().await.unwrap_or_default();
+    if let Ok(parsed) = serde_json::from_str::<ActivityErrorResponse>(&body_text) {
+        ActivityError::network(format!(
+            "service returned {status}: {} ({})",
+            parsed.message, parsed.error
+        ))
+    } else {
+        ActivityError::network(format!("service returned {status}: {body_text}"))
     }
 }

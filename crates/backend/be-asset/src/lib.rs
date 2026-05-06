@@ -4,13 +4,10 @@ pub use error::{AssetError, AssetResult};
 
 use std::sync::Arc;
 
+use asset_core::Asset;
 use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
-use chrono::{DateTime, Utc};
-use prost_types::Timestamp;
 use uuid::Uuid;
-
-use proto_gen::asset::{Asset, AssetResponse, CreateAssetRequest};
 
 const ALLOWED_MIME_TYPES: &[&str] = &[
     "image/png",
@@ -69,6 +66,17 @@ fn validate_content_matches_mime(content: &[u8], declared_mime: &str) -> bool {
     }
 }
 
+/// Domain input for [`AssetService::create_asset`]. Speaks in raw bytes so the
+/// transport layer (HTTP, gRPC, etc.) is free to choose its own encoding.
+#[derive(Debug, Clone)]
+pub struct CreateAssetInput {
+    pub name: String,
+    pub content: Vec<u8>,
+    pub mime_type: String,
+    pub metadata: Option<serde_json::Value>,
+    pub activity_id: Option<Uuid>,
+}
+
 #[derive(Debug)]
 pub struct AssetService {
     db: Arc<DatabaseManager>,
@@ -90,50 +98,45 @@ impl AssetService {
         &self.storage
     }
 
-    fn db_asset_to_proto(asset: &be_remote_db::Asset) -> Asset {
+    fn db_asset_to_dto(asset: be_remote_db::Asset) -> Asset {
         use base64::{Engine as _, engine::general_purpose};
 
         Asset {
-            id: asset.id.to_string(),
+            id: asset.id,
+            name: asset.name,
+            mime_type: asset.mime_type,
+            size_bytes: asset.size_bytes,
             checksum_sha256: asset
                 .checksum_sha256
                 .as_ref()
                 .map(|h| general_purpose::STANDARD.encode(h)),
-            size_bytes: asset.size_bytes,
-            storage_uri: asset.storage_uri.clone(),
-            mime_type: asset.mime_type.clone(),
-            metadata: asset.metadata.to_string(),
-            created_at: Some(datetime_to_timestamp(asset.created_at)),
-            updated_at: Some(datetime_to_timestamp(asset.updated_at)),
+            storage_uri: asset.storage_uri,
+            metadata: asset.metadata,
+            created_at: asset.created_at,
+            updated_at: asset.updated_at,
         }
     }
-}
 
-fn datetime_to_timestamp(dt: DateTime<Utc>) -> Timestamp {
-    Timestamp {
-        seconds: dt.timestamp(),
-        nanos: dt.timestamp_subsec_nanos() as i32,
-    }
-}
-
-impl AssetService {
-    pub async fn create_asset(
-        &self,
-        req: CreateAssetRequest,
-        user_id: Uuid,
-    ) -> AssetResult<AssetResponse> {
+    pub async fn create_asset(&self, input: CreateAssetInput, user_id: Uuid) -> AssetResult<Asset> {
         tracing::info!("CreateAsset request received");
 
-        if req.content.is_empty() {
+        let CreateAssetInput {
+            name,
+            content,
+            mime_type,
+            metadata,
+            activity_id,
+        } = input;
+
+        if content.is_empty() {
             return Err(AssetError::EmptyContent);
         }
 
-        if req.mime_type.is_empty() {
+        if mime_type.is_empty() {
             return Err(AssetError::MissingMimeType);
         }
 
-        let mime_base = req
-            .mime_type
+        let mime_base = mime_type
             .split(';')
             .next()
             .unwrap_or("")
@@ -141,15 +144,15 @@ impl AssetService {
             .to_ascii_lowercase();
 
         if !ALLOWED_MIME_TYPES.contains(&mime_base.as_str()) {
-            return Err(AssetError::UnsupportedMimeType(req.mime_type));
+            return Err(AssetError::UnsupportedMimeType(mime_type));
         }
 
-        if !validate_content_matches_mime(&req.content, &mime_base) {
+        if !validate_content_matches_mime(&content, &mime_base) {
             return Err(AssetError::MimeTypeMismatch);
         }
 
-        let checksum_sha256 = StorageService::calculate_sha256(&req.content);
-        let size_bytes = req.content.len() as i64;
+        let checksum_sha256 = StorageService::calculate_sha256(&content);
+        let size_bytes = content.len() as i64;
 
         tracing::debug!(
             "Processing asset: {} bytes, SHA256: {}",
@@ -161,31 +164,24 @@ impl AssetService {
 
         let storage_uri = self
             .storage
-            .upload(&user_id, &asset_id, &req.content, &req.mime_type)
+            .upload(&user_id, &asset_id, &content, &mime_type)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to upload asset to storage: {}", e);
                 AssetError::StorageUpload(e)
             })?;
 
-        let metadata: Option<serde_json::Value> = req
-            .metadata
-            .as_ref()
-            .map(|m| serde_json::from_str(m))
-            .transpose()
-            .map_err(AssetError::InvalidMetadata)?;
-
         let asset = self
             .db
             .create_asset()
             .id(asset_id)
             .user_id(user_id)
-            .name(req.name)
+            .name(name)
             .checksum_sha256(checksum_sha256)
             .size_bytes(size_bytes)
             .storage_uri(storage_uri)
             .storage_backend(self.storage.get_backend_name().to_string())
-            .mime_type(req.mime_type)
+            .mime_type(mime_type)
             .maybe_metadata(metadata)
             .call()
             .await
@@ -194,10 +190,7 @@ impl AssetService {
                 AssetError::DatabaseCreate(e)
             })?;
 
-        if let Some(activity_id_str) = &req.activity_id {
-            let activity_id =
-                Uuid::parse_str(activity_id_str).map_err(AssetError::InvalidActivityId)?;
-
+        if let Some(activity_id) = activity_id {
             self.db
                 .link_asset_to_activity()
                 .activity_id(activity_id)
@@ -213,8 +206,6 @@ impl AssetService {
 
         tracing::debug!("Created asset {}", asset.id);
 
-        Ok(AssetResponse {
-            asset: Some(Self::db_asset_to_proto(&asset)),
-        })
+        Ok(Self::db_asset_to_dto(asset))
     }
 }

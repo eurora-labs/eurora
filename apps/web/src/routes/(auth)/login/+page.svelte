@@ -59,10 +59,9 @@
 			sessionStorage.setItem('challengeMethod', challengeMethod);
 			storeDeviceRedirectUri();
 
-			if ((await auth.ensureValidToken()) && auth.accessToken) {
+			await auth.ready;
+			if (auth.isAuthenticated) {
 				pendingDesktopLogin = loginToken;
-			} else {
-				goto('/login');
 			}
 		} catch (error) {
 			Sentry.captureException(error, { tags: { area: 'auth.desktop-login' } });
@@ -80,13 +79,6 @@
 		if (!pendingDesktopLogin) return;
 		loading = true;
 		submitError = null;
-
-		if (!(await auth.ensureValidToken())) {
-			submitError = 'Session expired. Please sign in again.';
-			pendingDesktopLogin = null;
-			loading = false;
-			return;
-		}
 
 		try {
 			await auth.associateDesktopLogin(pendingDesktopLogin);
@@ -237,8 +229,8 @@
 						variant="outline"
 						class="w-full"
 						disabled={loading}
-						onclick={() => {
-							auth.logout();
+						onclick={async () => {
+							await auth.logout();
 							pendingDesktopLogin = null;
 						}}
 					>

@@ -1,0 +1,26 @@
+[package]
+name = "asset-core"
+version = "0.0.0"
+edition.workspace = true
+description = "Shared HTTP DTOs for the Eurora asset service. Consumed by both the backend (be-asset-service) and the desktop/web apps, and exported as TypeScript bindings via specta."
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+chrono = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+specta = { workspace = true, optional = true, features = [
+  "derive",
+  "chrono",
+  "uuid",
+  "serde_json",
+] }
+# `specta-typescript` exports the `Unknown` marker type used by `#[specta(type =
+# Unknown)]` attributes on `serde_json::Value` fields, so it must be available
+# whenever the `specta` feature is on.
+specta-typescript = { version = "0.0.10", optional = true }
+uuid = { workspace = true, features = ["serde"] }
+
+[features]
+default = []
+specta = ["dep:specta", "dep:specta-typescript"]
