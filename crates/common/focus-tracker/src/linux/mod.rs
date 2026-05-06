@@ -27,3 +27,13 @@ where
         .await
         .map_err(qualify_x11_error)
 }
+
+/// Linux placeholder for [`crate::focused_document_url`].
+///
+/// X11/Wayland have no equivalent of the macOS Accessibility API's
+/// `AXDocument` attribute, so we always report "no document URL". Callers
+/// must treat `Ok(None)` as a soft signal — not an error.
+#[allow(clippy::unnecessary_wraps)]
+pub(crate) fn focused_document_url(_pid: u32) -> FocusTrackerResult<Option<String>> {
+    Ok(None)
+}
