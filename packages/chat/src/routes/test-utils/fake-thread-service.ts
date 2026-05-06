@@ -1,12 +1,12 @@
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { MessageNode } from '$lib/models/messages/index.js';
 import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
-import type { ChatStreamEvent } from '$lib/models/streaming.js';
+import type { ChatServerMessage } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type {
 	BranchDirection,
+	ChatContext,
 	IThreadService,
-	SendMessageOptions,
 } from '$lib/services/thread/thread-service.js';
 
 let nextId = 1;
@@ -106,8 +106,10 @@ export class FakeThreadService implements IThreadService {
 	deleteDelay = 0;
 	shouldFailDelete = false;
 
-	streamChunks: ChatStreamEvent[] = [];
+	streamFrames: ChatServerMessage[] = [];
 	streamDelay = 0;
+
+	context: ChatContext = { contentBlocks: [], assetChips: [] };
 
 	seed(count: number): void {
 		this.threads = Array.from({ length: count }, (_, i) =>
@@ -179,16 +181,20 @@ export class FakeThreadService implements IThreadService {
 		return [];
 	}
 
+	async collectContext(_threadId: string): Promise<ChatContext> {
+		return this.context;
+	}
+
 	async *sendMessage(
 		_threadId: string,
-		_text: string,
-		_options?: SendMessageOptions,
-	): AsyncIterable<ChatStreamEvent> {
-		for (const chunk of this.streamChunks) {
+		_request: unknown,
+		_signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		for (const frame of this.streamFrames) {
 			if (this.streamDelay > 0) {
 				await new Promise((r) => setTimeout(r, this.streamDelay));
 			}
-			yield chunk;
+			yield frame;
 		}
 	}
 }

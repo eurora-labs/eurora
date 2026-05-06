@@ -1,18 +1,16 @@
 import { ApiClient } from '$lib/api/client.js';
-import { fromChatServerMessage } from '@eurora/chat/models/streaming';
-import type { AssetChip, MessageNode } from '@eurora/chat/models/messages/index';
+import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
-import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
+import type { ChatServerMessage } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type {
 	BranchDirection,
+	ChatContext,
 	IThreadService,
-	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
 import type {
 	ChatClientMessage,
 	ChatSendRequest,
-	ChatServerMessage,
 	CreateThreadRequest,
 	CreateThreadResponse,
 	GenerateThreadTitleRequest,
@@ -28,8 +26,8 @@ import type { ConfigService } from '@eurora/shared/config/config-service';
 /**
  * SPA-side thread service. CRUD goes over REST (JSON, cookie auth, transparent
  * 401-refresh via [`ApiClient`]); chat streaming opens a WebSocket to
- * `/threads/{id}/chat` and yields the `ChatServerMessage` envelopes through
- * the shared message converter.
+ * `/threads/{id}/chat` and yields the wire `ChatServerMessage` envelopes
+ * unchanged.
  *
  * Same-origin/same-site cookies are sent automatically with the WebSocket
  * upgrade handshake, so no token plumbing is needed here. CSRF protection
@@ -115,15 +113,18 @@ export class ThreadService implements IThreadService {
 		return resp.results;
 	}
 
+	async collectContext(_threadId: string): Promise<ChatContext> {
+		return { contentBlocks: [], assetChips: [] };
+	}
+
 	async *sendMessage(
 		threadId: string,
-		text: string,
-		options: SendMessageOptions = {},
-	): AsyncIterable<ChatStreamEvent> {
-		const { parentMessageId, signal, assetChips, preservedAssetChips } = options;
+		request: ChatSendRequest,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
 		const ws = new WebSocket(deriveWsUrl(this.#api.baseUrl, `/threads/${threadId}/chat`));
 
-		const buffer: ChatStreamEvent[] = [];
+		const buffer: ChatServerMessage[] = [];
 		let resolve: ((value: void) => void) | null = null;
 		let finished = false;
 		let error: unknown = null;
@@ -134,17 +135,13 @@ export class ThreadService implements IThreadService {
 		}
 
 		ws.addEventListener('open', () => {
-			const frame: ChatClientMessage = {
-				type: 'send',
-				...buildSendRequest(text, parentMessageId, preservedAssetChips ?? assetChips),
-			};
+			const frame: ChatClientMessage = { type: 'send', ...request };
 			ws.send(JSON.stringify(frame));
 		});
 
 		ws.addEventListener('message', (ev: MessageEvent<string>) => {
 			try {
-				const frame = JSON.parse(ev.data) as ChatServerMessage;
-				buffer.push(fromChatServerMessage(frame));
+				buffer.push(JSON.parse(ev.data) as ChatServerMessage);
 			} catch (e) {
 				error = e;
 				finished = true;
@@ -207,21 +204,6 @@ export class ThreadService implements IThreadService {
 			}
 		}
 	}
-}
-
-function buildSendRequest(
-	text: string,
-	parentMessageId: string | null | undefined,
-	assetChips: AssetChip[] | undefined,
-): ChatSendRequest {
-	const chips = assetChips ?? [];
-	return {
-		content_blocks: [
-			{ type: 'text', text, id: null, annotations: null, index: null, extras: null },
-		],
-		parent_message_id: parentMessageId ?? null,
-		asset_chips_json: chips.length > 0 ? JSON.stringify(chips) : null,
-	};
 }
 
 function deriveWsUrl(apiUrl: string, path: string): string {

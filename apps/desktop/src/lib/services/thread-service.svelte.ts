@@ -1,25 +1,14 @@
-import { fromChatServerMessage } from '@eurora/chat/models/streaming';
-import type { ContextChip, Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-import type { AssetChip } from '@eurora/chat/models/messages/index';
+import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
-import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
+import type { ChatServerMessage } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type {
+	BranchDirection,
+	ChatContext,
 	IThreadService,
-	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
-import type {
-	ChatServerMessage,
-	MessageNode,
-	Thread as WireThread,
-} from '@eurora/shared/bindings/thread';
-
-type ExtendedQuery = Query & { preserved_asset_chips: ContextChip[] | null };
-
-function toContextChip(chip: AssetChip): ContextChip {
-	return { id: chip.id, name: chip.name, icon: chip.icon, domain: chip.domain };
-}
+import type { ChatSendRequest, Thread as WireThread } from '@eurora/shared/bindings/thread';
 
 export class ThreadService implements IThreadService {
 	private readonly taurpc: TaurpcService;
@@ -49,7 +38,7 @@ export class ThreadService implements IThreadService {
 	async switchBranch(
 		threadId: string,
 		messageId: string,
-		direction: number,
+		direction: BranchDirection,
 	): Promise<MessageNode[]> {
 		return (await this.taurpc.thread.switch_branch(
 			threadId,
@@ -63,13 +52,11 @@ export class ThreadService implements IThreadService {
 	}
 
 	async createThread(): Promise<Thread> {
-		const raw = (await this.taurpc.thread.create()) as unknown as WireThread;
-		return raw;
+		return (await this.taurpc.thread.create()) as unknown as WireThread;
 	}
 
 	async generateTitle(threadId: string): Promise<Thread> {
-		const raw = (await this.taurpc.thread.generate_title(threadId)) as unknown as WireThread;
-		return raw;
+		return (await this.taurpc.thread.generate_title(threadId)) as unknown as WireThread;
 	}
 
 	async searchThreads(
@@ -96,19 +83,20 @@ export class ThreadService implements IThreadService {
 		)) as unknown as MessageSearchResult[];
 	}
 
+	async collectContext(threadId: string): Promise<ChatContext> {
+		const wire = await this.taurpc.chat.collect_context(threadId);
+		return {
+			contentBlocks: wire.content_blocks,
+			assetChips: wire.asset_chips,
+		};
+	}
+
 	async *sendMessage(
 		threadId: string,
-		text: string,
-		options: SendMessageOptions = {},
-	): AsyncIterable<ChatStreamEvent> {
-		const { parentMessageId, signal, assetChips, preservedAssetChips } = options;
-		const query: ExtendedQuery = {
-			text,
-			assets: assetChips?.map((c) => c.id) ?? [],
-			parent_message_id: parentMessageId ?? null,
-			preserved_asset_chips: preservedAssetChips?.map(toContextChip) ?? null,
-		};
-		const buffer: ChatStreamEvent[] = [];
+		request: ChatSendRequest,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		const buffer: ChatServerMessage[] = [];
 		let resolve: ((value: void) => void) | null = null;
 		let finished = false;
 		let error: unknown = null;
@@ -118,17 +106,8 @@ export class ThreadService implements IThreadService {
 			resolve = null;
 		}
 
-		// The Tauri channel emits typed `ChatServerMessage` frames. Until taurpc
-		// regenerates its local bindings (which happens at app runtime, not at
-		// `cargo check`), the channel callback's type still reflects the
-		// pre-typing wire shape, so we narrow via `unknown`.
-		function onEvent(response: unknown) {
-			try {
-				buffer.push(fromChatServerMessage(response as ChatServerMessage));
-			} catch (e) {
-				error = e;
-				finished = true;
-			}
+		function onEvent(response: ChatServerMessage) {
+			buffer.push(response);
 			notify();
 		}
 
@@ -137,7 +116,7 @@ export class ThreadService implements IThreadService {
 		}
 		signal?.addEventListener('abort', onAbort, { once: true });
 
-		this.taurpc.chat.send_query(threadId, onEvent, query).then(
+		this.taurpc.chat.send_query(threadId, onEvent, request).then(
 			() => {
 				finished = true;
 				notify();
@@ -164,9 +143,7 @@ export class ThreadService implements IThreadService {
 				});
 			}
 
-			while (buffer.length > 0) {
-				yield buffer.shift()!;
-			}
+			while (buffer.length > 0) yield buffer.shift()!;
 
 			if (error) throw error;
 		} finally {

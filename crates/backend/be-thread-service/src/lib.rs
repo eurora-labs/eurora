@@ -18,6 +18,7 @@ mod error;
 mod handlers;
 mod llm;
 mod message_projection;
+mod preliminary;
 mod service;
 mod tools;
 
@@ -58,10 +59,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route(
             "/threads/{thread_id}/messages/switch-branch",
             post(handlers::messages::switch_branch),
-        )
-        .route(
-            "/threads/{thread_id}/preliminary-blocks",
-            post(handlers::messages::save_preliminary_content_blocks),
         )
         .route("/threads/{thread_id}/chat", get(handlers::chat::chat_ws))
         .route("/threads/search", get(handlers::search::search_threads))

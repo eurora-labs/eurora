@@ -25,7 +25,7 @@
 	let logoHovered = $state(false);
 	let searchOpen = $state(false);
 
-	const accountLabel = $derived(auth.user?.name ?? auth.user?.email ?? '');
+	const accountLabel = $derived(auth.user?.display_name ?? auth.user?.email ?? '');
 	const accountInitial = $derived(accountLabel ? accountLabel.charAt(0).toUpperCase() : '');
 
 	function handleKeydown(e: KeyboardEvent) {

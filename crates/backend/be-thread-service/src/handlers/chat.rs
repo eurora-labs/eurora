@@ -40,6 +40,7 @@ use crate::agent_loop::run_agent_loop;
 use crate::conversion::convert_db_message_to_base_message;
 use crate::error::{ThreadServiceError, ThreadServiceResult};
 use crate::llm::{LlmContext, prepare_llm_context};
+use crate::preliminary::rewrite_preliminary_blocks;
 use crate::service::AppState;
 
 const CONTEXT_MESSAGE_LIMIT: u32 = 5;
@@ -233,7 +234,14 @@ async fn run_turn(
         })
         .collect();
 
-    let content_blocks: Vec<ContentBlock> = request.content_blocks;
+    // Rewrite inline payloads (large text, base64 images) into asset
+    // references before we persist or feed them to the LLM. This used to be
+    // a separate `POST /threads/{id}/preliminary-blocks` round trip; doing
+    // it inline keeps the chat turn to a single round trip and removes the
+    // class of bugs where the rewrite step silently failed and the chat
+    // proceeded with raw payloads.
+    let content_blocks: Vec<ContentBlock> =
+        rewrite_preliminary_blocks(&state, user_id, request.content_blocks).await?;
 
     let mut human_additional_kwargs: HashMap<String, Value> = HashMap::new();
     if let Some(ref chips_json) = request.asset_chips_json
