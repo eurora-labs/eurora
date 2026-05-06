@@ -3,14 +3,14 @@
 use auth_core::TokenResponse;
 
 use crate::error::{AuthError, AuthResult};
-use crate::service::AuthService;
+use crate::service::{AuthService, MintedSession, user_info_from_row};
 use crate::tokens::{generate_jwt_pair, sha256_token};
 
 impl AuthService {
     /// Rotate a refresh token: validate the inbound token, generate a
     /// new pair, and atomically swap the stored hash so the old token
     /// can never be reused.
-    pub async fn refresh_access_token(&self, refresh_token: &str) -> AuthResult<TokenResponse> {
+    pub async fn refresh_access_token(&self, refresh_token: &str) -> AuthResult<MintedSession> {
         let token_hash = sha256_token(refresh_token);
 
         let existing = self
@@ -50,7 +50,7 @@ impl AuthService {
             user.id,
             &user.email,
             user.display_name.clone(),
-            role,
+            role.clone(),
             user.email_verified,
         )?;
 
@@ -74,11 +74,13 @@ impl AuthService {
                 }
             })?;
 
-        Ok(TokenResponse {
+        let tokens = TokenResponse {
             access_token: pair.access_token,
             refresh_token: pair.refresh_token,
             expires_in: self.jwt_config().access_token_expiry_hours * 3600,
-        })
+        };
+        let user_info = user_info_from_row(&user, role, user.email_verified);
+        Ok(MintedSession::new(tokens, user_info))
     }
 
     pub async fn logout(&self, refresh_token: &str) -> AuthResult<()> {

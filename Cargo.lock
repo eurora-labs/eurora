@@ -1437,6 +1437,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-extra"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9963ff19f40c6102c76756ef0a46004c0d58957d87259fc9208ff8441c12ab96"
+dependencies = [
+ "axum",
+ "axum-core",
+ "bytes",
+ "cookie",
+ "futures-util",
+ "http 1.4.0",
+ "http-body 1.0.1",
+ "http-body-util",
+ "mime",
+ "pin-project-lite",
+ "rustversion",
+ "serde_core",
+ "tower-layer",
+ "tower-service",
+]
+
+[[package]]
 name = "axum-macros"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1586,10 +1608,10 @@ name = "be-asset-service"
 version = "0.0.0"
 dependencies = [
  "asset-core",
- "auth-core",
  "axum",
  "base64 0.22.1",
  "be-asset",
+ "be-auth-core",
  "serde",
  "thiserror 2.0.18",
  "tower-http",
@@ -1619,6 +1641,8 @@ dependencies = [
  "argon2",
  "auth-core",
  "axum",
+ "axum-extra",
+ "base64 0.22.1",
  "be-auth-core",
  "be-email-service",
  "be-remote-db",
@@ -1636,6 +1660,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "thiserror 2.0.18",
+ "time",
  "tokio",
  "tower",
  "tower-http",
@@ -1651,6 +1676,7 @@ dependencies = [
  "async-trait",
  "auth-core",
  "axum",
+ "axum-extra",
  "be-auth-core",
  "be-remote-db",
  "casbin",
@@ -1803,7 +1829,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
- "tower",
  "tower-http",
  "tracing",
  "uuid",

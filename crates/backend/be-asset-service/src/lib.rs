@@ -1,6 +1,15 @@
-pub mod error;
-pub mod handlers;
-pub mod service;
+//! HTTP asset service.
+//!
+//! Exposes a small Axum router for uploading user file assets. Authentication
+//! and Casbin authorization are applied by the surrounding `be-authz`
+//! middleware in `be-monolith`; this crate only assumes that a verified
+//! [`be_auth_core::Claims`] has been inserted into request extensions by the
+//! time a handler runs and pulls them back out via the
+//! [`be_auth_core::AuthUser`] extractor.
+
+mod error;
+mod handlers;
+mod service;
 
 use std::sync::Arc;
 

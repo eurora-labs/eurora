@@ -15,6 +15,6 @@ export function initDependencies() {
 		[CONFIG_SERVICE, config],
 		[AUTH_SERVICE, auth],
 		[DOWNLOAD_SERVICE, new DownloadService(config)],
-		[SUBSCRIPTION_SERVICE, new SubscriptionService(auth, config)],
+		[SUBSCRIPTION_SERVICE, new SubscriptionService(config)],
 	]);
 }

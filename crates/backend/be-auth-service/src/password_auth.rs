@@ -4,7 +4,7 @@ use auth_core::TokenResponse;
 
 use crate::error::{AuthError, AuthResult};
 use crate::passwords::{hash_password, validate_email, validate_password, verify_password};
-use crate::service::AuthService;
+use crate::service::{AuthService, MintedSession, user_info_from_row};
 use crate::tokens::generate_jwt_pair;
 
 impl AuthService {
@@ -13,7 +13,7 @@ impl AuthService {
         email: &str,
         password: &str,
         display_name: Option<String>,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         let email = email.trim();
         validate_email(email)?;
         validate_password(password)?;
@@ -61,7 +61,7 @@ impl AuthService {
         &self,
         email: &str,
         password: &str,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         let email = email.trim();
         if email.is_empty() || password.is_empty() {
             return Err(AuthError::InvalidInput(
@@ -109,18 +109,19 @@ impl AuthService {
     }
 
     /// Generate an access/refresh pair, persist the refresh-token hash,
-    /// and wrap the result in the [`TokenResponse`] envelope.
+    /// and bundle it with the user profile that handlers will serialise
+    /// alongside (or instead of) the tokens.
     pub(crate) async fn mint_session(
         &self,
         user: &be_remote_db::User,
         role: auth_core::Role,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         let pair = generate_jwt_pair(
             self.jwt_config(),
             user.id,
             &user.email,
             user.display_name.clone(),
-            role,
+            role.clone(),
             user.email_verified,
         )?;
 
@@ -132,10 +133,12 @@ impl AuthService {
             .call()
             .await?;
 
-        Ok(TokenResponse {
+        let tokens = TokenResponse {
             access_token: pair.access_token,
             refresh_token: pair.refresh_token,
             expires_in: self.jwt_config().access_token_expiry_hours * 3600,
-        })
+        };
+        let user_info = user_info_from_row(user, role, user.email_verified);
+        Ok(MintedSession::new(tokens, user_info))
     }
 }

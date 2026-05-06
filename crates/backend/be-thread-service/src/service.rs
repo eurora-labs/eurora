@@ -14,7 +14,6 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(db: Arc<DatabaseManager>, asset_service: Arc<AssetService>) -> Self {
-        tracing::info!("Creating new ThreadService AppState");
         let providers = crate::llm::build_providers();
         Self {
             db,

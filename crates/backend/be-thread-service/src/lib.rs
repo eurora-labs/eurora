@@ -27,7 +27,6 @@ use axum::Router;
 use axum::routing::{get, post};
 use be_asset::AssetService;
 use be_remote_db::DatabaseManager;
-use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 
 pub use error::{ThreadServiceError, ThreadServiceResult};
@@ -70,7 +69,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/threads/messages/search",
             get(handlers::search::search_messages),
         )
-        .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
+        .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
 

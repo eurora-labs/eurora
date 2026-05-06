@@ -1,26 +1,26 @@
 use std::sync::Arc;
 
 use asset_core::{Asset, CreateAssetRequest};
-use auth_core::Claims;
 use axum::{
-    Extension, Json,
+    Json,
     extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
 use base64::{Engine as _, engine::general_purpose};
 use be_asset::CreateAssetInput;
-use uuid::Uuid;
+use be_auth_core::AuthUser;
 
 use crate::{error::AssetServiceError, service::AppState};
 
-#[tracing::instrument(skip_all, fields(user_sub = %claims.sub, mime_type = %payload.mime_type))]
+#[tracing::instrument(skip_all, fields(user_id))]
 pub async fn create_asset_handler(
     State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
+    user: AuthUser,
     Json(payload): Json<CreateAssetRequest>,
 ) -> Result<Response, AssetServiceError> {
-    let user_id = Uuid::parse_str(&claims.sub).map_err(AssetServiceError::InvalidUserId)?;
+    let user_id = user.user_id()?;
+    tracing::Span::current().record("user_id", tracing::field::display(user_id));
 
     let content = general_purpose::STANDARD
         .decode(payload.content.as_bytes())

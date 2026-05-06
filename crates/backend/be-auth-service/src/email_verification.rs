@@ -1,6 +1,5 @@
 //! Email-verification token issue / verify / resend.
 
-use auth_core::TokenResponse;
 use chrono::{Duration, Utc};
 use uuid::Uuid;
 
@@ -8,7 +7,7 @@ use crate::VERIFICATION_RESEND_COOLDOWN_SECONDS;
 use crate::VERIFICATION_TOKEN_BYTES;
 use crate::VERIFICATION_TOKEN_EXPIRY_HOURS;
 use crate::error::{AuthError, AuthResult};
-use crate::service::AuthService;
+use crate::service::{AuthService, MintedSession};
 use crate::tokens::{random_hex, sha256_token};
 
 impl AuthService {
@@ -45,7 +44,7 @@ impl AuthService {
 
     /// Atomically consume a verification token and mark the matching
     /// user verified, then mint a fresh session.
-    pub async fn verify_email(&self, token: &str) -> AuthResult<TokenResponse> {
+    pub async fn verify_email(&self, token: &str) -> AuthResult<MintedSession> {
         if token.is_empty() {
             return Err(AuthError::InvalidInput(
                 "Verification token is required".into(),

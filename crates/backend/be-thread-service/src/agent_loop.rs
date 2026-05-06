@@ -89,13 +89,17 @@ struct RoundResult {
 
 async fn run_round(
     chat_model: &(dyn BaseChatModel + Send + Sync),
-    messages: Vec<AnyMessage>,
+    messages: &[AnyMessage],
     tx: &mpsc::Sender<ChatServerMessage>,
     token: &CancellationToken,
     acc: &mut ChatAccumulator,
 ) -> Result<RoundResult, String> {
+    // `BaseChatModel::stream` takes ownership of its message vec, so we must
+    // clone here. The clone is bounded by the chat history length and the
+    // tool-call budget; if this becomes a hotspot, push the slice through
+    // the trait instead.
     let provider_stream = tokio::select! {
-        result = chat_model.stream(messages, None, None) => {
+        result = chat_model.stream(messages.to_vec(), None, None) => {
             result.map_err(|e| {
                 tracing::error!("Error starting chat stream: {e}");
                 e.to_string()
@@ -131,16 +135,13 @@ async fn run_round(
 
         let Some(result) = next else { break };
 
-        let chunk = result.map_err(|e| e.to_string())?;
+        let mut chunk = result.map_err(|e| e.to_string())?;
 
         let chunk_text = chunk.content.to_string();
         if !chunk_text.is_empty() {
             round_content.push_str(&chunk_text);
         }
         acc.absorb(&chunk);
-        if !chunk.tool_calls.is_empty() {
-            tool_calls.extend(chunk.tool_calls.iter().cloned());
-        }
 
         let chunk_value = match serde_json::to_value(&chunk) {
             Ok(v) => v,
@@ -149,6 +150,12 @@ async fn run_round(
                 continue;
             }
         };
+
+        // Move tool calls out of the chunk into our running list. Done after
+        // the borrow above releases so we don't have to clone.
+        if !chunk.tool_calls.is_empty() {
+            tool_calls.append(&mut chunk.tool_calls);
+        }
 
         if tx
             .send(ChatServerMessage::Chunk { chunk: chunk_value })
@@ -239,7 +246,7 @@ async fn run_forced_synthesis(
             .into(),
     );
 
-    let result = run_round(&*synthesis_model, synthesis_messages, tx, token, acc)
+    let result = run_round(&*synthesis_model, &synthesis_messages, tx, token, acc)
         .await
         .map_err(agent_chain::Error::other)?;
 
@@ -362,7 +369,7 @@ pub async fn run_agent_loop(
     let mut budget_exhausted = false;
 
     for round in 0..max_tool_rounds {
-        let result = match run_round(&*chat_model, messages.clone(), &tx, &token, &mut acc).await {
+        let result = match run_round(&*chat_model, &messages, &tx, &token, &mut acc).await {
             Ok(r) => r,
             Err(detail) => {
                 let _ = tx

@@ -126,15 +126,14 @@ pub async fn delete_thread(
 /// Token-gated. The `be-authz` middleware checks the user's monthly token
 /// limit before this handler runs; on exhaustion it short-circuits with a
 /// 429 and this code never executes.
-#[tracing::instrument(skip(state, user, body), fields(thread_id = %thread_id))]
+#[tracing::instrument(skip(state, user), fields(thread_id = %thread_id))]
 pub async fn generate_thread_title(
     State(state): State<Arc<AppState>>,
     user: AuthUser,
     Path(thread_id): Path<Uuid>,
-    Json(body): Json<GenerateThreadTitleRequest>,
+    Json(_): Json<GenerateThreadTitleRequest>,
 ) -> ThreadServiceResult<Json<GenerateThreadTitleResponse>> {
     let user_id = user.user_id()?;
-    let _ = body.content; // accepted for forward compat; current title model uses recent history
 
     let recent_messages = state
         .db
@@ -163,7 +162,7 @@ pub async fn generate_thread_title(
     }));
 
     let title_provider = state.providers.title.clone();
-    let mut title = match title_provider.invoke(messages, None).await {
+    let raw_title = match title_provider.invoke(messages, None).await {
         Ok(message) => message.content.to_string(),
         Err(e) => {
             tracing::warn!("Title model failed, falling back to default: {e}");
@@ -171,9 +170,12 @@ pub async fn generate_thread_title(
         }
     };
 
-    let title_words: Vec<&str> = title.split_whitespace().collect();
-    let trimmed = title_words[..title_words.len().min(TITLE_MAX_WORDS)].join(" ");
-    title = if trimmed.is_empty() {
+    let trimmed = raw_title
+        .split_whitespace()
+        .take(TITLE_MAX_WORDS)
+        .collect::<Vec<_>>()
+        .join(" ");
+    let title = if trimmed.is_empty() {
         TITLE_DEFAULT.to_string()
     } else {
         capitalize_first(&trimmed)

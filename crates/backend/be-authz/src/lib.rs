@@ -1,5 +1,6 @@
 mod axum_layer;
 mod bypass;
+mod csrf;
 mod enforcer;
 mod error;
 mod http_token_gate;
@@ -8,6 +9,7 @@ mod token_gate;
 
 pub use axum_layer::{AuthzState, authz_middleware};
 pub use be_auth_core::*;
+pub use csrf::{CsrfConfig, csrf_middleware};
 pub use enforcer::CasbinAuthz;
 pub use error::AuthzError;
 pub use http_token_gate::{HttpTokenGateState, http_token_gate_middleware};

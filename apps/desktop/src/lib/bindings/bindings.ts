@@ -38,18 +38,32 @@ export type BrowserExtensionStatus = {
 /**
  *  Frame sent by the server over the chat WebSocket.
  * 
- *  `chunk` carries an `AIMessageChunk` JSON; the client should accumulate
- *  chunks (using agent-chain's chunk-merge semantics) and replace placeholder
- *  state with the `final_messages` payload when the turn ends.
+ *  Both [`ConfirmedHumanMessage`](ChatServerMessage::ConfirmedHumanMessage) and
+ *  [`Final`](ChatServerMessage::Final) carry a *complete active branch* —
+ *  every depth of the active conversation projected through `build_branch_tree`,
+ *  so each node's `children` enumerate the sibling variants at that depth and
+ *  `sibling_index` records which one is active. Clients should replace their
+ *  active-branch state wholesale with `messages`; sibling-navigator UI
+ *  depends on this metadata being current.
+ * 
+ *  `chunk` carries an `AIMessageChunk` JSON; clients accumulate chunks (using
+ *  agent-chain's chunk-merge semantics) into an optimistic AI placeholder
+ *  appended after the confirmed human, and discard that placeholder when the
+ *  `Final` frame arrives.
  */
 export type ChatServerMessage = 
-// The user's message has been persisted; clients should display it.
-{ type: "confirmed_human_message"; message: MessageNode } | 
+/**
+ *  The user's turn has been persisted. `messages` is the active branch
+ *  from the thread root through the new human leaf, including sibling
+ *  alternatives at every depth.
+ */
+{ type: "confirmed_human_message"; messages: MessageNode[] } | 
 // One streaming chunk from the AI.
 { type: "chunk"; chunk: unknown } | 
 /**
- *  The turn ended successfully; tree positions for everything that was
- *  persisted during this turn (human + AI + any tool messages).
+ *  The turn ended successfully. `messages` is the active branch from the
+ *  thread root through the freshly-persisted AI leaf, including sibling
+ *  alternatives at every depth.
  */
 { type: "final"; messages: MessageNode[] } | 
 // The turn aborted with an error. The connection is closed after this.
@@ -177,7 +191,7 @@ export type UpdateInfo = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'onboarding':'{"get_browser_extension_download_url":[]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_connection_count":[],"get_browser_extension_url":["process_name"],"get_docker_compose_path":[],"install_update":[],"is_browser_extension_connected":["process_name"],"list_activities":[],"open_url_in_browser":["process_id","url"],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id","content"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"send_query":["thread_id","channel","query"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_extension_url":["process_name"],"get_docker_compose_path":[],"install_update":[],"is_browser_extension_connected":["process_name"],"list_activities":[],"open_url_in_browser":["process_id","url"],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id"],"get_messages":["thread_id","limit","offset","all_variants"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -208,7 +222,6 @@ resend_verification_email: () => Promise<null>},
 send_query: (threadId: string, channel: TAURI_CHANNEL<ChatServerMessage>, query: Query) => Promise<null>},
 "context_chip": {get: () => Promise<ContextChip[]>},
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
-"onboarding": {get_browser_extension_download_url: () => Promise<string>},
 "payment": {create_checkout_url: () => Promise<string>, 
 is_subscribed: () => Promise<boolean>},
 "prompt": {disconnect: () => Promise<null>, 
@@ -231,7 +244,6 @@ check_for_update: () => Promise<{
 } | null>, 
 check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 focus_main_window: () => Promise<null>, 
-get_browser_connection_count: () => Promise<bigint>, 
 get_browser_extension_url: (processName: string) => Promise<string | null>, 
 get_docker_compose_path: () => Promise<string>, 
 install_update: () => Promise<null>, 
@@ -246,7 +258,7 @@ save_api_key: (apiKey: string) => Promise<null>},
 "thread": {create: () => Promise<Thread>, 
 current_thread_changed: (thread: Thread) => Promise<void>, 
 delete: (threadId: string) => Promise<null>, 
-generate_title: (threadId: string, content: string) => Promise<Thread>, 
+generate_title: (threadId: string) => Promise<Thread>, 
 get_messages: (threadId: string, limit: number, offset: number, allVariants: boolean) => Promise<MessageNode[]>, 
 list: (limit: number, offset: number) => Promise<Thread[]>, 
 new_thread_added: (thread: Thread) => Promise<void>, 

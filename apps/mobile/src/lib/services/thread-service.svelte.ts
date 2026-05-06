@@ -62,8 +62,8 @@ export class ThreadService implements IThreadService {
 		};
 	}
 
-	async generateTitle(threadId: string, content: string): Promise<Thread> {
-		const raw = await this.taurpc.thread.generate_title(threadId, content);
+	async generateTitle(threadId: string): Promise<Thread> {
+		const raw = await this.taurpc.thread.generate_title(threadId);
 		return {
 			id: raw.id!,
 			title: raw.title,

@@ -139,11 +139,13 @@ pub struct SwitchBranchRequest {
 }
 
 /// Request body for `POST /threads/{thread_id}/title`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+///
+/// The endpoint reads recent thread history server-side, so no payload is
+/// needed. An empty body type keeps the request well-typed for code-gen and
+/// leaves room to add fields later.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
-pub struct GenerateThreadTitleRequest {
-    pub content: String,
-}
+pub struct GenerateThreadTitleRequest {}
 
 /// Response body for `POST /threads/{thread_id}/title`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

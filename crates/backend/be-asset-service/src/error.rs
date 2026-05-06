@@ -1,14 +1,17 @@
+use std::borrow::Cow;
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
 use be_asset::AssetError;
+use be_auth_core::{InvalidUserId, MissingClaims};
 use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Serialize)]
 pub struct ErrorResponse {
-    pub error: String,
+    pub error: &'static str,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<String>,
@@ -16,11 +19,11 @@ pub struct ErrorResponse {
 
 #[derive(Debug, Error)]
 pub enum AssetServiceError {
-    #[error("missing authentication claims")]
-    MissingClaims,
+    #[error(transparent)]
+    MissingClaims(#[from] MissingClaims),
 
-    #[error("invalid user ID in claims: {0}")]
-    InvalidUserId(#[source] uuid::Error),
+    #[error(transparent)]
+    InvalidUserId(#[from] InvalidUserId),
 
     #[error("invalid base64 content: {0}")]
     InvalidBase64(#[source] base64::DecodeError),
@@ -29,103 +32,116 @@ pub enum AssetServiceError {
     Asset(#[from] AssetError),
 }
 
+struct Rendered {
+    status: StatusCode,
+    kind: &'static str,
+    message: Cow<'static, str>,
+    details: Option<String>,
+}
+
 impl AssetServiceError {
-    pub fn error_kind(&self) -> &'static str {
+    fn render(&self) -> Rendered {
         match self {
-            Self::MissingClaims => "missing_claims",
-            Self::InvalidUserId(_) => "invalid_user_id",
-            Self::InvalidBase64(_) => "invalid_base64",
-            Self::Asset(err) => match err {
-                AssetError::EmptyContent => "empty_content",
-                AssetError::MissingMimeType => "missing_mime_type",
-                AssetError::UnsupportedMimeType(_) => "unsupported_mime_type",
-                AssetError::MimeTypeMismatch => "mime_type_mismatch",
-                AssetError::StorageUpload(_) => "storage_upload",
-                AssetError::DatabaseCreate(_) => "database_create",
-                AssetError::DatabaseLinkActivity(_) => "database_link_activity",
-                AssetError::StorageConfig(_) => "storage_config",
+            Self::MissingClaims(_) => Rendered {
+                status: StatusCode::UNAUTHORIZED,
+                kind: "missing_claims",
+                message: Cow::Borrowed("Missing authentication claims"),
+                details: None,
             },
+            Self::InvalidUserId(e) => Rendered {
+                status: StatusCode::UNAUTHORIZED,
+                kind: "invalid_user_id",
+                message: Cow::Borrowed("Invalid user ID in claims"),
+                details: Some(e.to_string()),
+            },
+            Self::InvalidBase64(e) => Rendered {
+                status: StatusCode::BAD_REQUEST,
+                kind: "invalid_base64",
+                message: Cow::Borrowed("Asset content is not valid base64"),
+                details: Some(e.to_string()),
+            },
+            Self::Asset(err) => render_asset(err),
+        }
+    }
+}
+
+fn render_asset(err: &AssetError) -> Rendered {
+    match err {
+        AssetError::EmptyContent => Rendered {
+            status: StatusCode::BAD_REQUEST,
+            kind: "empty_content",
+            message: Cow::Borrowed("Asset content cannot be empty"),
+            details: None,
+        },
+        AssetError::MissingMimeType => Rendered {
+            status: StatusCode::BAD_REQUEST,
+            kind: "missing_mime_type",
+            message: Cow::Borrowed("MIME type is required"),
+            details: None,
+        },
+        AssetError::UnsupportedMimeType(mime) => Rendered {
+            status: StatusCode::BAD_REQUEST,
+            kind: "unsupported_mime_type",
+            message: Cow::Borrowed("Unsupported MIME type"),
+            details: Some(mime.clone()),
+        },
+        AssetError::MimeTypeMismatch => Rendered {
+            status: StatusCode::BAD_REQUEST,
+            kind: "mime_type_mismatch",
+            message: Cow::Borrowed("Content does not match declared MIME type"),
+            details: None,
+        },
+        AssetError::StorageUpload(e) => {
+            tracing::error!(error = %e, "storage upload failed");
+            Rendered {
+                status: StatusCode::BAD_GATEWAY,
+                kind: "storage_upload",
+                message: Cow::Borrowed("Failed to upload asset to storage"),
+                details: None,
+            }
+        }
+        AssetError::DatabaseCreate(e) => {
+            tracing::error!(error = %e, "database create failed");
+            Rendered {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                kind: "database_create",
+                message: Cow::Borrowed("Failed to persist asset"),
+                details: None,
+            }
+        }
+        AssetError::DatabaseLinkActivity(e) => {
+            tracing::error!(error = %e, "database link-activity failed");
+            Rendered {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                kind: "database_link_activity",
+                message: Cow::Borrowed("Failed to link asset to activity"),
+                details: None,
+            }
+        }
+        AssetError::StorageConfig(e) => {
+            tracing::error!(error = %e, "storage config error");
+            Rendered {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                kind: "storage_config",
+                message: Cow::Borrowed("Asset storage misconfigured"),
+                details: None,
+            }
         }
     }
 }
 
 impl IntoResponse for AssetServiceError {
     fn into_response(self) -> Response {
-        let (status, message, details) = match &self {
-            AssetServiceError::MissingClaims => (
-                StatusCode::UNAUTHORIZED,
-                "Missing authentication claims".to_owned(),
-                None,
-            ),
-            AssetServiceError::InvalidUserId(e) => (
-                StatusCode::UNAUTHORIZED,
-                "Invalid user ID in claims".to_owned(),
-                Some(e.to_string()),
-            ),
-            AssetServiceError::InvalidBase64(e) => (
-                StatusCode::BAD_REQUEST,
-                "Asset content is not valid base64".to_owned(),
-                Some(e.to_string()),
-            ),
-            AssetServiceError::Asset(err) => match err {
-                AssetError::EmptyContent => (
-                    StatusCode::BAD_REQUEST,
-                    "Asset content cannot be empty".to_owned(),
-                    None,
-                ),
-                AssetError::MissingMimeType => (
-                    StatusCode::BAD_REQUEST,
-                    "MIME type is required".to_owned(),
-                    None,
-                ),
-                AssetError::UnsupportedMimeType(mime) => (
-                    StatusCode::BAD_REQUEST,
-                    "Unsupported MIME type".to_owned(),
-                    Some(mime.clone()),
-                ),
-                AssetError::MimeTypeMismatch => (
-                    StatusCode::BAD_REQUEST,
-                    "Content does not match declared MIME type".to_owned(),
-                    None,
-                ),
-                AssetError::StorageUpload(e) => {
-                    tracing::error!("storage upload failed: {}", e);
-                    (
-                        StatusCode::BAD_GATEWAY,
-                        "Failed to upload asset to storage".to_owned(),
-                        None,
-                    )
-                }
-                AssetError::DatabaseCreate(e) => {
-                    tracing::error!("database create failed: {}", e);
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Failed to persist asset".to_owned(),
-                        None,
-                    )
-                }
-                AssetError::DatabaseLinkActivity(e) => {
-                    tracing::error!("database link-activity failed: {}", e);
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Failed to link asset to activity".to_owned(),
-                        None,
-                    )
-                }
-                AssetError::StorageConfig(e) => {
-                    tracing::error!("storage config error: {}", e);
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Asset storage misconfigured".to_owned(),
-                        None,
-                    )
-                }
-            },
-        };
+        let Rendered {
+            status,
+            kind,
+            message,
+            details,
+        } = self.render();
 
         let body = ErrorResponse {
-            error: self.error_kind().to_owned(),
-            message,
+            error: kind,
+            message: message.into_owned(),
             details,
         };
 

@@ -69,7 +69,6 @@ pub trait ThreadApi {
     async fn generate_title<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        content: String,
     ) -> Result<Thread, String>;
 
     async fn search_threads<R: Runtime>(
@@ -170,12 +169,11 @@ impl ThreadApi for ThreadApiImpl {
         self,
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
-        content: String,
     ) -> Result<Thread, String> {
         let manager = thread_manager(&app_handle)?;
         let id = parse_uuid("thread_id", &thread_id)?;
         let thread = manager
-            .generate_thread_title(id, content)
+            .generate_thread_title(id)
             .await
             .map_err(|e| e.to_string())?;
         Ok(Thread::from(thread))

@@ -25,7 +25,7 @@ use crate::crypto::{decrypt_sensitive_string, encrypt_sensitive_string};
 use crate::error::{AuthError, AuthResult};
 use crate::log_redaction::hash_email_for_log;
 use crate::oauth::{NewOAuthIdentity, OAuthTokenBundle};
-use crate::service::AuthService;
+use crate::service::{AuthService, MintedSession, user_info_from_row};
 use crate::tokens::random_hex;
 
 const OAUTH_STATE_BYTES: usize = 16; // 32 hex chars, ~128 bits of entropy
@@ -44,7 +44,7 @@ impl AuthService {
         code: &str,
         state: &str,
         login_token: Option<String>,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         match provider {
             Provider::Google => self.handle_google_login(code, state, login_token).await,
             Provider::Github => self.handle_github_login(code, state, login_token).await,
@@ -102,7 +102,7 @@ impl AuthService {
         code: &str,
         state: &str,
         login_token: Option<String>,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         if code.is_empty() {
             return Err(AuthError::InvalidInput(
                 "Authorization code is required".into(),
@@ -168,7 +168,7 @@ impl AuthService {
         code: &str,
         state: &str,
         login_token: Option<String>,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         if code.is_empty() {
             return Err(AuthError::InvalidInput(
                 "Authorization code is required".into(),
@@ -250,7 +250,7 @@ impl AuthService {
         &self,
         identity: NewOAuthIdentity,
         login_token: Option<String>,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         let provider_verified = identity.email_verified;
         let user = self.resolve_oauth_user(identity).await?;
         let email_verified = self
@@ -445,13 +445,13 @@ impl AuthService {
         user: &be_remote_db::User,
         role: auth_core::Role,
         override_email_verified: bool,
-    ) -> AuthResult<TokenResponse> {
+    ) -> AuthResult<MintedSession> {
         let pair = crate::tokens::generate_jwt_pair(
             self.jwt_config(),
             user.id,
             &user.email,
             user.display_name.clone(),
-            role,
+            role.clone(),
             override_email_verified,
         )?;
 
@@ -463,10 +463,12 @@ impl AuthService {
             .call()
             .await?;
 
-        Ok(TokenResponse {
+        let tokens = TokenResponse {
             access_token: pair.access_token,
             refresh_token: pair.refresh_token,
             expires_in: self.jwt_config().access_token_expiry_hours * 3600,
-        })
+        };
+        let user_info = user_info_from_row(user, role, override_email_verified);
+        Ok(MintedSession::new(tokens, user_info))
     }
 }
