@@ -183,6 +183,53 @@ fn get_frontmost_window_pid() -> FocusTrackerResult<i32> {
 }
 
 fn get_window_title_via_accessibility(pid: i32) -> FocusTrackerResult<Option<String>> {
+    let Some(focused_window) = copy_focused_window(pid)? else {
+        return Ok(None);
+    };
+    // SAFETY: `focused_window` is a non-null `AXUIElementRef` returned by
+    // `AXUIElementCopyAttributeValue`; ownership is transferred to us so we
+    // must release it once we've finished reading attributes off it.
+    let title = unsafe { copy_string_attribute(focused_window, ns_string!("AXTitle")) };
+    unsafe { CFRelease(focused_window) };
+    Ok(title)
+}
+
+/// Returns the document URL of the focused window for the given PID, when the
+/// window exposes one via the Accessibility API.
+///
+/// Apps that follow Apple's `NSDocument`-based architecture (Preview, Pages,
+/// TextEdit, …) populate `AXDocument` on their focused window with a
+/// `file://` URL pointing at the open document.
+///
+/// Returns:
+///
+/// - `Ok(Some(url))` when the focused window exposes `AXDocument`.
+/// - `Ok(None)` when there is no focused window or it does not expose the
+///   attribute (e.g. an unsaved document, an app that does not implement it,
+///   or the user is looking at a non-document window).
+///
+/// # Errors
+///
+/// Returns [`FocusTrackerError::PermissionDenied`] when macOS denies
+/// Accessibility access — callers should treat this as "we can't see what
+/// the user is reading" and back off, identical to the title path.
+pub fn focused_document_url(pid: u32) -> FocusTrackerResult<Option<String>> {
+    let pid = i32::try_from(pid).map_err(|_| {
+        FocusTrackerError::platform(format!("pid {pid} does not fit into a macOS pid_t"))
+    })?;
+    let Some(focused_window) = copy_focused_window(pid)? else {
+        return Ok(None);
+    };
+    // SAFETY: see `get_window_title_via_accessibility`.
+    let url = unsafe { copy_string_attribute(focused_window, ns_string!("AXDocument")) };
+    unsafe { CFRelease(focused_window) };
+    Ok(url)
+}
+
+/// Returns an owned `AXUIElementRef` for the focused window of the given PID.
+///
+/// The caller is responsible for `CFRelease`ing the returned pointer.
+fn copy_focused_window(pid: i32) -> FocusTrackerResult<Option<*mut c_void>> {
     let app_element = unsafe { AXUIElementCreateApplication(pid) };
     if app_element.is_null() {
         return Ok(None);
@@ -210,26 +257,33 @@ fn get_window_title_via_accessibility(pid: i32) -> FocusTrackerResult<Option<Str
         return Ok(None);
     }
 
-    let title_attr = ns_string!("AXTitle");
-    let mut title_value: *mut c_void = std::ptr::null_mut();
+    Ok(Some(focused_window))
+}
+
+/// Reads a CFString-valued attribute off an `AXUIElementRef` and returns it
+/// as an owned [`String`].
+///
+/// # Safety
+///
+/// `element` must be a valid, non-null `AXUIElementRef`. `attribute` must be
+/// a non-null `NSString` (typically constructed via [`ns_string!`]).
+unsafe fn copy_string_attribute(element: *mut c_void, attribute: &NSString) -> Option<String> {
+    let mut value: *mut c_void = std::ptr::null_mut();
     let result = unsafe {
         AXUIElementCopyAttributeValue(
-            focused_window,
-            std::ptr::from_ref::<NSString>(title_attr).cast::<c_void>(),
-            &raw mut title_value,
+            element,
+            std::ptr::from_ref::<NSString>(attribute).cast::<c_void>(),
+            &raw mut value,
         )
     };
 
-    unsafe { CFRelease(focused_window) };
-
-    if result != K_AX_ERROR_SUCCESS || title_value.is_null() {
-        return Ok(None);
+    if result != K_AX_ERROR_SUCCESS || value.is_null() {
+        return None;
     }
 
-    let title_str = unsafe { cfstring_to_string(title_value) };
-    unsafe { CFRelease(title_value) };
-
-    Ok(title_str)
+    let s = unsafe { cfstring_to_string(value) };
+    unsafe { CFRelease(value) };
+    s
 }
 
 /// Converts a `CFStringRef` (passed as `*const c_void`) to a Rust [`String`].

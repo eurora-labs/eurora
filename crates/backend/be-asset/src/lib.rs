@@ -17,6 +17,7 @@ const ALLOWED_MIME_TYPES: &[&str] = &[
     "image/svg+xml",
     "application/pdf",
     "text/plain",
+    "text/markdown",
     "application/json",
     "application/octet-stream",
 ];
@@ -59,7 +60,7 @@ fn validate_content_matches_mime(content: &[u8], declared_mime: &str) -> bool {
                 .unwrap_or(false)
         }
         "application/pdf" => content.starts_with(b"%PDF"),
-        "text/plain" => std::str::from_utf8(content).is_ok(),
+        "text/plain" | "text/markdown" => std::str::from_utf8(content).is_ok(),
         "application/json" => serde_json::from_slice::<serde_json::Value>(content).is_ok(),
         "application/octet-stream" => true,
         _ => false,
@@ -207,5 +208,30 @@ impl AssetService {
         tracing::debug!("Created asset {}", asset.id);
 
         Ok(Self::db_asset_to_dto(asset))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_markdown_is_allowed() {
+        assert!(ALLOWED_MIME_TYPES.contains(&"text/markdown"));
+    }
+
+    #[test]
+    fn text_markdown_accepts_utf8_content() {
+        assert!(validate_content_matches_mime(
+            b"# Heading\n\nBody with *emphasis*.",
+            "text/markdown"
+        ));
+        assert!(validate_content_matches_mime(b"", "text/markdown"));
+    }
+
+    #[test]
+    fn text_markdown_rejects_invalid_utf8() {
+        // Lone continuation byte — never valid UTF-8.
+        assert!(!validate_content_matches_mime(&[0x80], "text/markdown"));
     }
 }
