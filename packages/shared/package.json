@@ -9,18 +9,15 @@
 		"test:watch": "vitest --watch --mode development"
 	},
 	"devDependencies": {
-		"@bufbuild/buf": "^1.68.4",
-		"@bufbuild/protobuf": "^2.12.0",
-		"@bufbuild/protoc-gen-es": "^2.12.0",
 		"typescript": "^5.9.3",
 		"vite": "catalog:",
 		"vite-plugin-dts": "^4.5.4",
 		"vitest": "catalog:"
 	},
 	"exports": {
-		"./proto/*.js": {
-			"import": "./dist/protos/*.js",
-			"types": "./dist/protos/*.d.ts"
+		"./bindings/*": {
+			"import": "./dist/bindings/*.js",
+			"types": "./dist/bindings/*.d.ts"
 		},
 		"./*": {
 			"import": "./dist/*.js",

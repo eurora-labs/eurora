@@ -4,7 +4,6 @@ version = "0.0.0"
 edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
-default-run = "euro-tauri"
 
 [package.metadata.cargo-machete]
 ignored = [
@@ -24,13 +23,8 @@ name = "euro-tauri"
 path = "src/main.rs"
 test = false
 
-[[bin]]
-name = "office-addin-clean"
-path = "src/bin/office-addin-clean.rs"
-test = false
-
 [dependencies]
-agent-chain-core = { workspace = true, features = ["prost"] }
+agent-chain-core = { workspace = true }
 auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 backon = { workspace = true }
@@ -49,18 +43,15 @@ euro-process = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-thread = { workspace = true }
+thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
 euro-user = { workspace = true }
 euro-vision = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true }
 keyring = { workspace = true }
 parking_lot = { workspace = true }
-proto-gen = { workspace = true }
-rcgen = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
-rustls-pemfile = { workspace = true }
-sha1 = { workspace = true }
+rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
@@ -84,15 +75,12 @@ tauri-plugin-window-state = "2"
 # taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 taurpc = { workspace = true }
 tempfile = { workspace = true }
-# The features here optimize for performance.
-time = { workspace = true }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"
 thiserror = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
-x509-parser = { workspace = true }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -5,11 +5,18 @@ use axum::extract::{ConnectInfo, MatchedPath, Request};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
+use axum_extra::extract::cookie::CookieJar;
 use be_auth_core::JwtConfig;
 
 use crate::CasbinAuthz;
 use crate::bypass::{is_email_verification_exempt, is_rest_bypass};
 use crate::rate_limit::{self, AuthFailureRateLimiter, HealthCheckRateLimiter, TrustedProxies};
+
+/// Cookie name carrying the access JWT for the browser SPA flow. Kept
+/// in sync with `be_auth_service::ACCESS_COOKIE`; we don't pull the
+/// auth-service crate in here because `be-authz` sits beneath it in
+/// the dependency graph.
+const ACCESS_COOKIE: &str = "eu_access";
 
 pub struct AuthzState {
     pub authz: CasbinAuthz,
@@ -35,6 +42,41 @@ impl AuthzState {
             trusted_proxies,
         }
     }
+}
+
+/// Pull the access JWT out of the request, preferring the
+/// `Authorization: Bearer …` header (desktop / mobile) and falling
+/// back to the `eu_access` cookie (browser SPA). Returns the
+/// human-readable reason on failure so the surrounding 401 envelope
+/// can describe what was wrong.
+fn extract_access_token(req: &Request) -> Result<String, &'static str> {
+    if let Some(header) = req.headers().get(axum::http::header::AUTHORIZATION) {
+        let header_str = header
+            .to_str()
+            .map_err(|_| "Invalid authorization header")?;
+        let trimmed = header_str.trim_start();
+        let (scheme, rest) = trimmed
+            .split_once(' ')
+            .ok_or("Authorization header must start with 'Bearer '")?;
+        if !scheme.eq_ignore_ascii_case("Bearer") {
+            return Err("Authorization header must start with 'Bearer '");
+        }
+        if rest.is_empty() {
+            return Err("Authorization header is empty");
+        }
+        return Ok(rest.to_owned());
+    }
+
+    let jar = CookieJar::from_headers(req.headers());
+    if let Some(cookie) = jar.get(ACCESS_COOKIE) {
+        let value = cookie.value();
+        if value.is_empty() {
+            return Err("Empty access cookie");
+        }
+        return Ok(value.to_owned());
+    }
+
+    Err("Missing authorization credential")
 }
 
 fn too_many_requests_response() -> Response {
@@ -84,41 +126,21 @@ pub async fn authz_middleware(
         }
     };
 
-    let auth_header = match req
-        .headers()
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-    {
-        Some(h) => h.to_string(),
-        None => {
+    let token = match extract_access_token(&req) {
+        Ok(t) => t,
+        Err(reason) => {
             if state.rate_limiter.check_key(&client_ip).is_err() {
                 return too_many_requests_response();
             }
             return (
                 StatusCode::UNAUTHORIZED,
-                axum::Json(serde_json::json!({"error": "Missing authorization header"})),
+                axum::Json(serde_json::json!({ "error": reason })),
             )
                 .into_response();
         }
     };
 
-    let token = match auth_header.strip_prefix("Bearer ") {
-        Some(t) => t,
-        None => {
-            if state.rate_limiter.check_key(&client_ip).is_err() {
-                return too_many_requests_response();
-            }
-            return (
-                StatusCode::UNAUTHORIZED,
-                axum::Json(
-                    serde_json::json!({"error": "Authorization header must start with 'Bearer '"}),
-                ),
-            )
-                .into_response();
-        }
-    };
-
-    let claims = match state.jwt_config.validate_access_token(token) {
+    let claims = match state.jwt_config.validate_access_token(&token) {
         Ok(c) => c,
         Err(e) => {
             if state.rate_limiter.check_key(&client_ip).is_err() {
@@ -213,7 +235,7 @@ mod tests {
             access_token_expiry_hours: 1,
             refresh_token_expiry_days: 7,
             validation,
-            approved_emails: vec![],
+            approved_emails: std::collections::HashSet::new(),
         }
     }
 

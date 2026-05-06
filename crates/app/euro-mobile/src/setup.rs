@@ -55,10 +55,10 @@ fn init_state(
 
     // Single shared AuthManager so concurrent refreshes coalesce through one
     // refresh lock, regardless of which consumer initiates the refresh.
-    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.subscribe());
+    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
 
     let thread_manager =
-        euro_thread::ThreadManager::new(endpoint_manager.subscribe(), auth_manager.clone());
+        euro_thread::ThreadManager::new(endpoint_manager.clone(), auth_manager.clone());
     app_handle.manage(SharedThreadManager::new(thread_manager));
 
     let path = app.path().app_data_dir()?;

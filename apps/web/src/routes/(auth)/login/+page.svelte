@@ -47,10 +47,9 @@
 			sessionStorage.setItem('challengeMethod', challengeMethod);
 			storeAppRedirectUri(page.url.searchParams.get('redirect_uri'));
 
-			if ((await auth.ensureValidToken()) && auth.accessToken) {
+			await auth.ready;
+			if (auth.isAuthenticated) {
 				pendingAppLogin = loginToken;
-			} else {
-				goto('/login');
 			}
 		} catch (error) {
 			Sentry.captureException(error, { tags: { area: 'auth.app-login' } });
@@ -68,13 +67,6 @@
 		if (!pendingAppLogin) return;
 		loading = true;
 		submitError = null;
-
-		if (!(await auth.ensureValidToken())) {
-			submitError = 'Session expired. Please sign in again.';
-			pendingAppLogin = null;
-			loading = false;
-			return;
-		}
 
 		try {
 			await auth.associateAppLogin(pendingAppLogin);
@@ -225,8 +217,8 @@
 						variant="outline"
 						class="w-full"
 						disabled={loading}
-						onclick={() => {
-							auth.logout();
+						onclick={async () => {
+							await auth.logout();
 							pendingAppLogin = null;
 						}}
 					>

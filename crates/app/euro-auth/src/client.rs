@@ -1,45 +1,57 @@
-use crate::error::{AuthError, AuthResult};
-use anyhow::{Result, anyhow};
-use proto_gen::auth::{
-    EmailPasswordCredentials, LoginByLoginTokenRequest, LoginRequest, RefreshTokenRequest,
-    RegisterRequest, TokenResponse, login_request::Credential,
-    proto_auth_service_client::ProtoAuthServiceClient,
-};
-use tokio::sync::watch;
-use tonic::transport::Channel;
+//! HTTP client for the Eurora auth service.
+//!
+//! Talks JSON over HTTPS using the same shared base URL as the rest of
+//! the desktop / mobile HTTP services. The base URL is read from
+//! [`euro_endpoint::EndpointManager`] on every call so a backend switch
+//! propagates without needing to rebuild the client.
 
-#[derive(Debug, Clone)]
+use std::sync::Arc;
+
+use auth_core::{
+    AssociateLoginTokenRequest, AuthErrorResponse, CheckEmailRequest, CheckEmailResponse,
+    LoginByLoginTokenRequest, LoginRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    ThirdPartyAuthUrlResponse, TokenResponse, VerifyEmailRequest,
+};
+use euro_endpoint::EndpointManager;
+use reqwest::{RequestBuilder, Response};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+
+use crate::error::{AuthError, AuthResult};
+
+#[derive(Clone)]
 pub struct AuthClient {
-    channel_rx: watch::Receiver<Channel>,
+    endpoint_manager: Arc<EndpointManager>,
+    http: reqwest::Client,
+}
+
+impl std::fmt::Debug for AuthClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthClient")
+            .field("base_url", &self.endpoint_manager.current_url().as_str())
+            .finish()
+    }
 }
 
 impl AuthClient {
-    pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
-        Self { channel_rx }
+    pub fn new(endpoint_manager: Arc<EndpointManager>) -> Self {
+        let http = endpoint_manager.client();
+        Self {
+            endpoint_manager,
+            http,
+        }
     }
 
     pub async fn login_by_password(
         &self,
         login: impl Into<String>,
         password: impl Into<String>,
-    ) -> Result<TokenResponse> {
-        let req = LoginRequest {
-            credential: Some(Credential::EmailPassword(EmailPasswordCredentials {
-                login: login.into(),
-                password: password.into(),
-            })),
+    ) -> AuthResult<TokenResponse> {
+        let body = LoginRequest::EmailPassword {
+            login: login.into(),
+            password: password.into(),
         };
-        self.login(req).await
-    }
-
-    async fn login(&self, data: LoginRequest) -> Result<TokenResponse> {
-        let mut client = self.client();
-        let response = client.login(data).await.map_err(|e| {
-            tracing::error!("Login failed: {}", e);
-            anyhow!("Login failed: {}", e)
-        })?;
-
-        Ok(response.into_inner())
+        self.post_json("/auth/login", &body, None).await
     }
 
     pub async fn register(
@@ -47,84 +59,122 @@ impl AuthClient {
         email: impl Into<String>,
         password: impl Into<String>,
         display_name: Option<String>,
-    ) -> Result<TokenResponse> {
-        let mut client = self.client();
-        let response = client
-            .register(RegisterRequest {
-                email: email.into(),
-                password: password.into(),
-                display_name,
-            })
-            .await
-            .map_err(|e| {
-                tracing::error!("Registration failed: {}", e);
-                anyhow!("Registration failed: {}", e)
-            })?;
-
-        Ok(response.into_inner())
+    ) -> AuthResult<TokenResponse> {
+        let body = RegisterRequest {
+            email: email.into(),
+            password: password.into(),
+            display_name,
+        };
+        self.post_json("/auth/register", &body, None).await
     }
 
-    pub async fn refresh_token(
-        &self,
-        refresh_token: impl Into<String>,
-    ) -> AuthResult<TokenResponse> {
-        let refresh_token: String = refresh_token.into();
-        let mut client = self.client();
-        let mut request = tonic::Request::new(RefreshTokenRequest {});
-        request.metadata_mut().insert(
-            "authorization",
-            format!("Bearer {}", refresh_token).parse().unwrap(),
-        );
-        let response = client.refresh_token(request).await.map_err(|status| {
-            tracing::warn!(
-                code = ?status.code(),
-                message = status.message(),
-                "Token refresh failed",
-            );
-            AuthError::from_refresh_status(status)
-        })?;
+    pub async fn refresh_token(&self, refresh_token: impl AsRef<str>) -> AuthResult<TokenResponse> {
+        send_typed(self.request("/auth/refresh", Some(refresh_token.as_ref()))).await
+    }
 
-        Ok(response.into_inner())
+    pub async fn logout(&self, refresh_token: impl AsRef<str>) -> AuthResult<()> {
+        send_unit(self.request("/auth/logout", Some(refresh_token.as_ref()))).await
     }
 
     pub async fn login_by_login_token(
         &self,
         login_token: impl Into<String>,
-    ) -> Result<TokenResponse> {
-        let mut client = self.client();
-        let login_token = login_token.into();
-        let response = client
-            .login_by_login_token(LoginByLoginTokenRequest {
-                token: login_token.clone(),
-            })
+    ) -> AuthResult<TokenResponse> {
+        let body = LoginByLoginTokenRequest {
+            token: login_token.into(),
+        };
+        self.post_json("/auth/login-token/exchange", &body, None)
             .await
-            .map_err(|e| {
-                tracing::error!("Login by login token failed: {}", e);
-                anyhow!("Login by login token failed: {}", e)
-            })?;
-
-        Ok(response.into_inner())
     }
 
-    pub async fn resend_verification_email(&self, access_token: impl Into<String>) -> Result<()> {
-        let mut client = self.client();
-        let mut request = tonic::Request::new(());
-        request.metadata_mut().insert(
-            "authorization",
-            format!("Bearer {}", access_token.into()).parse().unwrap(),
-        );
-        client
-            .resend_verification_email(request)
-            .await
-            .map_err(|e| {
-                tracing::error!("Resend verification email failed: {}", e);
-                anyhow!("Resend verification email failed: {}", e)
-            })?;
-        Ok(())
+    pub async fn associate_login_token(
+        &self,
+        access_token: impl AsRef<str>,
+        code_challenge: impl Into<String>,
+    ) -> AuthResult<()> {
+        let body = AssociateLoginTokenRequest {
+            code_challenge: code_challenge.into(),
+        };
+        send_unit(
+            self.request("/auth/login-token/associate", Some(access_token.as_ref()))
+                .json(&body),
+        )
+        .await
     }
 
-    fn client(&self) -> ProtoAuthServiceClient<Channel> {
-        let channel = self.channel_rx.borrow().clone();
-        ProtoAuthServiceClient::new(channel)
+    pub async fn check_email(&self, email: impl Into<String>) -> AuthResult<CheckEmailResponse> {
+        let body = CheckEmailRequest {
+            email: email.into(),
+        };
+        self.post_json("/auth/email/check", &body, None).await
     }
+
+    pub async fn verify_email(&self, token: impl Into<String>) -> AuthResult<TokenResponse> {
+        let body = VerifyEmailRequest {
+            token: token.into(),
+        };
+        self.post_json("/auth/email/verify", &body, None).await
+    }
+
+    pub async fn resend_verification_email(&self, access_token: impl AsRef<str>) -> AuthResult<()> {
+        send_unit(self.request(
+            "/auth/email/resend-verification",
+            Some(access_token.as_ref()),
+        ))
+        .await
+    }
+
+    pub async fn third_party_auth_url(
+        &self,
+        provider: auth_core::Provider,
+    ) -> AuthResult<ThirdPartyAuthUrlResponse> {
+        let body = ThirdPartyAuthUrlRequest { provider };
+        self.post_json("/auth/oauth/url", &body, None).await
+    }
+
+    async fn post_json<B, R>(&self, path: &str, body: &B, bearer: Option<&str>) -> AuthResult<R>
+    where
+        B: Serialize + ?Sized,
+        R: DeserializeOwned,
+    {
+        send_typed(self.request(path, bearer).json(body)).await
+    }
+
+    fn request(&self, path: &str, bearer: Option<&str>) -> RequestBuilder {
+        let mut builder = self.http.post(self.endpoint_manager.url(path));
+        if let Some(token) = bearer {
+            builder = builder.bearer_auth(token);
+        }
+        builder
+    }
+}
+
+async fn send_typed<R: DeserializeOwned>(builder: RequestBuilder) -> AuthResult<R> {
+    let response = builder.send().await.map_err(AuthError::from_transport)?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = decode_error_body(response).await;
+        return Err(AuthError::from_http_response(status, body));
+    }
+    let bytes = response.bytes().await.map_err(AuthError::from_transport)?;
+    serde_json::from_slice(&bytes)
+        .map_err(|e| AuthError::Transient(anyhow::anyhow!("failed to decode auth response: {e}")))
+}
+
+async fn send_unit(builder: RequestBuilder) -> AuthResult<()> {
+    let response = builder.send().await.map_err(AuthError::from_transport)?;
+    let status = response.status();
+    if !status.is_success() {
+        let body = decode_error_body(response).await;
+        return Err(AuthError::from_http_response(status, body));
+    }
+    Ok(())
+}
+
+async fn decode_error_body(response: Response) -> Option<AuthErrorResponse> {
+    let bytes = response.bytes().await.ok()?;
+    if bytes.is_empty() {
+        return None;
+    }
+    serde_json::from_slice(&bytes).ok()
 }

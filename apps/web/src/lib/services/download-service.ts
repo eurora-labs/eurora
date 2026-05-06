@@ -104,7 +104,7 @@ export class DownloadService {
 	}
 
 	getDownloadUrl(option: DownloadOption, channel: string = 'release'): string {
-		const baseUrl = this.config.restApiUrl;
+		const baseUrl = this.config.apiUrl;
 		if (option.bundleType) {
 			return `${baseUrl}/download/${channel}/${option.targetArch}/${option.bundleType}`;
 		}

@@ -2,9 +2,9 @@ use agent_chain_core::messages::ContentBlocks;
 use bon::bon;
 use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use euro_auth::AuthManager;
+use euro_endpoint::EndpointManager;
 use std::sync::Arc;
-use tokio::sync::{Mutex, watch};
-use tonic::transport::Channel;
+use tokio::sync::Mutex;
 
 use crate::{
     ActivityStorage, AssetFunctionality, ContextChip, TimelineError, collector::CollectorService,
@@ -21,7 +21,7 @@ pub struct TimelineManager {
 impl TimelineManager {
     #[builder]
     pub fn new(
-        channel_rx: watch::Receiver<Channel>,
+        endpoint_manager: Arc<EndpointManager>,
         auth_manager: AuthManager,
     ) -> TimelineResult<Self> {
         let timeline_config = TimelineConfig::default();
@@ -32,7 +32,10 @@ impl TimelineManager {
 
         let collector =
             CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
-        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(channel_rx, auth_manager)));
+        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(
+            endpoint_manager,
+            auth_manager,
+        )));
 
         Ok(TimelineManager {
             storage,

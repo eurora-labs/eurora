@@ -1,29 +1,26 @@
 use axum::extract::DefaultBodyLimit;
-use axum::http::{HeaderValue, Method, header};
-use be_activity_service::{ActivityService, ProtoActivityServiceServer};
-use be_asset_service::{AssetService, ProtoAssetServiceServer};
+use axum::http::{HeaderName, HeaderValue, Method, header};
+use be_activity_service::init_activity_service;
+use be_asset_service::init_asset_service;
 use be_auth_core::JwtConfig;
-use be_auth_service::AuthService;
+use be_auth_service::{CookieConfig, init_auth_service};
 use be_authz::{
-    AuthzState, CasbinAuthz, GrpcAuthzLayer, TrustedProxies, authz_middleware,
-    new_auth_failure_rate_limiter, new_health_check_rate_limiter,
+    AuthzState, CasbinAuthz, CsrfConfig, HttpTokenGateState, TrustedProxies, authz_middleware,
+    csrf_middleware, http_token_gate_middleware, new_auth_failure_rate_limiter,
+    new_health_check_rate_limiter,
 };
 use be_payment_service::{PaymentService, init_payment_service};
 use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
-use be_thread_service::{ProtoThreadServiceServer, ThreadService};
+use be_thread_service::init_thread_service;
 use be_update_service::init_update_service;
 use dotenv::dotenv;
-use proto_gen::auth::proto_auth_service_server::ProtoAuthServiceServer;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tonic::transport::Server;
-use tonic_web::GrpcWebLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-const GRPC_MAX_DECODE_SIZE: usize = 1024 * 1024 * 1024; // 1 GB
 const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
 fn build_cors() -> CorsLayer {
@@ -61,16 +58,10 @@ fn build_cors() -> CorsLayer {
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
             header::ACCEPT,
-            header::HeaderName::from_static("x-grpc-web"),
-            header::HeaderName::from_static("x-user-agent"),
-            header::HeaderName::from_static("grpc-timeout"),
-            header::HeaderName::from_static("connect-protocol-version"),
-            header::HeaderName::from_static("connect-timeout-ms"),
-        ])
-        .expose_headers([
-            header::HeaderName::from_static("grpc-status"),
-            header::HeaderName::from_static("grpc-message"),
-            header::HeaderName::from_static("grpc-status-details-bin"),
+            // SPA echoes the eu_csrf cookie value here for the
+            // double-submit CSRF check. Must be in the CORS allowlist
+            // or the browser strips it on cross-origin requests.
+            HeaderName::from_static("x-csrf-token"),
         ])
         .allow_credentials(true)
         .max_age(Duration::from_secs(3600))
@@ -110,11 +101,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
-
-    let (health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter
-        .set_serving::<ProtoAuthServiceServer<AuthService>>()
-        .await;
 
     let app_level = if cfg!(debug_assertions) {
         LevelFilter::DEBUG
@@ -156,11 +142,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("REMOTE_DATABASE_URL environment variable must be set");
     let db_manager = Arc::new(DatabaseManager::new(&database_url).await?);
 
-    let grpc_addr: SocketAddr = std::env::var("MONOLITH_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:50051".to_string())
-        .parse()
-        .expect("Invalid MONOLITH_ADDR format");
-
     let http_addr: SocketAddr = std::env::var("HTTP_ADDR")
         .unwrap_or_else(|_| "0.0.0.0:3000".to_string())
         .parse()
@@ -196,7 +177,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let auth_service = AuthService::new(db_manager.clone(), jwt_config.clone(), email_service);
+    let cookie_config = CookieConfig::from_env();
+    let csrf_config = Arc::new(CsrfConfig::from_env());
+
+    let auth_router = init_auth_service(
+        db_manager.clone(),
+        jwt_config.clone(),
+        email_service.clone(),
+        cookie_config.clone(),
+    )
+    .await?;
 
     let payment_service = match init_payment_service(db_manager.clone()) {
         Ok(svc) => Some(svc),
@@ -223,11 +213,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         db_manager.clone(),
         storage.clone(),
     ));
-    let activity_service = ActivityService::new(db_manager.clone(), core_asset.clone());
-    let assets_service = AssetService::new(db_manager.clone(), storage.clone());
-    let thread_service = ThreadService::new(db_manager.clone(), core_asset.clone());
+    let activity_router = init_activity_service(db_manager.clone(), core_asset.clone());
+    let asset_router = init_asset_service(core_asset.clone());
+    let thread_router = init_thread_service(db_manager.clone(), core_asset.clone());
 
-    tracing::info!("Starting gRPC server at {}", grpc_addr);
     tracing::info!("Starting HTTP server at {}", http_addr);
 
     let bucket_name =
@@ -254,42 +243,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let health_rate_limiter = new_health_check_rate_limiter();
     let trusted_proxies = TrustedProxies::from_env();
 
-    let grpc_authz_layer = GrpcAuthzLayer::new(
-        authz.clone(),
-        jwt_config.clone(),
-        auth_rate_limiter.clone(),
-        health_rate_limiter.clone(),
-        db_manager.clone(),
-        trusted_proxies.clone(),
-    );
-
-    let grpc_server = Server::builder()
-        .accept_http1(true)
-        .layer(build_cors())
-        .layer(GrpcWebLayer::new())
-        .layer(grpc_authz_layer)
-        .add_service(health_service)
-        .add_service(
-            ProtoAuthServiceServer::new(auth_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
-                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
-        )
-        .add_service(
-            ProtoActivityServiceServer::new(activity_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
-                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
-        )
-        .add_service(
-            ProtoAssetServiceServer::new(assets_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
-                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
-        )
-        .add_service(
-            ProtoThreadServiceServer::new(thread_service)
-                .max_decoding_message_size(GRPC_MAX_DECODE_SIZE)
-                .max_encoding_message_size(GRPC_MAX_DECODE_SIZE),
-        );
-
     let authz_state = Arc::new(AuthzState::new(
         authz,
         jwt_config,
@@ -298,35 +251,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         trusted_proxies,
     ));
 
+    let token_gate_state = Arc::new(HttpTokenGateState::new(db_manager.clone()));
+
     let health_route = axum::Router::new().route(
         "/health",
         axum::routing::get(|| async { axum::http::StatusCode::OK }),
     );
 
     // Layer order matters: the last `.layer()` call is the OUTERMOST wrapper.
-    // CORS must be outermost so that responses produced by `authz_middleware`
-    // (e.g. 401/403/429 short-circuits) still carry `Access-Control-*` headers —
-    // otherwise the browser blocks them at the network layer and surfaces a
-    // generic "Failed to fetch" instead of the real status.
+    //
+    // Inner → outer:
+    //   1. http_token_gate  — runs *after* authz so claims are already in
+    //      request extensions; only inspects token-gated routes.
+    //   2. authz_middleware — verifies JWT (Authorization header or
+    //      eu_access cookie) and inserts Claims.
+    //   3. csrf_middleware  — runs before authz so a forged request
+    //      with the cookie attached is rejected before we even look at
+    //      the JWT. Bearer-mode (desktop / mobile) requests bypass it.
+    //   4. CORS             — must be outermost so 401/403/429 short-circuit
+    //      responses still carry `Access-Control-*` headers; otherwise the
+    //      browser surfaces the failure as a generic "Failed to fetch"
+    //      instead of the real status.
     let http_router = update_router
         .merge(payment_router)
+        .merge(activity_router)
+        .merge(asset_router)
+        .merge(thread_router)
+        .merge(auth_router)
         .merge(health_route)
         .layer(DefaultBodyLimit::max(HTTP_MAX_BODY_SIZE))
+        .layer(axum::middleware::from_fn_with_state(
+            token_gate_state,
+            http_token_gate_middleware,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             authz_state,
             authz_middleware,
         ))
+        .layer(axum::middleware::from_fn_with_state(
+            csrf_config,
+            csrf_middleware,
+        ))
         .layer(build_cors());
 
-    let grpc_future = grpc_server.serve_with_shutdown(grpc_addr, async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to install CTRL+C signal handler");
-        tracing::info!("Shutting down gRPC server...");
-    });
-
     let http_listener = tokio::net::TcpListener::bind(http_addr).await?;
-    let http_future = axum::serve(
+    let outcome = axum::serve(
         http_listener,
         http_router.into_make_service_with_connect_info::<SocketAddr>(),
     )
@@ -335,18 +304,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .expect("Failed to install CTRL+C signal handler");
         tracing::info!("Shutting down HTTP server...");
+    })
+    .await
+    .map_err(|e| {
+        tracing::error!("HTTP server error: {}", e);
+        Box::<dyn std::error::Error>::from(e)
     });
-
-    let outcome: Result<(), Box<dyn std::error::Error>> = tokio::select! {
-        result = grpc_future => result.map_err(|e| {
-            tracing::error!("gRPC server error: {}", e);
-            e.into()
-        }),
-        result = http_future => result.map_err(|e| {
-            tracing::error!("HTTP server error: {}", e);
-            e.into()
-        }),
-    };
 
     if let Some(drainer) = payment_drainer {
         drainer.shutdown().await;

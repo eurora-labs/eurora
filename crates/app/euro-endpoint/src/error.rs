@@ -3,13 +3,10 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum EndpointError {
     #[error("Invalid endpoint URL: {0}")]
-    InvalidUrl(String),
+    InvalidUrl(#[source] url::ParseError),
 
-    #[error("TLS configuration error: {0}")]
-    Tls(#[source] tonic::transport::Error),
-
-    #[error("No endpoint subscribers")]
-    NoSubscribers,
+    #[error("Failed to build HTTP client: {0}")]
+    Build(#[source] reqwest::Error),
 }
 
 pub type Result<T> = std::result::Result<T, EndpointError>;

@@ -1,18 +1,4 @@
-use std::time::Duration;
-
-use posthog_rs::Event;
-
-const CAPTURE_TIMEOUT: Duration = Duration::from_secs(5);
-
-fn capture_async(event: Event) {
-    tokio::spawn(async move {
-        match tokio::time::timeout(CAPTURE_TIMEOUT, posthog_rs::capture(event)).await {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => tracing::warn!("Failed to capture analytics event: {e}"),
-            Err(_) => tracing::warn!("Analytics event capture timed out"),
-        }
-    });
-}
+use be_analytics::{Event, capture_async};
 
 pub fn track_checkout_session_created(price_id: &str) {
     let mut event = Event::new_anon("checkout_session_created");

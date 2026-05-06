@@ -1,139 +1,212 @@
-use crate::error::{Error, Result};
-use agent_chain::messages::{ContentBlock, ContentBlocks};
-use agent_chain_core::proto::{ChatStreamResponse, ProtoContentBlock};
-use euro_auth::{AuthManager, AuthedChannel, build_authed_channel};
-use proto_gen::thread::{
-    ChatStreamRequest, CreateThreadRequest, DeleteThreadRequest, GenerateThreadTitleRequest,
-    GetMessagesRequest, GetMessagesResponse, GetThreadRequest, ListThreadsRequest, ProtoThread,
-    SavePreliminaryContentBlocksRequest, SearchMessagesRequest, SearchMessagesResponse,
-    SearchThreadsRequest, SearchThreadsResponse, SwitchBranchRequest,
-    proto_thread_service_client::ProtoThreadServiceClient,
-};
-use std::pin::Pin;
-use tokio::sync::watch;
-use tokio_stream::{Stream, StreamExt};
-use tokio_util::sync::CancellationToken;
-use tonic::transport::Channel;
+//! Desktop-side client for the Eurora thread HTTP / WebSocket service.
+//!
+//! Mirrors `euro-activity::ActivityStorage` in shape: a single
+//! [`EndpointManager`] gives the live base URL, an [`AuthManager`] supplies
+//! bearer tokens, and a shared [`reqwest::Client`] handles the JSON request
+//! / response round-trips. Streaming chat goes over a WebSocket established
+//! via `tokio-tungstenite`.
 
+use std::sync::Arc;
+
+use euro_auth::AuthManager;
+use euro_endpoint::EndpointManager;
+use euro_secret::ExposeSecret;
+use futures::{SinkExt, StreamExt};
+use reqwest::header;
+use serde::de::DeserializeOwned;
+use serde::ser::Serialize;
+use thread_core::{
+    ChatClientMessage, ChatSendRequest, ChatServerMessage, CreateThreadRequest,
+    CreateThreadResponse, DeleteThreadResponse, GenerateThreadTitleRequest,
+    GenerateThreadTitleResponse, GetMessagesQuery, GetMessagesResponse, GetThreadResponse,
+    ListThreadsQuery, ListThreadsResponse, MessageNode, SavePreliminaryContentBlocksRequest,
+    SavePreliminaryContentBlocksResponse, SearchMessagesQuery, SearchMessagesResponse,
+    SearchThreadsQuery, SearchThreadsResponse, SwitchBranchRequest, Thread,
+};
+use tokio::net::TcpStream;
+use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::HeaderValue;
+use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
+
+use crate::error::{Error, Result};
+
+/// HTTP / WebSocket client for the thread service.
+///
+/// Cheap to clone: holds an `Arc<EndpointManager>`, an `AuthManager` (itself
+/// `Arc` internally), and a `reqwest::Client` (which uses internal
+/// reference counting).
+#[derive(Clone)]
 pub struct ThreadManager {
-    channel_rx: watch::Receiver<Channel>,
+    endpoint_manager: Arc<EndpointManager>,
     auth_manager: AuthManager,
+    http: reqwest::Client,
 }
 
 impl ThreadManager {
-    pub fn new(channel_rx: watch::Receiver<Channel>, auth_manager: AuthManager) -> Self {
+    pub fn new(endpoint_manager: Arc<EndpointManager>, auth_manager: AuthManager) -> Self {
+        let http = endpoint_manager.client();
         Self {
-            channel_rx,
+            endpoint_manager,
             auth_manager,
+            http,
         }
     }
 
-    fn client(&self) -> ProtoThreadServiceClient<AuthedChannel> {
-        let channel = self.channel_rx.borrow().clone();
-        let authed = build_authed_channel(channel, self.auth_manager.clone());
-        ProtoThreadServiceClient::new(authed)
-            .max_decoding_message_size(1024 * 1024 * 1024)
-            .max_encoding_message_size(1024 * 1024 * 1024)
+    fn url(&self, path: &str) -> reqwest::Url {
+        self.endpoint_manager.url(path)
     }
 
-    pub async fn create(&self, request: CreateThreadRequest) -> Result<ProtoThread> {
-        let mut client = self.client();
-        let response = client.create_thread(request).await?.into_inner();
-        if let Some(thread) = response.thread {
-            Ok(thread)
-        } else {
-            Err(Error::CreateThread(
-                "Server did not return the saved thread".to_string(),
-            ))
-        }
+    fn ws_url(&self, path: &str) -> Result<reqwest::Url> {
+        let mut url = self.endpoint_manager.url(path);
+        let new_scheme = match url.scheme() {
+            "https" => "wss",
+            "http" => "ws",
+            other => {
+                return Err(Error::InvalidUrl(format!(
+                    "endpoint URL has unsupported scheme for WebSocket: {other}"
+                )));
+            }
+        };
+        url.set_scheme(new_scheme)
+            .map_err(|()| Error::InvalidUrl(format!("Failed to switch scheme to {new_scheme}")))?;
+        Ok(url)
     }
 
-    pub async fn list_threads(&self, request: ListThreadsRequest) -> Result<Vec<ProtoThread>> {
-        let mut client = self.client();
-        let response = client.list_threads(request).await?.into_inner();
-
-        Ok(response.threads.into_iter().collect())
+    async fn bearer(&self) -> Result<String> {
+        let token = self
+            .auth_manager
+            .get_or_refresh_access_token()
+            .await
+            .map_err(|e| Error::Auth(e.to_string()))?;
+        Ok(format!("Bearer {}", token.expose_secret()))
     }
 
-    pub async fn delete_thread(&self, thread_id: String) -> Result<()> {
-        let mut client = self.client();
-        client
-            .delete_thread(DeleteThreadRequest { thread_id })
+    async fn get_json<R: DeserializeOwned>(&self, path: &str) -> Result<R> {
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .get(self.url(path))
+            .header(header::AUTHORIZATION, bearer)
+            .send()
             .await?;
-        Ok(())
+        decode(response).await
     }
 
-    pub async fn get_thread(&self, thread_id: String) -> Result<ProtoThread> {
-        let mut client = self.client();
-        let response = client
-            .get_thread(GetThreadRequest { thread_id })
-            .await?
-            .into_inner();
+    async fn get_json_query<Q: Serialize, R: DeserializeOwned>(
+        &self,
+        path: &str,
+        query: &Q,
+    ) -> Result<R> {
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .get(self.url(path))
+            .header(header::AUTHORIZATION, bearer)
+            .query(query)
+            .send()
+            .await?;
+        decode(response).await
+    }
 
-        if let Some(thread) = response.thread {
-            Ok(thread)
-        } else {
-            Err(Error::ThreadNotFound)
-        }
+    async fn post_json<B: Serialize, R: DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<R> {
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .post(self.url(path))
+            .header(header::AUTHORIZATION, bearer)
+            .json(body)
+            .send()
+            .await?;
+        decode(response).await
+    }
+
+    async fn delete<R: DeserializeOwned>(&self, path: &str) -> Result<R> {
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .delete(self.url(path))
+            .header(header::AUTHORIZATION, bearer)
+            .send()
+            .await?;
+        decode(response).await
+    }
+
+    pub async fn create(&self, title: Option<String>) -> Result<Thread> {
+        let body = CreateThreadRequest { title };
+        let response: CreateThreadResponse = self.post_json("/threads", &body).await?;
+        Ok(response.thread)
+    }
+
+    pub async fn list_threads(&self, limit: u32, offset: u32) -> Result<Vec<Thread>> {
+        let query = ListThreadsQuery {
+            limit: Some(limit),
+            offset: Some(offset),
+        };
+        let response: ListThreadsResponse = self.get_json_query("/threads", &query).await?;
+        Ok(response.threads)
+    }
+
+    pub async fn get_thread(&self, thread_id: Uuid) -> Result<Thread> {
+        let response: GetThreadResponse = self.get_json(&format!("/threads/{thread_id}")).await?;
+        Ok(response.thread)
+    }
+
+    pub async fn delete_thread(&self, thread_id: Uuid) -> Result<()> {
+        let _: DeleteThreadResponse = self.delete(&format!("/threads/{thread_id}")).await?;
+        Ok(())
     }
 
     pub async fn get_messages(
         &self,
-        thread_id: String,
+        thread_id: Uuid,
         limit: u32,
         offset: u32,
         all_variants: bool,
-    ) -> Result<GetMessagesResponse> {
-        let mut client = self.client();
-        let response = client
-            .get_messages(GetMessagesRequest {
-                thread_id,
-                limit,
-                offset,
-                all_variants,
-            })
-            .await?
-            .into_inner();
-
-        Ok(response)
+    ) -> Result<Vec<MessageNode>> {
+        let query = GetMessagesQuery {
+            limit: Some(limit),
+            offset: Some(offset),
+            all_variants,
+        };
+        let response: GetMessagesResponse = self
+            .get_json_query(&format!("/threads/{thread_id}/messages"), &query)
+            .await?;
+        Ok(response.messages)
     }
 
     pub async fn switch_branch(
         &self,
-        thread_id: String,
-        message_id: String,
+        thread_id: Uuid,
+        message_id: Uuid,
         direction: i32,
-    ) -> Result<GetMessagesResponse> {
-        let mut client = self.client();
-        let response = client
-            .switch_branch(SwitchBranchRequest {
-                thread_id,
-                message_id,
-                direction,
-            })
-            .await?
-            .into_inner();
-
-        Ok(response)
+    ) -> Result<Vec<MessageNode>> {
+        let body = SwitchBranchRequest {
+            message_id,
+            direction,
+        };
+        let response: GetMessagesResponse = self
+            .post_json(
+                &format!("/threads/{thread_id}/messages/switch-branch"),
+                &body,
+            )
+            .await?;
+        Ok(response.messages)
     }
 
-    pub async fn generate_thread_title(
-        &self,
-        thread_id: String,
-        content: String,
-    ) -> Result<ProtoThread> {
-        let mut client = self.client();
-        let response = client
-            .generate_thread_title(GenerateThreadTitleRequest { thread_id, content })
-            .await?
-            .into_inner();
-
-        match response.thread {
-            Some(thread) => Ok(thread),
-            None => Err(Error::UpdateThread(
-                "Thread title could not be generated".to_string(),
-            )),
-        }
+    pub async fn generate_thread_title(&self, thread_id: Uuid) -> Result<Thread> {
+        let body = GenerateThreadTitleRequest::default();
+        let response: GenerateThreadTitleResponse = self
+            .post_json(&format!("/threads/{thread_id}/title"), &body)
+            .await?;
+        Ok(response.thread)
     }
 
     pub async fn search_threads(
@@ -142,17 +215,12 @@ impl ThreadManager {
         limit: u32,
         offset: u32,
     ) -> Result<SearchThreadsResponse> {
-        let mut client = self.client();
-        let response = client
-            .search_threads(SearchThreadsRequest {
-                query,
-                limit,
-                offset,
-            })
-            .await?
-            .into_inner();
-
-        Ok(response)
+        let query = SearchThreadsQuery {
+            q: query,
+            limit: Some(limit),
+            offset: Some(offset),
+        };
+        self.get_json_query("/threads/search", &query).await
     }
 
     pub async fn search_messages(
@@ -161,77 +229,137 @@ impl ThreadManager {
         limit: u32,
         offset: u32,
     ) -> Result<SearchMessagesResponse> {
-        let mut client = self.client();
-        let response = client
-            .search_messages(SearchMessagesRequest {
-                query,
-                limit,
-                offset,
-            })
-            .await?
-            .into_inner();
-
-        Ok(response)
-    }
-}
-
-impl ThreadManager {
-    pub async fn save_preliminary_content_blocks(
-        &mut self,
-        thread_id: String,
-        blocks: ContentBlocks,
-    ) -> Result<ContentBlocks> {
-        let mut client = self.client();
-        let proto_blocks: Vec<ProtoContentBlock> =
-            blocks.into_inner().into_iter().map(|b| b.into()).collect();
-
-        let response = client
-            .save_preliminary_content_blocks(SavePreliminaryContentBlocksRequest {
-                thread_id,
-                content_blocks: proto_blocks,
-            })
-            .await?
-            .into_inner();
-
-        let content_blocks: Vec<ContentBlock> = response
-            .content_blocks
-            .into_iter()
-            .map(ContentBlock::from)
-            .collect();
-
-        Ok(content_blocks.into())
-    }
-}
-
-impl ThreadManager {
-    pub async fn chat_stream(
-        &mut self,
-        thread_id: String,
-        content_blocks: ContentBlocks,
-        parent_message_id: Option<String>,
-        asset_chips_json: Option<String>,
-        cancel: CancellationToken,
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<ChatStreamResponse>> + Send>>> {
-        let mut client = self.client();
-        let proto_blocks: Vec<ProtoContentBlock> = content_blocks
-            .into_inner()
-            .into_iter()
-            .map(|b| b.into())
-            .collect();
-
-        let response = tokio::select! {
-            result = client.chat_stream(ChatStreamRequest {
-                thread_id,
-                content_blocks: proto_blocks,
-                parent_message_id,
-                asset_chips_json,
-            }) => result?,
-            () = cancel.cancelled() => return Err(Error::Cancelled),
+        let query = SearchMessagesQuery {
+            q: query,
+            limit: Some(limit),
+            offset: Some(offset),
         };
-
-        let stream = response.into_inner();
-        let mapped_stream = stream.map(|result| result.map_err(Error::from));
-
-        Ok(Box::pin(mapped_stream))
+        self.get_json_query("/threads/messages/search", &query)
+            .await
     }
+
+    pub async fn save_preliminary_content_blocks(
+        &self,
+        thread_id: Uuid,
+        content_blocks: Vec<serde_json::Value>,
+    ) -> Result<Vec<serde_json::Value>> {
+        let body = SavePreliminaryContentBlocksRequest { content_blocks };
+        let response: SavePreliminaryContentBlocksResponse = self
+            .post_json(&format!("/threads/{thread_id}/preliminary-blocks"), &body)
+            .await?;
+        Ok(response.content_blocks)
+    }
+
+    /// Open a chat WebSocket and stream the turn back to the caller.
+    ///
+    /// Sends a single [`ChatClientMessage::Send`] frame, then yields each
+    /// inbound [`ChatServerMessage`] on the returned receiver. The receiver
+    /// closes when the server emits a `Final` or `Error` frame, or when
+    /// `cancel` fires (which prompts a `Cancel` frame and a clean close).
+    pub async fn chat_stream(
+        &self,
+        thread_id: Uuid,
+        request: ChatSendRequest,
+        cancel: CancellationToken,
+    ) -> Result<mpsc::UnboundedReceiver<Result<ChatServerMessage>>> {
+        let url = self.ws_url(&format!("/threads/{thread_id}/chat"))?;
+        let bearer = self.bearer().await?;
+
+        let mut req = url
+            .as_str()
+            .into_client_request()
+            .map_err(|e| Error::InvalidUrl(e.to_string()))?;
+        req.headers_mut().insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_str(&bearer)
+                .map_err(|e| Error::ChatProtocol(format!("Invalid bearer header: {e}")))?,
+        );
+
+        let (mut stream, _response) = tokio_tungstenite::connect_async_tls_with_config(
+            req,
+            None,
+            false,
+            None as Option<Connector>,
+        )
+        .await?;
+
+        // Send the opening Send frame.
+        let send_frame =
+            serde_json::to_string(&ChatClientMessage::Send(request)).map_err(Error::Encode)?;
+        stream.send(Message::Text(send_frame.into())).await?;
+
+        let (tx, rx) = mpsc::unbounded_channel::<Result<ChatServerMessage>>();
+        tokio::spawn(drive_chat(stream, tx, cancel));
+        Ok(rx)
+    }
+}
+
+async fn drive_chat(
+    mut stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    tx: mpsc::UnboundedSender<Result<ChatServerMessage>>,
+    cancel: CancellationToken,
+) {
+    loop {
+        tokio::select! {
+            biased;
+            () = cancel.cancelled() => {
+                let cancel_frame = serde_json::to_string(&ChatClientMessage::Cancel)
+                    .expect("cancel frame serializes");
+                let _ = stream.send(Message::Text(cancel_frame.into())).await;
+                let _ = stream.close(None).await;
+                let _ = tx.send(Err(Error::Cancelled));
+                return;
+            }
+            msg = stream.next() => {
+                let Some(msg) = msg else { return };
+                let msg = match msg {
+                    Ok(m) => m,
+                    Err(e) => {
+                        let _ = tx.send(Err(Error::WebSocket(e)));
+                        return;
+                    }
+                };
+                match msg {
+                    Message::Text(text) => match serde_json::from_str::<ChatServerMessage>(&text) {
+                        Ok(event) => {
+                            let is_terminal = matches!(
+                                &event,
+                                ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
+                            );
+                            if tx.send(Ok(event)).is_err() {
+                                let _ = stream.close(None).await;
+                                return;
+                            }
+                            if is_terminal {
+                                let _ = stream.close(None).await;
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(Error::Decode(e)));
+                            return;
+                        }
+                    },
+                    Message::Close(_) => return,
+                    Message::Ping(payload) => {
+                        // Respond to pings to keep the connection alive; some proxies require this.
+                        let _ = stream.send(Message::Pong(payload)).await;
+                    }
+                    Message::Binary(_) | Message::Pong(_) | Message::Frame(_) => {
+                        // Ignore — the wire protocol is text-only.
+                    }
+                }
+            }
+        }
+    }
+}
+
+async fn decode<R: DeserializeOwned>(response: reqwest::Response) -> Result<R> {
+    let status = response.status();
+    if status.is_success() {
+        let body = response.text().await?;
+        return serde_json::from_str(&body).map_err(Error::Decode);
+    }
+    let body = response.text().await.unwrap_or_default();
+    Err(Error::from_response(status, &body))
 }

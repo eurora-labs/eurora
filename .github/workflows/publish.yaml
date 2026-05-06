@@ -98,14 +98,6 @@ jobs:
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
 
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Compile Protobuf
-              run: pnpm proto:typescript
-
             - name: Build SvelteKit
               env:
                   SENTRY_RELEASE: ${{ env.version }}
@@ -177,14 +169,6 @@ jobs:
 
             - name: Init Node Environment
               uses: ./.github/actions/init-env-node
-
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Compile Protobuf
-              run: pnpm proto:typescript
 
             - name: Build extension
               shell: bash
@@ -372,24 +356,6 @@ jobs:
                     gir1.2-javascriptcoregtk-4.1 \
                     gir1.2-webkit2-4.1 \
                     libpipewire-0.3-dev;
-
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Compile Protobuf
-              run: pnpm proto:typescript
-
-            - name: Install Swift protoc plugins
-              if: runner.os == 'macOS'
-              run: |
-                  brew install protobuf swift-protobuf
-                  # Build protoc-gen-grpc-swift from source at the version matching Package.resolved
-                  # to prevent brew version drift from breaking the build.
-                  git clone --depth 1 --branch 2.2.1 https://github.com/grpc/grpc-swift-protobuf.git /tmp/grpc-swift-protobuf
-                  swift build -c release --package-path /tmp/grpc-swift-protobuf --product protoc-gen-grpc-swift-2
-                  sudo cp /tmp/grpc-swift-protobuf/.build/release/protoc-gen-grpc-swift-2 /usr/local/bin/protoc-gen-grpc-swift-2
 
             - name: Build Safari browser extension
               if: runner.os == 'macOS'

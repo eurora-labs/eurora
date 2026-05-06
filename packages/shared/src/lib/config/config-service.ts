@@ -1,17 +1,10 @@
 import { InjectionToken } from '$lib/context.js';
 
 export class ConfigService {
-	readonly grpcApiUrl: string;
-	readonly restApiUrl: string;
+	readonly apiUrl: string;
 
-	constructor(grpcApiUrl: string, restApiUrl: string | undefined) {
-		this.grpcApiUrl = grpcApiUrl;
-
-		if (restApiUrl) {
-			this.restApiUrl = restApiUrl;
-		} else {
-			this.restApiUrl = grpcApiUrl;
-		}
+	constructor(apiUrl: string) {
+		this.apiUrl = apiUrl;
 	}
 }
 

@@ -8,7 +8,7 @@ on:
 env:
     RUST_BACKTRACE: full
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
-    VITE_GRPC_API_URL: http://localhost:50051
+    VITE_API_URL: http://localhost:3000
 
 permissions:
     id-token: write
@@ -26,6 +26,7 @@ jobs:
             docs: ${{ steps.filter.outputs.docs }}
             node: ${{ steps.filter.outputs.node }}
             rust: ${{ steps.filter.outputs.rust }}
+            swift: ${{ steps.filter.outputs.swift }}
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
@@ -53,6 +54,9 @@ jobs:
                       rust: &any-rust
                         - *rust
                         - 'crates/**'
+                      swift:
+                        - *workflows
+                        - 'apps/macos/**'
 
     prettier:
         needs: changes
@@ -85,12 +89,6 @@ jobs:
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
-            - name: Compile Protobuf
-              run: pnpm proto:typescript
             - run: pnpm build
             - run: pnpm check
             - run: pnpm check-types
@@ -111,10 +109,6 @@ jobs:
               with:
                   persist-credentials: false
                   lfs: true
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Rust Cache
               uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
               with:
@@ -123,6 +117,23 @@ jobs:
             - run: cargo fmt --check --all
             - name: Cargo Clippy
               run: ./scripts/clippy.sh
+
+    swift-lint:
+        needs: changes
+        if: ${{ needs.changes.outputs.swift == 'true' }}
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
+            - name: Install SwiftLint and SwiftFormat
+              run: brew install swiftlint swiftformat
+            - name: SwiftLint
+              working-directory: apps/macos
+              run: swiftlint
+            - name: SwiftFormat
+              working-directory: apps/macos
+              run: swiftformat --lint .
 
     rust-test:
         needs: changes
@@ -139,10 +150,6 @@ jobs:
               with:
                   persist-credentials: false
                   lfs: true
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Rust Cache
               uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
               with:
@@ -179,10 +186,6 @@ jobs:
               with:
                   persist-credentials: false
                   lfs: true
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Rust Cache
               uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
               with:
@@ -201,10 +204,6 @@ jobs:
               with:
                   persist-credentials: false
                   lfs: true
-            - name: Install Protoc
-              uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3
-              with:
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Rust Cache
               uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
               with:

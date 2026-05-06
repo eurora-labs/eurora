@@ -5,14 +5,14 @@ import {
 	type BrowserObj,
 	type WatcherResponse,
 } from '../../../shared/content/extensions/watchers/watcher';
-import { ProtoImageFormat } from '@eurora/shared/proto/shared_pb.js';
 import browser from 'webextension-polyfill';
 import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
 import type { NativeYoutubeAsset, NativeYoutubeSnapshot } from '../../../shared/content/bindings';
-import type { ProtoImage } from '@eurora/shared/proto/shared_pb.js';
 
-interface EurImage extends Partial<ProtoImage> {
+interface EurImage {
 	dataBase64: string;
+	width: number;
+	height: number;
 }
 
 export class YoutubeWatcher extends Watcher<WatcherParams> {
@@ -125,7 +125,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 			dataBase64: canvas.toDataURL('image/png').split(',')[1],
 			width: canvas.width,
 			height: canvas.height,
-			format: ProtoImageFormat.PNG,
 		};
 	}
 

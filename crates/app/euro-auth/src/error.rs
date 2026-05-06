@@ -1,3 +1,5 @@
+use auth_core::AuthErrorResponse;
+use reqwest::StatusCode;
 use thiserror::Error;
 
 /// Errors produced by the authentication layer.
@@ -33,12 +35,27 @@ pub enum AuthError {
 pub type AuthResult<T> = Result<T, AuthError>;
 
 impl AuthError {
-    /// Classify a `tonic::Status` returned by the auth service.
-    pub fn from_refresh_status(status: tonic::Status) -> Self {
-        match status.code() {
-            tonic::Code::Unauthenticated => AuthError::InvalidRefreshToken,
-            _ => AuthError::Transient(anyhow::Error::new(status)),
+    /// Classify a non-2xx HTTP response from the auth service.
+    ///
+    /// `body` is the decoded [`AuthErrorResponse`] envelope, if available.
+    /// Falls back to a free-form message when the response wasn't valid
+    /// JSON or didn't match the envelope shape.
+    pub fn from_http_response(status: StatusCode, body: Option<AuthErrorResponse>) -> Self {
+        let detail = body
+            .as_ref()
+            .map(|b| format!("{} ({})", b.message, b.error))
+            .unwrap_or_else(|| status.to_string());
+
+        match status {
+            StatusCode::UNAUTHORIZED => AuthError::InvalidRefreshToken,
+            _ => AuthError::Transient(anyhow::anyhow!("auth service returned {status}: {detail}")),
         }
+    }
+
+    /// Classify a network-level (i.e. transport, DNS, body decode) failure.
+    /// Always transient — the server may not have seen the request at all.
+    pub fn from_transport(err: reqwest::Error) -> Self {
+        AuthError::Transient(anyhow::Error::new(err))
     }
 
     /// Whether this error means the user's session is definitively gone.
