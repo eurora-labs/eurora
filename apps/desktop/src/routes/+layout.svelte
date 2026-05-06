@@ -71,11 +71,7 @@
 
 <ModeWatcher defaultMode="system" />
 
-<div
-	class="app-shell relative flex flex-col h-screen overflow-hidden {currentPlatform === 'linux'
-		? 'rounded-[20px]'
-		: ''}"
->
+<div class="app-shell flex flex-col overflow-hidden bg-background">
 	<Titlebar />
 	<main class="flex-1 min-h-0 bg-background">
 		{@render children?.()}
@@ -86,6 +82,19 @@
 <UpdateChecker />
 <Toaster />
 
+<!--
+	Resize handles cover the OS window rect (the full viewport, including
+	the Linux shadow gutter), so they are siblings of the visually-rounded
+	shell rather than children clipped by it. macOS uses native edge resize.
+-->
 {#if currentPlatform !== 'macos'}
 	<ResizeHandles />
 {/if}
+
+<style>
+	.app-shell {
+		position: fixed;
+		inset: 0;
+		border-radius: var(--shell-radius);
+	}
+</style>

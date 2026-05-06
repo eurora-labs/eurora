@@ -1,4 +1,6 @@
-use euro_settings::{APISettings, AppSettings, AppearanceSettings, GeneralSettings, TelemetrySettings};
+use euro_settings::{
+    APISettings, AppSettings, AppearanceSettings, GeneralSettings, TelemetrySettings,
+};
 use tauri::{Manager, Runtime};
 
 use crate::error::ResultExt;

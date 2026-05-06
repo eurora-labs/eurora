@@ -31,7 +31,8 @@
 	const threadDateLabel = $derived(dateFormatter.format(new Date(threadDateIso)));
 
 	let maximized = $state(false);
-	let isMac = platform() === 'macos';
+	const currentPlatform = platform();
+	const isMac = currentPlatform === 'macos';
 
 	const appWindow = getCurrentWindow();
 
@@ -60,9 +61,15 @@
 	}
 </script>
 
+<!--
+	Tauri's drag-region handler reads `data-tauri-drag-region` on `e.target`
+	directly (no ancestor walk), so every non-interactive child of the bar
+	carries the attribute. Interactive controls (Tabs, Min/Max/Close) omit
+	it so they remain clickable.
+-->
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
-	<div class="flex-1" data-tauri-drag-region></div>
-	<div class="pointer-events-auto flex items-center gap-2 h-full px-2 min-w-0">
+	<div data-tauri-drag-region class="titlebar-fill"></div>
+	<div data-tauri-drag-region class="titlebar-content">
 		{#if hasMessages}
 			<Tabs.Root
 				value={chatService.viewMode}
@@ -80,14 +87,23 @@
 				</Tabs.List>
 			</Tabs.Root>
 		{/if}
-		<span class="truncate text-xs font-medium max-w-[28ch]" title={threadTitle}>
+		<span
+			data-tauri-drag-region
+			class="truncate text-xs font-medium max-w-[28ch]"
+			title={threadTitle}
+		>
 			{threadTitle}
 		</span>
-		<time class="text-xs text-muted-foreground whitespace-nowrap" datetime={threadDateIso}>
+		<time
+			data-tauri-drag-region
+			class="text-xs text-muted-foreground whitespace-nowrap"
+			datetime={threadDateIso}
+		>
 			{threadDateLabel}
 		</time>
 		{#if user.authenticated}
 			<Badge
+				data-tauri-drag-region
 				variant={user.planLabel === 'Pro' ? 'outline' : 'secondary'}
 				class="text-xs px-2 py-0.5 {user.planLabel === 'Pro'
 					? 'select-none opacity-50'
@@ -96,11 +112,11 @@
 		{/if}
 	</div>
 	{#if !isMac}
-		<div class="flex items-center h-full">
+		<div class="window-controls">
 			<Button
 				variant="ghost"
 				size="icon"
-				class="h-full rounded-none"
+				class="window-control-btn"
 				onclick={minimize}
 				aria-label="Minimize"
 			>
@@ -109,7 +125,7 @@
 			<Button
 				variant="ghost"
 				size="icon"
-				class="h-full rounded-none"
+				class="window-control-btn"
 				onclick={toggleMaximize}
 				aria-label={maximized ? 'Restore' : 'Maximize'}
 			>
@@ -122,7 +138,7 @@
 			<Button
 				variant="ghost"
 				size="icon"
-				class="h-full rounded-none"
+				class="window-control-btn window-control-close"
 				onclick={close}
 				aria-label="Close"
 			>
@@ -136,15 +152,52 @@
 	.titlebar {
 		display: flex;
 		flex-shrink: 0;
-		align-items: center;
-		justify-content: flex-end;
+		align-items: stretch;
 		height: var(--titlebar-height);
 		min-height: var(--titlebar-height);
 		user-select: none;
 		-webkit-user-select: none;
 	}
 
+	/* Reserve room for the native macOS traffic lights at the top-left. */
 	.titlebar-mac {
-		pointer-events: none;
+		padding-left: 76px;
+	}
+
+	.titlebar-fill {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+
+	.titlebar-content {
+		display: flex;
+		align-items: center;
+		min-width: 0;
+		height: 100%;
+		padding: 0 0.5rem;
+		gap: 0.5rem;
+	}
+
+	.window-controls {
+		display: flex;
+		flex-shrink: 0;
+		align-items: stretch;
+		height: 100%;
+	}
+
+	/*
+	 * Fluent (Windows 11) standard caption-button hit target: 46x32. We use the
+	 * same width on Linux so the bar feels consistent across platforms; the
+	 * height tracks the titlebar via `h-full`.
+	 */
+	.window-controls :global(.window-control-btn) {
+		width: 46px;
+		height: 100%;
+		border-radius: 0;
+	}
+
+	.window-controls :global(.window-control-close:hover) {
+		background-color: rgb(232 17 35);
+		color: white;
 	}
 </style>
