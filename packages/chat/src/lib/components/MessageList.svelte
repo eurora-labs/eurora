@@ -29,7 +29,6 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { tick } from 'svelte';
-	import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 	import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
 
 	let { emptyState, onCopy, onEdit }: Props = $props();
@@ -58,12 +57,6 @@
 		prevThreadId = threadId;
 		prevStreamingId = streamingId;
 	});
-
-	function getContentBlocks(node: MessageNode): ContentBlock[] {
-		const msg = node.message;
-		if (!msg || msg.type === 'remove') return [];
-		return msg.content;
-	}
 
 	function getReasoningContent(node: MessageNode): string {
 		return getReasoningFromMessage(node.message);

@@ -196,24 +196,6 @@ pub struct SearchMessageResult {
     pub snippet: String,
 }
 
-/// Request body for `POST /threads/{thread_id}/preliminary-blocks`.
-///
-/// `content_blocks` carries `agent_chain` `ContentBlock` JSON values; the
-/// service rewrites large in-line payloads into asset references and returns
-/// the rewritten blocks.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "specta", derive(Type))]
-pub struct SavePreliminaryContentBlocksRequest {
-    pub content_blocks: Vec<ContentBlock>,
-}
-
-/// Response body for `POST /threads/{thread_id}/preliminary-blocks`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "specta", derive(Type))]
-pub struct SavePreliminaryContentBlocksResponse {
-    pub content_blocks: Vec<ContentBlock>,
-}
-
 /// Frame sent by the client over the chat WebSocket.
 ///
 /// Bidirectional from day one; the current set is `Send` (start a turn) and
@@ -299,8 +281,6 @@ pub fn type_collection() -> specta::TypeCollection {
         .register::<SearchMessagesQuery>()
         .register::<SearchMessagesResponse>()
         .register::<SearchMessageResult>()
-        .register::<SavePreliminaryContentBlocksRequest>()
-        .register::<SavePreliminaryContentBlocksResponse>()
         .register::<ChatClientMessage>()
         .register::<ChatSendRequest>()
         .register::<ChatServerMessage>()

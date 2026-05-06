@@ -19,9 +19,8 @@ use thread_core::{
     ChatClientMessage, ChatSendRequest, ChatServerMessage, CreateThreadRequest,
     CreateThreadResponse, DeleteThreadResponse, GenerateThreadTitleRequest,
     GenerateThreadTitleResponse, GetMessagesQuery, GetMessagesResponse, GetThreadResponse,
-    ListThreadsQuery, ListThreadsResponse, MessageNode, SavePreliminaryContentBlocksRequest,
-    SavePreliminaryContentBlocksResponse, SearchMessagesQuery, SearchMessagesResponse,
-    SearchThreadsQuery, SearchThreadsResponse, SwitchBranchRequest, Thread,
+    ListThreadsQuery, ListThreadsResponse, MessageNode, SearchMessagesQuery,
+    SearchMessagesResponse, SearchThreadsQuery, SearchThreadsResponse, SwitchBranchRequest, Thread,
 };
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
@@ -236,18 +235,6 @@ impl ThreadManager {
         };
         self.get_json_query("/threads/messages/search", &query)
             .await
-    }
-
-    pub async fn save_preliminary_content_blocks(
-        &self,
-        thread_id: Uuid,
-        content_blocks: Vec<agent_chain_core::messages::ContentBlock>,
-    ) -> Result<Vec<agent_chain_core::messages::ContentBlock>> {
-        let body = SavePreliminaryContentBlocksRequest { content_blocks };
-        let response: SavePreliminaryContentBlocksResponse = self
-            .post_json(&format!("/threads/{thread_id}/preliminary-blocks"), &body)
-            .await?;
-        Ok(response.content_blocks)
     }
 
     /// Open a chat WebSocket and stream the turn back to the caller.

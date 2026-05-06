@@ -1,7 +1,9 @@
 import { InjectionToken } from '@eurora/shared/context';
+import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
+import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
 
 export type ViewMode = 'list' | 'graph';
 
@@ -317,17 +319,13 @@ export class ChatService {
 		let receivedFinal = false;
 
 		const abortController = new AbortController();
-		const stream = this.threadClient.sendMessage(threadId, text, {
-			parentMessageId: options.parentMessageId,
-			signal: abortController.signal,
-			assetChips: options.assetChips,
-			preservedAssetChips: options.preservedAssetChips,
-		});
+		const request = await this.buildSendRequest(threadId, text, options);
+		const stream = this.threadClient.sendMessage(threadId, request, abortController.signal);
 		let onFirstChunk = options.onFirstChunk;
 
 		try {
 			for await (const event of stream) {
-				if (event.type === 'confirmed_human') {
+				if (event.type === 'confirmed_human_message') {
 					const confirmed = event.message;
 					entry.messages = entry.messages.map((node) => {
 						if (node.message.id === tempHumanId) return confirmed;
@@ -350,6 +348,10 @@ export class ChatService {
 					entry.invalidateFullTree();
 					receivedFinal = true;
 					break;
+				}
+
+				if (event.type === 'error') {
+					throw new Error(`${event.kind}: ${event.message}`);
 				}
 
 				const chunk = event.chunk;
@@ -410,6 +412,46 @@ export class ChatService {
 		}
 
 		return receivedFinal;
+	}
+
+	private async buildSendRequest(
+		threadId: string,
+		text: string,
+		options: {
+			parentMessageId?: string | null;
+			assetChips?: AssetChip[];
+			preservedAssetChips?: AssetChip[];
+		},
+	): Promise<ChatSendRequest> {
+		const parent_message_id = options.parentMessageId ?? null;
+		const isEdit = options.preservedAssetChips !== undefined;
+
+		// On edits we replay the chips that were already attached to the
+		// original turn — there is no fresh activity to sample. On new turns
+		// with attached UI chips we ask the host to assemble per-turn context
+		// (asset bytes, snapshots, the persisted chip). Hosts without a
+		// context source return empty arrays.
+		const context =
+			!isEdit && (options.assetChips?.length ?? 0) > 0
+				? await this.threadClient.collectContext(threadId)
+				: { contentBlocks: [], assetChips: [] };
+
+		const persistedChips = isEdit ? (options.preservedAssetChips ?? []) : context.assetChips;
+
+		const userBlock: ContentBlock = {
+			type: 'text',
+			id: null,
+			text,
+			annotations: null,
+			index: null,
+			extras: null,
+		};
+
+		return {
+			content_blocks: [...context.contentBlocks, userBlock],
+			parent_message_id,
+			asset_chips_json: persistedChips.length > 0 ? JSON.stringify(persistedChips) : null,
+		};
 	}
 
 	private appendPlaceholders(

@@ -1,4 +1,4 @@
-use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
+use agent_chain_core::messages::ContentBlock;
 use euro_activity::types::ContextChip;
 use euro_timeline::TimelineManager;
 use tauri::{Manager, Runtime, ipc::Channel};
@@ -10,21 +10,31 @@ use uuid::Uuid;
 use crate::error::AppError;
 use crate::shared_types::{ActiveStreamTokens, SharedThreadManager};
 
+/// Per-turn host context returned by `chat.collect_context`.
+///
+/// `content_blocks` are inlined directly — large payloads are rewritten into
+/// asset references server-side at chat-turn time, so the wire format here
+/// can carry raw bytes/text without the client having to round-trip them.
 #[taurpc::ipc_type]
-pub struct Query {
-    text: String,
-    assets: Vec<String>,
-    parent_message_id: Option<String>,
-    preserved_asset_chips: Option<Vec<ContextChip>>,
+pub struct ChatContext {
+    pub content_blocks: Vec<ContentBlock>,
+    pub asset_chips: Vec<ContextChip>,
 }
 
+// Trait method docs are not supported by `#[taurpc::procedures]` — see the
+// `ChatApiImpl` resolvers below for behavior notes.
 #[taurpc::procedures(path = "chat")]
 pub trait ChatApi {
+    async fn collect_context<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+    ) -> Result<ChatContext, String>;
+
     async fn send_query<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         channel: Channel<ChatServerMessage>,
-        query: Query,
+        request: ChatSendRequest,
     ) -> Result<(), String>;
 
     async fn cancel_query<R: Runtime>(
@@ -36,107 +46,70 @@ pub trait ChatApi {
 #[derive(Clone)]
 pub struct ChatApiImpl;
 
+const STREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
 #[taurpc::resolvers]
 impl ChatApi for ChatApiImpl {
+    async fn collect_context<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        _thread_id: String,
+    ) -> Result<ChatContext, String> {
+        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
+            .try_state()
+            .ok_or(AppError::Unavailable("Timeline"))?;
+
+        let timeline = timeline_state.lock().await;
+
+        // Refreshing the activity is best-effort: a missing tab or stale
+        // browser bridge shouldn't abort the chat turn — we just contribute
+        // no fresh context for it.
+        if let Err(e) = timeline.refresh_current_activity().await {
+            tracing::debug!("collect_context: refresh failed: {e}");
+        }
+        if timeline.save_current_activity_to_service().await.is_err() {
+            return Ok(ChatContext {
+                content_blocks: Vec::new(),
+                asset_chips: Vec::new(),
+            });
+        }
+
+        let asset_blocks = timeline.construct_messages_from_last_asset().await;
+        let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
+
+        let mut content_blocks: Vec<ContentBlock> =
+            Vec::with_capacity(asset_blocks.len() + snapshot_blocks.len());
+        content_blocks.extend(asset_blocks.into_inner());
+        content_blocks.extend(snapshot_blocks.into_inner());
+
+        let asset_chips = timeline
+            .get_context_chip()
+            .await
+            .map(|chip| vec![chip])
+            .unwrap_or_default();
+
+        Ok(ChatContext {
+            content_blocks,
+            asset_chips,
+        })
+    }
+
     async fn send_query<R: Runtime>(
         self,
         app_handle: tauri::AppHandle<R>,
         thread_id: String,
         channel: Channel<ChatServerMessage>,
-        query: Query,
+        request: ChatSendRequest,
     ) -> Result<(), String> {
         let thread_state: tauri::State<SharedThreadManager> = app_handle
             .try_state()
             .ok_or(AppError::Unavailable("Thread manager"))?;
-        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
-            .try_state()
-            .ok_or(AppError::Unavailable("Timeline"))?;
         let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
             .try_state()
             .ok_or(AppError::Unavailable("Active stream tokens"))?;
 
         let thread_uuid =
             Uuid::parse_str(&thread_id).map_err(|e| format!("Invalid thread_id: {e}"))?;
-        let parent_message_uuid = match query.parent_message_id.as_deref() {
-            Some(s) if !s.is_empty() => {
-                Some(Uuid::parse_str(s).map_err(|e| format!("Invalid parent_message_id: {e}"))?)
-            }
-            _ => None,
-        };
-
-        tracing::debug!(
-            "send_query: assets={:?}, preserved_chips={}",
-            query.assets,
-            query
-                .preserved_asset_chips
-                .as_ref()
-                .map(|c| c.len())
-                .unwrap_or(0)
-        );
-
-        let is_edit = query.preserved_asset_chips.is_some();
-
-        let (chip, asset_blocks, snapshot_blocks) = if is_edit {
-            (None, ContentBlocks::new(), ContentBlocks::new())
-        } else {
-            let timeline = timeline_state.lock().await;
-            let _ = timeline.refresh_current_activity().await;
-
-            let save_ok = timeline.save_current_activity_to_service().await.is_ok();
-            tracing::debug!(
-                "send_query: save_ok={save_ok}, assets_empty={}",
-                query.assets.is_empty()
-            );
-
-            if save_ok && !query.assets.is_empty() {
-                let chip = timeline.get_context_chip().await;
-                let asset_blocks = timeline.construct_messages_from_last_asset().await;
-                let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
-                tracing::debug!(
-                    "send_query: chip={:?}, asset_blocks={}, snapshot_blocks={}",
-                    chip.is_some(),
-                    asset_blocks.len(),
-                    snapshot_blocks.len()
-                );
-                (chip, asset_blocks, snapshot_blocks)
-            } else {
-                (None, ContentBlocks::new(), ContentBlocks::new())
-            }
-        };
-
-        let asset_chips_json: Option<String> = if let Some(chips) = &query.preserved_asset_chips {
-            if chips.is_empty() {
-                None
-            } else {
-                serde_json::to_string(chips).ok()
-            }
-        } else if let Some(chip) = chip {
-            serde_json::to_string(&[chip]).ok()
-        } else {
-            None
-        };
-
-        let mut context_blocks = ContentBlocks::new();
-
-        let mut all_blocks = ContentBlocks::new();
-        all_blocks.extend(asset_blocks.into_inner());
-        all_blocks.extend(snapshot_blocks.into_inner());
-
-        if !all_blocks.is_empty() {
-            match thread_state
-                .save_preliminary_content_blocks(thread_uuid, all_blocks.into_inner())
-                .await
-            {
-                Ok(returned) => {
-                    context_blocks = ContentBlocks::from(returned);
-                }
-                Err(e) => tracing::warn!("Failed to save preliminary blocks: {e}"),
-            }
-        }
-
-        let user_text_block: ContentBlock =
-            TextContentBlock::builder().text(&query.text).build().into();
-        context_blocks.push(user_text_block);
 
         let cancel = CancellationToken::new();
         tokens_state
@@ -144,58 +117,17 @@ impl ChatApi for ChatApiImpl {
             .await
             .insert(thread_id.clone(), cancel.clone());
 
-        let request = ChatSendRequest {
-            content_blocks: context_blocks.into_inner(),
-            parent_message_id: parent_message_uuid,
-            asset_chips_json,
-        };
-
-        tracing::debug!("Opening chat WebSocket");
-        let mut rx = thread_state
-            .chat_stream(thread_uuid, request, cancel.clone())
-            .await
-            .map_err(|e| format!("Failed to open chat stream: {e}"))?;
-
-        let stream_future = async {
-            while let Some(item) = rx.recv().await {
-                match item {
-                    Ok(event) => {
-                        let is_terminal = matches!(
-                            &event,
-                            ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
-                        );
-                        if let Err(e) = channel.send(event) {
-                            return Err(format!("Failed to forward chat event: {e}"));
-                        }
-                        if is_terminal {
-                            return Ok(());
-                        }
-                    }
-                    Err(euro_thread::Error::Cancelled) => return Ok(()),
-                    Err(e) => return Err(format!("Stream error: {e}")),
-                }
-            }
-            Ok(())
-        };
-
-        let timeout = std::time::Duration::from_secs(300);
-        let result = match tokio::time::timeout(timeout, stream_future).await {
-            Ok(Ok(())) => {
-                tracing::debug!("Stream completed successfully");
-                Ok(())
-            }
-            Ok(Err(e)) => {
-                cancel.cancel();
-                Err(e)
-            }
-            Err(_) => {
-                cancel.cancel();
-                Err("Stream processing timed out after 5 minutes".to_string())
-            }
-        };
+        let stream_result = forward_chat_stream(
+            thread_state.inner(),
+            thread_uuid,
+            request,
+            cancel.clone(),
+            &channel,
+        )
+        .await;
 
         tokens_state.lock().await.remove(&thread_id);
-        result
+        stream_result
     }
 
     async fn cancel_query<R: Runtime>(
@@ -213,5 +145,55 @@ impl ChatApi for ChatApiImpl {
         }
 
         Ok(())
+    }
+}
+
+async fn forward_chat_stream(
+    thread: &SharedThreadManager,
+    thread_uuid: Uuid,
+    request: ChatSendRequest,
+    cancel: CancellationToken,
+    channel: &Channel<ChatServerMessage>,
+) -> Result<(), String> {
+    let mut rx = thread
+        .chat_stream(thread_uuid, request, cancel.clone())
+        .await
+        .map_err(|e| format!("Failed to open chat stream: {e}"))?;
+
+    let stream_future = async {
+        while let Some(item) = rx.recv().await {
+            match item {
+                Ok(event) => {
+                    let is_terminal = matches!(
+                        &event,
+                        ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
+                    );
+                    channel
+                        .send(event)
+                        .map_err(|e| format!("Failed to forward chat event: {e}"))?;
+                    if is_terminal {
+                        return Ok(());
+                    }
+                }
+                Err(euro_thread::Error::Cancelled) => return Ok(()),
+                Err(e) => return Err(format!("Stream error: {e}")),
+            }
+        }
+        Ok(())
+    };
+
+    match tokio::time::timeout(STREAM_TIMEOUT, stream_future).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => {
+            cancel.cancel();
+            Err(e)
+        }
+        Err(_) => {
+            cancel.cancel();
+            Err(format!(
+                "Stream processing timed out after {} seconds",
+                STREAM_TIMEOUT.as_secs()
+            ))
+        }
     }
 }

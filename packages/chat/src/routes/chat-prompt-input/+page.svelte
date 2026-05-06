@@ -61,8 +61,8 @@
 				chatService.activeThreadId = threadId;
 				await chatService.loadMessages(threadId);
 			},
-			setStreamChunks(chunks: any[]) {
-				fakeService.streamChunks = chunks;
+			setStreamFrames(frames: any[]) {
+				fakeService.streamFrames = frames;
 			},
 			simulateStreaming(threadId: string) {
 				const entry = chatService.getThreadData(threadId);

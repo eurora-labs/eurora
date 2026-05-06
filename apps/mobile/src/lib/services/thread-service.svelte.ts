@@ -1,16 +1,14 @@
-import { fromChatServerMessage } from '@eurora/chat/models/streaming';
-import type { Query } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
-import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
+import type { ChatServerMessage } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type {
 	BranchDirection,
+	ChatContext,
 	IThreadService,
-	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
 import type {
-	ChatServerMessage,
+	ChatSendRequest,
 	MessageNode,
 	Thread as WireThread,
 } from '@eurora/shared/bindings/thread';
@@ -88,18 +86,18 @@ export class ThreadService implements IThreadService {
 		)) as unknown as MessageSearchResult[];
 	}
 
+	async collectContext(_threadId: string): Promise<ChatContext> {
+		// Mobile has no desktop activity timeline — chat turns carry only the
+		// user's text.
+		return { contentBlocks: [], assetChips: [] };
+	}
+
 	async *sendMessage(
 		threadId: string,
-		text: string,
-		options: SendMessageOptions = {},
-	): AsyncIterable<ChatStreamEvent> {
-		const { parentMessageId, signal, assetChips } = options;
-		const query: Query = {
-			text,
-			assets: assetChips?.map((c) => c.id) ?? [],
-			parent_message_id: parentMessageId ?? null,
-		};
-		const buffer: ChatStreamEvent[] = [];
+		request: ChatSendRequest,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		const buffer: ChatServerMessage[] = [];
 		let resolve: ((value: void) => void) | null = null;
 		let finished = false;
 		let error: unknown = null;
@@ -109,16 +107,8 @@ export class ThreadService implements IThreadService {
 			resolve = null;
 		}
 
-		// Until taurpc regenerates its local bindings (which happens at app
-		// runtime, not at `cargo check`), the channel callback's type still
-		// reflects the pre-typing wire shape, so we narrow via `unknown`.
 		function onEvent(response: unknown) {
-			try {
-				buffer.push(fromChatServerMessage(response as ChatServerMessage));
-			} catch (e) {
-				error = e;
-				finished = true;
-			}
+			buffer.push(response as ChatServerMessage);
 			notify();
 		}
 
@@ -127,7 +117,17 @@ export class ThreadService implements IThreadService {
 		}
 		signal?.addEventListener('abort', onAbort, { once: true });
 
-		this.taurpc.chat.send_query(threadId, onEvent, query).then(
+		const sendQuery = (
+			this.taurpc.chat as unknown as {
+				send_query: (
+					threadId: string,
+					channel: (response: unknown) => void,
+					request: ChatSendRequest,
+				) => Promise<void>;
+			}
+		).send_query.bind(this.taurpc.chat);
+
+		sendQuery(threadId, onEvent, request).then(
 			() => {
 				finished = true;
 				notify();
@@ -154,9 +154,7 @@ export class ThreadService implements IThreadService {
 				});
 			}
 
-			while (buffer.length > 0) {
-				yield buffer.shift()!;
-			}
+			while (buffer.length > 0) yield buffer.shift()!;
 
 			if (error) throw error;
 		} finally {
