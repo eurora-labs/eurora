@@ -33,7 +33,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 pub use error::BridgeError;
 pub use frame::{
     CancelFrame, ErrorFrame, EventFrame, Frame, FrameKind, RegisterFrame, RequestFrame,
-    ResponseFrame,
+    ResponseFrame, ShutdownFrame,
 };
 
 /// Hostname clients dial. Resolved to [`BRIDGE_BIND_IP`] by the OS
@@ -92,6 +92,7 @@ pub fn type_collection() -> specta::TypeCollection {
         .register::<ErrorFrame>()
         .register::<CancelFrame>()
         .register::<RegisterFrame>()
+        .register::<ShutdownFrame>()
 }
 
 #[cfg(test)]
