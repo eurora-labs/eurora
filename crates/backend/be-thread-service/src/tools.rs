@@ -182,17 +182,31 @@ fn truncate_content(content: &str, max_chars: usize) -> String {
         return content.to_string();
     }
 
-    let truncated = &content[..max_chars];
+    let safe_end = floor_char_boundary(content, max_chars);
+    let truncated = &content[..safe_end];
     let cut_point = truncated
         .rfind("\n\n")
         .or_else(|| truncated.rfind('\n'))
-        .unwrap_or(max_chars);
+        .unwrap_or(safe_end);
 
     format!(
         "{}\n\n[Content truncated — {:.0}% of original shown]",
         &content[..cut_point],
         (cut_point as f64 / content.len() as f64) * 100.0
     )
+}
+
+/// Largest index `≤ index` that lies on a UTF-8 character boundary. Mirrors
+/// `str::floor_char_boundary` (currently nightly-only).
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
 }
 
 // ---------------------------------------------------------------------------
@@ -545,6 +559,16 @@ mod tests {
     fn test_truncate_content_short() {
         let content = "Short content.";
         assert_eq!(truncate_content(content, 100), content);
+    }
+
+    #[test]
+    fn test_truncate_content_does_not_panic_on_multibyte_boundary() {
+        // "é" is two bytes in UTF-8. Repeating it 200 times gives 400 bytes.
+        // Truncating at byte 5 must not split a codepoint.
+        let content = "é".repeat(200);
+        let truncated = truncate_content(&content, 5);
+        assert!(truncated.is_char_boundary(0));
+        assert!(truncated.contains("[Content truncated"));
     }
 
     #[test]

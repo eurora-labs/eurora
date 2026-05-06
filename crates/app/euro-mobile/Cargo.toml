@@ -15,7 +15,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-chain-core = { workspace = true, features = ["prost"] }
+agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dotenv = { workspace = true }
@@ -28,8 +28,9 @@ euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-thread = { workspace = true }
 euro-user = { workspace = true }
+thread-core = { workspace = true, features = ["specta"] }
+uuid = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
-proto-gen = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }

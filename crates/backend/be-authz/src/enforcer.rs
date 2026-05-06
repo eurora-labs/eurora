@@ -53,19 +53,31 @@ mod tests {
     #[tokio::test]
     async fn free_can_list_threads() {
         let authz = test_authz().await;
-        assert!(
-            authz
-                .enforce("Free", "ThreadService", "ListThreads")
-                .unwrap()
-        );
+        assert!(authz.enforce("Free", "/threads", "GET").unwrap());
     }
 
     #[tokio::test]
     async fn free_can_create_thread() {
         let authz = test_authz().await;
+        assert!(authz.enforce("Free", "/threads", "POST").unwrap());
+    }
+
+    #[tokio::test]
+    async fn free_can_chat() {
+        let authz = test_authz().await;
         assert!(
             authz
-                .enforce("Free", "ThreadService", "CreateThread")
+                .enforce("Free", "/threads/{thread_id}/chat", "GET")
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn free_can_generate_title() {
+        let authz = test_authz().await;
+        assert!(
+            authz
+                .enforce("Free", "/threads/{thread_id}/title", "POST")
                 .unwrap()
         );
     }
@@ -73,21 +85,13 @@ mod tests {
     #[tokio::test]
     async fn tier1_inherits_free_permissions() {
         let authz = test_authz().await;
-        assert!(
-            authz
-                .enforce("Tier1", "ThreadService", "ListThreads")
-                .unwrap()
-        );
+        assert!(authz.enforce("Tier1", "/threads", "GET").unwrap());
     }
 
     #[tokio::test]
     async fn tier1_can_create_thread() {
         let authz = test_authz().await;
-        assert!(
-            authz
-                .enforce("Tier1", "ThreadService", "CreateThread")
-                .unwrap()
-        );
+        assert!(authz.enforce("Tier1", "/threads", "POST").unwrap());
     }
 
     #[tokio::test]
@@ -111,38 +115,18 @@ mod tests {
     #[tokio::test]
     async fn unknown_role_denied() {
         let authz = test_authz().await;
-        assert!(
-            !authz
-                .enforce("Unknown", "ThreadService", "ListThreads")
-                .unwrap()
-        );
+        assert!(!authz.enforce("Unknown", "/threads", "GET").unwrap());
     }
 
-    const PROTO_METHODS: &[(&str, &str)] = &[
-        ("ThreadService", "CreateThread"),
-        ("ThreadService", "ListThreads"),
-        ("ThreadService", "GetThread"),
-        ("ThreadService", "GetMessages"),
-        ("ThreadService", "AddHiddenHumanMessage"),
-        ("ThreadService", "AddHumanMessage"),
-        ("ThreadService", "AddSystemMessage"),
-        ("ThreadService", "ChatStream"),
-        ("ThreadService", "GenerateThreadTitle"),
-        ("ActivityService", "ListActivities"),
-        ("ActivityService", "InsertActivity"),
-        ("AssetService", "CreateAsset"),
-    ];
-
+    /// Pin the contract that the policy file contains no stray gRPC entries
+    /// after the HTTP migration. Resources must be either route templates
+    /// (start with `/`) or the role-grant entries handled by `g`.
     #[tokio::test]
-    async fn policy_grpc_actions_match_proto_methods() {
+    async fn policy_contains_only_rest_resources() {
         let base = env!("CARGO_MANIFEST_DIR");
         let policy_path = format!("{base}/../../../config/authz/policy.csv");
         let policy = std::fs::read_to_string(&policy_path).expect("failed to read policy.csv");
 
-        let proto_set: std::collections::HashSet<(&str, &str)> =
-            PROTO_METHODS.iter().copied().collect();
-
-        let mut checked = 0;
         for line in policy.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
@@ -153,33 +137,11 @@ mod tests {
                 continue;
             }
             let resource = parts[2];
-            let action = parts[3];
-
-            if resource.starts_with('/') {
-                continue;
-            }
-
-            if action == "*" {
-                assert!(
-                    proto_set.iter().any(|(svc, _)| *svc == resource),
-                    "Policy entry ({resource}, {action}) references unknown service. \
-                     Did a proto service get renamed or removed?"
-                );
-                checked += 1;
-                continue;
-            }
-
             assert!(
-                proto_set.contains(&(resource, action)),
-                "Policy entry ({resource}, {action}) does not match any proto method. \
-                 Did a proto RPC get renamed or removed?"
+                resource.starts_with('/'),
+                "Policy entry resource {resource:?} is not an HTTP route. \
+                 The codebase no longer ships a gRPC surface — clean up dead policies."
             );
-            checked += 1;
         }
-
-        assert!(
-            checked > 0,
-            "No gRPC policy entries were checked — is the policy file empty?"
-        );
     }
 }

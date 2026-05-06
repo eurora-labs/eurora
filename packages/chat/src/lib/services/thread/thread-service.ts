@@ -27,7 +27,7 @@ export interface IThreadService {
 	): Promise<MessageNode[]>;
 	deleteThread(threadId: string): Promise<void>;
 	createThread(): Promise<Thread>;
-	generateTitle(threadId: string, content: string): Promise<Thread>;
+	generateTitle(threadId: string): Promise<Thread>;
 	sendMessage(
 		threadId: string,
 		text: string,

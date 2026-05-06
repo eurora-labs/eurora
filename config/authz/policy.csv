@@ -1,16 +1,8 @@
 # Role hierarchy: Tier1 > Free
 g, Tier1, Free
 
-# ── gRPC policies ──
-# Resource = short service name (Proto prefix stripped), Action = RPC method name.
-
-# Free: all gRPC endpoints (limited externally by token count)
-p, Free, ThreadService, *
-p, Free, ActivityService, *
-p, Free, AssetService, *
-
 # ── REST policies ──
-# Resource = route template path, Action = HTTP method.
+# Resource = route template path (axum MatchedPath form), Action = HTTP method.
 
 # Free: payment endpoints (any authenticated user)
 p, Free, /payment/pricing, GET
@@ -18,3 +10,24 @@ p, Free, /payment/checkout, POST
 p, Free, /payment/portal, POST
 p, Free, /payment/subscription, GET
 p, Free, /payment/checkout-status, GET
+
+# Free: activity endpoints (limited externally by token count)
+p, Free, /activities, GET
+p, Free, /activities, POST
+
+# Free: asset endpoints (limited externally by token count)
+p, Free, /v1/assets, POST
+
+# Free: thread endpoints. The /title and /chat routes additionally pass
+# through `http_token_gate_middleware` which enforces monthly token caps.
+p, Free, /threads, GET
+p, Free, /threads, POST
+p, Free, /threads/{thread_id}, GET
+p, Free, /threads/{thread_id}, DELETE
+p, Free, /threads/{thread_id}/title, POST
+p, Free, /threads/{thread_id}/messages, GET
+p, Free, /threads/{thread_id}/messages/switch-branch, POST
+p, Free, /threads/{thread_id}/preliminary-blocks, POST
+p, Free, /threads/{thread_id}/chat, GET
+p, Free, /threads/search, GET
+p, Free, /threads/messages/search, GET

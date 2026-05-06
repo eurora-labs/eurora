@@ -3,14 +3,14 @@ use crate::error::{AuthError, AuthResult};
 use anyhow::{Result, anyhow};
 use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use euro_endpoint::EndpointManager;
 use euro_secret::{ExposeSecret, SecretString, secret};
 use jsonwebtoken::dangerous::insecure_decode;
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::ops::Deref;
 use std::sync::Arc;
-use tokio::sync::{Mutex, watch};
-use tonic::transport::Channel;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, Copy)]
 struct JwtConfig {
@@ -61,9 +61,9 @@ pub struct AuthManagerInner {
 }
 
 impl AuthManager {
-    pub fn new(channel_rx: watch::Receiver<Channel>) -> Self {
+    pub fn new(endpoint_manager: Arc<EndpointManager>) -> Self {
         Self(Arc::new(AuthManagerInner {
-            auth_client: AuthClient::new(channel_rx),
+            auth_client: AuthClient::new(endpoint_manager),
             jwt_config: JwtConfig::from_env(),
             refresh_lock: Mutex::new(()),
         }))
@@ -196,6 +196,7 @@ impl AuthManager {
         self.auth_client
             .resend_verification_email(access_token.expose_secret())
             .await
+            .map_err(anyhow::Error::from)
     }
 
     pub async fn login_by_login_token(&self, login_token: String) -> Result<SecretString> {

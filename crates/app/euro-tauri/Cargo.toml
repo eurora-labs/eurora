@@ -24,7 +24,7 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
-agent-chain-core = { workspace = true, features = ["prost"] }
+agent-chain-core = { workspace = true }
 auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 backon = { workspace = true }
@@ -43,13 +43,13 @@ euro-process = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
 euro-thread = { workspace = true }
+thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
 euro-user = { workspace = true }
 euro-vision = { workspace = true }
 futures = { workspace = true }
 keyring = { workspace = true }
 parking_lot = { workspace = true }
-proto-gen = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 rustls = { workspace = true }
 serde = { workspace = true }

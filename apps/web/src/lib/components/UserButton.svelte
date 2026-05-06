@@ -10,8 +10,8 @@
 
 	const auth = inject(AUTH_SERVICE);
 
-	function handleLogout() {
-		auth.logout();
+	async function handleLogout() {
+		await auth.logout();
 		goto('/');
 	}
 
@@ -19,7 +19,7 @@
 		goto('/settings');
 	}
 
-	function getInitials(name?: string, email?: string): string {
+	function getInitials(name?: string | null, email?: string): string {
 		if (name) {
 			return name
 				.split(' ')
@@ -40,8 +40,9 @@
 		<DropdownMenu.Trigger>
 			<Button variant="ghost" class="relative h-8 w-8 rounded-full p-0">
 				<Avatar.Root class="h-8 w-8">
-					<Avatar.Image src={auth.user.avatar} alt={auth.user.name || auth.user.email} />
-					<Avatar.Fallback>{getInitials(auth.user.name, auth.user.email)}</Avatar.Fallback
+					<Avatar.Image alt={auth.user.display_name || auth.user.email} />
+					<Avatar.Fallback
+						>{getInitials(auth.user.display_name, auth.user.email)}</Avatar.Fallback
 					>
 				</Avatar.Root>
 			</Button>

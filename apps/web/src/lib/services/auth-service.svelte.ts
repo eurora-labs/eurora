@@ -1,162 +1,136 @@
 import { browser } from '$app/environment';
-import { create } from '@bufbuild/protobuf';
-import { EmptySchema } from '@bufbuild/protobuf/wkt';
-import { createClient, type Client } from '@connectrpc/connect';
-import { createGrpcWebTransport } from '@connectrpc/connect-web';
+import { ApiClient, ApiError, setSessionExpiredHandler } from '$lib/api/client.js';
 import { InjectionToken } from '@eurora/shared/context';
-import {
-	AssociateLoginTokenRequestSchema,
-	CheckEmailRequestSchema,
-	LoginRequestSchema,
-	ProtoAuthService,
-	Provider,
-	RefreshTokenRequestSchema,
-	RegisterRequestSchema,
-	VerifyEmailRequestSchema,
-	type TokenResponse,
-} from '@eurora/shared/proto/auth_service_pb.js';
 import * as Sentry from '@sentry/sveltekit';
+import type {
+	AssociateLoginTokenRequest,
+	CheckEmailRequest,
+	CheckEmailResponse,
+	LoginRequest,
+	Provider,
+	RegisterRequest,
+	ThirdPartyAuthUrlRequest,
+	ThirdPartyAuthUrlResponse,
+	UserInfo,
+	UserResponse,
+	VerifyEmailRequest,
+} from '@eurora/shared/bindings/auth';
 import type { ConfigService } from '@eurora/shared/config/config-service';
 
-export type OAuthProvider = 'google' | 'github';
+export type OAuthProvider = Provider;
 
-export interface User {
-	id: string;
-	email: string;
-	name?: string;
-	avatar?: string;
-	emailVerified: boolean;
-}
+export type User = UserInfo;
 
 export type CheckEmailResult =
 	| { status: 'oauth'; provider: OAuthProvider }
 	| { status: 'not_found' }
-	| { status: 'exists' };
+	| { status: 'password' };
 
-const COOKIE_KEYS = {
-	ACCESS_TOKEN: 'eurora_access_token',
-	REFRESH_TOKEN: 'eurora_refresh_token',
-	EXPIRES_AT: 'eurora_expires_at',
-	USER: 'eurora_user',
-} as const;
-
-const REFRESH_LEEWAY_MS = 5 * 60 * 1000;
-
+/**
+ * Browser-side auth state.
+ *
+ * The session lives entirely in `HttpOnly` cookies set by the backend
+ * (`eu_access`, `eu_refresh`) plus a JS-readable CSRF cookie
+ * (`eu_csrf`); this class never touches token values directly. The
+ * SPA only needs to know "who is logged in" — that comes from
+ * `GET /auth/me` on boot and from the `UserResponse` body returned
+ * by the session-minting endpoints.
+ */
 export class AuthService {
 	isAuthenticated = $state(false);
 	user = $state<User | null>(null);
-	accessToken = $state<string | null>(null);
+	/** Resolves once the initial `/auth/me` probe has settled. */
+	ready = $state<Promise<void>>(Promise.resolve());
 
-	readonly #config: ConfigService;
-	#refreshTokenValue: string | null = null;
-	#expiresAt: number | null = null;
-	#client: Client<typeof ProtoAuthService> | null = null;
-	#refreshInflight: Promise<void> | null = null;
+	readonly #api: ApiClient;
 
 	constructor(config: ConfigService) {
-		this.#config = config;
-		if (browser) this.#hydrateFromCookies();
+		this.#api = new ApiClient(config);
+		setSessionExpiredHandler(() => this.#clearLocal());
+		if (browser) this.ready = this.#hydrate();
 	}
 
 	async login(email: string, password: string): Promise<void> {
-		const tokens = await this.#grpc.login(
-			create(LoginRequestSchema, {
-				credential: {
-					case: 'emailPassword',
-					value: { login: email, password },
-				},
-			}),
-		);
-		this.#setSession(tokens);
+		const body: LoginRequest = { kind: 'email_password', login: email, password };
+		const resp = await this.#api.fetch<UserResponse, LoginRequest>('/auth/login', { body });
+		this.#setSession(resp.user);
 	}
 
 	async register(email: string, password: string, displayName?: string): Promise<void> {
-		const tokens = await this.#grpc.register(
-			create(RegisterRequestSchema, { email, password, displayName }),
-		);
-		this.#setSession(tokens);
+		const body: RegisterRequest = {
+			email,
+			password,
+			display_name: displayName ?? null,
+		};
+		const resp = await this.#api.fetch<UserResponse, RegisterRequest>('/auth/register', {
+			body,
+		});
+		this.#setSession(resp.user);
 	}
 
 	async loginWithOAuth(
 		provider: OAuthProvider,
 		code: string,
 		state: string,
-		opts?: { loginToken?: string; challengeMethod?: string },
+		opts?: { loginToken?: string },
 	): Promise<void> {
-		const tokens = await this.#grpc.login(
-			create(LoginRequestSchema, {
-				credential: {
-					case: 'thirdParty',
-					value: {
-						provider: toProtoProvider(provider),
-						code,
-						state,
-						loginToken: opts?.loginToken,
-						challengeMethod: opts?.challengeMethod,
-					},
-				},
-			}),
-		);
-		this.#setSession(tokens);
+		const body: LoginRequest = {
+			kind: 'third_party',
+			provider,
+			code,
+			state,
+			login_token: opts?.loginToken ?? null,
+		};
+		const resp = await this.#api.fetch<UserResponse, LoginRequest>('/auth/login', { body });
+		this.#setSession(resp.user);
 	}
 
 	async verifyEmail(token: string): Promise<void> {
-		const tokens = await this.#grpc.verifyEmail(create(VerifyEmailRequestSchema, { token }));
-		this.#setSession(tokens);
+		const body: VerifyEmailRequest = { token };
+		const resp = await this.#api.fetch<UserResponse, VerifyEmailRequest>('/auth/email/verify', {
+			body,
+		});
+		this.#setSession(resp.user);
 	}
 
 	async resendVerificationEmail(): Promise<void> {
-		const accessToken = this.accessToken;
-		if (!accessToken) {
-			throw new Error('Cannot resend verification email without an active session');
-		}
-		await this.#grpc.resendVerificationEmail(create(EmptySchema), {
-			headers: new Headers({ authorization: `Bearer ${accessToken}` }),
-		});
+		await this.#api.fetch<void>('/auth/email/resend-verification', { method: 'POST' });
 	}
 
 	async checkEmail(email: string): Promise<CheckEmailResult> {
-		const resp = await this.#grpc.checkEmail(create(CheckEmailRequestSchema, { email }));
-		if (resp.status === 'oauth') {
-			const provider = fromProtoProvider(resp.provider);
-			if (!provider) {
-				throw new Error('Unknown OAuth provider returned for email check');
+		const body: CheckEmailRequest = { email };
+		const resp = await this.#api.fetch<CheckEmailResponse, CheckEmailRequest>(
+			'/auth/email/check',
+			{ body },
+		);
+		switch (resp.status) {
+			case 'oauth': {
+				if (!resp.provider) {
+					throw new Error('Auth service returned `oauth` status without a provider');
+				}
+				return { status: 'oauth', provider: resp.provider };
 			}
-			return { status: 'oauth', provider };
+			case 'not_found':
+				return { status: 'not_found' };
+			case 'password':
+				return { status: 'password' };
 		}
-		if (resp.status === 'not_found') return { status: 'not_found' };
-		return { status: 'exists' };
 	}
 
 	async getOAuthRedirectUrl(provider: OAuthProvider): Promise<string> {
-		const resp = await this.#grpc.getThirdPartyAuthUrl({ provider: toProtoProvider(provider) });
+		const body: ThirdPartyAuthUrlRequest = { provider };
+		const resp = await this.#api.fetch<ThirdPartyAuthUrlResponse, ThirdPartyAuthUrlRequest>(
+			'/auth/oauth/url',
+			{ body },
+		);
 		return resp.url;
 	}
 
-	async ensureValidToken(): Promise<boolean> {
-		if (!this.isAuthenticated || !this.#expiresAt) return false;
-		if (this.#expiresAt > Date.now() + REFRESH_LEEWAY_MS) return true;
-
-		this.#refreshInflight ??= this.#refresh().finally(() => {
-			this.#refreshInflight = null;
-		});
-		try {
-			await this.#refreshInflight;
-			return true;
-		} catch {
-			return false;
-		}
-	}
-
 	async associateDesktopLogin(loginToken: string): Promise<void> {
-		const accessToken = this.accessToken;
-		if (!accessToken) {
-			throw new Error('Cannot associate desktop login without an active session');
-		}
-		await this.#grpc.associateLoginToken(
-			create(AssociateLoginTokenRequestSchema, { codeChallenge: loginToken }),
-			{ headers: new Headers({ authorization: `Bearer ${accessToken}` }) },
-		);
+		const body: AssociateLoginTokenRequest = { code_challenge: loginToken };
+		await this.#api.fetch<void, AssociateLoginTokenRequest>('/auth/login-token/associate', {
+			body,
+		});
 		if (browser) {
 			sessionStorage.removeItem('loginToken');
 			sessionStorage.removeItem('challengeMethod');
@@ -187,197 +161,51 @@ export class AuthService {
 		return true;
 	}
 
-	logout(): void {
-		this.#clearCookies();
-		Sentry.setUser(null);
-		this.isAuthenticated = false;
-		this.user = null;
-		this.accessToken = null;
-		this.#refreshTokenValue = null;
-		this.#expiresAt = null;
-	}
-
-	get #grpc(): Client<typeof ProtoAuthService> {
-		this.#client ??= createClient(
-			ProtoAuthService,
-			createGrpcWebTransport({
-				baseUrl: this.#config.grpcApiUrl,
-				useBinaryFormat: true,
-			}),
-		);
-		return this.#client;
-	}
-
-	async #refresh(): Promise<void> {
-		if (!this.#refreshTokenValue) {
-			throw new Error('No refresh token available');
-		}
+	/**
+	 * Sign the user out of this device. Calls the backend so the
+	 * refresh token is revoked server-side and `Set-Cookie` headers
+	 * clear the auth cookies; falls through to clearing local state
+	 * even if the network call fails so the UI never gets stuck.
+	 */
+	async logout(): Promise<void> {
 		try {
-			const tokens = await this.#grpc.refreshToken(create(RefreshTokenRequestSchema, {}));
-			// Re-derive the user from the new access token: fields like
-			// `emailVerified` can flip mid-session (e.g. user clicks the
-			// verification link in another tab) and we want the cookie + state
-			// to reflect the new claims.
-			const user = userFromAccessToken(tokens.accessToken);
-			if (!user) {
-				throw new Error('Invalid refreshed access token');
+			await this.#api.fetch<void>('/auth/logout', { method: 'POST', skipAuthRefresh: true });
+		} catch (err) {
+			if (!(err instanceof ApiError) || err.status !== 401) {
+				Sentry.captureException(err, { tags: { area: 'auth.logout' } });
 			}
-			this.#writeCookies(tokens, user);
-			this.user = user;
-			this.accessToken = tokens.accessToken;
-			this.#refreshTokenValue = tokens.refreshToken;
-			this.#expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
-		} catch (err) {
-			Sentry.captureException(err, { tags: { area: 'auth.refresh' } });
-			this.logout();
-			throw err;
+		} finally {
+			this.#clearLocal();
 		}
 	}
 
-	#setSession(tokens: TokenResponse): void {
-		const user = userFromAccessToken(tokens.accessToken);
-		if (!user) {
-			throw new Error('Invalid access token');
-		}
-		const expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
-
-		this.#writeCookies(tokens, user);
-		Sentry.setUser({ id: user.id });
-
-		this.isAuthenticated = true;
-		this.user = user;
-		this.accessToken = tokens.accessToken;
-		this.#refreshTokenValue = tokens.refreshToken;
-		this.#expiresAt = expiresAt;
-	}
-
-	#hydrateFromCookies(): void {
+	async #hydrate(): Promise<void> {
 		try {
-			const accessToken = readCookie(COOKIE_KEYS.ACCESS_TOKEN);
-			const refreshToken = readCookie(COOKIE_KEYS.REFRESH_TOKEN);
-			const expiresAtStr = readCookie(COOKIE_KEYS.EXPIRES_AT);
-			const userStr = readCookie(COOKIE_KEYS.USER);
-
-			if (!refreshToken || !expiresAtStr || !userStr) return;
-
-			const expiresAt = Number.parseInt(expiresAtStr, 10);
-			const accessFresh = !!accessToken && expiresAt > Date.now() + REFRESH_LEEWAY_MS;
-
-			// Prefer claims from the access token when it's fresh — they are
-			// the source of truth for fields like `emailVerified`. Fall back to
-			// the cookie payload only when the access token is missing or
-			// expired (the user can still hold a usable refresh token).
-			const user =
-				(accessFresh && accessToken ? userFromAccessToken(accessToken) : null) ??
-				normalizeUser(JSON.parse(decodeURIComponent(userStr)));
-
-			Sentry.setUser({ id: user.id });
-
-			this.isAuthenticated = true;
-			this.user = user;
-			this.accessToken = accessFresh ? accessToken : null;
-			this.#refreshTokenValue = refreshToken;
-			this.#expiresAt = expiresAt;
+			const resp = await this.#api.fetch<UserResponse>('/auth/me', {
+				skipAuthRefresh: false,
+			});
+			this.#setSession(resp.user);
 		} catch (err) {
+			if (err instanceof ApiError && err.status === 401) {
+				this.#clearLocal();
+				return;
+			}
 			Sentry.captureException(err, { tags: { area: 'auth.init' } });
+			this.#clearLocal();
 		}
 	}
 
-	#writeCookies(tokens: TokenResponse, user: User): void {
-		if (!browser) return;
-		const expiresAt = Date.now() + Number(tokens.expiresIn) * 1000;
-		const accessMaxAge = Number(tokens.expiresIn);
-		const sessionMaxAge = accessMaxAge * 10;
-
-		writeCookie(COOKIE_KEYS.ACCESS_TOKEN, tokens.accessToken, accessMaxAge);
-		writeCookie(COOKIE_KEYS.REFRESH_TOKEN, tokens.refreshToken, sessionMaxAge);
-		writeCookie(COOKIE_KEYS.EXPIRES_AT, expiresAt.toString(), sessionMaxAge);
-		writeCookie(COOKIE_KEYS.USER, encodeURIComponent(JSON.stringify(user)), sessionMaxAge);
+	#setSession(user: User): void {
+		Sentry.setUser({ id: user.id });
+		this.user = user;
+		this.isAuthenticated = true;
 	}
 
-	#clearCookies(): void {
-		if (!browser) return;
-		for (const name of Object.values(COOKIE_KEYS)) deleteCookie(name);
+	#clearLocal(): void {
+		Sentry.setUser(null);
+		this.user = null;
+		this.isAuthenticated = false;
 	}
 }
 
 export const AUTH_SERVICE = new InjectionToken<AuthService>('AuthService');
-
-function toProtoProvider(provider: OAuthProvider): Provider {
-	return provider === 'google' ? Provider.GOOGLE : Provider.GITHUB;
-}
-
-function fromProtoProvider(provider: Provider | undefined): OAuthProvider | undefined {
-	if (provider === Provider.GOOGLE) return 'google';
-	if (provider === Provider.GITHUB) return 'github';
-	return undefined;
-}
-
-function writeCookie(name: string, value: string, maxAgeSec: number): void {
-	const secure = location.protocol === 'https:' ? '; secure' : '';
-	document.cookie = `${name}=${value}; path=/; max-age=${maxAgeSec}; samesite=lax${secure}`;
-}
-
-function deleteCookie(name: string): void {
-	document.cookie = `${name}=; path=/; max-age=0`;
-}
-
-function readCookie(name: string): string | null {
-	const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
-	return match ? match[1] : null;
-}
-
-interface JwtPayload {
-	sub?: string;
-	user_id?: string;
-	email?: string;
-	name?: string;
-	avatar?: string;
-	picture?: string;
-	email_verified?: boolean;
-	[key: string]: unknown;
-}
-
-function decodeJwtPayload(token: string): JwtPayload | null {
-	try {
-		const base64Url = token.split('.')[1];
-		const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-		const json = decodeURIComponent(
-			atob(base64)
-				.split('')
-				.map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-				.join(''),
-		);
-		return JSON.parse(json) as JwtPayload;
-	} catch (err) {
-		Sentry.captureException(err, { tags: { area: 'auth.jwt-decode' } });
-		return null;
-	}
-}
-
-function userFromAccessToken(token: string): User | null {
-	const claims = decodeJwtPayload(token);
-	if (!claims) return null;
-	return {
-		id: claims.sub ?? claims.user_id ?? 'unknown',
-		email: claims.email ?? 'unknown@example.com',
-		name: claims.name ?? claims.email,
-		avatar: claims.avatar ?? claims.picture,
-		emailVerified: claims.email_verified === true,
-	};
-}
-
-// Older cookies may lack `emailVerified`. Default it to `false` rather than
-// `undefined` so callers can rely on the boolean shape; the next refresh will
-// repopulate it from the access token.
-function normalizeUser(raw: unknown): User {
-	const user = raw as Partial<User> & { id?: string; email?: string };
-	return {
-		id: user.id ?? 'unknown',
-		email: user.email ?? 'unknown@example.com',
-		name: user.name,
-		avatar: user.avatar,
-		emailVerified: user.emailVerified === true,
-	};
-}
