@@ -42,7 +42,7 @@
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"svelte-medium-image-zoom": "^0.2.6",
-		"svelte-sonner": "^1.1.0",
+		"svelte-sonner": "^1.1.1",
 		"svelte-system-info": "^1.0.3",
 		"sveltekit-superforms": "^2.30.1",
 		"tailwindcss": "catalog:",
