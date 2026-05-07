@@ -1,0 +1,20 @@
+[package]
+name = "llm-core"
+version = "0.0.1"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+description = "Shared LLM provider configuration schema and env-based loader."
+publish = false
+
+[dependencies]
+secrecy = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+specta = { workspace = true, optional = true, features = ["derive"] }
+thiserror = { workspace = true }
+url = { workspace = true, features = ["serde"] }
+
+[features]
+# Derive `specta::Type` on the redacted-view types so they can be returned
+# from Tauri procedures without re-defining the shape on the frontend.
+specta = ["dep:specta", "specta/url"]

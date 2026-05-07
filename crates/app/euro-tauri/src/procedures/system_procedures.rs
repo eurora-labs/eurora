@@ -1,18 +1,22 @@
-use std::net::TcpListener;
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 
 use euro_activity::ContextChip;
 use euro_browser::BundledExtensionState;
 use euro_process::{Browser, BrowserStore};
 use euro_timeline::TimelineManager;
+use llm_core::RedactedLlmConfig;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{Manager, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
+use url::Url;
 
 use crate::error::ResultExt;
-use crate::shared_types::SharedEndpointManager;
+use crate::shared_types::{SharedAppSettings, SharedEndpointManager};
+use crate::telemetry;
 
 /// `RequestFrame.action` the desktop sends to the macOS launcher to
 /// deep-link the user into Safari's extension settings. Mirrors the
@@ -46,12 +50,28 @@ pub struct UpdateInfo {
     pub body: Option<String>,
 }
 
+/// Single payload the desktop frontend fetches once at startup to bring
+/// up its Sentry / PostHog SDKs. Bundles the user's persisted consent
+/// state, the embedded build-time keys, and the release identity so the
+/// SDKs can tag events with channel + version. Empty strings mean
+/// "disabled" — keeps dev builds quiet without forcing a separate
+/// nullable type per field.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
-pub struct LocalBackendInfo {
-    pub grpc_port: u16,
-    pub http_port: u16,
-    pub postgres_port: u16,
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryBootstrap {
+    pub settings: euro_settings::TelemetrySettings,
+    pub sentry_dsn: String,
+    pub posthog_key: String,
+    pub posthog_host: String,
+    pub channel: String,
+    pub release: String,
 }
+
+// `LocalBackendInfo` and the `start_local_backend` procedure that returned
+// it have been removed. The desktop app no longer manages a docker-compose
+// instance for the user — the backend is expected to be running separately
+// (`just dev:backend` or a deployed instance), and the user picks how to
+// reach it via the connection mode in `APISettings`.
 
 /// What the desktop frontend should render for a given browser when its
 /// Eurora extension isn't currently driving messages back to the app.
@@ -105,8 +125,21 @@ pub struct BrowserExtensionStatus {
 
 #[taurpc::procedures(path = "system")]
 pub trait SystemApi {
-    async fn check_grpc_server_connection(server_address: Option<String>)
-    -> Result<String, String>;
+    async fn check_backend_connection<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        server_address: Option<String>,
+    ) -> Result<String, String>;
+
+    async fn get_llm_info<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<RedactedLlmConfig, String>;
+
+    // Probe an arbitrary URL by hitting /llm/info — used by the connection
+    // picker's "Test connection" button before persisting the URL.
+    async fn test_backend_url<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        url: String,
+    ) -> Result<RedactedLlmConfig, String>;
 
     async fn list_activities<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
@@ -124,15 +157,6 @@ pub trait SystemApi {
 
     async fn request_accessibility_permission() -> Result<(), String>;
 
-    async fn get_docker_compose_path<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<String, String>;
-
-    async fn start_local_backend<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        ollama_model: String,
-    ) -> Result<LocalBackendInfo, String>;
-
     async fn get_browser_extension_state(
         process_name: String,
     ) -> Result<BrowserExtensionState, String>;
@@ -145,6 +169,20 @@ pub trait SystemApi {
     async fn browser_extension_status_changed(status: BrowserExtensionStatus);
 
     async fn focus_main_window<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
+
+    async fn get_telemetry_bootstrap<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<TelemetryBootstrap, String>;
+
+    async fn needs_telemetry_consent<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<bool, String>;
+
+    async fn reinit_telemetry<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<(), String>;
+
+    async fn rotate_telemetry_distinct_id<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<String, String>;
 }
 
 /// Authoritative resolver behind [`SystemApi::get_browser_extension_state`]
@@ -223,61 +261,38 @@ async fn open_safari_extension_settings() -> Result<(), String> {
     Err("Safari is only supported on macOS".to_string())
 }
 
-fn resolve_docker_compose_path<R: Runtime>(
-    app_handle: &tauri::AppHandle<R>,
-) -> Result<PathBuf, String> {
-    if cfg!(debug_assertions) {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("docker-compose.yml");
-        if path.exists() {
-            return Ok(path);
-        }
+/// Hit `/llm/info` on `base_url` and return the redacted configuration.
+/// Shared by `get_llm_info` (which uses the configured endpoint) and
+/// `test_backend_url` (which lets the connection picker probe an arbitrary
+/// URL before persisting it).
+async fn fetch_llm_info(base_url: &str) -> Result<RedactedLlmConfig, String> {
+    let parsed = Url::parse(base_url).map_err(|e| format!("Invalid URL `{base_url}`: {e}"))?;
+    let info_url = parsed
+        .join("llm/info")
+        .map_err(|e| format!("Failed to derive /llm/info URL: {e}"))?;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
+
+    let response = client
+        .get(info_url.clone())
+        .send()
+        .await
+        .map_err(|e| format!("Request to {info_url} failed: {e}"))?;
+
+    if !response.status().is_success() {
         return Err(format!(
-            "docker-compose.yml not found at {}",
-            path.display()
+            "Backend at {base_url} returned {} on /llm/info",
+            response.status()
         ));
     }
 
-    let resource_dir = app_handle
-        .path()
-        .resource_dir()
-        .ctx("Failed to resolve resource directory")?;
-
-    let path = resource_dir.join("docker-compose.yml");
-    if path.exists() {
-        Ok(path)
-    } else {
-        Err(format!(
-            "docker-compose.yml not found at {}",
-            path.display()
-        ))
-    }
-}
-
-const DEFAULT_PORTS: [u16; 3] = [39051, 39080, 39432];
-
-fn find_available_port(preferred: u16) -> Result<u16, String> {
-    if TcpListener::bind(("localhost", preferred)).is_ok() {
-        return Ok(preferred);
-    }
-    let listener = TcpListener::bind("localhost:0").ctx("Failed to find available port")?;
-    let port = listener
-        .local_addr()
-        .ctx("Failed to get local address")?
-        .port();
-    Ok(port)
-}
-
-fn host_ids() -> (String, String) {
-    #[cfg(unix)]
-    {
-        let uid = unsafe { libc::getuid() };
-        let gid = unsafe { libc::getgid() };
-        (uid.to_string(), gid.to_string())
-    }
-    #[cfg(not(unix))]
-    {
-        ("0".to_string(), "0".to_string())
-    }
+    response
+        .json::<RedactedLlmConfig>()
+        .await
+        .map_err(|e| format!("Failed to parse /llm/info response: {e}"))
 }
 
 #[derive(Clone)]
@@ -285,17 +300,17 @@ pub struct SystemApiImpl;
 
 #[taurpc::resolvers]
 impl SystemApi for SystemApiImpl {
-    async fn check_grpc_server_connection(
+    async fn check_backend_connection<R: Runtime>(
         self,
+        _app_handle: tauri::AppHandle<R>,
         server_address: Option<String>,
     ) -> Result<String, String> {
-        let address = server_address.unwrap_or_else(|| "localhost:50051".to_string());
+        let address = server_address.unwrap_or_else(|| "localhost:3000".to_string());
+        let host_port = address.replace("http://", "").replace("https://", "");
 
-        tracing::debug!("Checking connection to gRPC server");
+        tracing::debug!("Checking TCP reachability of {host_port}");
 
-        match tokio::net::TcpStream::connect(address.replace("http://", "").replace("https://", ""))
-            .await
-        {
+        match tokio::net::TcpStream::connect(&host_port).await {
             Ok(_) => {
                 tracing::debug!("TCP connection successful");
                 Ok("Server is reachable".to_string())
@@ -306,6 +321,23 @@ impl SystemApi for SystemApiImpl {
                 Err(error_msg)
             }
         }
+    }
+
+    async fn get_llm_info<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<RedactedLlmConfig, String> {
+        let endpoint_manager = app_handle.state::<SharedEndpointManager>();
+        let url = endpoint_manager.current_url().to_string();
+        fetch_llm_info(&url).await
+    }
+
+    async fn test_backend_url<R: Runtime>(
+        self,
+        _app_handle: tauri::AppHandle<R>,
+        url: String,
+    ) -> Result<RedactedLlmConfig, String> {
+        fetch_llm_info(&url).await
     }
 
     async fn list_activities<R: Runtime>(
@@ -491,114 +523,6 @@ impl SystemApi for SystemApiImpl {
         }
     }
 
-    async fn get_docker_compose_path<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-    ) -> Result<String, String> {
-        let path = resolve_docker_compose_path(&app_handle)?;
-        tracing::debug!("Docker compose path: {}", path.display());
-        Ok(path.to_string_lossy().to_string())
-    }
-
-    async fn start_local_backend<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        ollama_model: String,
-    ) -> Result<LocalBackendInfo, String> {
-        let compose_path = resolve_docker_compose_path(&app_handle)?;
-        let compose_file = compose_path.to_string_lossy();
-
-        tracing::info!("Stopping any existing eurora docker compose instances");
-        let _ = tokio::process::Command::new("docker")
-            .args(["compose", "-f", &compose_file, "down", "--remove-orphans"])
-            .output()
-            .await;
-
-        let ps = tokio::process::Command::new("docker")
-            .args(["ps", "-aq", "--filter", "name=eurora"])
-            .output()
-            .await;
-        if let Ok(ps) = ps {
-            let ids = String::from_utf8_lossy(&ps.stdout);
-            let ids: Vec<&str> = ids.split_whitespace().collect();
-            if !ids.is_empty() {
-                tracing::info!("Stopping {} stray eurora container(s)", ids.len());
-                let _ = tokio::process::Command::new("docker")
-                    .arg("rm")
-                    .arg("-f")
-                    .args(&ids)
-                    .output()
-                    .await;
-            }
-        }
-
-        let grpc_port = find_available_port(DEFAULT_PORTS[0])?;
-        let http_port = find_available_port(DEFAULT_PORTS[1])?;
-        let postgres_port = find_available_port(DEFAULT_PORTS[2])?;
-
-        let model = if ollama_model.is_empty() {
-            "llama3.2".to_string()
-        } else {
-            ollama_model
-        };
-
-        let asset_dir = dirs::data_dir()
-            .ok_or_else(|| "Failed to resolve platform data directory".to_string())?
-            .join("eurora")
-            .join("assets");
-        tokio::fs::create_dir_all(&asset_dir)
-            .await
-            .ctx("Failed to create asset directory")?;
-
-        let (uid, gid) = host_ids();
-
-        tracing::info!(
-            "Starting local backend via docker compose: {} (grpc={}, http={}, postgres={}, ollama_model={}, asset_dir={}, uid={}, gid={})",
-            compose_path.display(),
-            grpc_port,
-            http_port,
-            postgres_port,
-            model,
-            asset_dir.display(),
-            uid,
-            gid,
-        );
-
-        let output = tokio::process::Command::new("docker")
-            .args(["compose", "-f", &compose_file, "up", "-d"])
-            .env("EURORA_GRPC_PORT", grpc_port.to_string())
-            .env("EURORA_HTTP_PORT", http_port.to_string())
-            .env("EURORA_POSTGRES_PORT", postgres_port.to_string())
-            .env("OLLAMA_MODEL", &model)
-            .env("EURORA_ASSET_DIR", asset_dir.to_string_lossy().as_ref())
-            .env("EURORA_UID", &uid)
-            .env("EURORA_GID", &gid)
-            .output()
-            .await
-            .ctx("Failed to run docker compose")?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            tracing::error!("docker compose failed: {stderr}");
-            return Err(format!("docker compose failed: {stderr}"));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        tracing::info!("docker compose started: {stdout}");
-
-        let local_url = format!("http://localhost:{grpc_port}");
-        let endpoint_manager = app_handle.state::<SharedEndpointManager>();
-        endpoint_manager
-            .set_global_backend_url(&local_url)
-            .ctx("Failed to switch API endpoint")?;
-
-        Ok(LocalBackendInfo {
-            grpc_port,
-            http_port,
-            postgres_port,
-        })
-    }
-
     async fn get_browser_extension_state(
         self,
         process_name: String,
@@ -632,5 +556,89 @@ impl SystemApi for SystemApiImpl {
         app_handle: tauri::AppHandle<R>,
     ) -> Result<(), String> {
         crate::window::show_and_focus_main(&app_handle).map_err(|e| e.to_string())
+    }
+
+    async fn get_telemetry_bootstrap<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<TelemetryBootstrap, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let mut settings = state.lock().await;
+
+        // Lazily allocate the distinct id the first time the frontend
+        // bootstraps after consent. Persist immediately so a crash
+        // before the next save doesn't lose the id and accidentally
+        // generate a fresh one on the next run.
+        let id_changed = if settings.telemetry.needs_consent() {
+            false
+        } else {
+            settings.telemetry.ensure_distinct_id()
+        };
+        if id_changed {
+            settings
+                .save_to_default_path()
+                .ctx("Failed to persist telemetry distinct id")?;
+        }
+
+        let telemetry = settings.telemetry.clone();
+        drop(settings);
+
+        Ok(TelemetryBootstrap {
+            settings: telemetry,
+            sentry_dsn: env!("EURORA_DESKTOP_SENTRY_DSN").to_owned(),
+            posthog_key: env!("EURORA_DESKTOP_POSTHOG_KEY").to_owned(),
+            posthog_host: env!("EURORA_DESKTOP_POSTHOG_HOST").to_owned(),
+            channel: env!("EURORA_RELEASE_CHANNEL").to_owned(),
+            release: env!("CARGO_PKG_VERSION").to_owned(),
+        })
+    }
+
+    async fn needs_telemetry_consent<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<bool, String> {
+        let state = app_handle.state::<SharedAppSettings>();
+        let settings = state.lock().await;
+        Ok(settings.telemetry.needs_consent())
+    }
+
+    async fn reinit_telemetry<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<(), String> {
+        let settings_state = app_handle.state::<SharedAppSettings>();
+        let telemetry = {
+            let settings = settings_state.lock().await;
+            settings.telemetry.clone()
+        };
+        let controller = app_handle
+            .try_state::<Arc<telemetry::Controller>>()
+            .ok_or_else(|| "Telemetry controller not available".to_string())?;
+        controller.reapply(&telemetry);
+        Ok(())
+    }
+
+    async fn rotate_telemetry_distinct_id<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+    ) -> Result<String, String> {
+        let settings_state = app_handle.state::<SharedAppSettings>();
+        let mut settings = settings_state.lock().await;
+        settings.telemetry.rotate_distinct_id();
+        settings
+            .save_to_default_path()
+            .ctx("Failed to persist rotated telemetry id")?;
+        let new_id = settings
+            .telemetry
+            .distinct_id
+            .clone()
+            .expect("rotate_distinct_id always populates the id");
+        let telemetry = settings.telemetry.clone();
+        drop(settings);
+
+        if let Some(controller) = app_handle.try_state::<Arc<telemetry::Controller>>() {
+            controller.reapply(&telemetry);
+        }
+        Ok(new_id)
     }
 }

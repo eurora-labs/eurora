@@ -1,59 +1,68 @@
 // import { svelteTesting } from '@testing-library/svelte/vite';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export default defineConfig({
-	plugins: [debounceReload(), sveltekit()],
+const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
-	server: {
-		port: 1420,
-		strictPort: false,
-		fs: {
-			strict: false,
+export default defineConfig(({ mode }) => {
+	// Read the workspace-root .env so the desktop bundle and the Sentry
+	// build plugin see the same values the rest of the stack does.
+	// `loadEnv` only exposes vars matching `envPrefix` to client code,
+	// so backend secrets never leak into the bundle.
+	const env = loadEnv(mode, workspaceRoot, '');
+
+	const sentryAuthToken = env.SENTRY_AUTH_TOKEN;
+	const sentryOrg = env.SENTRY_ORG;
+	const sentryProject = env.SENTRY_PROJECT;
+	const sentryRelease = env.SENTRY_RELEASE;
+
+	const sentryUploadEnabled = Boolean(sentryAuthToken && sentryOrg && sentryProject);
+
+	return {
+		envDir: workspaceRoot,
+		envPrefix: ['VITE_', 'TAURI_'],
+		plugins: [
+			debounceReload(),
+			sveltekit(),
+			...(sentryUploadEnabled
+				? [
+						sentryVitePlugin({
+							authToken: sentryAuthToken,
+							org: sentryOrg,
+							project: sentryProject,
+							release: sentryRelease ? { name: sentryRelease } : undefined,
+							sourcemaps: { assets: ['./build/**/*'] },
+							telemetry: false,
+						}),
+					]
+				: []),
+		],
+
+		server: {
+			port: 1420,
+			strictPort: false,
+			fs: {
+				strict: false,
+			},
 		},
-	},
-	envPrefix: ['VITE_', 'TAURI_'],
 
-	build: {
-		rollupOptions: { output: { manualChunks: {} } },
-		// Tauri supports es2021
-		target: 'modules',
-		// minify production builds
-		minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
-		// ship sourcemaps for better sentry error reports
-		sourcemap: true,
-	},
-	optimizeDeps: {
-		exclude: ['@eurora/ui'],
-	},
-
-	// test: {
-	// 	workspace: [
-	// 		{
-	// 			extends: './vite.config.ts',
-	// 			plugins: [svelteTesting()],
-
-	// 			test: {
-	// 				name: 'client',
-	// 				environment: 'jsdom',
-	// 				clearMocks: true,
-	// 				include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-	// 				exclude: ['src/lib/server/**'],
-	// 				setupFiles: ['./vitest-setup-client.ts']
-	// 			}
-	// 		},
-	// 		{
-	// 			extends: './vite.config.ts',
-
-	// 			test: {
-	// 				name: 'server',
-	// 				environment: 'node',
-	// 				include: ['src/**/*.{test,spec}.{js,ts}'],
-	// 				exclude: ['src/**/*.svelte.{test,spec}.{js,ts}']
-	// 			}
-	// 		}
-	// 	]
-	// },
+		build: {
+			rollupOptions: { output: { manualChunks: {} } },
+			// Tauri supports es2021
+			target: 'modules',
+			// minify production builds
+			minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
+			// Source maps are required for the Sentry vite plugin to map
+			// stack traces back to the original Svelte/TS sources.
+			sourcemap: true,
+		},
+		optimizeDeps: {
+			exclude: ['@eurora/ui'],
+		},
+	};
 });
 
 function debounceReload() {

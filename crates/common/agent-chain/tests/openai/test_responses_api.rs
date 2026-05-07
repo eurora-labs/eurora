@@ -7,7 +7,7 @@ use futures::StreamExt;
 use std::collections::HashMap;
 
 fn load_env() {
-    let _ = dotenv::dotenv();
+    let _ = dotenvy::dotenv();
 }
 
 // =============================================================================

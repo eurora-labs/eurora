@@ -12,13 +12,13 @@ const PLAN_FREE: &str = "free";
 impl AuthService {
     /// Look up the caller's role.
     ///
-    /// In `RUNNING_EURORA_FULLY_LOCAL=true` mode every user is `Tier1`
-    /// — no payment service exists, so plan checks are bypassed.
-    /// Otherwise we hit the DB; an absent plan row means `Free`, and
-    /// any other DB error propagates rather than silently downgrading
-    /// the user (which would be a billing / feature-gate hazard).
+    /// In dev mode (debug builds) every user is `Tier1` — no payment
+    /// service exists, so plan checks are bypassed. Otherwise we hit
+    /// the DB; an absent plan row means `Free`, and any other DB error
+    /// propagates rather than silently downgrading the user (which
+    /// would be a billing / feature-gate hazard).
     pub(crate) async fn resolve_role(&self, user_id: Uuid) -> AuthResult<Role> {
-        if self.local_mode() {
+        if self.dev_mode() {
             return Ok(Role::Tier1);
         }
 

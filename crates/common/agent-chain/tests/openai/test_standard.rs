@@ -8,7 +8,7 @@ use futures::StreamExt;
 const MODEL: &str = "gpt-4o-mini";
 
 fn load_env() {
-    let _ = dotenv::dotenv();
+    let _ = dotenvy::dotenv();
 }
 
 fn make_model() -> ChatOpenAI {

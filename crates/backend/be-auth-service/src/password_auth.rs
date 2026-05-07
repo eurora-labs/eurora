@@ -41,7 +41,7 @@ impl AuthService {
                 tracing::error!(user_id = %user.id, error = %e, "send verification email failed");
             }
         } else {
-            // No email service configured (typically `RUNNING_EURORA_FULLY_LOCAL=true`).
+            // No email service configured (typically a debug build).
             // Mark the user verified so subsequent endpoints behave normally.
             self.db()
                 .set_email_verified()

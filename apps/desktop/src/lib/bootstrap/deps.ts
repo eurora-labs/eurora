@@ -2,6 +2,7 @@ import { createTauRPCProxy } from '$lib/bindings/bindings.js';
 import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 import { APPEARANCE_SERVICE, AppearanceService } from '$lib/services/appearance-service.svelte.js';
 import { GENERAL_SERVICE, GeneralService } from '$lib/services/general-service.svelte.js';
+import { TELEMETRY_SERVICE, TelemetryService } from '$lib/services/telemetry-service.svelte.js';
 import { ThreadService } from '$lib/services/thread-service.svelte.js';
 import { TIMELINE_SERVICE, TimelineService } from '$lib/services/timeline-service.svelte.js';
 import { USER_SERVICE, UserService } from '$lib/services/user-service.svelte.js';
@@ -13,10 +14,12 @@ export function initDependencies() {
 	const taurpc = createTauRPCProxy();
 	const threadClient = new ThreadService(taurpc);
 	const appearance = new AppearanceService(taurpc);
+	const telemetry = new TelemetryService(taurpc);
 	return provideAll([
 		[TAURPC_SERVICE, taurpc],
+		[TELEMETRY_SERVICE, telemetry],
 		[THREAD_SERVICE, threadClient],
-		[USER_SERVICE, new UserService(taurpc)],
+		[USER_SERVICE, new UserService(taurpc, telemetry)],
 		[CHAT_SERVICE, new ChatService(threadClient)],
 		[APPEARANCE_SERVICE, appearance],
 		[GENERAL_SERVICE, new GeneralService(taurpc)],

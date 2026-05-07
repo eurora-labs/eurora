@@ -32,26 +32,30 @@ fn mobile_entry_point() {
     run();
 }
 
+/// Mobile apps run in a sandbox with no access to the project's `.env`,
+/// so `build.rs` reads it at compile time and forwards the relevant keys
+/// into `option_env!` slots. Inject those into the process env at
+/// startup so the existing `std::env::var(...)` call sites (including
+/// `EndpointManager::from_env`) see them.
 fn load_env() {
-    dotenv::dotenv().ok();
-
-    // On mobile the app's working directory is the sandbox, so `dotenv()`
-    // above can't find the project's .env. build.rs bakes those values into
-    // the binary via cargo:rustc-env; inject them into the process env so
-    // existing `std::env::var(...)` call sites (and EndpointManager::from_env)
-    // see them.
     for (key, value) in [
-        ("AUTH_SERVICE_URL", option_env!("AUTH_SERVICE_URL")),
-        ("API_BASE_URL", option_env!("API_BASE_URL")),
+        (
+            "EURORA_AUTH_SERVICE_URL",
+            option_env!("EURORA_AUTH_SERVICE_URL"),
+        ),
+        ("EURORA_API_BASE_URL", option_env!("EURORA_API_BASE_URL")),
+        ("EURORA_REST_API_URL", option_env!("EURORA_REST_API_URL")),
     ] {
         if std::env::var_os(key).is_some() {
             continue;
         }
-        if let Some(v) = value {
-            // SAFETY: called once at startup before any threads are spawned
-            // that might read env concurrently.
-            unsafe { std::env::set_var(key, v) };
+        let Some(v) = value else { continue };
+        if v.is_empty() {
+            continue;
         }
+        // SAFETY: called once at startup before any threads are spawned
+        // that might read env concurrently.
+        unsafe { std::env::set_var(key, v) };
     }
 }
 
