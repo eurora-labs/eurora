@@ -1,12 +1,11 @@
 use auth_core::Claims;
-use euro_endpoint::DEFAULT_API_URL;
 use euro_secret::{ExposeSecret, SecretString, secret};
 use tauri::{AppHandle, Manager, Runtime};
 use url::Url;
 
 use crate::error::ResultExt;
 use crate::procedures::{auth_manager, user_controller};
-use crate::shared_types::{SharedAppSettings, SharedEndpointManager, SharedUserController};
+use crate::shared_types::{SharedAppSettings, SharedUserController};
 
 #[taurpc::ipc_type]
 pub struct LoginToken {
@@ -59,22 +58,11 @@ impl AuthApi for AuthApiImpl {
         self,
         app_handle: AppHandle<R>,
     ) -> Result<LoginToken, String> {
-        if !cfg!(debug_assertions) {
-            {
-                let settings_state = app_handle.state::<SharedAppSettings>();
-                let mut settings = settings_state.lock().await;
-                settings.api.endpoint = DEFAULT_API_URL.to_string();
-                settings
-                    .save_to_default_path()
-                    .ctx("Failed to save settings")?;
-            }
-
-            let endpoint_manager = app_handle.state::<SharedEndpointManager>();
-            endpoint_manager
-                .set_global_backend_url(DEFAULT_API_URL)
-                .ctx("Failed to switch to cloud endpoint")?;
-        }
-
+        // Honour whatever connection mode the user picked. Earlier builds
+        // forcibly switched the endpoint back to the cloud here, which made
+        // self-hosted login impossible from a release build; that override
+        // has been removed in favour of the explicit Cloud / Local / Custom
+        // picker in `APISettings::mode`.
         let auth_manager = auth_manager(&app_handle).await?;
         let (code_verifier, code_challenge) = auth_manager
             .get_login_tokens()

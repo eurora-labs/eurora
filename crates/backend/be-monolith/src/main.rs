@@ -15,11 +15,18 @@ use be_storage::StorageService;
 use be_thread_service::init_thread_service;
 use be_update_service::init_update_service;
 use dotenv::dotenv;
+use llm_core::LlmConfig;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+
+/// Dev mode is keyed off the build profile rather than an env var: debug
+/// builds skip wiring of services that need real secrets (email, payment,
+/// update) so `cargo run -p be-monolith` works against a clean Postgres
+/// without any external setup. Release builds require the full stack.
+const DEV_MODE: bool = cfg!(debug_assertions);
 
 const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
@@ -133,12 +140,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .expect("Failed to initialize casbin enforcer");
 
-    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
-        .map(|v| v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
+    if DEV_MODE {
+        tracing::warn!("=========================================================");
+        tracing::warn!(" DEV MODE (debug build)");
+        tracing::warn!(" Email, payment, and update services will be skipped.");
+        tracing::warn!(" New users are auto-verified. Do not expose publicly.");
+        tracing::warn!("=========================================================");
+    }
 
-    let email_service = if local_mode {
-        tracing::info!("Email service disabled in local mode");
+    let (llm_config, llm_source) = LlmConfig::from_env()
+        .expect("LLM configuration is invalid; check EURORA_LLM_* / OPENAI_API_KEY env vars");
+    let llm_config = Arc::new(llm_config);
+    tracing::info!(
+        source = ?llm_source,
+        providers = ?llm_config.providers.keys().map(|id| id.as_str().to_string()).collect::<Vec<_>>(),
+        chat_model = %llm_config.roles.chat.model,
+        title_model = %llm_config.roles.title.model,
+        has_vision = %llm_config.roles.vision.is_some(),
+        "LLM configuration loaded"
+    );
+
+    let email_service = if DEV_MODE {
+        tracing::info!("Email service disabled in dev mode");
         None
     } else {
         match be_email_service::EmailService::from_env() {
@@ -164,15 +187,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    let payment_service = match init_payment_service(db_manager.clone()) {
-        Ok(svc) => Some(svc),
-        Err(e) if local_mode => {
-            tracing::warn!("Payment service disabled in local mode: {}", e);
-            None
-        }
-        Err(e) => {
-            tracing::error!("Failed to initialize payment service: {}", e);
-            return Err(e.into());
+    let payment_service = if DEV_MODE {
+        tracing::info!("Payment service disabled in dev mode");
+        None
+    } else {
+        match init_payment_service(db_manager.clone()) {
+            Ok(svc) => Some(svc),
+            Err(e) => {
+                tracing::error!("Failed to initialize payment service: {}", e);
+                return Err(e.into());
+            }
         }
     };
 
@@ -191,22 +215,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     let activity_router = init_activity_service(db_manager.clone(), core_asset.clone());
     let asset_router = init_asset_service(core_asset.clone());
-    let thread_router = init_thread_service(db_manager.clone(), core_asset.clone());
+    let thread_router =
+        init_thread_service(db_manager.clone(), core_asset.clone(), llm_config.clone())
+            .expect("Failed to wire thread service from LLM configuration");
 
     tracing::info!("Starting HTTP server at {}", http_addr);
 
-    let bucket_name =
-        std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
-
-    let update_router = match init_update_service(bucket_name).await {
-        Ok(router) => router,
-        Err(e) if local_mode => {
-            tracing::warn!("Update service disabled in local mode: {}", e);
-            axum::Router::new()
-        }
-        Err(e) => {
-            tracing::error!("Failed to initialize update service: {}", e);
-            return Err(e.into());
+    let update_router = if DEV_MODE {
+        tracing::info!("Update service disabled in dev mode");
+        axum::Router::new()
+    } else {
+        let bucket_name =
+            std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
+        match init_update_service(bucket_name).await {
+            Ok(router) => router,
+            Err(e) => {
+                tracing::error!("Failed to initialize update service: {}", e);
+                return Err(e.into());
+            }
         }
     };
 
@@ -234,6 +260,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         axum::routing::get(|| async { axum::http::StatusCode::OK }),
     );
 
+    // `/llm/info` exposes the redacted LLM configuration (provider names,
+    // models, base URLs — never API keys). The desktop app's connection
+    // panel calls this *before* login to confirm a backend is reachable
+    // and to surface "you're talking to: openai / gpt-4o-mini" in the UI.
+    let llm_info_state = llm_config.clone();
+    let llm_info_route = axum::Router::new().route(
+        "/llm/info",
+        axum::routing::get(move || {
+            let cfg = llm_info_state.clone();
+            async move { axum::Json(cfg.redacted()) }
+        }),
+    );
+
     // Layer order matters: the last `.layer()` call is the OUTERMOST wrapper.
     //
     // Inner → outer:
@@ -256,6 +295,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(thread_router)
         .merge(auth_router)
         .merge(health_route)
+        .merge(llm_info_route)
         .layer(DefaultBodyLimit::max(HTTP_MAX_BODY_SIZE))
         .layer(axum::middleware::from_fn_with_state(
             token_gate_state,

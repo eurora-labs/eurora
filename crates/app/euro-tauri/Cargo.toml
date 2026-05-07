@@ -49,6 +49,7 @@ euro-user = { workspace = true }
 euro-vision = { workspace = true }
 futures = { workspace = true }
 keyring = { workspace = true }
+llm-core = { workspace = true, features = ["specta"] }
 parking_lot = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 rustls = { workspace = true }
@@ -72,6 +73,16 @@ tauri-plugin-store = "2"
 tauri-plugin-tracing = { version = "0.3.2", features = ["colored"] }
 tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
+sentry = { workspace = true, default-features = false, features = [
+  "backtrace",
+  "contexts",
+  "debug-images",
+  "panic",
+  "reqwest",
+  "rustls",
+  "tracing",
+  "release-health",
+] }
 # taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
 taurpc = { workspace = true }
 tempfile = { workspace = true }
@@ -92,8 +103,6 @@ core-foundation = "0.10.1"
 winreg = "0.56"
 windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
 
 [features]
 default = ["custom-protocol", "devtools"]

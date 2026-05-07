@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { type TelemetrySettings } from '$lib/bindings/bindings.js';
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Item from '@eurora/ui/components/item/index';
@@ -10,20 +11,18 @@
 	import { onMount } from 'svelte';
 
 	let taurpc = inject(TAURPC_SERVICE);
+	let telemetry = inject(TELEMETRY_SERVICE);
 
-	let errorReporting = $state(false);
-	let usageMetrics = $state(false);
+	let errorReporting = $state(true);
+	let usageMetrics = $state(true);
 	let nonAnonymousUsageMetrics = $state(false);
 	let telemetrySettings: TelemetrySettings | undefined = $state();
+	let saving = $state(false);
 
 	onMount(() => {
 		taurpc.settings
 			.get_telemetry_settings()
 			.then((settings) => {
-				if (settings.considered) {
-					goToLogin();
-				}
-
 				telemetrySettings = settings;
 				errorReporting = settings.anonymousErrors;
 				usageMetrics = settings.anonymousMetrics;
@@ -35,17 +34,21 @@
 	});
 
 	async function updateSettings() {
-		if (!telemetrySettings) return;
+		if (!telemetrySettings || saving) return;
 
-		telemetrySettings.considered = true;
-		telemetrySettings.anonymousErrors = errorReporting;
-		telemetrySettings.anonymousMetrics = usageMetrics;
-		telemetrySettings.nonAnonymousMetrics = nonAnonymousUsageMetrics;
-
+		saving = true;
 		try {
-			telemetrySettings = await taurpc.settings.set_telemetry_settings(telemetrySettings);
+			telemetrySettings = await taurpc.settings.set_telemetry_settings({
+				...telemetrySettings,
+				anonymousErrors: errorReporting,
+				anonymousMetrics: usageMetrics,
+				nonAnonymousMetrics: nonAnonymousUsageMetrics,
+			});
+			await telemetry.refresh();
 		} catch (error) {
 			console.error('Failed to update telemetry settings:', error);
+			saving = false;
+			return;
 		}
 
 		goToLogin();
@@ -56,21 +59,21 @@
 	}
 </script>
 
-<div class="relative flex h-full w-full flex-col">
-	<div class="flex flex-col justify-center items-start h-full w-full px-8">
-		<article class="pb-4">
-			<h1 class="text-4xl font-bold drop-shadow-lg pb-4">Welcome to Eurora!</h1>
-			<p class="pb-2">
-				Eurora uses these metrics strictly to help us improve the app. We do not collect any
-				personal information unless you yourself choose to provide it.
-			</p>
-			<p>
-				I ask you to please keep these settings enabled. Eurora is self-funded and these
-				metrics are essential for us to improve the app and stay competitive with
-				billionaire-funded apps.
-			</p>
-		</article>
+<div class="flex flex-col justify-center h-full px-8 gap-6">
+	<div>
+		<h1 class="text-3xl font-bold mb-2">Welcome to Eurora!</h1>
+		<p class="text-sm text-muted-foreground mb-2">
+			Eurora uses these metrics strictly to help us improve the app. We do not collect any
+			personal information unless you yourself choose to provide it.
+		</p>
+		<p class="text-sm text-muted-foreground">
+			I ask you to please keep these settings enabled. Eurora is self-funded and these metrics
+			are essential for us to improve the app and stay competitive with billionaire-funded
+			apps.
+		</p>
+	</div>
 
+	<Item.Group class="gap-2">
 		<Item.Root variant="default">
 			<Item.Content>
 				<Item.Title>Error reporting</Item.Title>
@@ -97,20 +100,20 @@
 				<Item.Description>Share of detailed usage metrics.</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Switch bind:checked={nonAnonymousUsageMetrics} />
+				<Switch bind:checked={nonAnonymousUsageMetrics} disabled={!usageMetrics} />
 			</Item.Actions>
 		</Item.Root>
-		<div class="flex justify-end">
-			<Button
-				variant="default"
-				onclick={() => {
-					updateSettings();
-				}}
-				>Continue
-				<ChevronRight />
-			</Button>
-		</div>
-	</div>
+	</Item.Group>
 
-	<div class="pb-16"></div>
+	<div class="flex justify-end">
+		<Button
+			variant="default"
+			disabled={saving}
+			onclick={() => {
+				updateSettings();
+			}}
+			>Continue
+			<ChevronRight />
+		</Button>
+	</div>
 </div>

@@ -384,6 +384,14 @@ jobs:
                   CARGO_PROFILE_RELEASE_OPT_LEVEL: s
                   RELEASE_CHANNEL: ${{ env.channel }}
                   RELEASE_VERSION: ${{ env.version }}
+                  EURORA_RELEASE_CHANNEL: ${{ env.channel }}
+                  EURORA_DESKTOP_SENTRY_DSN: ${{ secrets.EURORA_DESKTOP_SENTRY_DSN }}
+                  EURORA_DESKTOP_POSTHOG_KEY: ${{ secrets.EURORA_DESKTOP_POSTHOG_KEY }}
+                  EURORA_DESKTOP_POSTHOG_HOST: ${{ secrets.EURORA_DESKTOP_POSTHOG_HOST }}
+                  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+                  SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+                  SENTRY_PROJECT: ${{ secrets.SENTRY_DESKTOP_PROJECT }}
+                  SENTRY_RELEASE: ${{ env.version }}
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
                   APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}

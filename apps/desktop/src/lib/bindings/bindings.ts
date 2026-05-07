@@ -24,7 +24,7 @@ export type AIMessageChunk = {
 };
 
 export type APISettings = {
-	endpoint: string,
+	mode: ConnectionMode,
 };
 
 export type AccentColor = {
@@ -57,7 +57,13 @@ export type AnyMessage = { type: "human" } & HumanMessage | { type: "system" } &
 export type AppSettings = {
 	general: GeneralSettings,
 	telemetry: TelemetrySettings,
-	api: APISettings,
+	/**
+	 *  Falls back to [`APISettings::default`] when the persisted config has
+	 *  never been touched, which lets debug builds land on `localhost` and
+	 *  release builds on the cloud without the `defaults.jsonc` having to
+	 *  know about the build profile.
+	 */
+	api?: APISettings,
 	appearance: AppearanceSettings,
 };
 
@@ -213,6 +219,16 @@ export type Claims = {
 	jti?: string,
 };
 
+/**
+ *  Where the desktop app should send authenticated requests.
+ * 
+ *  `Cloud` and `Local` carry no parameters because their URLs are baked in,
+ *  which keeps "I want to talk to the production server" expressible as a
+ *  stable enum value rather than a magic string. `Custom` covers everything
+ *  else (self-hosted homelab, a colleague's tunnel, etc.).
+ */
+export type ConnectionMode = { kind: "cloud" } | { kind: "local" } | { kind: "custom"; url: string };
+
 export type ContentBlock = { type: "text" } & TextContentBlock | { type: "invalid_tool_call" } & InvalidToolCallBlock | { type: "reasoning" } & ReasoningContentBlock | { type: "non_standard" } & NonStandardContentBlock | { type: "image" } & ImageContentBlock | { type: "video" } & VideoContentBlock | { type: "audio" } & AudioContentBlock | { type: "text-plain" } & PlainTextContentBlock | { type: "file" } & FileContentBlock | { type: "tool_call" } & ToolCallBlock | { type: "tool_call_chunk" } & ToolCallChunkBlock | { type: "server_tool_call" } & ServerToolCall | { type: "server_tool_call_chunk" } & ServerToolCallChunk | { type: "server_tool_result" } & ServerToolResult;
 
 export type ContentBlocks = ContentBlock[];
@@ -279,12 +295,6 @@ export type InvalidToolCallBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
-export type LocalBackendInfo = {
-	grpc_port: number,
-	http_port: number,
-	postgres_port: number,
-};
-
 export type LoginToken = {
 	code_challenge: string,
 	expires_in: bigint,
@@ -298,6 +308,12 @@ export type MessageNode = {
 	children?: MessageNode[],
 	sibling_index: number,
 	depth: number,
+};
+
+// Pointer to a model owned by a specific provider.
+export type ModelRef = {
+	provider: string,
+	model: string,
 };
 
 export type NonStandardContentBlock = {
@@ -331,6 +347,25 @@ export type ReasoningContentBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
+export type RedactedAwsCreds = { kind: "default" } | { kind: "static"; access_key_id: string };
+
+export type RedactedGoogleCreds = { kind: "api_key"; has_key: boolean } | { kind: "service_account"; path: string };
+
+/**
+ *  View of [`LlmConfig`] safe to serialise across the wire and into logs.
+ * 
+ *  Mirrors the shape of [`LlmConfig`] but replaces every secret-bearing field
+ *  with a boolean flag indicating whether a value is present. Consumers
+ *  (e.g. the desktop app's connection panel) can show "you're connected to
+ *  OpenAI / gpt-4o-mini" without ever seeing the API key.
+ */
+export type RedactedLlmConfig = {
+	providers: { [key in string]: RedactedProvider },
+	roles: Roles,
+};
+
+export type RedactedProvider = { kind: "openai"; has_api_key: boolean; base_url: string | null; organization: string | null } | { kind: "anthropic"; has_api_key: boolean; base_url: string | null } | { kind: "google"; credentials: RedactedGoogleCreds; project: string | null } | { kind: "bedrock"; region: string; credentials: RedactedAwsCreds } | { kind: "openai_compatible"; base_url: string; has_api_key: boolean; header_names: string[]; has_overrides: boolean };
+
 export type RemoveMessage = {
 	id: string,
 	name?: string | null,
@@ -339,6 +374,17 @@ export type RemoveMessage = {
 };
 
 export type Role = "Free" | "Tier1";
+
+/**
+ *  Per-role model assignments. `chat` and `title` are mandatory; `vision` is
+ *  only required when the deployment expects to handle image-bearing
+ *  messages.
+ */
+export type Roles = {
+	chat: ModelRef,
+	title: ModelRef,
+	vision: ModelRef | null,
+};
 
 export type SearchMessageResultView = {
 	id: string,
@@ -389,8 +435,25 @@ export type SystemMessage = {
 	response_metadata?: { [key in string]: unknown },
 };
 
+/**
+ *  Single payload the desktop frontend fetches once at startup to bring
+ *  up its Sentry / PostHog SDKs. Bundles the user's persisted consent
+ *  state, the embedded build-time keys, and the release identity so the
+ *  SDKs can tag events with channel + version. Empty strings mean
+ *  "disabled" — keeps dev builds quiet without forcing a separate
+ *  nullable type per field.
+ */
+export type TelemetryBootstrap = {
+	settings: TelemetrySettings,
+	sentryDsn: string,
+	posthogKey: string,
+	posthogHost: string,
+	channel: string,
+	release: string,
+};
+
 export type TelemetrySettings = {
-	considered: boolean,
+	consentVersion: number,
 	anonymousMetrics: boolean,
 	anonymousErrors: boolean,
 	nonAnonymousMetrics: boolean,
@@ -505,7 +568,7 @@ export type VideoContentBlock = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"collect_context":["thread_id"],"regenerate":["thread_id","ai_message_id","channel"],"send_query":["thread_id","channel","request"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'prompt':'{"disconnect":[],"get_service_name":[],"prompt_service_change":["service_name"],"switch_to_ollama":["base_url","model"],"switch_to_remote":["provider","api_key","model"]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_appearance_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_appearance_settings":["appearance_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_for_update":[],"check_grpc_server_connection":["server_address"],"focus_main_window":[],"get_browser_extension_state":["process_name"],"get_docker_compose_path":[],"install_update":[],"list_activities":[],"open_browser_extension_settings":["process_name"],"open_url_in_browser":["process_id","url"],"quit":[],"request_accessibility_permission":[],"start_local_backend":["ollama_model"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"collect_context":["thread_id"],"regenerate":["thread_id","ai_message_id","channel"],"send_query":["thread_id","channel","request"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_appearance_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_appearance_settings":["appearance_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_backend_connection":["server_address"],"check_for_update":[],"focus_main_window":[],"get_browser_extension_state":["process_name"],"get_llm_info":[],"get_telemetry_bootstrap":[],"install_update":[],"list_activities":[],"needs_telemetry_consent":[],"open_browser_extension_settings":["process_name"],"open_url_in_browser":["process_id","url"],"quit":[],"reinit_telemetry":[],"request_accessibility_permission":[],"rotate_telemetry_distinct_id":[],"test_backend_url":["url"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -540,11 +603,6 @@ send_query: (threadId: string, channel: TAURI_CHANNEL<ChatServerMessage>, reques
 "monitor": {capture_monitor: (monitorId: string) => Promise<string>},
 "payment": {create_checkout_url: () => Promise<string>, 
 is_subscribed: () => Promise<boolean>},
-"prompt": {disconnect: () => Promise<null>, 
-get_service_name: () => Promise<string>, 
-prompt_service_change: (serviceName: string | null) => Promise<void>, 
-switch_to_ollama: (baseUrl: string, model: string) => Promise<null>, 
-switch_to_remote: (provider: string, apiKey: string, model: string) => Promise<null>},
 "settings": {get_all_settings: () => Promise<AppSettings>, 
 get_api_settings: () => Promise<APISettings>, 
 get_appearance_settings: () => Promise<AppearanceSettings>, 
@@ -556,21 +614,25 @@ set_general_settings: (generalSettings: GeneralSettings) => Promise<GeneralSetti
 set_telemetry_settings: (telemetrySettings: TelemetrySettings) => Promise<TelemetrySettings>},
 "system": {browser_extension_status_changed: (status: BrowserExtensionStatus) => Promise<void>, 
 check_accessibility_permission: () => Promise<boolean>, 
+check_backend_connection: (serverAddress: string | null) => Promise<string>, 
 check_for_update: () => Promise<{
 	version: string,
 	body: string | null,
 } | null>, 
-check_grpc_server_connection: (serverAddress: string | null) => Promise<string>, 
 focus_main_window: () => Promise<null>, 
 get_browser_extension_state: (processName: string) => Promise<BrowserExtensionState>, 
-get_docker_compose_path: () => Promise<string>, 
+get_llm_info: () => Promise<RedactedLlmConfig>, 
+get_telemetry_bootstrap: () => Promise<TelemetryBootstrap>, 
 install_update: () => Promise<null>, 
 list_activities: () => Promise<ContextChip[]>, 
+needs_telemetry_consent: () => Promise<boolean>, 
 open_browser_extension_settings: (processName: string) => Promise<null>, 
 open_url_in_browser: (processId: number, url: string) => Promise<null>, 
 quit: () => Promise<null>, 
+reinit_telemetry: () => Promise<null>, 
 request_accessibility_permission: () => Promise<null>, 
-start_local_backend: (ollamaModel: string) => Promise<LocalBackendInfo>},
+rotate_telemetry_distinct_id: () => Promise<string>, 
+test_backend_url: (url: string) => Promise<RedactedLlmConfig>},
 "third_party": {check_api_key_exists: () => Promise<boolean>, 
 save_api_key: (apiKey: string) => Promise<null>},
 "thread": {create: () => Promise<Thread>, 

@@ -17,13 +17,10 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             AppSettings::defaults()
         }
     };
-    let endpoint_url = &app_settings.api.endpoint;
-    let endpoint_manager = if endpoint_url.is_empty() {
-        EndpointManager::from_env()
-    } else {
-        EndpointManager::new(endpoint_url)
-    }?;
-    let endpoint_manager = std::sync::Arc::new(endpoint_manager);
+    // The persisted ConnectionMode always resolves to a non-empty URL, so
+    // we never need the env-fallback path.
+    let endpoint_url = app_settings.api.endpoint();
+    let endpoint_manager = std::sync::Arc::new(EndpointManager::new(endpoint_url)?);
 
     app.manage(endpoint_manager.clone());
     app.manage(SharedAppSettings::new(app_settings));

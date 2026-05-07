@@ -22,5 +22,23 @@ fn main() {
         );
     }
 
+    embed_telemetry_keys();
+
     tauri_build::build();
+}
+
+/// Forward telemetry secrets from the build environment into compiled
+/// `env!()` slots. Missing values become empty strings so dev builds
+/// (and CI for forks) stay green; the runtime treats empty as "disabled".
+fn embed_telemetry_keys() {
+    for var in [
+        "EURORA_DESKTOP_SENTRY_DSN",
+        "EURORA_DESKTOP_POSTHOG_KEY",
+        "EURORA_DESKTOP_POSTHOG_HOST",
+        "EURORA_RELEASE_CHANNEL",
+    ] {
+        let value = std::env::var(var).unwrap_or_default();
+        println!("cargo:rustc-env={var}={value}");
+        println!("cargo:rerun-if-env-changed={var}");
+    }
 }
