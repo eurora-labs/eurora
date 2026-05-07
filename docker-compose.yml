@@ -16,16 +16,24 @@ services:
     postgres:
         image: postgres:16
         restart: unless-stopped
+        # The `:?` interpolation form fails compose with a clear error
+        # if the variable is unset. There are no in-file defaults: dev
+        # values live in `.env` (created from `.env.example` by `just
+        # init`), production values come from the deploy environment.
         environment:
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-            POSTGRES_DB: eurora
+            POSTGRES_USER: ${POSTGRES_USER:?required (run `just init` to create .env)}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required (run `just init` to create .env)}
+            POSTGRES_DB: ${POSTGRES_DB:?required (run `just init` to create .env)}
         ports:
-            - '${EURORA_POSTGRES_PORT:-5432}:5432'
+            - '${EURORA_POSTGRES_PORT:?required (run `just init` to create .env)}:5432'
         volumes:
             - eurora-pgdata:/var/lib/postgresql/data
         healthcheck:
-            test: ['CMD-SHELL', 'pg_isready -U postgres -d eurora']
+            # `$$` escapes compose's own interpolation so the variable
+            # is resolved at run time inside the container, where the
+            # postgres image has already populated POSTGRES_USER /
+            # POSTGRES_DB from the values above.
+            test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
             interval: 5s
             timeout: 3s
             retries: 10
@@ -39,7 +47,13 @@ services:
             postgres:
                 condition: service_healthy
         environment:
-            REMOTE_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/eurora
+            # Composed from the same POSTGRES_* vars as the postgres
+            # service so credentials stay in sync. The host differs
+            # from the host-side `REMOTE_DATABASE_URL` in `.env`
+            # because the seed container reaches postgres at its
+            # compose-network hostname/port (`postgres:5432`), not the
+            # host-published port.
+            REMOTE_DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
             EURORA_SEED_FORCE: '1'
         volumes:
             - ./scripts/seed:/seed:ro

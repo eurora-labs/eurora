@@ -68,6 +68,15 @@ Expected a SocketAddr like `0.0.0.0:3000` or `127.0.0.1:3000`."
     },
 
     #[error(
+        "Invalid `AUTH_COOKIE_SECURE` value `{value}` (expected `true` or `false`).
+
+Local dev sets `false` because the stack runs without TLS;
+production deploys must set `true` so cookies are only sent over
+HTTPS."
+    )]
+    InvalidCookieSecure { value: String },
+
+    #[error(
         "Failed to bind HTTP listener at {addr}: {source}
 
 Another process is already listening on that port. Run `just doctor` to
@@ -117,9 +126,11 @@ re-apply migrations from scratch."
 
   {source}
 
-The defaults assume `cargo run -p be-monolith` is invoked from the repo
-root so the relative paths resolve. Set `AUTHZ_MODEL_PATH` and
-`AUTHZ_POLICY_PATH` if you run from a different working directory."
+`AUTHZ_MODEL_PATH` and `AUTHZ_POLICY_PATH` are resolved relative to
+the backend's working directory. The values in `.env.example`
+(`config/authz/model.conf`, `config/authz/policy.csv`) assume
+`cargo run -p be-monolith` is invoked from the repo root; override
+them if you run from a different directory or in a container."
     )]
     Authz {
         model_path: String,
@@ -160,7 +171,7 @@ Stripe is required in production. To run without it, build with `cargo run`
   {source}
 
 For local development, set `ASSET_STORAGE_BACKEND=fs` and
-`ASSET_STORAGE_FS_ROOT=./assets` in your `.env`."
+`ASSET_STORAGE_FS_ROOT=../assets` in your `.env`."
     )]
     StorageConfig {
         #[source]
@@ -232,5 +243,27 @@ impl From<be_auth_core::JwtConfigError> for BootstrapError {
 impl From<be_thread_service::BuildError> for BootstrapError {
     fn from(source: be_thread_service::BuildError) -> Self {
         BootstrapError::ThreadService { source }
+    }
+}
+
+impl From<be_auth_core::MissingWebOrigins> for BootstrapError {
+    fn from(_: be_auth_core::MissingWebOrigins) -> Self {
+        BootstrapError::MissingEnv {
+            name: be_auth_core::WEB_ALLOWED_ORIGINS_ENV,
+        }
+    }
+}
+
+impl From<be_auth_service::CookieConfigError> for BootstrapError {
+    fn from(value: be_auth_service::CookieConfigError) -> Self {
+        match value {
+            be_auth_service::CookieConfigError::MissingEnv { name } => {
+                BootstrapError::MissingEnv { name }
+            }
+            be_auth_service::CookieConfigError::InvalidCookieSecure { value } => {
+                BootstrapError::InvalidCookieSecure { value }
+            }
+            be_auth_service::CookieConfigError::WebOrigins(e) => e.into(),
+        }
     }
 }

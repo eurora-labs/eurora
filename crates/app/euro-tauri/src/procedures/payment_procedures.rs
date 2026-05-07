@@ -7,9 +7,13 @@ use crate::error::ResultExt;
 use crate::procedures::auth_manager;
 
 fn rest_api_url() -> String {
+    // Runtime override → bake-time default. `EURORA_API_BASE_URL` /
+    // `EURORA_REST_API_URL` are operator-set escape hatches;
+    // `euro_settings::CLOUD_API_URL` is the canonical "Cloud" endpoint
+    // baked at compile time from `EURORA_CLOUD_API_URL` in `.env`.
     std::env::var("EURORA_REST_API_URL")
         .or_else(|_| std::env::var("EURORA_API_BASE_URL"))
-        .unwrap_or_else(|_| "https://api.eurora-labs.com".to_string())
+        .unwrap_or_else(|_| euro_settings::CLOUD_API_URL.to_string())
 }
 
 #[derive(Deserialize)]

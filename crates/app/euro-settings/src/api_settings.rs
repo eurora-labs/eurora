@@ -2,9 +2,18 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 /// Canonical Eurora cloud backend.
-pub const CLOUD_API_URL: &str = "https://api.eurora-labs.com";
-/// Canonical local-development backend served by `cargo run -p be-monolith`.
-pub const LOCAL_API_URL: &str = "http://localhost:3000";
+///
+/// Baked at compile time from `EURORA_CLOUD_API_URL` (sourced from
+/// the workspace `.env` by `build.rs`). Override the value at build
+/// time to ship a fork pointing at a different organisation's
+/// infrastructure — there is no in-source default.
+pub const CLOUD_API_URL: &str = env!("EURORA_CLOUD_API_URL");
+
+/// Canonical local-development backend served by
+/// `cargo run -p be-monolith`. Baked at compile time from
+/// `EURORA_LOCAL_API_URL` (workspace `.env`); override at build
+/// time if your local backend listens elsewhere.
+pub const LOCAL_API_URL: &str = env!("EURORA_LOCAL_API_URL");
 
 /// Where the desktop app should send authenticated requests.
 ///

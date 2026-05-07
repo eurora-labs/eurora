@@ -3,7 +3,6 @@
     windows_subsystem = "windows"
 )]
 
-use dotenvy::dotenv;
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::{AccentColor, TimelineAppEvent};
@@ -570,7 +569,13 @@ fn install_default_crypto_provider() {
 }
 
 fn main() {
-    dotenv().ok();
+    // Inject build-time URL bake-ins into the process env. Whatever
+    // is in the host shell already (e.g., `EURORA_API_BASE_URL=foo
+    // cargo run` for a one-off override, or vars exported by
+    // `just dev` via `set dotenv-load`) wins; the bake-time values
+    // only fill the gaps so packaged release builds — which have no
+    // `.env` on disk — still know where to point.
+    euro_tauri::load_env();
 
     install_default_crypto_provider();
 

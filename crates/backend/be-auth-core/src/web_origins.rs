@@ -10,11 +10,15 @@
 //! * The monolith's `CorsLayer` — which origins may make credentialed
 //!   `fetch` calls.
 //!
-//! Keeping the env var name, default, and parse logic in one place
-//! ensures the three layers can never disagree about which origins
-//! count as "the SPA". This module lives in `be-auth-core` because
-//! both `be-authz` and `be-auth-service` already depend on it, and
-//! it's pure config plumbing — no axum, no async.
+//! Keeping the env var name and parse logic in one place ensures the
+//! three layers can never disagree about which origins count as "the
+//! SPA". This module lives in `be-auth-core` because both `be-authz`
+//! and `be-auth-service` already depend on it, and it's pure config
+//! plumbing — no axum, no async.
+//!
+//! There is no in-source fallback: dev origins live in `.env.example`,
+//! production origins must be set explicitly. Missing the variable is
+//! a startup error, not a "defaulted to localhost" silent success.
 
 use std::collections::HashSet;
 
@@ -23,21 +27,11 @@ use std::collections::HashSet;
 /// the `Origin` header.
 pub const WEB_ALLOWED_ORIGINS_ENV: &str = "WEB_ALLOWED_ORIGINS";
 
-const PROD_DEFAULT: &str = "https://www.eurora-labs.com";
-const DEV_DEFAULT: &str = "http://localhost:5173,http://localhost:3000";
-
-/// Default origin list when `WEB_ALLOWED_ORIGINS` is unset.
-///
-/// Debug builds get the local Vite/Next dev hosts so a fresh checkout
-/// works without a `.env`; release builds get only the canonical
-/// production origin so a forgotten env var fails closed.
-pub fn default_web_origins() -> &'static str {
-    if cfg!(debug_assertions) {
-        DEV_DEFAULT
-    } else {
-        PROD_DEFAULT
-    }
-}
+/// Returned by [`web_origins_from_env`] when the variable is unset,
+/// blank, or parses to an empty set.
+#[derive(Debug, thiserror::Error)]
+#[error("`{}` is unset or empty", WEB_ALLOWED_ORIGINS_ENV)]
+pub struct MissingWebOrigins;
 
 /// Parse a comma-separated origin list into a set, trimming whitespace
 /// and dropping empty entries.
@@ -49,12 +43,19 @@ pub fn parse_web_origins(raw: &str) -> HashSet<String> {
         .collect()
 }
 
-/// Read and parse `WEB_ALLOWED_ORIGINS`, falling back to
-/// [`default_web_origins`].
-pub fn web_origins_from_env() -> HashSet<String> {
-    let raw =
-        std::env::var(WEB_ALLOWED_ORIGINS_ENV).unwrap_or_else(|_| default_web_origins().to_owned());
-    parse_web_origins(&raw)
+/// Read and parse `WEB_ALLOWED_ORIGINS`. Returns
+/// [`MissingWebOrigins`] if the variable is unset, blank after
+/// trimming, or contains nothing but separators.
+pub fn web_origins_from_env() -> Result<HashSet<String>, MissingWebOrigins> {
+    let raw = std::env::var(WEB_ALLOWED_ORIGINS_ENV)
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or(MissingWebOrigins)?;
+    let parsed = parse_web_origins(&raw);
+    if parsed.is_empty() {
+        return Err(MissingWebOrigins);
+    }
+    Ok(parsed)
 }
 
 #[cfg(test)]
@@ -67,10 +68,5 @@ mod tests {
         assert!(set.contains("https://a.example"));
         assert!(set.contains("https://b.example"));
         assert_eq!(set.len(), 2);
-    }
-
-    #[test]
-    fn default_is_non_empty() {
-        assert!(!default_web_origins().is_empty());
     }
 }

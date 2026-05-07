@@ -23,8 +23,11 @@ impl PaymentConfig {
             )
         })?;
 
-        let frontend_url =
-            std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+        let frontend_url = std::env::var("FRONTEND_URL").map_err(|_| {
+            crate::error::PaymentError::Config(
+                "FRONTEND_URL environment variable must be set".into(),
+            )
+        })?;
 
         HeaderValue::from_str(&frontend_url).map_err(|e| {
             crate::error::PaymentError::Config(format!(

@@ -78,12 +78,20 @@ check_docker_daemon() {
     return 1
 }
 
-# Returns 0 if `port` is free, 1 if it's in use. Uses a portable
-# /dev/tcp probe so we don't depend on `nc` / `lsof` which vary by
-# distribution.
+# Returns 0 if `port` is in use, non-zero if it's free. Uses bash's
+# built-in /dev/tcp redirection — portable across Linux and macOS without
+# depending on `nc` / `lsof` (which vary by distribution) or `timeout`
+# (GNU coreutils, missing from a vanilla macOS install).
+#
+# On localhost this is fast: the kernel returns ECONNREFUSED immediately
+# when nothing is listening, so no explicit timeout is needed.
 port_in_use() {
     local port=$1
-    (timeout 1 bash -c "</dev/tcp/127.0.0.1/$port") >/dev/null 2>&1
+    (exec 3<>/dev/tcp/127.0.0.1/$port) >/dev/null 2>&1
+    local rc=$?
+    exec 3<&- 2>/dev/null || true
+    exec 3>&- 2>/dev/null || true
+    return $rc
 }
 
 # True iff the host port $1 is bound by our docker-compose Postgres
@@ -128,25 +136,94 @@ check_env_file() {
         return 0
     fi
     fail ".env" "not found"
-    hint "Run: just bootstrap"
+    hint "Run: just init"
+    return 1
+}
+
+# Resolve `key`'s effective value. Process env wins (so values
+# exported by `set dotenv-load` in the justfile take precedence); we
+# fall back to grepping `.env` for the standalone invocation path
+# (`./scripts/doctor.sh`). Empty string if neither defines it.
+#
+# We deliberately do NOT `source .env` — its contents are user-provided
+# and can contain command substitutions that would execute under bash.
+# Awk-grepping the raw value is the safe equivalent.
+resolve_env_value() {
+    local key=$1
+    local value=${!key:-}
+    if [ -n "$value" ]; then
+        printf '%s' "$value"
+        return 0
+    fi
+    if [ -f "$REPO_ROOT/.env" ]; then
+        awk -F= -v k="$key" '
+            $1 == k {
+                sub(/^[^=]*=/, "")
+                print
+                exit
+            }
+        ' "$REPO_ROOT/.env"
+    fi
+}
+
+# Print the names of every required env var, sourced from
+# `.env.example` (every uncommented `KEY=VALUE` line). `.env.example`
+# is the single source of truth — adding a required key means
+# uncommenting it there, and doctor picks it up automatically.
+#
+# OPENAI_API_KEY is excluded here because `check_openai_key` runs a
+# more detailed check (placeholder detection) for it specifically.
+parse_required_env() {
+    awk -F= '
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*$/ { next }
+        /^[A-Z_][A-Z0-9_]*=/ {
+            split($0, parts, "=")
+            if (parts[1] != "OPENAI_API_KEY") print parts[1]
+        }
+    ' "$REPO_ROOT/.env.example"
+}
+
+check_env_complete() {
+    if [ ! -f "$REPO_ROOT/.env.example" ]; then
+        fail "env vars" ".env.example not found at repo root"
+        return 1
+    fi
+    local missing=() total=0 key value
+    while IFS= read -r key; do
+        total=$((total + 1))
+        value=$(resolve_env_value "$key")
+        if [ -z "$value" ]; then
+            missing+=("$key")
+        fi
+    done < <(parse_required_env)
+
+    if [ "${#missing[@]}" -eq 0 ]; then
+        pass "env vars" "$total/$total required keys set"
+        return 0
+    fi
+
+    fail "env vars" "${#missing[@]} of $total required key(s) missing"
+    # If only a few are missing, list them inline; otherwise just
+    # point at the canonical reference to keep the output readable.
+    if [ "${#missing[@]}" -le 5 ]; then
+        hint "Add to .env: ${missing[*]}"
+    else
+        hint "Run \`just init\` to create .env from .env.example, then re-run doctor."
+        hint "Missing: ${missing[*]:0:5} … (+$((${#missing[@]} - 5)) more)"
+    fi
     return 1
 }
 
 check_openai_key() {
-    local env_file=$REPO_ROOT/.env
-    if [ ! -f "$env_file" ]; then
-        # Already reported by `check_env_file`. Skip silently to keep
-        # the output uncluttered.
-        return 1
-    fi
     local value
-    value=$(awk -F= '/^OPENAI_API_KEY=/{ sub(/^OPENAI_API_KEY=/, ""); print; exit }' "$env_file")
+    value=$(resolve_env_value OPENAI_API_KEY)
     if [ -z "$value" ]; then
-        fail "OPENAI_API_KEY" "unset in .env"
+        fail "OPENAI_API_KEY" "unset"
         hint "Get a key from https://platform.openai.com/api-keys and add it to .env."
         return 1
     fi
-    if [[ "$value" == "sk-..." ]] || [[ "$value" == "sk_test" ]]; then
+    if [ "$value" = "sk-..." ] || [ "$value" = "sk_test" ]; then
         fail "OPENAI_API_KEY" "still set to a placeholder"
         hint "Replace the placeholder in .env with a real key from https://platform.openai.com/api-keys."
         return 1
@@ -178,22 +255,24 @@ check_command "cargo-watch" "cargo-watch" "Install with: cargo install cargo-wat
 check_command "pnpm"        "pnpm"        "Install with: corepack enable" || true
 check_command "just"        "just"        "Install with: cargo install just" || true
 
-# Port checks. Postgres has a special case because we run our own postgres,
-# and the host port is overridable via EURORA_POSTGRES_PORT (set by the user
-# when their host already has a Postgres on 5432). When invoked through
-# `just doctor`, the env var is already exported via dotenv-load; when run
-# standalone we fall back to grepping .env so the standalone path agrees.
-postgres_port=${EURORA_POSTGRES_PORT:-}
-if [ -z "$postgres_port" ] && [ -f "$REPO_ROOT/.env" ]; then
-    postgres_port=$(awk -F= '/^EURORA_POSTGRES_PORT=/{ sub(/^EURORA_POSTGRES_PORT=/, ""); print; exit }' "$REPO_ROOT/.env")
-fi
-postgres_port=${postgres_port:-5432}
+# Port checks. We resolve the port from the user's env so the doctor
+# follows whatever HTTP_ADDR / EURORA_POSTGRES_PORT they've configured;
+# the literal fallbacks (3000 / 5433) only fire when the variables
+# are unset (e.g., a fresh checkout where doctor is run before
+# `just init`) so the doctor itself stays usable in that broken state.
+http_addr=$(resolve_env_value HTTP_ADDR)
+http_port=${http_addr##*:}
+http_port=${http_port:-3000}
 
-check_port_free "port 3000" 3000 "Stop the conflicting process or set HTTP_ADDR." || true
-check_postgres_port "$postgres_port"                                              || true
-check_port_free "port 5173" 5173 "Stop the conflicting process or move the web dev server." || true
+postgres_port=$(resolve_env_value EURORA_POSTGRES_PORT)
+postgres_port=${postgres_port:-5433}
+
+check_port_free "port $http_port" "$http_port" "Stop the conflicting process or set HTTP_ADDR." || true
+check_postgres_port "$postgres_port"                                                            || true
+check_port_free "port 5173" 5173 "Stop the conflicting process or move the web dev server."     || true
 
 check_env_file    || true
+check_env_complete || true
 check_openai_key  || true
 
 printf "\n"

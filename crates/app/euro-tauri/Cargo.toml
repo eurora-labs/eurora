@@ -32,7 +32,6 @@ backtrace = { version = "0.3.76", optional = true }
 chrono = { workspace = true, features = ["serde"] }
 color-thief = "0.2.2"
 dirs = { workspace = true }
-dotenvy = { workspace = true }
 euro-activity = { workspace = true }
 euro-auth = { workspace = true }
 euro-browser = { workspace = true }

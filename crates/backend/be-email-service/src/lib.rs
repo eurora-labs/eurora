@@ -18,10 +18,10 @@ impl EmailService {
             .map_err(|_| EmailError::Config("LETTERMINT_API_TOKEN must be set".into()))?;
 
         let from_address = std::env::var("LETTERMINT_SENDER")
-            .unwrap_or_else(|_| "Eurora <noreply@eurora-labs.com>".into());
+            .map_err(|_| EmailError::Config("LETTERMINT_SENDER must be set".into()))?;
 
-        let frontend_url =
-            std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".into());
+        let frontend_url = std::env::var("FRONTEND_URL")
+            .map_err(|_| EmailError::Config("FRONTEND_URL must be set".into()))?;
 
         let client = LettermintClient::builder().api_token(api_token).build();
 

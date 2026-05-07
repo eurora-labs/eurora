@@ -38,21 +38,15 @@ pub(crate) const DEV_MODE: bool = cfg!(debug_assertions);
 
 const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
 
-/// Stable placeholders used in dev mode when the real JWT secrets aren't
-/// supplied via `.env`. They are deliberately recognisable so an operator
-/// who somehow ships them in a release build can audit-grep for them.
-const DEV_JWT_ACCESS_SECRET: &str = "dev_jwt_access_secret";
-const DEV_JWT_REFRESH_SECRET: &str = "dev_jwt_refresh_secret";
-
 /// Boot the backend. Owns every fallible step between "process started" and
 /// "axum is serving HTTP".
 pub async fn run() -> Result<(), BootstrapError> {
     install_crypto_provider();
 
     // `dotenv` is best-effort: missing `.env` is fine if the operator
-    // exports vars in their shell. We warn below if both `.env` is missing
-    // and the LLM config can't be assembled, which is the most common
-    // first-run failure mode for a fresh checkout.
+    // exports vars in their shell. We warn below when `.env` is absent
+    // so a fresh checkout that forgot `just init` gets a friendlier
+    // hint than the first MissingEnv error from `require_env`.
     let dotenv_loaded = dotenvy::dotenv().is_ok();
 
     let _sentry_guard = init_sentry();
@@ -70,19 +64,16 @@ pub async fn run() -> Result<(), BootstrapError> {
         return run_migrations_only().await;
     }
 
-    init_posthog().await;
+    init_posthog().await?;
 
     if DEV_MODE {
         log_dev_banner();
     }
 
-    if !dotenv_loaded
-        && std::env::var("OPENAI_API_KEY").is_err()
-        && std::env::var("EURORA_LLM_KIND").is_err()
-    {
+    if !dotenv_loaded {
         tracing::warn!(
-            "No `.env` file at the repo root and no LLM env vars set in the shell. \
-             Run `cp .env.example .env` and fill in OPENAI_API_KEY before starting."
+            "No `.env` file at the repo root. Run `just init` to create one \
+             from `.env.example`, then re-run."
         );
     }
 
@@ -97,31 +88,26 @@ pub async fn run() -> Result<(), BootstrapError> {
         "LLM configuration loaded"
     );
 
-    let database_url = database_url_from_env()?;
+    let database_url = require_env("REMOTE_DATABASE_URL")?;
     let db_manager = Arc::new(
         DatabaseManager::new(&database_url)
             .await
             .map_err(|e| BootstrapError::Database { source: e.into() })?,
     );
 
-    let http_addr: SocketAddr = std::env::var("HTTP_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:3000".to_string())
-        .parse()
-        .map_err(|source| {
-            // `HTTP_ADDR` was set but unparseable; pull the original value
-            // back out for the error.
-            BootstrapError::InvalidHttpAddr {
-                value: std::env::var("HTTP_ADDR").unwrap_or_default(),
+    let http_addr_raw = require_env("HTTP_ADDR")?;
+    let http_addr: SocketAddr =
+        http_addr_raw
+            .parse()
+            .map_err(|source| BootstrapError::InvalidHttpAddr {
+                value: http_addr_raw.clone(),
                 source,
-            }
-        })?;
+            })?;
 
-    let jwt_config = build_jwt_config()?;
+    let jwt_config = JwtConfig::try_from_env()?;
 
-    let model_path =
-        std::env::var("AUTHZ_MODEL_PATH").unwrap_or_else(|_| "config/authz/model.conf".to_string());
-    let policy_path = std::env::var("AUTHZ_POLICY_PATH")
-        .unwrap_or_else(|_| "config/authz/policy.csv".to_string());
+    let model_path = require_env("AUTHZ_MODEL_PATH")?;
+    let policy_path = require_env("AUTHZ_POLICY_PATH")?;
     let authz = CasbinAuthz::new(&model_path, &policy_path)
         .await
         .map_err(|source| BootstrapError::Authz {
@@ -143,8 +129,8 @@ pub async fn run() -> Result<(), BootstrapError> {
         Some(Arc::new(svc))
     };
 
-    let cookie_config = CookieConfig::from_env();
-    let origin_guard_config = Arc::new(OriginGuardConfig::from_env());
+    let cookie_config = CookieConfig::from_env()?;
+    let origin_guard_config = Arc::new(OriginGuardConfig::from_env()?);
 
     let auth_router = init_auth_service(
         db_manager.clone(),
@@ -190,8 +176,7 @@ pub async fn run() -> Result<(), BootstrapError> {
         tracing::info!("Update service disabled in dev mode");
         axum::Router::new()
     } else {
-        let bucket_name =
-            std::env::var("S3_BUCKET_NAME").unwrap_or_else(|_| "eurora-releases".to_string());
+        let bucket_name = require_env("S3_BUCKET_NAME")?;
         init_update_service(bucket_name)
             .await
             .map_err(|source| BootstrapError::UpdateService { source })?
@@ -270,7 +255,7 @@ pub async fn run() -> Result<(), BootstrapError> {
             origin_guard_config,
             origin_guard_middleware,
         ))
-        .layer(build_cors());
+        .layer(build_cors()?);
 
     tracing::info!("Starting HTTP server at {}", http_addr);
     let http_listener = tokio::net::TcpListener::bind(http_addr)
@@ -346,7 +331,7 @@ fn has_flag(flag: &str) -> bool {
 /// `sqlx::migrate!` pass the running backend uses on every startup —
 /// keeping a single source of truth for schema application.
 async fn run_migrations_only() -> Result<(), BootstrapError> {
-    let database_url = database_url_from_env()?;
+    let database_url = require_env("REMOTE_DATABASE_URL")?;
     tracing::info!("Applying database migrations…");
     let _ = DatabaseManager::new(&database_url)
         .await
@@ -376,23 +361,27 @@ fn init_tracing() {
         .expect("failed to initialize tracing subscriber");
 }
 
-async fn init_posthog() {
-    if let Some(posthog_key) = std::env::var("POSTHOG_API_KEY")
+async fn init_posthog() -> Result<(), BootstrapError> {
+    let Some(api_key) = std::env::var("POSTHOG_API_KEY")
         .ok()
         .filter(|s| !s.is_empty())
-    {
-        let posthog_options = posthog_rs::ClientOptionsBuilder::default()
-            .api_key(posthog_key)
-            .host("https://eu.i.posthog.com")
-            .build()
-            .expect("valid posthog client options");
-        match posthog_rs::init_global(posthog_options).await {
-            Ok(()) => tracing::info!("PostHog analytics initialized"),
-            Err(e) => tracing::warn!("Failed to initialize PostHog: {}", e),
-        }
-    } else {
+    else {
         tracing::info!("POSTHOG_API_KEY not set, analytics disabled");
+        return Ok(());
+    };
+
+    let host = require_env("POSTHOG_HOST")?;
+
+    let posthog_options = posthog_rs::ClientOptionsBuilder::default()
+        .api_key(api_key)
+        .host(host)
+        .build()
+        .expect("valid posthog client options");
+    match posthog_rs::init_global(posthog_options).await {
+        Ok(()) => tracing::info!("PostHog analytics initialized"),
+        Err(e) => tracing::warn!("Failed to initialize PostHog: {}", e),
     }
+    Ok(())
 }
 
 fn log_dev_banner() {
@@ -403,42 +392,24 @@ fn log_dev_banner() {
     tracing::warn!("=========================================================");
 }
 
-/// Resolve the Postgres connection string. Debug builds default to the
-/// docker-compose Postgres `just dev:postgres-up` brings up so a fresh
-/// checkout runs without an explicit override; release builds refuse to
-/// start without it.
-fn database_url_from_env() -> Result<String, BootstrapError> {
-    match std::env::var("REMOTE_DATABASE_URL") {
-        Ok(v) if !v.is_empty() => Ok(v),
-        _ if DEV_MODE => Ok("postgresql://postgres:postgres@localhost:5432/eurora".to_string()),
-        _ => Err(BootstrapError::MissingEnv {
-            name: "REMOTE_DATABASE_URL",
-        }),
-    }
+/// Read a required environment variable. Returns
+/// [`BootstrapError::MissingEnv`] if the variable is unset or blank
+/// after trimming — there are no in-source fallbacks, so dev and prod
+/// run the same code path. Dev defaults live in `.env.example`.
+fn require_env(name: &'static str) -> Result<String, BootstrapError> {
+    std::env::var(name)
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or(BootstrapError::MissingEnv { name })
 }
 
-/// Build the JWT configuration. Release builds require both
-/// `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` to be set explicitly;
-/// debug builds fall back to stable, recognisable placeholders so a
-/// fresh checkout is one `OPENAI_API_KEY` away from running.
-fn build_jwt_config() -> Result<JwtConfig, BootstrapError> {
-    match JwtConfig::try_from_env() {
-        Ok(cfg) => Ok(cfg),
-        Err(_) if DEV_MODE => Ok(JwtConfig::from_secrets(
-            DEV_JWT_ACCESS_SECRET,
-            DEV_JWT_REFRESH_SECRET,
-        )),
-        Err(e) => Err(e.into()),
-    }
-}
-
-fn build_cors() -> CorsLayer {
-    let allowed: Vec<HeaderValue> = web_origins_from_env()
+fn build_cors() -> Result<CorsLayer, BootstrapError> {
+    let allowed: Vec<HeaderValue> = web_origins_from_env()?
         .into_iter()
         .filter_map(|s| s.parse::<HeaderValue>().ok())
         .collect();
 
-    CorsLayer::new()
+    Ok(CorsLayer::new()
         .allow_origin(AllowOrigin::list(allowed))
         .allow_methods([
             Method::GET,
@@ -449,5 +420,5 @@ fn build_cors() -> CorsLayer {
         ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT])
         .allow_credentials(true)
-        .max_age(Duration::from_secs(3600))
+        .max_age(Duration::from_secs(3600)))
 }

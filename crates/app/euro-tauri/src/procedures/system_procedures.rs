@@ -305,7 +305,12 @@ impl SystemApi for SystemApiImpl {
         _app_handle: tauri::AppHandle<R>,
         server_address: Option<String>,
     ) -> Result<String, String> {
-        let address = server_address.unwrap_or_else(|| "localhost:3000".to_string());
+        // Default to the build-time-baked Local-mode endpoint when
+        // the frontend doesn't pass an explicit address (e.g., the
+        // very first reachability probe before connection mode is
+        // resolved). Strip the scheme so the result is a `host:port`
+        // suitable for `TcpStream::connect`.
+        let address = server_address.unwrap_or_else(|| euro_settings::LOCAL_API_URL.to_string());
         let host_port = address.replace("http://", "").replace("https://", "");
 
         tracing::debug!("Checking TCP reachability of {host_port}");
