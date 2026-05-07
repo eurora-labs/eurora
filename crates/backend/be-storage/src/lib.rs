@@ -22,18 +22,11 @@ pub enum StorageConfig {
     },
 }
 
-impl Default for StorageConfig {
-    fn default() -> Self {
-        StorageConfig::FS {
-            root: "./assets".to_string(),
-        }
-    }
-}
-
 impl StorageConfig {
     pub fn from_env() -> StorageResult<Self> {
         let backend = std::env::var("ASSET_STORAGE_BACKEND")
-            .unwrap_or_else(|_| "fs".to_string())
+            .map_err(|_| StorageError::missing_env_var("ASSET_STORAGE_BACKEND"))?
+            .trim()
             .to_lowercase();
 
         match backend.as_str() {
@@ -58,11 +51,14 @@ impl StorageConfig {
                     secret_access_key,
                 })
             }
-            _ => {
+            "fs" => {
                 let root = std::env::var("ASSET_STORAGE_FS_ROOT")
-                    .unwrap_or_else(|_| "./assets".to_string());
+                    .map_err(|_| StorageError::missing_env_var("ASSET_STORAGE_FS_ROOT"))?;
                 Ok(StorageConfig::FS { root })
             }
+            other => Err(StorageError::configuration(format!(
+                "unknown ASSET_STORAGE_BACKEND `{other}` (expected `fs` or `s3`)"
+            ))),
         }
     }
 }
@@ -339,16 +335,5 @@ mod tests {
             "pdf"
         );
         assert_eq!(StorageService::extension_from_mime("unknown/type"), "bin");
-    }
-
-    #[test]
-    fn test_storage_config_default() {
-        let config = StorageConfig::default();
-        match config {
-            StorageConfig::FS { root } => {
-                assert_eq!(root, "./assets");
-            }
-            _ => panic!("Expected Filesystem config"),
-        }
     }
 }

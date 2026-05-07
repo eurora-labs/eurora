@@ -70,8 +70,12 @@ impl AuthApi for AuthApiImpl {
             .ctx("Failed to get login tokens")?;
         let expires_in: i64 = 60 * 20;
 
+        // `EURORA_AUTH_SERVICE_URL` is baked into the binary by
+        // `build.rs` and injected into the process env by
+        // `euro_tauri::load_env`, so a runtime miss here means
+        // someone called this entry point before `main` ran.
         let base_url = std::env::var("EURORA_AUTH_SERVICE_URL")
-            .unwrap_or_else(|_| "https://www.eurora-labs.com".to_string());
+            .ctx("EURORA_AUTH_SERVICE_URL not in process env")?;
         let mut url =
             Url::parse(&format!("{base_url}/login")).ctx("Invalid EURORA_AUTH_SERVICE_URL")?;
         url.query_pairs_mut()

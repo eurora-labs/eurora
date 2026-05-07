@@ -4,7 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="$SCRIPT_DIR/data"
 
-DB_URL="${REMOTE_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/eurora}"
+# REMOTE_DATABASE_URL is the single source of truth — the justfile
+# loads `.env` and propagates it; the docker-compose seed container
+# composes its own from POSTGRES_{USER,PASSWORD,DB}. There is no
+# in-script fallback by design (see .env.example).
+: "${REMOTE_DATABASE_URL:?REMOTE_DATABASE_URL is required (run \`just init\` to create .env)}"
+DB_URL="$REMOTE_DATABASE_URL"
 
 if [[ "$DB_URL" =~ ^postgresql://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)$ ]]; then
     PGUSER="${BASH_REMATCH[1]}"

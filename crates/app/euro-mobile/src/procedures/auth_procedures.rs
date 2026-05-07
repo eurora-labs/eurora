@@ -58,8 +58,11 @@ pub trait AuthApi {
 }
 
 fn build_auth_url(code_challenge: &str) -> Result<Url, String> {
+    // `EURORA_AUTH_SERVICE_URL` is baked at build time by `build.rs`
+    // and injected into the process env by `load_env` at startup, so
+    // a miss here means this entry point was reached before `run` ran.
     let base = std::env::var("EURORA_AUTH_SERVICE_URL")
-        .unwrap_or_else(|_| "https://www.eurora-labs.com".to_string());
+        .ctx("EURORA_AUTH_SERVICE_URL not in process env")?;
     let mut url = Url::parse(&format!("{base}/login")).ctx("Invalid EURORA_AUTH_SERVICE_URL")?;
     url.query_pairs_mut()
         .append_pair("code_challenge", code_challenge)

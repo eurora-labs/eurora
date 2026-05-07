@@ -66,7 +66,7 @@ Please download the version for your platform on https://www.eurora-labs.com/
 The full stack — Postgres, the backend, the web auth UI, and the desktop app — comes up from a single command. You'll need [Docker](https://www.docker.com/), [Rust](https://rustup.rs/), [pnpm](https://pnpm.io/) (`corepack enable` works), and [`just`](https://just.systems/).
 
 ```sh
-just bootstrap        # copies .env.example to .env, runs pnpm install
+just init             # copies .env.example to .env, runs pnpm install
 $EDITOR .env          # paste your OPENAI_API_KEY
 just dev              # Postgres + backend + web + desktop, supervised together
 ```

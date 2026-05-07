@@ -13,7 +13,11 @@ use std::sync::RwLock;
 
 use url::Url;
 
-pub const DEFAULT_API_URL: &str = "https://api.eurora-labs.com";
+/// Default base URL when `EURORA_API_BASE_URL` isn't set. Baked at
+/// compile time from `EURORA_CLOUD_API_URL` (workspace `.env`) so
+/// forks rebuilding for their own organisation pick up the right
+/// endpoint without source changes.
+pub const DEFAULT_API_URL: &str = env!("EURORA_CLOUD_API_URL");
 
 /// Owns the live backend base URL plus a single shared [`reqwest::Client`].
 ///

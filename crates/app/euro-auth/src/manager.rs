@@ -12,20 +12,22 @@ use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// How long before the access-token's `exp` we proactively refresh.
+///
+/// Algorithmic constant: tuned against the access-token TTL set in
+/// `be_auth_core::JwtConfig` (currently 1h) and the round-trip cost
+/// of a refresh. Not operator-tunable.
+const REFRESH_OFFSET_MINUTES: i64 = 15;
+
 #[derive(Debug, Clone, Copy)]
 struct JwtConfig {
     refresh_offset_seconds: i64,
 }
 
 impl JwtConfig {
-    fn from_env() -> Self {
-        let minutes: i64 = std::env::var("JWT_REFRESH_OFFSET")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(15)
-            .max(0);
+    const fn new() -> Self {
         Self {
-            refresh_offset_seconds: minutes.saturating_mul(60),
+            refresh_offset_seconds: REFRESH_OFFSET_MINUTES * 60,
         }
     }
 }
@@ -64,7 +66,7 @@ impl AuthManager {
     pub fn new(endpoint_manager: Arc<EndpointManager>) -> Self {
         Self(Arc::new(AuthManagerInner {
             auth_client: AuthClient::new(endpoint_manager),
-            jwt_config: JwtConfig::from_env(),
+            jwt_config: JwtConfig::new(),
             refresh_lock: Mutex::new(()),
         }))
     }

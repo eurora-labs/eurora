@@ -5,21 +5,26 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 
 	const cloneCommand = 'git clone https://github.com/eurora-labs/eurora && cd eurora';
-	const justDevCommand = 'just bootstrap && $EDITOR .env && just dev';
+	const justDevCommand = 'just init && $EDITOR .env && just dev';
 
-	const envFileContents = `# LLM provider — the only value 'just dev' needs you to set.
+	const envFileContents = `# .env.example is the single source of truth and ships with working
+# dev defaults for everything below — just init copies it to .env and
+# the only value you must edit is OPENAI_API_KEY.
 OPENAI_API_KEY=sk-...
 EURORA_CHAT_MODEL=gpt-4o-mini
 
 # Web frontend — Vite-exposed.
 VITE_API_URL=http://localhost:3000
 
-# Debug builds default REMOTE_DATABASE_URL to docker-compose's local
-# Postgres, JWT secrets to stable placeholders, CORS origins to
-# localhost+tauri://localhost, AUTH_COOKIE_SECURE to false, and asset
-# storage to ./assets — uncomment any of those in .env to override.
-# Release builds refuse to start without REMOTE_DATABASE_URL and the
-# JWT secrets.`;
+# Backend operational config (dev defaults shown; production deploys
+# must set their own JWT secrets, CORS origins, database URL, …).
+REMOTE_DATABASE_URL=postgresql://postgres:postgres@localhost:5433/eurora
+JWT_ACCESS_SECRET=dev_jwt_access_secret_DO_NOT_USE_IN_PROD
+JWT_REFRESH_SECRET=dev_jwt_refresh_secret_DO_NOT_USE_IN_PROD
+WEB_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,tauri://localhost
+AUTH_COOKIE_SECURE=false
+ASSET_STORAGE_BACKEND=fs
+ASSET_STORAGE_FS_ROOT=../assets`;
 
 	const ollamaEnvContents = `# Replace the OPENAI_API_KEY block with these four lines.
 EURORA_LLM_KIND=openai_compatible
@@ -199,7 +204,7 @@ EURORA_CHAT_MODEL=llama3.2`;
 			</div>
 			<p class="mt-3 text-sm text-muted-foreground">
 				That's it. <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-					>just bootstrap</code
+					>just init</code
 				>
 				copies
 				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env.example</code>
