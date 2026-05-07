@@ -1,9 +1,32 @@
 // import { svelteTesting } from '@testing-library/svelte/vite';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
+const sentryRelease = process.env.SENTRY_RELEASE;
+
+const sentryUploadEnabled = Boolean(sentryAuthToken && sentryOrg && sentryProject);
+
 export default defineConfig({
-	plugins: [debounceReload(), sveltekit()],
+	plugins: [
+		debounceReload(),
+		sveltekit(),
+		...(sentryUploadEnabled
+			? [
+					sentryVitePlugin({
+						authToken: sentryAuthToken,
+						org: sentryOrg,
+						project: sentryProject,
+						release: sentryRelease ? { name: sentryRelease } : undefined,
+						sourcemaps: { assets: ['./build/**/*'] },
+						telemetry: false,
+					}),
+				]
+			: []),
+	],
 
 	server: {
 		port: 1420,
@@ -20,7 +43,8 @@ export default defineConfig({
 		target: 'modules',
 		// minify production builds
 		minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
-		// ship sourcemaps for better sentry error reports
+		// Source maps are required for the Sentry vite plugin to map
+		// stack traces back to the original Svelte/TS sources.
 		sourcemap: true,
 	},
 	optimizeDeps: {

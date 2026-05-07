@@ -11,7 +11,7 @@
 		"check-types": "turbo run check-types",
 		"dev:monolith": "cargo watch -x 'run -p be-monolith -- --mode development'",
 		"prod:monolith": "cargo run -p be-monolith -- --mode production",
-		"docker:monolith": "./scripts/build-monolith-image.sh --restart",
+		"docker:monolith": "./scripts/build-monolith-image.sh",
 		"dev:desktop": "cd crates/app/euro-tauri && tauri dev",
 		"dev:word": "concurrently -n vite,addin,desktop -c cyan,blue,green \"pnpm --filter @eurora/office-addin dev\" \"pnpm --filter @eurora/office-addin start\" \"cross-env EURORA_OFFICE_ADDIN_DEV_SIDELOAD=1 pnpm dev:desktop\"",
 		"dev:android": "concurrently --kill-others -n vite,android -c blue,green \"pnpm --filter @eurora/mobile dev\" \"pnpm tauri android dev --config crates/app/euro-mobile/tauri.conf.json --config crates/app/euro-mobile/tauri.android-dev.conf.json --features devtools --no-dev-server-wait\"",

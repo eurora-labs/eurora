@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 anyhow = { workspace = true }
 dirs = { workspace = true }
-euro-debug = { workspace = true }
 euro-fs = { workspace = true }
 notify = { version = "8.2.0" }
 serde = { workspace = true, features = ["derive", "std"] }
@@ -17,6 +16,7 @@ serde_json_lenient = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

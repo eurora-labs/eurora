@@ -7,6 +7,7 @@
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
 	import { APPEARANCE_SERVICE } from '$lib/services/appearance-service.svelte.js';
 	import { GENERAL_SERVICE } from '$lib/services/general-service.svelte.js';
+	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
@@ -24,6 +25,12 @@
 	let { children } = $props();
 
 	initDependencies();
+
+	// Initialize telemetry first so any errors in subsequent service
+	// startup are captured. The service no-ops until consent has been
+	// granted via the onboarding flow.
+	const telemetryService = inject(TELEMETRY_SERVICE);
+	telemetryService.init();
 
 	const userService = inject(USER_SERVICE);
 	userService.init();
