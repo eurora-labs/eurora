@@ -70,9 +70,10 @@ impl AuthApi for AuthApiImpl {
             .ctx("Failed to get login tokens")?;
         let expires_in: i64 = 60 * 20;
 
-        let base_url = std::env::var("AUTH_SERVICE_URL")
+        let base_url = std::env::var("EURORA_AUTH_SERVICE_URL")
             .unwrap_or_else(|_| "https://www.eurora-labs.com".to_string());
-        let mut url = Url::parse(&format!("{base_url}/login")).ctx("Invalid AUTH_SERVICE_URL")?;
+        let mut url =
+            Url::parse(&format!("{base_url}/login")).ctx("Invalid EURORA_AUTH_SERVICE_URL")?;
         url.query_pairs_mut()
             .append_pair("code_challenge", &code_challenge)
             .append_pair("code_challenge_method", "S256");

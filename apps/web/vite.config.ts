@@ -2,9 +2,13 @@ import { sentrySvelteKit } from '@sentry/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig, loadEnv } from 'vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 export default defineConfig(({ mode }) => {
-	const env = loadEnv(mode, process.cwd(), '');
+	const env = loadEnv(mode, workspaceRoot, '');
 
 	if (!env.VITE_API_URL) {
 		throw new Error(
@@ -27,6 +31,7 @@ export default defineConfig(({ mode }) => {
 	}
 
 	return {
+		envDir: workspaceRoot,
 		plugins: [
 			sentrySvelteKit({
 				autoUploadSourceMaps: uploadSourceMaps,

@@ -16,6 +16,8 @@
     // override the build-profile default for fresh installs.
     "appearance": {
         "theme": "system",
-        "dynamicAccent": true
+        "dynamicAccent": true,
+        "interfaceScale": 1.0,
+        "textScale": 1.0
     }
 }

@@ -230,7 +230,7 @@ dependencies = [
  "backon",
  "base64 0.22.1",
  "bon",
- "dotenv",
+ "dotenvy",
  "futures",
  "percent-encoding",
  "reqwest 0.12.28",
@@ -1773,6 +1773,7 @@ dependencies = [
 name = "be-monolith"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "axum",
  "be-activity-service",
  "be-asset",
@@ -1786,11 +1787,12 @@ dependencies = [
  "be-storage",
  "be-thread-service",
  "be-update-service",
- "dotenv",
+ "dotenvy",
  "llm-core",
  "posthog-rs",
  "rustls 0.23.40",
  "sentry",
+ "thiserror 2.0.18",
  "tokio",
  "tower-http",
  "tracing",
@@ -3329,12 +3331,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "498cfcded997a93eb31edd639361fa33fd229a8784e953b37d71035fe3890b7b"
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
-
-[[package]]
 name = "dotenvy"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3858,7 +3854,6 @@ dependencies = [
  "auth-core",
  "backon",
  "chrono",
- "dotenv",
  "euro-auth",
  "euro-encrypt",
  "euro-endpoint",
@@ -4006,7 +4001,7 @@ dependencies = [
  "color-thief",
  "core-foundation 0.10.1",
  "dirs 6.0.0",
- "dotenv",
+ "dotenvy",
  "euro-activity",
  "euro-auth",
  "euro-bridge-protocol",

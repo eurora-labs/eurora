@@ -6,6 +6,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
 
 [dependencies]
+anyhow = { workspace = true }
 axum = { workspace = true }
 be-activity-service = { workspace = true }
 be-asset = { workspace = true }
@@ -19,7 +20,7 @@ be-remote-db = { workspace = true }
 be-storage = { workspace = true, features = ["encryption"] }
 be-thread-service = { workspace = true }
 be-update-service = { workspace = true }
-dotenv = { workspace = true }
+dotenvy = { workspace = true }
 llm-core = { workspace = true }
 posthog-rs = { workspace = true }
 rustls = { workspace = true, features = ["aws_lc_rs"] }
@@ -33,6 +34,7 @@ sentry = { workspace = true, default-features = false, features = [
   "tracing",
   "release-health",
 ] }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tower-http = { workspace = true, features = ["cors"] }
 tracing = { workspace = true }

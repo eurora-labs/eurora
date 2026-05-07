@@ -8,7 +8,7 @@ const REASONING_MODEL: &str = "deepseek-r1:1.5b";
 const SAMPLE_PROMPT: &str = "What is 3^3?";
 
 fn load_env() {
-    let _ = dotenv::dotenv();
+    let _ = dotenvy::dotenv();
 }
 
 // =============================================================================

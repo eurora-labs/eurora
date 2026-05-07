@@ -32,11 +32,11 @@ impl AppSettings {
 
         let mut app_settings: AppSettings = serde_json::from_value(settings)?;
 
-        // `API_BASE_URL` is the developer escape hatch: setting it in the
-        // shell forces the app to talk to that URL on this run regardless
-        // of the persisted connection mode. Persisted setting is left
-        // untouched — the override is in-memory only.
-        if let Ok(api_base_url) = std::env::var("API_BASE_URL") {
+        // `EURORA_API_BASE_URL` is the developer escape hatch: setting
+        // it in the shell forces the app to talk to that URL on this
+        // run regardless of the persisted connection mode. Persisted
+        // setting is left untouched — the override is in-memory only.
+        if let Ok(api_base_url) = std::env::var("EURORA_API_BASE_URL") {
             app_settings.api.mode = ConnectionMode::Custom { url: api_base_url };
         }
 
@@ -170,10 +170,35 @@ mod tests {
         let mut settings = AppSettings::load(&path).expect("load defaults");
         settings.appearance.theme = Theme::Light;
         settings.appearance.dynamic_accent = false;
+        settings.appearance.interface_scale = 1.25;
+        settings.appearance.text_scale = 1.1;
         settings.save(&path).expect("save");
 
         let reloaded = AppSettings::load(&path).expect("reload");
         assert_eq!(reloaded.appearance.theme, Theme::Light);
         assert!(!reloaded.appearance.dynamic_accent);
+        assert_eq!(reloaded.appearance.interface_scale, 1.25);
+        assert_eq!(reloaded.appearance.text_scale, 1.1);
+    }
+
+    #[test]
+    fn legacy_appearance_section_without_scale_fields_inherits_defaults() {
+        // Pre-accessibility-controls users have appearance objects that lack
+        // `interfaceScale`/`textScale`. The `#[serde(default)]` on those fields
+        // must turn those omissions into the identity scale instead of failing
+        // the load.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{"appearance": {"theme": "dark", "dynamicAccent": false}}"#,
+        )
+        .expect("write legacy settings");
+
+        let loaded = AppSettings::load(&path).expect("load legacy appearance settings");
+        assert_eq!(loaded.appearance.theme, Theme::Dark);
+        assert!(!loaded.appearance.dynamic_accent);
+        assert_eq!(loaded.appearance.interface_scale, 1.0);
+        assert_eq!(loaded.appearance.text_scale, 1.0);
     }
 }
