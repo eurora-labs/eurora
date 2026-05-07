@@ -98,53 +98,54 @@
 		<RadioGroup.Root bind:value={kind} class="flex flex-col gap-3">
 			<div class="flex items-start gap-3">
 				<RadioGroup.Item value="cloud" id="mode-cloud" class="mt-1" />
-				<Label for="mode-cloud" class="flex flex-col gap-1">
-					<span class="text-sm font-medium">Eurora Cloud</span>
+				<div class="flex flex-col gap-0.5">
+					<Label for="mode-cloud" class="text-sm font-medium">Eurora Cloud</Label>
 					<span class="text-xs text-muted-foreground">
 						Hosted backend at api.eurora-labs.com.
 					</span>
-				</Label>
+				</div>
 			</div>
 			<div class="flex items-start gap-3">
 				<RadioGroup.Item value="local" id="mode-local" class="mt-1" />
-				<Label for="mode-local" class="flex flex-col gap-1">
-					<span class="text-sm font-medium">Local</span>
+				<div class="flex flex-col gap-0.5">
+					<Label for="mode-local" class="text-sm font-medium">Local</Label>
 					<span class="text-xs text-muted-foreground">
 						Backend running on this machine at http://localhost:3000.
 					</span>
-				</Label>
+				</div>
 			</div>
 			<div class="flex items-start gap-3">
 				<RadioGroup.Item value="custom" id="mode-custom" class="mt-1" />
-				<Label for="mode-custom" class="flex flex-col gap-1 flex-1">
-					<span class="text-sm font-medium">Custom</span>
+				<div class="flex flex-1 flex-col gap-2">
+					<Label for="mode-custom" class="text-sm font-medium">Custom</Label>
 					<Input
 						placeholder="https://eurora.example.com"
 						bind:value={customUrl}
 						disabled={kind !== 'custom'}
-						class="mt-1"
 					/>
-				</Label>
+				</div>
 			</div>
 		</RadioGroup.Root>
 
-		<div class="flex items-center gap-2">
-			<Button onclick={save}>Save</Button>
-			<Button variant="outline" onclick={testConnection} disabled={testing}>
-				{#if testing}
-					<Spinner class="size-4" />
-					Testing…
-				{:else}
-					Test connection
-				{/if}
-			</Button>
-		</div>
+		<div class="flex flex-col gap-2">
+			<div class="flex items-center gap-2">
+				<Button onclick={save}>Save</Button>
+				<Button variant="outline" onclick={testConnection} disabled={testing}>
+					{#if testing}
+						<Spinner class="size-4" />
+						Testing…
+					{:else}
+						Test connection
+					{/if}
+				</Button>
+			</div>
 
-		{#if resolvedEndpoint}
-			<p class="text-xs text-muted-foreground">Active: {resolvedEndpoint}</p>
-		{/if}
-		{#if llmInfoText}
-			<p class="text-xs text-muted-foreground">{llmInfoText}</p>
-		{/if}
+			{#if resolvedEndpoint}
+				<p class="text-xs text-muted-foreground">Active: {resolvedEndpoint}</p>
+			{/if}
+			{#if llmInfoText}
+				<p class="text-xs text-muted-foreground">{llmInfoText}</p>
+			{/if}
+		</div>
 	</section>
 </div>
