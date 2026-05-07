@@ -58,9 +58,9 @@ pub trait AuthApi {
 }
 
 fn build_auth_url(code_challenge: &str) -> Result<Url, String> {
-    let base = std::env::var("AUTH_SERVICE_URL")
+    let base = std::env::var("EURORA_AUTH_SERVICE_URL")
         .unwrap_or_else(|_| "https://www.eurora-labs.com".to_string());
-    let mut url = Url::parse(&format!("{base}/login")).ctx("Invalid AUTH_SERVICE_URL")?;
+    let mut url = Url::parse(&format!("{base}/login")).ctx("Invalid EURORA_AUTH_SERVICE_URL")?;
     url.query_pairs_mut()
         .append_pair("code_challenge", code_challenge)
         .append_pair("code_challenge_method", "S256")

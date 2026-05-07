@@ -46,7 +46,8 @@ impl EndpointManager {
     }
 
     pub fn from_env() -> Result<Self> {
-        let url = std::env::var("API_BASE_URL").unwrap_or_else(|_| DEFAULT_API_URL.to_string());
+        let url =
+            std::env::var("EURORA_API_BASE_URL").unwrap_or_else(|_| DEFAULT_API_URL.to_string());
         Self::new(&url)
     }
 

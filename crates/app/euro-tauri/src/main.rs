@@ -3,7 +3,7 @@
     windows_subsystem = "windows"
 )]
 
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::{AccentColor, TimelineAppEvent};

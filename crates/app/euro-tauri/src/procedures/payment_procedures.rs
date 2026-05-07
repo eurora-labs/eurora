@@ -7,8 +7,8 @@ use crate::error::ResultExt;
 use crate::procedures::auth_manager;
 
 fn rest_api_url() -> String {
-    std::env::var("REST_API_URL")
-        .or_else(|_| std::env::var("API_BASE_URL"))
+    std::env::var("EURORA_REST_API_URL")
+        .or_else(|_| std::env::var("EURORA_API_BASE_URL"))
         .unwrap_or_else(|_| "https://api.eurora-labs.com".to_string())
 }
 

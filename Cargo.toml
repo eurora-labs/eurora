@@ -73,7 +73,7 @@ cfg-if = "1.0.4"
 chacha20poly1305 = "0.10.1"
 chrono = "0.4.43"
 dirs = "6.0"
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 email_address = "0.2"
 enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }

@@ -5,20 +5,21 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 
 	const cloneCommand = 'git clone https://github.com/eurora-labs/eurora && cd eurora';
-	const justDevCommand = 'cp .env.example .env && $EDITOR .env && just dev';
+	const justDevCommand = 'just bootstrap && $EDITOR .env && just dev';
 
-	const envFileContents = `# LLM provider — required.
+	const envFileContents = `# LLM provider — the only value 'just dev' needs you to set.
 OPENAI_API_KEY=sk-...
 EURORA_CHAT_MODEL=gpt-4o-mini
 
-# Backend runtime defaults — match docker-compose.yml.
-REMOTE_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/eurora
-JWT_ACCESS_SECRET=dev_access_secret
-JWT_REFRESH_SECRET=dev_refresh_secret
-WEB_ALLOWED_ORIGINS=http://localhost:5173,tauri://localhost
-AUTH_COOKIE_SECURE=false
-ASSET_STORAGE_BACKEND=fs
-ASSET_STORAGE_FS_ROOT=./assets`;
+# Web frontend — Vite-exposed.
+VITE_API_URL=http://localhost:3000
+
+# Debug builds default REMOTE_DATABASE_URL to docker-compose's local
+# Postgres, JWT secrets to stable placeholders, CORS origins to
+# localhost+tauri://localhost, AUTH_COOKIE_SECURE to false, and asset
+# storage to ./assets — uncomment any of those in .env to override.
+# Release builds refuse to start without REMOTE_DATABASE_URL and the
+# JWT secrets.`;
 
 	const ollamaEnvContents = `# Replace the OPENAI_API_KEY block with these four lines.
 EURORA_LLM_KIND=openai_compatible
@@ -72,17 +73,39 @@ EURORA_CHAT_MODEL=llama3.2`;
 			required: false,
 		},
 		{
-			name: 'JWT_ACCESS_SECRET / JWT_REFRESH_SECRET',
-			default: '—',
+			name: 'VITE_API_URL',
+			default: 'http://localhost:3000',
 			description:
-				'Random strings used to sign JWTs. Generate with `openssl rand -hex 32`. Must be set in production.',
+				'Backend URL the SvelteKit web app talks to. Vite exposes this to client code at build time.',
+			required: true,
+		},
+		{
+			name: 'JWT_ACCESS_SECRET / JWT_REFRESH_SECRET',
+			default: 'dev placeholder (debug builds only)',
+			description:
+				'Random strings used to sign JWTs. Generate with `openssl rand -hex 32`. Required in release builds.',
 			required: true,
 		},
 		{
 			name: 'REMOTE_DATABASE_URL',
-			default: '—',
-			description: 'PostgreSQL connection string. Required in production deployments.',
+			default: 'docker-compose Postgres (debug builds only)',
+			description:
+				'PostgreSQL connection string. Required in release builds; debug builds fall back to the local docker-compose Postgres.',
 			required: true,
+		},
+		{
+			name: 'EURORA_API_BASE_URL',
+			default: '—',
+			description:
+				'Desktop/mobile escape hatch: forces the app to talk to this URL on a single run, ignoring the persisted connection-mode setting.',
+			required: false,
+		},
+		{
+			name: 'EURORA_AUTH_SERVICE_URL',
+			default: 'https://www.eurora-labs.com',
+			description:
+				'Where the OAuth/login page is served. Set to http://localhost:5173 in dev so the desktop app uses the local SvelteKit auth UI.',
+			required: false,
 		},
 	];
 </script>
@@ -132,6 +155,20 @@ EURORA_CHAT_MODEL=llama3.2`;
 					>.
 				</li>
 				<li>
+					<strong>pnpm</strong> — used by the web and desktop frontends. The easiest path
+					is
+					<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+						>corepack enable</code
+					>; alternatives are listed at
+					<a
+						href="https://pnpm.io/installation"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-primary underline underline-offset-4 hover:text-primary/80"
+						>pnpm.io</a
+					>.
+				</li>
+				<li>
 					<strong>just</strong> — the task runner that orchestrates the local stack.
 					Install with
 					<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
@@ -162,13 +199,22 @@ EURORA_CHAT_MODEL=llama3.2`;
 			</div>
 			<p class="mt-3 text-sm text-muted-foreground">
 				That's it. <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-					>just dev</code
+					>just bootstrap</code
 				>
+				copies
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env.example</code>
+				to
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> and runs
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">pnpm install</code>;
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">just dev</code>
 				brings up Postgres, seeds a
 				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">dev@dev.com</code>
 				user (password
 				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">dev</code>), and runs
-				the backend, the web auth UI, and the desktop app.
+				the backend, the web auth UI, and the desktop app. The single
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> at the repo
+				root is the contract — every consumer (backend, Vite for web/desktop, mobile build) reads
+				from there.
 			</p>
 		</section>
 
@@ -191,8 +237,17 @@ EURORA_CHAT_MODEL=llama3.2`;
 				<TriangleAlertIcon />
 				<AlertDescription>
 					<p>
-						The JWT secrets in the example above are placeholders. For any deployment
-						reachable from outside your machine, set them to long random strings (e.g.
+						Debug builds fall back to placeholder JWT secrets so a fresh checkout runs
+						without setup. Release builds refuse to start without explicit
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>JWT_ACCESS_SECRET</code
+						>
+						and
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>JWT_REFRESH_SECRET</code
+						>
+						values — for any deployment reachable from outside your machine, set them to long
+						random strings (e.g.
 						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
 							>openssl rand -hex 32</code
 						>).

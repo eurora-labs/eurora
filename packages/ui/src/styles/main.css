@@ -30,6 +30,21 @@
 }
 
 :root {
+	/*
+	 * Accessibility scale variables. Defaults render the design system at its
+	 * native sizing so apps that never write to these variables behave exactly
+	 * as before. The desktop app's AppearanceService updates them at runtime.
+	 *
+	 *  --ui-scale   — multiplies the root font-size, scaling every rem-anchored
+	 *                 token (text + spacing + control sizes) together.
+	 *  --text-scale — additional multiplier layered onto the typography tokens
+	 *                 only, leaving spacing and control sizes alone.
+	 */
+	--ui-scale: 1;
+	--text-scale: 1;
+
+	font-size: calc(16px * var(--ui-scale));
+
 	--background: oklch(0.9821 0 0);
 	--foreground: oklch(0.3211 0 0);
 	--card: oklch(1 0 0);
@@ -156,6 +171,26 @@
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
 	--radius-xl: calc(var(--radius) + 4px);
+
+	/*
+	 * Override Tailwind's default typography tokens so every `text-*` utility
+	 * picks up the user's text-scale preference without altering rem-based
+	 * spacing utilities. Stays in rem (not em) to avoid the compounding-size
+	 * trap when text utilities are nested.
+	 */
+	--text-xs: calc(0.75rem * var(--text-scale));
+	--text-sm: calc(0.875rem * var(--text-scale));
+	--text-base: calc(1rem * var(--text-scale));
+	--text-lg: calc(1.125rem * var(--text-scale));
+	--text-xl: calc(1.25rem * var(--text-scale));
+	--text-2xl: calc(1.5rem * var(--text-scale));
+	--text-3xl: calc(1.875rem * var(--text-scale));
+	--text-4xl: calc(2.25rem * var(--text-scale));
+	--text-5xl: calc(3rem * var(--text-scale));
+	--text-6xl: calc(3.75rem * var(--text-scale));
+	--text-7xl: calc(4.5rem * var(--text-scale));
+	--text-8xl: calc(6rem * var(--text-scale));
+	--text-9xl: calc(8rem * var(--text-scale));
 }
 
 @layer base {
@@ -217,12 +252,12 @@
 
 @utility typo-title {
 	font-weight: 700;
-	font-size: clamp(2.25rem, 1.5rem + 3vw, 3rem);
+	font-size: calc(clamp(2.25rem, 1.5rem + 3vw, 3rem) * var(--text-scale));
 	line-height: 1.1;
 	letter-spacing: -0.02em;
 }
 
 @utility typo-body {
-	font-size: 1.125rem;
+	font-size: calc(1.125rem * var(--text-scale));
 	line-height: 1.6;
 }

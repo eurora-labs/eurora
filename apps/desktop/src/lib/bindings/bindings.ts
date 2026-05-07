@@ -70,6 +70,16 @@ export type AppSettings = {
 export type AppearanceSettings = {
 	theme: Theme,
 	dynamicAccent: boolean,
+	/**
+	 *  Multiplier applied to the document's root font-size, scaling every
+	 *  rem-anchored design token (text, spacing, controls) together.
+	 */
+	interfaceScale: number,
+	/**
+	 *  Additional multiplier layered on top of `interface_scale` that affects
+	 *  only typography utilities, leaving spacing and control sizes alone.
+	 */
+	textScale: number,
 };
 
 export type AudioContentBlock = {

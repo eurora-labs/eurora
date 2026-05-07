@@ -188,6 +188,13 @@ impl SettingsApi for SettingsApiImpl {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
 
+        // Clamp scales and reject NaN/inf at the API boundary so a buggy
+        // client or hand-edited config can't push the UI into an unusable
+        // state. The frontend already constrains its sliders, so this is a
+        // defensive backstop, not the primary validation path.
+        let mut appearance_settings = appearance_settings;
+        appearance_settings.sanitize();
+
         settings.appearance = appearance_settings;
         settings
             .save_to_default_path()
