@@ -570,11 +570,11 @@ fn install_default_crypto_provider() {
 
 fn main() {
     // Inject build-time URL bake-ins into the process env. Whatever
-    // is in the host shell already (e.g., `EURORA_API_BASE_URL=foo
-    // cargo run` for a one-off override, or vars exported by
-    // `just dev` via `set dotenv-load`) wins; the bake-time values
-    // only fill the gaps so packaged release builds — which have no
-    // `.env` on disk — still know where to point.
+    // is in the host shell already (vars exported by `just dev` via
+    // `set dotenv-load`, or one-off `WEB_URL=foo cargo run` overrides)
+    // wins; the bake-time values only fill the gaps so packaged
+    // release builds — which have no `.env` on disk — still know
+    // where to point.
     euro_tauri::load_env();
 
     install_default_crypto_provider();
@@ -639,8 +639,14 @@ fn main() {
 
                     let app_settings = AppSettings::load_from_default_path_creating()?;
                     // The persisted ConnectionMode always resolves to a
-                    // non-empty URL, so we never need the env-fallback path.
+                    // non-empty URL, so we never need an env-fallback path.
                     let endpoint_url = app_settings.api.endpoint();
+                    tracing::info!(
+                        mode = ?app_settings.api.mode,
+                        endpoint_url = %endpoint_url,
+                        baked_default = euro_settings::DEFAULT_API_URL,
+                        "Resolved API endpoint at startup"
+                    );
                     let endpoint_manager = std::sync::Arc::new(EndpointManager::new(endpoint_url)?);
 
                     // Reconcile the early-Sentry guard against the

@@ -57,11 +57,24 @@ placeholder. Rotating the secret invalidates every existing session."
     MissingJwtSecret { name: &'static str },
 
     #[error(
-        "Invalid `HTTP_ADDR` value `{value}`: {source}
+        "Invalid `{name}` value `{value}`: {source}
 
-Expected a SocketAddr like `0.0.0.0:3000` or `127.0.0.1:3000`."
+Expected an absolute URL like `http://localhost:3000` or `https://api.example.com`."
     )]
-    InvalidHttpAddr {
+    InvalidUrl {
+        name: &'static str,
+        value: String,
+        #[source]
+        source: url::ParseError,
+    },
+
+    #[error(
+        "Failed to construct backend bind address `{value}`: {source}
+
+This usually means `BACKEND_URL` resolves to a port the OS rejected.
+Pick a free TCP port (1024–65535) and update `BACKEND_URL` accordingly."
+    )]
+    InvalidBindAddr {
         value: String,
         #[source]
         source: std::net::AddrParseError,
@@ -80,7 +93,7 @@ HTTPS."
         "Failed to bind HTTP listener at {addr}: {source}
 
 Another process is already listening on that port. Run `just doctor` to
-locate it, or set `HTTP_ADDR` to a free port."
+locate it, or update `BACKEND_URL` to a free port."
     )]
     BindFailed {
         addr: SocketAddr,
@@ -246,14 +259,6 @@ impl From<be_thread_service::BuildError> for BootstrapError {
     }
 }
 
-impl From<be_auth_core::MissingWebOrigins> for BootstrapError {
-    fn from(_: be_auth_core::MissingWebOrigins) -> Self {
-        BootstrapError::MissingEnv {
-            name: be_auth_core::WEB_ALLOWED_ORIGINS_ENV,
-        }
-    }
-}
-
 impl From<be_auth_service::CookieConfigError> for BootstrapError {
     fn from(value: be_auth_service::CookieConfigError) -> Self {
         match value {
@@ -263,7 +268,6 @@ impl From<be_auth_service::CookieConfigError> for BootstrapError {
             be_auth_service::CookieConfigError::InvalidCookieSecure { value } => {
                 BootstrapError::InvalidCookieSecure { value }
             }
-            be_auth_service::CookieConfigError::WebOrigins(e) => e.into(),
         }
     }
 }

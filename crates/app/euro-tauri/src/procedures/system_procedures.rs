@@ -141,6 +141,13 @@ pub trait SystemApi {
         url: String,
     ) -> Result<RedactedLlmConfig, String>;
 
+    // The backend URL the desktop binary was built against. Surfaced to
+    // the frontend so the connection picker can show what `Default` mode
+    // resolves to — the value differs per release (dev builds point at
+    // localhost, end-user binaries at the shipping organisation's
+    // hosted backend).
+    async fn get_default_backend_url() -> Result<String, String>;
+
     async fn list_activities<R: Runtime>(
         app_handle: tauri::AppHandle<R>,
     ) -> Result<Vec<ContextChip>, String>;
@@ -305,12 +312,12 @@ impl SystemApi for SystemApiImpl {
         _app_handle: tauri::AppHandle<R>,
         server_address: Option<String>,
     ) -> Result<String, String> {
-        // Default to the build-time-baked Local-mode endpoint when
-        // the frontend doesn't pass an explicit address (e.g., the
-        // very first reachability probe before connection mode is
-        // resolved). Strip the scheme so the result is a `host:port`
-        // suitable for `TcpStream::connect`.
-        let address = server_address.unwrap_or_else(|| euro_settings::LOCAL_API_URL.to_string());
+        // Default to the build-time-baked endpoint when the frontend
+        // doesn't pass an explicit address (e.g., the very first
+        // reachability probe before connection mode is resolved).
+        // Strip the scheme so the result is a `host:port` suitable
+        // for `TcpStream::connect`.
+        let address = server_address.unwrap_or_else(|| euro_settings::DEFAULT_API_URL.to_string());
         let host_port = address.replace("http://", "").replace("https://", "");
 
         tracing::debug!("Checking TCP reachability of {host_port}");
@@ -343,6 +350,10 @@ impl SystemApi for SystemApiImpl {
         url: String,
     ) -> Result<RedactedLlmConfig, String> {
         fetch_llm_info(&url).await
+    }
+
+    async fn get_default_backend_url(self) -> Result<String, String> {
+        Ok(euro_settings::DEFAULT_API_URL.to_string())
     }
 
     async fn list_activities<R: Runtime>(

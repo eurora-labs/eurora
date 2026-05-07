@@ -13,15 +13,17 @@
 OPENAI_API_KEY=sk-...
 EURORA_CHAT_MODEL=gpt-4o-mini
 
-# Web frontend — Vite-exposed.
-VITE_API_URL=http://localhost:3000
+# Service URLs. Each appears here exactly once; CORS allow-list, the
+# backend bind address, and the desktop's "Default" connection URL
+# are all derived from these.
+BACKEND_URL=http://localhost:3000
+WEB_URL=http://localhost:5173
 
 # Backend operational config (dev defaults shown; production deploys
-# must set their own JWT secrets, CORS origins, database URL, …).
-REMOTE_DATABASE_URL=postgresql://postgres:postgres@localhost:5433/eurora
+# must set their own JWT secrets and database URL).
+REMOTE_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/eurora
 JWT_ACCESS_SECRET=dev_jwt_access_secret_DO_NOT_USE_IN_PROD
 JWT_REFRESH_SECRET=dev_jwt_refresh_secret_DO_NOT_USE_IN_PROD
-WEB_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,tauri://localhost
 AUTH_COOKIE_SECURE=false
 ASSET_STORAGE_BACKEND=fs
 ASSET_STORAGE_FS_ROOT=../assets`;
@@ -78,10 +80,17 @@ EURORA_CHAT_MODEL=llama3.2`;
 			required: false,
 		},
 		{
-			name: 'VITE_API_URL',
+			name: 'BACKEND_URL',
 			default: 'http://localhost:3000',
 			description:
-				'Backend URL the SvelteKit web app talks to. Vite exposes this to client code at build time.',
+				'The single canonical backend URL. The backend reads it to compute its bind address and CORS allow-list; the SvelteKit app reads it as `import.meta.env.PUBLIC_API_URL`; the desktop and mobile binaries bake it as their "Default" connection-mode URL.',
+			required: true,
+		},
+		{
+			name: 'WEB_URL',
+			default: 'http://localhost:5173',
+			description:
+				'SvelteKit dev server / OAuth-landing URL. The backend uses it for outbound emails and Stripe success/cancel pages; the desktop bakes it as the login redirect.',
 			required: true,
 		},
 		{
@@ -97,20 +106,6 @@ EURORA_CHAT_MODEL=llama3.2`;
 			description:
 				'PostgreSQL connection string. Required in release builds; debug builds fall back to the local docker-compose Postgres.',
 			required: true,
-		},
-		{
-			name: 'EURORA_API_BASE_URL',
-			default: '—',
-			description:
-				'Desktop/mobile escape hatch: forces the app to talk to this URL on a single run, ignoring the persisted connection-mode setting.',
-			required: false,
-		},
-		{
-			name: 'EURORA_AUTH_SERVICE_URL',
-			default: 'https://www.eurora-labs.com',
-			description:
-				'Where the OAuth/login page is served. Set to http://localhost:5173 in dev so the desktop app uses the local SvelteKit auth UI.',
-			required: false,
 		},
 	];
 </script>
@@ -382,13 +377,15 @@ EURORA_CHAT_MODEL=llama3.2`;
 				<div>
 					<h3 class="mb-1 font-medium">Postgres port already in use</h3>
 					<p class="text-sm text-muted-foreground">
-						If port 5432 conflicts with another service, set
+						If port 5434 conflicts with another service, change the host-side port in
 						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>EURORA_POSTGRES_PORT</code
+							>docker-compose.yml</code
 						>
-						in your
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> to
-						a free port.
+						and update the port embedded in
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>REMOTE_DATABASE_URL</code
+						>
+						to match.
 					</p>
 				</div>
 				<div>

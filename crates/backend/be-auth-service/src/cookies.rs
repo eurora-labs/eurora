@@ -14,7 +14,6 @@
 use std::collections::HashSet;
 
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use be_auth_core::{MissingWebOrigins, web_origins_from_env};
 use time::Duration as TimeDuration;
 
 pub const ACCESS_COOKIE: &str = "eu_access";
@@ -63,13 +62,17 @@ pub enum CookieConfigError {
 
     #[error("invalid `AUTH_COOKIE_SECURE` value `{value}` (expected `true` or `false`)")]
     InvalidCookieSecure { value: String },
-
-    #[error(transparent)]
-    WebOrigins(#[from] MissingWebOrigins),
 }
 
 impl CookieConfig {
-    pub fn from_env() -> Result<Self, CookieConfigError> {
+    /// Build a [`CookieConfig`] reading the cookie-shape knobs
+    /// (`AUTH_COOKIE_SECURE`, `AUTH_COOKIE_DOMAIN`) from the
+    /// environment, with the SPA-origin allow-list passed in by the
+    /// caller. Origins are derived from the workspace's canonical
+    /// `BACKEND_URL` / `WEB_URL` primitives — see
+    /// [`be_monolith::bootstrap`]'s `compose_web_origins` — so this
+    /// type does not own that contract.
+    pub fn from_env(web_origins: HashSet<String>) -> Result<Self, CookieConfigError> {
         let domain = std::env::var("AUTH_COOKIE_DOMAIN")
             .ok()
             .map(|s| s.trim().to_string())
@@ -94,7 +97,7 @@ impl CookieConfig {
         Ok(Self {
             domain,
             secure,
-            web_origins: web_origins_from_env()?,
+            web_origins,
         })
     }
 

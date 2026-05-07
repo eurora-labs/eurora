@@ -159,7 +159,7 @@ function Test-PostgresPort {
         return $true
     }
     Write-Fail "port $Port" "in use by something else"
-    Write-Hint "Stop the conflicting process or set EURORA_POSTGRES_PORT in .env."
+    Write-Hint "Stop the conflicting process or change the host-side port in docker-compose.yml."
     return $false
 }
 
@@ -293,25 +293,25 @@ Test-Command "cargo-watch" "cargo-watch" "Install with: cargo install cargo-watc
 Test-Command "pnpm"        "pnpm"        "Install with: corepack enable"           | Out-Null
 Test-Command "just"        "just"        "Install with: cargo install just"        | Out-Null
 
-# Port checks. We resolve the port from the user's env so the doctor
-# follows whatever HTTP_ADDR / EURORA_POSTGRES_PORT they've configured;
-# the literal fallbacks (3000 / 5433) only fire when the variables are
+# Port checks. We resolve the backend port from the user's
+# `BACKEND_URL` so the doctor follows whatever they've configured;
+# the literal fallbacks (3000 / 5434) only fire when the variables are
 # unset (e.g., a fresh checkout where doctor runs before `just init`)
 # so the doctor itself stays usable in that broken state.
-$httpAddr = Resolve-EnvValue "HTTP_ADDR"
-if ([string]::IsNullOrEmpty($httpAddr)) {
+$backendUrl = Resolve-EnvValue "BACKEND_URL"
+if ([string]::IsNullOrEmpty($backendUrl)) {
     $httpPort = "3000"
 } else {
-    $httpPort = ($httpAddr -split ':')[-1]
+    $tail = ($backendUrl -split ':')[-1]
+    $httpPort = ($tail -split '/')[0]
     if ([string]::IsNullOrEmpty($httpPort)) { $httpPort = "3000" }
 }
 
-$postgresPort = Resolve-EnvValue "EURORA_POSTGRES_PORT"
-if ([string]::IsNullOrEmpty($postgresPort)) {
-    $postgresPort = "5433"
-}
+# The host port the postgres container binds on the host. Hardcoded in
+# `docker-compose.yml` (5434) — the doctor matches that default.
+$postgresPort = "5434"
 
-Test-PortFree     "port $httpPort" ([int]$httpPort)  "Stop the conflicting process or set HTTP_ADDR."           | Out-Null
+Test-PortFree     "port $httpPort" ([int]$httpPort)  "Stop the conflicting process or update BACKEND_URL."      | Out-Null
 Test-PostgresPort ([int]$postgresPort)                                                                          | Out-Null
 Test-PortFree     "port 5173"     5173               "Stop the conflicting process or move the web dev server." | Out-Null
 

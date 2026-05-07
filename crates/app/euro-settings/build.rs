@@ -1,13 +1,13 @@
-//! Bake `EURORA_CLOUD_API_URL` and `EURORA_LOCAL_API_URL` into
-//! `api_settings::{CLOUD_API_URL,LOCAL_API_URL}` at compile time.
+//! Bake `BACKEND_URL` into `api_settings::DEFAULT_API_URL` at compile
+//! time.
 //!
-//! The values come from the workspace `.env` (or shell env, which
+//! The value comes from the workspace `.env` (or shell env, which
 //! wins). There is no in-source fallback — fork-and-rebrand builds
-//! override these by editing `.env` or exporting in CI.
+//! override this by editing `.env` or exporting in CI.
 
 use std::path::{Path, PathBuf};
 
-const REQUIRED: &[&str] = &["EURORA_CLOUD_API_URL", "EURORA_LOCAL_API_URL"];
+const REQUIRED: &[&str] = &["BACKEND_URL"];
 
 fn main() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

@@ -8,7 +8,8 @@ on:
 env:
     RUST_BACKTRACE: full
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
-    VITE_API_URL: http://localhost:3000
+    BACKEND_URL: http://localhost:3000
+    WEB_URL: http://localhost:5173
 
 permissions:
     id-token: write

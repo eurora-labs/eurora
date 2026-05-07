@@ -35,17 +35,9 @@ fn mobile_entry_point() {
 /// Mobile apps run in a sandbox with no access to the project's `.env`,
 /// so `build.rs` reads it at compile time and forwards the relevant keys
 /// into `option_env!` slots. Inject those into the process env at
-/// startup so the existing `std::env::var(...)` call sites (including
-/// `EndpointManager::from_env`) see them.
+/// startup so the existing `std::env::var(...)` call sites see them.
 fn load_env() {
-    for (key, value) in [
-        (
-            "EURORA_AUTH_SERVICE_URL",
-            option_env!("EURORA_AUTH_SERVICE_URL"),
-        ),
-        ("EURORA_API_BASE_URL", option_env!("EURORA_API_BASE_URL")),
-        ("EURORA_REST_API_URL", option_env!("EURORA_REST_API_URL")),
-    ] {
+    for (key, value) in [("WEB_URL", option_env!("WEB_URL"))] {
         if std::env::var_os(key).is_some() {
             continue;
         }

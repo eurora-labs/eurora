@@ -11,9 +11,10 @@
         "nonAnonymousMetrics": false,
         "distinctId": null
     },
-    // `api` is intentionally absent: APISettings::default() picks Cloud on
-    // release builds and Local on debug builds. Setting a literal here would
-    // override the build-profile default for fresh installs.
+    // `api` is intentionally absent: `APISettings::default()` resolves to
+    // `ConnectionMode::Default`, which points at the URL baked at compile
+    // time from `BACKEND_URL`. Hard-coding a value here would override that
+    // on fresh installs.
     "appearance": {
         "theme": "system",
         "dynamicAccent": true,

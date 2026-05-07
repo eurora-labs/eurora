@@ -145,6 +145,11 @@ export class AuthService {
 		try {
 			await this.associateAppLogin(loginToken);
 		} catch (err) {
+			// Capture to Sentry plus a console error: the native swallow
+			// here used to make a backend-rejected associate look like a
+			// silent no-op in the desktop polling loop, which sent us
+			// debugging the wrong layer for an afternoon.
+			console.error('[auth.associate-app] associate failed', err);
 			Sentry.captureException(err, { tags: { area: 'auth.associate-app' } });
 			return false;
 		}

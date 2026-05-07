@@ -232,12 +232,13 @@ export type Claims = {
 /**
  *  Where the desktop app should send authenticated requests.
  * 
- *  `Cloud` and `Local` carry no parameters because their URLs are baked in,
- *  which keeps "I want to talk to the production server" expressible as a
- *  stable enum value rather than a magic string. `Custom` covers everything
- *  else (self-hosted homelab, a colleague's tunnel, etc.).
+ *  `Default` carries no parameters because its URL is baked in, which
+ *  keeps "I want to talk to the URL this binary was built against"
+ *  expressible as a stable enum value rather than a magic string.
+ *  `Custom` covers everything else (self-hosted homelab, a colleague's
+ *  tunnel, a different organisation's infrastructure).
  */
-export type ConnectionMode = { kind: "cloud" } | { kind: "local" } | { kind: "custom"; url: string };
+export type ConnectionMode = { kind: "default" } | { kind: "custom"; url: string };
 
 export type ContentBlock = { type: "text" } & TextContentBlock | { type: "invalid_tool_call" } & InvalidToolCallBlock | { type: "reasoning" } & ReasoningContentBlock | { type: "non_standard" } & NonStandardContentBlock | { type: "image" } & ImageContentBlock | { type: "video" } & VideoContentBlock | { type: "audio" } & AudioContentBlock | { type: "text-plain" } & PlainTextContentBlock | { type: "file" } & FileContentBlock | { type: "tool_call" } & ToolCallBlock | { type: "tool_call_chunk" } & ToolCallChunkBlock | { type: "server_tool_call" } & ServerToolCall | { type: "server_tool_call_chunk" } & ServerToolCallChunk | { type: "server_tool_result" } & ServerToolResult;
 
@@ -578,7 +579,7 @@ export type VideoContentBlock = {
 };
 import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurpc'
 type TAURI_CHANNEL<T> = (response: T) => void
-const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"collect_context":["thread_id"],"regenerate":["thread_id","ai_message_id","channel"],"send_query":["thread_id","channel","request"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_appearance_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_appearance_settings":["appearance_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_backend_connection":["server_address"],"check_for_update":[],"focus_main_window":[],"get_browser_extension_state":["process_name"],"get_llm_info":[],"get_telemetry_bootstrap":[],"install_update":[],"list_activities":[],"needs_telemetry_consent":[],"open_browser_extension_settings":["process_name"],"open_url_in_browser":["process_id","url"],"quit":[],"reinit_telemetry":[],"request_accessibility_permission":[],"rotate_telemetry_distinct_id":[],"test_backend_url":["url"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
+const ARGS_MAP = { 'auth':'{"auth_state_changed":["claims"],"get_access_token_payload":[],"get_login_token":[],"is_authenticated":[],"login":["login","password"],"logout":[],"poll_for_login":[],"refresh_session":[],"register":["email","password"],"resend_verification_email":[]}', 'chat':'{"cancel_query":["thread_id"],"collect_context":["thread_id"],"regenerate":["thread_id","ai_message_id","channel"],"send_query":["thread_id","channel","request"]}', 'context_chip':'{"get":[]}', 'monitor':'{"capture_monitor":["monitor_id"]}', 'payment':'{"create_checkout_url":[],"is_subscribed":[]}', 'settings':'{"get_all_settings":[],"get_api_settings":[],"get_appearance_settings":[],"get_general_settings":[],"get_telemetry_settings":[],"set_api_settings":["api_settings"],"set_appearance_settings":["appearance_settings"],"set_general_settings":["general_settings"],"set_telemetry_settings":["telemetry_settings"]}', 'system':'{"browser_extension_status_changed":["status"],"check_accessibility_permission":[],"check_backend_connection":["server_address"],"check_for_update":[],"focus_main_window":[],"get_browser_extension_state":["process_name"],"get_default_backend_url":[],"get_llm_info":[],"get_telemetry_bootstrap":[],"install_update":[],"list_activities":[],"needs_telemetry_consent":[],"open_browser_extension_settings":["process_name"],"open_url_in_browser":["process_id","url"],"quit":[],"reinit_telemetry":[],"request_accessibility_permission":[],"rotate_telemetry_distinct_id":[],"test_backend_url":["url"]}', 'third_party':'{"check_api_key_exists":[],"save_api_key":["api_key"]}', 'thread':'{"create":[],"current_thread_changed":["thread"],"delete":["thread_id"],"generate_title":["thread_id"],"get_messages":["thread_id","limit","offset"],"list":["limit","offset"],"new_thread_added":["thread"],"search_messages":["query","limit","offset"],"search_threads":["query","limit","offset"],"switch_branch":["thread_id","message_id","direction"],"thread_title_changed":["thread"]}', 'timeline':'{"list":[],"new_app_event":["event"],"new_assets_event":["chips"]}' }
 export type Router = { "auth": {auth_state_changed: (claims: {
 	sub: string,
 	email: string,
@@ -631,6 +632,7 @@ check_for_update: () => Promise<{
 } | null>, 
 focus_main_window: () => Promise<null>, 
 get_browser_extension_state: (processName: string) => Promise<BrowserExtensionState>, 
+get_default_backend_url: () => Promise<string>, 
 get_llm_info: () => Promise<RedactedLlmConfig>, 
 get_telemetry_bootstrap: () => Promise<TelemetryBootstrap>, 
 install_update: () => Promise<null>, 

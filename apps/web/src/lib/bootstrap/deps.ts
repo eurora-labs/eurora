@@ -11,7 +11,7 @@ import { CONFIG_SERVICE, ConfigService } from '@eurora/shared/config/config-serv
 import { provideAll } from '@eurora/shared/context';
 
 export function initDependencies() {
-	const config = new ConfigService(import.meta.env.VITE_API_URL);
+	const config = new ConfigService(import.meta.env.PUBLIC_API_URL);
 	const threadClient = new ThreadService(config);
 
 	provideAll([

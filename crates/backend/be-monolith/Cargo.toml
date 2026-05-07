@@ -39,3 +39,4 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 tower-http = { workspace = true, features = ["cors"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+url = { workspace = true }

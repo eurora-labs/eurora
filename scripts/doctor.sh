@@ -126,7 +126,7 @@ check_postgres_port() {
         return 0
     fi
     fail "port $port" "in use by something else"
-    hint "Stop the conflicting process or set EURORA_POSTGRES_PORT in .env."
+    hint "Stop the conflicting process or change the host-side port in docker-compose.yml."
     return 1
 }
 
@@ -255,21 +255,24 @@ check_command "cargo-watch" "cargo-watch" "Install with: cargo install cargo-wat
 check_command "pnpm"        "pnpm"        "Install with: corepack enable" || true
 check_command "just"        "just"        "Install with: cargo install just" || true
 
-# Port checks. We resolve the port from the user's env so the doctor
-# follows whatever HTTP_ADDR / EURORA_POSTGRES_PORT they've configured;
-# the literal fallbacks (3000 / 5433) only fire when the variables
+# Port checks. We resolve the backend port from the user's
+# `BACKEND_URL` so the doctor follows whatever they've configured;
+# the literal fallbacks (3000 / 5434) only fire when the variables
 # are unset (e.g., a fresh checkout where doctor is run before
 # `just init`) so the doctor itself stays usable in that broken state.
-http_addr=$(resolve_env_value HTTP_ADDR)
-http_port=${http_addr##*:}
+backend_url=$(resolve_env_value BACKEND_URL)
+backend_url=${backend_url:-http://localhost:3000}
+http_port=${backend_url##*:}
+http_port=${http_port%%/*}
 http_port=${http_port:-3000}
 
-postgres_port=$(resolve_env_value EURORA_POSTGRES_PORT)
-postgres_port=${postgres_port:-5433}
+# The host port the postgres container binds on the host. Hardcoded in
+# `docker-compose.yml` (5434) — the doctor matches that default.
+postgres_port=5434
 
-check_port_free "port $http_port" "$http_port" "Stop the conflicting process or set HTTP_ADDR." || true
-check_postgres_port "$postgres_port"                                                            || true
-check_port_free "port 5173" 5173 "Stop the conflicting process or move the web dev server."     || true
+check_port_free "port $http_port" "$http_port" "Stop the conflicting process or update BACKEND_URL." || true
+check_postgres_port "$postgres_port"                                                                 || true
+check_port_free "port 5173" 5173 "Stop the conflicting process or move the web dev server."         || true
 
 check_env_file    || true
 check_env_complete || true

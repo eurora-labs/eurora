@@ -152,8 +152,10 @@ impl AuthClient {
 async fn send_typed<R: DeserializeOwned>(builder: RequestBuilder) -> AuthResult<R> {
     let response = builder.send().await.map_err(AuthError::from_transport)?;
     let status = response.status();
+    let url = response.url().to_string();
     if !status.is_success() {
         let body = decode_error_body(response).await;
+        tracing::warn!(%url, %status, ?body, "auth client: non-success response");
         return Err(AuthError::from_http_response(status, body));
     }
     let bytes = response.bytes().await.map_err(AuthError::from_transport)?;
@@ -164,8 +166,10 @@ async fn send_typed<R: DeserializeOwned>(builder: RequestBuilder) -> AuthResult<
 async fn send_unit(builder: RequestBuilder) -> AuthResult<()> {
     let response = builder.send().await.map_err(AuthError::from_transport)?;
     let status = response.status();
+    let url = response.url().to_string();
     if !status.is_success() {
         let body = decode_error_body(response).await;
+        tracing::warn!(%url, %status, ?body, "auth client: non-success response");
         return Err(AuthError::from_http_response(status, body));
     }
     Ok(())

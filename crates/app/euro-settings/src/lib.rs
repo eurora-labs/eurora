@@ -9,7 +9,7 @@ mod persistence;
 mod telemetry_settings;
 mod watch;
 
-pub use api_settings::{APISettings, CLOUD_API_URL, ConnectionMode, LOCAL_API_URL};
+pub use api_settings::{APISettings, ConnectionMode, DEFAULT_API_URL};
 pub use appearance_settings::{AppearanceSettings, DEFAULT_SCALE, MAX_SCALE, MIN_SCALE, Theme};
 pub use general_settings::GeneralSettings;
 pub use telemetry_settings::{CURRENT_CONSENT_VERSION, TelemetrySettings};
