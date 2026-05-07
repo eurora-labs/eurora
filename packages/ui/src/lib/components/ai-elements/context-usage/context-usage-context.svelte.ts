@@ -11,54 +11,34 @@ export interface LanguageModelUsage {
 
 export type ModelId = string;
 
+export interface ContextUsageStateOptions {
+	usedTokens: () => number;
+	maxTokens: () => number;
+	usage?: () => LanguageModelUsage | undefined;
+	modelId?: () => ModelId | undefined;
+}
+
 export class ContextUsageState {
-	#usedTokens = $state(0);
-	#maxTokens = $state(0);
-	#usage = $state<LanguageModelUsage | undefined>(undefined);
-	#modelId = $state<ModelId | undefined>(undefined);
+	readonly #opts: ContextUsageStateOptions;
 
-	constructor(options: {
-		usedTokens: number;
-		maxTokens: number;
-		usage?: LanguageModelUsage;
-		modelId?: ModelId;
-	}) {
-		this.#usedTokens = options.usedTokens;
-		this.#maxTokens = options.maxTokens;
-		this.#usage = options.usage;
-		this.#modelId = options.modelId;
+	constructor(opts: ContextUsageStateOptions) {
+		this.#opts = opts;
 	}
 
-	get usedTokens() {
-		return this.#usedTokens;
+	get usedTokens(): number {
+		return this.#opts.usedTokens();
 	}
 
-	set usedTokens(value: number) {
-		this.#usedTokens = value;
+	get maxTokens(): number {
+		return this.#opts.maxTokens();
 	}
 
-	get maxTokens() {
-		return this.#maxTokens;
+	get usage(): LanguageModelUsage | undefined {
+		return this.#opts.usage?.();
 	}
 
-	set maxTokens(value: number) {
-		this.#maxTokens = value;
-	}
-
-	get usage() {
-		return this.#usage;
-	}
-
-	set usage(value: LanguageModelUsage | undefined) {
-		this.#usage = value;
-	}
-
-	get modelId() {
-		return this.#modelId;
-	}
-
-	set modelId(value: ModelId | undefined) {
-		this.#modelId = value;
+	get modelId(): ModelId | undefined {
+		return this.#opts.modelId?.();
 	}
 }
 

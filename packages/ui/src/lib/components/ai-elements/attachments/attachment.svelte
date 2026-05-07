@@ -2,11 +2,9 @@
 	import { cn } from '$lib/utils.js';
 	import {
 		getAttachmentsContext,
-		getMediaCategory,
 		setAttachmentItemContext,
 		type AttachmentData,
 	} from './attachments-context.svelte.js';
-	import { watch } from 'runed';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
@@ -18,20 +16,14 @@
 
 	let { class: className, data, onRemove, children, ...restProps }: Props = $props();
 
-	let attachmentsCtx = getAttachmentsContext();
-	let variant = $derived(attachmentsCtx.variant);
+	const attachmentsCtx = getAttachmentsContext();
+	const variant = $derived(attachmentsCtx.variant);
 
-	let itemCtx = setAttachmentItemContext(data, variant, onRemove);
-
-	watch(
-		() => [data, variant, onRemove] as const,
-		([d, v, r]) => {
-			itemCtx.data = d;
-			itemCtx.variant = v;
-			itemCtx.onRemove = r;
-			itemCtx.mediaCategory = getMediaCategory(d);
-		},
-	);
+	setAttachmentItemContext({
+		data: () => data,
+		variant: () => variant,
+		onRemove: () => onRemove,
+	});
 </script>
 
 <div

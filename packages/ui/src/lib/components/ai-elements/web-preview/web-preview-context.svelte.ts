@@ -2,21 +2,19 @@ import { getContext, setContext } from 'svelte';
 
 const WEB_PREVIEW_CONTEXT_KEY = Symbol.for('web-preview-context');
 
+export interface WebPreviewContextOptions {
+	initialUrl?: string;
+	onUrlChange?: () => ((url: string) => void) | undefined;
+}
+
 export class WebPreviewContext {
+	readonly #onUrlChange: () => ((url: string) => void) | undefined;
 	#url = $state('');
 	#consoleOpen = $state(false);
-	#onUrlChange: ((url: string) => void) | undefined;
 
-	constructor(
-		options: {
-			url?: string;
-			consoleOpen?: boolean;
-			onUrlChange?: (url: string) => void;
-		} = {},
-	) {
-		this.#url = options.url ?? '';
-		this.#consoleOpen = options.consoleOpen ?? false;
-		this.#onUrlChange = options.onUrlChange;
+	constructor(opts: WebPreviewContextOptions = {}) {
+		this.#url = opts.initialUrl ?? '';
+		this.#onUrlChange = opts.onUrlChange ?? (() => undefined);
 	}
 
 	get url() {
@@ -25,7 +23,7 @@ export class WebPreviewContext {
 
 	set url(value: string) {
 		this.#url = value;
-		this.#onUrlChange?.(value);
+		this.#onUrlChange()?.(value);
 	}
 
 	get consoleOpen() {

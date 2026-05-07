@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
@@ -18,7 +19,7 @@
 		children?: Snippet;
 	} = $props();
 
-	let internalShowValues = $state(defaultShowValues);
+	let internalShowValues = $state(untrack(() => defaultShowValues));
 	let resolvedShowValues = $derived(controlledShowValues ?? internalShowValues);
 
 	setEnvironmentVariables({

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import * as DropdownMenu from '$lib/components/dropdown-menu/index.js';
 	import { setOpenInContext } from './open-in-context.svelte.js';
-	import { watch } from 'runed';
 
 	interface Props {
 		query: string;
@@ -10,14 +9,7 @@
 
 	let { query, children }: Props = $props();
 
-	let contextInstance = setOpenInContext(query);
-
-	watch(
-		() => query,
-		() => {
-			contextInstance.query = query;
-		},
-	);
+	setOpenInContext({ query: () => query });
 </script>
 
 <DropdownMenu.Root>

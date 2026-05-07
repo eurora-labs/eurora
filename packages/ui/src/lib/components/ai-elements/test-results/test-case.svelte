@@ -17,20 +17,12 @@
 
 	let { class: className, name, status, duration, children, ...rest }: Props = $props();
 
-	let ctx = new TestCaseState({ name, status, duration });
+	const ctx = new TestCaseState({
+		name: () => name,
+		status: () => status,
+		duration: () => duration,
+	});
 	setTestCaseContext(ctx);
-
-	$effect(() => {
-		ctx.name = name;
-	});
-
-	$effect(() => {
-		ctx.status = status;
-	});
-
-	$effect(() => {
-		ctx.duration = duration;
-	});
 </script>
 
 <div

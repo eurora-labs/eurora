@@ -2,29 +2,29 @@ import { getContext, setContext } from 'svelte';
 
 const CHAIN_OF_THOUGHT_KEY = Symbol.for('chain-of-thought');
 
-export class ChainOfThoughtState {
-	#isOpen = $state(false);
-	#isStreaming = $state(false);
+export interface ChainOfThoughtStateOptions {
+	isOpen: () => boolean;
+	setOpen: (value: boolean) => void;
+	isStreaming?: () => boolean;
+}
 
-	constructor(options: { isOpen?: boolean; isStreaming?: boolean }) {
-		this.#isOpen = options.isOpen ?? false;
-		this.#isStreaming = options.isStreaming ?? false;
+export class ChainOfThoughtState {
+	readonly #opts: ChainOfThoughtStateOptions;
+
+	constructor(opts: ChainOfThoughtStateOptions) {
+		this.#opts = opts;
 	}
 
-	get isOpen() {
-		return this.#isOpen;
+	get isOpen(): boolean {
+		return this.#opts.isOpen();
 	}
 
 	set isOpen(value: boolean) {
-		this.#isOpen = value;
+		this.#opts.setOpen(value);
 	}
 
-	get isStreaming() {
-		return this.#isStreaming;
-	}
-
-	set isStreaming(value: boolean) {
-		this.#isStreaming = value;
+	get isStreaming(): boolean {
+		return this.#opts.isStreaming?.() ?? false;
 	}
 }
 

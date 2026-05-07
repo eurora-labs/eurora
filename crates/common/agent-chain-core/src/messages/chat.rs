@@ -18,7 +18,6 @@ type JsonObjectTs = HashMap<String, Unknown>;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ChatMessage {
-    #[serde(default)]
     pub content: ContentBlocks,
     pub role: String,
     #[serde(default)]
@@ -128,7 +127,6 @@ impl ChatMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ChatMessageChunk {
-    #[serde(default)]
     pub content: ContentBlocks,
     pub role: String,
     #[serde(default)]

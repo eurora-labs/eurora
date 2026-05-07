@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
 	import { Collapsible } from '$lib/components/collapsible/index.js';
@@ -29,25 +30,23 @@
 	const AUTO_CLOSE_DELAY = 1000;
 	const MS_IN_S = 1000;
 
-	let resolvedDefaultOpen = defaultOpen ?? isStreaming;
-	let isExplicitlyClosed = defaultOpen === false;
+	const { resolvedDefaultOpen, isExplicitlyClosed } = untrack(() => ({
+		resolvedDefaultOpen: defaultOpen ?? isStreaming,
+		isExplicitlyClosed: defaultOpen === false,
+	}));
 
-	let isOpen = $state(open ?? resolvedDefaultOpen);
-	let hasEverStreamed = $state(isStreaming);
+	let isOpen = $state(untrack(() => open ?? resolvedDefaultOpen));
+	let hasEverStreamed = $state(untrack(() => isStreaming));
 	let hasAutoClosed = $state(false);
 	let startTime = $state<number | null>(null);
+	let measuredDuration = $state<number | undefined>(undefined);
 
-	let ctx = new ReasoningState({
-		isStreaming,
-		isOpen,
-		duration: durationProp,
+	const ctx = new ReasoningState({
+		isStreaming: () => isStreaming,
+		isOpen: () => isOpen,
+		duration: () => durationProp ?? measuredDuration,
 	});
-
 	setReasoningContext(ctx);
-
-	$effect(() => {
-		ctx.isStreaming = isStreaming;
-	});
 
 	$effect(() => {
 		if (isStreaming) {
@@ -56,14 +55,8 @@
 				startTime = Date.now();
 			}
 		} else if (startTime !== null) {
-			ctx.duration = Math.ceil((Date.now() - startTime) / MS_IN_S);
+			measuredDuration = Math.ceil((Date.now() - startTime) / MS_IN_S);
 			startTime = null;
-		}
-	});
-
-	$effect(() => {
-		if (durationProp !== undefined) {
-			ctx.duration = durationProp;
 		}
 	});
 
@@ -86,7 +79,6 @@
 
 	function setOpen(value: boolean) {
 		isOpen = value;
-		ctx.isOpen = value;
 		if (open !== undefined) {
 			open = value;
 		}

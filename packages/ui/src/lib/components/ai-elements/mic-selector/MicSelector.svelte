@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import * as Popover from '$lib/components/popover/index.js';
 	import {
@@ -28,39 +28,32 @@
 		children,
 	}: Props = $props();
 
-	let audioDevices = useAudioDevices();
+	let internalValue = $state<string | undefined>(untrack(() => defaultValue));
+	let internalOpen = $state(untrack(() => defaultOpen));
+
+	const audioDevices = useAudioDevices();
 	onDestroy(() => audioDevices.destroy());
 
-	let context = new MicSelectorContext({
-		value: controlledValue ?? defaultValue,
-		open: controlledOpen ?? defaultOpen,
-		onValueChange,
-		onOpenChange,
+	const context = new MicSelectorContext({
+		devices: () => audioDevices.devices,
+		value: () => controlledValue ?? internalValue,
+		setValue: (val) => {
+			internalValue = val;
+			onValueChange?.(val);
+		},
+		open: () => controlledOpen ?? internalOpen,
+		setOpen: (val) => {
+			internalOpen = val;
+			onOpenChange?.(val);
+		},
 	});
-
-	$effect(() => {
-		if (controlledValue !== undefined) {
-			context.value = controlledValue;
-		}
-	});
-
-	$effect(() => {
-		if (controlledOpen !== undefined) {
-			context.open = controlledOpen;
-		}
-	});
-
-	$effect(() => {
-		context.devices = audioDevices.devices;
-	});
+	setMicSelectorContext(context);
 
 	$effect(() => {
 		if (context.open && !audioDevices.hasPermission && !audioDevices.loading) {
 			audioDevices.loadDevices();
 		}
 	});
-
-	setMicSelectorContext(context);
 </script>
 
 <Popover.Root bind:open={context.open}>

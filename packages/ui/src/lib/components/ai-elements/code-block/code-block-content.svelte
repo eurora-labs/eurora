@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { BundledLanguage } from 'shiki';
 	import { cn } from '$lib/utils.js';
 	import {
@@ -28,18 +29,20 @@
 
 	let { code, language, showLineNumbers = false, class: className }: Props = $props();
 
-	let tokenized = $state<TokenizedCode>(highlightCode(code, language) ?? createRawTokens(code));
+	let tokenized = $state<TokenizedCode>(
+		untrack(() => highlightCode(code, language) ?? createRawTokens(code)),
+	);
 
 	$effect(() => {
 		let cancelled = false;
 
-		tokenized = highlightCode(code, language) ?? createRawTokens(code);
-
-		highlightCode(code, language, (result) => {
+		const cached = highlightCode(code, language, (result) => {
 			if (!cancelled) {
 				tokenized = result;
 			}
 		});
+
+		tokenized = cached ?? createRawTokens(code);
 
 		return () => {
 			cancelled = true;

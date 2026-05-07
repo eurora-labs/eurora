@@ -137,7 +137,6 @@ impl InvalidToolCall {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolMessage {
-    #[serde(default)]
     pub content: ContentBlocks,
     #[serde(deserialize_with = "deserialize_tool_call_id")]
     pub tool_call_id: String,
@@ -287,7 +286,6 @@ impl ToolOutputMixin for ToolMessage {}
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolMessageChunk {
-    #[serde(default)]
     pub content: ContentBlocks,
     #[serde(deserialize_with = "deserialize_tool_call_id")]
     pub tool_call_id: String,

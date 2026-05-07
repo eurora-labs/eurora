@@ -28,16 +28,11 @@
 		...restProps
 	}: Props = $props();
 
-	let context = new PersonaContext({ variant, state: personaState });
+	const context = new PersonaContext({
+		variant: () => variant,
+		state: () => personaState,
+	});
 	setPersonaContext(context);
-
-	$effect(() => {
-		context.variant = variant;
-	});
-
-	$effect(() => {
-		context.state = personaState;
-	});
 
 	let canvasRef: HTMLCanvasElement | undefined = $state();
 

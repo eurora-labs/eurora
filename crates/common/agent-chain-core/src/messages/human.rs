@@ -19,7 +19,6 @@ type JsonObjectTs = HashMap<String, Unknown>;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct HumanMessage {
-    #[serde(default)]
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,
@@ -135,7 +134,6 @@ impl HumanMessage {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct HumanMessageChunk {
-    #[serde(default)]
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,

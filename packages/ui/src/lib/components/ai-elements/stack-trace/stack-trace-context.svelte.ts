@@ -3,52 +3,40 @@ import { parseStackTrace, type ParsedStackTrace } from './parse-stack.js';
 
 const STACK_TRACE_CONTEXT_KEY = Symbol.for('ai-stack-trace');
 
+export type StackTraceClickHandler = (filePath: string, line?: number, column?: number) => void;
+
+export interface StackTraceStateOptions {
+	raw: () => string;
+	isOpen: () => boolean;
+	setOpen: (value: boolean) => void;
+	onFilePathClick?: () => StackTraceClickHandler | undefined;
+}
+
 export class StackTraceState {
-	#raw = $state('');
-	#trace = $state<ParsedStackTrace>({ errorType: null, errorMessage: '', frames: [], raw: '' });
-	#isOpen = $state(false);
-	#onFilePathClick: ((filePath: string, line?: number, column?: number) => void) | undefined;
+	readonly #opts: StackTraceStateOptions;
 
-	constructor(options: {
-		raw: string;
-		isOpen?: boolean;
-		onFilePathClick?: (filePath: string, line?: number, column?: number) => void;
-	}) {
-		this.#raw = options.raw;
-		this.#trace = parseStackTrace(options.raw);
-		this.#isOpen = options.isOpen ?? false;
-		this.#onFilePathClick = options.onFilePathClick;
+	constructor(opts: StackTraceStateOptions) {
+		this.#opts = opts;
 	}
 
-	get raw() {
-		return this.#raw;
+	get raw(): string {
+		return this.#opts.raw();
 	}
 
-	set raw(value: string) {
-		this.#raw = value;
-		this.#trace = parseStackTrace(value);
+	get trace(): ParsedStackTrace {
+		return parseStackTrace(this.raw);
 	}
 
-	get trace() {
-		return this.#trace;
+	get onFilePathClick(): StackTraceClickHandler | undefined {
+		return this.#opts.onFilePathClick?.();
 	}
 
-	get isOpen() {
-		return this.#isOpen;
+	get isOpen(): boolean {
+		return this.#opts.isOpen();
 	}
 
 	set isOpen(value: boolean) {
-		this.#isOpen = value;
-	}
-
-	get onFilePathClick() {
-		return this.#onFilePathClick;
-	}
-
-	set onFilePathClick(
-		value: ((filePath: string, line?: number, column?: number) => void) | undefined,
-	) {
-		this.#onFilePathClick = value;
+		this.#opts.setOpen(value);
 	}
 }
 
