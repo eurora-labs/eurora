@@ -1,0 +1,50 @@
+# Local development stack for Eurora.
+#
+# Brings up Postgres (and an optional one-shot seed container) so you can run
+# the backend natively via `just dev:backend` (which is `cargo run -p
+# be-monolith`). Running the backend on the host keeps the inner-loop fast
+# — no Docker image to rebuild on every code change.
+#
+# `just dev`         — start Postgres + run backend + start the desktop app
+# `just dev:reset`   — wipe the database volume and re-seed the dev user
+#
+# The seed loader at `scripts/seed/seed.sh` is idempotent (it TRUNCATEs first)
+# so it only runs when you opt in via `--profile seed` (driven by the
+# justfile recipes).
+
+services:
+    postgres:
+        image: postgres:16
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: eurora
+        ports:
+            - '${EURORA_POSTGRES_PORT:-5432}:5432'
+        volumes:
+            - eurora-pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U postgres -d eurora']
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+    # Idempotent dev-data seeder. `restart: no` and the explicit profile mean
+    # this only runs when you ask for it (`docker compose --profile seed up`).
+    seed:
+        image: postgres:16
+        profiles: ['seed']
+        depends_on:
+            postgres:
+                condition: service_healthy
+        environment:
+            REMOTE_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/eurora
+            EURORA_SEED_FORCE: '1'
+        volumes:
+            - ./scripts/seed:/seed:ro
+        entrypoint: ['/bin/bash', '/seed/seed.sh']
+        restart: 'no'
+
+volumes:
+    eurora-pgdata:

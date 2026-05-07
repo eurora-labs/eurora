@@ -1,6 +1,7 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type { LoginToken } from '$lib/bindings/bindings.js';
 import type { TaurpcService } from '$lib/bindings/taurpcService.js';
+import type { TelemetryService } from '$lib/services/telemetry-service.svelte.js';
 
 export class UserService {
 	authenticated = $state(false);
@@ -12,10 +13,12 @@ export class UserService {
 	readonly planLabel = $derived(this.role === 'Tier1' ? 'Pro' : 'Free');
 
 	private readonly taurpc: TaurpcService;
+	private readonly telemetry: TelemetryService;
 	private readonly unlisteners: Promise<() => void>[] = [];
 
-	constructor(taurpc: TaurpcService) {
+	constructor(taurpc: TaurpcService, telemetry: TelemetryService) {
 		this.taurpc = taurpc;
+		this.telemetry = telemetry;
 	}
 
 	private async fetchProfile() {
@@ -25,6 +28,11 @@ export class UserService {
 		this.displayName = claims.display_name ?? null;
 		this.role = claims.role;
 		this.emailVerified = claims.email_verified ?? false;
+		this.telemetry.identify({
+			email: this.email,
+			displayName: this.displayName,
+			role: this.role,
+		});
 	}
 
 	async init() {
@@ -42,12 +50,18 @@ export class UserService {
 					this.displayName = claims.display_name;
 					this.role = claims.role;
 					this.emailVerified = claims.email_verified ?? false;
+					this.telemetry.identify({
+						email: this.email,
+						displayName: this.displayName,
+						role: this.role,
+					});
 				} else {
 					this.authenticated = false;
 					this.emailVerified = false;
 					this.email = '';
 					this.displayName = null;
 					this.role = '';
+					this.telemetry.reset();
 				}
 			}),
 		);

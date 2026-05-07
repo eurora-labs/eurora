@@ -4,118 +4,107 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 
-	const ollamaPullCommand = 'ollama pull llama3.2';
-	const ollamaServeCommand = 'ollama serve';
+	const cloneCommand = 'git clone https://github.com/eurora-labs/eurora && cd eurora';
+	const justDevCommand = 'just bootstrap && $EDITOR .env && just dev';
 
-	const envFileContents = `# Required - set these to random strings (e.g. openssl rand -hex 32)
-JWT_ACCESS_SECRET=
-JWT_REFRESH_SECRET=
+	const envFileContents = `# LLM provider — the only value 'just dev' needs you to set.
+OPENAI_API_KEY=sk-...
+EURORA_CHAT_MODEL=gpt-4o-mini
 
-# Optional - uncomment and change as needed
-# OLLAMA_MODEL=llama3.2
-# EURORA_GRPC_PORT=39051
-# EURORA_POSTGRES_PORT=39432
-# EURORA_ASSET_DIR=~/.local/share/eurora/assets
-# APPROVED_EMAILS=*`;
+# Web frontend — Vite-exposed.
+VITE_API_URL=http://localhost:3000
 
-	const composeFile = `services:
-  postgres:
-    image: postgres:16
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: eurora
-    ports:
-      - '\${EURORA_POSTGRES_PORT:-39432}:5432'
-    volumes:
-      - eurora-pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
-      interval: 5s
-      timeout: 3s
-      retries: 5
+# Debug builds default REMOTE_DATABASE_URL to docker-compose's local
+# Postgres, JWT secrets to stable placeholders, CORS origins to
+# localhost+tauri://localhost, AUTH_COOKIE_SECURE to false, and asset
+# storage to ./assets — uncomment any of those in .env to override.
+# Release builds refuse to start without REMOTE_DATABASE_URL and the
+# JWT secrets.`;
 
-  backend:
-    image: ghcr.io/eurora-labs/eurora/be-monolith:latest
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - '\${EURORA_GRPC_PORT:-39051}:\${EURORA_GRPC_PORT:-39051}'
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    user: '\${EURORA_UID:-1000}:\${EURORA_GID:-1000}'
-    environment:
-      REMOTE_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/eurora
-      MONOLITH_ADDR: 0.0.0.0:\${EURORA_GRPC_PORT:-39051}
-      RUNNING_EURORA_FULLY_LOCAL: 'true'
-      OLLAMA_MODEL: \${OLLAMA_MODEL:-llama3.2}
-      OLLAMA_HOST: http://host.docker.internal:11434
-      JWT_ACCESS_SECRET: \${JWT_ACCESS_SECRET:-change-me-access}
-      JWT_REFRESH_SECRET: \${JWT_REFRESH_SECRET:-change-me-refresh}
-      ASSET_STORAGE_BACKEND: fs
-      ASSET_STORAGE_FS_ROOT: /data/assets
-      APPROVED_EMAILS: '\${APPROVED_EMAILS:-*}'
-    volumes:
-      - \${EURORA_ASSET_DIR:-~/.local/share/eurora/assets}:/data/assets
-
-volumes:
-  eurora-pgdata:`;
-
-	const startCommand = 'docker compose up -d';
-	const logsCommand = 'docker compose logs -f backend';
+	const ollamaEnvContents = `# Replace the OPENAI_API_KEY block with these four lines.
+EURORA_LLM_KIND=openai_compatible
+EURORA_LLM_BASE_URL=http://localhost:11434/v1
+EURORA_LLM_API_KEY=
+EURORA_CHAT_MODEL=llama3.2`;
 
 	const envVars = [
 		{
-			name: 'JWT_ACCESS_SECRET',
-			default: 'change-me-access',
-			description: 'Secret used to sign access tokens. Must be set to a long random string.',
+			name: 'OPENAI_API_KEY',
+			default: '—',
+			description:
+				'Required when EURORA_LLM_KIND is omitted or set to "openai". Drop this when pointing at an OpenAI-compatible server.',
 			required: true,
 		},
 		{
-			name: 'JWT_REFRESH_SECRET',
-			default: 'change-me-refresh',
-			description: 'Secret used to sign refresh tokens. Must be set to a long random string.',
+			name: 'EURORA_CHAT_MODEL',
+			default: '—',
+			description: 'Model used for chat (and title, unless EURORA_TITLE_MODEL overrides).',
 			required: true,
 		},
 		{
-			name: 'OLLAMA_MODEL',
-			default: 'llama3.2',
-			description: 'The Ollama model the backend will use for inference.',
-			required: false,
-		},
-		{
-			name: 'EURORA_GRPC_PORT',
-			default: '39051',
-			description: 'Port the backend listens on. Change if 39051 is already in use.',
-			required: false,
-		},
-		{
-			name: 'EURORA_POSTGRES_PORT',
-			default: '39432',
-			description: 'Host port for PostgreSQL. Only relevant if you need direct DB access.',
-			required: false,
-		},
-		{
-			name: 'EURORA_UID / EURORA_GID',
-			default: '1000',
+			name: 'EURORA_LLM_KIND',
+			default: 'openai',
 			description:
-				'User/group ID the backend container runs as. Match your host user to avoid file-permission issues.',
+				'Either "openai" (default) or "openai_compatible". Other kinds are not yet wired.',
 			required: false,
 		},
 		{
-			name: 'EURORA_ASSET_DIR',
-			default: '~/.local/share/eurora/assets',
-			description: 'Host directory where uploaded assets are stored.',
+			name: 'EURORA_LLM_BASE_URL',
+			default: '—',
+			description: 'Required for "openai_compatible". Optional override for "openai".',
 			required: false,
 		},
 		{
-			name: 'APPROVED_EMAILS',
-			default: '*',
+			name: 'EURORA_LLM_API_KEY',
+			default: '—',
+			description: 'API key for "openai_compatible" servers that require one.',
+			required: false,
+		},
+		{
+			name: 'EURORA_TITLE_MODEL',
+			default: 'EURORA_CHAT_MODEL',
+			description: 'Model used for thread title generation.',
+			required: false,
+		},
+		{
+			name: 'EURORA_VISION_MODEL',
+			default: '—',
+			description: 'When set, image-bearing messages are routed to this model.',
+			required: false,
+		},
+		{
+			name: 'VITE_API_URL',
+			default: 'http://localhost:3000',
 			description:
-				'Comma-separated list of email addresses allowed to sign up. Use * to allow everyone.',
+				'Backend URL the SvelteKit web app talks to. Vite exposes this to client code at build time.',
+			required: true,
+		},
+		{
+			name: 'JWT_ACCESS_SECRET / JWT_REFRESH_SECRET',
+			default: 'dev placeholder (debug builds only)',
+			description:
+				'Random strings used to sign JWTs. Generate with `openssl rand -hex 32`. Required in release builds.',
+			required: true,
+		},
+		{
+			name: 'REMOTE_DATABASE_URL',
+			default: 'docker-compose Postgres (debug builds only)',
+			description:
+				'PostgreSQL connection string. Required in release builds; debug builds fall back to the local docker-compose Postgres.',
+			required: true,
+		},
+		{
+			name: 'EURORA_API_BASE_URL',
+			default: '—',
+			description:
+				'Desktop/mobile escape hatch: forces the app to talk to this URL on a single run, ignoring the persisted connection-mode setting.',
+			required: false,
+		},
+		{
+			name: 'EURORA_AUTH_SERVICE_URL',
+			default: 'https://www.eurora-labs.com',
+			description:
+				'Where the OAuth/login page is served. Set to http://localhost:5173 in dev so the desktop app uses the local SvelteKit auth UI.',
 			required: false,
 		},
 	];
@@ -125,15 +114,17 @@ volumes:
 	<title>Self-Hosting - Eurora Labs</title>
 	<meta
 		name="description"
-		content="Self-host Eurora with Docker Compose and Ollama. Run AI locally with full control over your data. Step-by-step guide with environment variable reference."
+		content="Self-host Eurora locally with one command. The desktop app talks to the backend over HTTP — point it at OpenAI, an OpenAI-compatible local server, or your own deployment."
 	/>
 </svelte:head>
 
 <div>
 	<h1 class="mb-4 text-4xl font-bold">Self-Hosting</h1>
 	<p class="mb-12 text-lg text-muted-foreground">
-		Run the Eurora backend on your own machine using Docker Compose. This gives you full control
-		over your data and lets you use local models via Ollama.
+		Run the Eurora backend on your own machine. The fastest path is the bundled
+		<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">just dev</code>
+		recipe — it spins up Postgres, seeds a development user, and runs the backend natively against
+		an LLM provider you choose.
 	</p>
 
 	<div class="flex flex-col gap-12">
@@ -141,7 +132,8 @@ volumes:
 			<h2 class="mb-2 text-2xl font-semibold">Prerequisites</h2>
 			<ul class="list-disc space-y-2 pl-5 text-muted-foreground">
 				<li>
-					<strong>Docker &amp; Docker Compose</strong> - follow the
+					<strong>Docker &amp; Docker Compose</strong> — used to run Postgres and the seed
+					container. Follow the
 					<a
 						href="https://docs.docker.com/get-docker/"
 						target="_blank"
@@ -149,73 +141,89 @@ volumes:
 						class="text-primary underline underline-offset-4 hover:text-primary/80"
 					>
 						official installation guide</a
-					>. Docker Desktop includes Compose by default.
+					>.
 				</li>
 				<li>
-					<strong>Ollama</strong> - install from
+					<strong>Rust</strong> — the backend runs natively on your host for fast
+					iteration. Install via
 					<a
-						href="https://ollama.com"
+						href="https://rustup.rs"
 						target="_blank"
 						rel="noopener noreferrer"
 						class="text-primary underline underline-offset-4 hover:text-primary/80"
-					>
-						ollama.com</a
-					>, then pull a model and make sure Ollama is running:
-					<div class="mt-3 flex flex-col gap-2">
-						<CodeBlock.Root code={ollamaPullCommand} language="shellscript">
-							<CodeBlock.Header>
-								<CodeBlock.Actions class="ml-auto">
-									<CodeBlock.CopyButton />
-								</CodeBlock.Actions>
-							</CodeBlock.Header>
-						</CodeBlock.Root>
-						<CodeBlock.Root code={ollamaServeCommand} language="shellscript">
-							<CodeBlock.Header>
-								<CodeBlock.Actions class="ml-auto">
-									<CodeBlock.CopyButton />
-								</CodeBlock.Actions>
-							</CodeBlock.Header>
-						</CodeBlock.Root>
-					</div>
-					<p class="mt-2 text-sm">
-						You can use any model Ollama supports - just set
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>OLLAMA_MODEL</code
-						>
-						in your
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code>
-						file to match. If Ollama is already running in the background, you can skip
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>ollama serve</code
-						>.
-					</p>
+						>rustup</a
+					>.
+				</li>
+				<li>
+					<strong>pnpm</strong> — used by the web and desktop frontends. The easiest path
+					is
+					<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+						>corepack enable</code
+					>; alternatives are listed at
+					<a
+						href="https://pnpm.io/installation"
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-primary underline underline-offset-4 hover:text-primary/80"
+						>pnpm.io</a
+					>.
+				</li>
+				<li>
+					<strong>just</strong> — the task runner that orchestrates the local stack.
+					Install with
+					<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+						>cargo install just</code
+					>.
 				</li>
 			</ul>
 		</section>
 
 		<section>
-			<h2 class="mb-2 text-2xl font-semibold">1. Create a project directory</h2>
-			<p class="mb-3 text-muted-foreground">
-				Create a new directory for your Eurora self-hosted setup. All files from the
-				following steps go in this directory.
-			</p>
-			<CodeBlock.Root
-				code="mkdir eurora-selfhosted && cd eurora-selfhosted"
-				language="shellscript"
-			>
+			<h2 class="mb-2 text-2xl font-semibold">Quickstart</h2>
+			<p class="mb-3 text-muted-foreground">Clone the repo and run the dev recipe:</p>
+			<CodeBlock.Root code={cloneCommand} language="shellscript">
 				<CodeBlock.Header>
 					<CodeBlock.Actions class="ml-auto">
 						<CodeBlock.CopyButton />
 					</CodeBlock.Actions>
 				</CodeBlock.Header>
 			</CodeBlock.Root>
+			<div class="mt-3">
+				<CodeBlock.Root code={justDevCommand} language="shellscript">
+					<CodeBlock.Header>
+						<CodeBlock.Actions class="ml-auto">
+							<CodeBlock.CopyButton />
+						</CodeBlock.Actions>
+					</CodeBlock.Header>
+				</CodeBlock.Root>
+			</div>
+			<p class="mt-3 text-sm text-muted-foreground">
+				That's it. <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+					>just bootstrap</code
+				>
+				copies
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env.example</code>
+				to
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> and runs
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">pnpm install</code>;
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">just dev</code>
+				brings up Postgres, seeds a
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">dev@dev.com</code>
+				user (password
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">dev</code>), and runs
+				the backend, the web auth UI, and the desktop app. The single
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> at the repo
+				root is the contract — every consumer (backend, Vite for web/desktop, mobile build) reads
+				from there.
+			</p>
 		</section>
 
 		<section>
-			<h2 class="mb-2 text-2xl font-semibold">2. Create a .env file</h2>
+			<h2 class="mb-2 text-2xl font-semibold">.env reference</h2>
 			<p class="mb-3 text-muted-foreground">
-				Create a <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code>
-				file next to your compose file. At minimum, set the two JWT secrets to random values.
+				The only value you need to fill in for the default flow is
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">OPENAI_API_KEY</code
+				>:
 			</p>
 			<CodeBlock.Root code={envFileContents} language="bash">
 				<CodeBlock.Header>
@@ -229,78 +237,82 @@ volumes:
 				<TriangleAlertIcon />
 				<AlertDescription>
 					<p>
-						The JWT secrets <strong>must</strong> be set before starting the services. Leaving
-						them at their defaults is insecure, even for local use.
+						Debug builds fall back to placeholder JWT secrets so a fresh checkout runs
+						without setup. Release builds refuse to start without explicit
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>JWT_ACCESS_SECRET</code
+						>
+						and
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>JWT_REFRESH_SECRET</code
+						>
+						values — for any deployment reachable from outside your machine, set them to long
+						random strings (e.g.
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>openssl rand -hex 32</code
+						>).
 					</p>
 				</AlertDescription>
 			</Alert>
 		</section>
 
 		<section>
-			<h2 class="mb-2 text-2xl font-semibold">3. Create docker-compose.yml</h2>
+			<h2 class="mb-2 text-2xl font-semibold">Pointing at a local model</h2>
 			<p class="mb-3 text-muted-foreground">
-				Create a
-				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-					>docker-compose.yml</code
-				>
-				file with the following contents. Docker Compose will automatically read variables from
-				your <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> file.
+				To run with a local OpenAI-compatible server like Ollama, LM Studio, or vLLM, swap
+				the OpenAI block in your
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> for:
 			</p>
-			<CodeBlock.Root code={composeFile} language="yaml">
+			<CodeBlock.Root code={ollamaEnvContents} language="bash">
 				<CodeBlock.Header>
-					<CodeBlock.Filename>docker-compose.yml</CodeBlock.Filename>
+					<CodeBlock.Filename>.env (Ollama)</CodeBlock.Filename>
 					<CodeBlock.Actions>
 						<CodeBlock.CopyButton />
 					</CodeBlock.Actions>
 				</CodeBlock.Header>
 			</CodeBlock.Root>
-		</section>
-
-		<section>
-			<h2 class="mb-2 text-2xl font-semibold">4. Start the services</h2>
-			<p class="mb-3 text-muted-foreground">
-				Make sure Ollama is running, then start the containers. Docker will pull the images
-				automatically on the first run.
-			</p>
-			<CodeBlock.Root code={startCommand} language="shellscript">
-				<CodeBlock.Header>
-					<CodeBlock.Actions class="ml-auto">
-						<CodeBlock.CopyButton />
-					</CodeBlock.Actions>
-				</CodeBlock.Header>
-			</CodeBlock.Root>
-			<p class="mt-3 mb-3 text-muted-foreground">
-				To verify everything started correctly, check the logs:
-			</p>
-			<CodeBlock.Root code={logsCommand} language="shellscript">
-				<CodeBlock.Header>
-					<CodeBlock.Actions class="ml-auto">
-						<CodeBlock.CopyButton />
-					</CodeBlock.Actions>
-				</CodeBlock.Header>
-			</CodeBlock.Root>
-		</section>
-
-		<section>
-			<h2 class="mb-2 text-2xl font-semibold">5. Connect the desktop app</h2>
-			<p class="mb-3 text-muted-foreground">
-				Open the Eurora desktop app and go to <strong>Settings &rarr; API Settings</strong>.
-				Select <strong>Ollama</strong> as the provider, set the endpoint to
+			<p class="mt-3 text-sm text-muted-foreground">
+				Ollama serves an OpenAI-compatible API at
 				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-					>http://localhost:39051</code
+					>http://localhost:11434/v1</code
 				>
-				(or your custom
-				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-					>EURORA_GRPC_PORT</code
-				>), and click <strong>Connect</strong>.
+				when you run
+				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">ollama serve</code>.
+				The same env-var shape works for any other OpenAI-compatible endpoint.
 			</p>
-			<Alert>
+		</section>
+
+		<section>
+			<h2 class="mb-2 text-2xl font-semibold">Connect the desktop app</h2>
+			<p class="mb-3 text-muted-foreground">
+				The desktop app picks its backend in <strong>Settings &rarr; Connection</strong>:
+			</p>
+			<ul class="list-disc space-y-2 pl-5 text-muted-foreground">
+				<li>
+					<strong>Eurora Cloud</strong> — the hosted backend at api.eurora-labs.com.
+				</li>
+				<li>
+					<strong>Local</strong> — what
+					<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">just dev</code>
+					brings up at
+					<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+						>http://localhost:3000</code
+					>.
+				</li>
+				<li>
+					<strong>Custom</strong> — any URL you self-host at.
+				</li>
+			</ul>
+			<Alert class="mt-3">
 				<InfoIcon />
 				<AlertDescription>
 					<p>
-						If you see "Run Locally" on the onboarding screen, that link brings you to
-						this guide. After Docker is running, configure the connection in
-						<strong>Settings &rarr; API Settings</strong>.
+						The "Test connection" button hits
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>/llm/info</code
+						>
+						on the chosen URL and surfaces the active model in a toast — useful for confirming
+						you're talking to the right backend before saving.
 					</p>
 				</AlertDescription>
 			</Alert>
@@ -309,9 +321,9 @@ volumes:
 		<section>
 			<h2 class="mb-4 text-2xl font-semibold">Environment variable reference</h2>
 			<p class="mb-3 text-muted-foreground">
-				All variables are set in your
-				<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> file. Docker
-				Compose substitutes them into the compose file automatically.
+				Set these in your <code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+					>.env</code
+				> file.
 			</p>
 			<div class="overflow-x-auto rounded-lg border">
 				<table class="w-full text-sm">
@@ -339,7 +351,7 @@ volumes:
 				</table>
 			</div>
 			<p class="mt-2 text-xs text-muted-foreground">
-				<span class="text-destructive">*</span> Required - must be explicitly set.
+				<span class="text-destructive">*</span> Required for production deployments.
 			</p>
 		</section>
 
@@ -347,47 +359,42 @@ volumes:
 			<h2 class="mb-4 text-2xl font-semibold">Troubleshooting</h2>
 			<div class="flex flex-col gap-4">
 				<div>
-					<h3 class="mb-1 font-medium">Backend can't reach Ollama</h3>
+					<h3 class="mb-1 font-medium">
+						Backend exits with "LLM configuration is invalid"
+					</h3>
 					<p class="text-sm text-muted-foreground">
-						The backend connects to Ollama via
+						The backend reads its provider config from environment variables at startup.
+						The most common cause is forgetting
 						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>host.docker.internal:11434</code
-						>. Make sure Ollama is running on your host machine before starting the
-						containers. On Linux, if
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>host.docker.internal</code
-						>
-						doesn't resolve, ensure you're using Docker 20.10+ which supports the
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>host-gateway</code
-						> extra host.
-					</p>
-				</div>
-				<div>
-					<h3 class="mb-1 font-medium">Permission denied on asset directory</h3>
-					<p class="text-sm text-muted-foreground">
-						The container runs as
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>EURORA_UID:EURORA_GID</code
-						>
-						(default 1000:1000). Make sure the asset directory on the host is owned by the
-						same user, or adjust the UID/GID in your
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> file.
-					</p>
-				</div>
-				<div>
-					<h3 class="mb-1 font-medium">Port already in use</h3>
-					<p class="text-sm text-muted-foreground">
-						If port 39051 or 39432 conflicts with another service, change
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
-							>EURORA_GRPC_PORT</code
+							>OPENAI_API_KEY</code
 						>
 						or
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>EURORA_CHAT_MODEL</code
+						>. The error message names the missing variable.
+					</p>
+				</div>
+				<div>
+					<h3 class="mb-1 font-medium">Postgres port already in use</h3>
+					<p class="text-sm text-muted-foreground">
+						If port 5432 conflicts with another service, set
 						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
 							>EURORA_POSTGRES_PORT</code
 						>
 						in your
-						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> file.
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm">.env</code> to
+						a free port.
+					</p>
+				</div>
+				<div>
+					<h3 class="mb-1 font-medium">Test connection fails with HTTP 4xx</h3>
+					<p class="text-sm text-muted-foreground">
+						The connection picker probes
+						<code class="rounded bg-muted px-1.5 py-0.5 font-mono text-sm"
+							>/llm/info</code
+						> on the chosen URL. A 4xx response usually means the URL points at something
+						other than an Eurora backend (a reverse proxy without the route configured, an
+						old version, etc.).
 					</p>
 				</div>
 			</div>

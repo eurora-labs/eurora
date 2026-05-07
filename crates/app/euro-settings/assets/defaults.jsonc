@@ -3,17 +3,21 @@
         "autostart": true
     },
     "telemetry": {
-        "considered": true, // For now we collect no telemetry, so the user does not have to opt-in
+        // Bumped to re-prompt every install for an updated consent. See
+        // CURRENT_CONSENT_VERSION in euro-settings.
+        "consentVersion": 0,
         "anonymousMetrics": true,
         "anonymousErrors": true,
         "nonAnonymousMetrics": false,
         "distinctId": null
     },
-    "api": {
-        "endpoint": "https://api.eurora-labs.com"
-    },
+    // `api` is intentionally absent: APISettings::default() picks Cloud on
+    // release builds and Local on debug builds. Setting a literal here would
+    // override the build-profile default for fresh installs.
     "appearance": {
         "theme": "system",
-        "dynamicAccent": true
+        "dynamicAccent": true,
+        "interfaceScale": 1.0,
+        "textScale": 1.0
     }
 }

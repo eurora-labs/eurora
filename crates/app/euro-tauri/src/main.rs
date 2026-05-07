@@ -3,7 +3,7 @@
     windows_subsystem = "windows"
 )]
 
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
 use euro_tauri::procedures::timeline_procedures::{AccentColor, TimelineAppEvent};
@@ -16,7 +16,6 @@ use euro_tauri::{
         context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
         monitor_procedures::{MonitorApi, MonitorApiImpl},
         payment_procedures::{PaymentApi, PaymentApiImpl},
-        prompt_procedures::{PromptApi, PromptApiImpl},
         settings_procedures::{SettingsApi, SettingsApiImpl},
         system_procedures::{SystemApi, SystemApiImpl},
         third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
@@ -24,7 +23,7 @@ use euro_tauri::{
         timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
     },
     shared_types::{ActiveStreamTokens, SharedThreadManager},
-    show_and_focus_main,
+    show_and_focus_main, telemetry,
 };
 use euro_timeline::TimelineManager;
 use tauri::{
@@ -544,7 +543,6 @@ fn build_router() -> Router<tauri::Wry> {
         .merge(MonitorApiImpl.into_handler())
         .merge(SystemApiImpl.into_handler())
         .merge(ContextChipApiImpl.into_handler())
-        .merge(PromptApiImpl.into_handler())
         .merge(PaymentApiImpl.into_handler())
         .merge(ChatApiImpl.into_handler())
 }
@@ -576,6 +574,13 @@ fn main() {
 
     install_default_crypto_provider();
 
+    // Initialize Sentry as early as possible so panics during the rest
+    // of startup are still captured. The controller is then handed to
+    // the Tauri app state so the `system.reinit_telemetry` procedure
+    // can swap the underlying client when consent changes at runtime.
+    let early_settings = AppSettings::peek_from_default_path();
+    let telemetry_controller = std::sync::Arc::new(telemetry::init(&early_settings.telemetry));
+
     #[cfg(debug_assertions)]
     {
         use keyring::{mock, set_default_credential_builder};
@@ -593,6 +598,7 @@ fn main() {
         .block_on(async {
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
+            let telemetry_controller = telemetry_controller.clone();
             let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_clipboard_manager::init())
@@ -627,16 +633,21 @@ fn main() {
                         std::env::args().any(|arg| arg == "--startup-launch");
 
                     let app_settings = AppSettings::load_from_default_path_creating()?;
-                    let endpoint_url = &app_settings.api.endpoint;
-                    let endpoint_manager = if endpoint_url.is_empty() {
-                        EndpointManager::from_env()
-                    } else {
-                        EndpointManager::new(endpoint_url)
-                    }?;
-                    let endpoint_manager = std::sync::Arc::new(endpoint_manager);
+                    // The persisted ConnectionMode always resolves to a
+                    // non-empty URL, so we never need the env-fallback path.
+                    let endpoint_url = app_settings.api.endpoint();
+                    let endpoint_manager = std::sync::Arc::new(EndpointManager::new(endpoint_url)?);
+
+                    // Reconcile the early-Sentry guard against the
+                    // settings we just authoritatively loaded from disk.
+                    // The `peek` may have observed a missing or unreadable
+                    // file; this call ensures the runtime telemetry state
+                    // matches what's persisted before the app comes up.
+                    telemetry_controller.reapply(&app_settings.telemetry);
 
                     tauri_app.manage(endpoint_manager.clone());
                     tauri_app.manage(Mutex::new(app_settings.clone()));
+                    tauri_app.manage(telemetry_controller.clone());
                     tauri_app.manage(WindowState::default());
 
                     register_autostart(tauri_app, &app_settings);

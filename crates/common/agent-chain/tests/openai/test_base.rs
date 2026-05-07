@@ -14,7 +14,7 @@ const MAX_TOKEN_COUNT: u32 = 100;
 
 /// Load .env file from project root (if present).
 fn load_env() {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 }
 
 /// Ported from `test_chat_openai`.

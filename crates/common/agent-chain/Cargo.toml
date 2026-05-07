@@ -33,7 +33,7 @@ tracing = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-dotenv = { workspace = true }
+dotenvy = { workspace = true }
 
 [features]
 default = []

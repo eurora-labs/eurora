@@ -4,7 +4,7 @@ use agent_chain_core::embeddings::Embeddings;
 const DEFAULT_MODEL: &str = "llama3.1";
 
 fn load_env() {
-    let _ = dotenv::dotenv();
+    let _ = dotenvy::dotenv();
 }
 
 // =============================================================================

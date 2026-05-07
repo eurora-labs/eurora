@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use euro_settings::{
     APISettings, AppSettings, AppearanceSettings, GeneralSettings, TelemetrySettings,
 };
@@ -5,6 +7,7 @@ use tauri::{Manager, Runtime};
 
 use crate::error::ResultExt;
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager};
+use crate::telemetry;
 
 #[taurpc::procedures(path = "settings")]
 pub trait SettingsApi {
@@ -108,11 +111,27 @@ impl SettingsApi for SettingsApiImpl {
         let mut settings = state.lock().await;
 
         settings.telemetry = telemetry_settings;
+        // Any save through this procedure is by definition a recorded
+        // consent at the current schema version. Stamping it here
+        // (rather than trusting the frontend) prevents an old client
+        // from accidentally pinning the user at a stale version.
+        settings.telemetry.record_consent();
+        // Allocate a stable id alongside the first consent so that
+        // an exit between this call and the next save doesn't drop
+        // the id.
+        settings.telemetry.ensure_distinct_id();
         settings
             .save_to_default_path()
             .ctx("Failed to persist telemetry settings")?;
 
-        Ok(settings.telemetry.clone())
+        let new_telemetry = settings.telemetry.clone();
+        drop(settings);
+
+        if let Some(controller) = app_handle.try_state::<Arc<telemetry::Controller>>() {
+            controller.reapply(&new_telemetry);
+        }
+
+        Ok(new_telemetry)
     }
 
     async fn get_api_settings<R: Runtime>(
@@ -133,19 +152,20 @@ impl SettingsApi for SettingsApiImpl {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
 
-        let new_endpoint = api_settings.endpoint.clone();
         settings.api = api_settings;
 
         settings
             .save_to_default_path()
             .ctx("Failed to persist api settings")?;
 
-        if !new_endpoint.is_empty() {
-            let endpoint_manager = app_handle.state::<SharedEndpointManager>();
-            endpoint_manager
-                .set_global_backend_url(&new_endpoint)
-                .ctx("Failed to switch API endpoint")?;
-        }
+        // Translate the persisted connection mode into a concrete URL and
+        // hand it to the shared endpoint manager so in-flight requests pick
+        // up the change without a restart.
+        let endpoint = settings.api.endpoint().to_string();
+        let endpoint_manager = app_handle.state::<SharedEndpointManager>();
+        endpoint_manager
+            .set_global_backend_url(&endpoint)
+            .ctx("Failed to switch API endpoint")?;
 
         Ok(settings.api.clone())
     }
@@ -167,6 +187,13 @@ impl SettingsApi for SettingsApiImpl {
     ) -> Result<AppearanceSettings, String> {
         let state = app_handle.state::<SharedAppSettings>();
         let mut settings = state.lock().await;
+
+        // Clamp scales and reject NaN/inf at the API boundary so a buggy
+        // client or hand-edited config can't push the UI into an unusable
+        // state. The frontend already constrains its sliders, so this is a
+        // defensive backstop, not the primary validation path.
+        let mut appearance_settings = appearance_settings;
+        appearance_settings.sanitize();
 
         settings.appearance = appearance_settings;
         settings

@@ -31,13 +31,37 @@ pub struct JwtConfig {
     pub approved_emails: HashSet<String>,
 }
 
-impl Default for JwtConfig {
-    fn default() -> Self {
-        let access_secret = std::env::var("JWT_ACCESS_SECRET")
-            .expect("JWT_ACCESS_SECRET must be set at runtime for secure token validation");
-        let refresh_secret = std::env::var("JWT_REFRESH_SECRET")
-            .expect("JWT_REFRESH_SECRET must be set at runtime for secure token validation");
+/// Failure modes when reading JWT configuration from the environment.
+///
+/// Carries the variable name so callers (e.g. `be-monolith`'s startup
+/// error printer) can produce remediation messages without re-deriving
+/// which secret was missing.
+#[derive(Debug, thiserror::Error)]
+pub enum JwtConfigError {
+    #[error("JWT signing secret `{name}` is unset or empty")]
+    MissingSecret { name: &'static str },
+}
 
+impl JwtConfig {
+    /// Build [`JwtConfig`] strictly from environment variables.
+    ///
+    /// Returns [`JwtConfigError::MissingSecret`] if either
+    /// `JWT_ACCESS_SECRET` or `JWT_REFRESH_SECRET` is unset or blank.
+    /// Callers that want a debug-build placeholder should layer that
+    /// policy on top of this constructor — the goal here is to keep the
+    /// secret-loading path obvious in code, not bury the fallback behind
+    /// a convenience trait.
+    pub fn try_from_env() -> std::result::Result<Self, JwtConfigError> {
+        let access_secret = require_secret("JWT_ACCESS_SECRET")?;
+        let refresh_secret = require_secret("JWT_REFRESH_SECRET")?;
+        Ok(Self::from_secrets(&access_secret, &refresh_secret))
+    }
+
+    /// Construct a [`JwtConfig`] from explicit secrets. Used both by
+    /// [`try_from_env`](Self::try_from_env) and by callers that source
+    /// the secrets from elsewhere (e.g. a debug-build fallback to stable
+    /// placeholders).
+    pub fn from_secrets(access_secret: &str, refresh_secret: &str) -> Self {
         Self {
             access_token_encoding_key: EncodingKey::from_secret(access_secret.as_bytes()),
             access_token_decoding_key: DecodingKey::from_secret(access_secret.as_bytes()),
@@ -61,6 +85,13 @@ impl Default for JwtConfig {
                 .filter(|s| !s.is_empty())
                 .collect(),
         }
+    }
+}
+
+fn require_secret(name: &'static str) -> std::result::Result<String, JwtConfigError> {
+    match std::env::var(name) {
+        Ok(v) if !v.is_empty() => Ok(v),
+        _ => Err(JwtConfigError::MissingSecret { name }),
     }
 }
 

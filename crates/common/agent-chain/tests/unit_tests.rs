@@ -2,6 +2,8 @@
 //!
 //! Ported from `langchain/libs/partners/openai/tests/unit_tests/chat_models/test_base.py`
 
+#![cfg(feature = "openai")]
+
 use agent_chain::providers::openai::ChatOpenAI;
 use agent_chain_core::language_models::BaseLanguageModel;
 use agent_chain_core::messages::{

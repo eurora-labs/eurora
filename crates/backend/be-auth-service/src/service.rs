@@ -91,9 +91,6 @@ pub struct AuthService {
     email_service: Option<Arc<EmailService>>,
     google_oauth_client: Option<GoogleOAuthClient>,
     github_oauth_client: Option<GitHubOAuthClient>,
-    /// `RUNNING_EURORA_FULLY_LOCAL=true`. Cached at startup so the role
-    /// resolver doesn't read env vars on every request.
-    local_mode: bool,
 }
 
 #[derive(Default)]
@@ -109,17 +106,12 @@ impl AuthService {
         email_service: Option<Arc<EmailService>>,
         oauth_clients: AuthServiceConfig,
     ) -> Self {
-        let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
-            .map(|v| v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
-
         Self {
             db,
             jwt_config,
             email_service,
             google_oauth_client: oauth_clients.google,
             github_oauth_client: oauth_clients.github,
-            local_mode,
         }
     }
 
@@ -135,8 +127,11 @@ impl AuthService {
         self.email_service.as_ref()
     }
 
-    pub(crate) fn local_mode(&self) -> bool {
-        self.local_mode
+    /// Dev mode is tied to the build profile: debug builds skip
+    /// payment/email/update wiring, release builds do not. There is no
+    /// runtime override.
+    pub(crate) fn dev_mode(&self) -> bool {
+        cfg!(debug_assertions)
     }
 
     pub(crate) fn google_oauth(&self) -> AuthResult<&GoogleOAuthClient> {

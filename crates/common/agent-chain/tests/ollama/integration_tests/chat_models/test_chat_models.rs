@@ -7,7 +7,7 @@ use futures::StreamExt;
 const DEFAULT_MODEL: &str = "llama3.1";
 const REASONING_MODEL: &str = "gpt-oss:20b";
 fn load_env() {
-    let _ = dotenv::dotenv();
+    let _ = dotenvy::dotenv();
 }
 
 // =============================================================================
