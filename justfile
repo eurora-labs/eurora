@@ -47,8 +47,18 @@ dev: doctor
     just dev-seed-if-empty
     pnpm exec concurrently --kill-others --names backend,web,desktop --prefix-colors cyan,green,yellow \
         "cargo watch -x 'run -p be-monolith'" \
-        "pnpm dev:web" \
-        "pnpm dev:desktop"
+        "just _wait-for-backend && pnpm dev:web" \
+        "just _wait-for-backend && pnpm dev:desktop"
+
+# Block until the backend's /health endpoint responds, with a 120s ceiling
+# to cover a slow first-time debug compile. Used by `dev` to delay web /
+# desktop startup until the backend has bound its port — without this, the
+# Vite dev server tries to call /llm/info before the backend exists and
+# the desktop app surfaces a connection error on boot.
+_wait-for-backend:
+    @timeout 120 bash -c 'until curl -fsS http://localhost:3000/health >/dev/null 2>&1; do sleep 0.5; done' \
+        && echo "Backend is ready." \
+        || (echo "Backend did not become ready within 120s." >&2; exit 1)
 
 # First-run setup: copy .env.example to .env and install JS deps.
 # Idempotent — safe to run again any time.
