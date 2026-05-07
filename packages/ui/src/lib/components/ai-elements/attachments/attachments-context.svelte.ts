@@ -53,49 +53,70 @@ export function getAttachmentLabel(data: AttachmentData): string {
 	return data.filename || (category === 'image' ? 'Image' : 'Attachment');
 }
 
-class AttachmentsState {
-	variant = $state<AttachmentVariant>('grid');
+export interface AttachmentsStateOptions {
+	variant: () => AttachmentVariant;
+}
 
-	constructor(variant: AttachmentVariant) {
-		this.variant = variant;
+class AttachmentsState {
+	readonly #opts: AttachmentsStateOptions;
+
+	constructor(opts: AttachmentsStateOptions) {
+		this.#opts = opts;
+	}
+
+	get variant(): AttachmentVariant {
+		return this.#opts.variant();
 	}
 }
 
-class AttachmentItemState {
-	data = $state<AttachmentData>({} as AttachmentData);
-	mediaCategory = $state<AttachmentMediaCategory>('unknown');
-	onRemove = $state<(() => void) | undefined>(undefined);
-	variant = $state<AttachmentVariant>('grid');
+export interface AttachmentItemStateOptions {
+	data: () => AttachmentData;
+	variant: () => AttachmentVariant;
+	onRemove?: () => (() => void) | undefined;
+}
 
-	constructor(data: AttachmentData, variant: AttachmentVariant, onRemove?: () => void) {
-		this.data = data;
-		this.mediaCategory = getMediaCategory(data);
-		this.onRemove = onRemove;
-		this.variant = variant;
+class AttachmentItemState {
+	readonly #opts: AttachmentItemStateOptions;
+
+	constructor(opts: AttachmentItemStateOptions) {
+		this.#opts = opts;
+	}
+
+	get data(): AttachmentData {
+		return this.#opts.data();
+	}
+
+	get variant(): AttachmentVariant {
+		return this.#opts.variant();
+	}
+
+	get onRemove(): (() => void) | undefined {
+		return this.#opts.onRemove?.();
+	}
+
+	get mediaCategory(): AttachmentMediaCategory {
+		return getMediaCategory(this.data);
 	}
 }
 
 const ATTACHMENTS_KEY = 'ai-attachments';
 const ATTACHMENT_ITEM_KEY = 'ai-attachment-item';
 
-export function setAttachmentsContext(variant: AttachmentVariant): AttachmentsState {
-	const state = new AttachmentsState(variant);
+export function setAttachmentsContext(opts: AttachmentsStateOptions): AttachmentsState {
+	const state = new AttachmentsState(opts);
 	setContext(Symbol.for(ATTACHMENTS_KEY), state);
 	return state;
 }
 
 export function getAttachmentsContext(): AttachmentsState {
 	return (
-		getContext<AttachmentsState>(Symbol.for(ATTACHMENTS_KEY)) ?? new AttachmentsState('grid')
+		getContext<AttachmentsState>(Symbol.for(ATTACHMENTS_KEY)) ??
+		new AttachmentsState({ variant: () => 'grid' })
 	);
 }
 
-export function setAttachmentItemContext(
-	data: AttachmentData,
-	variant: AttachmentVariant,
-	onRemove?: () => void,
-): AttachmentItemState {
-	const state = new AttachmentItemState(data, variant, onRemove);
+export function setAttachmentItemContext(opts: AttachmentItemStateOptions): AttachmentItemState {
+	const state = new AttachmentItemState(opts);
 	setContext(Symbol.for(ATTACHMENT_ITEM_KEY), state);
 	return state;
 }

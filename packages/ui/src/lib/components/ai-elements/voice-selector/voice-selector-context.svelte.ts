@@ -2,42 +2,34 @@ import { getContext, setContext } from 'svelte';
 
 const VOICE_SELECTOR_CONTEXT_KEY = Symbol.for('voice-selector-context');
 
-export class VoiceSelectorContext {
-	#value = $state<string | undefined>(undefined);
-	#open = $state(false);
-	#onValueChange: ((value: string | undefined) => void) | undefined;
-	#onOpenChange: ((open: boolean) => void) | undefined;
+export interface VoiceSelectorContextOptions {
+	value: () => string | undefined;
+	setValue: (value: string | undefined) => void;
+	open: () => boolean;
+	setOpen: (open: boolean) => void;
+}
 
-	constructor(
-		options: {
-			value?: string;
-			open?: boolean;
-			onValueChange?: (value: string | undefined) => void;
-			onOpenChange?: (open: boolean) => void;
-		} = {},
-	) {
-		this.#value = options.value;
-		this.#open = options.open ?? false;
-		this.#onValueChange = options.onValueChange;
-		this.#onOpenChange = options.onOpenChange;
+export class VoiceSelectorContext {
+	readonly #opts: VoiceSelectorContextOptions;
+
+	constructor(opts: VoiceSelectorContextOptions) {
+		this.#opts = opts;
 	}
 
-	get value() {
-		return this.#value;
+	get value(): string | undefined {
+		return this.#opts.value();
 	}
 
 	set value(val: string | undefined) {
-		this.#value = val;
-		this.#onValueChange?.(val);
+		this.#opts.setValue(val);
 	}
 
-	get open() {
-		return this.#open;
+	get open(): boolean {
+		return this.#opts.open();
 	}
 
 	set open(val: boolean) {
-		this.#open = val;
-		this.#onOpenChange?.(val);
+		this.#opts.setOpen(val);
 	}
 }
 

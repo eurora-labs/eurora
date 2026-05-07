@@ -131,7 +131,6 @@ impl UsageMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AIMessage {
-    #[serde(default)]
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,
@@ -397,7 +396,6 @@ pub enum ChunkPosition {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AIMessageChunk {
-    #[serde(default)]
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,
@@ -407,7 +405,6 @@ pub struct AIMessageChunk {
     pub tool_calls: Vec<ToolCall>,
     #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
-    #[serde(default)]
     pub tool_call_chunks: Vec<ToolCallChunk>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage_metadata: Option<UsageMetadata>,

@@ -15,12 +15,8 @@
 
 	let { class: className, summary, children, ...rest }: Props = $props();
 
-	let ctx = new TestResultsState({ summary });
+	const ctx = new TestResultsState({ summary: () => summary });
 	setTestResultsContext(ctx);
-
-	$effect(() => {
-		ctx.summary = summary;
-	});
 </script>
 
 <div data-slot="test-results" class={cn('rounded-lg border bg-background', className)} {...rest}>

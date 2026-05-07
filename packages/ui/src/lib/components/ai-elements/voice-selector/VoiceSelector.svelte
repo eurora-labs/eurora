@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import * as Dialog from '$lib/components/dialog/index.js';
 	import {
@@ -26,25 +27,21 @@
 		children,
 	}: Props = $props();
 
-	let context = new VoiceSelectorContext({
-		value: valueProp ?? defaultValue,
-		open: openProp ?? defaultOpen,
-		onValueChange,
-		onOpenChange,
-	});
+	let internalValue = $state<string | undefined>(untrack(() => defaultValue));
+	let internalOpen = $state(untrack(() => defaultOpen));
 
-	$effect(() => {
-		if (valueProp !== undefined) {
-			context.value = valueProp;
-		}
+	const context = new VoiceSelectorContext({
+		value: () => valueProp ?? internalValue,
+		setValue: (val) => {
+			internalValue = val;
+			onValueChange?.(val);
+		},
+		open: () => openProp ?? internalOpen,
+		setOpen: (val) => {
+			internalOpen = val;
+			onOpenChange?.(val);
+		},
 	});
-
-	$effect(() => {
-		if (openProp !== undefined) {
-			context.open = openProp;
-		}
-	});
-
 	setVoiceSelectorContext(context);
 </script>
 

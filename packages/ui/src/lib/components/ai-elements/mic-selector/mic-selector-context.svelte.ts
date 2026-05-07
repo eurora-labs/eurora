@@ -2,56 +2,40 @@ import { getContext, setContext } from 'svelte';
 
 const MIC_SELECTOR_CONTEXT_KEY = Symbol.for('mic-selector-context');
 
+export interface MicSelectorContextOptions {
+	devices: () => MediaDeviceInfo[];
+	value: () => string | undefined;
+	setValue: (value: string | undefined) => void;
+	open: () => boolean;
+	setOpen: (open: boolean) => void;
+}
+
 export class MicSelectorContext {
-	#devices = $state<MediaDeviceInfo[]>([]);
-	#value = $state<string | undefined>(undefined);
-	#open = $state(false);
+	readonly #opts: MicSelectorContextOptions;
 	#width = $state(200);
-	#onValueChange: ((value: string | undefined) => void) | undefined;
-	#onOpenChange: ((open: boolean) => void) | undefined;
 
-	constructor(
-		options: {
-			devices?: MediaDeviceInfo[];
-			value?: string;
-			open?: boolean;
-			width?: number;
-			onValueChange?: (value: string | undefined) => void;
-			onOpenChange?: (open: boolean) => void;
-		} = {},
-	) {
-		this.#devices = options.devices ?? [];
-		this.#value = options.value;
-		this.#open = options.open ?? false;
-		this.#width = options.width ?? 200;
-		this.#onValueChange = options.onValueChange;
-		this.#onOpenChange = options.onOpenChange;
+	constructor(opts: MicSelectorContextOptions) {
+		this.#opts = opts;
 	}
 
-	get devices() {
-		return this.#devices;
+	get devices(): MediaDeviceInfo[] {
+		return this.#opts.devices();
 	}
 
-	set devices(value: MediaDeviceInfo[]) {
-		this.#devices = value;
-	}
-
-	get value() {
-		return this.#value;
+	get value(): string | undefined {
+		return this.#opts.value();
 	}
 
 	set value(val: string | undefined) {
-		this.#value = val;
-		this.#onValueChange?.(val);
+		this.#opts.setValue(val);
 	}
 
-	get open() {
-		return this.#open;
+	get open(): boolean {
+		return this.#opts.open();
 	}
 
 	set open(val: boolean) {
-		this.#open = val;
-		this.#onOpenChange?.(val);
+		this.#opts.setOpen(val);
 	}
 
 	get width() {

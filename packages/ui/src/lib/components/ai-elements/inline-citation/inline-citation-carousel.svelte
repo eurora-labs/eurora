@@ -12,13 +12,8 @@
 
 	let { class: className, total = 0, children, ...rest }: Props = $props();
 
-	let ctx = new CarouselState({ currentIndex: 0, total });
-
+	const ctx = new CarouselState({ total: () => total });
 	setCarouselContext(ctx);
-
-	$effect(() => {
-		ctx.total = total;
-	});
 </script>
 
 <div data-slot="inline-citation-carousel" class={cn('w-full', className)} {...rest}>

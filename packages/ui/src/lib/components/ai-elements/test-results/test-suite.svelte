@@ -18,16 +18,8 @@
 
 	let { class: className, name, status, open = $bindable(false), children }: Props = $props();
 
-	let ctx = new TestSuiteState({ name, status });
+	const ctx = new TestSuiteState({ name: () => name, status: () => status });
 	setTestSuiteContext(ctx);
-
-	$effect(() => {
-		ctx.name = name;
-	});
-
-	$effect(() => {
-		ctx.status = status;
-	});
 </script>
 
 <Collapsible data-slot="test-suite" class={cn('rounded-lg border', className)} bind:open>

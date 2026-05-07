@@ -64,7 +64,7 @@
 					>
 						<img
 							src={profileImageUrl}
-							alt="Andre Roelofs profile photo"
+							alt="Andre Roelofs"
 							class="aspect-square h-[150px] rounded border object-cover"
 						/>
 					</ChainOfThought.Image>

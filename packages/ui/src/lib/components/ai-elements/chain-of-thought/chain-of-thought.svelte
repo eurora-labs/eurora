@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import { cn } from '$lib/utils.js';
 	import {
@@ -26,26 +27,18 @@
 		...rest
 	}: Props = $props();
 
-	let isOpen = $state(open ?? defaultOpen);
+	let internalOpen = $state(untrack(() => open ?? defaultOpen));
+	const resolvedOpen = $derived(open ?? internalOpen);
 
-	let ctx = new ChainOfThoughtState({ isOpen, isStreaming });
-
+	const ctx = new ChainOfThoughtState({
+		isOpen: () => resolvedOpen,
+		setOpen: (value) => setOpen(value),
+		isStreaming: () => isStreaming,
+	});
 	setChainOfThoughtContext(ctx);
 
-	$effect(() => {
-		ctx.isStreaming = isStreaming;
-	});
-
-	$effect(() => {
-		if (open !== undefined) {
-			isOpen = open;
-			ctx.isOpen = open;
-		}
-	});
-
 	export function setOpen(value: boolean) {
-		isOpen = value;
-		ctx.isOpen = value;
+		internalOpen = value;
 		if (open !== undefined) {
 			open = value;
 		}
