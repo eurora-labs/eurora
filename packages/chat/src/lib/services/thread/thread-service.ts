@@ -23,12 +23,7 @@ export interface ChatContext {
 
 export interface IThreadService {
 	listThreads(limit: number, offset: number): Promise<Thread[]>;
-	getMessages(
-		threadId: string,
-		limit: number,
-		offset: number,
-		allVariants: boolean,
-	): Promise<MessageNode[]>;
+	getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]>;
 	switchBranch(
 		threadId: string,
 		messageId: string,
@@ -49,6 +44,15 @@ export interface IThreadService {
 	sendMessage(
 		threadId: string,
 		request: ChatSendRequest,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage>;
+
+	/// Open the chat WebSocket in regenerate mode. The server rewinds
+	/// `active_leaf` to the AI message's human parent and runs the agent on
+	/// the existing context; the new AI response lands as a sibling variant.
+	regenerateAi(
+		threadId: string,
+		aiMessageId: string,
 		signal?: AbortSignal,
 	): AsyncIterable<ChatServerMessage>;
 }

@@ -56,7 +56,6 @@ pub trait ThreadApi {
         thread_id: String,
         limit: u32,
         offset: u32,
-        all_variants: bool,
     ) -> Result<Vec<MessageNode>, String>;
 
     async fn switch_branch<R: Runtime>(
@@ -139,12 +138,11 @@ impl ThreadApi for ThreadApiImpl {
         thread_id: String,
         limit: u32,
         offset: u32,
-        all_variants: bool,
     ) -> Result<Vec<MessageNode>, String> {
         let manager = thread_manager(&app_handle)?;
         let id = parse_uuid("thread_id", &thread_id)?;
         manager
-            .get_messages(id, limit, offset, all_variants)
+            .get_messages(id, limit, offset)
             .await
             .map_err(|e| e.to_string())
     }

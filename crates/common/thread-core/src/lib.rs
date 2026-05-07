@@ -100,8 +100,6 @@ pub struct GetMessagesQuery {
     pub limit: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offset: Option<u32>,
-    #[serde(default)]
-    pub all_variants: bool,
 }
 
 /// Response body for endpoints that return the message tree.
@@ -198,15 +196,18 @@ pub struct SearchMessageResult {
 
 /// Frame sent by the client over the chat WebSocket.
 ///
-/// Bidirectional from day one; the current set is `Send` (start a turn) and
-/// `Cancel` (interrupt the in-flight turn). New variants can be added without
-/// breaking older clients because serde rejects unknown tagged variants only
-/// on deserialize, never on encode.
+/// Bidirectional from day one; the current set is `Send` (start a turn from
+/// a new human message), `Regenerate` (re-roll an existing AI response under
+/// the same human parent so it becomes a sibling variant), and `Cancel`
+/// (interrupt the in-flight turn). New variants can be added without breaking
+/// older clients because serde rejects unknown tagged variants only on
+/// deserialize, never on encode.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ChatClientMessage {
     Send(ChatSendRequest),
+    Regenerate(RegenerateRequest),
     Cancel,
 }
 
@@ -222,6 +223,17 @@ pub struct ChatSendRequest {
     pub parent_message_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_chips_json: Option<String>,
+}
+
+/// Payload of a [`ChatClientMessage::Regenerate`] frame.
+///
+/// The server resolves the AI message's parent (a human message), rewinds
+/// `active_leaf` to that parent, and runs the agent loop on the existing
+/// context. The newly produced AI message lands as a sibling of the original.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct RegenerateRequest {
+    pub ai_message_id: Uuid,
 }
 
 /// Frame sent by the server over the chat WebSocket.
@@ -283,6 +295,7 @@ pub fn type_collection() -> specta::TypeCollection {
         .register::<SearchMessageResult>()
         .register::<ChatClientMessage>()
         .register::<ChatSendRequest>()
+        .register::<RegenerateRequest>()
         .register::<ChatServerMessage>()
         .register::<ThreadErrorResponse>()
 }
@@ -359,6 +372,18 @@ mod tests {
     fn chat_client_message_serializes_unit_cancel() {
         let s = serde_json::to_string(&ChatClientMessage::Cancel).unwrap();
         assert_eq!(s, "{\"type\":\"cancel\"}");
+    }
+
+    #[test]
+    fn chat_client_message_serializes_regenerate_with_tag() {
+        let m = ChatClientMessage::Regenerate(RegenerateRequest {
+            ai_message_id: Uuid::nil(),
+        });
+        let s = serde_json::to_string(&m).unwrap();
+        assert!(s.contains("\"type\":\"regenerate\""));
+        assert!(s.contains("\"ai_message_id\""));
+        let back: ChatClientMessage = serde_json::from_str(&s).unwrap();
+        assert_eq!(m, back);
     }
 
     #[test]

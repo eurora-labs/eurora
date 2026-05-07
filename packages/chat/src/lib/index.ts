@@ -2,13 +2,7 @@ export { default as SidebarThreadsList } from './components/SidebarThreadsList.s
 export { default as MessageList } from './components/MessageList.svelte';
 export { default as ChatPromptInput } from './components/ChatPromptInput.svelte';
 export { default as SearchDialog } from './components/SearchDialog.svelte';
-export { MessageGraph } from './components/message-graph/index.js';
-export {
-	ChatService,
-	CHAT_SERVICE,
-	ThreadMessages,
-	type ViewMode,
-} from './services/chat/chat-service.svelte.js';
+export { ChatService, CHAT_SERVICE, ThreadMessages } from './services/chat/chat-service.svelte.js';
 export {
 	THREAD_SERVICE,
 	type BranchDirection,

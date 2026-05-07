@@ -3,7 +3,7 @@
 	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 	import { buildSuggestions } from '$lib/chat/suggestions.js';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
-	import { MessageList, MessageGraph, ChatPromptInput, middleTruncate } from '@eurora/chat';
+	import { MessageList, ChatPromptInput, middleTruncate } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
@@ -24,7 +24,6 @@
 	let assets = $state<ContextChip[] | null>(null);
 
 	const threadId = $derived(data.threadId);
-	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
 	const latestTimelineItem = $derived(timelineService.latest);
 	const focusedProcessName = $derived(latestTimelineItem?.process_name ?? '');
 	const focusedProcessId = $derived(latestTimelineItem?.process_id ?? 0);
@@ -83,10 +82,8 @@
 		chatService.editMessage(messageId, newText).catch((e) => toast.error(String(e)));
 	}
 
-	function handleGraphNavigate(messageId: string) {
-		if (!threadId) return;
-		chatService.switchBranch(threadId, messageId, 0).catch((e) => toast.error(String(e)));
-		chatService.viewMode = 'list';
+	function handleRegenerate(messageId: string) {
+		chatService.regenerateAi(messageId).catch((e) => toast.error(String(e)));
 	}
 
 	async function installExtension(installUrl: string) {
@@ -199,11 +196,12 @@
 {/snippet}
 
 <div class="flex h-full flex-col overflow-hidden">
-	{#if chatService.viewMode === 'graph' && hasMessages}
-		<MessageGraph onMessageDblClick={handleGraphNavigate} class="min-h-0 flex-1" />
-	{:else}
-		<MessageList onCopy={handleCopy} onEdit={handleEdit} {emptyState} />
-	{/if}
+	<MessageList
+		onCopy={handleCopy}
+		onEdit={handleEdit}
+		onRegenerate={handleRegenerate}
+		{emptyState}
+	/>
 	<ChatPromptInput onSubmit={handleSubmit} {suggestions}>
 		{#snippet header()}
 			{#if assets && assets.length > 0}

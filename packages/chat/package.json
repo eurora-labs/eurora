@@ -53,7 +53,6 @@
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
-		"@xyflow/svelte": "^1.5.2",
 		"publint": "^0.3.17",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",

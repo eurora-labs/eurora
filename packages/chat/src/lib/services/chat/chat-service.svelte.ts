@@ -1,11 +1,10 @@
 import { InjectionToken } from '@eurora/shared/context';
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
+import type { ChatServerMessage } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
-import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
-
-export type ViewMode = 'list' | 'graph';
+import type { AIMessageChunk, ChatSendRequest } from '@eurora/shared/bindings/thread';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
@@ -23,17 +22,8 @@ export class ThreadMessages {
 	loaded = $state(false);
 	isTransient = $state(false);
 
-	fullTree: MessageNode[] | null = $state(null);
-	fullTreeLoading = $state(false);
-
-	treeRoots: MessageNode[] = $derived(this.fullTree ?? buildTreeFromBranch(this.messages));
-
 	constructor(thread: Thread) {
 		this.thread = thread;
-	}
-
-	invalidateFullTree(): void {
-		this.fullTree = null;
 	}
 }
 
@@ -48,7 +38,6 @@ export class ChatService {
 	loadingThreads = $state(false);
 	loadingMoreThreads = $state(false);
 	hasMoreThreads = $state(true);
-	viewMode: ViewMode = $state('list');
 
 	private readonly threadClient: IThreadService;
 
@@ -126,12 +115,7 @@ export class ChatService {
 
 		entry.loading = true;
 		try {
-			const messages = await this.threadClient.getMessages(
-				threadId,
-				MESSAGE_PAGE_SIZE,
-				0,
-				false,
-			);
+			const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0);
 			entry.messages = messages;
 			entry.offset = messages.length;
 			entry.hasMore = messages.length === MESSAGE_PAGE_SIZE;
@@ -153,27 +137,10 @@ export class ChatService {
 
 		const messages = await this.threadClient.switchBranch(threadId, messageId, direction);
 		entry.messages = messages;
-		entry.invalidateFullTree();
-	}
-
-	async loadFullTree(threadId: string): Promise<void> {
-		const entry = this.threadIndex.get(threadId);
-		if (!entry || entry.fullTreeLoading || entry.fullTree) return;
-
-		entry.fullTreeLoading = true;
-		try {
-			const roots = await this.threadClient.getMessages(threadId, 0, 0, true);
-			entry.fullTree = roots;
-		} catch (error) {
-			console.error(`Failed to load full tree for thread ${threadId}:`, error);
-		} finally {
-			entry.fullTreeLoading = false;
-		}
 	}
 
 	async sendMessage(text: string, assetChips: AssetChip[] = []): Promise<void> {
 		if (!text.trim()) return;
-		this.viewMode = 'list';
 
 		const current = this.activeThreadId;
 		const existing = current ? this.threadIndex.get(current) : undefined;
@@ -222,8 +189,6 @@ export class ChatService {
 	}
 
 	addLocalExchange(userText: string, aiText: string): void {
-		this.viewMode = 'list';
-
 		const threadId = `transient-${crypto.randomUUID()}`;
 		const entry = new ThreadMessages(makeStubThread(threadId));
 		entry.isTransient = true;
@@ -241,10 +206,60 @@ export class ChatService {
 		this.activeThreadId = threadId;
 	}
 
+	async regenerateAi(aiMessageId: string): Promise<void> {
+		const threadId = this.activeThreadId;
+		if (!threadId) return;
+
+		const entry = this.getThreadData(threadId);
+		if (!entry || entry.isTransient) return;
+
+		const targetIndex = entry.messages.findIndex((n) => n.message.id === aiMessageId);
+		if (targetIndex < 0) return;
+
+		const target = entry.messages[targetIndex];
+		if (target.message.type !== 'ai') return;
+
+		const parentId = target.parent_id ?? null;
+		if (!parentId) return;
+
+		this.abortController?.abort();
+
+		const placeholderId = `temp-${crypto.randomUUID()}`;
+		const placeholder = makeAiNode(placeholderId, parentId, '');
+		entry.messages = entry.messages.map((node, i) => (i === targetIndex ? placeholder : node));
+		entry.streamingMessageId = placeholderId;
+
+		const abortController = new AbortController();
+		this.abortController = abortController;
+
+		const stream = this.threadClient.regenerateAi(
+			threadId,
+			aiMessageId,
+			abortController.signal,
+		);
+		const receivedFinal = await this.consumeAiStream(entry, placeholder, stream);
+
+		if (!receivedFinal) {
+			await this.reconcileMessages(entry, threadId);
+		} else {
+			// The new AI variant is now the active leaf; refresh so the
+			// branch tree picks up the new sibling counts and indices.
+			try {
+				const messages = await this.threadClient.getMessages(
+					threadId,
+					MESSAGE_PAGE_SIZE,
+					0,
+				);
+				entry.messages = messages;
+			} catch (error) {
+				console.error(`Failed to refresh after regenerate for thread ${threadId}:`, error);
+			}
+		}
+	}
+
 	async editMessage(messageId: string, text: string): Promise<void> {
 		const threadId = this.activeThreadId;
 		if (!threadId) return;
-		this.viewMode = 'list';
 
 		const entry = this.getThreadData(threadId);
 		if (!entry || entry.isTransient) return;
@@ -267,7 +282,6 @@ export class ChatService {
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
 		}
-		entry.invalidateFullTree();
 	}
 
 	private async reconcileMessages(entry: ThreadMessages, threadId: string): Promise<void> {
@@ -278,12 +292,7 @@ export class ChatService {
 
 			if (entry.streamingMessageId) return;
 
-			const messages = await this.threadClient.getMessages(
-				threadId,
-				MESSAGE_PAGE_SIZE,
-				0,
-				false,
-			);
+			const messages = await this.threadClient.getMessages(threadId, MESSAGE_PAGE_SIZE, 0);
 
 			if (entry.streamingMessageId) return;
 
@@ -292,6 +301,60 @@ export class ChatService {
 				return;
 			}
 		}
+	}
+
+	/// Drive an AI-only chat stream into an existing placeholder node. Used by
+	/// `regenerateAi`, where there is no human-message confirmation envelope —
+	/// the server immediately starts streaming chunks and ends with `final`.
+	private async consumeAiStream(
+		entry: ThreadMessages,
+		placeholder: MessageNode,
+		stream: AsyncIterable<ChatServerMessage>,
+	): Promise<boolean> {
+		const aiMessage = placeholder.message;
+		if (aiMessage.type !== 'ai') return false;
+
+		const placeholderId = aiMessage.id;
+		let receivedFinal = false;
+		const ctx: ChunkAppendState = { hasContent: false, pendingWhitespace: '' };
+
+		try {
+			for await (const event of stream) {
+				if (event.type === 'final') {
+					const aiMsg = event.messages[0];
+					if (aiMsg) {
+						entry.messages = entry.messages.map((node) =>
+							node.message.id === placeholderId ? aiMsg : node,
+						);
+					}
+					entry.loaded = true;
+					receivedFinal = true;
+					break;
+				}
+
+				if (event.type === 'error') {
+					throw new Error(`${event.kind}: ${event.message}`);
+				}
+
+				if (event.type === 'confirmed_human_message') {
+					// Regenerate never persists a new human message; ignore
+					// stray envelopes rather than asserting on them.
+					continue;
+				}
+
+				appendChunkToAiMessage(aiMessage, event.chunk, ctx);
+			}
+		} catch (e) {
+			console.error('AI stream error:', e);
+			if (aiMessage.content.length === 0) {
+				entry.messages = entry.messages.filter((n) => n.message.id !== placeholderId);
+			}
+		} finally {
+			entry.streamingMessageId = null;
+			entry.loaded = true;
+		}
+
+		return receivedFinal;
 	}
 
 	private async consumeStream(
@@ -314,8 +377,7 @@ export class ChatService {
 		const tempHumanId = entry.messages.at(-2)?.message.id;
 		const tempAiId = aiMessage.id;
 
-		let hasReceivedContent = false;
-		let pendingWhitespace = '';
+		const ctx: ChunkAppendState = { hasContent: false, pendingWhitespace: '' };
 		let receivedFinal = false;
 
 		const abortController = new AbortController();
@@ -345,7 +407,6 @@ export class ChatService {
 						);
 					}
 					entry.loaded = true;
-					entry.invalidateFullTree();
 					receivedFinal = true;
 					break;
 				}
@@ -354,50 +415,12 @@ export class ChatService {
 					throw new Error(`${event.kind}: ${event.message}`);
 				}
 
-				const chunk = event.chunk;
-
 				if (onFirstChunk) {
 					onFirstChunk();
 					onFirstChunk = undefined;
 				}
 
-				// Mirror agent-chain's `extract_reasoning_from_additional_kwargs`:
-				// providers like DeepSeek, Ollama, XAI emit reasoning in
-				// additional_kwargs. Accumulate it on the AI message's kwargs
-				// (the wire shape) so the UI can render it without inventing a
-				// fake `reasoning` content block.
-				appendReasoningKwargs(aiMessage, chunk);
-
-				for (const block of chunk.content) {
-					if (block.type === 'text') {
-						let textContent = block.text;
-						if (!hasReceivedContent) {
-							if (textContent.trim().length === 0) {
-								pendingWhitespace += textContent;
-								continue;
-							}
-							hasReceivedContent = true;
-							textContent = pendingWhitespace + textContent;
-							pendingWhitespace = '';
-						}
-						const existing = aiMessage.content.find((b) => b.type === 'text');
-						if (existing && existing.type === 'text') {
-							existing.text += textContent;
-						} else {
-							aiMessage.content.push({ ...block, text: textContent });
-						}
-					} else if (block.type === 'reasoning') {
-						const existing = aiMessage.content.find((b) => b.type === 'reasoning');
-						if (existing && existing.type === 'reasoning') {
-							existing.reasoning =
-								(existing.reasoning ?? '') + (block.reasoning ?? '');
-						} else {
-							aiMessage.content.push({ ...block });
-						}
-					} else {
-						aiMessage.content.push(block);
-					}
-				}
+				appendChunkToAiMessage(aiMessage, event.chunk, ctx);
 			}
 		} catch (e) {
 			console.error(`Stream error for thread ${threadId}:`, e);
@@ -486,28 +509,54 @@ export class ChatService {
 	}
 }
 
-function buildTreeFromBranch(messages: MessageNode[]): MessageNode[] {
-	if (messages.length === 0) return [];
+interface ChunkAppendState {
+	hasContent: boolean;
+	pendingWhitespace: string;
+}
 
-	const nodeMap = new Map<string, MessageNode>();
-	for (const msg of messages) {
-		const id = msg.message.id ?? '';
-		nodeMap.set(id, { ...msg, children: [] });
-	}
+function appendChunkToAiMessage(
+	aiMessage: MessageNode['message'],
+	chunk: AIMessageChunk,
+	ctx: ChunkAppendState,
+): void {
+	if (aiMessage.type !== 'ai') return;
 
-	const roots: MessageNode[] = [];
-	for (const msg of messages) {
-		const id = msg.message.id ?? '';
-		const node = nodeMap.get(id)!;
-		const parent = msg.parent_id ? nodeMap.get(msg.parent_id) : undefined;
-		if (parent) {
-			parent.children = [...(parent.children ?? []), node];
+	// Mirror agent-chain's `extract_reasoning_from_additional_kwargs`:
+	// providers like DeepSeek, Ollama, XAI emit reasoning in
+	// additional_kwargs. Accumulate it on the AI message's kwargs (the wire
+	// shape) so the UI can render it without inventing a fake `reasoning`
+	// content block.
+	appendReasoningKwargs(aiMessage, chunk);
+
+	for (const block of chunk.content) {
+		if (block.type === 'text') {
+			let textContent = block.text;
+			if (!ctx.hasContent) {
+				if (textContent.trim().length === 0) {
+					ctx.pendingWhitespace += textContent;
+					continue;
+				}
+				ctx.hasContent = true;
+				textContent = ctx.pendingWhitespace + textContent;
+				ctx.pendingWhitespace = '';
+			}
+			const existing = aiMessage.content.find((b) => b.type === 'text');
+			if (existing && existing.type === 'text') {
+				existing.text += textContent;
+			} else {
+				aiMessage.content.push({ ...block, text: textContent });
+			}
+		} else if (block.type === 'reasoning') {
+			const existing = aiMessage.content.find((b) => b.type === 'reasoning');
+			if (existing && existing.type === 'reasoning') {
+				existing.reasoning = (existing.reasoning ?? '') + (block.reasoning ?? '');
+			} else {
+				aiMessage.content.push({ ...block });
+			}
 		} else {
-			roots.push(node);
+			aiMessage.content.push(block);
 		}
 	}
-
-	return roots;
 }
 
 function makeHumanNode(

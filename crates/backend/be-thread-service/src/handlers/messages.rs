@@ -7,7 +7,7 @@ use be_remote_db::PaginationParams;
 use thread_core::{GetMessagesQuery, GetMessagesResponse, SwitchBranchRequest};
 use uuid::Uuid;
 
-use crate::conversion::{build_branch_tree, build_full_tree};
+use crate::conversion::build_branch_tree;
 use crate::error::{ThreadServiceError, ThreadServiceResult};
 use crate::service::AppState;
 
@@ -26,25 +26,18 @@ pub async fn get_messages(
     let limit = query.limit.unwrap_or(GET_MESSAGES_DEFAULT_LIMIT);
     let offset = query.offset.unwrap_or(GET_MESSAGES_DEFAULT_OFFSET);
 
-    let messages = if query.all_variants {
-        let rows = state
-            .db
-            .list_all_thread_messages(thread_id, user_id, limit as i64, offset as i64)
-            .await?;
-        build_full_tree(rows)?
-    } else {
-        let rows = state
-            .db
-            .list_branch_with_siblings()
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .params(PaginationParams::new(offset, limit, "ASC"))
-            .call()
-            .await?;
-        build_branch_tree(rows)?
-    };
+    let rows = state
+        .db
+        .list_branch_with_siblings()
+        .thread_id(thread_id)
+        .user_id(user_id)
+        .params(PaginationParams::new(offset, limit, "ASC"))
+        .call()
+        .await?;
 
-    Ok(Json(GetMessagesResponse { messages }))
+    Ok(Json(GetMessagesResponse {
+        messages: build_branch_tree(rows)?,
+    }))
 }
 
 #[tracing::instrument(skip(state, user, body), fields(thread_id = %thread_id, message_id = %body.message_id, direction = body.direction))]

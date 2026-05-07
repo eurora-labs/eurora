@@ -3,7 +3,7 @@ use euro_activity::types::ContextChip;
 use euro_timeline::TimelineManager;
 use tauri::{Manager, Runtime, ipc::Channel};
 use thread_core::{ChatSendRequest, ChatServerMessage};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -35,6 +35,13 @@ pub trait ChatApi {
         thread_id: String,
         channel: Channel<ChatServerMessage>,
         request: ChatSendRequest,
+    ) -> Result<(), String>;
+
+    async fn regenerate<R: Runtime>(
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        ai_message_id: String,
+        channel: Channel<ChatServerMessage>,
     ) -> Result<(), String>;
 
     async fn cancel_query<R: Runtime>(
@@ -117,10 +124,50 @@ impl ChatApi for ChatApiImpl {
             .await
             .insert(thread_id.clone(), cancel.clone());
 
+        let thread = thread_state.inner();
         let stream_result = forward_chat_stream(
-            thread_state.inner(),
-            thread_uuid,
-            request,
+            thread
+                .chat_stream(thread_uuid, request, cancel.clone())
+                .await,
+            cancel.clone(),
+            &channel,
+        )
+        .await;
+
+        tokens_state.lock().await.remove(&thread_id);
+        stream_result
+    }
+
+    async fn regenerate<R: Runtime>(
+        self,
+        app_handle: tauri::AppHandle<R>,
+        thread_id: String,
+        ai_message_id: String,
+        channel: Channel<ChatServerMessage>,
+    ) -> Result<(), String> {
+        let thread_state: tauri::State<SharedThreadManager> = app_handle
+            .try_state()
+            .ok_or(AppError::Unavailable("Thread manager"))?;
+        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
+            .try_state()
+            .ok_or(AppError::Unavailable("Active stream tokens"))?;
+
+        let thread_uuid =
+            Uuid::parse_str(&thread_id).map_err(|e| format!("Invalid thread_id: {e}"))?;
+        let ai_message_uuid =
+            Uuid::parse_str(&ai_message_id).map_err(|e| format!("Invalid ai_message_id: {e}"))?;
+
+        let cancel = CancellationToken::new();
+        tokens_state
+            .lock()
+            .await
+            .insert(thread_id.clone(), cancel.clone());
+
+        let thread = thread_state.inner();
+        let stream_result = forward_chat_stream(
+            thread
+                .chat_regenerate(thread_uuid, ai_message_uuid, cancel.clone())
+                .await,
             cancel.clone(),
             &channel,
         )
@@ -149,16 +196,13 @@ impl ChatApi for ChatApiImpl {
 }
 
 async fn forward_chat_stream(
-    thread: &SharedThreadManager,
-    thread_uuid: Uuid,
-    request: ChatSendRequest,
+    open_result: euro_thread::Result<
+        mpsc::UnboundedReceiver<euro_thread::Result<ChatServerMessage>>,
+    >,
     cancel: CancellationToken,
     channel: &Channel<ChatServerMessage>,
 ) -> Result<(), String> {
-    let mut rx = thread
-        .chat_stream(thread_uuid, request, cancel.clone())
-        .await
-        .map_err(|e| format!("Failed to open chat stream: {e}"))?;
+    let mut rx = open_result.map_err(|e| format!("Failed to open chat stream: {e}"))?;
 
     let stream_future = async {
         while let Some(item) = rx.recv().await {

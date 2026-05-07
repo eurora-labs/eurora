@@ -21,17 +21,11 @@ export class ThreadService implements IThreadService {
 		return (await this.taurpc.thread.list(limit, offset)) as unknown as Thread[];
 	}
 
-	async getMessages(
-		threadId: string,
-		limit: number,
-		offset: number,
-		allVariants: boolean,
-	): Promise<MessageNode[]> {
+	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
 		return (await this.taurpc.thread.get_messages(
 			threadId,
 			limit,
 			offset,
-			allVariants,
 		)) as unknown as MessageNode[];
 	}
 
@@ -91,9 +85,33 @@ export class ThreadService implements IThreadService {
 		};
 	}
 
-	async *sendMessage(
+	sendMessage(
 		threadId: string,
 		request: ChatSendRequest,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		return this.#streamChat(
+			threadId,
+			(channel) => this.taurpc.chat.send_query(threadId, channel, request),
+			signal,
+		);
+	}
+
+	regenerateAi(
+		threadId: string,
+		aiMessageId: string,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		return this.#streamChat(
+			threadId,
+			(channel) => this.taurpc.chat.regenerate(threadId, aiMessageId, channel),
+			signal,
+		);
+	}
+
+	async *#streamChat(
+		threadId: string,
+		open: (channel: (response: ChatServerMessage) => void) => Promise<unknown>,
 		signal?: AbortSignal,
 	): AsyncIterable<ChatServerMessage> {
 		const buffer: ChatServerMessage[] = [];
@@ -116,7 +134,7 @@ export class ThreadService implements IThreadService {
 		}
 		signal?.addEventListener('abort', onAbort, { once: true });
 
-		this.taurpc.chat.send_query(threadId, onEvent, request).then(
+		open(onEvent).then(
 			() => {
 				finished = true;
 				notify();

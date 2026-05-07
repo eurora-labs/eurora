@@ -1,19 +1,23 @@
 //! WebSocket chat endpoint.
 //!
-//! The frontend opens one WebSocket per chat turn (via the desktop's Tauri
-//! bridge). The wire protocol is the [`ChatClientMessage`] / [`ChatServerMessage`]
-//! enum pair from `thread-core`. The server dispatch is:
+//! The frontend opens one WebSocket per chat turn. The wire protocol is the
+//! [`ChatClientMessage`] / [`ChatServerMessage`] enum pair from `thread-core`.
 //!
-//! 1. The client sends [`ChatClientMessage::Send`] with the human turn.
-//! 2. The server persists the human message, emits
-//!    [`ChatServerMessage::ConfirmedHumanMessage`], and spawns the agent loop.
-//! 3. The agent loop streams [`ChatServerMessage::Chunk`] frames as the model
-//!    produces them and ends with [`ChatServerMessage::Final`].
-//! 4. The server then closes the socket.
+//! The server expects exactly one command frame to start a turn, then runs
+//! that turn to completion (or cancellation). The accepted initial frames are:
 //!
-//! At any point the client can send [`ChatClientMessage::Cancel`] (or just
-//! drop the socket) to abort the turn — both paths cancel the agent loop's
-//! [`CancellationToken`].
+//! - [`ChatClientMessage::Send`] — start a turn from a new human message. The
+//!   server persists the human message, emits
+//!   [`ChatServerMessage::ConfirmedHumanMessage`], and spawns the agent loop.
+//! - [`ChatClientMessage::Regenerate`] — re-roll the AI response of an
+//!   existing AI message. The server resolves the AI's parent (a human
+//!   message), rewinds `active_leaf` to it, and spawns the agent loop on the
+//!   existing context. The new AI response lands as a sibling variant of the
+//!   original.
+//!
+//! Once the turn is running, the agent loop streams [`ChatServerMessage::Chunk`]
+//! frames and ends with [`ChatServerMessage::Final`]. At any point the client
+//! can send [`ChatClientMessage::Cancel`] (or just drop the socket) to abort.
 //!
 //! Token gating is enforced by the surrounding `be-authz` middleware before
 //! the upgrade handshake completes.
@@ -29,7 +33,9 @@ use axum::response::Response;
 use be_remote_db::{MessageType, PaginationParams};
 use futures::{SinkExt, StreamExt};
 use serde_json::Value;
-use thread_core::{ChatClientMessage, ChatSendRequest, ChatServerMessage, MessageNode};
+use thread_core::{
+    ChatClientMessage, ChatSendRequest, ChatServerMessage, MessageNode, RegenerateRequest,
+};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -47,6 +53,12 @@ const CONTEXT_MESSAGE_LIMIT: u32 = 5;
 const MAX_TOOL_ROUNDS: usize = 15;
 const SERVER_CHANNEL_DEPTH: usize = 32;
 
+/// One of the command frames that may legally open a chat turn.
+enum InitialCommand {
+    Send(ChatSendRequest),
+    Regenerate(RegenerateRequest),
+}
+
 /// Axum entry point — upgrades the HTTP request to a WebSocket and hands
 /// the socket off to [`handle_socket`].
 #[tracing::instrument(skip(state, user, ws), fields(thread_id = %thread_id))]
@@ -63,11 +75,11 @@ pub async fn chat_ws(
 async fn handle_socket(socket: WebSocket, state: Arc<AppState>, user_id: Uuid, thread_id: Uuid) {
     let (mut sender, mut receiver) = socket.split();
 
-    // First inbound frame must be `Send`. `Cancel` before any in-flight turn
-    // is meaningless and we treat it as a protocol error to keep the state
-    // machine simple.
-    let send_request = match wait_for_send(&mut receiver).await {
-        Ok(req) => req,
+    // First inbound frame must be `Send` or `Regenerate`. `Cancel` before any
+    // in-flight turn is meaningless and we treat it as a protocol error to
+    // keep the state machine simple.
+    let command = match wait_for_initial_command(&mut receiver).await {
+        Ok(cmd) => cmd,
         Err(detail) => {
             let _ = sender
                 .send(serialize_event(&ChatServerMessage::Error {
@@ -84,8 +96,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, user_id: Uuid, t
 
     // A second task watches for client-initiated `Cancel` frames (or socket
     // close) and trips the token. We deliberately do not forward inbound
-    // messages other than `Cancel` — accepting more `Send`s mid-turn is a
-    // future-bidirectional feature, not a current one.
+    // command frames mid-turn — accepting more `Send`/`Regenerate`s in the
+    // same socket is a future-bidirectional feature, not a current one.
     let cancel_for_reader = cancel.clone();
     let reader_task = tokio::spawn(async move {
         while let Some(frame) = receiver.next().await {
@@ -96,8 +108,8 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, user_id: Uuid, t
                         cancel_for_reader.cancel();
                         break;
                     }
-                    Ok(ChatClientMessage::Send(_)) => {
-                        tracing::warn!("Ignoring extra Send frame mid-turn");
+                    Ok(ChatClientMessage::Send(_)) | Ok(ChatClientMessage::Regenerate(_)) => {
+                        tracing::warn!("Ignoring extra command frame mid-turn");
                     }
                     Err(e) => {
                         tracing::warn!(error = %e, "Failed to decode client frame");
@@ -114,16 +126,16 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, user_id: Uuid, t
 
     // Run the turn. Errors that surface here become a final `Error` frame
     // before we close the socket.
-    if let Err(err) = run_turn(
-        state.clone(),
-        user_id,
-        thread_id,
-        send_request,
-        tx,
-        cancel.clone(),
-    )
-    .await
-    {
+    let dispatch_result = match command {
+        InitialCommand::Send(req) => {
+            run_turn(state.clone(), user_id, thread_id, req, tx, cancel.clone()).await
+        }
+        InitialCommand::Regenerate(req) => {
+            regenerate_ai_response(state.clone(), user_id, thread_id, req, tx, cancel.clone()).await
+        }
+    };
+
+    if let Err(err) = dispatch_result {
         tracing::warn!(error = %err, "Chat turn failed before agent loop dispatch");
         let _ = sender
             .send(serialize_event(&ChatServerMessage::Error {
@@ -157,13 +169,16 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, user_id: Uuid, t
     reader_task.abort();
 }
 
-async fn wait_for_send(
+async fn wait_for_initial_command(
     receiver: &mut futures::stream::SplitStream<WebSocket>,
-) -> Result<ChatSendRequest, String> {
+) -> Result<InitialCommand, String> {
     while let Some(frame) = receiver.next().await {
         match frame {
             Ok(Message::Text(text)) => match serde_json::from_str::<ChatClientMessage>(&text) {
-                Ok(ChatClientMessage::Send(req)) => return Ok(req),
+                Ok(ChatClientMessage::Send(req)) => return Ok(InitialCommand::Send(req)),
+                Ok(ChatClientMessage::Regenerate(req)) => {
+                    return Ok(InitialCommand::Regenerate(req));
+                }
                 Ok(ChatClientMessage::Cancel) => {
                     return Err("Cannot cancel before a turn has started".to_string());
                 }
@@ -173,7 +188,7 @@ async fn wait_for_send(
             Ok(Message::Binary(_)) | Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => continue,
         }
     }
-    Err("Connection closed before any Send frame".to_string())
+    Err("Connection closed before any command frame".to_string())
 }
 
 fn serialize_event(event: &ChatServerMessage) -> Message {
@@ -193,6 +208,37 @@ fn serialize_event(event: &ChatServerMessage) -> Message {
     }
 }
 
+/// Load the active branch's recent message history (oldest → newest) as the
+/// LLM-facing message vector.
+///
+/// Reads `CONTEXT_MESSAGE_LIMIT` rows DESC then reverses; rows that fail to
+/// project into an `AnyMessage` are dropped with a warning rather than
+/// aborting the turn — a single corrupt row should never silently break chat.
+async fn load_active_branch_context(
+    state: &AppState,
+    user_id: Uuid,
+    thread_id: Uuid,
+) -> ThreadServiceResult<Vec<AnyMessage>> {
+    let mut recent_messages = state
+        .db
+        .list_messages()
+        .thread_id(thread_id)
+        .user_id(user_id)
+        .params(PaginationParams::new(0, CONTEXT_MESSAGE_LIMIT, "DESC"))
+        .call()
+        .await?;
+    recent_messages.reverse();
+
+    Ok(recent_messages
+        .into_iter()
+        .filter_map(|msg| {
+            convert_db_message_to_base_message(msg)
+                .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
+                .ok()
+        })
+        .collect())
+}
+
 async fn run_turn(
     state: Arc<AppState>,
     user_id: Uuid,
@@ -201,8 +247,8 @@ async fn run_turn(
     tx: mpsc::Sender<ChatServerMessage>,
     cancel: CancellationToken,
 ) -> ThreadServiceResult<()> {
-    // An explicit parent means this turn is an edit or re-roll: rewind the
-    // active leaf to that parent so the new human message branches off it.
+    // An explicit parent means this turn is an edit: rewind the active leaf
+    // to that parent so the new human message branches off it.
     if let Some(parent_id) = request.parent_message_id {
         state
             .db
@@ -214,25 +260,7 @@ async fn run_turn(
             .await?;
     }
 
-    // Pull recent context (DESC then reverse to get chronological order).
-    let mut recent_messages = state
-        .db
-        .list_messages()
-        .thread_id(thread_id)
-        .user_id(user_id)
-        .params(PaginationParams::new(0, CONTEXT_MESSAGE_LIMIT, "DESC"))
-        .call()
-        .await?;
-    recent_messages.reverse();
-
-    let mut messages: Vec<AnyMessage> = recent_messages
-        .into_iter()
-        .filter_map(|msg| {
-            convert_db_message_to_base_message(msg)
-                .map_err(|e| tracing::warn!("Skipping unconvertible message: {e}"))
-                .ok()
-        })
-        .collect();
+    let mut messages = load_active_branch_context(&state, user_id, thread_id).await?;
 
     // Rewrite inline payloads (large text, base64 images) into asset
     // references before we persist or feed them to the LLM. This used to be
@@ -322,6 +350,70 @@ async fn run_turn(
             .thread_id(thread_id)
             .user_id(user_id)
             .human_message_id(human_message_id)
+            .max_tool_rounds(MAX_TOOL_ROUNDS)
+            .call(),
+    );
+
+    Ok(())
+}
+
+async fn regenerate_ai_response(
+    state: Arc<AppState>,
+    user_id: Uuid,
+    thread_id: Uuid,
+    request: RegenerateRequest,
+    tx: mpsc::Sender<ChatServerMessage>,
+    cancel: CancellationToken,
+) -> ThreadServiceResult<()> {
+    // Resolve the AI message and its parent. We require the target to be an
+    // AI row with a parent so the new variant has somewhere to attach.
+    let ai_message = state
+        .db
+        .get_message(thread_id, user_id, request.ai_message_id)
+        .await?
+        .ok_or_else(|| ThreadServiceError::not_found("AI message"))?;
+
+    if ai_message.message_type != MessageType::Ai {
+        return Err(ThreadServiceError::invalid_argument(
+            "ai_message_id must reference an AI message",
+        ));
+    }
+
+    let human_parent_id = ai_message.parent_message_id.ok_or_else(|| {
+        ThreadServiceError::invalid_argument("AI message has no parent to regenerate from")
+    })?;
+
+    // Rewind the active leaf to the human parent so the agent loop's new AI
+    // row is created as a sibling of the original AI message.
+    state
+        .db
+        .set_active_leaf()
+        .id(thread_id)
+        .user_id(user_id)
+        .active_leaf_id(human_parent_id)
+        .call()
+        .await?;
+
+    let messages = load_active_branch_context(&state, user_id, thread_id).await?;
+
+    let LlmContext {
+        messages: llm_messages,
+        chat_model,
+        tools,
+    } = prepare_llm_context(&state.providers, &state.asset_service, messages).await?;
+
+    let db = state.db.clone();
+    tokio::spawn(
+        run_agent_loop()
+            .tx(tx)
+            .token(cancel)
+            .db(db)
+            .chat_model(chat_model)
+            .tools(tools)
+            .messages(llm_messages)
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .human_message_id(human_parent_id)
             .max_tool_rounds(MAX_TOOL_ROUNDS)
             .call(),
     );

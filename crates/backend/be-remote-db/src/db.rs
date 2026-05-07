@@ -1423,6 +1423,34 @@ impl DatabaseManager {
         Ok(message)
     }
 
+    /// Fetch a single message by id, scoped to (thread, user) for authorization.
+    ///
+    /// Returns `Ok(None)` when no row matches — the caller decides whether to
+    /// treat that as a not-found error or a benign missing reference.
+    pub async fn get_message(
+        &self,
+        thread_id: Uuid,
+        user_id: Uuid,
+        message_id: Uuid,
+    ) -> DbResult<Option<Message>> {
+        let row = sqlx::query_as::<_, Message>(
+            r#"
+            SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
+                   m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
+                   m.created_at, m.updated_at
+            FROM messages m
+            JOIN threads t ON t.id = m.thread_id
+            WHERE m.id = $1 AND m.thread_id = $2 AND t.user_id = $3
+            "#,
+        )
+        .bind(message_id)
+        .bind(thread_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     #[builder]
     pub async fn list_messages(
         &self,
@@ -1554,35 +1582,6 @@ impl DatabaseManager {
             .bind(params.offset())
             .fetch_all(&self.pool)
             .await?;
-
-        Ok(rows)
-    }
-
-    pub async fn list_all_thread_messages(
-        &self,
-        thread_id: Uuid,
-        user_id: Uuid,
-        limit: i64,
-        offset: i64,
-    ) -> DbResult<Vec<crate::types::Message>> {
-        let rows = sqlx::query_as::<_, crate::types::Message>(
-            r#"
-            SELECT m.id, m.thread_id, m.user_id, m.parent_message_id, m.message_type,
-                   m.content, m.tool_call_id, m.tool_calls, m.additional_kwargs,
-                   m.created_at, m.updated_at
-            FROM messages m
-            JOIN threads t ON t.id = m.thread_id
-            WHERE m.thread_id = $1 AND t.user_id = $2
-            ORDER BY m.created_at ASC, m.id ASC
-            LIMIT $3 OFFSET $4
-            "#,
-        )
-        .bind(thread_id)
-        .bind(user_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&self.pool)
-        .await?;
 
         Ok(rows)
     }
