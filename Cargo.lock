@@ -1797,6 +1797,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
@@ -3772,6 +3773,7 @@ dependencies = [
  "specta",
  "thiserror 2.0.18",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

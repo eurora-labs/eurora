@@ -25,7 +25,6 @@ use axum::extract::Request;
 use axum::http::{Method, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use be_auth_core::{MissingWebOrigins, web_origins_from_env};
 
 #[derive(Debug, Clone)]
 pub struct OriginGuardConfig {
@@ -36,12 +35,6 @@ pub struct OriginGuardConfig {
 }
 
 impl OriginGuardConfig {
-    pub fn from_env() -> Result<Self, MissingWebOrigins> {
-        Ok(Self {
-            web_origins: web_origins_from_env()?,
-        })
-    }
-
     pub fn new(web_origins: HashSet<String>) -> Self {
         Self { web_origins }
     }

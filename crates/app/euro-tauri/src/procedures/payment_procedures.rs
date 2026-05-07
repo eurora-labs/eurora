@@ -1,19 +1,21 @@
 use euro_secret::ExposeSecret;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
+use url::Url;
 
 use crate::error::ResultExt;
 use crate::procedures::auth_manager;
+use crate::shared_types::SharedEndpointManager;
 
-fn rest_api_url() -> String {
-    // Runtime override → bake-time default. `EURORA_API_BASE_URL` /
-    // `EURORA_REST_API_URL` are operator-set escape hatches;
-    // `euro_settings::CLOUD_API_URL` is the canonical "Cloud" endpoint
-    // baked at compile time from `EURORA_CLOUD_API_URL` in `.env`.
-    std::env::var("EURORA_REST_API_URL")
-        .or_else(|_| std::env::var("EURORA_API_BASE_URL"))
-        .unwrap_or_else(|_| euro_settings::CLOUD_API_URL.to_string())
+/// Build an absolute URL for `path` against the shared
+/// [`EndpointManager`]. The manager is the single source of truth for
+/// which backend the rest of the desktop is talking to (auth,
+/// threads, timeline) — payment must hit the same one or the
+/// Default/Custom toggle in `Settings → API` silently splits the app
+/// across two backends.
+fn api_url<R: Runtime>(app_handle: &AppHandle<R>, path: &str) -> Url {
+    app_handle.state::<SharedEndpointManager>().url(path)
 }
 
 #[derive(Deserialize)]
@@ -58,11 +60,10 @@ impl PaymentApi for PaymentApiImpl {
             .await
             .ctx("Failed to get access token")?;
 
-        let base_url = rest_api_url();
         let client = Client::new();
 
         let pricing: PricingResponse = client
-            .get(format!("{base_url}/payment/pricing"))
+            .get(api_url(&app_handle, "/payment/pricing"))
             .header("Authorization", format!("Bearer {}", token.expose_secret()))
             .send()
             .await
@@ -74,7 +75,7 @@ impl PaymentApi for PaymentApiImpl {
             .ctx("Failed to parse pricing response")?;
 
         let checkout: CheckoutResponse = client
-            .post(format!("{base_url}/payment/checkout"))
+            .post(api_url(&app_handle, "/payment/checkout"))
             .header("Authorization", format!("Bearer {}", token.expose_secret()))
             .json(&CheckoutRequest {
                 price_id: pricing.pro_price_id,
@@ -98,9 +99,8 @@ impl PaymentApi for PaymentApiImpl {
             .await
             .ctx("Failed to get access token")?;
 
-        let base_url = rest_api_url();
         let sub: SubscriptionResponse = Client::new()
-            .get(format!("{base_url}/payment/subscription"))
+            .get(api_url(&app_handle, "/payment/subscription"))
             .header("Authorization", format!("Bearer {}", token.expose_secret()))
             .send()
             .await

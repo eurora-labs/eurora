@@ -13,11 +13,11 @@ use std::sync::RwLock;
 
 use url::Url;
 
-/// Default base URL when `EURORA_API_BASE_URL` isn't set. Baked at
-/// compile time from `EURORA_CLOUD_API_URL` (workspace `.env`) so
-/// forks rebuilding for their own organisation pick up the right
-/// endpoint without source changes.
-pub const DEFAULT_API_URL: &str = env!("EURORA_CLOUD_API_URL");
+/// Default base URL the binary was compiled against. Baked at
+/// compile time from `BACKEND_URL` (workspace `.env`) so forks
+/// rebuilding for their own organisation pick up the right endpoint
+/// without source changes.
+pub const DEFAULT_API_URL: &str = env!("BACKEND_URL");
 
 /// Owns the live backend base URL plus a single shared [`reqwest::Client`].
 ///
@@ -47,12 +47,6 @@ impl EndpointManager {
             client,
             base_url: RwLock::new(base_url),
         })
-    }
-
-    pub fn from_env() -> Result<Self> {
-        let url =
-            std::env::var("EURORA_API_BASE_URL").unwrap_or_else(|_| DEFAULT_API_URL.to_string());
-        Self::new(&url)
     }
 
     /// Returns the URL the manager is currently pointing at.

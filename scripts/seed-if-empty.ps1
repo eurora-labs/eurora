@@ -10,21 +10,17 @@
 
 $ErrorActionPreference = "Stop"
 
-# Postgres credentials live in .env (loaded by the justfile via
-# `set dotenv-load`). They're forwarded to the postgres container via
-# docker-compose; we use the same values here so the host-side psql
-# probe lines up with what the container was provisioned with.
-foreach ($var in 'POSTGRES_USER', 'POSTGRES_DB') {
-    $value = [System.Environment]::GetEnvironmentVariable($var)
-    if ([string]::IsNullOrEmpty($value)) {
-        [Console]::Error.WriteLine("$var is required (run 'just init' to create .env).")
-        exit 1
-    }
-}
+# Postgres user/db are hardcoded in docker-compose.yml for the dev
+# stack — they're conventions, not user config. We use the same
+# values here so the host-side psql probe lines up with what the
+# container was provisioned with. If you change them in compose,
+# change them here too.
+$PG_USER = 'postgres'
+$PG_DB = 'eurora'
 
 function Invoke-Psql {
     param([Parameter(Mandatory)][string]$Sql)
-    $output = docker compose exec -T postgres psql -U $env:POSTGRES_USER -d $env:POSTGRES_DB -tAc $Sql
+    $output = docker compose exec -T postgres psql -U $PG_USER -d $PG_DB -tAc $Sql
     if ($LASTEXITCODE -ne 0) {
         throw "psql failed (exit $LASTEXITCODE): $Sql"
     }

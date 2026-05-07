@@ -42,11 +42,27 @@ impl FromRequestParts<Arc<AppState>> for AccessClaims {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        let token = extract_token(parts, ACCESS_COOKIE)?;
+        let path = parts.uri.path().to_owned();
+        let token = match extract_token(parts, ACCESS_COOKIE) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(%path, error = ?e, "AccessClaims: token extraction failed");
+                return Err(e);
+            }
+        };
         let claims = state
             .jwt_config()
             .validate_access_token(&token)
-            .map_err(|_| AuthError::InvalidToken)?;
+            .map_err(|e| {
+                tracing::warn!(
+                    %path,
+                    token_len = token.len(),
+                    error = %e,
+                    "AccessClaims: JWT validation failed"
+                );
+                AuthError::InvalidToken
+            })?;
+        tracing::debug!(%path, sub = %claims.sub, "AccessClaims: validated");
         Ok(AccessClaims(claims))
     }
 }

@@ -7,14 +7,10 @@ use std::path::{Path, PathBuf};
 
 /// Required: build fails loudly if these aren't set. The binary
 /// cannot function without them.
-const REQUIRED: &[&str] = &["EURORA_AUTH_SERVICE_URL"];
+const REQUIRED: &[&str] = &["WEB_URL"];
 
-/// Optional: runtime overrides (`EURORA_API_BASE_URL`,
-/// `EURORA_REST_API_URL`) may legitimately be unset. Missing keys
-/// are baked as empty strings; `option_env!` returns `Some("")` and
-/// `load_env` in `src/lib.rs` skips empty values, leaving the binary
-/// to fall back to its compiled-in defaults.
-const OPTIONAL: &[&str] = &["EURORA_API_BASE_URL", "EURORA_REST_API_URL"];
+/// Optional: empty if unset.
+const OPTIONAL: &[&str] = &[];
 
 fn main() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

@@ -8,6 +8,11 @@
 # `just dev`         — start Postgres + run backend + start the desktop app
 # `just dev:reset`   — wipe the database volume and re-seed the dev user
 #
+# Postgres user/password/db and the host-bound port are hardcoded here:
+# they're conventions of the dev stack, not user config. The backend reads
+# `REMOTE_DATABASE_URL` from `.env`; if you change the host port below,
+# update that URL too.
+#
 # The seed loader at `scripts/seed/seed.sh` is idempotent (it TRUNCATEs first)
 # so it only runs when you opt in via `--profile seed` (driven by the
 # justfile recipes).
@@ -16,16 +21,12 @@ services:
     postgres:
         image: postgres:16
         restart: unless-stopped
-        # The `:?` interpolation form fails compose with a clear error
-        # if the variable is unset. There are no in-file defaults: dev
-        # values live in `.env` (created from `.env.example` by `just
-        # init`), production values come from the deploy environment.
         environment:
-            POSTGRES_USER: ${POSTGRES_USER:?required (run `just init` to create .env)}
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required (run `just init` to create .env)}
-            POSTGRES_DB: ${POSTGRES_DB:?required (run `just init` to create .env)}
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: eurora
         ports:
-            - '${EURORA_POSTGRES_PORT:?required (run `just init` to create .env)}:5432'
+            - '5434:5432'
         volumes:
             - eurora-pgdata:/var/lib/postgresql/data
         healthcheck:
@@ -47,13 +48,11 @@ services:
             postgres:
                 condition: service_healthy
         environment:
-            # Composed from the same POSTGRES_* vars as the postgres
-            # service so credentials stay in sync. The host differs
-            # from the host-side `REMOTE_DATABASE_URL` in `.env`
-            # because the seed container reaches postgres at its
-            # compose-network hostname/port (`postgres:5432`), not the
-            # host-published port.
-            REMOTE_DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+            # Composed from the same hardcoded credentials the postgres
+            # service uses. The host (`postgres:5432`) is the
+            # compose-network hostname, not the host-published port that
+            # the backend on the host reaches via `REMOTE_DATABASE_URL`.
+            REMOTE_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/eurora
             EURORA_SEED_FORCE: '1'
         volumes:
             - ./scripts/seed:/seed:ro

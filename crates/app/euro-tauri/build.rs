@@ -1,12 +1,10 @@
 //! Bake URL constants and telemetry secrets into the desktop binary.
 //!
-//! `EURORA_AUTH_SERVICE_URL` (login landing) and the runtime overrides
-//! (`EURORA_API_BASE_URL`, `EURORA_REST_API_URL`) are forwarded from
-//! the workspace `.env` (or shell env). `load_env` in `src/lib.rs`
-//! injects the non-empty values into the process environment at
-//! startup so `std::env::var(...)` call sites in the procedures
-//! continue to work in packaged release builds where `.env` isn't
-//! available on disk.
+//! `WEB_URL` (login landing) is forwarded from the workspace `.env`
+//! (or shell env). `load_env` in `src/lib.rs` injects the non-empty
+//! value into the process environment at startup so
+//! `std::env::var(...)` call sites in the procedures continue to work
+//! in packaged release builds where `.env` isn't available on disk.
 //!
 //! Telemetry secrets (`EURORA_DESKTOP_*`) are baked the same way but
 //! consumed via `env!()` directly by the telemetry module — empty
@@ -15,10 +13,10 @@
 use std::path::{Path, PathBuf};
 
 /// Required URL bake-ins: build fails if any is missing.
-const REQUIRED_URLS: &[&str] = &["EURORA_AUTH_SERVICE_URL"];
+const REQUIRED_URLS: &[&str] = &["WEB_URL"];
 
 /// Optional runtime overrides: empty if unset.
-const OPTIONAL_URLS: &[&str] = &["EURORA_API_BASE_URL", "EURORA_REST_API_URL"];
+const OPTIONAL_URLS: &[&str] = &[];
 
 /// Telemetry keys: optional, missing values disable telemetry at runtime.
 const TELEMETRY_KEYS: &[&str] = &[

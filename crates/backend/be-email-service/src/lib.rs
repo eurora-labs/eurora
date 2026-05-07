@@ -20,8 +20,8 @@ impl EmailService {
         let from_address = std::env::var("LETTERMINT_SENDER")
             .map_err(|_| EmailError::Config("LETTERMINT_SENDER must be set".into()))?;
 
-        let frontend_url = std::env::var("FRONTEND_URL")
-            .map_err(|_| EmailError::Config("FRONTEND_URL must be set".into()))?;
+        let frontend_url = std::env::var("WEB_URL")
+            .map_err(|_| EmailError::Config("WEB_URL must be set".into()))?;
 
         let client = LettermintClient::builder().api_token(api_token).build();
 

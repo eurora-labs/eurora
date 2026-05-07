@@ -30,3 +30,4 @@ tokio = { workspace = true, features = [
   "rt-multi-thread",
   "sync",
 ] }
+tracing = { workspace = true }

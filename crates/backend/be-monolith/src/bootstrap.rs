@@ -4,7 +4,7 @@
 //! `run` is responsible for everything between "process started" and "tokio
 //! runtime is serving HTTP". `main` only owns the runtime lifecycle and the
 //! pretty-printer for failures.
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::HashSet, net::SocketAddr, sync::Arc, time::Duration};
 
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderValue, Method, header};
@@ -15,7 +15,7 @@ use be_auth_service::{CookieConfig, init_auth_service};
 use be_authz::{
     AuthzState, CasbinAuthz, HttpTokenGateState, OriginGuardConfig, TrustedProxies,
     authz_middleware, http_token_gate_middleware, new_auth_failure_rate_limiter,
-    new_health_check_rate_limiter, origin_guard_middleware, web_origins_from_env,
+    new_health_check_rate_limiter, origin_guard_middleware,
 };
 use be_payment_service::{PaymentService, init_payment_service};
 use be_remote_db::DatabaseManager;
@@ -27,8 +27,15 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use url::Url;
 
 use crate::errors::BootstrapError;
+
+/// The webview origin Tauri serves the desktop SPA from. Hard-coded
+/// because it's a property of the Tauri runtime, not something an
+/// operator configures — any other value would mean the desktop
+/// build is misconfigured.
+const TAURI_WEB_ORIGIN: &str = "tauri://localhost";
 
 /// Dev mode is keyed off the build profile rather than an env var: debug
 /// builds skip wiring of services that need real secrets (email, payment,
@@ -95,14 +102,10 @@ pub async fn run() -> Result<(), BootstrapError> {
             .map_err(|e| BootstrapError::Database { source: e.into() })?,
     );
 
-    let http_addr_raw = require_env("HTTP_ADDR")?;
-    let http_addr: SocketAddr =
-        http_addr_raw
-            .parse()
-            .map_err(|source| BootstrapError::InvalidHttpAddr {
-                value: http_addr_raw.clone(),
-                source,
-            })?;
+    let backend_url = require_url("BACKEND_URL")?;
+    let web_url = require_url("WEB_URL")?;
+    let http_addr = backend_bind_addr(&backend_url)?;
+    let web_origins = compose_web_origins(&backend_url, &web_url);
 
     let jwt_config = JwtConfig::try_from_env()?;
 
@@ -129,8 +132,8 @@ pub async fn run() -> Result<(), BootstrapError> {
         Some(Arc::new(svc))
     };
 
-    let cookie_config = CookieConfig::from_env()?;
-    let origin_guard_config = Arc::new(OriginGuardConfig::from_env()?);
+    let cookie_config = CookieConfig::from_env(web_origins.clone())?;
+    let origin_guard_config = Arc::new(OriginGuardConfig::new(web_origins.clone()));
 
     let auth_router = init_auth_service(
         db_manager.clone(),
@@ -255,7 +258,7 @@ pub async fn run() -> Result<(), BootstrapError> {
             origin_guard_config,
             origin_guard_middleware,
         ))
-        .layer(build_cors()?);
+        .layer(build_cors(&web_origins));
 
     tracing::info!("Starting HTTP server at {}", http_addr);
     let http_listener = tokio::net::TcpListener::bind(http_addr)
@@ -403,13 +406,13 @@ fn require_env(name: &'static str) -> Result<String, BootstrapError> {
         .ok_or(BootstrapError::MissingEnv { name })
 }
 
-fn build_cors() -> Result<CorsLayer, BootstrapError> {
-    let allowed: Vec<HeaderValue> = web_origins_from_env()?
-        .into_iter()
+fn build_cors(web_origins: &HashSet<String>) -> CorsLayer {
+    let allowed: Vec<HeaderValue> = web_origins
+        .iter()
         .filter_map(|s| s.parse::<HeaderValue>().ok())
         .collect();
 
-    Ok(CorsLayer::new()
+    CorsLayer::new()
         .allow_origin(AllowOrigin::list(allowed))
         .allow_methods([
             Method::GET,
@@ -420,5 +423,60 @@ fn build_cors() -> Result<CorsLayer, BootstrapError> {
         ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT])
         .allow_credentials(true)
-        .max_age(Duration::from_secs(3600)))
+        .max_age(Duration::from_secs(3600))
+}
+
+/// Read a required URL-valued environment variable, parsing it eagerly
+/// so a typo (e.g. `BACKEND_URL=localhost:3000` missing the scheme)
+/// fails at startup rather than the first time we try to derive the
+/// listen address from it.
+fn require_url(name: &'static str) -> Result<Url, BootstrapError> {
+    let raw = require_env(name)?;
+    Url::parse(&raw).map_err(|source| BootstrapError::InvalidUrl {
+        name,
+        value: raw,
+        source,
+    })
+}
+
+/// Bind address derived from `BACKEND_URL`. We always bind on
+/// `0.0.0.0` so the backend is reachable from outside the host (the
+/// desktop dev build runs in the same machine, but `docker compose`
+/// and remote testing both need a wildcard bind); the URL only
+/// contributes the port.
+fn backend_bind_addr(backend_url: &Url) -> Result<SocketAddr, BootstrapError> {
+    let port = backend_url
+        .port_or_known_default()
+        .ok_or_else(|| BootstrapError::InvalidUrl {
+            name: "BACKEND_URL",
+            value: backend_url.to_string(),
+            source: url::ParseError::EmptyHost,
+        })?;
+    format!("0.0.0.0:{port}")
+        .parse()
+        .map_err(|source| BootstrapError::InvalidBindAddr {
+            value: format!("0.0.0.0:{port}"),
+            source,
+        })
+}
+
+/// Build the SPA-origin allow-list from the workspace's two canonical
+/// URL primitives plus the Tauri webview origin. Single source of
+/// truth — every other layer (CORS, origin guard, cookie-mode
+/// detection) consumes this same set.
+fn compose_web_origins(backend_url: &Url, web_url: &Url) -> HashSet<String> {
+    let mut origins = HashSet::new();
+    origins.insert(strip_trailing_slash(backend_url));
+    origins.insert(strip_trailing_slash(web_url));
+    origins.insert(TAURI_WEB_ORIGIN.to_string());
+    origins
+}
+
+/// `Url::to_string()` on a base URL with no path always emits a
+/// trailing slash (`http://localhost:3000/`), but browsers send the
+/// `Origin` header without one. Normalise so equality comparisons
+/// downstream hit.
+fn strip_trailing_slash(url: &Url) -> String {
+    let s = url.to_string();
+    s.strip_suffix('/').unwrap_or(&s).to_string()
 }

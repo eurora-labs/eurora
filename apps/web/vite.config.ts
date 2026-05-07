@@ -10,9 +10,9 @@ const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, workspaceRoot, '');
 
-	if (!env.VITE_API_URL) {
+	if (!env.BACKEND_URL) {
 		throw new Error(
-			'Missing required environment variable: VITE_API_URL\n' +
+			'Missing required environment variable: BACKEND_URL\n' +
 				'Please ensure this variable is set in your .env file or environment.',
 		);
 	}
@@ -32,6 +32,15 @@ export default defineConfig(({ mode }) => {
 
 	return {
 		envDir: workspaceRoot,
+		// Expose `BACKEND_URL` to client code as `import.meta.env.PUBLIC_API_URL`
+		// without dragging it into the loader's `VITE_*` / `PUBLIC_*` namespace.
+		// This is what the SvelteKit app reads via `ConfigService` — keeping
+		// the env var name aligned with the workspace's other consumers
+		// (be-monolith, the desktop build.rs scripts) means a single edit
+		// to `.env` propagates everywhere.
+		define: {
+			'import.meta.env.PUBLIC_API_URL': JSON.stringify(env.BACKEND_URL),
+		},
 		plugins: [
 			sentrySvelteKit({
 				autoUploadSourceMaps: uploadSourceMaps,

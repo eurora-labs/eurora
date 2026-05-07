@@ -1,31 +1,27 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-/// Canonical Eurora cloud backend.
+/// The backend URL the binary was compiled against.
 ///
-/// Baked at compile time from `EURORA_CLOUD_API_URL` (sourced from
-/// the workspace `.env` by `build.rs`). Override the value at build
+/// Baked at compile time from `BACKEND_URL` (sourced from the workspace
+/// `.env` by `build.rs`). For dev builds that's typically
+/// `http://localhost:3000`; for release binaries it's whatever the
+/// shipping organisation set in their CI. Override the value at build
 /// time to ship a fork pointing at a different organisation's
 /// infrastructure — there is no in-source default.
-pub const CLOUD_API_URL: &str = env!("EURORA_CLOUD_API_URL");
-
-/// Canonical local-development backend served by
-/// `cargo run -p be-monolith`. Baked at compile time from
-/// `EURORA_LOCAL_API_URL` (workspace `.env`); override at build
-/// time if your local backend listens elsewhere.
-pub const LOCAL_API_URL: &str = env!("EURORA_LOCAL_API_URL");
+pub const DEFAULT_API_URL: &str = env!("BACKEND_URL");
 
 /// Where the desktop app should send authenticated requests.
 ///
-/// `Cloud` and `Local` carry no parameters because their URLs are baked in,
-/// which keeps "I want to talk to the production server" expressible as a
-/// stable enum value rather than a magic string. `Custom` covers everything
-/// else (self-hosted homelab, a colleague's tunnel, etc.).
+/// `Default` carries no parameters because its URL is baked in, which
+/// keeps "I want to talk to the URL this binary was built against"
+/// expressible as a stable enum value rather than a magic string.
+/// `Custom` covers everything else (self-hosted homelab, a colleague's
+/// tunnel, a different organisation's infrastructure).
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ConnectionMode {
-    Cloud,
-    Local,
+    Default,
     Custom { url: String },
 }
 
@@ -33,8 +29,7 @@ impl ConnectionMode {
     /// Resolve the mode to a concrete URL string.
     pub fn endpoint(&self) -> &str {
         match self {
-            ConnectionMode::Cloud => CLOUD_API_URL,
-            ConnectionMode::Local => LOCAL_API_URL,
+            ConnectionMode::Default => DEFAULT_API_URL,
             ConnectionMode::Custom { url } => url.as_str(),
         }
     }
@@ -56,15 +51,9 @@ impl APISettings {
 }
 
 impl Default for APISettings {
-    /// Debug builds default to talking to a backend on `localhost:3000` —
-    /// the `just dev` flow stands one up there. Release builds default to
-    /// the public Eurora cloud.
     fn default() -> Self {
-        let mode = if cfg!(debug_assertions) {
-            ConnectionMode::Local
-        } else {
-            ConnectionMode::Cloud
-        };
-        Self { mode }
+        Self {
+            mode: ConnectionMode::Default,
+        }
     }
 }

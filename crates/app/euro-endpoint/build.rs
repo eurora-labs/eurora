@@ -1,12 +1,12 @@
-//! Bake `EURORA_CLOUD_API_URL` into `DEFAULT_API_URL` at compile time.
-//! See `euro-settings/build.rs` for the same pattern with more
+//! Bake `BACKEND_URL` into `DEFAULT_API_URL` at compile time. See
+//! `euro-settings/build.rs` for the same pattern with more
 //! commentary; the two scripts deliberately stay independent (no
 //! shared build crate) — the forwarding logic is short enough to
 //! inline.
 
 use std::path::{Path, PathBuf};
 
-const REQUIRED: &[&str] = &["EURORA_CLOUD_API_URL"];
+const REQUIRED: &[&str] = &["BACKEND_URL"];
 
 fn main() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

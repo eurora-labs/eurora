@@ -5,7 +5,7 @@ use serde_json_lenient::to_string_pretty;
 use std::path::Path;
 
 use crate::{
-    AppSettings, ConnectionMode,
+    AppSettings,
     json::{json_difference, merge_non_null_json_value},
     watch::SETTINGS_FILE,
 };
@@ -30,16 +30,7 @@ impl AppSettings {
 
         merge_non_null_json_value(customizations, &mut settings);
 
-        let mut app_settings: AppSettings = serde_json::from_value(settings)?;
-
-        // `EURORA_API_BASE_URL` is the developer escape hatch: setting
-        // it in the shell forces the app to talk to that URL on this
-        // run regardless of the persisted connection mode. Persisted
-        // setting is left untouched — the override is in-memory only.
-        if let Ok(api_base_url) = std::env::var("EURORA_API_BASE_URL") {
-            app_settings.api.mode = ConnectionMode::Custom { url: api_base_url };
-        }
-
+        let app_settings: AppSettings = serde_json::from_value(settings)?;
         Ok(app_settings)
     }
 

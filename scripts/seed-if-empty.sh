@@ -14,15 +14,16 @@
 
 set -euo pipefail
 
-# Postgres credentials live in .env (loaded by the justfile via
-# `set dotenv-load`). They're forwarded to the postgres container via
-# docker-compose; we use the same values here so the host-side psql
-# probe lines up with what the container was provisioned with.
-: "${POSTGRES_USER:?POSTGRES_USER is required (run \`just init\` to create .env)}"
-: "${POSTGRES_DB:?POSTGRES_DB is required (run \`just init\` to create .env)}"
+# Postgres user/db are hardcoded in docker-compose.yml for the dev
+# stack — they're conventions, not user config. We use the same
+# values here so the host-side psql probe lines up with what the
+# container was provisioned with. If you change them in compose,
+# change them here too.
+PG_USER=postgres
+PG_DB=eurora
 
 psql_silent() {
-    docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$1"
+    docker compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" -tAc "$1"
 }
 
 schema=$(psql_silent "SELECT to_regclass('public.users')" | tr -d '[:space:]')

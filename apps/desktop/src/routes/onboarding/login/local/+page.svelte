@@ -1,3 +1,4 @@
+<!-- TODO: This needs to be remade completely -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { type APISettings, type ConnectionMode } from '$lib/bindings/bindings.js';
@@ -21,7 +22,7 @@
 		// localhost:3000 is the canonical Local mode URL — store as Local so
 		// the persisted config survives a future port-default change.
 		if (url === 'http://localhost:3000' || url === 'http://127.0.0.1:3000') {
-			return { kind: 'local' };
+			return { kind: 'custom', url: 'http://localhost:3000' };
 		}
 		return { kind: 'custom', url };
 	}
@@ -30,7 +31,7 @@
 		const settings = await taurpc.settings.get_api_settings();
 		if (settings.mode.kind === 'custom') {
 			endpoint = settings.mode.url;
-		} else if (settings.mode.kind === 'local') {
+		} else if (settings.mode.kind === 'default') {
 			endpoint = 'http://localhost:3000';
 		}
 	});

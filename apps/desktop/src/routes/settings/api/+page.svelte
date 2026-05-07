@@ -13,20 +13,22 @@
 
 	const taurpc = inject(TAURPC_SERVICE);
 
-	type ModeKind = 'cloud' | 'local' | 'custom';
+	type ModeKind = 'default' | 'custom';
 
-	let kind = $state<ModeKind>('cloud');
+	let kind = $state<ModeKind>('default');
 	let customUrl = $state('http://localhost:3000');
+	// The backend URL `Default` mode resolves to. Baked at compile time
+	// from `BACKEND_URL` and fetched via `get_default_backend_url` so the
+	// UI never lies about what the binary will actually connect to.
+	let defaultUrl = $state('');
 	let resolvedEndpoint = $state('');
 	let testing = $state(false);
 	let llmInfoText = $state<string | null>(null);
 
 	function buildMode(): ConnectionMode {
 		switch (kind) {
-			case 'cloud':
-				return { kind: 'cloud' };
-			case 'local':
-				return { kind: 'local' };
+			case 'default':
+				return { kind: 'default' };
 			case 'custom':
 				return { kind: 'custom', url: customUrl };
 		}
@@ -47,7 +49,7 @@
 		testing = true;
 		llmInfoText = null;
 		try {
-			const url = kind === 'custom' ? customUrl : resolveBakedUrl(kind);
+			const url = kind === 'custom' ? customUrl : defaultUrl;
 			const info = await taurpc.system.test_backend_url(url);
 			const chat = info.roles.chat;
 			llmInfoText = `Connected — ${chat.provider} / ${chat.model}`;
@@ -59,25 +61,19 @@
 		}
 	}
 
-	function resolveBakedUrl(k: 'cloud' | 'local'): string {
-		// Mirror the constants in `euro-settings::api_settings`. The backend
-		// also resolves these on its end when persisting, but this lets the
-		// "test connection" button preview the URL before saving.
-		return k === 'cloud' ? 'https://api.eurora-labs.com' : 'http://localhost:3000';
-	}
-
 	function applyResult(settings: APISettings) {
 		kind = settings.mode.kind;
 		if (settings.mode.kind === 'custom') {
 			customUrl = settings.mode.url;
 		}
-		resolvedEndpoint =
-			settings.mode.kind === 'custom'
-				? settings.mode.url
-				: resolveBakedUrl(settings.mode.kind);
+		resolvedEndpoint = settings.mode.kind === 'custom' ? settings.mode.url : defaultUrl;
 	}
 
 	onMount(async () => {
+		// Order matters: the baked default URL has to land first so
+		// `applyResult` can fold it into `resolvedEndpoint` for the
+		// "Active: …" hint.
+		defaultUrl = await taurpc.system.get_default_backend_url();
 		const settings = await taurpc.settings.get_api_settings();
 		applyResult(settings);
 	});
@@ -97,20 +93,11 @@
 
 		<RadioGroup.Root bind:value={kind} class="flex flex-col gap-3">
 			<div class="flex items-start gap-3">
-				<RadioGroup.Item value="cloud" id="mode-cloud" class="mt-1" />
+				<RadioGroup.Item value="default" id="mode-default" class="mt-1" />
 				<div class="flex flex-col gap-0.5">
-					<Label for="mode-cloud" class="text-sm font-medium">Eurora Cloud</Label>
+					<Label for="mode-default" class="text-sm font-medium">Default</Label>
 					<span class="text-xs text-muted-foreground">
-						Hosted backend at api.eurora-labs.com.
-					</span>
-				</div>
-			</div>
-			<div class="flex items-start gap-3">
-				<RadioGroup.Item value="local" id="mode-local" class="mt-1" />
-				<div class="flex flex-col gap-0.5">
-					<Label for="mode-local" class="text-sm font-medium">Local</Label>
-					<span class="text-xs text-muted-foreground">
-						Backend running on this machine at http://localhost:3000.
+						{defaultUrl || 'Loading…'}
 					</span>
 				</div>
 			</div>

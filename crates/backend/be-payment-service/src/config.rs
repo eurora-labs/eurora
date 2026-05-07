@@ -23,15 +23,13 @@ impl PaymentConfig {
             )
         })?;
 
-        let frontend_url = std::env::var("FRONTEND_URL").map_err(|_| {
-            crate::error::PaymentError::Config(
-                "FRONTEND_URL environment variable must be set".into(),
-            )
+        let frontend_url = std::env::var("WEB_URL").map_err(|_| {
+            crate::error::PaymentError::Config("WEB_URL environment variable must be set".into())
         })?;
 
         HeaderValue::from_str(&frontend_url).map_err(|e| {
             crate::error::PaymentError::Config(format!(
-                "FRONTEND_URL '{frontend_url}' is not a valid header value: {e}"
+                "WEB_URL '{frontend_url}' is not a valid header value: {e}"
             ))
         })?;
 

@@ -145,7 +145,7 @@ dev-seed-if-empty:
 
 # Force a re-seed: nuke the volume and start fresh.
 dev-reset:
-    docker compose down -v
+    docker compose --profile seed down -v
     just dev-postgres-up
     just dev-migrate
     docker compose --profile seed up --no-deps --abort-on-container-exit seed

@@ -168,11 +168,21 @@ pub async fn login_token_associate(
     AccessClaims(claims): AccessClaims,
     Json(body): Json<AssociateLoginTokenRequest>,
 ) -> AuthResult<()> {
+    tracing::info!(
+        sub = %claims.sub,
+        challenge = %body.code_challenge,
+        "login_token_associate: handler entered"
+    );
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| AuthError::InvalidToken)?;
-    state
+    let result = state
         .auth
         .associate_login_token(user_id, &body.code_challenge)
-        .await
+        .await;
+    match &result {
+        Ok(()) => tracing::info!(%user_id, "login_token_associate: row created"),
+        Err(e) => tracing::error!(%user_id, error = %e, "login_token_associate: failed"),
+    }
+    result
 }
 
 #[tracing::instrument(skip_all)]
