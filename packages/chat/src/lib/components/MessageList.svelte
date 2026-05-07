@@ -5,6 +5,7 @@
 		emptyState?: Snippet;
 		onCopy?: (content: string) => void;
 		onEdit?: (messageId: string, newText: string) => void;
+		onRegenerate?: (messageId: string) => void;
 	}
 </script>
 
@@ -28,10 +29,11 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { tick } from 'svelte';
 	import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
 
-	let { emptyState, onCopy, onEdit }: Props = $props();
+	let { emptyState, onCopy, onEdit, onRegenerate }: Props = $props();
 
 	let copiedId = $state<string | null>(null);
 	let editingId = $state<string | null>(null);
@@ -257,6 +259,14 @@
 										onclick={() => startEdit(messageId, content)}
 									>
 										<PencilIcon />
+									</Message.Action>
+								{/if}
+								{#if !user && onRegenerate && messageId}
+									<Message.Action
+										tooltip="Regenerate"
+										onclick={() => onRegenerate(messageId)}
+									>
+										<RotateCcwIcon />
 									</Message.Action>
 								{/if}
 							</Message.Actions>

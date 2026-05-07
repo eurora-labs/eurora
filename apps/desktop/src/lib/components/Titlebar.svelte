@@ -1,13 +1,10 @@
 <script lang="ts">
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
-	import { CHAT_SERVICE, type ViewMode } from '@eurora/chat/services/chat/chat-service.svelte';
+	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import * as Tabs from '@eurora/ui/components/tabs/index';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import GitForkIcon from '@lucide/svelte/icons/git-fork';
-	import ListIcon from '@lucide/svelte/icons/list';
 	import MinusIcon from '@lucide/svelte/icons/minus';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -18,7 +15,6 @@
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
 
-	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
 	const activeThread = $derived(chatService.activeThread?.thread);
 	const threadTitle = $derived(activeThread?.title ?? 'New Chat');
 	const threadDateIso = $derived(activeThread?.created_at ?? new Date().toISOString());
@@ -70,23 +66,6 @@
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
 	<div data-tauri-drag-region class="titlebar-fill"></div>
 	<div data-tauri-drag-region class="titlebar-content">
-		{#if hasMessages}
-			<Tabs.Root
-				value={chatService.viewMode}
-				onValueChange={(v) => (chatService.viewMode = v as ViewMode)}
-			>
-				<Tabs.List class="h-7">
-					<Tabs.Trigger value="list" class="h-5 gap-1 px-2 text-xs">
-						<ListIcon size={12} />
-						List
-					</Tabs.Trigger>
-					<Tabs.Trigger value="graph" class="h-5 gap-1 px-2 text-xs">
-						<GitForkIcon size={12} />
-						Graph
-					</Tabs.Trigger>
-				</Tabs.List>
-			</Tabs.Root>
-		{/if}
 		<span
 			data-tauri-drag-region
 			class="truncate text-xs font-medium max-w-[28ch]"

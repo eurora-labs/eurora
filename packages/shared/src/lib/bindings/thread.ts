@@ -67,12 +67,17 @@ export type BlockIndex = bigint | string;
 /**
  *  Frame sent by the client over the chat WebSocket.
  *
- *  Bidirectional from day one; the current set is `Send` (start a turn) and
- *  `Cancel` (interrupt the in-flight turn). New variants can be added without
- *  breaking older clients because serde rejects unknown tagged variants only
- *  on deserialize, never on encode.
+ *  Bidirectional from day one; the current set is `Send` (start a turn from
+ *  a new human message), `Regenerate` (re-roll an existing AI response under
+ *  the same human parent so it becomes a sibling variant), and `Cancel`
+ *  (interrupt the in-flight turn). New variants can be added without breaking
+ *  older clients because serde rejects unknown tagged variants only on
+ *  deserialize, never on encode.
  */
-export type ChatClientMessage = ({ type: 'send' } & ChatSendRequest) | { type: 'cancel' };
+export type ChatClientMessage =
+	| ({ type: 'send' } & ChatSendRequest)
+	| ({ type: 'regenerate' } & RegenerateRequest)
+	| { type: 'cancel' };
 
 export type ChatMessage = {
 	content: ContentBlocks;
@@ -176,7 +181,6 @@ export type GenerateThreadTitleResponse = {
 export type GetMessagesQuery = {
 	limit?: number | null;
 	offset?: number | null;
-	all_variants?: boolean;
 };
 
 // Response body for endpoints that return the message tree.
@@ -279,6 +283,17 @@ export type ReasoningContentBlock = {
 	reasoning?: string | null;
 	index?: BlockIndex | null;
 	extras?: { [key in string]: unknown } | null;
+};
+
+/**
+ *  Payload of a [`ChatClientMessage::Regenerate`] frame.
+ *
+ *  The server resolves the AI message's parent (a human message), rewinds
+ *  `active_leaf` to that parent, and runs the agent loop on the existing
+ *  context. The newly produced AI message lands as a sibling of the original.
+ */
+export type RegenerateRequest = {
+	ai_message_id: string;
 };
 
 export type RemoveMessage = {

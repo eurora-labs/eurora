@@ -22,7 +22,6 @@
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@eurora/chat": "workspace:*",
-		"@xyflow/svelte": "^1.5.2",
 		"@fltsci/tauri-plugin-tracing": "^0.3.2",
 		"@gitbutler/svelte-comment-injector": "^1.0.1",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",

@@ -5,11 +5,9 @@
 //! 1. Translate `be_remote_db::Thread` rows into [`thread_core::Thread`].
 //! 2. Translate `be_remote_db::Message` rows into [`AnyMessage`] (carried
 //!    typed by [`thread_core::MessageNode::message`]).
-//! 3. Build [`MessageNode`] trees from the two row shapes the database
-//!    layer hands us (`BranchMessageRow` for active-branch+siblings views,
-//!    flat `Message` for the all-variants view).
-
-use std::collections::HashMap;
+//! 3. Build the active-branch [`MessageNode`] spine (with sibling metadata
+//!    so the list view can render variant chevrons) from the database's
+//!    `BranchMessageRow` shape.
 
 use agent_chain::{AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolCall, ToolMessage};
 use agent_chain_core::messages::ContentBlocks;
@@ -162,43 +160,6 @@ pub fn build_branch_tree(rows: Vec<BranchMessageRow>) -> ThreadServiceResult<Vec
                 children: g.children,
                 sibling_index: g.active_index,
                 depth: g.depth,
-            })
-        })
-        .collect()
-}
-
-/// Build the full message tree (every variant of every branch) from a flat
-/// list of database rows. Used for the `all_variants=true` view.
-pub fn build_full_tree(messages: Vec<Message>) -> ThreadServiceResult<Vec<MessageNode>> {
-    let mut children_by_parent: HashMap<Option<Uuid>, Vec<Message>> = HashMap::new();
-    for msg in messages {
-        children_by_parent
-            .entry(msg.parent_message_id)
-            .or_default()
-            .push(msg);
-    }
-    build_subtree(None, &children_by_parent, 0)
-}
-
-fn build_subtree(
-    parent_id: Option<Uuid>,
-    children_by_parent: &HashMap<Option<Uuid>, Vec<Message>>,
-    depth: i32,
-) -> ThreadServiceResult<Vec<MessageNode>> {
-    let Some(siblings) = children_by_parent.get(&parent_id) else {
-        return Ok(vec![]);
-    };
-    siblings
-        .iter()
-        .enumerate()
-        .map(|(idx, msg)| {
-            let children = build_subtree(Some(msg.id), children_by_parent, depth + 1)?;
-            Ok(MessageNode {
-                parent_id: msg.parent_message_id,
-                message: convert_db_message_to_base_message(msg.clone())?,
-                children,
-                sibling_index: idx as i32,
-                depth,
             })
         })
         .collect()

@@ -121,12 +121,7 @@ export class FakeThreadService implements IThreadService {
 		return this.threads.slice(offset, offset + limit);
 	}
 
-	async getMessages(
-		threadId: string,
-		_limit: number,
-		_offset: number,
-		_allVariants: boolean,
-	): Promise<MessageNode[]> {
+	async getMessages(threadId: string, _limit: number, _offset: number): Promise<MessageNode[]> {
 		return this.messagesByThread.get(threadId) ?? [];
 	}
 
@@ -188,6 +183,19 @@ export class FakeThreadService implements IThreadService {
 	async *sendMessage(
 		_threadId: string,
 		_request: unknown,
+		_signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		for (const frame of this.streamFrames) {
+			if (this.streamDelay > 0) {
+				await new Promise((r) => setTimeout(r, this.streamDelay));
+			}
+			yield frame;
+		}
+	}
+
+	async *regenerateAi(
+		_threadId: string,
+		_aiMessageId: string,
 		_signal?: AbortSignal,
 	): AsyncIterable<ChatServerMessage> {
 		for (const frame of this.streamFrames) {

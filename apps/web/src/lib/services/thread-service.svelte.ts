@@ -47,14 +47,9 @@ export class ThreadService implements IThreadService {
 		return resp.threads;
 	}
 
-	async getMessages(
-		threadId: string,
-		limit: number,
-		offset: number,
-		allVariants: boolean,
-	): Promise<MessageNode[]> {
+	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
 		const resp = await this.#api.fetch<GetMessagesResponse>(`/threads/${threadId}/messages`, {
-			query: { limit, offset, all_variants: allVariants },
+			query: { limit, offset },
 		});
 		return resp.messages;
 	}
@@ -117,9 +112,29 @@ export class ThreadService implements IThreadService {
 		return { contentBlocks: [], assetChips: [] };
 	}
 
-	async *sendMessage(
+	sendMessage(
 		threadId: string,
 		request: ChatSendRequest,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		return this.#openChatSocket(threadId, { type: 'send', ...request }, signal);
+	}
+
+	regenerateAi(
+		threadId: string,
+		aiMessageId: string,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		return this.#openChatSocket(
+			threadId,
+			{ type: 'regenerate', ai_message_id: aiMessageId },
+			signal,
+		);
+	}
+
+	async *#openChatSocket(
+		threadId: string,
+		opening: ChatClientMessage,
 		signal?: AbortSignal,
 	): AsyncIterable<ChatServerMessage> {
 		const ws = new WebSocket(deriveWsUrl(this.#api.baseUrl, `/threads/${threadId}/chat`));
@@ -135,8 +150,7 @@ export class ThreadService implements IThreadService {
 		}
 
 		ws.addEventListener('open', () => {
-			const frame: ChatClientMessage = { type: 'send', ...request };
-			ws.send(JSON.stringify(frame));
+			ws.send(JSON.stringify(opening));
 		});
 
 		ws.addEventListener('message', (ev: MessageEvent<string>) => {
