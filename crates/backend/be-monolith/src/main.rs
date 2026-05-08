@@ -21,7 +21,7 @@ use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
+const HTTP_MAX_BODY_SIZE: usize = 50 * 1024 * 1024; // 50 MB
 
 fn build_cors() -> CorsLayer {
     let allowed: Vec<HeaderValue> = std::env::var("WEB_ALLOWED_ORIGINS")
