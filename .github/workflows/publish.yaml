@@ -384,6 +384,8 @@ jobs:
                   CARGO_PROFILE_RELEASE_OPT_LEVEL: s
                   RELEASE_CHANNEL: ${{ env.channel }}
                   RELEASE_VERSION: ${{ env.version }}
+                  BACKEND_URL: ${{ vars.BACKEND_URL }}
+                  WEB_URL: ${{ vars.WEB_URL }}
                   EURORA_RELEASE_CHANNEL: ${{ env.channel }}
                   EURORA_DESKTOP_SENTRY_DSN: ${{ secrets.EURORA_DESKTOP_SENTRY_DSN }}
                   EURORA_DESKTOP_POSTHOG_KEY: ${{ secrets.EURORA_DESKTOP_POSTHOG_KEY }}
@@ -759,6 +761,8 @@ jobs:
                   RELEASE_CHANNEL: ${{ env.channel }}
                   RELEASE_VERSION: ${{ env.version }}
                   BUILD_NUMBER: ${{ github.run_number }}
+                  BACKEND_URL: ${{ vars.BACKEND_URL }}
+                  WEB_URL: ${{ vars.WEB_URL }}
                   APPLE_TEAM_ID: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
                   APPLE_IOS_CERTIFICATE: ${{ secrets.APPLE_IOS_CERTIFICATE }}
                   APPLE_IOS_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_IOS_CERTIFICATE_PASSWORD }}
@@ -863,6 +867,8 @@ jobs:
                   RELEASE_CHANNEL: ${{ env.channel }}
                   RELEASE_VERSION: ${{ env.version }}
                   BUILD_NUMBER: ${{ github.run_number }}
+                  BACKEND_URL: ${{ vars.BACKEND_URL }}
+                  WEB_URL: ${{ vars.WEB_URL }}
                   ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
                   NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
                   ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
