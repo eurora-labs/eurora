@@ -785,6 +785,8 @@ jobs:
     build-tauri-android:
         needs: [build-sveltekit, build-sveltekit-mobile]
         runs-on: ubuntu-latest
+        # Temporarily disabled: only building iOS and desktop for now.
+        if: false
         env:
             CARGO_TERM_COLOR: always
         steps:
