@@ -59,7 +59,7 @@ default: dev
 # actual command.
 
 # Postgres + backend + web + desktop, all in one terminal.
-dev: doctor dev-postgres-up dev-migrate dev-seed-if-empty
+dev: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
     pnpm exec concurrently --kill-others \
         --names backend,web,desktop --prefix-colors cyan,green,yellow \
         "just _dev-backend-watch" \
@@ -105,12 +105,12 @@ doctor:
 
 # ─── Backend ───────────────────────────────────────────────────────────────
 
-dev-backend: doctor dev-postgres-up dev-migrate dev-seed-if-empty
+dev-backend: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
     cargo run -p be-monolith
     # cargo watch -x 'run -p be-monolith'
 
 # Backend only, single run, no auto-restart (debugger / profiling).
-dev-backend-once: doctor dev-postgres-up dev-migrate dev-seed-if-empty
+dev-backend-once: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
     cargo run -p be-monolith
 
 # Apply schema migrations against the running Postgres (idempotent).
@@ -159,6 +159,21 @@ stop:
     docker compose down
 
 # ─── Internal helpers ──────────────────────────────────────────────────────
+
+# Start Docker Desktop if the daemon isn't already up. macOS-only side
+# effect; on Linux the script no-ops and lets `doctor` surface the
+# failure with a remediation hint (starting dockerd needs sudo). This
+# lives outside `doctor` so the doctor itself stays side-effect-free.
+
+[private]
+[unix]
+_ensure-docker:
+    @./scripts/ensure-docker.sh
+
+[private]
+[windows]
+_ensure-docker:
+    @powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/ensure-docker.ps1
 
 # Block until the backend's /health endpoint responds, with a 120s ceiling
 # to cover a slow first-time debug compile. Without this, the Vite dev

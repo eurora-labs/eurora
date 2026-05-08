@@ -3714,7 +3714,6 @@ dependencies = [
  "enum_dispatch",
  "euro-auth",
  "euro-browser",
- "euro-encrypt",
  "euro-endpoint",
  "euro-native-messaging",
  "euro-office",
@@ -3809,25 +3808,6 @@ name = "euro-debug"
 version = "0.0.0"
 
 [[package]]
-name = "euro-encrypt"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "chacha20poly1305",
- "euro-secret",
- "hkdf",
- "rand 0.10.1",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "zeroize",
-]
-
-[[package]]
 name = "euro-endpoint"
 version = "0.0.0"
 dependencies = [
@@ -3857,7 +3837,6 @@ dependencies = [
  "backon",
  "chrono",
  "euro-auth",
- "euro-encrypt",
  "euro-endpoint",
  "euro-secret",
  "euro-settings",
@@ -3959,6 +3938,7 @@ name = "euro-secret"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chacha20poly1305",
  "keyring",
  "rand 0.10.1",
@@ -4007,7 +3987,6 @@ dependencies = [
  "euro-auth",
  "euro-bridge-protocol",
  "euro-browser",
- "euro-encrypt",
  "euro-endpoint",
  "euro-process",
  "euro-secret",

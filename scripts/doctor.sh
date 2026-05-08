@@ -74,7 +74,11 @@ check_docker_daemon() {
         return 0
     fi
     fail "docker daemon" "not reachable"
-    hint "Start Docker Desktop, or run: sudo systemctl start docker"
+    case "$(uname -s)" in
+        Darwin) hint "Start Docker Desktop: open -a Docker (or 'just dev' — auto-starts it)" ;;
+        Linux)  hint "Start Docker: sudo systemctl start docker" ;;
+        *)      hint "Start your Docker daemon." ;;
+    esac
     return 1
 }
 
