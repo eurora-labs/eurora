@@ -3,22 +3,33 @@
 	<head>
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+		<title>Eurora</title>
 		<meta
 			name="viewport"
 			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-content"
 		/>
 		<style>
-			:root {
-				background-color: var(--background);
+			/*
+			 * Pre-hydration paint color. Keep in sync with the dark --background
+			 * token in packages/ui/src/styles/main.css and the window
+			 * backgroundColor in crates/app/euro-mobile/tauri.conf.json — all
+			 * three need to match to avoid a flash before the webview paints.
+			 */
+			html {
+				background-color: oklch(0.2303 0.0125 264.2926);
 			}
-			.dark {
-				--background: oklch(0.2303 0.0125 264.2926);
-			}
+
 			html,
 			body {
 				height: 100%;
-				overflow: hidden;
 				overscroll-behavior: none;
+				-webkit-text-size-adjust: 100%;
+				-webkit-tap-highlight-color: transparent;
+				touch-action: manipulation;
+			}
+
+			html {
+				overflow: hidden;
 			}
 		</style>
 		%sveltekit.head%

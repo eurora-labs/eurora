@@ -9,6 +9,7 @@
 #
 #   just init              first-run setup (.env, pnpm install)
 #   just dev               full stack (backend hot-reloads via cargo-watch)
+#   just ios               full stack with mobile on an iOS simulator (macOS only)
 #   just dev-backend       backend only (Postgres + cargo-watch)
 #   just dev-backend-once  backend only, no auto-restart (debugger / profiling)
 #   just dev-web           web auth UI only
@@ -75,6 +76,32 @@ _dev-web-after-backend: _wait-for-backend
 
 _dev-desktop-after-backend: _wait-for-backend
     pnpm dev:desktop
+
+# ─── Full stack (iOS) ──────────────────────────────────────────────────────
+#
+# Mirrors `just dev`, but the desktop app is replaced with the mobile app
+# running on an iOS simulator. macOS-only — `tauri ios dev` requires Xcode.
+#
+# `--handle-input --default-input-target mobile` routes stdin to the
+# mobile child so Tauri's interactive simulator picker actually receives
+# your keystrokes. Without it, `concurrently` swallows stdin and the
+# picker hangs.
+#
+# Unlike Android, iOS does not need a separate Vite process here: Tauri's
+# `beforeDevCommand` in tauri.conf.json spawns Vite itself.
+
+[macos]
+ios: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
+    pnpm exec concurrently --kill-others --handle-input --default-input-target mobile \
+        --names backend,web,mobile --prefix-colors cyan,green,magenta \
+        "just _dev-backend-watch" \
+        "just _dev-web-after-backend" \
+        "just _dev-ios-after-backend"
+
+[private]
+[macos]
+_dev-ios-after-backend: _wait-for-backend
+    pnpm dev:ios
 
 # ─── First-run setup ───────────────────────────────────────────────────────
 # Copy .env.example to .env (if missing) and install JS deps. Idempotent.
