@@ -393,3 +393,4 @@ apps/macos/Shared/Generated/*
 .cocoindex_code/
 *.db
 thoughts/
+.claude
