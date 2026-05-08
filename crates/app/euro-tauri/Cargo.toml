@@ -36,7 +36,6 @@ euro-activity = { workspace = true }
 euro-auth = { workspace = true }
 euro-browser = { workspace = true }
 euro-bridge-protocol = { workspace = true }
-euro-encrypt = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }
 euro-secret = { workspace = true }

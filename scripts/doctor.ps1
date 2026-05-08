@@ -99,7 +99,7 @@ function Test-DockerDaemon {
         return $true
     }
     Write-Fail "docker daemon" "not reachable"
-    Write-Hint "Start Docker Desktop."
+    Write-Hint "Start Docker Desktop (or 'just dev' — auto-starts it)."
     return $false
 }
 

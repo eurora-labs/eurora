@@ -19,7 +19,6 @@ chrono = { workspace = true, features = ["serde"] }
 enum_dispatch = { workspace = true }
 euro-auth = { workspace = true }
 euro-browser = { workspace = true }
-euro-encrypt = { workspace = true }
 euro-endpoint = { workspace = true }
 euro-native-messaging = { workspace = true }
 euro-office = { workspace = true }

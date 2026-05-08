@@ -4,7 +4,6 @@ use std::fmt;
 pub enum AppError {
     Io(std::io::Error),
     Endpoint(euro_endpoint::EndpointError),
-    Encrypt(euro_encrypt::EncryptError),
     Anyhow(anyhow::Error),
     UrlParse(url::ParseError),
     Json(serde_json::Error),
@@ -17,7 +16,6 @@ impl fmt::Display for AppError {
         match self {
             Self::Io(e) => write!(f, "{e}"),
             Self::Endpoint(e) => write!(f, "{e}"),
-            Self::Encrypt(e) => write!(f, "{e}"),
             Self::Anyhow(e) => write!(f, "{e}"),
             Self::UrlParse(e) => write!(f, "{e}"),
             Self::Json(e) => write!(f, "{e}"),
@@ -36,12 +34,6 @@ impl From<std::io::Error> for AppError {
 impl From<euro_endpoint::EndpointError> for AppError {
     fn from(e: euro_endpoint::EndpointError) -> Self {
         Self::Endpoint(e)
-    }
-}
-
-impl From<euro_encrypt::EncryptError> for AppError {
-    fn from(e: euro_encrypt::EncryptError) -> Self {
-        Self::Encrypt(e)
     }
 }
 
