@@ -43,7 +43,7 @@ const TAURI_WEB_ORIGIN: &str = "tauri://localhost";
 /// without any external setup. Release builds require the full stack.
 pub(crate) const DEV_MODE: bool = cfg!(debug_assertions);
 
-const HTTP_MAX_BODY_SIZE: usize = 2 * 1024 * 1024; // 2 MB
+const HTTP_MAX_BODY_SIZE: usize = 50 * 1024 * 1024; // 2 MB
 
 /// Boot the backend. Owns every fallible step between "process started" and
 /// "axum is serving HTTP".
