@@ -28,7 +28,6 @@
 		"svelte-check": "catalog:svelte",
 		"svelte-sonner": "^1.1.1",
 		"tailwindcss": "catalog:",
-		"taurpc": "^1.8.1",
 		"typescript": "^5.9.3",
 		"vite": "catalog:"
 	},
