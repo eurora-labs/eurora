@@ -1,7 +1,10 @@
 use euro_activity::ContextChip;
-use tauri::Runtime;
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use tauri_specta::Event;
 
-#[taurpc::ipc_type]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct AccentColor {
     /// Dominant color in CSS form: lowercase `#rrggbb`.
     pub hex: String,
@@ -46,7 +49,8 @@ fn relative_luminance(r: u8, g: u8, b: u8) -> f64 {
     0.2126 * srgb_to_linear(r) + 0.7152 * srgb_to_linear(g) + 0.0722 * srgb_to_linear(b)
 }
 
-#[taurpc::ipc_type]
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
 pub struct TimelineAppEvent {
     pub name: String,
     pub accent: Option<AccentColor>,
@@ -61,26 +65,11 @@ pub struct TimelineAppEvent {
     pub process_id: u32,
 }
 
-#[taurpc::procedures(path = "timeline")]
-pub trait TimelineApi {
-    #[taurpc(event)]
-    async fn new_app_event(event: TimelineAppEvent);
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct TimelineAssetsEvent(pub Vec<ContextChip>);
 
-    #[taurpc(event)]
-    async fn new_assets_event(chips: Vec<ContextChip>);
-
-    async fn list<R: Runtime>(app_handle: tauri::AppHandle<R>) -> Result<Vec<String>, String>;
-}
-
-#[derive(Clone)]
-pub struct TimelineApiImpl;
-
-#[taurpc::resolvers]
-impl TimelineApi for TimelineApiImpl {
-    async fn list<R: Runtime>(
-        self,
-        _app_handle: tauri::AppHandle<R>,
-    ) -> Result<Vec<String>, String> {
-        Ok(vec![])
-    }
+#[tauri::command]
+#[specta::specta]
+pub async fn timeline_list() -> Result<Vec<String>, String> {
+    Ok(vec![])
 }

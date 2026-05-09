@@ -7,32 +7,37 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 [dependencies]
 anyhow = { workspace = true }
 backon = { workspace = true }
-base64 = { workspace = true }
-enum_dispatch = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-process = { workspace = true }
 futures-util = { workspace = true }
-image = { workspace = true, features = ["default"] }
-resvg = { version = "0.47" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-specta = { workspace = true, features = [
-  "derive",
-  "collect",
-  "function",
-  "serde_json",
-] }
-specta-typescript = { version = "0.0.10" }
-strum_macros = { workspace = true }
-tiny-skia = "0.12"
+specta = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
-usvg = { version = "0.47", default-features = true }
+
+specta-serde = { version = "0.0.12", optional = true }
+specta-typescript = { version = "0.0.12", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt"] }
+
+[features]
+default = []
+codegen = ["dep:specta-serde", "dep:specta-typescript"]
+
+[[bin]]
+name = "euro-native-messaging"
+path = "src/main.rs"
+
+[[bin]]
+name = "euro-native-messaging-codegen"
+path = "src/bin/codegen.rs"
+required-features = ["codegen"]
 
 [lints.clippy]
 all = "deny"

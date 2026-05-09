@@ -1,16 +1,14 @@
 <script lang="ts">
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { inject } from '@eurora/shared/context';
+	import { commands } from '$lib/bindings/specta.bindings.js';
+	import { unwrap } from '$lib/bindings/result.js';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-
-	const taurpcService = inject(TAURPC_SERVICE);
 
 	let isUpdating = $state(false);
 
 	async function checkForUpdate() {
 		try {
-			const updateInfo = await taurpcService.system.check_for_update();
+			const updateInfo = unwrap(await commands.systemCheckForUpdate());
 
 			if (updateInfo) {
 				toast.info(`Update available: v${updateInfo.version}`, {
@@ -40,7 +38,7 @@
 		});
 
 		try {
-			await taurpcService.system.install_update();
+			unwrap(await commands.systemInstallUpdate());
 			// If we get here, the app didn't restart (shouldn't happen normally)
 			toast.success('Update installed!', {
 				id: toastId,

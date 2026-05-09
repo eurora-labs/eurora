@@ -36,7 +36,7 @@ pub use assets::{WordAsset, WordDocumentAsset};
 pub use client::{ACTION_GET_ASSETS, MICROSOFT_WORD_KIND, fetch_word_asset};
 pub use office_app::OfficeApp;
 
-/// Build the [`specta::TypeCollection`] containing every type the
+/// Build the [`specta::Types`] containing every type the
 /// Office add-in needs on the wire — both the bridge-protocol envelope
 /// types (`Frame`, `RegisterFrame`, …) and the office-specific asset
 /// types defined in this crate. Emitted as a single TypeScript
@@ -45,7 +45,7 @@ pub use office_app::OfficeApp;
 /// Desktop-only types (e.g. [`WordAsset`]) are intentionally not
 /// registered: they never travel over the wire and would just bloat
 /// the bindings file.
-pub fn type_collection() -> specta::TypeCollection {
+pub fn type_collection() -> specta::Types {
     let mut types = euro_bridge_protocol::type_collection();
     types.register_mut::<WordDocumentAsset>();
     types
@@ -63,7 +63,7 @@ mod tests {
         let types = type_collection();
         let names: Vec<&str> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().as_ref())
+            .map(|ndt| ndt.name.as_ref())
             .collect();
         assert!(
             names.contains(&"Frame"),
@@ -87,7 +87,7 @@ mod tests {
         let types = type_collection();
         let names: Vec<&str> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().as_ref())
+            .map(|ndt| ndt.name.as_ref())
             .collect();
         assert!(
             !names.contains(&"WordAsset"),

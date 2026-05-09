@@ -286,6 +286,7 @@ dependencies = [
  "sha2 0.10.9",
  "simsimd",
  "specta",
+ "specta-serde",
  "specta-typescript",
  "tempfile",
  "thiserror 2.0.18",
@@ -916,6 +917,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "specta-typescript",
 ]
 
 [[package]]
@@ -2850,22 +2852,12 @@ dependencies = [
 
 [[package]]
 name = "ctor"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "424e0138278faeb2b401f174ad17e715c829512d74f3d1e81eb43365c2e0590e"
-dependencies = [
- "ctor-proc-macro",
- "dtor 0.1.1",
-]
-
-[[package]]
-name = "ctor"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "352d39c2f7bef1d6ad73db6f5160efcaed66d94ef8c6c573a8410c00bf909a98"
 dependencies = [
  "ctor-proc-macro",
- "dtor 0.3.0",
+ "dtor",
 ]
 
 [[package]]
@@ -3369,15 +3361,6 @@ dependencies = [
 
 [[package]]
 name = "dtor"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "404d02eeb088a82cfd873006cb713fe411306c7d182c344905e101fb1167d301"
-dependencies = [
- "dtor-proc-macro",
-]
-
-[[package]]
-name = "dtor"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1057d6c64987086ff8ed0fd3fbf377a6b7d205cc7715868cd401705f715cbe4"
@@ -3729,7 +3712,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
- "taurpc",
+ "tauri-specta",
  "thiserror 2.0.18",
  "tiny-skia 0.12.0",
  "tokio",
@@ -3748,6 +3731,7 @@ dependencies = [
  "asset-core",
  "auth-core",
  "specta",
+ "specta-serde",
  "specta-typescript",
  "thread-core",
 ]
@@ -3855,7 +3839,7 @@ dependencies = [
  "tauri-plugin-os",
  "tauri-plugin-process",
  "tauri-plugin-store",
- "taurpc",
+ "tauri-specta",
  "thread-core",
  "tokio",
  "tokio-util",
@@ -3870,24 +3854,18 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "backon",
- "base64 0.22.1",
- "enum_dispatch",
  "euro-bridge-protocol",
  "euro-process",
  "futures-util",
- "image",
- "resvg",
  "serde",
  "serde_json",
  "specta",
+ "specta-serde",
  "specta-typescript",
- "strum_macros",
- "tiny-skia 0.12.0",
  "tokio",
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
- "usvg",
  "winreg 0.56.0",
 ]
 
@@ -4023,7 +4001,7 @@ dependencies = [
  "tauri-plugin-tracing",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
- "taurpc",
+ "tauri-specta",
  "tempfile",
  "thiserror 2.0.18",
  "thread-core",
@@ -10186,12 +10164,11 @@ dependencies = [
 
 [[package]]
 name = "specta"
-version = "2.0.0-rc.23"
+version = "2.0.0-rc.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76e9b845c713b099203e50efa3994c73ff25dfcde803d851afde7c818185896f"
+checksum = "38f9a30cbcbb7011f1da7d73483983bf838af123883e45f2b36ed76328df9c50"
 dependencies = [
  "chrono",
- "ctor 0.6.3",
  "paste",
  "rustc_version",
  "serde_json",
@@ -10202,9 +10179,9 @@ dependencies = [
 
 [[package]]
 name = "specta-macros"
-version = "2.0.0-rc.23"
+version = "2.0.0-rc.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83b5e3d7a656d87fc4d2488da7e98d8a71ac34b7b88522bd9d2702349274a9e9"
+checksum = "2ce14957ecc2897f1f848b8255b6531d13ddf49cbcf506b7c2c9fb1d005593bb"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -10214,33 +10191,41 @@ dependencies = [
 
 [[package]]
 name = "specta-serde"
-version = "0.0.10"
+version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "997ffbd731d8d8467f35225f7db65ba0b068d6691bed558caf25402bc5cfb1a9"
+checksum = "ee8a72b755ddb8949fd8f17c5db43f0e8a806ea587d9bc602ee3f73240c00029"
 dependencies = [
  "specta",
+ "specta-macros",
 ]
 
 [[package]]
 name = "specta-swift"
-version = "0.0.1"
+version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07ee0c086cf79ebeef581fcac87e1bb175fd183c953119e0757b4244984e79e9"
+checksum = "a076b5880073af112eed0d2d1012800df468d18dc00e316c7c758703ac074b1d"
 dependencies = [
  "serde",
  "specta",
- "specta-serde",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "specta-typescript"
-version = "0.0.10"
+version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f123c835f81fb4a32b43f800e565b28417271b353fc443fc79311bea59fe61b"
+checksum = "639404ee95557f2f8b7e4cb773ffefd45304c7ab8ba21ac83b69051595e083c0"
 dependencies = [
  "specta",
- "specta-serde",
+]
+
+[[package]]
+name = "specta-util"
+version = "0.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29b1fc02b446f7244a92924fe68c0555921209f1d342990cd1539e9138e69502"
+dependencies = [
+ "specta",
 ]
 
 [[package]]
@@ -10554,18 +10539,6 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
-
-[[package]]
-name = "strum_macros"
-version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab85eea0270ee17587ed4156089e10b9e6880ee688791d45a905f5b1ca36f664"
-dependencies = [
- "heck 0.5.0",
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
 
 [[package]]
 name = "subtle"
@@ -11270,6 +11243,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-specta"
+version = "2.0.0-rc.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee080f36d2ac17ce2f3a82fb53f02d664e8345457de51b56dad3c394dacc41a2"
+dependencies = [
+ "heck 0.5.0",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-serde",
+ "specta-typescript",
+ "specta-util",
+ "tauri",
+ "tauri-specta-macros",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "tauri-specta-macros"
+version = "2.0.0-rc.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a59dfdce06c98d8d211619bea5fdb39486d8a8c558e12b2d2ce255972320012"
+dependencies = [
+ "darling 0.23.0",
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "tauri-utils"
 version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11278,7 +11282,7 @@ dependencies = [
  "anyhow",
  "brotli",
  "cargo_metadata",
- "ctor 0.8.0",
+ "ctor",
  "dom_query",
  "dunce",
  "glob",
@@ -11316,37 +11320,6 @@ dependencies = [
  "dunce",
  "embed-resource",
  "toml 1.1.2+spec-1.1.0",
-]
-
-[[package]]
-name = "taurpc"
-version = "0.8.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=fix%2Fmobile-compilation#b90893ef5f2a7f36559ccfca26376635257f145e"
-dependencies = [
- "anyhow",
- "heck 0.5.0",
- "itertools 0.14.0",
- "serde",
- "serde_json",
- "specta",
- "specta-macros",
- "specta-serde",
- "specta-typescript",
- "tauri",
- "taurpc-macros",
- "tokio",
-]
-
-[[package]]
-name = "taurpc-macros"
-version = "0.8.0"
-source = "git+https://github.com/AndreRoelofs/TauRPC.git?branch=fix%2Fmobile-compilation#b90893ef5f2a7f36559ccfca26376635257f145e"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn 2.0.117",
 ]
 
 [[package]]

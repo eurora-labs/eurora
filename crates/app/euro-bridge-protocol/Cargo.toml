@@ -11,7 +11,7 @@ specta = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 
 anyhow = { workspace = true, optional = true }
-specta-swift = { version = "0.0.1", optional = true }
+specta-swift = { version = "0.0.3", optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

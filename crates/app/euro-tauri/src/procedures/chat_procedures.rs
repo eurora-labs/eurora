@@ -1,198 +1,155 @@
 use agent_chain_core::messages::ContentBlock;
 use euro_activity::types::ContextChip;
 use euro_timeline::TimelineManager;
-use tauri::{Manager, Runtime, ipc::Channel};
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use tauri::{AppHandle, Manager, ipc::Channel};
 use thread_core::{ChatSendRequest, ChatServerMessage};
 use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::error::AppError;
+use crate::error::ResultExt;
 use crate::shared_types::{ActiveStreamTokens, SharedThreadManager};
 
-/// Per-turn host context returned by `chat.collect_context`.
+const STREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Per-turn host context returned by `chat_collect_context`.
 ///
 /// `content_blocks` are inlined directly — large payloads are rewritten into
 /// asset references server-side at chat-turn time, so the wire format here
 /// can carry raw bytes/text without the client having to round-trip them.
-#[taurpc::ipc_type]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct ChatContext {
     pub content_blocks: Vec<ContentBlock>,
     pub asset_chips: Vec<ContextChip>,
 }
 
-// Trait method docs are not supported by `#[taurpc::procedures]` — see the
-// `ChatApiImpl` resolvers below for behavior notes.
-#[taurpc::procedures(path = "chat")]
-pub trait ChatApi {
-    async fn collect_context<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-    ) -> Result<ChatContext, String>;
-
-    async fn send_query<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-        channel: Channel<ChatServerMessage>,
-        request: ChatSendRequest,
-    ) -> Result<(), String>;
-
-    async fn regenerate<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-        ai_message_id: String,
-        channel: Channel<ChatServerMessage>,
-    ) -> Result<(), String>;
-
-    async fn cancel_query<R: Runtime>(
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-    ) -> Result<(), String>;
+fn thread_manager(app_handle: &AppHandle) -> Result<tauri::State<'_, SharedThreadManager>, String> {
+    app_handle
+        .try_state::<SharedThreadManager>()
+        .ok_or_else(|| "Thread manager not available".to_string())
 }
 
-#[derive(Clone)]
-pub struct ChatApiImpl;
+fn active_stream_tokens(
+    app_handle: &AppHandle,
+) -> Result<tauri::State<'_, ActiveStreamTokens>, String> {
+    app_handle
+        .try_state::<ActiveStreamTokens>()
+        .ok_or_else(|| "Active stream tokens not available".to_string())
+}
 
-const STREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_collect_context(
+    app_handle: AppHandle,
+    _thread_id: Uuid,
+) -> Result<ChatContext, String> {
+    let timeline_state = app_handle
+        .try_state::<Mutex<TimelineManager>>()
+        .ok_or_else(|| "Timeline not available".to_string())?;
 
-#[taurpc::resolvers]
-impl ChatApi for ChatApiImpl {
-    async fn collect_context<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        _thread_id: String,
-    ) -> Result<ChatContext, String> {
-        let timeline_state: tauri::State<Mutex<TimelineManager>> = app_handle
-            .try_state()
-            .ok_or(AppError::Unavailable("Timeline"))?;
+    let timeline = timeline_state.lock().await;
 
-        let timeline = timeline_state.lock().await;
-
-        // Refreshing the activity is best-effort: a missing tab or stale
-        // browser bridge shouldn't abort the chat turn — we just contribute
-        // no fresh context for it.
-        if let Err(e) = timeline.refresh_current_activity().await {
-            tracing::debug!("collect_context: refresh failed: {e}");
-        }
-        if timeline.save_current_activity_to_service().await.is_err() {
-            return Ok(ChatContext {
-                content_blocks: Vec::new(),
-                asset_chips: Vec::new(),
-            });
-        }
-
-        let asset_blocks = timeline.construct_messages_from_last_asset().await;
-        let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
-
-        let mut content_blocks: Vec<ContentBlock> =
-            Vec::with_capacity(asset_blocks.len() + snapshot_blocks.len());
-        content_blocks.extend(asset_blocks.into_inner());
-        content_blocks.extend(snapshot_blocks.into_inner());
-
-        let asset_chips = timeline
-            .get_context_chip()
-            .await
-            .map(|chip| vec![chip])
-            .unwrap_or_default();
-
-        Ok(ChatContext {
-            content_blocks,
-            asset_chips,
-        })
+    // Refreshing the activity is best-effort: a missing tab or stale browser
+    // bridge shouldn't abort the chat turn — we just contribute no fresh
+    // context for it.
+    if let Err(e) = timeline.refresh_current_activity().await {
+        tracing::debug!("collect_context: refresh failed: {e}");
+    }
+    if timeline.save_current_activity_to_service().await.is_err() {
+        return Ok(ChatContext {
+            content_blocks: Vec::new(),
+            asset_chips: Vec::new(),
+        });
     }
 
-    async fn send_query<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-        channel: Channel<ChatServerMessage>,
-        request: ChatSendRequest,
-    ) -> Result<(), String> {
-        let thread_state: tauri::State<SharedThreadManager> = app_handle
-            .try_state()
-            .ok_or(AppError::Unavailable("Thread manager"))?;
-        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
-            .try_state()
-            .ok_or(AppError::Unavailable("Active stream tokens"))?;
+    let asset_blocks = timeline.construct_messages_from_last_asset().await;
+    let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
 
-        let thread_uuid =
-            Uuid::parse_str(&thread_id).map_err(|e| format!("Invalid thread_id: {e}"))?;
+    let mut content_blocks: Vec<ContentBlock> =
+        Vec::with_capacity(asset_blocks.len() + snapshot_blocks.len());
+    content_blocks.extend(asset_blocks.into_inner());
+    content_blocks.extend(snapshot_blocks.into_inner());
 
-        let cancel = CancellationToken::new();
-        tokens_state
-            .lock()
-            .await
-            .insert(thread_id.clone(), cancel.clone());
+    let asset_chips = timeline
+        .get_context_chip()
+        .await
+        .map(|chip| vec![chip])
+        .unwrap_or_default();
 
-        let thread = thread_state.inner();
-        let stream_result = forward_chat_stream(
-            thread
-                .chat_stream(thread_uuid, request, cancel.clone())
-                .await,
-            cancel.clone(),
-            &channel,
-        )
-        .await;
+    Ok(ChatContext {
+        content_blocks,
+        asset_chips,
+    })
+}
 
-        tokens_state.lock().await.remove(&thread_id);
-        stream_result
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_send_query(
+    app_handle: AppHandle,
+    thread_id: Uuid,
+    channel: Channel<ChatServerMessage>,
+    request: ChatSendRequest,
+) -> Result<(), String> {
+    let thread_state = thread_manager(&app_handle)?;
+    let tokens_state = active_stream_tokens(&app_handle)?;
+
+    let cancel = CancellationToken::new();
+    tokens_state.lock().await.insert(thread_id, cancel.clone());
+
+    let thread = thread_state.inner();
+    let stream_result = forward_chat_stream(
+        thread.chat_stream(thread_id, request, cancel.clone()).await,
+        cancel.clone(),
+        &channel,
+    )
+    .await;
+
+    tokens_state.lock().await.remove(&thread_id);
+    stream_result
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_regenerate(
+    app_handle: AppHandle,
+    thread_id: Uuid,
+    ai_message_id: Uuid,
+    channel: Channel<ChatServerMessage>,
+) -> Result<(), String> {
+    let thread_state = thread_manager(&app_handle)?;
+    let tokens_state = active_stream_tokens(&app_handle)?;
+
+    let cancel = CancellationToken::new();
+    tokens_state.lock().await.insert(thread_id, cancel.clone());
+
+    let thread = thread_state.inner();
+    let stream_result = forward_chat_stream(
+        thread
+            .chat_regenerate(thread_id, ai_message_id, cancel.clone())
+            .await,
+        cancel.clone(),
+        &channel,
+    )
+    .await;
+
+    tokens_state.lock().await.remove(&thread_id);
+    stream_result
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_cancel_query(app_handle: AppHandle, thread_id: Uuid) -> Result<(), String> {
+    let tokens_state = active_stream_tokens(&app_handle)?;
+
+    if let Some(token) = tokens_state.lock().await.remove(&thread_id) {
+        token.cancel();
+        tracing::debug!("Cancelled stream for thread {thread_id}");
     }
 
-    async fn regenerate<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-        ai_message_id: String,
-        channel: Channel<ChatServerMessage>,
-    ) -> Result<(), String> {
-        let thread_state: tauri::State<SharedThreadManager> = app_handle
-            .try_state()
-            .ok_or(AppError::Unavailable("Thread manager"))?;
-        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
-            .try_state()
-            .ok_or(AppError::Unavailable("Active stream tokens"))?;
-
-        let thread_uuid =
-            Uuid::parse_str(&thread_id).map_err(|e| format!("Invalid thread_id: {e}"))?;
-        let ai_message_uuid =
-            Uuid::parse_str(&ai_message_id).map_err(|e| format!("Invalid ai_message_id: {e}"))?;
-
-        let cancel = CancellationToken::new();
-        tokens_state
-            .lock()
-            .await
-            .insert(thread_id.clone(), cancel.clone());
-
-        let thread = thread_state.inner();
-        let stream_result = forward_chat_stream(
-            thread
-                .chat_regenerate(thread_uuid, ai_message_uuid, cancel.clone())
-                .await,
-            cancel.clone(),
-            &channel,
-        )
-        .await;
-
-        tokens_state.lock().await.remove(&thread_id);
-        stream_result
-    }
-
-    async fn cancel_query<R: Runtime>(
-        self,
-        app_handle: tauri::AppHandle<R>,
-        thread_id: String,
-    ) -> Result<(), String> {
-        let tokens_state: tauri::State<ActiveStreamTokens> = app_handle
-            .try_state()
-            .ok_or(AppError::Unavailable("Active stream tokens"))?;
-
-        if let Some(token) = tokens_state.lock().await.remove(&thread_id) {
-            token.cancel();
-            tracing::debug!("Cancelled stream for thread {thread_id}");
-        }
-
-        Ok(())
-    }
+    Ok(())
 }
 
 async fn forward_chat_stream(
@@ -202,7 +159,7 @@ async fn forward_chat_stream(
     cancel: CancellationToken,
     channel: &Channel<ChatServerMessage>,
 ) -> Result<(), String> {
-    let mut rx = open_result.map_err(|e| format!("Failed to open chat stream: {e}"))?;
+    let mut rx = open_result.ctx("Failed to open chat stream")?;
 
     let stream_future = async {
         while let Some(item) = rx.recv().await {

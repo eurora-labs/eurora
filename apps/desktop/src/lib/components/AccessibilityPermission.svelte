@@ -1,13 +1,10 @@
 <script lang="ts">
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { inject } from '@eurora/shared/context';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
-
-	const taurpcService = inject(TAURPC_SERVICE);
 
 	let dialogOpen = $state(false);
 	let checking = $state(false);
@@ -15,7 +12,7 @@
 
 	async function checkPermission(): Promise<boolean> {
 		try {
-			return await taurpcService.system.check_accessibility_permission();
+			return await commands.systemCheckAccessibilityPermission();
 		} catch (error) {
 			console.error('Failed to check accessibility permission:', error);
 			return true; // Assume granted on error to avoid blocking
@@ -26,7 +23,7 @@
 		checking = true;
 		cancelled = false;
 		try {
-			await taurpcService.system.request_accessibility_permission();
+			await commands.systemRequestAccessibilityPermission();
 		} catch (error) {
 			console.error('Failed to request accessibility permission:', error);
 		}

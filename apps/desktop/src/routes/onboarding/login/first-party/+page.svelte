@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -9,7 +9,6 @@
 	import { onMount, onDestroy } from 'svelte';
 
 	const user = inject(USER_SERVICE);
-	const taurpc = inject(TAURPC_SERVICE);
 	let intervalId: ReturnType<typeof setInterval> | null = null;
 
 	async function openLogin() {
@@ -22,7 +21,10 @@
 				return;
 			}
 			clearInterval(intervalId!);
-			taurpc.system.focus_main_window().catch(() => {});
+			// Best-effort focus — the user is mid-OAuth, swallow both
+			// SystemError results and IPC rejections rather than blocking
+			// the redirect on a window-focus hiccup.
+			commands.systemFocusMainWindow().catch(() => {});
 			if (user.emailVerified) {
 				goto('/');
 			} else {

@@ -22,7 +22,7 @@ pub struct HumanMessage {
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
@@ -137,7 +137,7 @@ pub struct HumanMessageChunk {
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]

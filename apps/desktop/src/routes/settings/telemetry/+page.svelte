@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { type TelemetrySettings } from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { commands, type TelemetrySettings } from '$lib/bindings/specta.bindings.js';
+	import { unwrap } from '$lib/bindings/result.js';
 	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -10,7 +10,6 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const telemetry = inject(TELEMETRY_SERVICE);
 
 	let settings = $state<TelemetrySettings | null>(null);
@@ -19,7 +18,7 @@
 
 	onMount(async () => {
 		try {
-			settings = await taurpc.settings.get_telemetry_settings();
+			settings = await commands.settingsGetTelemetry();
 		} catch (error) {
 			console.error('Failed to load telemetry settings:', error);
 			toast.error('Could not load telemetry settings');
@@ -29,7 +28,7 @@
 	async function persist(next: TelemetrySettings) {
 		saving = true;
 		try {
-			settings = await taurpc.settings.set_telemetry_settings(next);
+			settings = unwrap(await commands.settingsSetTelemetry(next));
 			await telemetry.refresh();
 		} catch (error) {
 			console.error('Failed to save telemetry settings:', error);
@@ -49,7 +48,7 @@
 		rotating = true;
 		try {
 			await telemetry.rotateDistinctId();
-			settings = await taurpc.settings.get_telemetry_settings();
+			settings = await commands.settingsGetTelemetry();
 			toast.success('Telemetry id rotated');
 		} catch (error) {
 			console.error('Failed to rotate telemetry id:', error);

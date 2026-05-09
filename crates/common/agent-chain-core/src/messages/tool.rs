@@ -44,7 +44,7 @@ pub struct ToolCall {
     /// generated TS type is `Record<string, unknown>` to reflect that.
     #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub args: serde_json::Value,
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type", default)]
     pub call_type: Option<String>,
 }
 
@@ -69,15 +69,15 @@ impl ToolCall {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolCallChunk {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub args: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<i32>,
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type", default)]
     pub chunk_type: Option<String>,
 }
 
@@ -103,15 +103,15 @@ impl ToolCallChunk {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InvalidToolCall {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub args: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub error: Option<String>,
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type", default)]
     pub call_type: Option<String>,
 }
 
@@ -139,14 +139,15 @@ impl InvalidToolCall {
 pub struct ToolMessage {
     pub content: ContentBlocks,
     #[serde(deserialize_with = "deserialize_tool_call_id")]
+    #[cfg_attr(feature = "specta", specta(type = String))]
     pub tool_call_id: String,
     #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub status: ToolStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub artifact: Option<serde_json::Value>,
     #[serde(default)]
@@ -288,14 +289,15 @@ impl ToolOutputMixin for ToolMessage {}
 pub struct ToolMessageChunk {
     pub content: ContentBlocks,
     #[serde(deserialize_with = "deserialize_tool_call_id")]
+    #[cfg_attr(feature = "specta", specta(type = String))]
     pub tool_call_id: String,
     #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub status: ToolStatus,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub artifact: Option<serde_json::Value>,
     #[serde(default)]

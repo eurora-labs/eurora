@@ -1,72 +1,8 @@
 use crate::{Frame, MAX_FRAME_SIZE};
 use anyhow::{Context, Result, anyhow, bail};
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
-use image::{ImageBuffer, Rgba};
-use resvg::render;
-use specta_typescript::BigIntExportBehavior;
-use tiny_skia::Pixmap;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use usvg::{Options, Tree};
 
-pub fn convert_svg_to_rgba(svg: &str) -> Result<image::RgbaImage> {
-    let b64 = svg
-        .trim()
-        .strip_prefix("data:image/svg+xml;base64,")
-        .unwrap_or(svg);
-
-    let svg_bytes = BASE64_STANDARD
-        .decode(b64)
-        .map_err(|e| anyhow!("Failed to decode base64 SVG: {}", e))?;
-
-    let mut opt = Options::default();
-    opt.fontdb_mut().load_system_fonts();
-
-    let tree =
-        Tree::from_data(&svg_bytes, &opt).map_err(|e| anyhow!("Failed to parse SVG: {}", e))?;
-
-    let size = tree.size();
-    let width = size.width().ceil() as u32;
-    let height = size.height().ceil() as u32;
-
-    let mut pixmap = Pixmap::new(width, height).ok_or_else(|| {
-        anyhow!(
-            "Failed to create pixmap with dimensions {}x{}",
-            width,
-            height
-        )
-    })?;
-
-    render(&tree, tiny_skia::Transform::default(), &mut pixmap.as_mut());
-
-    let img = ImageBuffer::<Rgba<u8>, _>::from_raw(width, height, pixmap.data().to_vec())
-        .ok_or_else(|| {
-            anyhow!(
-                "Failed to create image buffer from pixmap data ({}x{})",
-                width,
-                height
-            )
-        })?;
-
-    Ok(img)
-}
-
-pub fn generate_typescript_definitions() -> Result<()> {
-    use specta_typescript::Typescript;
-
-    if let Err(e) = Typescript::default()
-        .bigint(BigIntExportBehavior::Fail)
-        .export_to(
-            "apps/browser/src/shared/content/bindings.ts",
-            &specta::collect(),
-        )
-    {
-        tracing::debug!("Failed to generate TypeScript definitions: {}", e);
-    }
-
-    Ok(())
-}
-
-pub async fn read_framed<R>(reader: &mut R) -> anyhow::Result<Option<Frame>>
+pub async fn read_framed<R>(reader: &mut R) -> Result<Option<Frame>>
 where
     R: AsyncRead + Unpin,
 {
@@ -105,7 +41,7 @@ where
     Ok(Some(frame))
 }
 
-pub async fn write_framed<W>(writer: &mut W, frame: &Frame) -> anyhow::Result<()>
+pub async fn write_framed<W>(writer: &mut W, frame: &Frame) -> Result<()>
 where
     W: AsyncWrite + Unpin,
 {

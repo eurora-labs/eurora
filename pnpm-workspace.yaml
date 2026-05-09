@@ -6,6 +6,21 @@ packages:
     - backend/*
     - e2e
 
+allowBuilds:
+    '@azure/msal-node-extensions': set this to true or false
+    '@azure/msal-node-runtime': set this to true or false
+    '@ffmpeg-installer/linux-x64': set this to true or false
+    '@microsoft/m365agentstoolkit-cli': set this to true or false
+    '@sentry/cli': set this to true or false
+    core-js: set this to true or false
+    edgedriver: set this to true or false
+    esbuild: set this to true or false
+    geckodriver: set this to true or false
+    keytar: set this to true or false
+    protobufjs: set this to true or false
+    spawn-sync: set this to true or false
+    unrs-resolver: set this to true or false
+
 catalog:
     '@lucide/svelte': ^0.577.0
     '@tailwindcss/postcss': ^4.2.4

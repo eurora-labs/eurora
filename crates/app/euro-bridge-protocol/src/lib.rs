@@ -78,12 +78,12 @@ pub fn bridge_url_for(addr: SocketAddr) -> String {
     )
 }
 
-/// Build the [`specta::TypeCollection`] containing every type that
+/// Build the [`specta::Types`] containing every type that
 /// participates in the wire protocol. Used by the codegen binary and
 /// available to other crates that want to merge these types into a
 /// larger collection.
-pub fn type_collection() -> specta::TypeCollection {
-    specta::TypeCollection::default()
+pub fn type_collection() -> specta::Types {
+    specta::Types::default()
         .register::<Frame>()
         .register::<FrameKind>()
         .register::<RequestFrame>()

@@ -27,12 +27,12 @@ pub use responses::{
     ThirdPartyAuthUrlResponse, TokenResponse, UserInfo, UserResponse,
 };
 
-/// Build a [`specta::TypeCollection`] containing every auth wire type
+/// Build a [`specta::Types`] containing every auth wire type
 /// the desktop / mobile app needs. Used by the codegen binary to emit
 /// `auth.ts`.
 #[cfg(feature = "specta")]
-pub fn type_collection() -> specta::TypeCollection {
-    specta::TypeCollection::default()
+pub fn type_collection() -> specta::Types {
+    specta::Types::default()
         .register::<Claims>()
         .register::<Role>()
         .register::<Provider>()
@@ -61,7 +61,7 @@ mod tests {
         let types = super::type_collection();
         let names: Vec<String> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().to_string())
+            .map(|ndt| ndt.name.to_string())
             .collect();
         for expected in [
             "Claims",

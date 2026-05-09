@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import SearchDialog from '@eurora/chat/components/SearchDialog.svelte';
@@ -24,7 +24,6 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
 	const timelineService = inject(TIMELINE_SERVICE);
@@ -80,7 +79,7 @@
 
 	async function quit() {
 		quitDialogOpen = false;
-		taurpc.system.quit().catch((error) => {
+		commands.systemQuit().catch((error) => {
 			console.error('Failed to quit application:', error);
 			toast.error(`The app encountered the following error: ${error}`, {
 				description: 'Please quit manually from the tray menu.',
@@ -90,7 +89,6 @@
 					onClick: () => {},
 				},
 			});
-			console.error('Failed to quit application:', error);
 		});
 	}
 
@@ -161,10 +159,10 @@
 				{#each visibleTimelineItems as item, i}
 					<Timeline.Item
 						color={item.accent?.hex}
-						iconBg={item.accent?.icon_bg}
-						iconColor={item.accent?.icon_bg === '#000000' ? '#ffffff' : '#000000'}
+						iconBg={item.accent?.iconBg}
+						iconColor={item.accent?.iconBg === '#000000' ? '#ffffff' : '#000000'}
 						highlighted={i === visibleTimelineItems.length - 1}
-						iconSrc={item.icon_base64}
+						iconSrc={item.iconBase64}
 						name={item.name}
 					/>
 				{/each}

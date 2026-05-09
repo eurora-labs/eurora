@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type Theme } from '$lib/bindings/bindings.js';
+	import { type Theme } from '$lib/bindings/specta.bindings.js';
 	import {
 		APPEARANCE_SERVICE,
 		MAX_SCALE,

@@ -45,12 +45,24 @@ export type Annotation =
  *  in lockstep with the actual JSON shape.
  */
 export type AnyMessage =
-	| ({ type: 'human' } & HumanMessage)
-	| ({ type: 'system' } & SystemMessage)
-	| ({ type: 'ai' } & AIMessage)
-	| ({ type: 'tool' } & ToolMessage)
-	| ({ type: 'chat' } & ChatMessage)
-	| ({ type: 'remove' } & RemoveMessage);
+	| ({
+			type: 'human';
+	  } & HumanMessage)
+	| ({
+			type: 'system';
+	  } & SystemMessage)
+	| ({
+			type: 'ai';
+	  } & AIMessage)
+	| ({
+			type: 'tool';
+	  } & ToolMessage)
+	| ({
+			type: 'chat';
+	  } & ChatMessage)
+	| ({
+			type: 'remove';
+	  } & RemoveMessage);
 
 export type AudioContentBlock = {
 	id?: string | null;
@@ -62,7 +74,7 @@ export type AudioContentBlock = {
 	extras?: { [key in string]: unknown } | null;
 };
 
-export type BlockIndex = bigint | string;
+export type BlockIndex = number | string;
 
 /**
  *  Frame sent by the client over the chat WebSocket.
@@ -75,8 +87,12 @@ export type BlockIndex = bigint | string;
  *  deserialize, never on encode.
  */
 export type ChatClientMessage =
-	| ({ type: 'send' } & ChatSendRequest)
-	| ({ type: 'regenerate' } & RegenerateRequest)
+	| ({
+			type: 'send';
+	  } & ChatSendRequest)
+	| ({
+			type: 'regenerate';
+	  } & RegenerateRequest)
 	| { type: 'cancel' };
 
 export type ChatMessage = {
@@ -108,49 +124,77 @@ export type ChatSendRequest = {
  *  when the turn ends.
  */
 export type ChatServerMessage =
-	// The user's message has been persisted; clients should display it.
+	/**  The user's message has been persisted; clients should display it. */
 	| { type: 'confirmed_human_message'; message: MessageNode }
-	// One streaming chunk from the AI.
+	/**  One streaming chunk from the AI. */
 	| { type: 'chunk'; chunk: AIMessageChunk }
 	/**
 	 *  The turn ended successfully; tree positions for everything that was
 	 *  persisted during this turn (human + AI + any tool messages).
 	 */
 	| { type: 'final'; messages: MessageNode[] }
-	// The turn aborted with an error. The connection is closed after this.
+	/**  The turn aborted with an error. The connection is closed after this. */
 	| { type: 'error'; kind: string; message: string };
 
 export type ChunkPosition = 'last';
 
 export type ContentBlock =
-	| ({ type: 'text' } & TextContentBlock)
-	| ({ type: 'invalid_tool_call' } & InvalidToolCallBlock)
-	| ({ type: 'reasoning' } & ReasoningContentBlock)
-	| ({ type: 'non_standard' } & NonStandardContentBlock)
-	| ({ type: 'image' } & ImageContentBlock)
-	| ({ type: 'video' } & VideoContentBlock)
-	| ({ type: 'audio' } & AudioContentBlock)
-	| ({ type: 'text-plain' } & PlainTextContentBlock)
-	| ({ type: 'file' } & FileContentBlock)
-	| ({ type: 'tool_call' } & ToolCallBlock)
-	| ({ type: 'tool_call_chunk' } & ToolCallChunkBlock)
-	| ({ type: 'server_tool_call' } & ServerToolCall)
-	| ({ type: 'server_tool_call_chunk' } & ServerToolCallChunk)
-	| ({ type: 'server_tool_result' } & ServerToolResult);
+	| ({
+			type: 'text';
+	  } & TextContentBlock)
+	| ({
+			type: 'invalid_tool_call';
+	  } & InvalidToolCallBlock)
+	| ({
+			type: 'reasoning';
+	  } & ReasoningContentBlock)
+	| ({
+			type: 'non_standard';
+	  } & NonStandardContentBlock)
+	| ({
+			type: 'image';
+	  } & ImageContentBlock)
+	| ({
+			type: 'video';
+	  } & VideoContentBlock)
+	| ({
+			type: 'audio';
+	  } & AudioContentBlock)
+	| ({
+			type: 'text-plain';
+	  } & PlainTextContentBlock)
+	| ({
+			type: 'file';
+	  } & FileContentBlock)
+	| ({
+			type: 'tool_call';
+	  } & ToolCallBlock)
+	| ({
+			type: 'tool_call_chunk';
+	  } & ToolCallChunkBlock)
+	| ({
+			type: 'server_tool_call';
+	  } & ServerToolCall)
+	| ({
+			type: 'server_tool_call_chunk';
+	  } & ServerToolCallChunk)
+	| ({
+			type: 'server_tool_result';
+	  } & ServerToolResult);
 
 export type ContentBlocks = ContentBlock[];
 
-// Request body for `POST /threads`.
+/**  Request body for `POST /threads`. */
 export type CreateThreadRequest = {
 	title?: string | null;
 };
 
-// Response body for `POST /threads`.
+/**  Response body for `POST /threads`. */
 export type CreateThreadResponse = {
 	thread: Thread;
 };
 
-// Response body for `DELETE /threads/{thread_id}`.
+/**  Response body for `DELETE /threads/{thread_id}`. */
 export type DeleteThreadResponse = Record<string, never>;
 
 export type FileContentBlock = {
@@ -172,23 +216,23 @@ export type FileContentBlock = {
  */
 export type GenerateThreadTitleRequest = Record<string, never>;
 
-// Response body for `POST /threads/{thread_id}/title`.
+/**  Response body for `POST /threads/{thread_id}/title`. */
 export type GenerateThreadTitleResponse = {
 	thread: Thread;
 };
 
-// Query parameters for `GET /threads/{thread_id}/messages`.
+/**  Query parameters for `GET /threads/{thread_id}/messages`. */
 export type GetMessagesQuery = {
 	limit?: number | null;
 	offset?: number | null;
 };
 
-// Response body for endpoints that return the message tree.
+/**  Response body for endpoints that return the message tree. */
 export type GetMessagesResponse = {
 	messages: MessageNode[];
 };
 
-// Response body for `GET /threads/{thread_id}`.
+/**  Response body for `GET /threads/{thread_id}`. */
 export type GetThreadResponse = {
 	thread: Thread;
 };
@@ -211,11 +255,11 @@ export type ImageContentBlock = {
 	extras?: { [key in string]: unknown } | null;
 };
 
-export type InputTokenDetails = { [key in string]: bigint } & {
+export type InputTokenDetails = {
 	audio?: bigint | null;
 	cache_creation?: bigint | null;
 	cache_read?: bigint | null;
-};
+} & { [key in string]: bigint };
 
 export type InvalidToolCall = {
 	name?: string | null;
@@ -234,18 +278,18 @@ export type InvalidToolCallBlock = {
 	extras?: { [key in string]: unknown } | null;
 };
 
-// Query parameters for `GET /threads`.
+/**  Query parameters for `GET /threads`. */
 export type ListThreadsQuery = {
 	limit?: number | null;
 	offset?: number | null;
 };
 
-// Response body for `GET /threads`.
+/**  Response body for `GET /threads`. */
 export type ListThreadsResponse = {
 	threads: Thread[];
 };
 
-// One node in the message tree returned by message-list endpoints.
+/**  One node in the message tree returned by message-list endpoints. */
 export type MessageNode = {
 	parent_id?: string | null;
 	message: AnyMessage;
@@ -260,10 +304,10 @@ export type NonStandardContentBlock = {
 	index?: BlockIndex | null;
 };
 
-export type OutputTokenDetails = { [key in string]: bigint } & {
+export type OutputTokenDetails = {
 	audio?: bigint | null;
 	reasoning?: bigint | null;
-};
+} & { [key in string]: bigint };
 
 export type PlainTextContentBlock = {
 	id?: string | null;
@@ -303,44 +347,44 @@ export type RemoveMessage = {
 	response_metadata?: { [key in string]: unknown };
 };
 
-// One message hit returned by full-text search.
+/**  One message hit returned by full-text search. */
 export type SearchMessageResult = {
 	id: string;
 	thread_id: string;
 	message_type: string;
-	rank: number;
+	rank: number | null;
 	created_at: string;
 	snippet: string;
 };
 
-// Query parameters for `GET /threads/messages/search`.
+/**  Query parameters for `GET /threads/messages/search`. */
 export type SearchMessagesQuery = {
 	q: string;
 	limit?: number | null;
 	offset?: number | null;
 };
 
-// Response body for `GET /threads/messages/search`.
+/**  Response body for `GET /threads/messages/search`. */
 export type SearchMessagesResponse = {
 	results: SearchMessageResult[];
 };
 
-// One thread hit returned by full-text search.
+/**  One thread hit returned by full-text search. */
 export type SearchThreadResult = {
 	id: string;
 	title: string;
-	rank: number;
+	rank: number | null;
 	updated_at: string;
 };
 
-// Query parameters for `GET /threads/search`.
+/**  Query parameters for `GET /threads/search`. */
 export type SearchThreadsQuery = {
 	q: string;
 	limit?: number | null;
 	offset?: number | null;
 };
 
-// Response body for `GET /threads/search`.
+/**  Response body for `GET /threads/search`. */
 export type SearchThreadsResponse = {
 	results: SearchThreadResult[];
 };
@@ -399,7 +443,7 @@ export type TextContentBlock = {
 	extras?: { [key in string]: unknown } | null;
 };
 
-// A persisted thread row as returned to the client.
+/**  A persisted thread row as returned to the client. */
 export type Thread = {
 	id: string;
 	user_id: string;

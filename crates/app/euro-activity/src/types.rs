@@ -5,6 +5,7 @@ use euro_native_messaging::NativeMessage;
 use euro_office::WordAsset;
 use euro_pdf::PdfAsset;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::sync::Arc;
 use url::Url;
 use uuid::Uuid;
@@ -16,7 +17,7 @@ use crate::{
     storage::SaveableAsset,
 };
 
-#[taurpc::ipc_type]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct ContextChip {
     pub id: String,
     pub name: String,
