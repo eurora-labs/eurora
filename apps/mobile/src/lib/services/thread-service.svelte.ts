@@ -1,5 +1,5 @@
-import { unwrap } from '$lib/bindings/result.js';
-import { commands } from '$lib/bindings/specta.bindings.js';
+import { CommandError, unwrap, type CommandResult } from '$lib/bindings/result.js';
+import { commands, type StreamError } from '$lib/bindings/specta.bindings.js';
 import { Channel } from '@tauri-apps/api/core';
 
 import type { MessageNode } from '@eurora/chat/models/messages/index';
@@ -12,8 +12,6 @@ import type {
 	IThreadService,
 } from '@eurora/chat/services/thread/thread-service';
 import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
-
-type CommandResult<T> = { status: 'ok'; data: T } | { status: 'error'; error: string };
 
 export class ThreadService implements IThreadService {
 	async listThreads(limit: number, offset: number): Promise<Thread[]> {
@@ -92,7 +90,7 @@ export class ThreadService implements IThreadService {
 
 	async *#streamChat(
 		threadId: string,
-		open: (channel: Channel<ChatServerMessage>) => Promise<CommandResult<null>>,
+		open: (channel: Channel<ChatServerMessage>) => Promise<CommandResult<null, StreamError>>,
 		signal?: AbortSignal,
 	): AsyncIterable<ChatServerMessage> {
 		const buffer: ChatServerMessage[] = [];
@@ -118,8 +116,10 @@ export class ThreadService implements IThreadService {
 
 		open(channel).then(
 			(result) => {
-				if (result.status === 'error') {
-					error = new Error(result.error);
+				// `Cancelled` is the user-driven AbortSignal path racing the
+				// server — surface as a clean stream end, not an error.
+				if (result.status === 'error' && result.error.type !== 'Cancelled') {
+					error = new CommandError(result.error);
 				}
 				finished = true;
 				notify();
