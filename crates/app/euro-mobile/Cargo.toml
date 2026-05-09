@@ -40,7 +40,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-store = "2"
-tauri-specta = { workspace = true }
+tauri-specta = { workspace = true, features = ["derive", "typescript"] }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"
 tracing = { workspace = true }

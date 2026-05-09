@@ -1,4 +1,8 @@
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
+import { Channel } from '@tauri-apps/api/core';
+
+import { commands } from '$lib/bindings/specta.bindings.js';
+import { unwrap } from '$lib/bindings/result.js';
+import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
 import type { ChatServerMessage } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
@@ -7,29 +11,17 @@ import type {
 	ChatContext,
 	IThreadService,
 } from '@eurora/chat/services/thread/thread-service';
-import type {
-	ChatSendRequest,
-	MessageNode,
-	Thread as WireThread,
-} from '@eurora/shared/bindings/thread';
+import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
+
+type CommandResult<T> = { status: 'ok'; data: T } | { status: 'error'; error: string };
 
 export class ThreadService implements IThreadService {
-	private readonly taurpc: TaurpcService;
-
-	constructor(taurpc: TaurpcService) {
-		this.taurpc = taurpc;
-	}
-
 	async listThreads(limit: number, offset: number): Promise<Thread[]> {
-		return (await this.taurpc.thread.list(limit, offset)) as unknown as Thread[];
+		return unwrap(await commands.threadList(limit, offset));
 	}
 
 	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
-		return (await this.taurpc.thread.get_messages(
-			threadId,
-			limit,
-			offset,
-		)) as unknown as MessageNode[];
+		return unwrap(await commands.threadGetMessages(threadId, limit, offset));
 	}
 
 	async switchBranch(
@@ -37,23 +29,19 @@ export class ThreadService implements IThreadService {
 		messageId: string,
 		direction: BranchDirection,
 	): Promise<MessageNode[]> {
-		return (await this.taurpc.thread.switch_branch(
-			threadId,
-			messageId,
-			direction,
-		)) as unknown as MessageNode[];
+		return unwrap(await commands.threadSwitchBranch(threadId, messageId, direction));
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
-		await this.taurpc.thread.delete(threadId);
+		unwrap(await commands.threadDelete(threadId));
 	}
 
 	async createThread(): Promise<Thread> {
-		return (await this.taurpc.thread.create()) as unknown as WireThread;
+		return unwrap(await commands.threadCreate());
 	}
 
 	async generateTitle(threadId: string): Promise<Thread> {
-		return (await this.taurpc.thread.generate_title(threadId)) as unknown as WireThread;
+		return unwrap(await commands.threadGenerateTitle(threadId));
 	}
 
 	async searchThreads(
@@ -61,11 +49,7 @@ export class ThreadService implements IThreadService {
 		limit: number,
 		offset: number,
 	): Promise<ThreadSearchResult[]> {
-		return (await this.taurpc.thread.search_threads(
-			query,
-			limit,
-			offset,
-		)) as unknown as ThreadSearchResult[];
+		return unwrap(await commands.threadSearchThreads(query, limit, offset));
 	}
 
 	async searchMessages(
@@ -73,11 +57,7 @@ export class ThreadService implements IThreadService {
 		limit: number,
 		offset: number,
 	): Promise<MessageSearchResult[]> {
-		return (await this.taurpc.thread.search_messages(
-			query,
-			limit,
-			offset,
-		)) as unknown as MessageSearchResult[];
+		return unwrap(await commands.threadSearchMessages(query, limit, offset));
 	}
 
 	async collectContext(_threadId: string): Promise<ChatContext> {
@@ -93,7 +73,7 @@ export class ThreadService implements IThreadService {
 	): AsyncIterable<ChatServerMessage> {
 		return this.#streamChat(
 			threadId,
-			(channel) => this.taurpc.chat.send_query(threadId, channel, request),
+			(channel) => commands.chatSendQuery(threadId, channel, request),
 			signal,
 		);
 	}
@@ -105,14 +85,14 @@ export class ThreadService implements IThreadService {
 	): AsyncIterable<ChatServerMessage> {
 		return this.#streamChat(
 			threadId,
-			(channel) => this.taurpc.chat.regenerate(threadId, aiMessageId, channel),
+			(channel) => commands.chatRegenerate(threadId, aiMessageId, channel),
 			signal,
 		);
 	}
 
 	async *#streamChat(
 		threadId: string,
-		open: (channel: (response: ChatServerMessage) => void) => Promise<unknown>,
+		open: (channel: Channel<ChatServerMessage>) => Promise<CommandResult<null>>,
 		signal?: AbortSignal,
 	): AsyncIterable<ChatServerMessage> {
 		const buffer: ChatServerMessage[] = [];
@@ -125,18 +105,22 @@ export class ThreadService implements IThreadService {
 			resolve = null;
 		}
 
-		function onEvent(response: ChatServerMessage) {
+		const channel = new Channel<ChatServerMessage>();
+		channel.onmessage = (response) => {
 			buffer.push(response);
 			notify();
-		}
+		};
 
 		function onAbort() {
 			notify();
 		}
 		signal?.addEventListener('abort', onAbort, { once: true });
 
-		open(onEvent).then(
-			() => {
+		open(channel).then(
+			(result) => {
+				if (result.status === 'error') {
+					error = new Error(result.error);
+				}
 				finished = true;
 				notify();
 			},
@@ -168,7 +152,10 @@ export class ThreadService implements IThreadService {
 		} finally {
 			signal?.removeEventListener('abort', onAbort);
 			if (!finished) {
-				this.taurpc.chat.cancel_query(threadId).catch(() => {});
+				commands
+					.chatCancelQuery(threadId)
+					.then(unwrap)
+					.catch(() => {});
 			}
 		}
 	}
