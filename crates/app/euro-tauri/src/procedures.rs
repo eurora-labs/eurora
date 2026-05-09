@@ -5,14 +5,17 @@ use crate::shared_types::SharedUserController;
 
 pub mod auth_procedures;
 pub mod chat_procedures;
-pub mod context_chip_procedures;
-pub mod monitor_procedures;
 pub mod payment_procedures;
 pub mod settings_procedures;
 pub mod system_procedures;
-pub mod third_party_procedures;
 pub mod thread_procedures;
 pub mod timeline_procedures;
+
+// The remaining procedure modules (third_party, context_chip) still target
+// the legacy `taurpc` macros and stay un-`mod`'d until each is ported to
+// tauri-specta. The source files are kept on disk so the migration can pick
+// them up incrementally rather than rewriting every procedure in a single
+// change.
 
 pub(crate) fn user_controller<R: Runtime>(
     app_handle: &AppHandle<R>,

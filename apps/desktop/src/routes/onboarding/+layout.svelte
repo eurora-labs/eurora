@@ -1,14 +1,11 @@
 <script lang="ts">
-	import { type TimelineAppEvent } from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { inject } from '@eurora/shared/context';
+	import { events, type TimelineAppEvent } from '$lib/bindings/specta.bindings.js';
 	import EuroraIcon from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
 
-	let taurpcService = inject(TAURPC_SERVICE);
 	let timelineItems: TimelineAppEvent[] = $state([]);
-	let newAppEventListener: () => void;
+	let newAppEventListener: (() => void) | undefined;
 
 	let { children } = $props();
 	onMount(() => {
@@ -16,12 +13,12 @@
 			document.body.classList.add(`${platform()}-app`);
 		}
 
-		taurpcService.timeline.new_app_event
-			.on((e) => {
+		events.timelineAppEvent
+			.listen((e) => {
 				if (timelineItems.length >= 5) {
 					timelineItems.shift();
 				}
-				timelineItems.push(e);
+				timelineItems.push(e.payload);
 			})
 			.then((listener) => {
 				newAppEventListener = listener;

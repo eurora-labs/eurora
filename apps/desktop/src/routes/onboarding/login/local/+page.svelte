@@ -1,9 +1,12 @@
 <!-- TODO: This needs to be remade completely -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type APISettings, type ConnectionMode } from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { inject } from '@eurora/shared/context';
+	import {
+		commands,
+		type APISettings,
+		type ConnectionMode,
+	} from '$lib/bindings/specta.bindings.js';
+	import { unwrap } from '$lib/bindings/result.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
@@ -12,8 +15,6 @@
 	import { open } from '@tauri-apps/plugin-shell';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-
-	const taurpc = inject(TAURPC_SERVICE);
 
 	let endpoint = $state('http://localhost:3000');
 	let connecting = $state(false);
@@ -28,7 +29,7 @@
 	}
 
 	onMount(async () => {
-		const settings = await taurpc.settings.get_api_settings();
+		const settings = await commands.settingsGetApi();
 		if (settings.mode.kind === 'custom') {
 			endpoint = settings.mode.url;
 		} else if (settings.mode.kind === 'default') {
@@ -43,10 +44,10 @@
 			// doesn't speak Eurora's protocol — better than the old TCP-only
 			// reachability check, which would happily greenlight a random
 			// HTTP server on the same port.
-			await taurpc.system.test_backend_url(endpoint);
+			unwrap(await commands.systemTestBackendUrl(endpoint));
 
 			const settings: APISettings = { mode: modeFor(endpoint) };
-			await taurpc.settings.set_api_settings(settings);
+			unwrap(await commands.settingsSetApi(settings));
 			goto('/onboarding/login/local/auth');
 		} catch (error) {
 			toast.error(`Could not connect to ${endpoint}. Error: ${error}`);

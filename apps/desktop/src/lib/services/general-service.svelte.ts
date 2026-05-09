@@ -1,17 +1,12 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
+import { commands } from '$lib/bindings/specta.bindings.js';
+import { unwrap } from '$lib/bindings/result.js';
 
 export class GeneralService {
 	autostart = $state(false);
 
-	private readonly taurpc: TaurpcService;
-
-	constructor(taurpc: TaurpcService) {
-		this.taurpc = taurpc;
-	}
-
 	async init(): Promise<void> {
-		const settings = await this.taurpc.settings.get_general_settings();
+		const settings = await commands.settingsGetGeneral();
 		this.autostart = settings.autostart;
 	}
 
@@ -21,9 +16,11 @@ export class GeneralService {
 	}
 
 	private async persist(): Promise<void> {
-		await this.taurpc.settings.set_general_settings({
-			autostart: this.autostart,
-		});
+		unwrap(
+			await commands.settingsSetGeneral({
+				autostart: this.autostart,
+			}),
+		);
 	}
 }
 

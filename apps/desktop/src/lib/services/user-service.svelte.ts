@@ -1,7 +1,17 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { LoginToken } from '$lib/bindings/bindings.js';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
+import { commands, events, type LoginToken } from '$lib/bindings/specta.bindings.js';
 import type { TelemetryService } from '$lib/services/telemetry-service.svelte.js';
+
+// tauri-specta wraps every `Result<T, E>`-returning command in a tagged
+// `{ status: "ok" | "error" }` envelope. The rest of this service treats
+// command failures as exceptions (matching the old taurpc UX), so unwrap
+// the envelope at the boundary and surface the backend message via `Error`.
+type CommandResult<T, E> = { status: 'ok'; data: T } | { status: 'error'; error: E };
+
+function unwrap<T>(result: CommandResult<T, string>): T {
+	if (result.status === 'error') throw new Error(result.error);
+	return result.data;
+}
 
 export class UserService {
 	authenticated = $state(false);
@@ -12,17 +22,15 @@ export class UserService {
 
 	readonly planLabel = $derived(this.role === 'Tier1' ? 'Pro' : 'Free');
 
-	private readonly taurpc: TaurpcService;
 	private readonly telemetry: TelemetryService;
 	private readonly unlisteners: Promise<() => void>[] = [];
 
-	constructor(taurpc: TaurpcService, telemetry: TelemetryService) {
-		this.taurpc = taurpc;
+	constructor(telemetry: TelemetryService) {
 		this.telemetry = telemetry;
 	}
 
 	private async fetchProfile() {
-		const claims = await this.taurpc.auth.get_access_token_payload();
+		const claims = unwrap(await commands.authGetAccessTokenPayload());
 		this.authenticated = true;
 		this.email = claims.email;
 		this.displayName = claims.display_name ?? null;
@@ -36,18 +44,19 @@ export class UserService {
 	}
 
 	async init() {
-		const isAuth = await this.taurpc.auth.is_authenticated();
+		const isAuth = unwrap(await commands.authIsAuthenticated());
 
 		if (isAuth) {
 			await this.fetchProfile();
 		}
 
 		this.unlisteners.push(
-			this.taurpc.auth.auth_state_changed.on((claims) => {
+			events.authStateChanged.listen((event) => {
+				const { claims } = event.payload;
 				if (claims) {
 					this.authenticated = true;
 					this.email = claims.email;
-					this.displayName = claims.display_name;
+					this.displayName = claims.display_name ?? null;
 					this.role = claims.role;
 					this.emailVerified = claims.email_verified ?? false;
 					this.telemetry.identify({
@@ -68,25 +77,25 @@ export class UserService {
 	}
 
 	async login(login: string, password: string): Promise<void> {
-		await this.taurpc.auth.login(login, password);
+		unwrap(await commands.authLogin(login, password));
 		await this.fetchProfile();
 	}
 
 	async register(email: string, password: string): Promise<void> {
-		await this.taurpc.auth.register(email, password);
+		unwrap(await commands.authRegister(email, password));
 		await this.fetchProfile();
 	}
 
 	async logout(): Promise<void> {
-		await this.taurpc.auth.logout();
+		unwrap(await commands.authLogout());
 	}
 
 	async getLoginToken(): Promise<LoginToken> {
-		return this.taurpc.auth.get_login_token();
+		return unwrap(await commands.authGetLoginToken());
 	}
 
 	async pollForLogin(): Promise<boolean> {
-		const success = await this.taurpc.auth.poll_for_login();
+		const success = unwrap(await commands.authPollForLogin());
 		if (success) {
 			await this.fetchProfile();
 		}
@@ -94,18 +103,18 @@ export class UserService {
 	}
 
 	async resendVerificationEmail(): Promise<void> {
-		await this.taurpc.auth.resend_verification_email();
+		unwrap(await commands.authResendVerificationEmail());
 	}
 
 	async checkVerification(): Promise<boolean> {
-		await this.taurpc.auth.refresh_session();
-		const claims = await this.taurpc.auth.get_access_token_payload();
+		unwrap(await commands.authRefreshSession());
+		const claims = unwrap(await commands.authGetAccessTokenPayload());
 		this.emailVerified = claims.email_verified ?? false;
 		return this.emailVerified;
 	}
 
 	async refreshSession(): Promise<void> {
-		await this.taurpc.auth.refresh_session();
+		unwrap(await commands.authRefreshSession());
 	}
 
 	destroy() {

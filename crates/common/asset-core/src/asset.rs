@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "specta")]
 use specta::Type;
 #[cfg(feature = "specta")]
-use specta_typescript::Unknown;
+use specta_typescript::{BigInt, Unknown};
 use uuid::Uuid;
 
 /// Canonical asset record returned from the asset service.
@@ -13,6 +13,7 @@ pub struct Asset {
     pub id: Uuid,
     pub name: String,
     pub mime_type: String,
+    #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
     pub size_bytes: Option<i64>,
     /// SHA-256 of the asset content, base64 (standard alphabet)-encoded.
     pub checksum_sha256: Option<String>,
@@ -31,9 +32,9 @@ pub struct CreateAssetRequest {
     /// Asset bytes, base64 (standard alphabet)-encoded.
     pub content: String,
     pub mime_type: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub metadata: Option<serde_json::Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub activity_id: Option<Uuid>,
 }

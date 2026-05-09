@@ -13,19 +13,19 @@
 //! single source of truth for the output directory and TypeScript settings.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use anyhow::{Context, Result};
-use specta::TypeCollection;
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use specta::Types;
+use specta_typescript::Typescript;
 
 const OUTPUT_DIR: &str = "packages/shared/src/lib/bindings";
 
 struct Service {
     /// Filename stem; the emitted file is `<name>.ts`.
     name: &'static str,
-    types: fn() -> TypeCollection,
+    types: fn() -> Types,
 }
 
 const SERVICES: &[Service] = &[
@@ -62,21 +62,21 @@ fn run() -> Result<()> {
     fs::create_dir_all(&out_dir)
         .with_context(|| format!("creating output directory {}", out_dir.display()))?;
 
-    let exporter = Typescript::default().bigint(BigIntExportBehavior::BigInt);
+    let exporter = Typescript::default();
 
+    // Wire types are serialize/deserialize-symmetric by policy: `serde(default)`
+    // is fine, but `skip_serializing_if`, `serde(with = ...)`, `serde(into = ...)`,
+    // and `serde(from = ...)` are all directional and will make this binary
+    // fail. That's the strictness we want — it keeps the bindings unified
+    // (no `_Serialize`/`_Deserialize` phase pairs) and forces optional fields
+    // to land as explicit `null`s on the wire instead of being silently omitted.
     for service in SERVICES {
         let path = out_dir.join(format!("{}.ts", service.name));
-        write_bindings(&exporter, &(service.types)(), &path)
+        exporter
+            .export_to(&path, &(service.types)(), specta_serde::Format)
             .with_context(|| format!("emitting {}", path.display()))?;
         println!("wrote {}", path.display());
     }
 
-    Ok(())
-}
-
-fn write_bindings(exporter: &Typescript, types: &TypeCollection, path: &Path) -> Result<()> {
-    exporter
-        .export_to(path, types)
-        .context("exporting TypeScript bindings")?;
     Ok(())
 }

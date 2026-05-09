@@ -3,13 +3,13 @@
 //! bridges to the desktop app over a WebSocket. Chrome launches one
 //! copy per browser instance.
 
+use std::process;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{env, process};
 
 use anyhow::Result;
 use backon::{ConstantBuilder, Retryable};
-use euro_native_messaging::utils::{generate_typescript_definitions, read_framed, write_framed};
+use euro_native_messaging::utils::{read_framed, write_framed};
 use euro_native_messaging::{Frame, FrameKind, RegisterFrame, bridge_url, parent_pid};
 use futures_util::{SinkExt, StreamExt};
 use tokio::io;
@@ -65,14 +65,6 @@ fn frame_summary(frame: &Frame) -> String {
 #[tokio::main]
 async fn main() -> Result<()> {
     parent_pid::capture_parent_pid();
-
-    #[cfg(debug_assertions)]
-    init_debug_logging();
-
-    let args: Vec<String> = env::args().collect();
-    if args.iter().any(|a| a == "--generate_specta") {
-        return generate_typescript_definitions();
-    }
 
     let app_pid = parent_pid::get_parent_pid();
     let host_pid = process::id();
@@ -344,27 +336,4 @@ where
     let json = serde_json::to_string(frame)?;
     sink.send(Message::Text(json.into())).await?;
     Ok(())
-}
-
-#[cfg(debug_assertions)]
-fn init_debug_logging() {
-    use std::fs;
-    use tracing_subscriber::prelude::*;
-
-    let log_path = env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.join("euro-native-messaging.log")))
-        .unwrap_or_else(|| "/tmp/euro-native-messaging.log".into());
-    let log_file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .expect("failed to open log file");
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_writer(std::sync::Mutex::new(log_file))
-                .with_ansi(false),
-        )
-        .init();
 }

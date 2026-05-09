@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[cfg(feature = "specta")]
-use specta_typescript::Unknown;
+use specta_typescript::{BigInt, Unknown};
 
 use super::base::{
     AnyMessage, BaseMessage, BaseMessageChunk, MergeableContent, get_msg_title_repr,
@@ -26,36 +26,46 @@ type JsonObjectTs = HashMap<String, Unknown>;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InputTokenDetails {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
     pub audio: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
     pub cache_creation: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
     pub cache_read: Option<i64>,
-    #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "specta", specta(type = HashMap<String, BigInt>))]
     pub extra: HashMap<String, i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct OutputTokenDetails {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
     pub audio: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
     pub reasoning: Option<i64>,
-    #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten, default)]
+    #[cfg_attr(feature = "specta", specta(type = HashMap<String, BigInt>))]
     pub extra: HashMap<String, i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct UsageMetadata {
+    #[cfg_attr(feature = "specta", specta(type = BigInt))]
     pub input_tokens: i64,
+    #[cfg_attr(feature = "specta", specta(type = BigInt))]
     pub output_tokens: i64,
+    #[cfg_attr(feature = "specta", specta(type = BigInt))]
     pub total_tokens: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub input_token_details: Option<InputTokenDetails>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub output_token_details: Option<OutputTokenDetails>,
 }
 
@@ -134,13 +144,13 @@ pub struct AIMessage {
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
     #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub usage_metadata: Option<UsageMetadata>,
     #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
@@ -399,14 +409,14 @@ pub struct AIMessageChunk {
     pub content: ContentBlocks,
     #[serde(default)]
     pub id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
     #[serde(default)]
     pub invalid_tool_calls: Vec<InvalidToolCall>,
     pub tool_call_chunks: Vec<ToolCallChunk>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub usage_metadata: Option<UsageMetadata>,
     #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
@@ -414,7 +424,7 @@ pub struct AIMessageChunk {
     #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub response_metadata: HashMap<String, serde_json::Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub chunk_position: Option<ChunkPosition>,
 }
 

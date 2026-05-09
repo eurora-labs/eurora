@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type TelemetrySettings } from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { commands, type TelemetrySettings } from '$lib/bindings/specta.bindings.js';
+	import { unwrap } from '$lib/bindings/result.js';
 	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -10,7 +10,6 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import { onMount } from 'svelte';
 
-	let taurpc = inject(TAURPC_SERVICE);
 	let telemetry = inject(TELEMETRY_SERVICE);
 
 	let errorReporting = $state(true);
@@ -20,8 +19,8 @@
 	let saving = $state(false);
 
 	onMount(() => {
-		taurpc.settings
-			.get_telemetry_settings()
+		commands
+			.settingsGetTelemetry()
 			.then((settings) => {
 				telemetrySettings = settings;
 				errorReporting = settings.anonymousErrors;
@@ -38,12 +37,14 @@
 
 		saving = true;
 		try {
-			telemetrySettings = await taurpc.settings.set_telemetry_settings({
-				...telemetrySettings,
-				anonymousErrors: errorReporting,
-				anonymousMetrics: usageMetrics,
-				nonAnonymousMetrics: nonAnonymousUsageMetrics,
-			});
+			telemetrySettings = unwrap(
+				await commands.settingsSetTelemetry({
+					...telemetrySettings,
+					anonymousErrors: errorReporting,
+					anonymousMetrics: usageMetrics,
+					nonAnonymousMetrics: nonAnonymousUsageMetrics,
+				}),
+			);
 			await telemetry.refresh();
 		} catch (error) {
 			console.error('Failed to update telemetry settings:', error);

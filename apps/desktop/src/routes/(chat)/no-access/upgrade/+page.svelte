@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
+	import { unwrap } from '$lib/bindings/result.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -12,7 +13,6 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const user = inject(USER_SERVICE);
 
 	let interval: ReturnType<typeof setInterval> | undefined;
@@ -20,7 +20,7 @@
 	function startPolling() {
 		interval = setInterval(async () => {
 			try {
-				const subscribed = await taurpc.payment.is_subscribed();
+				const subscribed = unwrap(await commands.paymentIsSubscribed());
 				if (!subscribed) return;
 
 				clearInterval(interval);
@@ -66,7 +66,7 @@
 				class="w-fit"
 				onclick={async () => {
 					try {
-						const url = await taurpc.payment.create_checkout_url();
+						const url = unwrap(await commands.paymentCreateCheckoutUrl());
 						await open(url);
 					} catch (e) {
 						toast.error(`Failed to open checkout: ${e}`);

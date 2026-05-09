@@ -17,7 +17,7 @@ tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 anyhow = { workspace = true, optional = true }
-specta-typescript = { version = "0.0.10", optional = true }
+specta-typescript = { version = "0.0.12", optional = true }
 
 [dev-dependencies]
 futures-util = { workspace = true }

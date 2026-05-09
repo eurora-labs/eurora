@@ -7,7 +7,7 @@ export type CancelFrame = {
 	id: number;
 };
 
-// Failure response correlated with a [`RequestFrame`] by `id`.
+/**  Failure response correlated with a [`RequestFrame`] by `id`. */
 export type ErrorFrame = {
 	id: number;
 	code: number;
@@ -39,12 +39,62 @@ export type Frame = {
  *  already consumes.
  */
 export type FrameKind =
-	| { Request: RequestFrame }
-	| { Response: ResponseFrame }
-	| { Event: EventFrame }
-	| { Error: ErrorFrame }
-	| { Cancel: CancelFrame }
-	| { Register: RegisterFrame };
+	| ({ Request: RequestFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Response: ResponseFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Shutdown?: never;
+	  })
+	| ({ Event: EventFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Error: ErrorFrame } & {
+			Cancel?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Cancel: CancelFrame } & {
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Register: RegisterFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Shutdown: ShutdownFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+	  });
 
 export type NativeArticleAsset = {
 	title: string;
@@ -66,6 +116,20 @@ export type NativeImage = {
 	base64: string;
 	mime_type: string;
 };
+
+/**
+ *  Envelope for every payload the browser native-messaging host
+ *  exchanges with the desktop bridge. Externally tagged on `kind` with
+ *  the inner payload under `data` so the JSON shape matches what the
+ *  browser extension already constructs.
+ */
+export type NativeMessage =
+	| { kind: 'NativeYoutubeAsset'; data: NativeYoutubeAsset }
+	| { kind: 'NativeArticleAsset'; data: NativeArticleAsset }
+	| { kind: 'NativeTwitterAsset'; data: NativeTwitterAsset }
+	| { kind: 'NativeYoutubeSnapshot'; data: NativeYoutubeSnapshot }
+	| { kind: 'NativeArticleSnapshot'; data: NativeArticleSnapshot }
+	| { kind: 'NativeMetadata'; data: NativeMetadata };
 
 export type NativeMetadata = {
 	url: string | null;
@@ -91,11 +155,11 @@ export type NativeYoutubeAsset = {
 	url: string;
 	title: string;
 	transcript: string;
-	current_time: number;
+	current_time: number | null;
 };
 
 export type NativeYoutubeSnapshot = {
-	current_time: number;
+	current_time: number | null;
 	video_frame_base64: string;
 	video_frame_width: number;
 	video_frame_height: number;
@@ -140,14 +204,14 @@ export type RegisterFrame = {
 	app_kind?: string | null;
 };
 
-// Desktop-initiated request to a connected client.
+/**  Desktop-initiated request to a connected client. */
 export type RequestFrame = {
 	id: number;
 	action: string;
 	payload?: string | null;
 };
 
-// Client reply to a [`RequestFrame`], correlated by `id`.
+/**  Client reply to a [`RequestFrame`], correlated by `id`. */
 export type ResponseFrame = {
 	id: number;
 	action: string;
@@ -157,6 +221,17 @@ export type ResponseFrame = {
 export type SearchData = {
 	query: string;
 	tweets: NativeTwitterTweet[];
+};
+
+/**
+ *  Desktop-initiated request that the receiving client (currently:
+ *  browser native-messaging hosts) terminate cleanly. Sent when the
+ *  desktop has just installed an updated messenger binary on disk and
+ *  wants stale connections to drop so the browser respawns from the new
+ *  binary. The `reason` is informational only (logged by the recipient).
+ */
+export type ShutdownFrame = {
+	reason?: string | null;
 };
 
 export type TimelineData = {

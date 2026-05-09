@@ -54,7 +54,7 @@ rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
-specta-typescript = { version = "0.0.10" }
+specta-typescript = { version = "0.0.12" }
 tauri = { version = "2.11.1", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2.3.2"
@@ -81,8 +81,7 @@ sentry = { workspace = true, default-features = false, features = [
   "tracing",
   "release-health",
 ] }
-# taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
-taurpc = { workspace = true }
+tauri-specta = { workspace = true, features = ["derive", "typescript"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"
