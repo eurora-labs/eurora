@@ -5,33 +5,27 @@
 
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
-use euro_tauri::procedures::timeline_procedures::{AccentColor, TimelineAppEvent};
+use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
-    MAIN_WINDOW_LABEL, WindowState, create_window,
+    MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
-        auth_procedures::{AuthApi, AuthApiImpl},
-        chat_procedures::{ChatApi, ChatApiImpl},
-        context_chip_procedures::{ContextChipApi, ContextChipApiImpl},
-        monitor_procedures::{MonitorApi, MonitorApiImpl},
-        payment_procedures::{PaymentApi, PaymentApiImpl},
-        settings_procedures::{SettingsApi, SettingsApiImpl},
-        system_procedures::{SystemApi, SystemApiImpl},
-        third_party_procedures::{ThirdPartyApi, ThirdPartyApiImpl},
-        thread_procedures::{ThreadApi, ThreadApiImpl},
-        timeline_procedures::{TauRpcTimelineApiEventTrigger, TimelineApi, TimelineApiImpl},
+        system_procedures::{
+            BrowserExtensionStatusChanged, SAFARI_BRIDGE_APP_KIND, resolve_browser_extension_state,
+        },
+        timeline_procedures::{AccentColor, TimelineAppEvent, TimelineAssetsEvent},
     },
-    shared_types::{ActiveStreamTokens, SharedThreadManager},
+    shared_types::{ActiveStreamTokens, SharedHttpClient, SharedThreadManager},
     show_and_focus_main, telemetry,
 };
+use euro_thread::commands::SharedChatContextProvider;
 use euro_timeline::TimelineManager;
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
-
-use taurpc::Router;
+use tauri_specta::Event;
 use tokio::sync::Mutex;
 
 /// Returns `true` when the on-disk messenger binary was replaced during
@@ -385,6 +379,10 @@ fn init_state(
         .build()?;
     app_handle.manage(Mutex::new(timeline));
 
+    let context_provider: SharedChatContextProvider =
+        std::sync::Arc::new(TimelineChatContextProvider::new(app_handle.clone()));
+    app_handle.manage(context_provider);
+
     let path = tauri_app.path().app_data_dir()?;
     let user_controller = euro_user::UserController::new(path, auth_manager);
     app_handle.manage(SharedUserController::new(user_controller));
@@ -393,6 +391,10 @@ fn init_state(
     Ok(())
 }
 
+/// Bridge `TimelineManager`'s internal broadcast channels to the
+/// frontend by emitting tauri-specta typed events. Each task takes a
+/// fresh receiver from the manager (so a slow consumer can't starve
+/// the producer or another listener) and runs for the app's lifetime.
 fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
     let assets_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
@@ -402,8 +404,7 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
             timeline.subscribe_to_assets_events()
         };
         while let Ok(assets_event) = asset_receiver.recv().await {
-            let _ = TauRpcTimelineApiEventTrigger::new(assets_handle.clone())
-                .new_assets_event(assets_event);
+            let _ = TimelineAssetsEvent(assets_event).emit(&assets_handle);
         }
     });
 
@@ -428,15 +429,14 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
                 icon_base64 = euro_vision::rgba_to_base64(icon).ok();
             }
 
-            let _ = TauRpcTimelineApiEventTrigger::new(activity_handle.clone()).new_app_event(
-                TimelineAppEvent {
-                    name: activity_event.name.clone(),
-                    accent,
-                    icon_base64,
-                    process_name: activity_event.process_name.clone(),
-                    process_id: activity_event.process_id,
-                },
-            );
+            let _ = TimelineAppEvent {
+                name: activity_event.name.clone(),
+                accent,
+                icon_base64,
+                process_name: activity_event.process_name.clone(),
+                process_id: activity_event.process_id,
+            }
+            .emit(&activity_handle);
         }
     });
 
@@ -453,7 +453,7 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
 
 /// Forward bridge registry changes — native-messenger registrations,
 /// disconnects, and bundled-extension state reports — to the frontend as
-/// `browser_extension_status_changed` events.
+/// `BrowserExtensionStatusChanged` events.
 ///
 /// All three signals are routed through the same resolver
 /// (`resolve_browser_extension_state`) so the frontend sees a single
@@ -461,11 +461,6 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
 /// signal triggered the recompute. The UI uses these to update the
 /// extension affordance without polling.
 fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
-    use euro_tauri::procedures::system_procedures::{
-        BrowserExtensionStatus, SAFARI_BRIDGE_APP_KIND, TauRpcSystemApiEventTrigger,
-        resolve_browser_extension_state,
-    };
-
     tauri::async_runtime::spawn(async move {
         let service = euro_browser::BridgeService::get_or_init();
         let mut registrations_rx = service.subscribe_to_registrations();
@@ -474,11 +469,11 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
 
         let emit = |process_name: String| {
             let state = resolve_browser_extension_state(&process_name);
-            let _ = TauRpcSystemApiEventTrigger::new(app_handle.clone())
-                .browser_extension_status_changed(BrowserExtensionStatus {
-                    process_name,
-                    state,
-                });
+            let _ = BrowserExtensionStatusChanged {
+                process_name,
+                state,
+            }
+            .emit(&app_handle);
         };
 
         loop {
@@ -526,24 +521,6 @@ fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
             }
         }
     });
-}
-
-fn build_router() -> Router<tauri::Wry> {
-    Router::new()
-        .export_config(
-            specta_typescript::Typescript::default()
-                .bigint(specta_typescript::BigIntExportBehavior::BigInt),
-        )
-        .merge(AuthApiImpl.into_handler())
-        .merge(TimelineApiImpl.into_handler())
-        .merge(ThreadApiImpl.into_handler())
-        .merge(SettingsApiImpl.into_handler())
-        .merge(ThirdPartyApiImpl.into_handler())
-        .merge(MonitorApiImpl.into_handler())
-        .merge(SystemApiImpl.into_handler())
-        .merge(ContextChipApiImpl.into_handler())
-        .merge(PaymentApiImpl.into_handler())
-        .merge(ChatApiImpl.into_handler())
 }
 
 /// Install rustls' default crypto provider before any rustls consumer
@@ -604,11 +581,35 @@ fn main() {
             tauri::async_runtime::set(tokio::runtime::Handle::current());
 
             let telemetry_controller = telemetry_controller.clone();
+            let specta = build_specta();
+
+            // Regenerate the TypeScript bindings on every dev launch.
+            // `specta-typescript` 0.0.12 fails the export by default if any
+            // `i64`/`u64` field crosses the wire without an explicit
+            // `#[specta(type = ...)]` override, which is the strictness we
+            // want — silently bridging through `bigint` masks lossy round
+            // trips on the JS side.
+            #[cfg(debug_assertions)]
+            {
+                let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../../apps/desktop/src/lib/bindings/specta.bindings.ts");
+                specta
+                    .export(specta_typescript::Typescript::default(), &bindings_path)
+                    .expect("Failed to export tauri-specta bindings");
+            }
+
             let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_clipboard_manager::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
+                .invoke_handler(specta.invoke_handler())
                 .setup(move |tauri_app| {
+                    // `mount_events` must run inside `setup` so the typed
+                    // event channels are wired before any procedure has a
+                    // chance to emit. Move `specta` into the closure so its
+                    // event registry stays alive for the app lifetime.
+                    specta.mount_events(tauri_app);
+
                     let messenger_replaced = install_native_messaging_manifests(tauri_app);
                     install_office_word_addin(tauri_app);
                     bind_and_serve_bridge()?;
@@ -656,16 +657,28 @@ fn main() {
                     // matches what's persisted before the app comes up.
                     telemetry_controller.reapply(&app_settings.telemetry);
 
+                    let http_client: SharedHttpClient = reqwest::Client::builder()
+                        .timeout(std::time::Duration::from_secs(5))
+                        .build()
+                        .expect("failed to build shared HTTP client");
+
                     tauri_app.manage(endpoint_manager.clone());
                     tauri_app.manage(Mutex::new(app_settings.clone()));
                     tauri_app.manage(telemetry_controller.clone());
                     tauri_app.manage(WindowState::default());
+                    tauri_app.manage(http_client);
+
+                    // All command-visible state must be in place before the
+                    // WebView is created — once the window exists the
+                    // frontend starts firing IPC calls, and any procedure
+                    // that does `try_state::<...>()` will see `None` if its
+                    // backing manager hasn't been registered yet.
+                    init_state(tauri_app, &endpoint_manager)?;
 
                     register_autostart(tauri_app, &app_settings);
                     setup_main_window(tauri_app, started_by_autostart)?;
                     setup_tray(tauri_app)?;
 
-                    init_state(tauri_app, &endpoint_manager)?;
                     spawn_timeline_listeners(tauri_app.handle().clone());
                     spawn_browser_status_bridge(tauri_app.handle().clone());
 
@@ -727,9 +740,7 @@ fn main() {
                     .build(),
             );
 
-            let router = build_router();
             builder
-                .invoke_handler(router.into_handler())
                 .build(tauri_context)
                 .expect("Failed to build tauri app")
                 .run(|_app_handle, event| {

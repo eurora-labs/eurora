@@ -24,7 +24,7 @@ euro-auth = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-webpki-roots"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
-euro-thread = { workspace = true }
+euro-thread = { workspace = true, features = ["tauri"] }
 euro-user = { workspace = true }
 thread-core = { workspace = true, features = ["specta"] }
 uuid = { workspace = true, features = ["serde"] }
@@ -32,7 +32,7 @@ futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
-specta-typescript = { version = "0.0.10" }
+specta-typescript = { version = "0.0.12" }
 tauri = { version = "2.11.1", features = [] }
 tauri-plugin-http = "2"
 tauri-plugin-appauth = { workspace = true }
@@ -40,8 +40,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-store = "2"
-# taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
-taurpc = { workspace = true }
+tauri-specta = { workspace = true, features = ["derive", "typescript"] }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"
 tracing = { workspace = true }

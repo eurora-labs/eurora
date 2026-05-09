@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { type APISettings, type ConnectionMode } from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { inject } from '@eurora/shared/context';
+	import { unwrap } from '$lib/bindings/result.js';
+	import {
+		commands,
+		type APISettings,
+		type ConnectionMode,
+	} from '$lib/bindings/specta.bindings.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
@@ -10,8 +13,6 @@
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
-
-	const taurpc = inject(TAURPC_SERVICE);
 
 	type ModeKind = 'default' | 'custom';
 
@@ -37,7 +38,7 @@
 	async function save() {
 		try {
 			const settings: APISettings = { mode: buildMode() };
-			const result = await taurpc.settings.set_api_settings(settings);
+			const result = unwrap(await commands.settingsSetApi(settings));
 			applyResult(result);
 			toast.success('Connection settings saved');
 		} catch (error) {
@@ -50,7 +51,7 @@
 		llmInfoText = null;
 		try {
 			const url = kind === 'custom' ? customUrl : defaultUrl;
-			const info = await taurpc.system.test_backend_url(url);
+			const info = unwrap(await commands.systemTestBackendUrl(url));
 			const chat = info.roles.chat;
 			llmInfoText = `Connected — ${chat.provider} / ${chat.model}`;
 			toast.success(llmInfoText);
@@ -73,8 +74,8 @@
 		// Order matters: the baked default URL has to land first so
 		// `applyResult` can fold it into `resolvedEndpoint` for the
 		// "Active: …" hint.
-		defaultUrl = await taurpc.system.get_default_backend_url();
-		const settings = await taurpc.settings.get_api_settings();
+		defaultUrl = await commands.systemGetDefaultBackendUrl();
+		const settings = await commands.settingsGetApi();
 		applyResult(settings);
 	});
 </script>

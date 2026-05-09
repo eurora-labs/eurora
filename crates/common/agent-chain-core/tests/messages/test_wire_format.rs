@@ -39,7 +39,9 @@ fn expect_keys(value: &serde_json::Value, expected: &[&str]) {
 }
 
 // ---------------------------------------------------------------------------
-// Bare-message shapes — none should carry "type".
+// Bare-message shapes — none should carry "type". Optional fields land on the
+// wire as explicit `null` when unset (no `skip_serializing_if`), so they're
+// always part of the key set.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -63,13 +65,20 @@ fn bare_human_message_has_no_type_field() {
 }
 
 #[test]
-fn bare_human_message_omits_name_when_none() {
+fn bare_human_message_serializes_name_as_null_when_none() {
     let msg = HumanMessage::builder().content("hi").build();
     let v = serde_json::to_value(&msg).unwrap();
     expect_keys(
         &v,
-        &["content", "id", "additional_kwargs", "response_metadata"],
+        &[
+            "content",
+            "id",
+            "name",
+            "additional_kwargs",
+            "response_metadata",
+        ],
     );
+    assert_eq!(v["name"], serde_json::Value::Null);
 }
 
 #[test]
@@ -79,8 +88,15 @@ fn bare_system_message_has_no_type_field() {
     assert!(v.get("type").is_none());
     expect_keys(
         &v,
-        &["content", "id", "additional_kwargs", "response_metadata"],
+        &[
+            "content",
+            "id",
+            "name",
+            "additional_kwargs",
+            "response_metadata",
+        ],
     );
+    assert_eq!(v["name"], serde_json::Value::Null);
 }
 
 #[test]
@@ -93,12 +109,16 @@ fn bare_ai_message_has_no_type_field() {
         &[
             "content",
             "id",
+            "name",
             "tool_calls",
             "invalid_tool_calls",
+            "usage_metadata",
             "additional_kwargs",
             "response_metadata",
         ],
     );
+    assert_eq!(v["name"], serde_json::Value::Null);
+    assert_eq!(v["usage_metadata"], serde_json::Value::Null);
 }
 
 #[test]
@@ -115,11 +135,15 @@ fn bare_tool_message_has_no_type_field() {
             "content",
             "tool_call_id",
             "id",
+            "name",
             "status",
+            "artifact",
             "additional_kwargs",
             "response_metadata",
         ],
     );
+    assert_eq!(v["name"], serde_json::Value::Null);
+    assert_eq!(v["artifact"], serde_json::Value::Null);
 }
 
 #[test]
@@ -133,10 +157,12 @@ fn bare_chat_message_has_no_type_field() {
             "content",
             "role",
             "id",
+            "name",
             "additional_kwargs",
             "response_metadata",
         ],
     );
+    assert_eq!(v["name"], serde_json::Value::Null);
 }
 
 #[test]
@@ -147,7 +173,11 @@ fn bare_remove_message_has_no_type_or_content_field() {
     // RemoveMessage has no content in its struct; the legacy synthetic `""`
     // emitted by the old custom Serialize is gone.
     assert!(v.get("content").is_none());
-    expect_keys(&v, &["id", "additional_kwargs", "response_metadata"]);
+    expect_keys(
+        &v,
+        &["id", "name", "additional_kwargs", "response_metadata"],
+    );
+    assert_eq!(v["name"], serde_json::Value::Null);
 }
 
 // ---------------------------------------------------------------------------

@@ -239,6 +239,17 @@ extension AppDelegate: BridgeWebSocketClientDelegate {
             localBridgeServer?.broadcast(frame: frame)
         case .register:
             break
+        case let .shutdown(shutdown):
+            // The Rust bridge sends Shutdown to native-messaging hosts when
+            // it has just replaced the messenger binary on disk and wants
+            // stale connections to drop. The macOS launcher isn't a
+            // native-messaging host (Safari talks to it via the extension),
+            // so the frame doesn't apply to us — log it for traceability.
+            if let reason = shutdown.reason {
+                logger.info("Received Shutdown frame from desktop (reason=\(reason, privacy: .public)); ignoring")
+            } else {
+                logger.info("Received Shutdown frame from desktop; ignoring")
+            }
         }
     }
 

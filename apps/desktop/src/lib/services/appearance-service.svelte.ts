@@ -1,15 +1,8 @@
+import { unwrap } from '$lib/bindings/result.js';
+import { commands, type Theme } from '$lib/bindings/specta.bindings.js';
 import { clearAccent } from '$lib/services/accent.js';
 import { InjectionToken } from '@eurora/shared/context';
 import { setMode } from 'mode-watcher';
-import type { AppearanceSettings, Theme } from '$lib/bindings/bindings.js';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-
-const DEFAULT_APPEARANCE: AppearanceSettings = {
-	theme: 'system',
-	dynamicAccent: true,
-	interfaceScale: 1,
-	textScale: 1,
-};
 
 /**
  * Bounds and identity value for the accessibility scale sliders. Kept in sync
@@ -26,19 +19,13 @@ const UI_SCALE_VAR = '--ui-scale';
 const TEXT_SCALE_VAR = '--text-scale';
 
 export class AppearanceService {
-	theme = $state<Theme>(DEFAULT_APPEARANCE.theme);
-	dynamicAccent = $state<boolean>(DEFAULT_APPEARANCE.dynamicAccent);
-	interfaceScale = $state<number>(DEFAULT_APPEARANCE.interfaceScale);
-	textScale = $state<number>(DEFAULT_APPEARANCE.textScale);
-
-	private readonly taurpc: TaurpcService;
-
-	constructor(taurpc: TaurpcService) {
-		this.taurpc = taurpc;
-	}
+	theme = $state<Theme>('system');
+	dynamicAccent = $state<boolean>(true);
+	interfaceScale = $state<number>(DEFAULT_SCALE);
+	textScale = $state<number>(DEFAULT_SCALE);
 
 	async init(): Promise<void> {
-		const settings = await this.taurpc.settings.get_appearance_settings();
+		const settings = await commands.settingsGetAppearance();
 		this.theme = settings.theme;
 		this.dynamicAccent = settings.dynamicAccent;
 		this.interfaceScale = sanitizeScale(settings.interfaceScale);
@@ -109,17 +96,26 @@ export class AppearanceService {
 	}
 
 	private async persist(): Promise<void> {
-		await this.taurpc.settings.set_appearance_settings({
-			theme: this.theme,
-			dynamicAccent: this.dynamicAccent,
-			interfaceScale: this.interfaceScale,
-			textScale: this.textScale,
-		});
+		unwrap(
+			await commands.settingsSetAppearance({
+				theme: this.theme,
+				dynamicAccent: this.dynamicAccent,
+				interfaceScale: this.interfaceScale,
+				textScale: this.textScale,
+			}),
+		);
 	}
 }
 
-function sanitizeScale(value: number): number {
-	if (!Number.isFinite(value)) return DEFAULT_SCALE;
+/**
+ * Clamp `value` into the supported scale range, replacing any non-finite or
+ * missing input with [`DEFAULT_SCALE`]. Accepts `null` because specta-typescript
+ * widens Rust `f32` fields to `number | null` (NaN/Infinity round-trip through
+ * `serde_json` as JSON null) — the IPC boundary is the only place a null can
+ * appear; in-process slider callers always pass a finite number.
+ */
+function sanitizeScale(value: number | null): number {
+	if (value === null || !Number.isFinite(value)) return DEFAULT_SCALE;
 	return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 }
 

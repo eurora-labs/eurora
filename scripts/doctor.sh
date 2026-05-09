@@ -255,7 +255,7 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 check_command "cargo"       "cargo"       "Install Rust via https://rustup.rs" || true
-check_command "cargo-watch" "cargo-watch" "Install with: cargo install cargo-watch" || true
+check_command "watchexec"   "watchexec"   "Install with: cargo install --locked watchexec-cli" || true
 check_command "pnpm"        "pnpm"        "Install with: corepack enable" || true
 check_command "just"        "just"        "Install with: cargo install just" || true
 

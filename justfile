@@ -8,9 +8,9 @@
 # without restarting the rest.
 #
 #   just init              first-run setup (.env, pnpm install)
-#   just dev               full stack (backend hot-reloads via cargo-watch)
+#   just dev               full stack (backend hot-reloads via watchexec)
 #   just ios               full stack with mobile on an iOS simulator (macOS only)
-#   just dev-backend       backend only (Postgres + cargo-watch)
+#   just dev-backend       backend only (Postgres + watchexec)
 #   just dev-backend-once  backend only, no auto-restart (debugger / profiling)
 #   just dev-web           web auth UI only
 #   just dev-desktop       desktop app only
@@ -46,13 +46,18 @@ default: dev
 # Postgres + backend + web + desktop, all in one terminal. Pieces share
 # `just` itself as the supervisor; Ctrl-C stops them all.
 #
-# `cargo watch -x 'run -p be-monolith'` recompiles + restarts the backend
-# on every save in any workspace crate. That covers cross-cutting changes
-# (e.g. tweaking llm-core or be-thread-service) without you having to
-# remember which crate triggers what. Cost: a save in an unrelated crate
-# also restarts the backend; benefit: you never have to think about it.
-# Use `dev-backend-once` for cases where you want a stable run (debugger,
-# profiling, watching a steady tracing tail).
+# `_dev-backend-watch` runs the backend under `watchexec`, which terminates
+# and re-runs `cargo run -p be-monolith` on every save under
+# `crates/backend/` or `crates/common/`, plus the workspace manifests.
+# `crates/app/` is intentionally excluded — those are clients of the
+# backend, not dependencies of it, so a desktop or mobile edit shouldn't
+# bounce the server. The watch is also extension-filtered to .rs / .toml
+# so log writes and editor scratch files don't trigger restarts.
+#
+# Cost: a save in any backend or common crate restarts be-monolith even
+# if the edit didn't touch its actual dep graph; benefit: you don't have
+# to remember which crate triggers what. Use `dev-backend-once` for
+# stable runs (debugger, profiling, watching a steady tracing tail).
 #
 # Each child of `concurrently` is itself a `just` recipe call. That keeps
 # shell-quoting consistent across platforms (cmd.exe vs bash tokenize
@@ -68,8 +73,10 @@ dev: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
         "just _dev-desktop-after-backend"
 
 _dev-backend-watch:
-    cargo run -p be-monolith
-    # cargo watch -x 'run -p be-monolith'
+    watchexec --restart --exts rs,toml \
+        --watch crates/backend --watch crates/common \
+        --watch Cargo.toml --watch Cargo.lock \
+        -- cargo run -p be-monolith
 
 _dev-web-after-backend: _wait-for-backend
     pnpm dev:web
@@ -132,9 +139,7 @@ doctor:
 
 # ─── Backend ───────────────────────────────────────────────────────────────
 
-dev-backend: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
-    cargo run -p be-monolith
-    # cargo watch -x 'run -p be-monolith'
+dev-backend: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty && _dev-backend-watch
 
 # Backend only, single run, no auto-restart (debugger / profiling).
 dev-backend-once: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
