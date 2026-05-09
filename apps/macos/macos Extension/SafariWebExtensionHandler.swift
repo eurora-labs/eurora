@@ -29,6 +29,10 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             return
         }
 
+        dispatch(frame: frame, context: context)
+    }
+
+    private func dispatch(frame: Frame, context: NSExtensionContext) {
         switch frame.kind {
         case .response, .error:
             // Reply to a server-pushed request — forward and acknowledge.
