@@ -1,32 +1,12 @@
 <script lang="ts">
-	import { events, type TimelineAppEvent } from '$lib/bindings/specta.bindings.js';
 	import EuroraIcon from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { onMount } from 'svelte';
 
-	let timelineItems: TimelineAppEvent[] = $state([]);
-	let newAppEventListener: (() => void) | undefined;
-
 	let { children } = $props();
+
 	onMount(() => {
-		if (document) {
-			document.body.classList.add(`${platform()}-app`);
-		}
-
-		events.timelineAppEvent
-			.listen((e) => {
-				if (timelineItems.length >= 5) {
-					timelineItems.shift();
-				}
-				timelineItems.push(e.payload);
-			})
-			.then((listener) => {
-				newAppEventListener = listener;
-			});
-
-		return () => {
-			newAppEventListener?.();
-		};
+		document.body.classList.add(`${platform()}-app`);
 	});
 </script>
 

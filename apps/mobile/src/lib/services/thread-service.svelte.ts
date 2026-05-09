@@ -1,7 +1,7 @@
+import { unwrap } from '$lib/bindings/result.js';
+import { commands } from '$lib/bindings/specta.bindings.js';
 import { Channel } from '@tauri-apps/api/core';
 
-import { commands } from '$lib/bindings/specta.bindings.js';
-import { unwrap } from '$lib/bindings/result.js';
 import type { MessageNode } from '@eurora/chat/models/messages/index';
 import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
 import type { ChatServerMessage } from '@eurora/chat/models/streaming';

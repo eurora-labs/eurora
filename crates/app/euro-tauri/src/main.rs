@@ -14,11 +14,10 @@ use euro_tauri::{
         },
         timeline_procedures::{AccentColor, TimelineAppEvent, TimelineAssetsEvent},
     },
-    shared_types::{ActiveStreamTokens, SharedThreadManager},
+    shared_types::{ActiveStreamTokens, SharedHttpClient, SharedThreadManager},
     show_and_focus_main, telemetry,
 };
 use euro_timeline::TimelineManager;
-use specta_typescript::Typescript;
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
@@ -589,7 +588,7 @@ fn main() {
                 let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                     .join("../../../apps/desktop/src/lib/bindings/specta.bindings.ts");
                 specta
-                    .export(Typescript::default(), &bindings_path)
+                    .export(specta_typescript::Typescript::default(), &bindings_path)
                     .expect("Failed to export tauri-specta bindings");
             }
 
@@ -652,16 +651,28 @@ fn main() {
                     // matches what's persisted before the app comes up.
                     telemetry_controller.reapply(&app_settings.telemetry);
 
+                    let http_client: SharedHttpClient = reqwest::Client::builder()
+                        .timeout(std::time::Duration::from_secs(5))
+                        .build()
+                        .expect("failed to build shared HTTP client");
+
                     tauri_app.manage(endpoint_manager.clone());
                     tauri_app.manage(Mutex::new(app_settings.clone()));
                     tauri_app.manage(telemetry_controller.clone());
                     tauri_app.manage(WindowState::default());
+                    tauri_app.manage(http_client);
+
+                    // All command-visible state must be in place before the
+                    // WebView is created — once the window exists the
+                    // frontend starts firing IPC calls, and any procedure
+                    // that does `try_state::<...>()` will see `None` if its
+                    // backing manager hasn't been registered yet.
+                    init_state(tauri_app, &endpoint_manager)?;
 
                     register_autostart(tauri_app, &app_settings);
                     setup_main_window(tauri_app, started_by_autostart)?;
                     setup_tray(tauri_app)?;
 
-                    init_state(tauri_app, &endpoint_manager)?;
                     spawn_timeline_listeners(tauri_app.handle().clone());
                     spawn_browser_status_bridge(tauri_app.handle().clone());
 

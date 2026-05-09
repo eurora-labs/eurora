@@ -5,21 +5,21 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
-	authGetLoginToken: () => typedError<LoginToken, string>(__TAURI_INVOKE("auth_get_login_token")),
-	authPollForLogin: () => typedError<boolean, string>(__TAURI_INVOKE("auth_poll_for_login")),
-	authRegister: (email: string, password: string) => typedError<null, string>(__TAURI_INVOKE("auth_register", { email, password })),
-	authLogin: (login: string, password: string) => typedError<null, string>(__TAURI_INVOKE("auth_login", { login, password })),
-	authLogout: () => typedError<null, string>(__TAURI_INVOKE("auth_logout")),
-	authIsAuthenticated: () => typedError<boolean, string>(__TAURI_INVOKE("auth_is_authenticated")),
-	authGetAccessTokenPayload: () => typedError<Claims, string>(__TAURI_INVOKE("auth_get_access_token_payload")),
-	authRefreshSession: () => typedError<null, string>(__TAURI_INVOKE("auth_refresh_session")),
-	authResendVerificationEmail: () => typedError<null, string>(__TAURI_INVOKE("auth_resend_verification_email")),
-	chatCollectContext: (threadId: string) => typedError<ChatContext, string>(__TAURI_INVOKE("chat_collect_context", { threadId })),
-	chatSendQuery: (threadId: string, channel: Channel<ChatServerMessage>, request: ChatSendRequest) => typedError<null, string>(__TAURI_INVOKE("chat_send_query", { threadId, channel, request })),
-	chatRegenerate: (threadId: string, aiMessageId: string, channel: Channel<ChatServerMessage>) => typedError<null, string>(__TAURI_INVOKE("chat_regenerate", { threadId, aiMessageId, channel })),
-	chatCancelQuery: (threadId: string) => typedError<null, string>(__TAURI_INVOKE("chat_cancel_query", { threadId })),
-	paymentCreateCheckoutUrl: () => typedError<string, string>(__TAURI_INVOKE("payment_create_checkout_url")),
-	paymentIsSubscribed: () => typedError<boolean, string>(__TAURI_INVOKE("payment_is_subscribed")),
+	authGetLoginToken: () => typedError<LoginToken, AuthError>(__TAURI_INVOKE("auth_get_login_token")),
+	authPollForLogin: () => typedError<boolean, AuthError>(__TAURI_INVOKE("auth_poll_for_login")),
+	authRegister: (email: string, password: string) => typedError<null, AuthError>(__TAURI_INVOKE("auth_register", { email, password })),
+	authLogin: (login: string, password: string) => typedError<null, AuthError>(__TAURI_INVOKE("auth_login", { login, password })),
+	authLogout: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_logout")),
+	authIsAuthenticated: () => typedError<boolean, AuthError>(__TAURI_INVOKE("auth_is_authenticated")),
+	authGetAccessTokenPayload: () => typedError<Claims, AuthError>(__TAURI_INVOKE("auth_get_access_token_payload")),
+	authRefreshSession: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_refresh_session")),
+	authResendVerificationEmail: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_resend_verification_email")),
+	chatCollectContext: (threadId: string) => typedError<ChatContext, StreamError>(__TAURI_INVOKE("chat_collect_context", { threadId })),
+	chatSendQuery: (threadId: string, channel: Channel<ChatServerMessage>, request: ChatSendRequest) => typedError<null, StreamError>(__TAURI_INVOKE("chat_send_query", { threadId, channel, request })),
+	chatRegenerate: (threadId: string, aiMessageId: string, channel: Channel<ChatServerMessage>) => typedError<null, StreamError>(__TAURI_INVOKE("chat_regenerate", { threadId, aiMessageId, channel })),
+	chatCancelQuery: (threadId: string) => typedError<null, StreamError>(__TAURI_INVOKE("chat_cancel_query", { threadId })),
+	paymentCreateCheckoutUrl: () => typedError<string, PaymentError>(__TAURI_INVOKE("payment_create_checkout_url")),
+	paymentIsSubscribed: () => typedError<boolean, PaymentError>(__TAURI_INVOKE("payment_is_subscribed")),
 	settingsGetAll: () => __TAURI_INVOKE<AppSettings>("settings_get_all"),
 	settingsGetTelemetry: () => __TAURI_INVOKE<TelemetrySettings>("settings_get_telemetry"),
 	settingsSetTelemetry: (telemetrySettings: TelemetrySettings) => typedError<TelemetrySettings, SettingsError>(__TAURI_INVOKE("settings_set_telemetry", { telemetrySettings })),
@@ -61,15 +61,14 @@ export const commands = {
 	systemNeedsTelemetryConsent: () => __TAURI_INVOKE<boolean>("system_needs_telemetry_consent"),
 	systemReinitTelemetry: () => __TAURI_INVOKE<void>("system_reinit_telemetry"),
 	systemRotateTelemetryDistinctId: () => typedError<string, SystemError>(__TAURI_INVOKE("system_rotate_telemetry_distinct_id")),
-	threadList: (limit: number, offset: number) => typedError<Thread[], string>(__TAURI_INVOKE("thread_list", { limit, offset })),
-	threadCreate: () => typedError<Thread, string>(__TAURI_INVOKE("thread_create")),
-	threadDelete: (threadId: string) => typedError<null, string>(__TAURI_INVOKE("thread_delete", { threadId })),
-	threadGetMessages: (threadId: string, limit: number, offset: number) => typedError<MessageNode[], string>(__TAURI_INVOKE("thread_get_messages", { threadId, limit, offset })),
-	threadSwitchBranch: (threadId: string, messageId: string, direction: number) => typedError<MessageNode[], string>(__TAURI_INVOKE("thread_switch_branch", { threadId, messageId, direction })),
-	threadGenerateTitle: (threadId: string) => typedError<Thread, string>(__TAURI_INVOKE("thread_generate_title", { threadId })),
-	threadSearchThreads: (query: string, limit: number, offset: number) => typedError<SearchThreadResult[], string>(__TAURI_INVOKE("thread_search_threads", { query, limit, offset })),
-	threadSearchMessages: (query: string, limit: number, offset: number) => typedError<SearchMessageResult[], string>(__TAURI_INVOKE("thread_search_messages", { query, limit, offset })),
-	timelineList: () => typedError<string[], string>(__TAURI_INVOKE("timeline_list")),
+	threadList: (limit: number, offset: number) => typedError<Thread[], ThreadError>(__TAURI_INVOKE("thread_list", { limit, offset })),
+	threadCreate: () => typedError<Thread, ThreadError>(__TAURI_INVOKE("thread_create")),
+	threadDelete: (threadId: string) => typedError<null, ThreadError>(__TAURI_INVOKE("thread_delete", { threadId })),
+	threadGetMessages: (threadId: string, limit: number, offset: number) => typedError<MessageNode[], ThreadError>(__TAURI_INVOKE("thread_get_messages", { threadId, limit, offset })),
+	threadSwitchBranch: (threadId: string, messageId: string, direction: number) => typedError<MessageNode[], ThreadError>(__TAURI_INVOKE("thread_switch_branch", { threadId, messageId, direction })),
+	threadGenerateTitle: (threadId: string) => typedError<Thread, ThreadError>(__TAURI_INVOKE("thread_generate_title", { threadId })),
+	threadSearchThreads: (query: string, limit: number, offset: number) => typedError<SearchThreadResult[], ThreadError>(__TAURI_INVOKE("thread_search_threads", { query, limit, offset })),
+	threadSearchMessages: (query: string, limit: number, offset: number) => typedError<SearchMessageResult[], ThreadError>(__TAURI_INVOKE("thread_search_messages", { query, limit, offset })),
 };
 
 /** Events */
@@ -186,6 +185,17 @@ export type AudioContentBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
+/**
+ *  Typed error surface for the `auth_*` IPC commands. Externally tagged
+ *  so the JS side gets `{ type: "NotAuthenticated" }` and can branch on
+ *  the variant. The split between `NotAuthenticated` (the user must sign
+ *  in again) and `Backend` (transient — local credentials are intact)
+ *  matches `euro_auth::AuthError::is_logged_out` / `is_transient`, so
+ *  the UI can decide whether to bounce the user to the login screen or
+ *  just toast and retry.
+ */
+export type AuthError = { type: "NotAuthenticated" } | { type: "Backend"; data: string } | { type: "LoginTokenExpired" } | { type: "Config"; data: string } | { type: "Persistence"; data: string } | { type: "StateUnavailable"; data: string } | { type: "Internal"; data: string };
+
 export type AuthStateChanged = {
 	claims: Claims | null,
 };
@@ -256,9 +266,10 @@ export type BrowserExtensionStatusChanged = {
 /**
  *  Per-turn host context returned by `chat_collect_context`.
  * 
- *  `content_blocks` are inlined directly — large payloads are rewritten into
- *  asset references server-side at chat-turn time, so the wire format here
- *  can carry raw bytes/text without the client having to round-trip them.
+ *  `content_blocks` are inlined directly — large payloads are rewritten
+ *  into asset references server-side at chat-turn time, so the wire
+ *  format here can carry raw bytes/text without the client having to
+ *  round-trip them.
  */
 export type ChatContext = {
 	contentBlocks: ContentBlock[],
@@ -468,6 +479,15 @@ export type OutputTokenDetails = {
 	reasoning?: bigint | null,
 } & { [key in string]: bigint };
 
+/**
+ *  Typed error surface for the `payment_*` IPC commands. Externally
+ *  tagged so the JS side can branch on `error.type`. `Auth` re-uses the
+ *  auth surface so the same "session expired" handler in the frontend
+ *  catches both auth-touching commands and payment-touching commands
+ *  without a parallel mapping.
+ */
+export type PaymentError = { type: "Auth"; data: AuthError } | { type: "Backend"; data: string } | { type: "BadResponse"; data: string };
+
 export type PlainTextContentBlock = {
 	id?: string | null,
 	file_id?: string | null,
@@ -583,6 +603,17 @@ export type ServerToolStatus = "success" | "error";
 export type SettingsError = { type: "Persistence"; data: string } | { type: "EndpointSwitch"; data: string };
 
 /**
+ *  Typed error surface for the streaming `chat_*` IPC commands.
+ *  Externally tagged so the JS side can branch on `error.type`.
+ *  `Cancelled` is split out from the rest so the UI can suppress its
+ *  own cancel-induced errors instead of showing a toast for them; an
+ *  upstream `euro_thread::Error` (e.g. a deleted thread mid-stream)
+ *  is wrapped in `Thread` so the JS side can drill into the same
+ *  `ThreadError` variants it handles for CRUD calls.
+ */
+export type StreamError = { type: "Cancelled" } | { type: "Timeout"; data: number } | { type: "Channel"; data: string } | { type: "StateUnavailable"; data: string } | { type: "Thread"; data: ThreadError };
+
+/**
  *  Typed error surface for the `system_*` IPC commands. Externally tagged
  *  so the JS side gets `{ type: "BackendUnreachable", data: "..." }` and
  *  can branch on `type` without parsing strings. Variants are grouped by
@@ -644,6 +675,15 @@ export type Thread = {
 	updated_at: string,
 	active_leaf_id?: string | null,
 };
+
+/**
+ *  Typed error surface for the CRUD/search `thread_*` IPC commands.
+ *  Externally tagged so the JS side can branch on `error.type` without
+ *  parsing strings. `NotFound` lifts `euro_thread::Error::ThreadNotFound`
+ *  to a dedicated variant so the UI can render an empty state instead of
+ *  a generic toast.
+ */
+export type ThreadError = { type: "NotFound" } | { type: "Backend"; data: string } | { type: "BadResponse"; data: string } | { type: "StateUnavailable"; data: string } | { type: "Internal"; data: string };
 
 export type TimelineAppEvent = {
 	name: string,

@@ -6,7 +6,7 @@ description = "Refactored activity system with enum-based type-safe design"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde", "specta"]
+ignored = ["humantime-serde"]
 
 [dependencies]
 activity-core = { workspace = true }

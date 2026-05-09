@@ -11,6 +11,7 @@ specta = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 
 anyhow = { workspace = true, optional = true }
+specta-serde = { version = "0.0.12", optional = true }
 specta-swift = { version = "0.0.3", optional = true }
 
 [dev-dependencies]
@@ -18,7 +19,7 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-codegen = ["dep:anyhow", "dep:specta-swift"]
+codegen = ["dep:anyhow", "dep:specta-serde", "dep:specta-swift"]
 
 [[bin]]
 name = "euro-bridge-protocol"

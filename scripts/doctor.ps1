@@ -289,7 +289,7 @@ if ($dockerOk) {
 }
 
 Test-Command "cargo"       "cargo"       "Install Rust via https://rustup.rs"      | Out-Null
-Test-Command "cargo-watch" "cargo-watch" "Install with: cargo install cargo-watch" | Out-Null
+Test-Command "watchexec"   "watchexec"   "Install with: cargo install --locked watchexec-cli" | Out-Null
 Test-Command "pnpm"        "pnpm"        "Install with: corepack enable"           | Out-Null
 Test-Command "just"        "just"        "Install with: cargo install just"        | Out-Null
 

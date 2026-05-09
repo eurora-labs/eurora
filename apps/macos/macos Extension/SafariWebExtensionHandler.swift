@@ -64,6 +64,13 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
                 context: context,
                 message: "Register frames are not accepted from the extension"
             )
+
+        case .shutdown:
+            extensionLogger.warning("Ignoring unexpected Shutdown frame from extension")
+            Self.completeWithError(
+                context: context,
+                message: "Shutdown frames are not accepted from the extension"
+            )
         }
     }
 

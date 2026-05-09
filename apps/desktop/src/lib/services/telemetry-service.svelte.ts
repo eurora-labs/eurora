@@ -1,12 +1,12 @@
-import { InjectionToken } from '@eurora/shared/context';
-import * as Sentry from '@sentry/svelte';
-import { posthog, type PostHogInterface } from 'posthog-js';
+import { unwrap } from '$lib/bindings/result.js';
 import {
 	commands,
 	type TelemetryBootstrap,
 	type TelemetrySettings,
 } from '$lib/bindings/specta.bindings.js';
-import { unwrap } from '$lib/bindings/result.js';
+import { InjectionToken } from '@eurora/shared/context';
+import * as Sentry from '@sentry/svelte';
+import { posthog, type PostHogInterface } from 'posthog-js';
 
 /**
  * Owns the lifecycle of Sentry + PostHog in the desktop app.

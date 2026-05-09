@@ -39,11 +39,81 @@ public enum FrameKind {
     case error(ErrorFrame)
     case cancel(CancelFrame)
     case register(RegisterFrame)
+    case shutdown(ShutdownFrame)
 }
+// MARK: - FrameKind Codable Implementation
+extension FrameKind: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case request = "Request"
+        case response = "Response"
+        case event = "Event"
+        case error = "Error"
+        case cancel = "Cancel"
+        case register = "Register"
+        case shutdown = "Shutdown"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        if container.allKeys.count != 1 {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid number of keys found, expected one.")
+            )
+        }
+
+        let key = container.allKeys.first!
+        switch key {
+        case .request:
+            let data = try container.decode(RequestFrame.self, forKey: .request)
+            self = .request(data)
+        case .response:
+            let data = try container.decode(ResponseFrame.self, forKey: .response)
+            self = .response(data)
+        case .event:
+            let data = try container.decode(EventFrame.self, forKey: .event)
+            self = .event(data)
+        case .error:
+            let data = try container.decode(ErrorFrame.self, forKey: .error)
+            self = .error(data)
+        case .cancel:
+            let data = try container.decode(CancelFrame.self, forKey: .cancel)
+            self = .cancel(data)
+        case .register:
+            let data = try container.decode(RegisterFrame.self, forKey: .register)
+            self = .register(data)
+        case .shutdown:
+            let data = try container.decode(ShutdownFrame.self, forKey: .shutdown)
+            self = .shutdown(data)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        switch self {
+        case .request(let data):
+            try container.encode(data, forKey: .request)
+        case .response(let data):
+            try container.encode(data, forKey: .response)
+        case .event(let data):
+            try container.encode(data, forKey: .event)
+        case .error(let data):
+            try container.encode(data, forKey: .error)
+        case .cancel(let data):
+            try container.encode(data, forKey: .cancel)
+        case .register(let data):
+            try container.encode(data, forKey: .register)
+        case .shutdown(let data):
+            try container.encode(data, forKey: .shutdown)
+        }
+    }
+}
+
 
 /// Mandatory first frame on every connection. Identifies the host
 /// process (the bridge) and the application process being represented.
-///
+/// 
 /// `app_pid` is the OS PID for clients that have one (browsers via the
 /// native-messaging host, the macOS launcher representing Safari).
 /// Sandboxed clients without access to a real PID — Office.js add-ins
@@ -76,59 +146,12 @@ public struct ResponseFrame: Codable {
     public let payload: String?
 }
 
-// MARK: - FrameKind Codable Implementation
-
-extension FrameKind: Codable {
-    private enum CodingKeys: String, CodingKey {
-        case request = "Request"
-        case response = "Response"
-        case event = "Event"
-        case error = "Error"
-        case cancel = "Cancel"
-        case register = "Register"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        guard container.allKeys.count == 1, let key = container.allKeys.first else {
-            throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: decoder.codingPath,
-                    debugDescription: "Expected exactly one key for externally-tagged enum"
-                )
-            )
-        }
-        switch key {
-        case .request:
-            self = try .request(container.decode(RequestFrame.self, forKey: .request))
-        case .response:
-            self = try .response(container.decode(ResponseFrame.self, forKey: .response))
-        case .event:
-            self = try .event(container.decode(EventFrame.self, forKey: .event))
-        case .error:
-            self = try .error(container.decode(ErrorFrame.self, forKey: .error))
-        case .cancel:
-            self = try .cancel(container.decode(CancelFrame.self, forKey: .cancel))
-        case .register:
-            self = try .register(container.decode(RegisterFrame.self, forKey: .register))
-        }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case let .request(value):
-            try container.encode(value, forKey: .request)
-        case let .response(value):
-            try container.encode(value, forKey: .response)
-        case let .event(value):
-            try container.encode(value, forKey: .event)
-        case let .error(value):
-            try container.encode(value, forKey: .error)
-        case let .cancel(value):
-            try container.encode(value, forKey: .cancel)
-        case let .register(value):
-            try container.encode(value, forKey: .register)
-        }
-    }
+/// Desktop-initiated request that the receiving client (currently:
+/// browser native-messaging hosts) terminate cleanly. Sent when the
+/// desktop has just installed an updated messenger binary on disk and
+/// wants stale connections to drop so the browser respawns from the new
+/// binary. The `reason` is informational only (logged by the recipient).
+public struct ShutdownFrame: Codable {
+    public let reason: String?
 }
+

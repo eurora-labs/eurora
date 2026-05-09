@@ -1,17 +1,8 @@
-import { InjectionToken } from '@eurora/shared/context';
+import { ListenerBag } from '$lib/bindings/listeners.js';
+import { unwrap } from '$lib/bindings/result.js';
 import { commands, events, type LoginToken } from '$lib/bindings/specta.bindings.js';
+import { InjectionToken } from '@eurora/shared/context';
 import type { TelemetryService } from '$lib/services/telemetry-service.svelte.js';
-
-// tauri-specta wraps every `Result<T, E>`-returning command in a tagged
-// `{ status: "ok" | "error" }` envelope. The rest of this service treats
-// command failures as exceptions (matching the old taurpc UX), so unwrap
-// the envelope at the boundary and surface the backend message via `Error`.
-type CommandResult<T, E> = { status: 'ok'; data: T } | { status: 'error'; error: E };
-
-function unwrap<T>(result: CommandResult<T, string>): T {
-	if (result.status === 'error') throw new Error(result.error);
-	return result.data;
-}
 
 export class UserService {
 	authenticated = $state(false);
@@ -23,7 +14,7 @@ export class UserService {
 	readonly planLabel = $derived(this.role === 'Tier1' ? 'Pro' : 'Free');
 
 	private readonly telemetry: TelemetryService;
-	private readonly unlisteners: Promise<() => void>[] = [];
+	private readonly listeners = new ListenerBag();
 
 	constructor(telemetry: TelemetryService) {
 		this.telemetry = telemetry;
@@ -50,7 +41,7 @@ export class UserService {
 			await this.fetchProfile();
 		}
 
-		this.unlisteners.push(
+		this.listeners.add(
 			events.authStateChanged.listen((event) => {
 				const { claims } = event.payload;
 				if (claims) {
@@ -117,11 +108,8 @@ export class UserService {
 		unwrap(await commands.authRefreshSession());
 	}
 
-	destroy() {
-		for (const p of this.unlisteners) {
-			p.then((unlisten) => unlisten());
-		}
-		this.unlisteners.length = 0;
+	destroy(): Promise<void> {
+		return this.listeners.destroy();
 	}
 }
 

@@ -3767,6 +3767,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "specta-serde",
  "specta-swift",
  "thiserror 2.0.18",
 ]
@@ -3882,6 +3883,7 @@ dependencies = [
  "serde",
  "serde_json",
  "specta",
+ "specta-serde",
  "specta-typescript",
  "tokio",
  "tokio-tungstenite",
@@ -3955,7 +3957,6 @@ dependencies = [
  "agent-chain-core",
  "anyhow",
  "auth-core",
- "backon",
  "backtrace",
  "chrono",
  "color-thief",
