@@ -7,6 +7,7 @@ import type {
 	RegisterFrame,
 	RequestFrame,
 	ResponseFrame,
+	ShutdownFrame,
 } from '$lib/shared/bindings';
 
 export function registerFrame(host_pid: number, app_pid: number, app_kind: string): Frame {
@@ -50,6 +51,10 @@ export function isCancel(kind: FrameKind): kind is { Cancel: CancelFrame } {
 	return 'Cancel' in kind;
 }
 
+export function isShutdown(kind: FrameKind): kind is { Shutdown: ShutdownFrame } {
+	return 'Shutdown' in kind;
+}
+
 // Narrows untyped JSON to a `Frame` shape suitable for dispatch. We only
 // validate the discriminator presence; deeper structural validation is the
 // desktop's job (it owns the schema).
@@ -67,7 +72,8 @@ export function parseFrame(raw: unknown): Frame | null {
 		tag !== 'Event' &&
 		tag !== 'Error' &&
 		tag !== 'Cancel' &&
-		tag !== 'Register'
+		tag !== 'Register' &&
+		tag !== 'Shutdown'
 	) {
 		return null;
 	}

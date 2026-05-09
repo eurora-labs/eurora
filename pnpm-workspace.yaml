@@ -1,28 +1,77 @@
 packages:
-    - apps/*
-    - packages/*
-    - packages/prosemirror/*
-    - crates/*
-    - backend/*
-    - e2e
+  - apps/*
+  - packages/*
+  - packages/prosemirror/*
+  - crates/*
+  - backend/*
+  - e2e
 
 catalog:
-    '@lucide/svelte': ^0.577.0
-    '@tailwindcss/postcss': ^4.2.4
-    '@vitest/ui': 3.2.4
-    postcss: ^8.5.12
-    tailwindcss: ^4.2.4
-    vite: 6.4.2
-    vitest: 3.2.4
+  '@lucide/svelte': ^0.577.0
+  '@tailwindcss/postcss': ^4.2.4
+  '@vitest/ui': 3.2.4
+  postcss: ^8.5.12
+  tailwindcss: ^4.2.4
+  vite: 6.4.2
+  vitest: 3.2.4
 
 catalogs:
-    redux:
-        '@reduxjs/toolkit': ^2.5.0
-    svelte:
-        '@sveltejs/adapter-static': 3.0.10
-        '@sveltejs/kit': 2.58.0
-        '@sveltejs/vite-plugin-svelte': 5.1.1
-        svelte: 5.55.5
-        svelte-check: 4.4.6
-onlyBuiltDependencies:
-    - esbuild
+  redux:
+    '@reduxjs/toolkit': ^2.5.0
+  svelte:
+    '@sveltejs/adapter-static': 3.0.10
+    '@sveltejs/kit': 2.58.0
+    '@sveltejs/vite-plugin-svelte': 5.1.1
+    svelte: 5.55.5
+    svelte-check: 4.4.6
+allowBuilds:
+  esbuild: true
+  keytar: true
+  '@azure/msal-node-runtime': true
+  '@ffmpeg-installer/linux-x64': true
+  edgedriver: true
+  geckodriver: true
+  '@sentry/cli': false
+  unrs-resolver: false
+  '@azure/msal-node-extensions': false
+  '@microsoft/m365agentstoolkit-cli': false
+  core-js: false
+  protobufjs: false
+  spawn-sync: false
+  '@ffmpeg-installer/darwin-arm64': true
+
+packageExtensions:
+  'langium@4.2.1':
+    dependencies:
+      vscode-jsonrpc: ^8.2.0
+
+overrides:
+  tar: '>=7.5.8'
+  node-forge: '>=1.3.2'
+  flatted: '>=3.4.0'
+  minimatch: '>=3.1.3'
+  '@isaacs/brace-expansion': '>=5.0.1'
+  serialize-javascript: '>=7.0.3'
+  form-data: '>=4.0.4'
+  rollup: '>=4.59.0'
+  undici: '>=7.24.0'
+  cookie: '>=0.7.0'
+  devalue: '>=5.6.4'
+  tmp: '>=0.2.4'
+  wdio-video-reporter>glob: '>=11.1.0'
+  effect: '>=3.20.0'
+  fast-xml-parser: '>=5.5.7'
+  lodash: '>=4.17.23'
+  mdast-util-to-hast: '>=13.2.1'
+  'ajv@>=7.0.0-alpha.0 <8.18.0': '>=8.18.0'
+  'serialize-javascript@<7.0.5': '>=7.0.5'
+  'brace-expansion@<1.1.13': '>=1.1.13'
+  'brace-expansion@>=2.0.0 <2.0.3': '>=2.0.3'
+  'brace-expansion@>=4.0.0 <5.0.5': '>=5.0.5'
+  'node-forge@<=1.3.3': '>=1.4.0'
+  'node-forge@<1.4.0': '>=1.4.0'
+  'picomatch@<2.3.2': '>=2.3.2'
+  'picomatch@>=4.0.0 <4.0.4': '>=4.0.4'
+  'yaml@>=1.0.0 <1.10.3': '>=1.10.3'
+  'yaml@>=2.0.0 <2.8.3': '>=2.8.3'
+  vite: 'catalog:'

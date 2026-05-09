@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "specta")]
 use specta::Type;
+#[cfg(feature = "specta")]
+use specta_typescript::BigInt;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "specta", derive(Type))]
@@ -35,7 +37,9 @@ pub struct Claims {
     pub email: String,
     #[serde(default)]
     pub display_name: Option<String>,
+    #[cfg_attr(feature = "specta", specta(type = BigInt))]
     pub exp: i64,
+    #[cfg_attr(feature = "specta", specta(type = BigInt))]
     pub iat: i64,
     pub token_type: String,
     pub role: Role,

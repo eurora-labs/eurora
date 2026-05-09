@@ -1,6 +1,6 @@
+import { unwrap } from '$lib/bindings/result.js';
+import { commands, events, type LoginOutcome } from '$lib/bindings/specta.bindings.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { LoginOutcome } from '$lib/bindings/bindings.js';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
 	authenticated = $state(false);
@@ -9,43 +9,36 @@ export class UserService {
 	displayName = $state<string | null>(null);
 	role = $state('');
 
-	private readonly taurpc: TaurpcService;
-	private readonly unlisteners: Array<() => void> = [];
-
-	constructor(taurpc: TaurpcService) {
-		this.taurpc = taurpc;
-	}
+	private readonly unlisteners: Promise<() => void>[] = [];
 
 	private async fetchProfile() {
-		const [e, d, r] = await Promise.all([
-			this.taurpc.auth.get_email(),
-			this.taurpc.auth.get_display_name(),
-			this.taurpc.auth.get_role(),
-		]);
+		const claims = unwrap(await commands.authGetAccessTokenPayload());
 		this.authenticated = true;
-		this.email = e;
-		this.displayName = d;
-		this.role = r;
+		this.email = claims.email;
+		this.displayName = claims.display_name ?? null;
+		this.role = claims.role;
 	}
 
 	async init() {
 		try {
-			const unlisten = await this.taurpc.auth.auth_state_changed.on((claims) => {
-				if (claims) {
-					this.authenticated = true;
-					this.email = claims.email;
-					this.displayName = claims.display_name;
-					this.role = claims.role;
-				} else {
-					this.authenticated = false;
-					this.email = '';
-					this.displayName = null;
-					this.role = '';
-				}
-			});
-			this.unlisteners.push(unlisten);
+			this.unlisteners.push(
+				events.authStateChanged.listen((event) => {
+					const { claims } = event.payload;
+					if (claims) {
+						this.authenticated = true;
+						this.email = claims.email;
+						this.displayName = claims.display_name ?? null;
+						this.role = claims.role;
+					} else {
+						this.authenticated = false;
+						this.email = '';
+						this.displayName = null;
+						this.role = '';
+					}
+				}),
+			);
 
-			const isAuth = await this.taurpc.auth.is_authenticated();
+			const isAuth = unwrap(await commands.authIsAuthenticated());
 			if (isAuth) {
 				await this.fetchProfile();
 			}
@@ -55,17 +48,17 @@ export class UserService {
 	}
 
 	async login(login: string, password: string): Promise<void> {
-		await this.taurpc.auth.login(login, password);
+		unwrap(await commands.authLogin(login, password));
 		await this.fetchProfile();
 	}
 
 	async register(email: string, password: string): Promise<void> {
-		await this.taurpc.auth.register(email, password);
+		unwrap(await commands.authRegister(email, password));
 		await this.fetchProfile();
 	}
 
 	async logout(): Promise<void> {
-		await this.taurpc.auth.logout();
+		unwrap(await commands.authLogout());
 	}
 
 	/**
@@ -78,7 +71,7 @@ export class UserService {
 	 * surfacing an error.
 	 */
 	async startLogin(): Promise<LoginOutcome> {
-		const outcome = await this.taurpc.auth.start_login();
+		const outcome = unwrap(await commands.authStartLogin());
 		if (outcome.kind === 'success') {
 			await this.fetchProfile();
 		}
@@ -86,11 +79,13 @@ export class UserService {
 	}
 
 	async refreshSession(): Promise<void> {
-		await this.taurpc.auth.refresh_session();
+		unwrap(await commands.authRefreshSession());
 	}
 
 	destroy() {
-		for (const fn of this.unlisteners) fn();
+		for (const p of this.unlisteners) {
+			p.then((unlisten) => unlisten());
+		}
 		this.unlisteners.length = 0;
 	}
 }

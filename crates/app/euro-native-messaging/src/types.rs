@@ -1,7 +1,5 @@
-use enum_dispatch::enum_dispatch;
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use strum_macros::AsRefStr;
 
 mod article;
 mod metadata;
@@ -19,17 +17,20 @@ pub struct NativeImage {
     pub mime_type: String,
 }
 
+/// Envelope for every payload the browser native-messaging host
+/// exchanges with the desktop bridge. Externally tagged on `kind` with
+/// the inner payload under `data` so the JSON shape matches what the
+/// browser extension already constructs.
 #[allow(clippy::enum_variant_names)]
-#[enum_dispatch]
-#[derive(Debug, Clone, Serialize, Deserialize, AsRefStr)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", content = "data")]
 pub enum NativeMessage {
-    NativeYoutubeAsset,
-    NativeArticleAsset,
-    NativeTwitterAsset,
+    NativeYoutubeAsset(NativeYoutubeAsset),
+    NativeArticleAsset(NativeArticleAsset),
+    NativeTwitterAsset(NativeTwitterAsset),
 
-    NativeYoutubeSnapshot,
-    NativeArticleSnapshot,
+    NativeYoutubeSnapshot(NativeYoutubeSnapshot),
+    NativeArticleSnapshot(NativeArticleSnapshot),
 
-    NativeMetadata,
+    NativeMetadata(NativeMetadata),
 }

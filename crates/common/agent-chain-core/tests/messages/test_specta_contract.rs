@@ -15,17 +15,19 @@ use agent_chain_core::messages::{
     ContentBlock, ContentBlocks, HumanMessage, HumanMessageChunk, RemoveMessage, SystemMessage,
     SystemMessageChunk, ToolCall, ToolMessage, ToolMessageChunk, UsageMetadata,
 };
-use specta::TypeCollection;
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use specta::Types;
+use specta_typescript::Typescript;
 
 /// Render a single type to a TypeScript string by registering it (and any
-/// transitively-referenced types) into a fresh `TypeCollection` and exporting.
+/// transitively-referenced types) into a fresh `Types` collection and exporting
+/// it through the symmetric `specta_serde::Format`. Wide integers are mapped
+/// to TS `bigint` per-field via `#[specta(type = BigInt)]` overrides on the
+/// underlying message types.
 fn render<T: specta::Type>() -> String {
-    let mut collection = TypeCollection::default();
-    collection.register_mut::<T>();
+    let mut types = Types::default();
+    types.register_mut::<T>();
     Typescript::default()
-        .bigint(BigIntExportBehavior::BigInt)
-        .export(&collection)
+        .export(&types, specta_serde::Format)
         .expect("specta export to TypeScript")
 }
 
@@ -149,14 +151,15 @@ fn response_metadata_renders_as_record_of_unknown() {
 }
 
 // ---------------------------------------------------------------------------
-// Optional fields with skip_serializing_if are TS-optional (`name?:`).
+// `serde(default)` makes a field deserialize-optional, which specta renders
+// as a TS-optional field (`name?:`).
 // ---------------------------------------------------------------------------
 
 #[test]
 fn human_message_name_is_optional_in_ts() {
     let ts = render::<HumanMessage>();
-    // `name` is `Option<String>` plus `skip_serializing_if = "Option::is_none"`,
-    // so specta should render it as `name?:`. The legacy bug had it required.
+    // `name` is `Option<String>` with `#[serde(default)]`, so specta should
+    // render it as `name?:`. The legacy bug had it required.
     assert_contains(&ts, "name?:");
 }
 

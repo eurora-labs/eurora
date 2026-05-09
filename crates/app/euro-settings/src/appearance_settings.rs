@@ -19,10 +19,6 @@ pub const MAX_SCALE: f32 = 1.5;
 /// Identity scale — the value the UI is designed against.
 pub const DEFAULT_SCALE: f32 = 1.0;
 
-fn default_scale() -> f32 {
-    DEFAULT_SCALE
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct AppearanceSettings {
@@ -30,11 +26,9 @@ pub struct AppearanceSettings {
     pub dynamic_accent: bool,
     /// Multiplier applied to the document's root font-size, scaling every
     /// rem-anchored design token (text, spacing, controls) together.
-    #[serde(default = "default_scale")]
     pub interface_scale: f32,
     /// Additional multiplier layered on top of `interface_scale` that affects
     /// only typography utilities, leaving spacing and control sizes alone.
-    #[serde(default = "default_scale")]
     pub text_scale: f32,
 }
 

@@ -8,11 +8,11 @@ pub mod asset;
 
 pub use asset::{Asset, CreateAssetRequest};
 
-/// Build a [`specta::TypeCollection`] containing every asset wire type the
-/// frontend needs. Consumed by `euro-api-codegen` to emit `asset.ts`.
+/// Build a [`specta::Types`] containing every asset wire type the frontend
+/// needs. Consumed by `euro-api-codegen` to emit `asset.ts`.
 #[cfg(feature = "specta")]
-pub fn type_collection() -> specta::TypeCollection {
-    specta::TypeCollection::default()
+pub fn type_collection() -> specta::Types {
+    specta::Types::default()
         .register::<Asset>()
         .register::<CreateAssetRequest>()
 }
@@ -25,7 +25,7 @@ mod tests {
         let types = super::type_collection();
         let names: Vec<String> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().to_string())
+            .map(|ndt| ndt.name.to_string())
             .collect();
         for expected in ["Asset", "CreateAssetRequest"] {
             assert!(

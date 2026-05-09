@@ -6,6 +6,7 @@ use euro_office::WordAsset;
 use euro_pdf::PdfAsset;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+pub use thread_core::ContextChip;
 use url::Url;
 use uuid::Uuid;
 
@@ -15,14 +16,6 @@ use crate::{
     snapshots::*,
     storage::SaveableAsset,
 };
-
-#[taurpc::ipc_type]
-pub struct ContextChip {
-    pub id: String,
-    pub name: String,
-    pub icon: Option<String>,
-    pub domain: Option<String>,
-}
 
 #[enum_dispatch(SaveableAsset, AssetFunctionality)]
 #[derive(Debug, Clone, Serialize, Deserialize)]

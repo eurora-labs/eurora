@@ -1,4 +1,4 @@
-import { createTauRPCProxy } from '$lib/bindings/bindings.js';
+import { commands } from '$lib/bindings/specta.bindings.js';
 import { redirect } from '@sveltejs/kit';
 
 export const prerender = true;
@@ -9,8 +9,7 @@ export async function load({ url }) {
 		return {};
 	}
 	try {
-		const taurpc = createTauRPCProxy();
-		if (await taurpc.system.needs_telemetry_consent()) {
+		if (await commands.systemNeedsTelemetryConsent()) {
 			redirect(307, '/onboarding');
 		}
 	} catch (error) {

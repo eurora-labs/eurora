@@ -4,6 +4,7 @@ version = "0.0.0"
 edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
+default-run = "euro-tauri"
 
 [package.metadata.cargo-machete]
 ignored = [
@@ -23,11 +24,20 @@ name = "euro-tauri"
 path = "src/main.rs"
 test = false
 
+# Standalone exporter for the tauri-specta TypeScript bindings. The
+# `euro-tauri` binary also re-exports them on every debug launch via a
+# `#[cfg(debug_assertions)]` block in `main.rs`; this bin lets CI / tooling
+# regenerate them without bringing up the Tauri runtime.
+[[bin]]
+name = "gen-bindings"
+path = "src/bin/gen_bindings.rs"
+test = false
+
 [dependencies]
 agent-chain-core = { workspace = true }
+async-trait = { workspace = true }
 auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
-backon = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 chrono = { workspace = true, features = ["serde"] }
 color-thief = "0.2.2"
@@ -40,7 +50,7 @@ euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
-euro-thread = { workspace = true }
+euro-thread = { workspace = true, features = ["tauri"] }
 thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
 euro-user = { workspace = true }
@@ -54,7 +64,7 @@ rustls = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
-specta-typescript = { version = "0.0.10" }
+specta-typescript = { version = "0.0.12" }
 tauri = { version = "2.11.1", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2.3.2"
@@ -81,8 +91,7 @@ sentry = { workspace = true, default-features = false, features = [
   "tracing",
   "release-health",
 ] }
-# taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
-taurpc = { workspace = true }
+tauri-specta = { workspace = true, features = ["derive", "typescript"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"

@@ -22,7 +22,7 @@ pub enum LoginRequest {
         provider: Provider,
         code: String,
         state: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
         login_token: Option<String>,
     },
 }
@@ -33,7 +33,7 @@ pub enum LoginRequest {
 pub struct RegisterRequest {
     pub email: String,
     pub password: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub display_name: Option<String>,
 }
 
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn login_third_party_omits_none_login_token() {
+    fn login_third_party_emits_null_login_token() {
         let req = LoginRequest::ThirdParty {
             provider: Provider::Github,
             code: "abc".into(),
@@ -119,17 +119,32 @@ mod tests {
             login_token: None,
         };
         let json = serde_json::to_value(&req).unwrap();
-        assert!(json.get("login_token").is_none());
+        assert_eq!(json["login_token"], serde_json::Value::Null);
+        let back: LoginRequest = serde_json::from_value(json).unwrap();
+        match back {
+            LoginRequest::ThirdParty { login_token, .. } => assert!(login_token.is_none()),
+            _ => panic!("expected ThirdParty variant"),
+        }
     }
 
     #[test]
-    fn register_request_omits_none_display_name() {
+    fn register_request_emits_null_display_name() {
         let req = RegisterRequest {
             email: "u@e.com".into(),
             password: "p".into(),
             display_name: None,
         };
         let json = serde_json::to_string(&req).unwrap();
-        assert!(!json.contains("display_name"));
+        assert!(json.contains("\"display_name\":null"));
+        let back: RegisterRequest = serde_json::from_str(&json).unwrap();
+        assert!(back.display_name.is_none());
+    }
+
+    #[test]
+    fn register_request_decodes_with_missing_display_name() {
+        // Forward-compat: an older client that omits the field still parses.
+        let back: RegisterRequest =
+            serde_json::from_str(r#"{"email":"u@e.com","password":"p"}"#).unwrap();
+        assert!(back.display_name.is_none());
     }
 }

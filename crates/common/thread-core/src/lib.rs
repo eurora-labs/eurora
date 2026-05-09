@@ -31,7 +31,7 @@ pub struct Thread {
     pub title: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub active_leaf_id: Option<Uuid>,
 }
 
@@ -39,7 +39,7 @@ pub struct Thread {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct CreateThreadRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub title: Option<String>,
 }
 
@@ -54,9 +54,9 @@ pub struct CreateThreadResponse {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ListThreadsQuery {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -83,7 +83,7 @@ pub struct DeleteThreadResponse {}
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct MessageNode {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub parent_id: Option<Uuid>,
     pub message: AnyMessage,
     #[serde(default)]
@@ -96,9 +96,9 @@ pub struct MessageNode {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct GetMessagesQuery {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -141,9 +141,9 @@ pub struct GenerateThreadTitleResponse {
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct SearchThreadsQuery {
     pub q: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -169,9 +169,9 @@ pub struct SearchThreadResult {
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct SearchMessagesQuery {
     pub q: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -219,9 +219,9 @@ pub enum ChatClientMessage {
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ChatSendRequest {
     pub content_blocks: Vec<ContentBlock>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub parent_message_id: Option<Uuid>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub asset_chips_json: Option<String>,
 }
 
@@ -265,15 +265,31 @@ pub enum ChatServerMessage {
 pub struct ThreadErrorResponse {
     pub error: String,
     pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub details: Option<String>,
 }
 
-/// Build a [`specta::TypeCollection`] containing every thread wire type the
-/// desktop app needs. Used by the codegen binary to emit `thread.ts`.
+/// Per-asset context chip surfaced alongside [`ChatContext`] content blocks.
+///
+/// Lives here (rather than in `euro-activity`) because both desktop and
+/// mobile chat IPC layers emit it: desktop populates it from the timeline,
+/// mobile populates it from native pickers. Keeping the wire shape in
+/// `thread-core` lets the IPC commands stay app-agnostic and avoids
+/// dragging the desktop-only `euro-activity` graph into mobile.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct ContextChip {
+    pub id: String,
+    pub name: String,
+    pub icon: Option<String>,
+    pub domain: Option<String>,
+}
+
+/// Build a [`specta::Types`] containing every thread wire type the desktop
+/// app needs. Used by the codegen binary to emit `thread.ts`.
 #[cfg(feature = "specta")]
-pub fn type_collection() -> specta::TypeCollection {
-    specta::TypeCollection::default()
+pub fn type_collection() -> specta::Types {
+    specta::Types::default()
         .register::<Thread>()
         .register::<CreateThreadRequest>()
         .register::<CreateThreadResponse>()
@@ -305,10 +321,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn create_thread_request_omits_optional_title() {
+    fn create_thread_request_serializes_optional_title_as_null() {
         let req = CreateThreadRequest::default();
         let s = serde_json::to_string(&req).unwrap();
-        assert_eq!(s, "{}");
+        assert_eq!(s, r#"{"title":null}"#);
+        let back: CreateThreadRequest = serde_json::from_str(&s).unwrap();
+        assert!(back.title.is_none());
+    }
+
+    #[test]
+    fn create_thread_request_decodes_with_missing_title() {
+        // Forward-compat: older clients that omit the field still parse.
+        let back: CreateThreadRequest = serde_json::from_str("{}").unwrap();
+        assert!(back.title.is_none());
     }
 
     #[test]
@@ -420,7 +445,7 @@ mod tests {
         let types = type_collection();
         let names: Vec<String> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().to_string())
+            .map(|ndt| ndt.name.to_string())
             .collect();
         for expected in [
             "Thread",

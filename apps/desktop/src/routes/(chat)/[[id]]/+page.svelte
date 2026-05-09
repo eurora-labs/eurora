@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { ListenerBag } from '$lib/bindings/listeners.js';
+	import { unwrap } from '$lib/bindings/result.js';
+	import {
+		commands,
+		events,
+		type BrowserExtensionState,
+		type ContextChip,
+	} from '$lib/bindings/specta.bindings.js';
 	import { buildSuggestions } from '$lib/chat/suggestions.js';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { MessageList, ChatPromptInput, middleTruncate } from '@eurora/chat';
@@ -14,22 +21,20 @@
 	import { open as openExternal } from '@tauri-apps/plugin-shell';
 	import { onMount, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import type { BrowserExtensionState, ContextChip } from '$lib/bindings/bindings.js';
 
 	let { data } = $props();
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
 	const timelineService = inject(TIMELINE_SERVICE);
 	let assets = $state<ContextChip[] | null>(null);
 
 	const threadId = $derived(data.threadId);
 	const latestTimelineItem = $derived(timelineService.latest);
-	const focusedProcessName = $derived(latestTimelineItem?.process_name ?? '');
-	const focusedProcessId = $derived(latestTimelineItem?.process_id ?? 0);
+	const focusedProcessName = $derived(latestTimelineItem?.processName ?? '');
+	const focusedProcessId = $derived(latestTimelineItem?.processId ?? 0);
 
 	let extensionState = $state<BrowserExtensionState | null>(null);
-	let unlistenStatus: (() => void) | null = null;
+	const listeners = new ListenerBag();
 
 	$effect(() => {
 		if (threadId) {
@@ -53,8 +58,8 @@
 
 		// Capture the current process name so racing responses from a previous
 		// focused process can't overwrite state for the current one.
-		taurpc.system
-			.get_browser_extension_state(processName)
+		commands
+			.systemGetBrowserExtensionState(processName)
 			.then((state) => {
 				if (focusedProcessName !== processName) return;
 				extensionState = state;
@@ -91,7 +96,7 @@
 
 		try {
 			if (pid > 0) {
-				await taurpc.system.open_url_in_browser(pid, installUrl);
+				unwrap(await commands.systemOpenUrlInBrowser(pid, installUrl));
 				return;
 			}
 		} catch (err) {
@@ -111,44 +116,41 @@
 
 	async function openExtensionSettings() {
 		try {
-			await taurpc.system.open_browser_extension_settings(focusedProcessName);
+			unwrap(await commands.systemOpenBrowserExtensionSettings(focusedProcessName));
 		} catch (err) {
 			toast.error(`Failed to open extension settings: ${err}`);
 		}
 	}
 
 	onMount(() => {
-		taurpc.timeline.new_assets_event.on((chips) => {
-			assets = chips;
-		});
+		listeners.add(
+			events.timelineAssetsEvent.listen((e) => {
+				assets = e.payload;
+			}),
+		);
 
 		// Seed the initial chip state so the suggestions row doesn't render
 		// stale "no active page" suggestions before the first event arrives.
 		// Without this, the reactive `$derived` below would briefly show the
 		// no-context suggestion and then swap it out under a clicking user.
-		taurpc.context_chip
-			.get()
-			.then((chips) => {
-				if (assets === null) assets = chips;
+		commands
+			.systemListActivities()
+			.then((result) => {
+				if (assets === null) assets = unwrap(result);
 			})
 			.catch((e) => toast.error(String(e)));
 
-		taurpc.system.browser_extension_status_changed
-			.on((status) => {
+		listeners.add(
+			events.browserExtensionStatusChanged.listen((event) => {
+				const status = event.payload;
 				if (status.process_name !== focusedProcessName) return;
 				extensionState = status.state;
-			})
-			.then((unlisten) => {
-				unlistenStatus = unlisten;
-			})
-			.catch((e) => {
-				toast.error(`Failed to subscribe to browser extension status: ${e}`);
-			});
+			}),
+		);
 	});
 
 	onDestroy(() => {
-		unlistenStatus?.();
-		unlistenStatus = null;
+		listeners.destroy();
 	});
 
 	const suggestions = $derived(
@@ -159,10 +161,10 @@
 {#snippet emptyState()}
 	<Empty.Root>
 		<Empty.Header>
-			{#if latestTimelineItem?.icon_base64}
+			{#if latestTimelineItem?.iconBase64}
 				<Empty.Title>Currently on</Empty.Title>
 				<Empty.Media variant="icon" class="bg-transparent">
-					<img src={latestTimelineItem.icon_base64} alt="" class="size-full" />
+					<img src={latestTimelineItem.iconBase64} alt="" class="size-full" />
 				</Empty.Media>
 			{:else}
 				<Empty.Title>No messages yet</Empty.Title>

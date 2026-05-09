@@ -1,7 +1,7 @@
+import { ListenerBag } from '$lib/bindings/listeners.js';
+import { events, type TimelineAppEvent } from '$lib/bindings/specta.bindings.js';
 import { applyAccent, clearAccent } from '$lib/services/accent.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { TimelineAppEvent } from '$lib/bindings/bindings.js';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 import type { AppearanceService } from '$lib/services/appearance-service.svelte.js';
 
 const RECENT_LIMIT = 5;
@@ -12,18 +12,17 @@ export class TimelineService {
 		this.recent.length > 0 ? this.recent[this.recent.length - 1] : null,
 	);
 
-	private readonly taurpc: TaurpcService;
 	private readonly appearance: AppearanceService;
-	private readonly unlisteners: Promise<() => void>[] = [];
+	private readonly listeners = new ListenerBag();
 
-	constructor(taurpc: TaurpcService, appearance: AppearanceService) {
-		this.taurpc = taurpc;
+	constructor(appearance: AppearanceService) {
 		this.appearance = appearance;
 	}
 
 	init() {
-		this.unlisteners.push(
-			this.taurpc.timeline.new_app_event.on((event) => {
+		this.listeners.add(
+			events.timelineAppEvent.listen((e) => {
+				const event = e.payload;
 				const next = [...this.recent, event];
 				this.recent = next.length > RECENT_LIMIT ? next.slice(-RECENT_LIMIT) : next;
 				if (this.appearance.dynamicAccent && event.accent) {
@@ -35,13 +34,10 @@ export class TimelineService {
 		);
 	}
 
-	destroy() {
+	async destroy(): Promise<void> {
 		clearAccent();
 		this.recent = [];
-		for (const p of this.unlisteners) {
-			p.then((unlisten) => unlisten());
-		}
-		this.unlisteners.length = 0;
+		await this.listeners.destroy();
 	}
 }
 

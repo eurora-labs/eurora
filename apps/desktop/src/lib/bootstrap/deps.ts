@@ -1,5 +1,3 @@
-import { createTauRPCProxy } from '$lib/bindings/bindings.js';
-import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
 import { APPEARANCE_SERVICE, AppearanceService } from '$lib/services/appearance-service.svelte.js';
 import { GENERAL_SERVICE, GeneralService } from '$lib/services/general-service.svelte.js';
 import { TELEMETRY_SERVICE, TelemetryService } from '$lib/services/telemetry-service.svelte.js';
@@ -11,18 +9,16 @@ import { THREAD_SERVICE } from '@eurora/chat/services/thread/thread-service';
 import { provideAll } from '@eurora/shared/context';
 
 export function initDependencies() {
-	const taurpc = createTauRPCProxy();
-	const threadClient = new ThreadService(taurpc);
-	const appearance = new AppearanceService(taurpc);
-	const telemetry = new TelemetryService(taurpc);
+	const threadClient = new ThreadService();
+	const appearance = new AppearanceService();
+	const telemetry = new TelemetryService();
 	return provideAll([
-		[TAURPC_SERVICE, taurpc],
 		[TELEMETRY_SERVICE, telemetry],
 		[THREAD_SERVICE, threadClient],
-		[USER_SERVICE, new UserService(taurpc, telemetry)],
+		[USER_SERVICE, new UserService(telemetry)],
 		[CHAT_SERVICE, new ChatService(threadClient)],
 		[APPEARANCE_SERVICE, appearance],
-		[GENERAL_SERVICE, new GeneralService(taurpc)],
-		[TIMELINE_SERVICE, new TimelineService(taurpc, appearance)],
+		[GENERAL_SERVICE, new GeneralService()],
+		[TIMELINE_SERVICE, new TimelineService(appearance)],
 	]);
 }

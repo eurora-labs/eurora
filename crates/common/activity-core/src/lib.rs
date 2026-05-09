@@ -41,15 +41,15 @@ pub struct Activity {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct InsertActivityRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<Uuid>,
     pub name: String,
     pub process_name: String,
     pub window_title: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub icon_png_base64: Option<String>,
     pub started_at: DateTime<Utc>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub ended_at: Option<DateTime<Utc>>,
 }
 
@@ -76,9 +76,9 @@ pub const MAX_LIST_LIMIT: u32 = 100;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ListActivitiesQuery {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -98,15 +98,15 @@ pub struct ListActivitiesResponse {
 pub struct ActivityErrorResponse {
     pub error: String,
     pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub details: Option<String>,
 }
 
-/// Build a [`specta::TypeCollection`] containing every activity wire type
-/// the desktop app needs. Used by the codegen binary to emit `activity.ts`.
+/// Build a [`specta::Types`] containing every activity wire type the desktop
+/// app needs. Used by the codegen binary to emit `activity.ts`.
 #[cfg(feature = "specta")]
-pub fn type_collection() -> specta::TypeCollection {
-    specta::TypeCollection::default()
+pub fn type_collection() -> specta::Types {
+    specta::Types::default()
         .register::<Activity>()
         .register::<InsertActivityRequest>()
         .register::<InsertActivityResponse>()
@@ -120,7 +120,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn insert_request_round_trips_with_optional_fields_omitted() {
+    fn insert_request_round_trips_with_optional_fields_null() {
         let req = InsertActivityRequest {
             id: None,
             name: "name".into(),
@@ -131,11 +131,24 @@ mod tests {
             ended_at: None,
         };
         let json = serde_json::to_string(&req).unwrap();
-        assert!(!json.contains("\"id\""));
-        assert!(!json.contains("\"icon_png_base64\""));
-        assert!(!json.contains("\"ended_at\""));
+        assert!(json.contains("\"id\":null"));
+        assert!(json.contains("\"icon_png_base64\":null"));
+        assert!(json.contains("\"ended_at\":null"));
         let back: InsertActivityRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(back.name, req.name);
+        assert!(back.id.is_none());
+        assert!(back.icon_png_base64.is_none());
+        assert!(back.ended_at.is_none());
+    }
+
+    #[test]
+    fn insert_request_decodes_with_missing_optional_fields() {
+        // Forward-compat: a payload that omits optionals (older clients) still parses.
+        let json = r#"{"name":"n","process_name":"p","window_title":"t","started_at":"2024-01-01T00:00:00Z"}"#;
+        let back: InsertActivityRequest = serde_json::from_str(json).unwrap();
+        assert!(back.id.is_none());
+        assert!(back.icon_png_base64.is_none());
+        assert!(back.ended_at.is_none());
     }
 
     #[test]
@@ -151,7 +164,7 @@ mod tests {
         let types = type_collection();
         let names: Vec<String> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().to_string())
+            .map(|ndt| ndt.name.to_string())
             .collect();
         for expected in [
             "Activity",

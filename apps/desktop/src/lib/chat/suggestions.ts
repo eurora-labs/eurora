@@ -1,4 +1,4 @@
-import type { ContextChip } from '$lib/bindings/bindings.js';
+import type { ContextChip } from '$lib/bindings/specta.bindings.js';
 import type { ChatService, Suggestion } from '@eurora/chat';
 
 const NO_ACTIVE_PAGE_RESPONSE =

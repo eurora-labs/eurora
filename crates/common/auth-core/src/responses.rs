@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "specta")]
 use specta::Type;
+#[cfg(feature = "specta")]
+use specta_typescript::BigInt;
 
 use crate::{Provider, Role};
 
@@ -14,6 +16,7 @@ pub struct TokenResponse {
     pub access_token: String,
     pub refresh_token: String,
     /// Lifetime of `access_token` in seconds.
+    #[cfg_attr(feature = "specta", specta(type = BigInt))]
     pub expires_in: i64,
 }
 
@@ -77,7 +80,7 @@ pub enum CheckEmailStatus {
 pub struct CheckEmailResponse {
     pub status: CheckEmailStatus,
     /// Populated only when `status == Oauth`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub provider: Option<Provider>,
 }
 
@@ -93,7 +96,7 @@ pub struct CheckEmailResponse {
 pub struct AuthErrorResponse {
     pub error: String,
     pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub details: Option<String>,
 }
 
@@ -110,13 +113,22 @@ mod tests {
     }
 
     #[test]
-    fn check_email_response_omits_none_provider() {
+    fn check_email_response_emits_null_provider() {
         let resp = CheckEmailResponse {
             status: CheckEmailStatus::Password,
             provider: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
-        assert!(!json.contains("provider"));
+        assert!(json.contains("\"provider\":null"));
+        let back: CheckEmailResponse = serde_json::from_str(&json).unwrap();
+        assert!(back.provider.is_none());
+    }
+
+    #[test]
+    fn check_email_response_decodes_with_missing_provider() {
+        // Forward-compat: older servers that omit the field still parse.
+        let back: CheckEmailResponse = serde_json::from_str(r#"{"status":"password"}"#).unwrap();
+        assert!(back.provider.is_none());
     }
 
     #[test]
@@ -128,9 +140,10 @@ mod tests {
             details: None,
         };
         let json = serde_json::to_string(&body).unwrap();
-        assert!(!json.contains("details"));
+        assert!(json.contains("\"details\":null"));
         let back: AuthErrorResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(back.error, "oauth_email_conflict");
+        assert!(back.details.is_none());
     }
 
     #[test]

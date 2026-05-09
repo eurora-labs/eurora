@@ -1,8 +1,12 @@
+import { unwrap } from '$lib/bindings/result.js';
+import {
+	commands,
+	type TelemetryBootstrap,
+	type TelemetrySettings,
+} from '$lib/bindings/specta.bindings.js';
 import { InjectionToken } from '@eurora/shared/context';
 import * as Sentry from '@sentry/svelte';
 import { posthog, type PostHogInterface } from 'posthog-js';
-import type { TelemetryBootstrap, TelemetrySettings } from '$lib/bindings/bindings.js';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 /**
  * Owns the lifecycle of Sentry + PostHog in the desktop app.
@@ -16,19 +20,14 @@ import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 export class TelemetryService {
 	settings = $state<TelemetrySettings | null>(null);
 
-	private readonly taurpc: TaurpcService;
 	private bootstrap: TelemetryBootstrap | null = null;
 	private sentryStarted = false;
 	private posthogStarted = false;
 	private identifiedUserId: string | null = null;
 
-	constructor(taurpc: TaurpcService) {
-		this.taurpc = taurpc;
-	}
-
 	async init(): Promise<void> {
 		try {
-			this.bootstrap = await this.taurpc.system.get_telemetry_bootstrap();
+			this.bootstrap = unwrap(await commands.systemGetTelemetryBootstrap());
 		} catch (error) {
 			console.error('Failed to fetch telemetry bootstrap:', error);
 			return;
@@ -45,11 +44,11 @@ export class TelemetryService {
 	async refresh(): Promise<void> {
 		if (!this.bootstrap) return;
 		try {
-			const next = await this.taurpc.settings.get_telemetry_settings();
+			const next = await commands.settingsGetTelemetry();
 			this.bootstrap = { ...this.bootstrap, settings: next };
 			this.settings = next;
 			this.applySdks();
-			await this.taurpc.system.reinit_telemetry();
+			await commands.systemReinitTelemetry();
 		} catch (error) {
 			console.error('Failed to refresh telemetry settings:', error);
 		}
@@ -95,7 +94,7 @@ export class TelemetryService {
 	async rotateDistinctId(): Promise<void> {
 		if (!this.bootstrap) return;
 		try {
-			const newId = await this.taurpc.system.rotate_telemetry_distinct_id();
+			const newId = unwrap(await commands.systemRotateTelemetryDistinctId());
 			if (this.settings) {
 				this.settings = { ...this.settings, distinctId: newId };
 				this.bootstrap = { ...this.bootstrap, settings: this.settings };

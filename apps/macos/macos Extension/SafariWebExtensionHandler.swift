@@ -29,6 +29,10 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             return
         }
 
+        dispatch(frame: frame, context: context)
+    }
+
+    private func dispatch(frame: Frame, context: NSExtensionContext) {
         switch frame.kind {
         case .response, .error:
             // Reply to a server-pushed request — forward and acknowledge.
@@ -63,6 +67,13 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             Self.completeWithError(
                 context: context,
                 message: "Register frames are not accepted from the extension"
+            )
+
+        case .shutdown:
+            extensionLogger.warning("Ignoring unexpected Shutdown frame from extension")
+            Self.completeWithError(
+                context: context,
+                message: "Shutdown frames are not accepted from the extension"
             )
         }
     }

@@ -6,7 +6,7 @@ description = "Refactored activity system with enum-based type-safe design"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde", "specta"]
+ignored = ["humantime-serde"]
 
 [dependencies]
 activity-core = { workspace = true }
@@ -34,9 +34,9 @@ resvg = { version = "0.47" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
-# taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
-taurpc = { workspace = true }
+tauri-specta = { workspace = true }
 thiserror = { workspace = true }
+thread-core = { workspace = true, features = ["specta"] }
 tiny-skia = "0.12"
 tokio = { workspace = true, features = [
   "fs",

@@ -6,7 +6,7 @@
 )]
 
 pub mod browser_launcher;
-pub mod error;
+pub mod chat_context;
 pub mod native_messaging;
 pub mod office_addin;
 pub mod procedures;
@@ -14,6 +14,14 @@ pub mod shared_types;
 pub mod telemetry;
 pub mod util;
 pub mod window;
+
+// `ipc` must be declared after `procedures` so the per-command
+// `__cmd__*` and `__tauri_command_name_*` macros that
+// `#[tauri::command]` exports into the crate root are visible to the
+// `tauri_specta::collect_commands!` invocation inside `ipc::build_specta`.
+pub mod ipc;
+
+pub use ipc::build_specta;
 pub use window::{
     MAIN_WINDOW_LABEL, create as create_window, show_and_focus_main, state::WindowState,
 };
