@@ -7,7 +7,6 @@ pub mod auth_procedures;
 pub mod payment_procedures;
 pub mod settings_procedures;
 pub mod system_procedures;
-pub mod thread_procedures;
 pub mod timeline_procedures;
 
 /// Look up the shared [`SharedUserController`] state. Returns `None` if it

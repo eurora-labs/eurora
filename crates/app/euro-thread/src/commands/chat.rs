@@ -4,23 +4,37 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::error::ResultExt;
-use crate::shared_types::{ActiveStreamTokens, SharedThreadManager};
+use super::context::{ChatContext, SharedChatContextProvider};
+use super::error::StreamError;
+use super::state::ActiveStreamTokens;
+use super::thread::thread_manager;
 
 const STREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
-fn thread_manager(app_handle: &AppHandle) -> Result<tauri::State<'_, SharedThreadManager>, String> {
-    app_handle
-        .try_state::<SharedThreadManager>()
-        .ok_or_else(|| "Thread manager not available".to_string())
-}
-
 fn active_stream_tokens(
     app_handle: &AppHandle,
-) -> Result<tauri::State<'_, ActiveStreamTokens>, String> {
+) -> Result<tauri::State<'_, ActiveStreamTokens>, StreamError> {
     app_handle
         .try_state::<ActiveStreamTokens>()
-        .ok_or_else(|| "Active stream tokens not available".to_string())
+        .ok_or(StreamError::StateUnavailable("active stream tokens"))
+}
+
+fn context_provider(
+    app_handle: &AppHandle,
+) -> Result<tauri::State<'_, SharedChatContextProvider>, StreamError> {
+    app_handle
+        .try_state::<SharedChatContextProvider>()
+        .ok_or(StreamError::StateUnavailable("chat context provider"))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_collect_context(
+    app_handle: AppHandle,
+    thread_id: Uuid,
+) -> Result<ChatContext, StreamError> {
+    let provider = context_provider(&app_handle)?;
+    provider.collect(thread_id).await
 }
 
 #[tauri::command]
@@ -30,8 +44,8 @@ pub async fn chat_send_query(
     thread_id: Uuid,
     channel: Channel<ChatServerMessage>,
     request: ChatSendRequest,
-) -> Result<(), String> {
-    let thread_state = thread_manager(&app_handle)?;
+) -> Result<(), StreamError> {
+    let thread_state = thread_manager(&app_handle, StreamError::StateUnavailable)?;
     let tokens_state = active_stream_tokens(&app_handle)?;
 
     let cancel = CancellationToken::new();
@@ -57,8 +71,8 @@ pub async fn chat_regenerate(
     thread_id: Uuid,
     ai_message_id: Uuid,
     channel: Channel<ChatServerMessage>,
-) -> Result<(), String> {
-    let thread_state = thread_manager(&app_handle)?;
+) -> Result<(), StreamError> {
+    let thread_state = thread_manager(&app_handle, StreamError::StateUnavailable)?;
     let tokens_state = active_stream_tokens(&app_handle)?;
 
     let cancel = CancellationToken::new();
@@ -79,7 +93,7 @@ pub async fn chat_regenerate(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn chat_cancel_query(app_handle: AppHandle, thread_id: Uuid) -> Result<(), String> {
+pub async fn chat_cancel_query(app_handle: AppHandle, thread_id: Uuid) -> Result<(), StreamError> {
     let tokens_state = active_stream_tokens(&app_handle)?;
 
     if let Some(token) = tokens_state.lock().await.remove(&thread_id) {
@@ -91,31 +105,24 @@ pub async fn chat_cancel_query(app_handle: AppHandle, thread_id: Uuid) -> Result
 }
 
 async fn forward_chat_stream(
-    open_result: euro_thread::Result<
-        mpsc::UnboundedReceiver<euro_thread::Result<ChatServerMessage>>,
-    >,
+    open_result: crate::Result<mpsc::UnboundedReceiver<crate::Result<ChatServerMessage>>>,
     cancel: CancellationToken,
     channel: &Channel<ChatServerMessage>,
-) -> Result<(), String> {
-    let mut rx = open_result.ctx("Failed to open chat stream")?;
+) -> Result<(), StreamError> {
+    let mut rx = open_result?;
 
     let stream_future = async {
         while let Some(item) = rx.recv().await {
-            match item {
-                Ok(event) => {
-                    let is_terminal = matches!(
-                        &event,
-                        ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
-                    );
-                    channel
-                        .send(event)
-                        .map_err(|e| format!("Failed to forward chat event: {e}"))?;
-                    if is_terminal {
-                        return Ok(());
-                    }
-                }
-                Err(euro_thread::Error::Cancelled) => return Ok(()),
-                Err(e) => return Err(format!("Stream error: {e}")),
+            let event = item?;
+            let is_terminal = matches!(
+                &event,
+                ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
+            );
+            channel
+                .send(event)
+                .map_err(|e| StreamError::Channel(e.to_string()))?;
+            if is_terminal {
+                return Ok(());
             }
         }
         Ok(())
@@ -129,10 +136,7 @@ async fn forward_chat_stream(
         }
         Err(_) => {
             cancel.cancel();
-            Err(format!(
-                "Stream processing timed out after {} seconds",
-                STREAM_TIMEOUT.as_secs()
-            ))
+            Err(StreamError::Timeout(STREAM_TIMEOUT.as_secs() as u32))
         }
     }
 }

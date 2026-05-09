@@ -8,6 +8,9 @@
 mod error;
 mod manager;
 
+#[cfg(feature = "tauri")]
+pub mod commands;
+
 pub use error::{Error, Result};
 pub use manager::ThreadManager;
 pub use thread_core::{

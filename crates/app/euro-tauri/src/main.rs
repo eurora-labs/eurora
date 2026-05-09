@@ -5,6 +5,7 @@
 
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
+use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
@@ -17,6 +18,7 @@ use euro_tauri::{
     shared_types::{ActiveStreamTokens, SharedHttpClient, SharedThreadManager},
     show_and_focus_main, telemetry,
 };
+use euro_thread::commands::SharedChatContextProvider;
 use euro_timeline::TimelineManager;
 use tauri::{
     Manager, generate_context,
@@ -376,6 +378,10 @@ fn init_state(
         .auth_manager(auth_manager.clone())
         .build()?;
     app_handle.manage(Mutex::new(timeline));
+
+    let context_provider: SharedChatContextProvider =
+        std::sync::Arc::new(TimelineChatContextProvider::new(app_handle.clone()));
+    app_handle.manage(context_provider);
 
     let path = tauri_app.path().app_data_dir()?;
     let user_controller = euro_user::UserController::new(path, auth_manager);
