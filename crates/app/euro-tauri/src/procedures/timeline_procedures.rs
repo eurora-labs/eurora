@@ -67,9 +67,3 @@ pub struct TimelineAppEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct TimelineAssetsEvent(pub Vec<ContextChip>);
-
-#[tauri::command]
-#[specta::specta]
-pub async fn timeline_list() -> Result<Vec<String>, String> {
-    Ok(vec![])
-}

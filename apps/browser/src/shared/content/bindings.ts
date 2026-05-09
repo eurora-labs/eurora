@@ -4,15 +4,15 @@
  *  by `id`.
  */
 export type CancelFrame = {
-	id: number;
+	id: number,
 };
 
 /**  Failure response correlated with a [`RequestFrame`] by `id`. */
 export type ErrorFrame = {
-	id: number;
-	code: number;
-	message: string;
-	details?: string | null;
+	id: number,
+	code: number,
+	message: string,
+	details?: string | null,
 };
 
 /**
@@ -20,8 +20,8 @@ export type ErrorFrame = {
  *  activation, Word selection change).
  */
 export type EventFrame = {
-	action: string;
-	payload?: string | null;
+	action: string,
+	payload?: string | null,
 };
 
 /**
@@ -30,7 +30,7 @@ export type EventFrame = {
  *  payload variant.
  */
 export type Frame = {
-	kind: FrameKind;
+	kind: FrameKind,
 };
 
 /**
@@ -38,83 +38,27 @@ export type Frame = {
  *  `{ "Request": { ... } }` — to match the shape the browser extension
  *  already consumes.
  */
-export type FrameKind =
-	| ({ Request: RequestFrame } & {
-			Cancel?: never;
-			Error?: never;
-			Event?: never;
-			Register?: never;
-			Response?: never;
-			Shutdown?: never;
-	  })
-	| ({ Response: ResponseFrame } & {
-			Cancel?: never;
-			Error?: never;
-			Event?: never;
-			Register?: never;
-			Request?: never;
-			Shutdown?: never;
-	  })
-	| ({ Event: EventFrame } & {
-			Cancel?: never;
-			Error?: never;
-			Register?: never;
-			Request?: never;
-			Response?: never;
-			Shutdown?: never;
-	  })
-	| ({ Error: ErrorFrame } & {
-			Cancel?: never;
-			Event?: never;
-			Register?: never;
-			Request?: never;
-			Response?: never;
-			Shutdown?: never;
-	  })
-	| ({ Cancel: CancelFrame } & {
-			Error?: never;
-			Event?: never;
-			Register?: never;
-			Request?: never;
-			Response?: never;
-			Shutdown?: never;
-	  })
-	| ({ Register: RegisterFrame } & {
-			Cancel?: never;
-			Error?: never;
-			Event?: never;
-			Request?: never;
-			Response?: never;
-			Shutdown?: never;
-	  })
-	| ({ Shutdown: ShutdownFrame } & {
-			Cancel?: never;
-			Error?: never;
-			Event?: never;
-			Register?: never;
-			Request?: never;
-			Response?: never;
-	  });
+export type FrameKind = ({ Request: RequestFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Response?: never; Shutdown?: never } | ({ Response: ResponseFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Shutdown?: never } | ({ Event: EventFrame }) & { Cancel?: never; Error?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Error: ErrorFrame }) & { Cancel?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Cancel: CancelFrame }) & { Error?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Register: RegisterFrame }) & { Cancel?: never; Error?: never; Event?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Shutdown: ShutdownFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Response?: never };
 
 export type NativeArticleAsset = {
-	title: string;
-	url: string;
-	content: string;
-	text_content: string;
-	site_name: string;
-	selected_text: string | null;
-	language: string;
-	excerpt: string;
-	length: number;
+	title: string,
+	url: string,
+	content: string,
+	text_content: string,
+	site_name: string,
+	selected_text: string | null,
+	language: string,
+	excerpt: string,
+	length: number,
 };
 
 export type NativeArticleSnapshot = {
-	highlighted_text: string | null;
+	highlighted_text: string | null,
 };
 
 export type NativeImage = {
-	base64: string;
-	mime_type: string;
+	base64: string,
+	mime_type: string,
 };
 
 /**
@@ -123,69 +67,57 @@ export type NativeImage = {
  *  the inner payload under `data` so the JSON shape matches what the
  *  browser extension already constructs.
  */
-export type NativeMessage =
-	| { kind: 'NativeYoutubeAsset'; data: NativeYoutubeAsset }
-	| { kind: 'NativeArticleAsset'; data: NativeArticleAsset }
-	| { kind: 'NativeTwitterAsset'; data: NativeTwitterAsset }
-	| { kind: 'NativeYoutubeSnapshot'; data: NativeYoutubeSnapshot }
-	| { kind: 'NativeArticleSnapshot'; data: NativeArticleSnapshot }
-	| { kind: 'NativeMetadata'; data: NativeMetadata };
+export type NativeMessage = { kind: "NativeYoutubeAsset"; data: NativeYoutubeAsset } | { kind: "NativeArticleAsset"; data: NativeArticleAsset } | { kind: "NativeTwitterAsset"; data: NativeTwitterAsset } | { kind: "NativeYoutubeSnapshot"; data: NativeYoutubeSnapshot } | { kind: "NativeArticleSnapshot"; data: NativeArticleSnapshot } | { kind: "NativeMetadata"; data: NativeMetadata };
 
 export type NativeMetadata = {
-	url: string | null;
-	icon_base64: string | null;
-	title: string | null;
+	url: string | null,
+	icon_base64: string | null,
+	title: string | null,
 };
 
 export type NativeTwitterAsset = {
-	url: string;
-	title: string;
-	result: ParseResult;
-	timestamp: string;
+	url: string,
+	title: string,
+	result: ParseResult,
+	timestamp: string,
 };
 
 export type NativeTwitterTweet = {
-	text: string;
-	timestamp: string | null;
-	author: string | null;
-	images?: NativeImage[];
+	text: string,
+	timestamp: string | null,
+	author: string | null,
+	images?: NativeImage[],
 };
 
 export type NativeYoutubeAsset = {
-	url: string;
-	title: string;
-	transcript: string;
-	current_time: number | null;
+	url: string,
+	title: string,
+	transcript: string,
+	current_time: number | null,
 };
 
 export type NativeYoutubeSnapshot = {
-	current_time: number | null;
-	video_frame_base64: string;
-	video_frame_width: number;
-	video_frame_height: number;
+	current_time: number | null,
+	video_frame_base64: string,
+	video_frame_width: number,
+	video_frame_height: number,
 };
 
 export type NotificationsData = {
-	tweets: NativeTwitterTweet[];
+	tweets: NativeTwitterTweet[],
 };
 
-export type ParseResult =
-	| { page: 'tweet'; data: TweetPageData }
-	| { page: 'profile'; data: ProfilePageData }
-	| { page: 'home'; data: TimelineData }
-	| { page: 'search'; data: SearchData }
-	| { page: 'notifications'; data: NotificationsData }
-	| { page: 'unsupported'; data: UnsupportedPageData };
+export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "profile"; data: ProfilePageData } | { page: "home"; data: TimelineData } | { page: "search"; data: SearchData } | { page: "notifications"; data: NotificationsData } | { page: "unsupported"; data: UnsupportedPageData };
 
 export type ProfilePageData = {
-	username: string;
-	tweets: NativeTwitterTweet[];
+	username: string,
+	tweets: NativeTwitterTweet[],
 };
 
 /**
  *  Mandatory first frame on every connection. Identifies the host
  *  process (the bridge) and the application process being represented.
- *
+ * 
  *  `app_pid` is the OS PID for clients that have one (browsers via the
  *  native-messaging host, the macOS launcher representing Safari).
  *  Sandboxed clients without access to a real PID — Office.js add-ins
@@ -194,33 +126,33 @@ export type ProfilePageData = {
  *  desktop can locate the client without relying on OS process lookup.
  */
 export type RegisterFrame = {
-	host_pid: number;
-	app_pid: number;
+	host_pid: number,
+	app_pid: number,
 	/**
 	 *  Logical client identifier for non-PID-based integrations.
 	 *  `None` for clients whose `app_pid` corresponds to a real OS
 	 *  process discoverable via process-name lookup.
 	 */
-	app_kind?: string | null;
+	app_kind?: string | null,
 };
 
 /**  Desktop-initiated request to a connected client. */
 export type RequestFrame = {
-	id: number;
-	action: string;
-	payload?: string | null;
+	id: number,
+	action: string,
+	payload?: string | null,
 };
 
 /**  Client reply to a [`RequestFrame`], correlated by `id`. */
 export type ResponseFrame = {
-	id: number;
-	action: string;
-	payload?: string | null;
+	id: number,
+	action: string,
+	payload?: string | null,
 };
 
 export type SearchData = {
-	query: string;
-	tweets: NativeTwitterTweet[];
+	query: string,
+	tweets: NativeTwitterTweet[],
 };
 
 /**
@@ -231,18 +163,18 @@ export type SearchData = {
  *  binary. The `reason` is informational only (logged by the recipient).
  */
 export type ShutdownFrame = {
-	reason?: string | null;
+	reason?: string | null,
 };
 
 export type TimelineData = {
-	tweets: NativeTwitterTweet[];
+	tweets: NativeTwitterTweet[],
 };
 
 export type TweetPageData = {
-	tweet: NativeTwitterTweet | null;
-	replies: NativeTwitterTweet[];
+	tweet: NativeTwitterTweet | null,
+	replies: NativeTwitterTweet[],
 };
 
 export type UnsupportedPageData = {
-	url: string;
+	url: string,
 };

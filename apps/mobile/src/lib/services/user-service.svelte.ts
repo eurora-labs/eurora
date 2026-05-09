@@ -1,6 +1,6 @@
-import { InjectionToken } from '@eurora/shared/context';
-import { commands, events, type LoginOutcome } from '$lib/bindings/specta.bindings.js';
 import { unwrap } from '$lib/bindings/result.js';
+import { commands, events, type LoginOutcome } from '$lib/bindings/specta.bindings.js';
+import { InjectionToken } from '@eurora/shared/context';
 
 export class UserService {
 	authenticated = $state(false);

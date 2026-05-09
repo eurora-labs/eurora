@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { unwrap } from '$lib/bindings/result.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import ExternalLink from '@lucide/svelte/icons/external-link';

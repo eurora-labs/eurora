@@ -1,8 +1,8 @@
+import { unwrap } from '$lib/bindings/result.js';
+import { commands, type Theme } from '$lib/bindings/specta.bindings.js';
 import { clearAccent } from '$lib/services/accent.js';
 import { InjectionToken } from '@eurora/shared/context';
 import { setMode } from 'mode-watcher';
-import { commands, type Theme } from '$lib/bindings/specta.bindings.js';
-import { unwrap } from '$lib/bindings/result.js';
 
 /**
  * Bounds and identity value for the accessibility scale sliders. Kept in sync

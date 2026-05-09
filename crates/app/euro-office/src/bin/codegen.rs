@@ -7,13 +7,11 @@
 //! ```
 
 use std::env;
-use std::fs;
-use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::{Context, Result};
 use euro_office::type_collection;
-use specta_typescript::{BigIntExportBehavior, Typescript};
+use specta_typescript::Typescript;
 
 const TYPESCRIPT_OUT: &str = "apps/office-addin/src/shared/bindings.ts";
 
@@ -40,17 +38,10 @@ fn main() -> ExitCode {
 }
 
 fn generate_bindings() -> Result<()> {
-    let out = Path::new(TYPESCRIPT_OUT);
-    if let Some(parent) = out.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("creating output directory {}", parent.display()))?;
-    }
-
     let types = type_collection();
 
     Typescript::default()
-        .bigint(BigIntExportBehavior::Fail)
-        .export_to(out, &types)
+        .export_to(TYPESCRIPT_OUT, &types, specta_serde::Format)
         .context("exporting TypeScript bindings")?;
 
     Ok(())

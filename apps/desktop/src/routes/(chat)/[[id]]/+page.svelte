@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { ListenerBag } from '$lib/bindings/listeners.js';
+	import { unwrap } from '$lib/bindings/result.js';
 	import {
 		commands,
 		events,
 		type BrowserExtensionState,
 		type ContextChip,
 	} from '$lib/bindings/specta.bindings.js';
-	import { unwrap } from '$lib/bindings/result.js';
 	import { buildSuggestions } from '$lib/chat/suggestions.js';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { MessageList, ChatPromptInput, middleTruncate } from '@eurora/chat';
@@ -33,7 +34,7 @@
 	const focusedProcessId = $derived(latestTimelineItem?.processId ?? 0);
 
 	let extensionState = $state<BrowserExtensionState | null>(null);
-	let unlistenStatus: (() => void) | null = null;
+	const listeners = new ListenerBag();
 
 	$effect(() => {
 		if (threadId) {
@@ -122,9 +123,11 @@
 	}
 
 	onMount(() => {
-		events.timelineAssetsEvent.listen((e) => {
-			assets = e.payload;
-		});
+		listeners.add(
+			events.timelineAssetsEvent.listen((e) => {
+				assets = e.payload;
+			}),
+		);
 
 		// Seed the initial chip state so the suggestions row doesn't render
 		// stale "no active page" suggestions before the first event arrives.
@@ -137,23 +140,17 @@
 			})
 			.catch((e) => toast.error(String(e)));
 
-		events.browserExtensionStatusChanged
-			.listen((event) => {
+		listeners.add(
+			events.browserExtensionStatusChanged.listen((event) => {
 				const status = event.payload;
 				if (status.process_name !== focusedProcessName) return;
 				extensionState = status.state;
-			})
-			.then((unlisten) => {
-				unlistenStatus = unlisten;
-			})
-			.catch((e) => {
-				toast.error(`Failed to subscribe to browser extension status: ${e}`);
-			});
+			}),
+		);
 	});
 
 	onDestroy(() => {
-		unlistenStatus?.();
-		unlistenStatus = null;
+		listeners.destroy();
 	});
 
 	const suggestions = $derived(

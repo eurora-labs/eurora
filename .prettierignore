@@ -16,3 +16,6 @@ package-lock.json
 
 apps/desktop/src/lib/bindings/bindings.ts
 apps/mobile/src/lib/bindings/bindings.ts
+apps/browser/src/shared/content/bindings.ts
+apps/office-addin/src/shared/bindings.ts
+packages/shared/src/lib/bindings/

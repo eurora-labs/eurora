@@ -75,6 +75,10 @@ public extension Frame {
     init(_ register: RegisterFrame) {
         self.init(kind: .register(register))
     }
+
+    init(_ shutdown: ShutdownFrame) {
+        self.init(kind: .shutdown(shutdown))
+    }
 }
 
 public extension ErrorFrame {
@@ -205,6 +209,7 @@ public extension FrameKind {
         case .error: "Error"
         case .cancel: "Cancel"
         case .register: "Register"
+        case .shutdown: "Shutdown"
         }
     }
 }
@@ -228,6 +233,11 @@ public extension Frame {
                 return "Register(host=\(register.hostPid), app=\(register.appPid), kind=\(kind))"
             }
             return "Register(host=\(register.hostPid), app=\(register.appPid))"
+        case let .shutdown(shutdown):
+            if let reason = shutdown.reason {
+                return "Shutdown(reason=\(reason))"
+            }
+            return "Shutdown"
         }
     }
 }

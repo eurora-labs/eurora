@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { commands, type TelemetrySettings } from '$lib/bindings/specta.bindings.js';
 	import { unwrap } from '$lib/bindings/result.js';
+	import { commands, type TelemetrySettings } from '$lib/bindings/specta.bindings.js';
 	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';

@@ -1,5 +1,6 @@
-import { applyAccent, clearAccent } from '$lib/services/accent.js';
+import { ListenerBag } from '$lib/bindings/listeners.js';
 import { events, type TimelineAppEvent } from '$lib/bindings/specta.bindings.js';
+import { applyAccent, clearAccent } from '$lib/services/accent.js';
 import { InjectionToken } from '@eurora/shared/context';
 import type { AppearanceService } from '$lib/services/appearance-service.svelte.js';
 
@@ -12,14 +13,14 @@ export class TimelineService {
 	);
 
 	private readonly appearance: AppearanceService;
-	private readonly unlisteners: Promise<() => void>[] = [];
+	private readonly listeners = new ListenerBag();
 
 	constructor(appearance: AppearanceService) {
 		this.appearance = appearance;
 	}
 
 	init() {
-		this.unlisteners.push(
+		this.listeners.add(
 			events.timelineAppEvent.listen((e) => {
 				const event = e.payload;
 				const next = [...this.recent, event];
@@ -33,13 +34,10 @@ export class TimelineService {
 		);
 	}
 
-	destroy() {
+	async destroy(): Promise<void> {
 		clearAccent();
 		this.recent = [];
-		for (const p of this.unlisteners) {
-			p.then((unlisten) => unlisten());
-		}
-		this.unlisteners.length = 0;
+		await this.listeners.destroy();
 	}
 }
 

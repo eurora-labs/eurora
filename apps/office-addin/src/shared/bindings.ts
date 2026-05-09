@@ -4,15 +4,15 @@
  *  by `id`.
  */
 export type CancelFrame = {
-	id: number;
+	id: number,
 };
 
-// Failure response correlated with a [`RequestFrame`] by `id`.
+/**  Failure response correlated with a [`RequestFrame`] by `id`. */
 export type ErrorFrame = {
-	id: number;
-	code: number;
-	message: string;
-	details?: string | null;
+	id: number,
+	code: number,
+	message: string,
+	details?: string | null,
 };
 
 /**
@@ -20,8 +20,8 @@ export type ErrorFrame = {
  *  activation, Word selection change).
  */
 export type EventFrame = {
-	action: string;
-	payload?: string | null;
+	action: string,
+	payload?: string | null,
 };
 
 /**
@@ -30,7 +30,7 @@ export type EventFrame = {
  *  payload variant.
  */
 export type Frame = {
-	kind: FrameKind;
+	kind: FrameKind,
 };
 
 /**
@@ -38,18 +38,12 @@ export type Frame = {
  *  `{ "Request": { ... } }` — to match the shape the browser extension
  *  already consumes.
  */
-export type FrameKind =
-	| { Request: RequestFrame }
-	| { Response: ResponseFrame }
-	| { Event: EventFrame }
-	| { Error: ErrorFrame }
-	| { Cancel: CancelFrame }
-	| { Register: RegisterFrame };
+export type FrameKind = ({ Request: RequestFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Response?: never; Shutdown?: never } | ({ Response: ResponseFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Shutdown?: never } | ({ Event: EventFrame }) & { Cancel?: never; Error?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Error: ErrorFrame }) & { Cancel?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Cancel: CancelFrame }) & { Error?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Register: RegisterFrame }) & { Cancel?: never; Error?: never; Event?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Shutdown: ShutdownFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Response?: never };
 
 /**
  *  Mandatory first frame on every connection. Identifies the host
  *  process (the bridge) and the application process being represented.
- *
+ * 
  *  `app_pid` is the OS PID for clients that have one (browsers via the
  *  native-messaging host, the macOS launcher representing Safari).
  *  Sandboxed clients without access to a real PID — Office.js add-ins
@@ -58,40 +52,51 @@ export type FrameKind =
  *  desktop can locate the client without relying on OS process lookup.
  */
 export type RegisterFrame = {
-	host_pid: number;
-	app_pid: number;
+	host_pid: number,
+	app_pid: number,
 	/**
 	 *  Logical client identifier for non-PID-based integrations.
 	 *  `None` for clients whose `app_pid` corresponds to a real OS
 	 *  process discoverable via process-name lookup.
 	 */
-	app_kind?: string | null;
+	app_kind?: string | null,
 };
 
-// Desktop-initiated request to a connected client.
+/**  Desktop-initiated request to a connected client. */
 export type RequestFrame = {
-	id: number;
-	action: string;
-	payload?: string | null;
+	id: number,
+	action: string,
+	payload?: string | null,
 };
 
-// Client reply to a [`RequestFrame`], correlated by `id`.
+/**  Client reply to a [`RequestFrame`], correlated by `id`. */
 export type ResponseFrame = {
-	id: number;
-	action: string;
-	payload?: string | null;
+	id: number,
+	action: string,
+	payload?: string | null,
+};
+
+/**
+ *  Desktop-initiated request that the receiving client (currently:
+ *  browser native-messaging hosts) terminate cleanly. Sent when the
+ *  desktop has just installed an updated messenger binary on disk and
+ *  wants stale connections to drop so the browser respawns from the new
+ *  binary. The `reason` is informational only (logged by the recipient).
+ */
+export type ShutdownFrame = {
+	reason?: string | null,
 };
 
 /**
  *  Snapshot of a Word document's textual content as it travels over the
  *  bridge.
- *
+ * 
  *  Sent by the Office add-in's runtime as the JSON payload of a
  *  `ResponseFrame` for `GET_ASSETS`. The desktop deserializes this
  *  directly — there is no `NativeMessage` discriminator wrapper because
  *  the WebSocket transport (unlike Chrome's stdio native-messaging)
  *  does not require a single envelope shape per message.
- *
+ * 
  *  This is a pure wire type: it derives [`specta::Type`] so it appears in
  *  the TypeScript bindings consumed by the add-in. The desktop wraps it
  *  in a [`WordAsset`] (with a stable UUID) before storing.
@@ -101,7 +106,7 @@ export type WordDocumentAsset = {
 	 *  Document title as reported by `Word.Document.properties.title`,
 	 *  or a fallback string when the document is unsaved/untitled.
 	 */
-	document_name: string;
-	// Full document body text (`Word.Document.body.text`).
-	text: string;
+	document_name: string,
+	/**  Full document body text (`Word.Document.body.text`). */
+	text: string,
 };

@@ -1,10 +1,10 @@
 <script lang="ts">
+	import { unwrap } from '$lib/bindings/result.js';
 	import {
 		commands,
 		type APISettings,
 		type ConnectionMode,
 	} from '$lib/bindings/specta.bindings.js';
-	import { unwrap } from '$lib/bindings/result.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';

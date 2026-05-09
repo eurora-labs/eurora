@@ -4,6 +4,7 @@ version = "0.0.0"
 edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 publish = false
+default-run = "euro-tauri"
 
 [package.metadata.cargo-machete]
 ignored = [
@@ -23,11 +24,19 @@ name = "euro-tauri"
 path = "src/main.rs"
 test = false
 
+# Standalone exporter for the tauri-specta TypeScript bindings. The
+# `euro-tauri` binary also re-exports them on every debug launch via a
+# `#[cfg(debug_assertions)]` block in `main.rs`; this bin lets CI / tooling
+# regenerate them without bringing up the Tauri runtime.
+[[bin]]
+name = "gen-bindings"
+path = "src/bin/gen_bindings.rs"
+test = false
+
 [dependencies]
 agent-chain-core = { workspace = true }
 auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
-backon = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
 chrono = { workspace = true, features = ["serde"] }
 color-thief = "0.2.2"

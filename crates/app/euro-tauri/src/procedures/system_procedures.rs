@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use euro_activity::ContextChip;
 use euro_browser::BundledExtensionState;
@@ -16,7 +15,7 @@ use thiserror::Error;
 use tokio::sync::Mutex;
 use url::Url;
 
-use crate::shared_types::{SharedAppSettings, SharedEndpointManager};
+use crate::shared_types::{SharedAppSettings, SharedEndpointManager, SharedHttpClient};
 use crate::telemetry;
 
 /// `RequestFrame.action` the desktop sends to the macOS launcher to
@@ -232,19 +231,15 @@ async fn open_safari_extension_settings() -> Result<(), SystemError> {
 /// Shared by `system_get_llm_info` (which uses the configured endpoint)
 /// and `system_test_backend_url` (which lets the connection picker probe
 /// an arbitrary URL before persisting it).
-async fn fetch_llm_info(base_url: &str) -> Result<RedactedLlmConfig, SystemError> {
+async fn fetch_llm_info(
+    client: &reqwest::Client,
+    base_url: &str,
+) -> Result<RedactedLlmConfig, SystemError> {
     let parsed = Url::parse(base_url)
         .map_err(|e| SystemError::InvalidUrl(format!("Invalid URL `{base_url}`: {e}")))?;
     let info_url = parsed
         .join("llm/info")
         .map_err(|e| SystemError::InvalidUrl(format!("Failed to derive /llm/info URL: {e}")))?;
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .map_err(|e| {
-            SystemError::BackendUnreachable(format!("Failed to build HTTP client: {e}"))
-        })?;
 
     let response = client.get(info_url.clone()).send().await.map_err(|e| {
         SystemError::BackendUnreachable(format!("Request to {info_url} failed: {e}"))
@@ -297,15 +292,20 @@ pub async fn system_check_backend_connection(
 pub async fn system_get_llm_info(app_handle: AppHandle) -> Result<RedactedLlmConfig, SystemError> {
     let endpoint_manager = app_handle.state::<SharedEndpointManager>();
     let url = endpoint_manager.current_url().to_string();
-    fetch_llm_info(&url).await
+    let client = app_handle.state::<SharedHttpClient>().inner().clone();
+    fetch_llm_info(&client, &url).await
 }
 
 /// Probe an arbitrary URL by hitting /llm/info — used by the connection
 /// picker's "Test connection" button before persisting the URL.
 #[tauri::command]
 #[specta::specta]
-pub async fn system_test_backend_url(url: String) -> Result<RedactedLlmConfig, SystemError> {
-    fetch_llm_info(&url).await
+pub async fn system_test_backend_url(
+    app_handle: AppHandle,
+    url: String,
+) -> Result<RedactedLlmConfig, SystemError> {
+    let client = app_handle.state::<SharedHttpClient>().inner().clone();
+    fetch_llm_info(&client, &url).await
 }
 
 /// The backend URL the desktop binary was built against. Surfaced to

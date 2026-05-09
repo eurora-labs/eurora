@@ -451,9 +451,6 @@ importers:
       tailwindcss:
         specifier: 'catalog:'
         version: 4.2.4
-      taurpc:
-        specifier: ^1.8.1
-        version: 1.8.1
       tinykeys:
         specifier: ^2.1.0
         version: 2.1.0
@@ -9592,9 +9589,6 @@ packages:
     resolution: {integrity: sha512-/7sHKgQO3JLP9ESlwTYUUftHUadOURUqq23xs1vjcnp8Vss6k0wCfzulyEtk5g91pjvnuriimGlyG7k6msrzRw==}
     engines: {node: '>=18'}
 
-  taurpc@1.8.1:
-    resolution: {integrity: sha512-qfR1ekhXApjbnWAqyE5qpDa/oMmKBwjNNDuqjYn7sO+ChI5qwQ4J/fS+00dVLE3I0lbZDizyY8ObSFBz3MRerQ==}
-
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
 
@@ -11142,17 +11136,18 @@ snapshots:
       picocolors: 1.1.1
     optional: true
 
-  '@covector/apply@0.10.0':
+  '@covector/apply@0.10.0(mocha@10.8.2)':
     dependencies:
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)
       semver: 7.7.4
     transitivePeerDependencies:
       - encoding
+      - mocha
 
-  '@covector/assemble@0.12.0':
+  '@covector/assemble@0.12.0(mocha@10.8.2)':
     dependencies:
-      '@covector/command': 0.8.0
+      '@covector/command': 0.8.0(mocha@10.8.2)
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)
       js-yaml: 4.1.1
@@ -11163,6 +11158,7 @@ snapshots:
       unified: 9.2.2
     transitivePeerDependencies:
       - encoding
+      - mocha
       - supports-color
 
   '@covector/changelog@0.12.0(mocha@10.8.2)':
@@ -11178,12 +11174,13 @@ snapshots:
       - mocha
       - supports-color
 
-  '@covector/command@0.8.0':
+  '@covector/command@0.8.0(mocha@10.8.2)':
     dependencies:
-      '@effection/process': 2.1.4
+      '@effection/process': 2.1.4(mocha@10.8.2)
       effection: 2.0.8(mocha@10.8.2)
     transitivePeerDependencies:
       - encoding
+      - mocha
 
   '@covector/files@0.8.0':
     dependencies:
@@ -11280,10 +11277,8 @@ snapshots:
     dependencies:
       effection: 2.0.8(mocha@10.8.2)
       mocha: 10.8.2
-    transitivePeerDependencies:
-      - encoding
 
-  '@effection/process@2.1.4':
+  '@effection/process@2.1.4(mocha@10.8.2)':
     dependencies:
       cross-spawn: 7.0.6
       ctrlc-windows: 2.2.0
@@ -11291,6 +11286,7 @@ snapshots:
       shellwords: 0.1.1
     transitivePeerDependencies:
       - encoding
+      - mocha
 
   '@effection/stream@2.0.6':
     dependencies:
@@ -15902,10 +15898,10 @@ snapshots:
   covector@0.12.4(mocha@10.8.2):
     dependencies:
       '@clack/prompts': 0.7.0
-      '@covector/apply': 0.10.0
-      '@covector/assemble': 0.12.0
+      '@covector/apply': 0.10.0(mocha@10.8.2)
+      '@covector/assemble': 0.12.0(mocha@10.8.2)
       '@covector/changelog': 0.12.0(mocha@10.8.2)
-      '@covector/command': 0.8.0
+      '@covector/command': 0.8.0(mocha@10.8.2)
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)
       globby: 11.1.0
@@ -20641,10 +20637,6 @@ snapshots:
       minipass: 7.1.3
       minizlib: 3.1.0
       yallist: 5.0.0
-
-  taurpc@1.8.1:
-    dependencies:
-      '@tauri-apps/api': 2.10.1
 
   teex@1.0.1:
     dependencies:
