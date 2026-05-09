@@ -5,60 +5,55 @@ import * as __TAURI_EVENT from '@tauri-apps/api/event';
 
 /** Commands */
 export const commands = {
-	authStartLogin: async () =>
-		await typedError<LoginOutcome, string>(__TAURI_INVOKE('auth_start_login')),
-	authLogin: async (login: string, password: string) =>
-		await typedError<null, string>(__TAURI_INVOKE('auth_login', { login, password })),
-	authRegister: async (email: string, password: string) =>
-		await typedError<null, string>(__TAURI_INVOKE('auth_register', { email, password })),
-	authLogout: async () => await typedError<null, string>(__TAURI_INVOKE('auth_logout')),
-	authIsAuthenticated: async () =>
-		await typedError<boolean, string>(__TAURI_INVOKE('auth_is_authenticated')),
-	authGetAccessTokenPayload: async () =>
-		await typedError<Claims, string>(__TAURI_INVOKE('auth_get_access_token_payload')),
-	authRefreshSession: async () =>
-		await typedError<null, string>(__TAURI_INVOKE('auth_refresh_session')),
-	threadList: async (limit: number, offset: number) =>
-		await typedError<Thread[], string>(__TAURI_INVOKE('thread_list', { limit, offset })),
-	threadCreate: async () => await typedError<Thread, string>(__TAURI_INVOKE('thread_create')),
-	threadDelete: async (threadId: string) =>
-		await typedError<null, string>(__TAURI_INVOKE('thread_delete', { threadId })),
-	threadGetMessages: async (threadId: string, limit: number, offset: number) =>
-		await typedError<MessageNode[], string>(
+	authStartLogin: () => typedError<LoginOutcome, string>(__TAURI_INVOKE('auth_start_login')),
+	authLogin: (login: string, password: string) =>
+		typedError<null, string>(__TAURI_INVOKE('auth_login', { login, password })),
+	authRegister: (email: string, password: string) =>
+		typedError<null, string>(__TAURI_INVOKE('auth_register', { email, password })),
+	authLogout: () => typedError<null, string>(__TAURI_INVOKE('auth_logout')),
+	authIsAuthenticated: () => typedError<boolean, string>(__TAURI_INVOKE('auth_is_authenticated')),
+	authGetAccessTokenPayload: () =>
+		typedError<Claims, string>(__TAURI_INVOKE('auth_get_access_token_payload')),
+	authRefreshSession: () => typedError<null, string>(__TAURI_INVOKE('auth_refresh_session')),
+	threadList: (limit: number, offset: number) =>
+		typedError<Thread[], ThreadError>(__TAURI_INVOKE('thread_list', { limit, offset })),
+	threadCreate: () => typedError<Thread, ThreadError>(__TAURI_INVOKE('thread_create')),
+	threadDelete: (threadId: string) =>
+		typedError<null, ThreadError>(__TAURI_INVOKE('thread_delete', { threadId })),
+	threadGetMessages: (threadId: string, limit: number, offset: number) =>
+		typedError<MessageNode[], ThreadError>(
 			__TAURI_INVOKE('thread_get_messages', { threadId, limit, offset }),
 		),
-	threadSwitchBranch: async (threadId: string, messageId: string, direction: number) =>
-		await typedError<MessageNode[], string>(
+	threadSwitchBranch: (threadId: string, messageId: string, direction: number) =>
+		typedError<MessageNode[], ThreadError>(
 			__TAURI_INVOKE('thread_switch_branch', { threadId, messageId, direction }),
 		),
-	threadGenerateTitle: async (threadId: string) =>
-		await typedError<Thread, string>(__TAURI_INVOKE('thread_generate_title', { threadId })),
-	threadSearchThreads: async (query: string, limit: number, offset: number) =>
-		await typedError<SearchThreadResult[], string>(
+	threadGenerateTitle: (threadId: string) =>
+		typedError<Thread, ThreadError>(__TAURI_INVOKE('thread_generate_title', { threadId })),
+	threadSearchThreads: (query: string, limit: number, offset: number) =>
+		typedError<SearchThreadResult[], ThreadError>(
 			__TAURI_INVOKE('thread_search_threads', { query, limit, offset }),
 		),
-	threadSearchMessages: async (query: string, limit: number, offset: number) =>
-		await typedError<SearchMessageResult[], string>(
+	threadSearchMessages: (query: string, limit: number, offset: number) =>
+		typedError<SearchMessageResult[], ThreadError>(
 			__TAURI_INVOKE('thread_search_messages', { query, limit, offset }),
 		),
-	chatSendQuery: async (
+	chatCollectContext: (threadId: string) =>
+		typedError<ChatContext, StreamError>(__TAURI_INVOKE('chat_collect_context', { threadId })),
+	chatSendQuery: (
 		threadId: string,
 		channel: Channel<ChatServerMessage>,
 		request: ChatSendRequest,
 	) =>
-		await typedError<null, string>(
+		typedError<null, StreamError>(
 			__TAURI_INVOKE('chat_send_query', { threadId, channel, request }),
 		),
-	chatRegenerate: async (
-		threadId: string,
-		aiMessageId: string,
-		channel: Channel<ChatServerMessage>,
-	) =>
-		await typedError<null, string>(
+	chatRegenerate: (threadId: string, aiMessageId: string, channel: Channel<ChatServerMessage>) =>
+		typedError<null, StreamError>(
 			__TAURI_INVOKE('chat_regenerate', { threadId, aiMessageId, channel }),
 		),
-	chatCancelQuery: async (threadId: string) =>
-		await typedError<null, string>(__TAURI_INVOKE('chat_cancel_query', { threadId })),
+	chatCancelQuery: (threadId: string) =>
+		typedError<null, StreamError>(__TAURI_INVOKE('chat_cancel_query', { threadId })),
 };
 
 /** Events */
@@ -147,6 +142,19 @@ export type AuthStateChanged = {
 };
 
 export type BlockIndex = number | string;
+
+/**
+ *  Per-turn host context returned by `chat_collect_context`.
+ *
+ *  `content_blocks` are inlined directly — large payloads are rewritten
+ *  into asset references server-side at chat-turn time, so the wire
+ *  format here can carry raw bytes/text without the client having to
+ *  round-trip them.
+ */
+export type ChatContext = {
+	contentBlocks: ContentBlock[];
+	assetChips: ContextChip[];
+};
 
 export type ChatMessage = {
 	content: ContentBlocks;
@@ -254,6 +262,22 @@ export type ContentBlock =
 	  } & ServerToolResult);
 
 export type ContentBlocks = ContentBlock[];
+
+/**
+ *  Per-asset context chip surfaced alongside [`ChatContext`] content blocks.
+ *
+ *  Lives here (rather than in `euro-activity`) because both desktop and
+ *  mobile chat IPC layers emit it: desktop populates it from the timeline,
+ *  mobile populates it from native pickers. Keeping the wire shape in
+ *  `thread-core` lets the IPC commands stay app-agnostic and avoids
+ *  dragging the desktop-only `euro-activity` graph into mobile.
+ */
+export type ContextChip = {
+	id: string;
+	name: string;
+	icon: string | null;
+	domain: string | null;
+};
 
 export type FileContentBlock = {
 	id?: string | null;
@@ -402,6 +426,22 @@ export type ServerToolResult = {
 
 export type ServerToolStatus = 'success' | 'error';
 
+/**
+ *  Typed error surface for the streaming `chat_*` IPC commands.
+ *  Externally tagged so the JS side can branch on `error.type`.
+ *  `Cancelled` is split out from the rest so the UI can suppress its
+ *  own cancel-induced errors instead of showing a toast for them; an
+ *  upstream [`crate::Error`] (e.g. a deleted thread mid-stream) is
+ *  wrapped in `Thread` so the JS side can drill into the same
+ *  [`ThreadError`] variants it handles for CRUD calls.
+ */
+export type StreamError =
+	| { type: 'Cancelled' }
+	| { type: 'Timeout'; data: number }
+	| { type: 'Channel'; data: string }
+	| { type: 'StateUnavailable'; data: string }
+	| { type: 'Thread'; data: ThreadError };
+
 export type SystemMessage = {
 	content: ContentBlocks;
 	id?: string | null;
@@ -427,6 +467,20 @@ export type Thread = {
 	updated_at: string;
 	active_leaf_id?: string | null;
 };
+
+/**
+ *  Typed error surface for the CRUD/search `thread_*` IPC commands.
+ *  Externally tagged so the JS side can branch on `error.type` without
+ *  parsing strings. `NotFound` lifts [`crate::Error::ThreadNotFound`] to
+ *  a dedicated variant so the UI can render an empty state instead of a
+ *  generic toast.
+ */
+export type ThreadError =
+	| { type: 'NotFound' }
+	| { type: 'Backend'; data: string }
+	| { type: 'BadResponse'; data: string }
+	| { type: 'StateUnavailable'; data: string }
+	| { type: 'Internal'; data: string };
 
 export type ToolCall = {
 	id?: string | null;
@@ -519,10 +573,8 @@ function makeEvent<T>(
 	const mapPayload = (payload: T) => (serialize ? serialize(payload) : payload);
 
 	const base = {
-		listen: async (cb: __TAURI_EVENT.EventCallback<T>) =>
-			await __TAURI_EVENT.listen(name, mapEvent(cb)),
-		once: async (cb: __TAURI_EVENT.EventCallback<T>) =>
-			await __TAURI_EVENT.once(name, mapEvent(cb)),
+		listen: (cb: __TAURI_EVENT.EventCallback<T>) => __TAURI_EVENT.listen(name, mapEvent(cb)),
+		once: (cb: __TAURI_EVENT.EventCallback<T>) => __TAURI_EVENT.once(name, mapEvent(cb)),
 		emit: ((payload: T) =>
 			__TAURI_EVENT.emit(name, mapPayload(payload)) as unknown) as EventEmit<T>,
 	};
@@ -530,9 +582,8 @@ function makeEvent<T>(
 	const fn = (
 		target: import('@tauri-apps/api/webview').Webview | import('@tauri-apps/api/window').Window,
 	) => ({
-		listen: async (cb: __TAURI_EVENT.EventCallback<T>) =>
-			await target.listen(name, mapEvent(cb)),
-		once: async (cb: __TAURI_EVENT.EventCallback<T>) => await target.once(name, mapEvent(cb)),
+		listen: (cb: __TAURI_EVENT.EventCallback<T>) => target.listen(name, mapEvent(cb)),
+		once: (cb: __TAURI_EVENT.EventCallback<T>) => target.once(name, mapEvent(cb)),
 		emit: ((payload: T) => target.emit(name, mapPayload(payload)) as unknown) as EventEmit<T>,
 	});
 

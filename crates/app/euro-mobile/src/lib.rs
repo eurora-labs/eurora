@@ -9,11 +9,6 @@ use procedures::auth_procedures::{
     AuthStateChanged, auth_get_access_token_payload, auth_is_authenticated, auth_login,
     auth_logout, auth_refresh_session, auth_register, auth_start_login,
 };
-use procedures::chat_procedures::{chat_cancel_query, chat_regenerate, chat_send_query};
-use procedures::thread_procedures::{
-    thread_create, thread_delete, thread_generate_title, thread_get_messages, thread_list,
-    thread_search_messages, thread_search_threads, thread_switch_branch,
-};
 
 pub mod error;
 pub mod procedures;
@@ -25,6 +20,10 @@ pub mod shared_types;
 /// `#[specta::specta]` are `#[macro_export]`'d into this crate's root macro
 /// namespace; calling `collect_commands!` from a sub-module would require
 /// path-qualifying every entry.
+///
+/// Thread/chat commands are sourced from `euro_thread::commands::*` so
+/// the desktop and mobile apps share one canonical IPC surface — adding
+/// a new thread or chat command requires editing only `euro-thread`.
 pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .disable_serde_phases()
@@ -36,17 +35,18 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             auth_is_authenticated,
             auth_get_access_token_payload,
             auth_refresh_session,
-            thread_list,
-            thread_create,
-            thread_delete,
-            thread_get_messages,
-            thread_switch_branch,
-            thread_generate_title,
-            thread_search_threads,
-            thread_search_messages,
-            chat_send_query,
-            chat_regenerate,
-            chat_cancel_query,
+            euro_thread::commands::thread::thread_list,
+            euro_thread::commands::thread::thread_create,
+            euro_thread::commands::thread::thread_delete,
+            euro_thread::commands::thread::thread_get_messages,
+            euro_thread::commands::thread::thread_switch_branch,
+            euro_thread::commands::thread::thread_generate_title,
+            euro_thread::commands::thread::thread_search_threads,
+            euro_thread::commands::thread::thread_search_messages,
+            euro_thread::commands::chat::chat_collect_context,
+            euro_thread::commands::chat::chat_send_query,
+            euro_thread::commands::chat::chat_regenerate,
+            euro_thread::commands::chat::chat_cancel_query,
         ])
         .events(tauri_specta::collect_events![AuthStateChanged])
 }

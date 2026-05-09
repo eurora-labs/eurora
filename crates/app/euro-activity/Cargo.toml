@@ -36,6 +36,7 @@ serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
 tauri-specta = { workspace = true }
 thiserror = { workspace = true }
+thread-core = { workspace = true, features = ["specta"] }
 tiny-skia = "0.12"
 tokio = { workspace = true, features = [
   "fs",

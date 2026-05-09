@@ -1,6 +1,7 @@
 use crate::shared_types::{SharedAppSettings, SharedThreadManager, SharedUserController};
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
+use euro_thread::commands::{NoopChatContextProvider, SharedChatContextProvider};
 use tauri::Manager;
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -63,6 +64,12 @@ fn init_state(
     app_handle.manage(SharedUserController::new(user_controller));
 
     app_handle.manage(crate::shared_types::ActiveStreamTokens::default());
+
+    // Mobile has no timeline — `chat_collect_context` returns an empty
+    // [`ChatContext`] until per-thread native-picker state replaces this
+    // with a real provider.
+    let context_provider: SharedChatContextProvider = std::sync::Arc::new(NoopChatContextProvider);
+    app_handle.manage(context_provider);
 
     Ok(())
 }

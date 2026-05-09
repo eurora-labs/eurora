@@ -3714,6 +3714,7 @@ dependencies = [
  "specta",
  "tauri-specta",
  "thiserror 2.0.18",
+ "thread-core",
  "tiny-skia 0.12.0",
  "tokio",
  "tracing",
@@ -3956,6 +3957,7 @@ version = "0.0.0"
 dependencies = [
  "agent-chain-core",
  "anyhow",
+ "async-trait",
  "auth-core",
  "backtrace",
  "chrono",
@@ -4020,6 +4022,7 @@ name = "euro-thread"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
+ "async-trait",
  "chrono",
  "euro-auth",
  "euro-endpoint",
@@ -4028,6 +4031,9 @@ dependencies = [
  "reqwest 0.12.28",
  "serde",
  "serde_json",
+ "specta",
+ "tauri",
+ "tauri-specta",
  "thiserror 2.0.18",
  "thread-core",
  "tokio",

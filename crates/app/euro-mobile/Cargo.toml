@@ -24,7 +24,7 @@ euro-auth = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-webpki-roots"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
-euro-thread = { workspace = true }
+euro-thread = { workspace = true, features = ["tauri"] }
 euro-user = { workspace = true }
 thread-core = { workspace = true, features = ["specta"] }
 uuid = { workspace = true, features = ["serde"] }

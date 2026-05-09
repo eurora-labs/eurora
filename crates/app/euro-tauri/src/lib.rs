@@ -6,6 +6,7 @@
 )]
 
 pub mod browser_launcher;
+pub mod chat_context;
 pub mod native_messaging;
 pub mod office_addin;
 pub mod procedures;
