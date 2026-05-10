@@ -99,38 +99,29 @@
 </script>
 
 <Sidebar.Root collapsible="icon" class="border-none">
-	<!--
-		Sidebar header is empty on purpose: the toggle lives in the
-		Titlebar so it can read as part of the window chrome and align
-		with the sidebar's right edge. The empty strip is kept so the
-		sidebar's top edge — which sits just below the Titlebar — gives
-		the menu a small breathing-room gutter before the first menu item.
-	-->
+	<Sidebar.Header>
+		<Sidebar.Menu>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton onclick={() => createChat()}>
+					<SquarePenIcon />
+					<span>New chat</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton onclick={() => (searchOpen = true)}>
+					<SearchIcon />
+					<span>Search</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+		</Sidebar.Menu>
+	</Sidebar.Header>
 	<Sidebar.Content>
-		<Sidebar.Group>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={() => createChat()}>
-							<SquarePenIcon />
-							<span>New chat</span>
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={() => (searchOpen = true)}>
-							<SearchIcon />
-							<span>Search</span>
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
 		{#if sidebarState.open}
 			<SidebarThreadsList onThreadSelect={handleThreadSelect} />
 		{/if}
 	</Sidebar.Content>
 	{#if visibleTimelineItems.length > 0}
-		<div class="px-2 py-2">
+		<div class="mx-2 border-t border-sidebar-border py-2">
 			<Timeline.Root class="w-full" defaultOpen={false}>
 				{#each visibleTimelineItems as item, i}
 					<Timeline.Item
