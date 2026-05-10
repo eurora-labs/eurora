@@ -24,15 +24,6 @@ name = "euro-tauri"
 path = "src/main.rs"
 test = false
 
-# Standalone exporter for the tauri-specta TypeScript bindings. The
-# `euro-tauri` binary also re-exports them on every debug launch via a
-# `#[cfg(debug_assertions)]` block in `main.rs`; this bin lets CI / tooling
-# regenerate them without bringing up the Tauri runtime.
-[[bin]]
-name = "gen-bindings"
-path = "src/bin/gen_bindings.rs"
-test = false
-
 [dependencies]
 agent-chain-core = { workspace = true }
 async-trait = { workspace = true }
