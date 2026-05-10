@@ -1,5 +1,5 @@
 <script lang="ts">
-	import '@eurora/ui/main.css';
+	import '@eurora/ui/preview.css';
 
 	let { children } = $props();
 </script>
