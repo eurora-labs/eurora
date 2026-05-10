@@ -14,6 +14,7 @@
 	import { getAssetChipsFromMessage, getReasoningFromMessage } from '$lib/utils/asset-chips.js';
 	import { getTextContent } from '$lib/utils/message-content.js';
 	import { middleTruncate } from '$lib/utils/text.js';
+	import { useIdleRef } from '$lib/utils/throttled.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
@@ -45,19 +46,45 @@
 	let prevThreadId: string | undefined;
 	let prevStreamingId: string | null | undefined;
 
+	// Streaming nodes mutate their text on every chunk. Markdown reparse +
+	// token tree rebuild for the trailing message is the dominant main-thread
+	// cost — heavy enough to peg a CPU if it runs at chunk rate. Defer those
+	// renders to browser idle time: `IdleRef.current` only updates when the
+	// browser has spare cycles. Newer chunks supersede pending idle updates,
+	// so under load intermediate snapshots are dropped rather than queued.
+	// On stream end, the latest value is flushed synchronously.
+	const streamingId = $derived(chatService.activeThread?.streamingMessageId ?? null);
+	const streamingNode = $derived.by<MessageNode | null>(() => {
+		const id = streamingId;
+		if (!id) return null;
+		const messages = chatService.activeThread?.messages;
+		if (!messages) return null;
+		return messages.find((n) => n.message.id === id) ?? null;
+	});
+
+	const idleStreamingContent = useIdleRef({
+		source: () => (streamingNode ? getTextContent(streamingNode) : ''),
+		isLive: () => streamingId !== null,
+	});
+	const idleStreamingReasoning = useIdleRef({
+		source: () => (streamingNode ? getReasoningFromMessage(streamingNode.message) : ''),
+		isLive: () => streamingId !== null,
+	});
+
 	$effect(() => {
 		const threadId = chatService.activeThreadId;
-		const streamingId = chatService.activeThread?.streamingMessageId ?? null;
+		const currentStreamingId = streamingId;
 
 		const threadChanged = threadId !== prevThreadId;
-		const streamingStarted = streamingId !== null && streamingId !== prevStreamingId;
+		const streamingStarted =
+			currentStreamingId !== null && currentStreamingId !== prevStreamingId;
 
 		if (threadChanged || streamingStarted) {
 			scrollContext.reengageAutoScroll();
 		}
 
 		prevThreadId = threadId;
-		prevStreamingId = streamingId;
+		prevStreamingId = currentStreamingId;
 	});
 
 	function getReasoningContent(node: MessageNode): string {
@@ -178,13 +205,17 @@
 				</Empty.Root>
 			{/if}
 		{/if}
-		{#each chatService.activeThread?.messages as node}
-			{@const content = getTextContent(node)}
-			{@const user = isUser(node)}
-			{@const reasoning = getReasoningContent(node)}
+		{#each chatService.activeThread?.messages ?? [] as node (getMessageId(node))}
 			{@const messageId = getMessageId(node)}
+			{@const isStreaming = streamingId === messageId}
+			{@const content = isStreaming
+				? idleStreamingContent.current
+				: getTextContent(node)}
+			{@const user = isUser(node)}
+			{@const reasoning = isStreaming
+				? idleStreamingReasoning.current
+				: getReasoningContent(node)}
 			{@const assetChips = getAssetChips(node)}
-			{@const isStreaming = chatService.activeThread?.streamingMessageId === messageId}
 			{#if content.length > 0 || assetChips.length > 0 || !user}
 				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
 					{#if user && assetChips.length > 0}
@@ -206,7 +237,7 @@
 					{#if reasoning}
 						<Reasoning.Root {isStreaming}>
 							<Reasoning.Trigger />
-							<Reasoning.Content children={reasoning} />
+							<Reasoning.Content streaming={isStreaming} children={reasoning} />
 						</Reasoning.Root>
 					{/if}
 					{#if user && editingId === messageId}
@@ -228,7 +259,7 @@
 					{:else}
 						<Message.Content>
 							{#if content.trim().length > 0}
-								<Message.Response {content} />
+								<Message.Response {content} streaming={isStreaming} />
 							{:else if isStreaming && !reasoning}
 								<Shimmer>Thinking</Shimmer>
 							{/if}
