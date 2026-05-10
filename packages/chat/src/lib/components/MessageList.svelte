@@ -13,7 +13,7 @@
 	import MessageItem from '$lib/components/MessageItem.svelte';
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
 	import { getReasoningFromMessage } from '$lib/utils/asset-chips.js';
-	import { getTextContent } from '$lib/utils/message-content.js';
+	import { getTextContent, messageId } from '$lib/utils/message-content.js';
 	import { useIdleRef } from '$lib/utils/throttled.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
@@ -35,9 +35,10 @@
 	// token tree rebuild for the trailing message is the dominant main-thread
 	// cost — heavy enough to peg a CPU if it runs at chunk rate. Defer those
 	// renders to browser idle time: `IdleRef.current` only updates when the
-	// browser has spare cycles. Newer chunks supersede pending idle updates,
-	// so under load intermediate snapshots are dropped rather than queued.
-	// On stream end, the latest value is flushed synchronously.
+	// browser has spare cycles, and newer chunks supersede pending idle
+	// updates so intermediate snapshots are dropped rather than queued. When
+	// the stream ends, MessageItem switches to reading `getTextContent(node)`
+	// directly, so the streaming signal can drop to '' without a visible gap.
 	const streamingId = $derived(chatService.activeThread?.streamingMessageId ?? null);
 	const isAnyStreaming = $derived(streamingId !== null);
 	const streamingNode = $derived.by<MessageNode | null>(() => {
@@ -77,14 +78,10 @@
 		prevStreamingId = currentStreamingId;
 	});
 
-	function getMessageId(node: MessageNode): string {
-		return node.message.id ?? '';
-	}
-
-	function handleSwitchBranch(messageId: string, direction: BranchDirection) {
+	function handleSwitchBranch(id: string, direction: BranchDirection) {
 		const threadId = chatService.activeThreadId;
-		if (!threadId || !messageId) return;
-		void chatService.switchBranch(threadId, messageId, direction);
+		if (!threadId) return;
+		void chatService.switchBranch(threadId, id, direction);
 	}
 </script>
 
@@ -119,10 +116,10 @@
 				</Empty.Root>
 			{/if}
 		{/if}
-		{#each chatService.activeThread?.messages ?? [] as node (getMessageId(node))}
+		{#each chatService.activeThread?.messages ?? [] as node (messageId(node))}
 			<MessageItem
 				{node}
-				isStreaming={streamingId === getMessageId(node)}
+				isStreaming={streamingId === messageId(node)}
 				{isAnyStreaming}
 				streamingContent={idleStreamingContent.current}
 				streamingReasoning={idleStreamingReasoning.current}

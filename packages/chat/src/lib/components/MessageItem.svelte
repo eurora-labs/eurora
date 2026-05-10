@@ -2,7 +2,7 @@
 	import type { MessageNode } from '$lib/models/messages/index.js';
 	import type { BranchDirection } from '$lib/services/thread/thread-service.js';
 
-	export interface MessageItemProps {
+	interface MessageItemProps {
 		node: MessageNode;
 		isStreaming: boolean;
 		isAnyStreaming: boolean;
@@ -19,7 +19,7 @@
 
 <script lang="ts">
 	import { getAssetChipsFromMessage, getReasoningFromMessage } from '$lib/utils/asset-chips.js';
-	import { getTextContent } from '$lib/utils/message-content.js';
+	import { getTextContent, messageId } from '$lib/utils/message-content.js';
 	import { middleTruncate } from '$lib/utils/text.js';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
 	import * as Message from '@eurora/ui/components/ai-elements/message/index';
@@ -50,7 +50,7 @@
 	// signals: when `isStreaming` is false, the streamingContent / streamingReasoning
 	// branches are never evaluated, so updates to those props do not invalidate
 	// this component.
-	const messageId = $derived(node.message.id ?? '');
+	const id = $derived(messageId(node));
 	const user = $derived(node.message?.type === 'human');
 	const content = $derived(isStreaming ? streamingContent : getTextContent(node));
 	const reasoning = $derived(
@@ -97,10 +97,10 @@
 		if (!editing) return;
 		const text = editText.trim();
 		if (!text) return;
-		const id = messageId;
+		const submittedId = id;
 		editing = false;
 		editText = '';
-		onEdit?.(id, text);
+		onEdit?.(submittedId, text);
 	}
 
 	function handleEditKeydown(e: KeyboardEvent) {
@@ -125,9 +125,7 @@
 		<Message.Action
 			tooltip="Previous"
 			disabled={node.sibling_index === 0}
-			onclick={() => {
-				if (messageId) onSwitchBranch(messageId, -1);
-			}}
+			onclick={() => onSwitchBranch(id, -1)}
 		>
 			<ChevronLeftIcon />
 		</Message.Action>
@@ -137,9 +135,7 @@
 		<Message.Action
 			tooltip="Next"
 			disabled={node.sibling_index === siblings.length - 1}
-			onclick={() => {
-				if (messageId) onSwitchBranch(messageId, 1);
-			}}
+			onclick={() => onSwitchBranch(id, 1)}
 		>
 			<ChevronRightIcon />
 		</Message.Action>
@@ -147,7 +143,7 @@
 {/snippet}
 
 {#if content.length > 0 || assetChips.length > 0 || !user}
-	<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
+	<Message.Root from={user ? 'user' : 'assistant'} data-message-id={id}>
 		{#if user && assetChips.length > 0}
 			<Attachment.Root variant="inline" class="ml-auto">
 				{#each assetChips as chip (chip.id)}
@@ -210,8 +206,8 @@
 						<PencilIcon />
 					</Message.Action>
 				{/if}
-				{#if !user && onRegenerate && messageId}
-					<Message.Action tooltip="Regenerate" onclick={() => onRegenerate(messageId)}>
+				{#if !user && onRegenerate}
+					<Message.Action tooltip="Regenerate" onclick={() => onRegenerate(id)}>
 						<RotateCcwIcon />
 					</Message.Action>
 				{/if}

@@ -12,13 +12,15 @@ import { parseBlocks, type Extension } from 'svelte-streamdown';
  * Svelte `#each` block keying and downstream `$derived` caches both rely on
  * that to elide work.
  *
- * Correctness: re-lexing `(prev_last_block.raw + new_suffix)` produces the
- * same trailing block list as `parseBlocks(full_content).slice(stable)` for
- * all standard Markdown. The only construct where appended content can
- * retroactively change parsing of an earlier line is the setext heading
- * (`title\n===` / `title\n---`) — and that's locally contained, always
- * within the previous-last-block, so re-including that block in the
- * re-lex covers it.
+ * Correctness: re-lexing `(prev_last_block + new_suffix)` produces the same
+ * trailing block list as `parseBlocks(full_content).slice(stable)` for all
+ * standard Markdown. We can't slice `content` by `sum(stable_lengths)`
+ * because `parseBlocks` drops the inter-block separator (blank-line) tokens,
+ * so summed block lengths fall short of the actual content position. The
+ * only construct where appended content can retroactively change parsing of
+ * an earlier line is the setext heading (`title\n===` / `title\n---`) —
+ * locally contained within the previous-last block, so re-including that
+ * block in the re-lex covers it.
  */
 export class IncrementalBlocks {
 	#blocks: string[] = [];
@@ -35,14 +37,11 @@ export class IncrementalBlocks {
 			return this.#blocks;
 		}
 
-		// Full reset on extension change, content shrink, or non-prefix
-		// divergence (e.g. user-triggered regenerate). All cheap edge cases —
-		// the next streaming response will resume incremental from here.
-		if (
-			extensionsChanged ||
-			content.length < this.#content.length ||
-			!content.startsWith(this.#stablePrefix())
-		) {
+		// Full re-parse on first call, extension change, content shrink, or
+		// any non-append divergence (e.g. user-triggered regenerate). The
+		// `startsWith` check covers the shrink case — a shorter string can't
+		// start with a longer one.
+		if (extensionsChanged || this.#blocks.length === 0 || !content.startsWith(this.#content)) {
 			this.#extensions = extensions;
 			this.#content = content;
 			this.#blocks = parseBlocks(content, [...extensions]);
@@ -50,25 +49,13 @@ export class IncrementalBlocks {
 		}
 
 		const stable = this.#blocks.slice(0, -1);
-		const stableLen = this.#stablePrefixLength();
-		const tailSlice = content.slice(stableLen);
-		const tailBlocks = parseBlocks(tailSlice, [...extensions]);
+		const prevLast = this.#blocks[this.#blocks.length - 1];
+		const newSuffix = content.slice(this.#content.length);
+		const tailBlocks = parseBlocks(prevLast + newSuffix, [...extensions]);
 
 		this.#content = content;
 		this.#blocks = stable.length === 0 ? tailBlocks : [...stable, ...tailBlocks];
 		return this.#blocks;
-	}
-
-	#stablePrefixLength(): number {
-		if (this.#blocks.length <= 1) return 0;
-		let len = 0;
-		for (let i = 0; i < this.#blocks.length - 1; i++) len += this.#blocks[i].length;
-		return len;
-	}
-
-	#stablePrefix(): string {
-		const len = this.#stablePrefixLength();
-		return len === 0 ? '' : this.#content.slice(0, len);
 	}
 }
 

@@ -89,4 +89,41 @@ describe('IncrementalBlocks', () => {
 			expect([...out]).toEqual(parseBlocks(step, []));
 		}
 	});
+
+	it('does not duplicate the previous-last block when 2+ blocks are stable', () => {
+		// Regression: `parseBlocks` drops blank-line separator tokens, so summed
+		// block lengths fall short of `content.length`. Slicing `content` at
+		// `sum(stable_lengths)` cuts inside the previous-last stable block and
+		// re-parses its tail, producing a duplicate. Reproduces the user-visible
+		// rendering bug where the trailing characters of a paragraph appear at
+		// the start of the next one.
+		const inc = new IncrementalBlocks();
+		inc.derive('AA\n\nBB\n\nCC');
+		const out = inc.derive('AA\n\nBB\n\nCC more');
+		expect([...out]).toEqual(parseBlocks('AA\n\nBB\n\nCC more', []));
+		expect(out).toHaveLength(3);
+	});
+
+	it('matches a fresh parse across a long multi-block streaming sequence', () => {
+		// Mirrors the user-reported bug: a paragraph followed by another
+		// paragraph followed by a new one — the third should not start with
+		// the tail of the second.
+		const final =
+			'Distance from focal to circle edge = 1.82 * sqrt(2) ≈ 2.57 ' +
+			'Ratio = 1.414 / 2.57 ≈ 0.55 ✓\n\n' +
+			'Great, the math checks out.\n\n' +
+			'Now, for the SIMD implementation:';
+
+		const milestones: string[] = [];
+		for (let i = 1; i <= final.length; i += 7) {
+			milestones.push(final.slice(0, i));
+		}
+		milestones.push(final);
+
+		const inc = new IncrementalBlocks();
+		for (const step of milestones) {
+			const out = inc.derive(step);
+			expect([...out]).toEqual(parseBlocks(step, []));
+		}
+	});
 });
