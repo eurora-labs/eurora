@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use euro_activity::ContextChip;
-use euro_browser::BundledExtensionState;
+use euro_bridge::BundledExtensionState;
 use euro_process::{Browser, BrowserStore};
 use euro_timeline::TimelineManager;
 use llm_core::RedactedLlmConfig;
@@ -156,7 +156,7 @@ pub fn resolve_browser_extension_state(process_name: &str) -> BrowserExtensionSt
     let Some(browser) = Browser::from_process_name(process_name) else {
         return BrowserExtensionState::Unsupported;
     };
-    let bridge = euro_browser::BridgeService::get_or_init();
+    let bridge = euro_bridge::BridgeService::get_or_init();
 
     match browser.store() {
         BrowserStore::Bundled => resolve_bundled_state(browser, bridge),
@@ -180,7 +180,7 @@ pub fn resolve_browser_extension_state(process_name: &str) -> BrowserExtensionSt
 
 fn resolve_bundled_state(
     browser: Browser,
-    bridge: &euro_browser::BridgeService,
+    bridge: &euro_bridge::BridgeService,
 ) -> BrowserExtensionState {
     // Today the only bundled host is the macOS Safari launcher. Other
     // `BrowserStore::Bundled` browsers (PaleMoon) have no first-party host
@@ -201,7 +201,7 @@ fn resolve_bundled_state(
 async fn open_safari_extension_settings() -> Result<(), SystemError> {
     use euro_bridge_protocol::BridgeError;
 
-    let bridge = euro_browser::BridgeService::get_or_init();
+    let bridge = euro_bridge::BridgeService::get_or_init();
     let pid = bridge
         .find_pid_by_app_name(SAFARI_BRIDGE_APP_KIND)
         .ok_or_else(|| SystemError::Bridge("Safari launcher is not connected".to_string()))?;

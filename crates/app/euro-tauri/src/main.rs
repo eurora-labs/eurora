@@ -248,9 +248,9 @@ fn install_office_word_addin(app: &tauri::App) {
 /// on a `std::sync::mpsc` channel for the bind result before returning.
 fn bind_and_serve_bridge() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx) =
-        std::sync::mpsc::sync_channel::<Result<std::net::SocketAddr, euro_browser::BridgeError>>(1);
+        std::sync::mpsc::sync_channel::<Result<std::net::SocketAddr, euro_bridge::BridgeError>>(1);
     tauri::async_runtime::spawn(async move {
-        match euro_browser::bind_bridge_server().await {
+        match euro_bridge::bind_bridge_server().await {
             Ok(bound) => {
                 let _ = tx.send(Ok(bound.local_addr()));
                 if let Err(err) = bound.serve().await {
@@ -265,7 +265,7 @@ fn bind_and_serve_bridge() -> Result<(), Box<dyn std::error::Error>> {
     let local_addr = rx.recv()??;
     tracing::info!(
         "Bridge listener bound at ws://{local_addr}{}",
-        euro_browser::BRIDGE_PATH
+        euro_bridge::BRIDGE_PATH
     );
     Ok(())
 }
@@ -462,7 +462,7 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
 /// extension affordance without polling.
 fn spawn_browser_status_bridge(app_handle: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let service = euro_browser::BridgeService::get_or_init();
+        let service = euro_bridge::BridgeService::get_or_init();
         let mut registrations_rx = service.subscribe_to_registrations();
         let mut disconnects_rx = service.subscribe_to_disconnects();
         let mut extension_states_rx = service.subscribe_to_extension_states();
@@ -628,7 +628,7 @@ fn main() {
                     if messenger_replaced {
                         const MESSENGER_PURGE_WINDOW: std::time::Duration =
                             std::time::Duration::from_secs(3);
-                        euro_browser::BridgeService::get_or_init()
+                        euro_bridge::BridgeService::get_or_init()
                             .open_browser_purge_window(MESSENGER_PURGE_WINDOW);
                     }
 
@@ -747,7 +747,7 @@ fn main() {
                     if matches!(event, tauri::RunEvent::Exit) {
                         let (tx, rx) = std::sync::mpsc::sync_channel::<()>(1);
                         tauri::async_runtime::spawn(async move {
-                            euro_browser::stop_bridge_server().await;
+                            euro_bridge::stop_bridge_server().await;
                             let _ = tx.send(());
                         });
                         let _ = rx.recv();

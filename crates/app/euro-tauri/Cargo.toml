@@ -35,7 +35,7 @@ color-thief = "0.2.2"
 dirs = { workspace = true }
 euro-activity = { workspace = true }
 euro-auth = { workspace = true }
-euro-browser = { workspace = true }
+euro-bridge = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }

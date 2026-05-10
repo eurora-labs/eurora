@@ -16,7 +16,7 @@ mod common;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use euro_browser::{BridgeService, Frame, FrameKind, RegisterFrame, ResponseFrame, bridge_url_for};
+use euro_bridge::{BridgeService, Frame, FrameKind, RegisterFrame, ResponseFrame, bridge_url_for};
 use euro_office::{ACTION_GET_ASSETS, MICROSOFT_WORD_KIND, WordDocumentAsset, fetch_word_asset};
 use futures_util::{SinkExt, StreamExt};
 use tokio::time::timeout;

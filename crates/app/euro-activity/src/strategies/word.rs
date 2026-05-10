@@ -18,7 +18,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use euro_browser::BridgeService;
+use euro_bridge::BridgeService;
 use euro_office::{OfficeApp, WordAsset, WordDocumentAsset, fetch_word_asset};
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
