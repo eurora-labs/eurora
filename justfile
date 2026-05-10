@@ -30,11 +30,18 @@
 #     logic are split via `[unix]` / `[windows]` attributes and delegate
 #     to scripts/*.{sh,ps1}.
 #
-#   - Env handling: `set dotenv-load := true` reads `.env` at the workspace
-#     root and exports every variable to the child processes spawned below.
-#     That single file is the contract — Vite reads it via `envDir`, the
-#     Rust binaries inherit it from the shell, and the mobile build bakes
-#     the relevant keys at compile time.
+#   - Env handling: `set dotenv-load` reads `.env` at the workspace root and
+#     exports every variable to the child processes spawned below. That
+#     single file is the contract — `just` is the only thing that reads
+#     `.env`. The Rust crates (binaries, tests, build scripts) only read
+#     from process env via `std::env::var`, so production deploys (where
+#     no `.env` exists) and CI (where vars come from `secrets.*`) walk
+#     the same code path. Vite reads `.env` via `envDir`, since Vite is
+#     not invoked through `just` directly.
+#
+#     To run a Rust binary or test outside `just`, export the variables
+#     yourself first (e.g. `set -a; source .env; set +a; cargo run …`),
+#     or use `direnv` (the repo ships an `.envrc`).
 
 set dotenv-load
 set shell := ["bash", "-cu"]
@@ -236,6 +243,35 @@ dev-reset:
     just dev-postgres-up
     just dev-migrate
     docker compose --profile seed up --no-deps --abort-on-container-exit seed
+
+# ─── Tests ─────────────────────────────────────────────────────────────────
+#
+# `set dotenv-load` exports `.env` into these recipes, so workspace tests
+# that read env vars (e.g. `OPENAI_API_KEY`, `BACKEND_URL`) pick them up
+# without any per-test loader. CI provides the same variables via
+# `env:`/`secrets.*` blocks, so the recipes are CI-portable too.
+#
+# Live integration tests (those that hit OpenAI / Ollama / live HTTP
+# endpoints) live behind the `integration-tests` cargo feature; running
+# the default `just test` does not exercise them.
+
+# Workspace tests minus live-API integration tests.
+test:
+    cargo test --workspace
+
+# Live-API integration tests (OpenAI, Ollama). Requires the relevant
+# provider keys in `.env`; the `integration-tests` feature is what
+# compiles the live test modules in.
+test-integration:
+    cargo test -p agent-chain --features integration-tests
+
+# Variadic passthrough so scripts and contributors can run any cargo
+# subcommand with `.env` already exported. Used by `scripts/clippy.sh`
+# (via `CARGO="just cargo"`) and handy as `just cargo check -p foo`,
+# `just cargo run -p be-monolith -- --migrate-only`, etc.
+[positional-arguments]
+cargo *args:
+    cargo "$@"
 
 # ─── Misc ──────────────────────────────────────────────────────────────────
 

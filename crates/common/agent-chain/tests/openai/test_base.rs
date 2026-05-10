@@ -12,16 +12,10 @@ use std::collections::HashMap;
 
 const MAX_TOKEN_COUNT: u32 = 100;
 
-/// Load .env file from project root (if present).
-fn load_env() {
-    dotenvy::dotenv().ok();
-}
-
 /// Ported from `test_chat_openai`.
 #[tokio::test]
 
 async fn test_chat_openai() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .temperature(0.7)
@@ -49,7 +43,6 @@ fn test_chat_openai_model() {
 #[tokio::test]
 
 async fn test_callable_api_key() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -82,7 +75,6 @@ async fn test_callable_api_key() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_chat_openai_system_message() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -104,7 +96,6 @@ async fn test_chat_openai_system_message() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_chat_openai_system_message_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -127,7 +118,6 @@ async fn test_chat_openai_system_message_responses_api() -> Result<(), Box<dyn s
 #[tokio::test]
 
 async fn test_chat_openai_generate() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -159,7 +149,6 @@ async fn test_chat_openai_generate() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_chat_openai_multiple_completions() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -180,7 +169,6 @@ async fn test_chat_openai_multiple_completions() -> Result<(), Box<dyn std::erro
 #[tokio::test]
 
 async fn test_chat_openai_streaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -199,7 +187,6 @@ async fn test_chat_openai_streaming() -> Result<(), Box<dyn std::error::Error>> 
 #[tokio::test]
 
 async fn test_chat_openai_streaming_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -219,7 +206,6 @@ async fn test_chat_openai_streaming_responses_api() -> Result<(), Box<dyn std::e
 #[tokio::test]
 
 async fn test_chat_openai_streaming_generation_info() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(2u32)
@@ -248,7 +234,6 @@ async fn test_chat_openai_streaming_generation_info() -> Result<(), Box<dyn std:
 
 async fn test_chat_openai_llm_output_contains_model_name() -> Result<(), Box<dyn std::error::Error>>
 {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -275,7 +260,6 @@ async fn test_chat_openai_llm_output_contains_model_name() -> Result<(), Box<dyn
 
 async fn test_chat_openai_streaming_llm_output_contains_model_name()
 -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -319,7 +303,6 @@ fn test_chat_openai_invalid_streaming_params() {
 #[tokio::test]
 
 async fn test_openai_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -357,7 +340,6 @@ async fn test_openai_abatch_tags() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_openai_abatch_tags_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_tokens(MAX_TOKEN_COUNT)
@@ -396,7 +378,6 @@ async fn test_openai_abatch_tags_responses_api() -> Result<(), Box<dyn std::erro
 #[tokio::test]
 
 async fn test_openai_invoke() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_retries(3)
@@ -430,7 +411,6 @@ async fn test_openai_invoke() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_retries(3)
@@ -472,7 +452,6 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_flex_usage_responses() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_retries(3)
@@ -494,7 +473,6 @@ async fn test_flex_usage_responses() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_flex_usage_responses_streaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .max_retries(3)
@@ -517,7 +495,6 @@ async fn test_flex_usage_responses_streaming() -> Result<(), Box<dyn std::error:
 #[tokio::test]
 
 async fn test_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .logprobs(true)
@@ -544,7 +521,6 @@ async fn test_response_metadata() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_response_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .logprobs(true)
@@ -582,7 +558,6 @@ async fn test_response_metadata_streaming() -> Result<(), Box<dyn std::error::Er
 #[tokio::test]
 
 async fn test_tool_use() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let generate_username_schema = serde_json::json!({
         "title": "GenerateUsername",
         "description": "Get a username based on someone's name and hair color.",
@@ -632,7 +607,6 @@ async fn test_tool_use() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_manual_tool_call_msg() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let generate_username_schema = serde_json::json!({
         "title": "GenerateUsername",
         "description": "Get a username based on someone's name and hair color.",
@@ -687,7 +661,6 @@ async fn test_manual_tool_call_msg() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_manual_tool_call_msg_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let generate_username_schema = serde_json::json!({
         "title": "GenerateUsername",
         "description": "Get a username based on someone's name and hair color.",
@@ -741,7 +714,6 @@ async fn test_manual_tool_call_msg_responses_api() -> Result<(), Box<dyn std::er
 #[tokio::test]
 
 async fn test_bind_tools_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let generate_username = serde_json::json!({
         "title": "GenerateUsername",
         "description": "Get a username based on someone's name and hair color.",
@@ -827,7 +799,6 @@ async fn test_bind_tools_tool_choice() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 
 async fn test_bind_tools_tool_choice_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let generate_username = serde_json::json!({
         "title": "GenerateUsername",
         "description": "Get a username based on someone's name and hair color.",
@@ -882,7 +853,6 @@ async fn test_bind_tools_tool_choice_responses_api() -> Result<(), Box<dyn std::
 #[tokio::test]
 
 async fn test_disable_parallel_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let generate_username = serde_json::json!({
         "title": "GenerateUsername",
         "description": "Get a username based on someone's name and hair color.",
@@ -927,7 +897,6 @@ async fn test_disable_parallel_tool_calling() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_openai_structured_output() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let schema = serde_json::json!({
         "title": "MyModel",
         "description": "A Person",
@@ -977,7 +946,6 @@ fn test_openai_proxy() {
 #[tokio::test]
 
 async fn test_openai_response_headers() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat_openai = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .include_response_headers(true)
@@ -1009,7 +977,6 @@ async fn test_openai_response_headers() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 
 async fn test_openai_response_headers_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let chat_openai = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .include_response_headers(true)
@@ -1042,7 +1009,6 @@ async fn test_openai_response_headers_responses_api() -> Result<(), Box<dyn std:
 #[tokio::test]
 
 async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::{
         ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock,
     };
@@ -1080,7 +1046,6 @@ async fn test_image_token_counting_jpeg() -> Result<(), Box<dyn std::error::Erro
 #[tokio::test]
 
 async fn test_image_token_counting_png() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::{
         ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock,
     };
@@ -1117,7 +1082,6 @@ async fn test_image_token_counting_png() -> Result<(), Box<dyn std::error::Error
 #[tokio::test]
 
 async fn test_tool_calling_strict() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let magic_function_schema = serde_json::json!({
         "title": "magic_function",
         "description": "Applies a magic function to an input.",
@@ -1157,7 +1121,6 @@ async fn test_tool_calling_strict() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_tool_calling_strict_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let magic_function_schema = serde_json::json!({
         "title": "magic_function",
         "description": "Applies a magic function to an input.",
@@ -1199,7 +1162,6 @@ async fn test_tool_calling_strict_responses_api() -> Result<(), Box<dyn std::err
 
 async fn test_structured_output_strict_function_calling() -> Result<(), Box<dyn std::error::Error>>
 {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -1241,7 +1203,6 @@ async fn test_structured_output_strict_function_calling() -> Result<(), Box<dyn 
 #[tokio::test]
 
 async fn test_structured_output_strict_json_schema() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -1283,7 +1244,6 @@ async fn test_structured_output_strict_json_schema() -> Result<(), Box<dyn std::
 #[tokio::test]
 
 async fn test_nested_structured_output_strict() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_with_eval_schema = serde_json::json!({
         "title": "JokeWithEvaluation",
         "description": "Joke to tell user.",
@@ -1341,7 +1301,6 @@ async fn test_nested_structured_output_strict() -> Result<(), Box<dyn std::error
 #[tokio::test]
 
 async fn test_json_schema_openai_format() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let schema = serde_json::json!({
         "title": "get_weather",
         "description": "Fetches the weather in the given location",
@@ -1390,7 +1349,6 @@ async fn test_json_schema_openai_format() -> Result<(), Box<dyn std::error::Erro
 #[tokio::test]
 
 async fn test_audio_output_modality() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut model_kwargs = HashMap::new();
     model_kwargs.insert(
         "modalities".to_string(),
@@ -1427,7 +1385,6 @@ async fn test_audio_output_modality() -> Result<(), Box<dyn std::error::Error>> 
 #[tokio::test]
 
 async fn test_audio_input_modality() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::{ContentBlock, ContentBlocks, TextContentBlock};
 
     let mut model_kwargs = HashMap::new();
@@ -1465,7 +1422,6 @@ async fn test_audio_input_modality() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_prediction_tokens() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let code = r#"/// <summary>
 /// Represents a user with a first name, last name, and username.
 /// </summary>
@@ -1516,7 +1472,6 @@ public class User
 #[tokio::test]
 
 async fn test_stream_o_series() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut stream = ChatOpenAI::new("o3-mini")
         .stream(
             vec![
@@ -1543,7 +1498,6 @@ async fn test_stream_o_series() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_stream_o_series_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut stream = ChatOpenAI::builder()
         .model("o3-mini")
         .use_responses_api(true)
@@ -1573,7 +1527,6 @@ async fn test_stream_o_series_responses_api() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_stream_response_format() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::new("gpt-4o-mini").response_format(serde_json::json!({
         "type": "json_schema",
         "json_schema": {
@@ -1617,7 +1570,6 @@ async fn test_stream_response_format() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 
 async fn test_o1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let response = ChatOpenAI::builder()
         .model("o1")
         .reasoning_effort("low")
@@ -1642,7 +1594,6 @@ async fn test_o1() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_o1_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let response = ChatOpenAI::builder()
         .model("o1")
         .reasoning_effort("low")
@@ -1668,7 +1619,6 @@ async fn test_o1_responses_api() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_o1_stream_default_works() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut stream = ChatOpenAI::new("o1")
         .stream(
             vec![HumanMessage::builder().content("say 'hi'").build().into()],
@@ -1690,7 +1640,6 @@ async fn test_o1_stream_default_works() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 
 async fn test_multi_party_conversation() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::new("gpt-4o-mini");
 
     let messages: Vec<AnyMessage> = vec![
@@ -1720,7 +1669,6 @@ async fn test_multi_party_conversation() -> Result<(), Box<dyn std::error::Error
 #[tokio::test]
 
 async fn test_structured_output_and_tools() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let response_format_schema = serde_json::json!({
         "title": "ResponseFormat",
         "type": "object",
@@ -1773,7 +1721,6 @@ async fn test_structured_output_and_tools() -> Result<(), Box<dyn std::error::Er
 #[tokio::test]
 
 async fn test_tools_and_structured_output() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let response_format_schema = serde_json::json!({
         "title": "ResponseFormat",
         "type": "object",
@@ -1820,7 +1767,6 @@ async fn test_tools_and_structured_output() -> Result<(), Box<dyn std::error::Er
 #[tokio::test]
 
 async fn test_prompt_cache_key_invoke() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut model_kwargs = HashMap::new();
     model_kwargs.insert(
         "prompt_cache_key".to_string(),
@@ -1847,7 +1793,6 @@ async fn test_prompt_cache_key_invoke() -> Result<(), Box<dyn std::error::Error>
 
 async fn test_prompt_cache_key_usage_methods_integration() -> Result<(), Box<dyn std::error::Error>>
 {
-    load_env();
     let messages: Vec<AnyMessage> = vec![HumanMessage::builder().content("Say hi").build().into()];
 
     // Test via model_kwargs
@@ -1873,7 +1818,6 @@ async fn test_prompt_cache_key_usage_methods_integration() -> Result<(), Box<dyn
 #[tokio::test]
 
 async fn test_schema_parsing_failures() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     // Test that invoking with a response_format that the model will violate
     // results in an error or a response that doesn't match the schema.
     // The Python test uses a Pydantic validator that rejects any response != "bad".
@@ -1917,7 +1861,6 @@ async fn test_schema_parsing_failures() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 
 async fn test_schema_parsing_failures_responses_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .use_responses_api(true)

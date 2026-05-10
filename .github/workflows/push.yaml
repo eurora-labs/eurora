@@ -105,6 +105,11 @@ jobs:
             CARGO_TERM_COLOR: always
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--ld-path=wild
+            # `scripts/clippy.sh` defaults `CARGO` to `just cargo` so local
+            # runs pick up `.env`; CI gets BACKEND_URL/WEB_URL from the
+            # workflow-level `env:` block, so plain `cargo` is sufficient
+            # and avoids depending on `just` being in the container image.
+            CARGO: cargo
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:

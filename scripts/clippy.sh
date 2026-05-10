@@ -7,7 +7,13 @@ if [[ ! " $* " == *" -p "* && ! " $* " == *" --package "* ]]; then
 fi
 
 set -x
-"${CARGO:-cargo}" clippy "$@" --release --all-targets --all-features -- --deny warnings
+# Default to `just cargo` so build scripts that read process env (e.g.
+# euro-{mobile,tauri,endpoint,settings}/build.rs requiring WEB_URL /
+# BACKEND_URL) see the workspace `.env`. `set dotenv-load` in the
+# justfile is the single point that loads it. CI sets `CARGO=cargo`
+# explicitly because the workflow already exports the vars via
+# `env:`/`secrets.*`.
+${CARGO:-just cargo} clippy "$@" --release --all-targets --all-features -- --deny warnings
 
 # If local, run other checks if we have the tools installed.
 if [[ -z "${GITHUB_ACTIONS+x}" ]]; then
