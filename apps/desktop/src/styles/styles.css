@@ -28,7 +28,7 @@
 }
 
 body.macos-app {
-	--titlebar-height: 28px;
+	--titlebar-height: 32px;
 }
 
 body.windows-app {

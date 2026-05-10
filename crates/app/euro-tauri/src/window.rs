@@ -154,10 +154,17 @@ pub fn create(
     .hidden_title(true)
     .disable_drag_drop_handler()
     .title_bar_style(tauri::TitleBarStyle::Overlay)
-    // Vertically center the traffic lights inside the 28px custom titlebar
-    // (lights are 12px tall → 8px top inset). Horizontal 12px matches the
-    // standard inset AppKit uses for unified-style windows.
-    .traffic_light_position(tauri::LogicalPosition::new(12.0, 8.0))
+    // The y value here is NOT a position-from-top; wry uses it as the
+    // height of the title-bar container *minus the button height*
+    // (see wry's `inset_traffic_lights`). The buttons stay anchored at
+    // their natural ~7px offset from the container bottom, so values of
+    // y < ~14 actually push the button tops above the container's top
+    // edge, where AppKit clips them — that's the "tops cut off" symptom
+    // on macOS 26 (Tahoe), whose larger Liquid Glass buttons make the
+    // problem more visible. y=16 centers the buttons in our 32px bar
+    // on Tahoe and looks correct on pre-Tahoe macOS too. Horizontal
+    // 12px matches AppKit's standard inset for unified-style windows.
+    .traffic_light_position(tauri::LogicalPosition::new(12.0, 16.0))
     .build()?;
     Ok(window)
 }

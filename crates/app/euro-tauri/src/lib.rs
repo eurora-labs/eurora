@@ -11,7 +11,6 @@ pub mod native_messaging;
 pub mod office_addin;
 pub mod procedures;
 pub mod shared_types;
-pub mod telemetry;
 pub mod util;
 pub mod window;
 

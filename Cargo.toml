@@ -86,6 +86,7 @@ euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings" }
 euro-storage = { path = "crates/app/euro-storage" }
 euro-tauri = { path = "crates/app/euro-tauri" }
+euro-telemetry = { path = "crates/app/euro-telemetry" }
 euro-thread = { path = "crates/app/euro-thread" }
 euro-timeline = { path = "crates/app/euro-timeline" }
 euro-user = { path = "crates/app/euro-user" }

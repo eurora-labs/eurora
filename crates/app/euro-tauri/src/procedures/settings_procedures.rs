@@ -9,7 +9,7 @@ use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager};
-use crate::telemetry;
+use euro_telemetry::Controller as TelemetryController;
 
 /// Typed error surface for the `settings_*` IPC commands. Externally
 /// tagged so the JS side gets `{ type: "Persistence", data: "..." }`
@@ -68,7 +68,7 @@ pub async fn settings_set_telemetry(
     let new_telemetry = settings.telemetry.clone();
     drop(settings);
 
-    if let Some(controller) = app_handle.try_state::<Arc<telemetry::Controller>>() {
+    if let Some(controller) = app_handle.try_state::<Arc<TelemetryController>>() {
         controller.reapply(&new_telemetry);
     }
 

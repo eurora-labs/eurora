@@ -16,7 +16,7 @@ use tokio::sync::Mutex;
 use url::Url;
 
 use crate::shared_types::{SharedAppSettings, SharedEndpointManager, SharedHttpClient};
-use crate::telemetry;
+use euro_telemetry::Controller as TelemetryController;
 
 /// `RequestFrame.action` the desktop sends to the macOS launcher to
 /// deep-link the user into Safari's extension settings. Mirrors the
@@ -570,22 +570,12 @@ pub async fn system_get_telemetry_bootstrap(
 
     Ok(TelemetryBootstrap {
         settings: telemetry,
-        sentry_dsn: non_empty(env!("EURORA_DESKTOP_SENTRY_DSN")),
-        posthog_key: non_empty(env!("EURORA_DESKTOP_POSTHOG_KEY")),
-        posthog_host: non_empty(env!("EURORA_DESKTOP_POSTHOG_HOST")),
-        channel: non_empty(env!("EURORA_RELEASE_CHANNEL")),
-        release: non_empty(crate::telemetry::RELEASE_VERSION),
+        sentry_dsn: euro_telemetry::non_empty(euro_telemetry::SENTRY_DSN).map(str::to_owned),
+        posthog_key: euro_telemetry::non_empty(euro_telemetry::POSTHOG_KEY).map(str::to_owned),
+        posthog_host: euro_telemetry::non_empty(euro_telemetry::POSTHOG_HOST).map(str::to_owned),
+        channel: euro_telemetry::non_empty(euro_telemetry::RELEASE_CHANNEL).map(str::to_owned),
+        release: euro_telemetry::non_empty(euro_telemetry::RELEASE_VERSION).map(str::to_owned),
     })
-}
-
-/// Compile-time empty strings (build was produced without a given
-/// telemetry secret) become `None` at the IPC boundary.
-fn non_empty(s: &'static str) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s.to_owned())
-    }
 }
 
 #[tauri::command]
@@ -604,7 +594,7 @@ pub async fn system_reinit_telemetry(app_handle: AppHandle) {
         let settings = settings_state.lock().await;
         settings.telemetry.clone()
     };
-    let controller = app_handle.state::<Arc<telemetry::Controller>>();
+    let controller = app_handle.state::<Arc<TelemetryController>>();
     controller.reapply(&telemetry);
 }
 
@@ -627,7 +617,7 @@ pub async fn system_rotate_telemetry_distinct_id(
     let telemetry = settings.telemetry.clone();
     drop(settings);
 
-    let controller = app_handle.state::<Arc<telemetry::Controller>>();
+    let controller = app_handle.state::<Arc<TelemetryController>>();
     controller.reapply(&telemetry);
     Ok(new_id)
 }
