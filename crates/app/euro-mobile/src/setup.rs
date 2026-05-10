@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use crate::shared_types::{SharedAppSettings, SharedThreadManager, SharedUserController};
 use euro_endpoint::EndpointManager;
 use euro_settings::AppSettings;
+use euro_telemetry::Controller as TelemetryController;
 use euro_thread::commands::{NoopChatContextProvider, SharedChatContextProvider};
 use tauri::Manager;
 
@@ -18,6 +21,15 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             AppSettings::defaults()
         }
     };
+
+    // Initialize Sentry from the loaded settings. Mobile can't peek
+    // before the Tauri builder runs (the config dir resolves through
+    // `app.path()`, which only exists after `setup`), so unlike the
+    // desktop the panic-capture window only opens here. Held as
+    // `Arc<TelemetryController>` so the `system_reinit_telemetry`
+    // procedure can swap the underlying client when consent changes.
+    let telemetry_controller = Arc::new(TelemetryController::init(&app_settings.telemetry));
+
     // The persisted ConnectionMode always resolves to a non-empty URL, so
     // we never need the env-fallback path.
     let endpoint_url = app_settings.api.endpoint();
@@ -25,6 +37,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     app.manage(endpoint_manager.clone());
     app.manage(SharedAppSettings::new(app_settings));
+    app.manage(telemetry_controller);
 
     init_state(app, &endpoint_manager)?;
 

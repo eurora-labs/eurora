@@ -16,8 +16,9 @@ use euro_tauri::{
         timeline_procedures::{AccentColor, TimelineAppEvent, TimelineAssetsEvent},
     },
     shared_types::{ActiveStreamTokens, SharedHttpClient, SharedThreadManager},
-    show_and_focus_main, telemetry,
+    show_and_focus_main,
 };
+use euro_telemetry::{Controller as TelemetryController, sentry_tracing};
 use euro_thread::commands::SharedChatContextProvider;
 use euro_timeline::TimelineManager;
 use tauri::{
@@ -561,7 +562,8 @@ fn main() {
     // the Tauri app state so the `system.reinit_telemetry` procedure
     // can swap the underlying client when consent changes at runtime.
     let early_settings = AppSettings::peek_from_default_path();
-    let telemetry_controller = std::sync::Arc::new(telemetry::init(&early_settings.telemetry));
+    let telemetry_controller =
+        std::sync::Arc::new(TelemetryController::init(&early_settings.telemetry));
 
     #[cfg(debug_assertions)]
     {
@@ -711,16 +713,15 @@ fn main() {
                         // unconditionally lets us avoid coordinating layer
                         // composition with the runtime consent toggle.
                         .with_layer(Box::new(
-                            sentry::integrations::tracing::layer::<tracing_subscriber::Registry>()
-                                .event_filter(|metadata| match *metadata.level() {
-                                    tracing::Level::ERROR => {
-                                        sentry::integrations::tracing::EventFilter::Event
-                                    }
+                            sentry_tracing::layer::<tracing_subscriber::Registry>().event_filter(
+                                |metadata| match *metadata.level() {
+                                    tracing::Level::ERROR => sentry_tracing::EventFilter::Event,
                                     tracing::Level::WARN | tracing::Level::INFO => {
-                                        sentry::integrations::tracing::EventFilter::Breadcrumb
+                                        sentry_tracing::EventFilter::Breadcrumb
                                     }
-                                    _ => sentry::integrations::tracing::EventFilter::Ignore,
-                                }),
+                                    _ => sentry_tracing::EventFilter::Ignore,
+                                },
+                            ),
                         ))
                         .with_default_subscriber()
                         .build(),

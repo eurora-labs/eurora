@@ -24,6 +24,7 @@ euro-auth = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-webpki-roots"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
+euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
 euro-user = { workspace = true }
 thread-core = { workspace = true, features = ["specta"] }
@@ -33,6 +34,7 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.12" }
+thiserror = { workspace = true }
 tauri = { version = "2.11.1", features = [] }
 tauri-plugin-http = "2"
 tauri-plugin-appauth = { workspace = true }

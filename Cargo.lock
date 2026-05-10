@@ -3845,6 +3845,7 @@ dependencies = [
  "euro-endpoint",
  "euro-secret",
  "euro-settings",
+ "euro-telemetry",
  "euro-thread",
  "euro-user",
  "futures",
@@ -3862,6 +3863,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-store",
  "tauri-specta",
+ "thiserror 2.0.18",
  "thread-core",
  "tokio",
  "tokio-util",
@@ -3971,6 +3973,7 @@ dependencies = [
  "euro-process",
  "euro-secret",
  "euro-settings",
+ "euro-telemetry",
  "euro-thread",
  "euro-timeline",
  "euro-user",
@@ -3981,7 +3984,6 @@ dependencies = [
  "parking_lot",
  "reqwest 0.12.28",
  "rustls 0.23.40",
- "sentry",
  "serde",
  "serde_json",
  "specta",
@@ -4015,6 +4017,18 @@ dependencies = [
  "uuid",
  "windows",
  "winreg 0.56.0",
+]
+
+[[package]]
+name = "euro-telemetry"
+version = "0.0.0"
+dependencies = [
+ "dirs 6.0.0",
+ "euro-settings",
+ "sentry",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 import { sentrySvelteKit } from '@sentry/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, searchForWorkspaceRoot } from 'vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -85,6 +85,16 @@ export default defineConfig(({ mode }) => {
 			host: serverHost,
 			port: serverPort,
 			strictPort: true,
+			fs: {
+				// `@eurora/ui` ships a Shiki Web Worker loaded via
+				// `new URL('./shiki-worker.js', import.meta.url)`, which Vite
+				// resolves to the package's real on-disk path
+				// (`packages/ui/dist/...`). That lives outside SvelteKit's
+				// default `fs.allow` roots, so widen to the pnpm workspace
+				// root to cover any first-party package that ships a
+				// worker or asset URL.
+				allow: [searchForWorkspaceRoot(process.cwd())],
+			},
 		},
 		worker: {
 			// The Shiki highlighter worker dynamically imports per-language

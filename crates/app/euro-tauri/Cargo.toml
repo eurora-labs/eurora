@@ -41,6 +41,7 @@ euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true }
+euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
 thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
@@ -72,16 +73,6 @@ tauri-plugin-store = "2"
 tauri-plugin-tracing = { version = "0.3.2", features = ["colored"] }
 tauri-plugin-updater = "2.10"
 tauri-plugin-window-state = "2"
-sentry = { workspace = true, default-features = false, features = [
-  "backtrace",
-  "contexts",
-  "debug-images",
-  "panic",
-  "reqwest",
-  "rustls",
-  "tracing",
-  "release-health",
-] }
 tauri-specta = { workspace = true, features = ["derive", "typescript"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }

@@ -4,6 +4,8 @@ use tauri::{AppHandle, Manager};
 use crate::shared_types::SharedUserController;
 
 pub mod auth_procedures;
+pub mod settings_procedures;
+pub mod system_procedures;
 
 pub(crate) fn user_controller(
     app_handle: &AppHandle,
