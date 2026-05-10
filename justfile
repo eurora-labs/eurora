@@ -39,6 +39,12 @@
 #     the same code path. Vite reads `.env` via `envDir`, since Vite is
 #     not invoked through `just` directly.
 #
+#     `BACKEND_URL` and `WEB_URL` default to localhost via the `export`
+#     declarations below, so they don't need to live in `.env`. Anything
+#     already in the environment (CI, the `ios-device` recipe shell)
+#     wins via `env_var_or_default`. Recipes can also override per-call
+#     by re-exporting in their own shell.
+#
 #     To run a Rust binary or test outside `just`, export the variables
 #     yourself first (e.g. `set -a; source .env; set +a; cargo run …`),
 #     or use `direnv` (the repo ships an `.envrc`).
@@ -46,6 +52,9 @@
 set dotenv-load
 set shell := ["bash", "-cu"]
 set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]
+
+export BACKEND_URL := env_var_or_default("BACKEND_URL", "http://localhost:3000")
+export WEB_URL := env_var_or_default("WEB_URL", "http://localhost:5173")
 
 default: dev
 
@@ -120,30 +129,29 @@ _dev-ios-after-backend: _wait-for-backend
 
 # ─── Full stack (iOS device) ───────────────────────────────────────────────
 #
-# Same shape as `just ios`, but bakes a LAN-reachable host into the mobile
-# binary so a physical iPhone on the same Wi-Fi can reach this Mac. The
-# simulator path bakes `localhost` URLs (which work because the simulator
-# shares the host's loopback); on a real device, `localhost` resolves to
-# the iPhone itself, so every embedded reference to `localhost:3000`
-# (backend) or `localhost:5173` (web auth) is broken.
+# Same shape as `just ios`, but uses a LAN-reachable host so a physical
+# iPhone on the same Wi-Fi can reach this Mac. On a real device,
+# `localhost` resolves to the iPhone itself, so every embedded reference
+# to `localhost:3000` (backend) or `localhost:5173` (web auth) is broken.
 #
 # `scripts/lan-ip.sh` resolves the Mac's IP on its default-route
 # interface and refuses to proceed if that's a CLAT46 synthesized
 # address (RFC 7335) — typical when the upstream is iPhone Personal
 # Hotspot on a 5G/IPv6-only carrier, where the IP exists only on the
-# Mac. The recipe exports the resulting LAN host into four places:
+# Mac. The recipe exports the resulting LAN host into the host-side
+# processes spawned below:
 #
-#   - apps/mobile/vite.config.ts          reads TAURI_DEV_HOST for its bind
-#   - apps/web/vite.config.ts             derives its bind from WEB_URL
-#   - euro-mobile + euro-{endpoint,settings}/build.rs
-#                                         bake the URLs into the iOS
-#                                         binary at compile time (the
-#                                         mobile sandbox has no runtime
-#                                         access to .env)
-#   - scripts/wait-for-backend.sh         polls the backend health URL
+#   - apps/mobile/vite.config.ts    reads TAURI_DEV_HOST for its bind
+#   - apps/web/vite.config.ts       derives its bind from WEB_URL
+#   - be-monolith                   reads BACKEND_URL / WEB_URL at runtime
+#   - scripts/wait-for-backend.sh   polls the backend health URL
 #
-# Overrides live in this recipe's shell, never in `.env`, so other
-# recipes (`just dev`, `just ios`) keep their localhost behavior.
+# The iOS cargo build that bakes the URLs into the binary runs inside
+# xcodebuild's script phase, which doesn't reliably propagate parent-
+# shell env vars. That path re-derives the host independently via
+# `_ios-xcode-script` (called from `gen/apple/project.yml`), so the
+# device build picks up the same LAN IP without depending on env
+# survival across xcodebuild.
 #
 # `--host=$TAURI_DEV_HOST` is passed explicitly (not bare `--host`,
 # which the simulator path uses) so we don't gamble on Tauri's
@@ -171,6 +179,24 @@ _dev-ios-device-after-backend: _wait-for-backend
     pnpm tauri ios dev --host="$TAURI_DEV_HOST" \
         --config crates/app/euro-mobile/tauri.conf.json \
         --features devtools
+
+# Invoked by xcodebuild's preBuildScript in
+# `crates/app/euro-mobile/gen/apple/project.yml`. Self-contained: re-
+# derives the LAN host instead of relying on env vars surviving from
+# the launching shell through tauri-cli, xcodebuild, and the script
+# phase. Falls back to `localhost` when no LAN IP is available so
+# offline simulator builds still succeed.
+
+[private]
+[macos]
+[positional-arguments]
+_ios-xcode-script *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    host=$("{{justfile_directory()}}/scripts/lan-ip.sh" 2>/dev/null || echo localhost)
+    export BACKEND_URL="http://$host:3000"
+    export WEB_URL="http://$host:5173"
+    pnpm tauri ios xcode-script "$@"
 
 # ─── First-run setup ───────────────────────────────────────────────────────
 # Copy .env.example to .env (if missing) and install JS deps. Idempotent.
