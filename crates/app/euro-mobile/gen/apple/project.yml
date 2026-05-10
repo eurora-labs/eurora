@@ -99,7 +99,12 @@ targets:
             echo "CI=true: skipping cargo build (handled by release-ios.sh)"
             exit 0
           fi
-          pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+          # Route through `just` so the cargo build runs with `BACKEND_URL`
+          # / `WEB_URL` set by the `_ios-xcode-script` recipe, which derives
+          # them from `scripts/lan-ip.sh` directly. xcodebuild does not
+          # reliably propagate parent-shell env vars into script phases, so
+          # we re-derive at this boundary instead of plumbing through.
+          just _ios-xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:

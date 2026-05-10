@@ -7,10 +7,6 @@ use futures::StreamExt;
 
 const MODEL: &str = "gpt-4o-mini";
 
-fn load_env() {
-    let _ = dotenvy::dotenv();
-}
-
 fn make_model() -> ChatOpenAI {
     ChatOpenAI::new(MODEL)
 }
@@ -23,7 +19,6 @@ fn make_model() -> ChatOpenAI {
 #[tokio::test]
 
 async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let result = model
         .invoke(
@@ -39,7 +34,6 @@ async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let result = model
         .invoke(
@@ -55,7 +49,6 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let mut stream = model
         .stream(
@@ -81,7 +74,6 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let mut stream = model
         .stream(
@@ -107,7 +99,6 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
@@ -128,7 +119,6 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let messages: Vec<AnyMessage> = vec![
         HumanMessage::builder().content("hello").build().into(),
@@ -148,7 +138,6 @@ async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::E
 #[tokio::test]
 
 async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let message = HumanMessage::builder()
         .content("hello")
@@ -169,7 +158,6 @@ async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     // stop at invoke time
     let model = make_model();
     let result = model
@@ -214,7 +202,6 @@ async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let result = model
         .invoke(
@@ -248,7 +235,6 @@ async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let mut stream = model
         .stream(
@@ -308,7 +294,6 @@ fn magic_function_no_args_schema() -> serde_json::Value {
 #[tokio::test]
 
 async fn test_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let model_with_tools = model.bind_tools(
         &[ToolLike::Schema(magic_function_schema())],
@@ -353,7 +338,6 @@ async fn test_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_tool_calling_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let model_with_tools = model.bind_tools(
         &[ToolLike::Schema(magic_function_schema())],
@@ -377,7 +361,6 @@ async fn test_tool_calling_async() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_tool_calling_with_no_arguments() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let model_with_tools = model.bind_tools(
         &[ToolLike::Schema(magic_function_no_args_schema())],
@@ -409,7 +392,6 @@ async fn test_tool_calling_with_no_arguments() -> Result<(), Box<dyn std::error:
 #[tokio::test]
 
 async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let adder_schema = serde_json::json!({
         "title": "my_adder_tool",
         "description": "Tool that adds two integers.",
@@ -457,7 +439,6 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
 #[tokio::test]
 
 async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let adder_schema = serde_json::json!({
         "title": "my_adder_tool",
         "description": "Tool that adds two integers.",
@@ -505,7 +486,6 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
 #[tokio::test]
 
 async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let adder_schema = serde_json::json!({
         "title": "my_adder_tool",
         "description": "Tool that adds two integers.",
@@ -558,7 +538,6 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
 #[tokio::test]
 
 async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -595,7 +574,6 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -633,7 +611,6 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 
 async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let schema = serde_json::json!({
         "title": "OptionalResponse",
         "type": "object",
@@ -671,7 +648,6 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
 #[tokio::test]
 
 async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -713,7 +689,6 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
 #[tokio::test]
 
 async fn test_json_mode() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
     let model_with_json = model.response_format(serde_json::json!({"type": "json_object"}));
 
@@ -747,7 +722,6 @@ async fn test_json_mode() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::{
         ContentBlock, ContentBlocks, ImageContentBlock, TextContentBlock,
     };
@@ -789,7 +763,6 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let weather_tool = serde_json::json!({
         "title": "get_weather",
         "description": "Get the weather at a location.",
@@ -844,7 +817,6 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_unicode_tool_call() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let unicode_tool = serde_json::json!({
         "title": "unicode_customer",
         "description": "Tool for creating a customer with Unicode name.",
@@ -893,7 +865,6 @@ async fn test_unicode_tool_call() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
 
     let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
@@ -913,7 +884,6 @@ async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
 
     let input1 = vec![HumanMessage::builder().content("Hello").build().into()];
@@ -938,7 +908,6 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_invoke_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let override_model = "gpt-4o";
     let model = ChatOpenAI::new(override_model);
 
@@ -967,7 +936,6 @@ async fn test_invoke_with_model_override() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_ainvoke_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let override_model = "gpt-4o";
     let model = ChatOpenAI::new(override_model);
 
@@ -993,7 +961,6 @@ async fn test_ainvoke_with_model_override() -> Result<(), Box<dyn std::error::Er
 #[tokio::test]
 
 async fn test_stream_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let override_model = "gpt-4o";
     let model = ChatOpenAI::new(override_model);
 
@@ -1019,7 +986,6 @@ async fn test_stream_with_model_override() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_astream_with_model_override() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let override_model = "gpt-4o";
     let model = ChatOpenAI::new(override_model);
 
@@ -1050,7 +1016,6 @@ async fn test_astream_with_model_override() -> Result<(), Box<dyn std::error::Er
 #[tokio::test]
 
 async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
 
     let get_weather = serde_json::json!({
@@ -1111,7 +1076,6 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::ContentBlocks;
 
     let model = make_model();
@@ -1170,7 +1134,6 @@ async fn test_pdf_inputs() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::ContentBlocks;
 
     let model = ChatOpenAI::new("gpt-4o-audio-preview");
@@ -1225,7 +1188,6 @@ async fn test_audio_inputs() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::ContentBlocks;
 
     let model = make_model();
@@ -1283,7 +1245,6 @@ async fn test_image_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::ContentBlocks;
 
     let model = make_model();
@@ -1352,7 +1313,6 @@ async fn test_pdf_tool_message() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     use agent_chain_core::messages::{ContentBlocks, SystemMessage};
 
     let model = make_model();
@@ -1447,7 +1407,6 @@ async fn test_anthropic_inputs() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_bind_runnables_as_tools() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = make_model();
 
     let greeting_tool = serde_json::json!({

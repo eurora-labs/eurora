@@ -90,13 +90,19 @@ pub fn run() {
 
             let specta = build_specta();
 
-            // Regenerate the TypeScript bindings on every dev launch.
+            // Regenerate the TypeScript bindings on every dev launch on the
+            // host. Gated on `not(mobile)` because `CARGO_MANIFEST_DIR` is a
+            // compile-time host path; on a real device that path doesn't
+            // exist and the export panics. The `export_specta_bindings`
+            // test below runs the same export on the host so bindings stay
+            // in sync via `cargo test` without needing this code path.
+            //
             // `specta-typescript` 0.0.12 fails the export by default if any
             // `i64`/`u64` field crosses the wire without an explicit
             // `#[specta(type = ...)]` override, which is the strictness we
             // want — silently bridging through `bigint` masks lossy round
             // trips on the JS side.
-            #[cfg(debug_assertions)]
+            #[cfg(all(debug_assertions, not(mobile)))]
             {
                 let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                     .join("../../../apps/mobile/src/lib/bindings/specta.bindings.ts");
