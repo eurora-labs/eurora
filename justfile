@@ -10,6 +10,7 @@
 #   just init              first-run setup (.env, pnpm install)
 #   just dev               full stack (backend hot-reloads via watchexec)
 #   just ios               full stack with mobile on an iOS simulator (macOS only)
+#   just ios-device        full stack with mobile on a physical iPhone (macOS only)
 #   just dev-backend       backend only (Postgres + watchexec)
 #   just dev-backend-once  backend only, no auto-restart (debugger / profiling)
 #   just dev-web           web auth UI only
@@ -109,6 +110,60 @@ ios: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
 [macos]
 _dev-ios-after-backend: _wait-for-backend
     pnpm dev:ios
+
+# ─── Full stack (iOS device) ───────────────────────────────────────────────
+#
+# Same shape as `just ios`, but bakes a LAN-reachable host into the mobile
+# binary so a physical iPhone on the same Wi-Fi can reach this Mac. The
+# simulator path bakes `localhost` URLs (which work because the simulator
+# shares the host's loopback); on a real device, `localhost` resolves to
+# the iPhone itself, so every embedded reference to `localhost:3000`
+# (backend) or `localhost:5173` (web auth) is broken.
+#
+# `scripts/lan-ip.sh` resolves the Mac's IP on its default-route
+# interface and refuses to proceed if that's a CLAT46 synthesized
+# address (RFC 7335) — typical when the upstream is iPhone Personal
+# Hotspot on a 5G/IPv6-only carrier, where the IP exists only on the
+# Mac. The recipe exports the resulting LAN host into four places:
+#
+#   - apps/mobile/vite.config.ts          reads TAURI_DEV_HOST for its bind
+#   - apps/web/vite.config.ts             derives its bind from WEB_URL
+#   - euro-mobile + euro-{endpoint,settings}/build.rs
+#                                         bake the URLs into the iOS
+#                                         binary at compile time (the
+#                                         mobile sandbox has no runtime
+#                                         access to .env)
+#   - scripts/wait-for-backend.sh         polls the backend health URL
+#
+# Overrides live in this recipe's shell, never in `.env`, so other
+# recipes (`just dev`, `just ios`) keep their localhost behavior.
+#
+# `--host=$TAURI_DEV_HOST` is passed explicitly (not bare `--host`,
+# which the simulator path uses) so we don't gamble on Tauri's
+# auto-detection picking the same interface `lan-ip.sh` did.
+
+[macos]
+ios-device: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
+    #!/usr/bin/env bash
+    set -euo pipefail
+    host=$(./scripts/lan-ip.sh)
+    echo "→ Using LAN host: $host"
+    export TAURI_DEV_HOST="$host"
+    export WEB_URL="http://$host:5173"
+    export BACKEND_URL="http://$host:3000"
+    export EURORA_HEALTH_URL="http://$host:3000/health"
+    pnpm exec concurrently --kill-others --handle-input --default-input-target mobile \
+        --names backend,web,mobile --prefix-colors cyan,green,magenta \
+        "just _dev-backend-watch" \
+        "just _dev-web-after-backend" \
+        "just _dev-ios-device-after-backend"
+
+[private]
+[macos]
+_dev-ios-device-after-backend: _wait-for-backend
+    pnpm tauri ios dev --host="$TAURI_DEV_HOST" \
+        --config crates/app/euro-mobile/tauri.conf.json \
+        --features devtools
 
 # ─── First-run setup ───────────────────────────────────────────────────────
 # Copy .env.example to .env (if missing) and install JS deps. Idempotent.
