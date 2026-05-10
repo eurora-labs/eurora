@@ -55,5 +55,12 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Eurora connects to a local development server during development.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
