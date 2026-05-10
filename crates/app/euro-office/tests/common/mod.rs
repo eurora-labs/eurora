@@ -1,5 +1,5 @@
 //! Test utilities for the Word add-in round-trip integration test.
-//! Mirrors the shape of `euro-browser`'s `tests/common/mod.rs` — the
+//! Mirrors the shape of `euro-bridge`'s `tests/common/mod.rs` — the
 //! two are not literally shared because doing so would require a
 //! cross-crate test-feature, and the helper is small.
 
@@ -7,7 +7,7 @@
 
 use std::net::SocketAddr;
 
-use euro_browser::{BoundServer, BridgeService};
+use euro_bridge::{BoundServer, BridgeService};
 
 /// Bind a fresh [`BridgeService`] to an ephemeral loopback port and
 /// spawn its accept loop. Returns the live service, the bound address,
@@ -16,7 +16,7 @@ use euro_browser::{BoundServer, BridgeService};
 pub async fn start_ephemeral_bridge() -> (
     BridgeService,
     SocketAddr,
-    tokio::task::JoinHandle<Result<(), euro_browser::BridgeError>>,
+    tokio::task::JoinHandle<Result<(), euro_bridge::BridgeError>>,
 ) {
     let service = BridgeService::new();
     let bound = service
@@ -30,6 +30,6 @@ pub async fn start_ephemeral_bridge() -> (
 
 pub fn spawn_serve(
     bound: BoundServer,
-) -> tokio::task::JoinHandle<Result<(), euro_browser::BridgeError>> {
+) -> tokio::task::JoinHandle<Result<(), euro_bridge::BridgeError>> {
     tokio::spawn(async move { bound.serve().await })
 }

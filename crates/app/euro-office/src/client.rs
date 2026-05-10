@@ -3,10 +3,10 @@
 //!
 //! The add-in registers as a non-PID client with
 //! `app_kind = Some(`[`MICROSOFT_WORD_KIND`]`)`. Callers locate it via
-//! [`euro_browser::BridgeService::find_clients_by_kind`] and then issue
+//! [`euro_bridge::BridgeService::find_clients_by_kind`] and then issue
 //! `GET_ASSETS` / `GET_METADATA` requests like any other bridge client.
 
-use euro_browser::BridgeService;
+use euro_bridge::BridgeService;
 
 use crate::WordDocumentAsset;
 
@@ -20,7 +20,7 @@ pub const MICROSOFT_WORD_KIND: &str = "microsoft-word";
 /// The add-in responds with a [`ResponseFrame`] whose `payload` is a
 /// JSON-encoded [`WordDocumentAsset`] (no `NativeMessage` wrapper).
 ///
-/// [`ResponseFrame`]: euro_browser::ResponseFrame
+/// [`ResponseFrame`]: euro_bridge::ResponseFrame
 pub const ACTION_GET_ASSETS: &str = "GET_ASSETS";
 
 /// Fetch the current [`WordDocumentAsset`] from the first registered

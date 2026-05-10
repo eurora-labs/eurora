@@ -12,7 +12,7 @@ mod common;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use euro_browser::{
+use euro_bridge::{
     BridgeError, BridgeService, EventFrame, Frame, FrameKind, RegisterFrame, ResponseFrame,
     bridge_url_for,
 };

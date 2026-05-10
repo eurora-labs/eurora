@@ -7,8 +7,8 @@ description = "Asset types and TypeScript bindings for the Eurora Office add-in 
 
 [dependencies]
 bon = { workspace = true }
+euro-bridge = { workspace = true }
 euro-bridge-protocol = { workspace = true }
-euro-browser = { workspace = true }
 euro-process = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

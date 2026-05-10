@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-pub use euro_browser::{BridgeService, EventFrame, Frame, FrameKind, RequestFrame, ResponseFrame};
+pub use euro_bridge::{BridgeService, EventFrame, Frame, FrameKind, RequestFrame, ResponseFrame};
 use euro_native_messaging::NativeMessage;
 use euro_process::Browser;
 use focus_tracker::FocusedWindow;

@@ -3696,7 +3696,7 @@ dependencies = [
  "chrono",
  "enum_dispatch",
  "euro-auth",
- "euro-browser",
+ "euro-bridge",
  "euro-endpoint",
  "euro-native-messaging",
  "euro-office",
@@ -3761,20 +3761,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "euro-bridge-protocol"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "specta",
- "specta-serde",
- "specta-swift",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "euro-browser"
+name = "euro-bridge"
 version = "0.0.0"
 dependencies = [
  "axum",
@@ -3787,6 +3774,19 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tracing",
+]
+
+[[package]]
+name = "euro-bridge-protocol"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-serde",
+ "specta-swift",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3877,8 +3877,8 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bon",
+ "euro-bridge",
  "euro-bridge-protocol",
- "euro-browser",
  "euro-process",
  "futures-util",
  "serde",
@@ -3966,8 +3966,8 @@ dependencies = [
  "dirs 6.0.0",
  "euro-activity",
  "euro-auth",
+ "euro-bridge",
  "euro-bridge-protocol",
- "euro-browser",
  "euro-endpoint",
  "euro-process",
  "euro-secret",
@@ -4054,7 +4054,7 @@ dependencies = [
  "chrono",
  "euro-activity",
  "euro-auth",
- "euro-browser",
+ "euro-bridge",
  "euro-endpoint",
  "focus-tracker",
  "image",
