@@ -24,9 +24,7 @@ export const DEFAULT_WARMUP_LANGS: readonly string[] = [
  * Boot the Shiki worker and pre-load the listed languages. Safe to call
  * outside a worker-capable environment — it no-ops there.
  */
-export function warmupShikiHighlighter(
-	langs: readonly string[] = DEFAULT_WARMUP_LANGS,
-): void {
+export function warmupShikiHighlighter(langs: readonly string[] = DEFAULT_WARMUP_LANGS): void {
 	if (typeof Worker === 'undefined') return;
 	try {
 		getShikiWorkerClient().warmup([...langs]);

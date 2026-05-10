@@ -199,18 +199,22 @@
 	</div>
 	<div style="height: fit-content; width: 100%;" class={streamdown.theme.code.container}>
 		{#if last}
-			<pre class={streamdown.theme.code.pre}><code>{#each last.tokens as line}<span
-							class={streamdown.theme.code.line}
+			<pre class={streamdown.theme.code.pre}><code
+					>{#each last.tokens as line}<span class={streamdown.theme.code.line}
 							>{#each line as t}<span
-									style={streamdown.isMounted ? streamdown.animationTextStyle : ''}
+									style={streamdown.isMounted
+										? streamdown.animationTextStyle
+										: ''}
 									style:color={t.color}
 									style:background-color={t.bgColor}>{t.content}</span
 								>{/each}</span
-						>{/each}</code></pre>
+						>{/each}</code
+				></pre>
 		{:else}
-			<pre class={streamdown.theme.code.pre}><code>{#each plainLines as line}<span
-							class={streamdown.theme.code.line}>{line}</span
-						>{/each}</code></pre>
+			<pre class={streamdown.theme.code.pre}><code
+					>{#each plainLines as line}<span class={streamdown.theme.code.line}>{line}</span
+						>{/each}</code
+				></pre>
 		{/if}
 	</div>
 </div>
