@@ -36,6 +36,7 @@ specta-typescript = { version = "0.0.12" }
 tauri = { version = "2.11.1", features = [] }
 tauri-plugin-http = "2"
 tauri-plugin-appauth = { workspace = true }
+tauri-plugin-google-auth = { workspace = true }
 tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"

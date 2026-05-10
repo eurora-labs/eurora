@@ -8,14 +8,27 @@ import { InjectionToken } from '@eurora/shared/context';
 import * as Sentry from '@sentry/svelte';
 import { posthog, type PostHogInterface } from 'posthog-js';
 
+const SENSITIVE_HEADER_NAMES = new Set([
+	'authorization',
+	'cookie',
+	'set-cookie',
+	'proxy-authorization',
+	'x-api-key',
+]);
+
 /**
  * Owns the lifecycle of Sentry + PostHog in the desktop app.
  *
  * Reads bootstrap data once at startup (consent + embedded keys), then
  * keeps the SDKs in sync with the user's preferences. When the user
- * toggles a switch in the settings UI, [`apply`] re-runs the gating
+ * toggles a switch in the settings UI, [`refresh`] re-runs the gating
  * logic without a process restart. The Rust client is reapplied through
  * `system.reinit_telemetry` so both surfaces stay coherent.
+ *
+ * `applySdks` and its callers are async because tearing down a Sentry
+ * client involves flushing buffered events; serializing the close ↔ init
+ * pair across consecutive opt-out / opt-in keeps us from racing the
+ * flush against a fresh `Sentry.init`.
  */
 export class TelemetryService {
 	settings = $state<TelemetrySettings | null>(null);
@@ -33,7 +46,7 @@ export class TelemetryService {
 			return;
 		}
 		this.settings = this.bootstrap.settings;
-		this.applySdks();
+		await this.applySdks();
 	}
 
 	/**
@@ -47,7 +60,7 @@ export class TelemetryService {
 			const next = await commands.settingsGetTelemetry();
 			this.bootstrap = { ...this.bootstrap, settings: next };
 			this.settings = next;
-			this.applySdks();
+			await this.applySdks();
 			await commands.systemReinitTelemetry();
 		} catch (error) {
 			console.error('Failed to refresh telemetry settings:', error);
@@ -100,7 +113,7 @@ export class TelemetryService {
 				this.bootstrap = { ...this.bootstrap, settings: this.settings };
 			}
 			this.reset();
-			this.applySdks();
+			await this.applySdks();
 		} catch (error) {
 			console.error('Failed to rotate telemetry distinct id:', error);
 		}
@@ -111,10 +124,10 @@ export class TelemetryService {
 		posthog.capture(event, properties);
 	}
 
-	private applySdks(): void {
+	private async applySdks(): Promise<void> {
 		if (!this.bootstrap || !this.settings) return;
 
-		this.applySentry();
+		await this.applySentry();
 		this.applyPostHog();
 	}
 
@@ -122,39 +135,41 @@ export class TelemetryService {
 		return (this.settings?.consentVersion ?? 0) > 0;
 	}
 
-	private applySentry(): void {
+	private async applySentry(): Promise<void> {
 		if (!this.bootstrap) return;
 		const { sentryDsn, channel, release } = this.bootstrap;
 		const wantsErrors = this.hasConsented() && this.settings?.anonymousErrors;
 
 		if (!wantsErrors || !sentryDsn) {
 			if (this.sentryStarted) {
-				Sentry.getClient()?.close(2_000);
+				// Await so a subsequent re-init doesn't race the flush.
+				await Sentry.getClient()?.close(2_000);
 				this.sentryStarted = false;
 			}
 			return;
 		}
 
 		if (!this.sentryStarted) {
-			Sentry.init({
-				dsn: sentryDsn,
-				release: release || undefined,
-				environment: channel || 'dev',
-				sendDefaultPii: false,
-				attachStacktrace: true,
-				tracesSampleRate: 0,
-				replaysSessionSampleRate: 0,
-				replaysOnErrorSampleRate: 0,
-				beforeSend(event) {
-					// Drop the URL query string — it can carry one-time
-					// auth tokens through OAuth callbacks.
-					if (event.request?.url) {
-						event.request.url = event.request.url.split('?')[0];
-					}
-					return event;
-				},
-			});
-			this.sentryStarted = true;
+			try {
+				Sentry.init({
+					dsn: sentryDsn,
+					release: release ?? undefined,
+					environment: channel ?? 'dev',
+					sendDefaultPii: false,
+					attachStacktrace: true,
+					tracesSampleRate: 0,
+					beforeSend: scrubSentryEvent,
+					beforeBreadcrumb: scrubSentryBreadcrumb,
+				});
+				this.sentryStarted = true;
+			} catch (error) {
+				// Sentry's init is normally infallible, but a malformed DSN
+				// or network init step can throw. Surface it loudly so a
+				// "telemetry says enabled, no events landing" report is
+				// debuggable from the user's console.
+				console.error('Sentry.init failed:', error);
+				return;
+			}
 		}
 
 		const distinctId = this.settings?.distinctId ?? null;
@@ -174,26 +189,31 @@ export class TelemetryService {
 		}
 
 		if (!this.posthogStarted) {
-			posthog.init(posthogKey, {
-				api_host: posthogHost || 'https://eu.i.posthog.com',
-				autocapture: false,
-				capture_pageview: false,
-				capture_pageleave: false,
-				disable_session_recording: true,
-				mask_all_text: true,
-				mask_all_element_attributes: true,
-				respect_dnt: true,
-				persistence: 'localStorage',
-				bootstrap: this.settings.distinctId
-					? { distinctID: this.settings.distinctId }
-					: undefined,
-				loaded: (instance: PostHogInterface) => {
-					if (this.settings?.distinctId) {
-						instance.register({ distinct_id: this.settings.distinctId });
-					}
-				},
-			});
-			this.posthogStarted = true;
+			try {
+				posthog.init(posthogKey, {
+					api_host: posthogHost ?? 'https://eu.i.posthog.com',
+					autocapture: false,
+					capture_pageview: false,
+					capture_pageleave: false,
+					disable_session_recording: true,
+					mask_all_text: true,
+					mask_all_element_attributes: true,
+					respect_dnt: true,
+					persistence: 'localStorage',
+					bootstrap: this.settings.distinctId
+						? { distinctID: this.settings.distinctId }
+						: undefined,
+					loaded: (instance: PostHogInterface) => {
+						if (this.settings?.distinctId) {
+							instance.register({ distinct_id: this.settings.distinctId });
+						}
+					},
+				});
+				this.posthogStarted = true;
+			} catch (error) {
+				console.error('posthog.init failed:', error);
+				return;
+			}
 		} else {
 			posthog.opt_in_capturing();
 		}
@@ -209,3 +229,68 @@ export class TelemetryService {
 }
 
 export const TELEMETRY_SERVICE = new InjectionToken<TelemetryService>('TelemetryService');
+
+/**
+ * `beforeSend` hook for Sentry events. Sanitizes the request envelope
+ * Sentry attaches to thrown errors so OAuth tokens, session cookies,
+ * and POST bodies don't leave the machine. The Rust side has its own
+ * scrubber for filesystem paths in stack frames; this one handles the
+ * web-shaped surfaces that only the JS SDK touches.
+ */
+function scrubSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
+	if (event.request) {
+		event.request = scrubRequest(event.request);
+	}
+	return event;
+}
+
+function scrubSentryBreadcrumb(breadcrumb: Sentry.Breadcrumb): Sentry.Breadcrumb {
+	const { data } = breadcrumb;
+	if (!data) return breadcrumb;
+
+	// `fetch` and `xhr` breadcrumbs from `breadcrumbsIntegration` carry
+	// the URL alongside status info. Strip the query string the same way
+	// `scrubRequest` strips it from `event.request.url`.
+	if (typeof data.url === 'string') {
+		data.url = stripQueryString(data.url);
+	}
+	return breadcrumb;
+}
+
+type RequestEventData = NonNullable<Sentry.ErrorEvent['request']>;
+
+function scrubRequest(request: RequestEventData): RequestEventData {
+	const scrubbed: RequestEventData = { ...request };
+	if (typeof scrubbed.url === 'string') {
+		scrubbed.url = stripQueryString(scrubbed.url);
+	}
+	if (scrubbed.headers) {
+		scrubbed.headers = scrubHeaders(scrubbed.headers);
+	}
+	if (scrubbed.cookies !== undefined) {
+		// `cookies` is `Record<string, string>` — we don't enumerate which
+		// names are sensitive (they all are, in practice), so collapse the
+		// whole map to a single redaction marker.
+		scrubbed.cookies = { __redacted__: '[redacted]' };
+	}
+	if (scrubbed.data !== undefined) {
+		// POST/PUT bodies frequently carry credentials, tokens, or PII.
+		// Sentry won't capture these unless an integration explicitly
+		// attaches them, but if one does we don't want it on the wire.
+		scrubbed.data = '[redacted]';
+	}
+	return scrubbed;
+}
+
+function stripQueryString(url: string): string {
+	const queryIndex = url.indexOf('?');
+	return queryIndex === -1 ? url : url.slice(0, queryIndex);
+}
+
+function scrubHeaders(headers: Record<string, string>): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const [name, value] of Object.entries(headers)) {
+		out[name] = SENSITIVE_HEADER_NAMES.has(name.toLowerCase()) ? '[redacted]' : value;
+	}
+	return out;
+}

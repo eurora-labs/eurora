@@ -702,6 +702,26 @@ fn main() {
                         })
                         .with_max_level(tauri_plugin_tracing::LevelFilter::DEBUG)
                         .with_colors()
+                        // Forward `tracing` events to Sentry alongside the
+                        // webview/console output. ERROR events become Sentry
+                        // `Event`s (with backtraces); INFO/WARN ride along as
+                        // breadcrumbs on the next Event. The layer is benign
+                        // when Sentry isn't initialized — events flowing
+                        // through it are simply dropped — so installing it
+                        // unconditionally lets us avoid coordinating layer
+                        // composition with the runtime consent toggle.
+                        .with_layer(Box::new(
+                            sentry::integrations::tracing::layer::<tracing_subscriber::Registry>()
+                                .event_filter(|metadata| match *metadata.level() {
+                                    tracing::Level::ERROR => {
+                                        sentry::integrations::tracing::EventFilter::Event
+                                    }
+                                    tracing::Level::WARN | tracing::Level::INFO => {
+                                        sentry::integrations::tracing::EventFilter::Breadcrumb
+                                    }
+                                    _ => sentry::integrations::tracing::EventFilter::Ignore,
+                                }),
+                        ))
                         .with_default_subscriber()
                         .build(),
                 )

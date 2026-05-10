@@ -41,6 +41,17 @@ export default defineConfig(({ mode }) => {
 		);
 	}
 
+	// Production builds without a DSN ship without telemetry. That's a valid
+	// choice (e.g. preview environments), but it's almost never intentional
+	// in the main production deploy — surface it loudly in the build log so
+	// a misconfiguration doesn't go unnoticed for weeks.
+	if (mode === 'production' && !env.PUBLIC_SENTRY_WEB_DSN) {
+		console.warn(
+			'[sentry] PUBLIC_SENTRY_WEB_DSN is not set for this production build; ' +
+				'no errors will be reported from either client or server.',
+		);
+	}
+
 	return {
 		envDir: workspaceRoot,
 		// Expose `BACKEND_URL` to client code as `import.meta.env.PUBLIC_API_URL`

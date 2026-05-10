@@ -8,6 +8,7 @@
 use procedures::auth_procedures::{
     AuthStateChanged, auth_get_access_token_payload, auth_is_authenticated, auth_login,
     auth_logout, auth_refresh_session, auth_register, auth_start_login,
+    auth_start_login_google_native,
 };
 
 pub mod error;
@@ -29,6 +30,7 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
         .disable_serde_phases()
         .commands(tauri_specta::collect_commands![
             auth_start_login,
+            auth_start_login_google_native,
             auth_login,
             auth_register,
             auth_logout,
@@ -61,8 +63,18 @@ fn mobile_entry_point() {
 /// so `build.rs` reads it at compile time and forwards the relevant keys
 /// into `option_env!` slots. Inject those into the process env at
 /// startup so the existing `std::env::var(...)` call sites see them.
+///
+/// `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_ID_IOS` are baked even though
+/// only the native sign-in path consumes them — the call site reads
+/// them via `std::env::var` on each invocation, so they must be in the
+/// process env at runtime, not just at compile time. Empty / unset
+/// values surface as `LoginOutcome::NativeUnavailable`.
 fn load_env() {
-    for (key, value) in [("WEB_URL", option_env!("WEB_URL"))] {
+    for (key, value) in [
+        ("WEB_URL", option_env!("WEB_URL")),
+        ("GOOGLE_CLIENT_ID", option_env!("GOOGLE_CLIENT_ID")),
+        ("GOOGLE_CLIENT_ID_IOS", option_env!("GOOGLE_CLIENT_ID_IOS")),
+    ] {
         if std::env::var_os(key).is_some() {
             continue;
         }
@@ -113,6 +125,7 @@ pub fn run() {
 
             tauri::Builder::default()
                 .plugin(tauri_plugin_appauth::init())
+                .plugin(tauri_plugin_google_auth::init())
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_http::init())
                 .plugin(tauri_plugin_opener::init())

@@ -44,6 +44,36 @@ pub struct ThirdPartyAuthUrlRequest {
     pub provider: Provider,
 }
 
+/// Request body for `POST /auth/oauth/mobile/url`.
+///
+/// The mobile app generates a PKCE pair locally and submits the
+/// challenge here; the backend stamps that challenge as the OAuth
+/// `state` (so it round-trips through Google and identifies the device
+/// in the callback) and as the eventual `login_token` row that the
+/// device redeems via `/auth/login-token/exchange`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct MobileThirdPartyAuthUrlRequest {
+    pub provider: Provider,
+    pub code_challenge: String,
+    pub code_challenge_method: String,
+}
+
+/// Request body for `POST /auth/oauth/google/id-token`.
+///
+/// Used by mobile after a native Google Sign-In flow: the client sends
+/// the ID token issued directly by Google's iOS / Android SDK and the
+/// backend verifies it against Google's JWKS without an authorization
+/// code round-trip. The optional `nonce` is checked against the JWT's
+/// nonce claim when supplied.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct GoogleIdTokenLoginRequest {
+    pub id_token: String,
+    #[serde(default)]
+    pub nonce: Option<String>,
+}
+
 /// Request body for `POST /auth/login-token/exchange`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
@@ -146,5 +176,28 @@ mod tests {
         let back: RegisterRequest =
             serde_json::from_str(r#"{"email":"u@e.com","password":"p"}"#).unwrap();
         assert!(back.display_name.is_none());
+    }
+
+    #[test]
+    fn mobile_third_party_auth_url_round_trip() {
+        let req = MobileThirdPartyAuthUrlRequest {
+            provider: Provider::Google,
+            code_challenge: "Y7-_aAbCdEfGhIjKlMnOpQrStUvWxYz0123456789AB".into(),
+            code_challenge_method: "S256".into(),
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["provider"], "google");
+        assert_eq!(json["code_challenge_method"], "S256");
+        let back: MobileThirdPartyAuthUrlRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(back.code_challenge.len(), 43);
+    }
+
+    #[test]
+    fn google_id_token_login_request_decodes_without_nonce() {
+        // Forward-compat: clients that don't thread a nonce still parse.
+        let back: GoogleIdTokenLoginRequest =
+            serde_json::from_str(r#"{"id_token":"eyJ..."}"#).unwrap();
+        assert!(back.nonce.is_none());
+        assert_eq!(back.id_token, "eyJ...");
     }
 }

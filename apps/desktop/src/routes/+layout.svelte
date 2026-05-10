@@ -27,9 +27,12 @@
 
 	initDependencies();
 
-	// Initialize telemetry first so any errors in subsequent service
-	// startup are captured. The service no-ops until consent has been
-	// granted via the onboarding flow.
+	// Kick off telemetry first. `init()` is async — it round-trips an IPC
+	// to fetch the consent state and embedded keys before `Sentry.init`
+	// runs — so errors that happen synchronously above this line, or
+	// between here and the IPC resolving, won't be captured. The Rust
+	// side has its own panic hook installed earlier in `main()`, which
+	// covers anything serious during the same window.
 	const telemetryService = inject(TELEMETRY_SERVICE);
 	telemetryService.init();
 

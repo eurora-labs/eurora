@@ -13,16 +13,18 @@ use std::sync::Arc;
 
 use auth_core::{
     AssociateLoginTokenRequest, AuthSuccessResponse, CheckEmailRequest, CheckEmailResponse,
-    LoginByLoginTokenRequest, LoginRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    GoogleIdTokenLoginRequest, LoginByLoginTokenRequest, LoginRequest,
+    MobileThirdPartyAuthUrlRequest, Provider, RegisterRequest, ThirdPartyAuthUrlRequest,
     ThirdPartyAuthUrlResponse, TokenResponse, UserResponse, VerifyEmailRequest,
 };
 use axum::{
     Json,
-    extract::State,
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    response::{IntoResponse, Redirect},
 };
 use axum_extra::extract::cookie::CookieJar;
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::cookies::{self, AuthMode};
@@ -148,6 +150,121 @@ pub async fn oauth_url(
 ) -> AuthResult<Json<ThirdPartyAuthUrlResponse>> {
     let url = state.auth.third_party_auth_url(body.provider).await?;
     Ok(Json(ThirdPartyAuthUrlResponse { url }))
+}
+
+/// Mobile OAuth start: device generates a PKCE pair locally, sends the
+/// challenge here, gets back the provider-authorisation URL pointing at
+/// the backend's mobile-callback endpoint.
+#[tracing::instrument(skip_all, fields(provider = ?body.provider))]
+pub async fn mobile_oauth_url(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<MobileThirdPartyAuthUrlRequest>,
+) -> AuthResult<Json<ThirdPartyAuthUrlResponse>> {
+    let url = state
+        .auth
+        .mobile_third_party_auth_url(
+            body.provider,
+            &body.code_challenge,
+            &body.code_challenge_method,
+        )
+        .await?;
+    Ok(Json(ThirdPartyAuthUrlResponse { url }))
+}
+
+/// Query params Google / GitHub send to our mobile-callback endpoint.
+/// `code` + `state` on success; `error` on user-cancel / provider rejection.
+#[derive(Debug, Deserialize)]
+pub struct MobileOAuthCallbackQuery {
+    code: Option<String>,
+    state: Option<String>,
+    error: Option<String>,
+    error_description: Option<String>,
+}
+
+/// Path params for `/auth/oauth/{provider}/mobile-callback`.
+#[derive(Debug, Deserialize)]
+pub struct MobileOAuthCallbackPath {
+    provider: String,
+}
+
+/// Mobile OAuth callback: invoked by the provider, *not* by the device.
+///
+/// Always 302s to the device's custom-scheme handler so the in-app
+/// browser session resolves cleanly — even on error. The device side
+/// inspects the resulting `status=` query to decide between completing
+/// the login (`ok`) or surfacing a friendly error (`error`).
+#[tracing::instrument(skip_all, fields(provider = %path.provider))]
+pub async fn mobile_oauth_callback(
+    State(state): State<Arc<AppState>>,
+    Path(path): Path<MobileOAuthCallbackPath>,
+    Query(query): Query<MobileOAuthCallbackQuery>,
+) -> Redirect {
+    let provider = match path.provider.as_str() {
+        "google" => Provider::Google,
+        "github" => Provider::Github,
+        other => {
+            tracing::warn!(provider = %other, "mobile OAuth callback for unknown provider");
+            return Redirect::to(&device_redirect_error("invalid_provider"));
+        }
+    };
+
+    if let Some(error) = &query.error {
+        tracing::warn!(
+            ?provider,
+            error = %error,
+            description = ?query.error_description,
+            "mobile OAuth callback: provider returned error",
+        );
+        return Redirect::to(&device_redirect_error(error));
+    }
+
+    let (Some(code), Some(state_param)) = (query.code, query.state) else {
+        tracing::warn!(?provider, "mobile OAuth callback missing code or state");
+        return Redirect::to(&device_redirect_error("invalid_callback"));
+    };
+
+    match state
+        .auth
+        .login_third_party_mobile(provider, &code, &state_param)
+        .await
+    {
+        Ok(()) => Redirect::to(DEVICE_REDIRECT_OK),
+        Err(e) => {
+            let kind = e.error_kind();
+            tracing::warn!(?provider, error = %e, kind = %kind, "mobile OAuth completion failed");
+            Redirect::to(&device_redirect_error(kind))
+        }
+    }
+}
+
+/// Custom-scheme URL the device's `ASWebAuthenticationSession` /
+/// Android `BrowserSessionActivity` is bound to. The mobile crate
+/// configures the in-app browser session to listen for `eurora://`
+/// — the OS captures the redirect and resolves the awaited future.
+const DEVICE_REDIRECT_OK: &str = "eurora://mobile/callback?status=ok";
+
+fn device_redirect_error(kind: &str) -> String {
+    let mut url = url::Url::parse("eurora://mobile/callback").expect("static URL must parse");
+    url.query_pairs_mut()
+        .append_pair("status", "error")
+        .append_pair("error", kind);
+    url.into()
+}
+
+/// Native Google sign-in: device hands us an ID token from the iOS or
+/// Android Google SDK; we verify it locally and mint a session.
+#[tracing::instrument(skip_all)]
+pub async fn google_id_token_login(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    jar: CookieJar,
+    Json(body): Json<GoogleIdTokenLoginRequest>,
+) -> AuthResult<(CookieJar, Json<AuthSuccessResponse>)> {
+    let session = state
+        .auth
+        .login_google_id_token(&body.id_token, body.nonce)
+        .await?;
+    Ok(session_response(&state, &headers, jar, session))
 }
 
 #[tracing::instrument(skip_all)]

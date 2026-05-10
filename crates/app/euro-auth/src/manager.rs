@@ -209,6 +209,40 @@ impl AuthManager {
 
         Ok(SecretString::from(response.access_token))
     }
+
+    /// Build a provider-authorisation URL for the mobile in-app browser
+    /// flow. The backend stamps the supplied `code_challenge` as the
+    /// OAuth `state`, so the same value identifies the device when the
+    /// callback fires.
+    pub async fn mobile_third_party_auth_url(
+        &self,
+        provider: auth_core::Provider,
+        code_challenge: impl Into<String>,
+    ) -> Result<String> {
+        let response = self
+            .auth_client
+            .mobile_third_party_auth_url(provider, code_challenge)
+            .await?;
+        Ok(response.url)
+    }
+
+    /// Trade a Google ID token (from the native iOS / Android SDKs) for
+    /// a session.
+    pub async fn login_by_google_id_token(
+        &self,
+        id_token: impl Into<String>,
+        nonce: Option<String>,
+    ) -> Result<SecretString> {
+        let response = self
+            .auth_client
+            .login_by_google_id_token(id_token, nonce)
+            .await?;
+
+        store_access_token(response.access_token.clone())?;
+        store_refresh_token(response.refresh_token.clone())?;
+
+        Ok(SecretString::from(response.access_token))
+    }
 }
 
 fn store_access_token(token: String) -> Result<()> {
