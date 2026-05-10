@@ -3,6 +3,7 @@
 	import { ChatPromptInput } from '$lib/index.js';
 	import { ChatService, CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
 	import { provide } from '@eurora/shared/context';
+	import * as PromptInput from '@eurora/ui/components/ai-elements/prompt-input/index';
 
 	const fakeService = new FakeThreadService();
 	const chatService = new ChatService(fakeService);
@@ -88,7 +89,13 @@
 		}))}
 		placeholder="Ask me anything..."
 		onSubmit={handleSubmit}
-	/>
+	>
+		{#snippet tools()}
+			<PromptInput.Button size="sm" variant="ghost" data-testid="playground-tool">
+				<span>Tool</span>
+			</PromptInput.Button>
+		{/snippet}
+	</ChatPromptInput>
 </div>
 
 <div data-testid="debug-panel" class="fixed top-0 right-0 p-2 text-xs bg-black text-white">

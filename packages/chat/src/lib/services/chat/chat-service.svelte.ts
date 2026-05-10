@@ -1,3 +1,4 @@
+import { DEFAULT_MODELS } from '$lib/models/chat-model.js';
 import { InjectionToken } from '@eurora/shared/context';
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
@@ -38,6 +39,15 @@ export class ChatService {
 	loadingThreads = $state(false);
 	loadingMoreThreads = $state(false);
 	hasMoreThreads = $state(true);
+
+	// Per-conversation behaviour flags. They live on the service rather than
+	// inside the prompt-input component so they survive thread navigation and
+	// can be read by `sendMessage` (and any future regenerate/edit paths).
+	// NOTE: not yet forwarded to the backend — `ChatSendRequest` has no
+	// matching fields. Wiring those requires a Specta regeneration pass.
+	searchEnabled = $state(true);
+	thinkingEnabled = $state(true);
+	selectedModelId: string | undefined = $state(DEFAULT_MODELS[0]?.id);
 
 	private readonly threadClient: IThreadService;
 
