@@ -40,7 +40,14 @@ body.linux-app {
 	--shell-radius: 12px;
 }
 
-body.macos-app [data-slot='sidebar-inner'] {
+/*
+ * The sidebar is absolutely positioned at top:0 of the app shell and
+ * therefore extends behind the Titlebar (which sits above with a
+ * higher stacking order). Pad the sidebar's inner content down by the
+ * titlebar height on every platform so menu items don't render under
+ * the window chrome.
+ */
+[data-slot='sidebar-inner'] {
 	padding-top: var(--titlebar-height);
 }
 

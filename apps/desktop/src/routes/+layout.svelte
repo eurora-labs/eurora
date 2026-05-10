@@ -12,6 +12,7 @@
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { warmupShikiHighlighter } from '@eurora/ui/components/ai-elements/message/shiki/index';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { platform } from '@tauri-apps/plugin-os';
@@ -86,12 +87,14 @@
 
 <ModeWatcher defaultMode="system" />
 
-<div class="app-shell flex flex-col overflow-hidden bg-background">
-	<Titlebar />
-	<main class="flex-1 min-h-0 bg-background">
-		{@render children?.()}
-	</main>
-</div>
+<Sidebar.Provider open={true}>
+	<div class="app-shell flex flex-col overflow-hidden bg-background">
+		<Titlebar />
+		<main class="flex flex-1 min-h-0 bg-background">
+			{@render children?.()}
+		</main>
+	</div>
+</Sidebar.Provider>
 
 <AccessibilityPermission />
 <UpdateChecker />

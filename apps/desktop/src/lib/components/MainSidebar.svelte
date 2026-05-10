@@ -10,13 +10,11 @@
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
-	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
-	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
 	import PowerIcon from '@lucide/svelte/icons/power';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -27,9 +25,8 @@
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
 	const timelineService = inject(TIMELINE_SERVICE);
-	const sidebarState = useSidebar();
+	const sidebarState = Sidebar.useSidebar();
 
-	let logoHovered = $state(false);
 	let quitDialogOpen = $state(false);
 	let searchOpen = $state(false);
 
@@ -102,34 +99,13 @@
 </script>
 
 <Sidebar.Root collapsible="icon" class="border-none">
-	<Sidebar.Header>
-		<div class="flex items-center justify-between">
-			{#if sidebarState.open}
-				<EuroraLogo class="size-7" />
-			{:else}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="size-7"
-					onmouseenter={() => (logoHovered = true)}
-					onmouseleave={() => (logoHovered = false)}
-					onclick={() => {
-						sidebarState.toggle();
-						logoHovered = false;
-					}}
-				>
-					<PanelLeftIcon class={logoHovered ? 'size-4' : 'hidden'} />
-					<EuroraLogo class={logoHovered ? 'hidden' : 'size-7'} />
-				</Button>
-			{/if}
-
-			<div data-tauri-drag-region class="flex-1 self-stretch"></div>
-
-			{#if sidebarState.open}
-				<Sidebar.Trigger />
-			{/if}
-		</div>
-	</Sidebar.Header>
+	<!--
+		Sidebar header is empty on purpose: the toggle lives in the
+		Titlebar so it can read as part of the window chrome and align
+		with the sidebar's right edge. The empty strip is kept so the
+		sidebar's top edge — which sits just below the Titlebar — gives
+		the menu a small breathing-room gutter before the first menu item.
+	-->
 	<Sidebar.Content>
 		<Sidebar.Group>
 			<Sidebar.GroupContent>

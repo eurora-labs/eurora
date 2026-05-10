@@ -18,9 +18,7 @@
 </script>
 
 <Menubar />
-<Sidebar.Provider open={true}>
-	<MainSidebar />
-	<Sidebar.Inset>
-		{@render children?.()}
-	</Sidebar.Inset>
-</Sidebar.Provider>
+<MainSidebar />
+<Sidebar.Inset>
+	{@render children?.()}
+</Sidebar.Inset>
