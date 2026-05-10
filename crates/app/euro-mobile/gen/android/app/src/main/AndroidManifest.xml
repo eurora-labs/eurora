@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required by `tauri-plugin-google-auth`'s native (Credential
+         Manager) flow so the Google Identity SDK can detect
+         connectivity before attempting sign-in. See ANDROID_SETUP.md in
+         the plugin crate. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />

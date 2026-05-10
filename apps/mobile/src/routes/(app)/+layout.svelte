@@ -36,7 +36,6 @@
 		<Sidebar.Inset class="h-dvh min-h-0">
 			<header class="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
 				<Sidebar.Trigger />
-				<h1 class="text-sm font-semibold text-foreground">Eurora</h1>
 			</header>
 			{@render children?.()}
 		</Sidebar.Inset>
