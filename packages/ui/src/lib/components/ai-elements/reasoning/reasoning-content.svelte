@@ -6,6 +6,7 @@
 	import SDMath from 'svelte-streamdown/math';
 	import Mermaid from 'svelte-streamdown/mermaid';
 	import StreamingCode from '../message/streaming-code.svelte';
+	import { IncrementalBlocks } from '../message/incremental-blocks.svelte.js';
 
 	let {
 		class: className,
@@ -18,6 +19,12 @@
 		streaming?: boolean;
 		[key: string]: unknown;
 	} = $props();
+
+	// Same per-block chunking strategy as `Message.Response` — see comments
+	// there. Reasoning streams can be very long for thinking-mode models
+	// and benefit even more from incremental parsing.
+	const incremental = new IncrementalBlocks();
+	const blocks = $derived(incremental.derive(children, []));
 
 	const components = $derived({
 		code: streaming ? StreamingCode : Code,
@@ -42,11 +49,14 @@
 	)}
 	{...restProps}
 >
-	<Streamdown
-		content={children}
-		{components}
-		{theme}
-		baseTheme="shadcn"
-		static={!streaming}
-	/>
+	{#each blocks as block, i (i)}
+		{@const isLast = i === blocks.length - 1}
+		<Streamdown
+			content={block}
+			{components}
+			{theme}
+			baseTheme="shadcn"
+			static={!streaming || !isLast}
+		/>
+	{/each}
 </CollapsibleContent>

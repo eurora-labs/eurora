@@ -97,7 +97,9 @@ function plaintextTokens(code: string): ThemedToken[][] {
 	return result;
 }
 
-async function handleHighlight(req: Extract<ShikiWorkerRequest, { type: 'highlight' }>): Promise<ShikiHighlightResponse> {
+async function handleHighlight(
+	req: Extract<ShikiWorkerRequest, { type: 'highlight' }>,
+): Promise<ShikiHighlightResponse> {
 	try {
 		const highlighter = await getHighlighter();
 

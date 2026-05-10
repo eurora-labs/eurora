@@ -10,36 +10,21 @@
 </script>
 
 <script lang="ts">
+	import MessageItem from '$lib/components/MessageItem.svelte';
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
-	import { getAssetChipsFromMessage, getReasoningFromMessage } from '$lib/utils/asset-chips.js';
+	import { getReasoningFromMessage } from '$lib/utils/asset-chips.js';
 	import { getTextContent } from '$lib/utils/message-content.js';
-	import { middleTruncate } from '$lib/utils/text.js';
 	import { useIdleRef } from '$lib/utils/throttled.svelte.js';
 	import { inject } from '@eurora/shared/context';
-	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
 	import * as Conversation from '@eurora/ui/components/ai-elements/conversation/index';
 	import { initStickToBottomContext } from '@eurora/ui/components/ai-elements/conversation/index';
-	import * as Message from '@eurora/ui/components/ai-elements/message/index';
-	import * as Reasoning from '@eurora/ui/components/ai-elements/reasoning/index';
-	import { Shimmer } from '@eurora/ui/components/ai-elements/shimmer/index';
-	import { Button } from '@eurora/ui/components/button/index';
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import { Skeleton } from '@eurora/ui/components/skeleton/index';
-	import CheckIcon from '@lucide/svelte/icons/check';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import CopyIcon from '@lucide/svelte/icons/copy';
-	import PencilIcon from '@lucide/svelte/icons/pencil';
-	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
-	import { tick } from 'svelte';
-	import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
+	import type { MessageNode } from '$lib/models/messages/index.js';
+	import type { BranchDirection } from '$lib/services/thread/thread-service.js';
 
 	let { emptyState, onCopy, onEdit, onRegenerate }: Props = $props();
 
-	let copiedId = $state<string | null>(null);
-	let editingId = $state<string | null>(null);
-	let editText = $state('');
-	let editTextarea = $state<HTMLTextAreaElement | null>(null);
 	const chatService = inject(CHAT_SERVICE);
 	const scrollContext = initStickToBottomContext();
 
@@ -54,11 +39,16 @@
 	// so under load intermediate snapshots are dropped rather than queued.
 	// On stream end, the latest value is flushed synchronously.
 	const streamingId = $derived(chatService.activeThread?.streamingMessageId ?? null);
+	const isAnyStreaming = $derived(streamingId !== null);
 	const streamingNode = $derived.by<MessageNode | null>(() => {
 		const id = streamingId;
 		if (!id) return null;
+		// The streaming placeholder is always the most recently appended node;
+		// fall back to a search only if that invariant is somehow violated.
 		const messages = chatService.activeThread?.messages;
-		if (!messages) return null;
+		if (!messages || messages.length === 0) return null;
+		const last = messages[messages.length - 1];
+		if (last.message.id === id) return last;
 		return messages.find((n) => n.message.id === id) ?? null;
 	});
 
@@ -87,92 +77,16 @@
 		prevStreamingId = currentStreamingId;
 	});
 
-	function getReasoningContent(node: MessageNode): string {
-		return getReasoningFromMessage(node.message);
-	}
-
-	function isUser(node: MessageNode): boolean {
-		return node.message?.type === 'human';
-	}
-
 	function getMessageId(node: MessageNode): string {
 		return node.message.id ?? '';
 	}
 
-	function getAssetChips(node: MessageNode): AssetChip[] {
-		return getAssetChipsFromMessage(node.message);
-	}
-
-	function handleCopy(content: string, messageId: string) {
-		onCopy?.(content);
-		copiedId = messageId;
-		setTimeout(() => {
-			if (copiedId === messageId) copiedId = null;
-		}, 2000);
-	}
-
-	async function startEdit(messageId: string, content: string) {
-		editingId = messageId;
-		editText = content;
-		await tick();
-		editTextarea?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-		editTextarea?.focus();
-	}
-
-	function cancelEdit() {
-		editingId = null;
-		editText = '';
-	}
-
-	function submitEdit() {
-		if (editingId === null) return;
-		const text = editText.trim();
-		if (!text) return;
-		const id = editingId;
-		editingId = null;
-		editText = '';
-		onEdit?.(id, text);
-	}
-
-	function handleEditKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && !e.shiftKey) {
-			e.preventDefault();
-			submitEdit();
-		} else if (e.key === 'Escape') {
-			cancelEdit();
-		}
+	function handleSwitchBranch(messageId: string, direction: BranchDirection) {
+		const threadId = chatService.activeThreadId;
+		if (!threadId || !messageId) return;
+		void chatService.switchBranch(threadId, messageId, direction);
 	}
 </script>
-
-{#snippet siblingNav(node: MessageNode)}
-	{@const children = node.children ?? []}
-	{#if children.length > 1}
-		{@const activeId = getMessageId(node)}
-		<Message.Action
-			tooltip="Previous"
-			disabled={node.sibling_index === 0}
-			onclick={() => {
-				if (activeId && chatService.activeThreadId)
-					chatService.switchBranch(chatService.activeThreadId, activeId, -1);
-			}}
-		>
-			<ChevronLeftIcon />
-		</Message.Action>
-		<span class="text-muted-foreground flex items-center text-xs">
-			{node.sibling_index + 1} / {children.length}
-		</span>
-		<Message.Action
-			tooltip="Next"
-			disabled={node.sibling_index === children.length - 1}
-			onclick={() => {
-				if (activeId && chatService.activeThreadId)
-					chatService.switchBranch(chatService.activeThreadId, activeId, 1);
-			}}
-		>
-			<ChevronRightIcon />
-		</Message.Action>
-	{/if}
-{/snippet}
 
 <Conversation.Root class="min-h-0 flex-1">
 	<Conversation.Content>
@@ -206,105 +120,17 @@
 			{/if}
 		{/if}
 		{#each chatService.activeThread?.messages ?? [] as node (getMessageId(node))}
-			{@const messageId = getMessageId(node)}
-			{@const isStreaming = streamingId === messageId}
-			{@const content = isStreaming
-				? idleStreamingContent.current
-				: getTextContent(node)}
-			{@const user = isUser(node)}
-			{@const reasoning = isStreaming
-				? idleStreamingReasoning.current
-				: getReasoningContent(node)}
-			{@const assetChips = getAssetChips(node)}
-			{#if content.length > 0 || assetChips.length > 0 || !user}
-				<Message.Root from={user ? 'user' : 'assistant'} data-message-id={messageId}>
-					{#if user && assetChips.length > 0}
-						<Attachment.Root variant="inline" class="ml-auto">
-							{#each assetChips as chip (chip.id)}
-								<Attachment.Item
-									data={{
-										type: 'file',
-										id: chip.id,
-										filename: middleTruncate(chip.name),
-									}}
-								>
-									<Attachment.Preview />
-									<Attachment.Info />
-								</Attachment.Item>
-							{/each}
-						</Attachment.Root>
-					{/if}
-					{#if reasoning}
-						<Reasoning.Root {isStreaming}>
-							<Reasoning.Trigger />
-							<Reasoning.Content streaming={isStreaming} children={reasoning} />
-						</Reasoning.Root>
-					{/if}
-					{#if user && editingId === messageId}
-						<div class="flex w-full flex-col gap-2">
-							<textarea
-								bind:this={editTextarea}
-								class="bg-muted/50 border-border w-full resize-none rounded-lg border p-3 focus:outline-none"
-								bind:value={editText}
-								onkeydown={handleEditKeydown}
-								rows={3}
-							></textarea>
-							<div class="flex justify-end gap-2">
-								<Button variant="ghost" size="sm" onclick={cancelEdit}>
-									Cancel
-								</Button>
-								<Button size="sm" onclick={submitEdit}>Send</Button>
-							</div>
-						</div>
-					{:else}
-						<Message.Content>
-							{#if content.trim().length > 0}
-								<Message.Response {content} streaming={isStreaming} />
-							{:else if isStreaming && !reasoning}
-								<Shimmer>Thinking</Shimmer>
-							{/if}
-						</Message.Content>
-					{/if}
-					{#if !isStreaming && editingId !== messageId}
-						{@const showActions = user
-							? !chatService.activeThread?.streamingMessageId
-							: content.trim().length > 0}
-						{#if showActions}
-							<Message.Actions class={user ? 'self-end' : ''}>
-								{@render siblingNav(node)}
-								{#if onCopy}
-									<Message.Action
-										tooltip="Copy"
-										onclick={() => handleCopy(content, messageId)}
-									>
-										{#if copiedId === messageId}
-											<CheckIcon />
-										{:else}
-											<CopyIcon />
-										{/if}
-									</Message.Action>
-								{/if}
-								{#if user && onEdit}
-									<Message.Action
-										tooltip="Edit"
-										onclick={() => startEdit(messageId, content)}
-									>
-										<PencilIcon />
-									</Message.Action>
-								{/if}
-								{#if !user && onRegenerate && messageId}
-									<Message.Action
-										tooltip="Regenerate"
-										onclick={() => onRegenerate(messageId)}
-									>
-										<RotateCcwIcon />
-									</Message.Action>
-								{/if}
-							</Message.Actions>
-						{/if}
-					{/if}
-				</Message.Root>
-			{/if}
+			<MessageItem
+				{node}
+				isStreaming={streamingId === getMessageId(node)}
+				{isAnyStreaming}
+				streamingContent={idleStreamingContent.current}
+				streamingReasoning={idleStreamingReasoning.current}
+				{onCopy}
+				{onEdit}
+				{onRegenerate}
+				onSwitchBranch={handleSwitchBranch}
+			/>
 		{/each}
 	</Conversation.Content>
 </Conversation.Root>
