@@ -8,7 +8,16 @@
 		"build": {
 			"dependsOn": ["package"],
 			"passThroughEnv": ["SENTRY_AUTH_TOKEN", "GITHUB_TOKEN"],
-			"env": ["SENTRY_RELEASE", "BACKEND_URL", "WEB_URL"],
+			"env": [
+				"SENTRY_RELEASE",
+				"BACKEND_URL",
+				"WEB_URL",
+				"PUBLIC_SENTRY_WEB_DSN",
+				"PUBLIC_SENTRY_ENVIRONMENT",
+				"PUBLIC_SENTRY_RELEASE",
+				"SENTRY_ORG",
+				"SENTRY_PROJECT"
+			],
 			"outputs": [
 				".svelte-kit/**",
 				"!.sveltekit/types",

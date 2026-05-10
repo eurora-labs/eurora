@@ -4,33 +4,55 @@
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
+	import type { LoginOutcome } from '$lib/bindings/specta.bindings.js';
 
 	const user = inject(USER_SERVICE);
 
 	let loading = $state(false);
 	let error = $state('');
 
-	async function startLogin() {
+	function handleOutcome(outcome: LoginOutcome) {
+		switch (outcome.kind) {
+			case 'success':
+				goto('/');
+				return;
+			case 'canceled':
+				loading = false;
+				return;
+			case 'rejected':
+				error = 'Login could not be completed. Please try again.';
+				loading = false;
+				return;
+			case 'native_unavailable':
+				// signInWithGoogle already falls back to the browser
+				// flow before returning this; reaching it here means
+				// even the fallback was skipped, which is unexpected.
+				error = 'Sign-in is unavailable on this device.';
+				loading = false;
+				return;
+		}
+	}
+
+	async function signInWithGoogle() {
 		loading = true;
 		error = '';
-
 		try {
-			const outcome = await user.startLogin();
-			switch (outcome.kind) {
-				case 'success':
-					goto('/');
-					return;
-				case 'canceled':
-					loading = false;
-					return;
-				case 'rejected':
-					error = 'Login could not be completed. Please try again.';
-					loading = false;
-					return;
-			}
+			handleOutcome(await user.signInWithGoogle());
 		} catch (err) {
-			console.error('Login failed:', err);
-			error = 'Login failed. Please try again.';
+			console.error('Google sign-in failed:', err);
+			error = 'Sign-in failed. Please try again.';
+			loading = false;
+		}
+	}
+
+	async function signInWithGitHub() {
+		loading = true;
+		error = '';
+		try {
+			handleOutcome(await user.startLogin('github'));
+		} catch (err) {
+			console.error('GitHub sign-in failed:', err);
+			error = 'Sign-in failed. Please try again.';
 			loading = false;
 		}
 	}
@@ -54,7 +76,10 @@
 				<p class="text-sm text-destructive text-center">{error}</p>
 			{/if}
 
-			<Button class="w-full" onclick={startLogin}>Log In / Sign Up</Button>
+			<Button class="w-full" onclick={signInWithGoogle}>Continue with Google</Button>
+			<Button class="w-full" variant="outline" onclick={signInWithGitHub}>
+				Continue with GitHub
+			</Button>
 		</div>
 	{/if}
 </div>

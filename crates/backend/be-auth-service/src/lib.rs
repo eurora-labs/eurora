@@ -84,6 +84,23 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/auth/logout", post(handlers::logout))
         .route("/auth/me", get(handlers::me))
         .route("/auth/oauth/url", post(handlers::oauth_url))
+        // Mobile OAuth: device hits `/auth/oauth/mobile/url` with its
+        // PKCE challenge, opens the returned authorisation URL in an
+        // in-app browser, then the provider 302s the user to
+        // `/auth/oauth/{provider}/mobile-callback` — which completes
+        // login and 302s to the device's `eurora://` deep-link.
+        .route("/auth/oauth/mobile/url", post(handlers::mobile_oauth_url))
+        .route(
+            "/auth/oauth/{provider}/mobile-callback",
+            get(handlers::mobile_oauth_callback),
+        )
+        // Native Google sign-in (iOS GoogleSignIn SDK / Android
+        // Credential Manager): device hands us an ID token that the
+        // backend verifies against Google's JWKS. No browser involved.
+        .route(
+            "/auth/oauth/google/id-token",
+            post(handlers::google_id_token_login),
+        )
         .route(
             "/auth/login-token/exchange",
             post(handlers::login_token_exchange),

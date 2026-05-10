@@ -14,12 +14,31 @@ export default defineConfig(({ mode }) => {
 	// so backend secrets never leak into the bundle.
 	const env = loadEnv(mode, workspaceRoot, '');
 
-	const sentryAuthToken = env.SENTRY_AUTH_TOKEN;
-	const sentryOrg = env.SENTRY_ORG;
-	const sentryProject = env.SENTRY_PROJECT;
-	const sentryRelease = env.SENTRY_RELEASE;
+	const sentryVars = {
+		SENTRY_AUTH_TOKEN: env.SENTRY_AUTH_TOKEN,
+		SENTRY_ORG: env.SENTRY_ORG,
+		SENTRY_PROJECT: env.SENTRY_PROJECT,
+		SENTRY_RELEASE: env.SENTRY_RELEASE,
+	};
 
-	const sentryUploadEnabled = Boolean(sentryAuthToken && sentryOrg && sentryProject);
+	// Fail closed: a partial config in CI almost always means a missing
+	// secret in the workflow or a stripped pass-through in turbo.json.
+	// Silently skipping the plugin produces a green build with no
+	// uploaded sourcemaps — exactly the bug we're trying to prevent.
+	const present = Object.values(sentryVars).filter(Boolean).length;
+	const partial = present > 0 && present < Object.keys(sentryVars).length;
+	if (partial && process.env.CI) {
+		const missing = Object.entries(sentryVars)
+			.filter(([, v]) => !v)
+			.map(([k]) => k);
+		throw new Error(
+			`Sentry vite plugin partially configured in CI; missing: ${missing.join(', ')}. ` +
+				`Set all four of SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT, SENTRY_RELEASE ` +
+				`(via the workflow's step env and turbo.json passThroughEnv) or none.`,
+		);
+	}
+
+	const sentryUploadEnabled = present === Object.keys(sentryVars).length;
 
 	return {
 		envDir: workspaceRoot,
@@ -30,10 +49,10 @@ export default defineConfig(({ mode }) => {
 			...(sentryUploadEnabled
 				? [
 						sentryVitePlugin({
-							authToken: sentryAuthToken,
-							org: sentryOrg,
-							project: sentryProject,
-							release: sentryRelease ? { name: sentryRelease } : undefined,
+							authToken: sentryVars.SENTRY_AUTH_TOKEN,
+							org: sentryVars.SENTRY_ORG,
+							project: sentryVars.SENTRY_PROJECT,
+							release: { name: sentryVars.SENTRY_RELEASE },
 							sourcemaps: { assets: ['./build/**/*'] },
 							telemetry: false,
 						}),

@@ -13,8 +13,11 @@ use std::path::PathBuf;
 /// cannot function without them.
 const REQUIRED: &[&str] = &["WEB_URL"];
 
-/// Optional: empty if unset.
-const OPTIONAL: &[&str] = &[];
+/// Optional: empty if unset. Native Google sign-in is gated on these
+/// being present at runtime (see `procedures::auth_procedures::
+/// native_google_client_id`); when absent, the mobile UI falls back to
+/// the in-app browser flow without erroring out.
+const OPTIONAL: &[&str] = &["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID_IOS"];
 
 fn main() {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

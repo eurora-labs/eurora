@@ -5,7 +5,58 @@ import * as __TAURI_EVENT from "@tauri-apps/api/event";
 
 /** Commands */
 export const commands = {
-	authStartLogin: () => typedError<LoginOutcome, string>(__TAURI_INVOKE("auth_start_login")),
+	/**
+	 *  Open the chosen provider's authorisation page in an in-app browser,
+	 *  complete sign-in, and exchange the device's PKCE verifier for
+	 *  session tokens once the redirect fires.
+	 * 
+	 *  **Flow shape.** The mobile crate generates a fresh PKCE pair locally
+	 *  and POSTs the challenge to the backend's `/auth/oauth/mobile/url`
+	 *  endpoint. The backend stamps that challenge as the OAuth `state`
+	 *  (so it round-trips through Google / GitHub) and returns the provider
+	 *  authorisation URL. After the user completes sign-in, the provider
+	 *  302s to the backend's `/auth/oauth/{provider}/mobile-callback`,
+	 *  which atomically completes login and 302s to
+	 *  `eurora://mobile/callback?status=ok|error`. The in-app browser
+	 *  captures the redirect; we then redeem the verifier (still in this
+	 *  awaiting frame) for our own access / refresh tokens.
+	 * 
+	 *  **Browser-session sharing.** We deliberately do *not* set
+	 *  `prefers_ephemeral_session: true`. Sharing cookies with the system
+	 *  browser is what enables the "I'm already signed in" UX users expect:
+	 * 
+	 *  - "Sign in with Google" recognises the user's existing Google
+	 *    session in the system browser and shows the account picker
+	 *    instead of prompting for email / password / 2FA;
+	 *  - iOS Keychain / Android Autofill and password managers can fill
+	 *    saved credentials for our domain;
+	 *  - the user's existing session on our own domain (if any) is
+	 *    honoured.
+	 * 
+	 *  The trade-off is that the in-app browser sees whatever is currently
+	 *  signed in to the user's system browser — which is exactly what users
+	 *  mean when they tap "Sign in with Google". For workflows that
+	 *  explicitly need a clean session, the user can sign out in the system
+	 *  browser first.
+	 */
+	authStartLogin: (provider: Provider) => typedError<LoginOutcome, string>(__TAURI_INVOKE("auth_start_login", { provider })),
+	/**
+	 *  Native Google sign-in via `tauri-plugin-google-auth`. On iOS this
+	 *  drives the GoogleSignIn SDK (account picker, no browser); on Android
+	 *  the Credential Manager API (system bottom sheet). Returns
+	 *  [`LoginOutcome::NativeUnavailable`] when the device can't service
+	 *  the request — Android without Play Services, or any non-mobile
+	 *  platform — so the frontend can fall back to [`auth_start_login`].
+	 * 
+	 *  We pass the platform-appropriate Google client ID:
+	 *  - iOS uses the iOS OAuth client (`GOOGLE_CLIENT_ID_IOS`); the
+	 *    resulting JWT carries `aud == GOOGLE_CLIENT_ID_IOS`, which the
+	 *    backend accepts via its `accepted_audiences` list.
+	 *  - Android Credential Manager only takes the *server* client ID
+	 *    (`GOOGLE_CLIENT_ID`); the resulting JWT carries `aud ==
+	 *    GOOGLE_CLIENT_ID` so the backend's primary verifier accepts it.
+	 */
+	authStartLoginGoogleNative: () => typedError<LoginOutcome, string>(__TAURI_INVOKE("auth_start_login_google_native")),
 	authLogin: (login: string, password: string) => typedError<null, string>(__TAURI_INVOKE("auth_login", { login, password })),
 	authRegister: (email: string, password: string) => typedError<null, string>(__TAURI_INVOKE("auth_register", { email, password })),
 	authLogout: () => typedError<null, string>(__TAURI_INVOKE("auth_logout")),
@@ -269,7 +320,13 @@ export type InvalidToolCallBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
-export type LoginOutcome = { kind: "success" } | { kind: "canceled" } | { kind: "rejected" };
+export type LoginOutcome = { kind: "success" } | { kind: "canceled" } | { kind: "rejected" } | 
+/**
+ *  Native sign-in is not available on this device (e.g. Android
+ *  without Play Services). The frontend should retry via the
+ *  in-app browser flow.
+ */
+{ kind: "native_unavailable" };
 
 /**  One node in the message tree returned by message-list endpoints. */
 export type MessageNode = {
@@ -303,6 +360,14 @@ export type PlainTextContentBlock = {
 	context?: string | null,
 	extras?: { [key in string]: unknown } | null,
 };
+
+/**
+ *  Third-party identity provider supported by the auth service.
+ * 
+ *  Wire format is lowercase JSON (`"google"`, `"github"`) so it reads
+ *  naturally in URLs and request bodies.
+ */
+export type Provider = "google" | "github";
 
 export type ReasoningContentBlock = {
 	id?: string | null,

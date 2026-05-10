@@ -12,6 +12,8 @@ pub struct GitHubOAuthConfig {
     pub client_id: SecretString,
     pub client_secret: SecretString,
     pub redirect_uri: String,
+    /// See [`crate::oauth::google::GoogleOAuthConfig::mobile_redirect_uri`].
+    pub mobile_redirect_uri: Option<String>,
 }
 
 impl GitHubOAuthConfig {
@@ -26,11 +28,15 @@ impl GitHubOAuthConfig {
         );
         let redirect_uri = env::var("GITHUB_REDIRECT_URI")
             .map_err(|_| OAuthError::MissingEnvVar("GITHUB_REDIRECT_URI"))?;
+        let mobile_redirect_uri = env::var("GITHUB_MOBILE_REDIRECT_URI")
+            .ok()
+            .filter(|s| !s.is_empty());
 
         Ok(Self {
             client_id,
             client_secret,
             redirect_uri,
+            mobile_redirect_uri,
         })
     }
 }
@@ -83,12 +89,41 @@ impl GitHubOAuthClient {
         &self.config.redirect_uri
     }
 
+    pub fn mobile_redirect_uri(&self) -> Option<&str> {
+        self.config.mobile_redirect_uri.as_deref()
+    }
+
     pub fn authorization_url(&self, state: &str, pkce_challenge: &str) -> String {
+        Self::build_authorization_url(
+            self.config.client_id.expose_secret(),
+            &self.config.redirect_uri,
+            state,
+            pkce_challenge,
+        )
+    }
+
+    pub fn mobile_authorization_url(&self, state: &str, pkce_challenge: &str) -> Option<String> {
+        self.config.mobile_redirect_uri.as_deref().map(|uri| {
+            Self::build_authorization_url(
+                self.config.client_id.expose_secret(),
+                uri,
+                state,
+                pkce_challenge,
+            )
+        })
+    }
+
+    fn build_authorization_url(
+        client_id: &str,
+        redirect_uri: &str,
+        state: &str,
+        pkce_challenge: &str,
+    ) -> String {
         let mut url =
             Url::parse("https://github.com/login/oauth/authorize").expect("static URL must parse");
         url.query_pairs_mut()
-            .append_pair("client_id", self.config.client_id.expose_secret())
-            .append_pair("redirect_uri", &self.config.redirect_uri)
+            .append_pair("client_id", client_id)
+            .append_pair("redirect_uri", redirect_uri)
             .append_pair("state", state)
             .append_pair("scope", "user:email")
             .append_pair("code_challenge", pkce_challenge)
@@ -101,6 +136,30 @@ impl GitHubOAuthClient {
         code: &str,
         pkce_verifier: &str,
     ) -> Result<GitHubUserInfo, OAuthError> {
+        self.exchange_code_with_redirect(code, pkce_verifier, &self.config.redirect_uri)
+            .await
+    }
+
+    pub async fn mobile_exchange_code(
+        &self,
+        code: &str,
+        pkce_verifier: &str,
+    ) -> Result<GitHubUserInfo, OAuthError> {
+        let redirect_uri = self
+            .config
+            .mobile_redirect_uri
+            .as_deref()
+            .ok_or(OAuthError::MissingEnvVar("GITHUB_MOBILE_REDIRECT_URI"))?;
+        self.exchange_code_with_redirect(code, pkce_verifier, redirect_uri)
+            .await
+    }
+
+    async fn exchange_code_with_redirect(
+        &self,
+        code: &str,
+        pkce_verifier: &str,
+        redirect_uri: &str,
+    ) -> Result<GitHubUserInfo, OAuthError> {
         let token_resp: GitHubTokenResponse = self
             .http
             .post("https://github.com/login/oauth/access_token")
@@ -109,7 +168,7 @@ impl GitHubOAuthClient {
                 ("client_id", self.config.client_id.expose_secret()),
                 ("client_secret", self.config.client_secret.expose_secret()),
                 ("code", code),
-                ("redirect_uri", self.config.redirect_uri.as_str()),
+                ("redirect_uri", redirect_uri),
                 ("code_verifier", pkce_verifier),
             ])
             .send()

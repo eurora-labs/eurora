@@ -3855,6 +3855,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-appauth",
+ "tauri-plugin-google-auth",
  "tauri-plugin-http",
  "tauri-plugin-opener",
  "tauri-plugin-os",
@@ -4009,6 +4010,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "url",
  "uuid",
  "windows",
@@ -8693,6 +8695,7 @@ dependencies = [
  "cookie",
  "cookie_store",
  "encoding_rs",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2 0.4.14",
@@ -10998,6 +11001,23 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "tauri-plugin-google-auth"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2887559d9aeda0ef71eb8d2e0a9934df8e48ba96d90b0d6d3e4731608e28e4a8"
+dependencies = [
+ "oauth2",
+ "open",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+ "url",
+ "uuid",
 ]
 
 [[package]]

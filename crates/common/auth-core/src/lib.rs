@@ -19,8 +19,9 @@ pub mod responses;
 pub use claims::{Claims, Role};
 pub use provider::Provider;
 pub use requests::{
-    AssociateLoginTokenRequest, CheckEmailRequest, LoginByLoginTokenRequest, LoginRequest,
-    RegisterRequest, ThirdPartyAuthUrlRequest, VerifyEmailRequest,
+    AssociateLoginTokenRequest, CheckEmailRequest, GoogleIdTokenLoginRequest,
+    LoginByLoginTokenRequest, LoginRequest, MobileThirdPartyAuthUrlRequest, RegisterRequest,
+    ThirdPartyAuthUrlRequest, VerifyEmailRequest,
 };
 pub use responses::{
     AuthErrorResponse, AuthSuccessResponse, CheckEmailResponse, CheckEmailStatus,
@@ -40,6 +41,8 @@ pub fn type_collection() -> specta::Types {
         .register::<RegisterRequest>()
         .register::<ThirdPartyAuthUrlRequest>()
         .register::<ThirdPartyAuthUrlResponse>()
+        .register::<MobileThirdPartyAuthUrlRequest>()
+        .register::<GoogleIdTokenLoginRequest>()
         .register::<LoginByLoginTokenRequest>()
         .register::<AssociateLoginTokenRequest>()
         .register::<CheckEmailRequest>()
@@ -71,6 +74,8 @@ mod tests {
             "RegisterRequest",
             "ThirdPartyAuthUrlRequest",
             "ThirdPartyAuthUrlResponse",
+            "MobileThirdPartyAuthUrlRequest",
+            "GoogleIdTokenLoginRequest",
             "LoginByLoginTokenRequest",
             "AssociateLoginTokenRequest",
             "CheckEmailRequest",

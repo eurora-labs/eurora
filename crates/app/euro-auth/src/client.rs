@@ -9,7 +9,8 @@ use std::sync::Arc;
 
 use auth_core::{
     AssociateLoginTokenRequest, AuthErrorResponse, CheckEmailRequest, CheckEmailResponse,
-    LoginByLoginTokenRequest, LoginRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    GoogleIdTokenLoginRequest, LoginByLoginTokenRequest, LoginRequest,
+    MobileThirdPartyAuthUrlRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
     ThirdPartyAuthUrlResponse, TokenResponse, VerifyEmailRequest,
 };
 use euro_endpoint::EndpointManager;
@@ -130,6 +131,38 @@ impl AuthClient {
     ) -> AuthResult<ThirdPartyAuthUrlResponse> {
         let body = ThirdPartyAuthUrlRequest { provider };
         self.post_json("/auth/oauth/url", &body, None).await
+    }
+
+    /// Mobile OAuth start: hand the backend a PKCE challenge and get
+    /// back a provider-authorisation URL that, once the user finishes,
+    /// 302s through `/auth/oauth/{provider}/mobile-callback` and lands
+    /// on the device's `eurora://` scheme.
+    pub async fn mobile_third_party_auth_url(
+        &self,
+        provider: auth_core::Provider,
+        code_challenge: impl Into<String>,
+    ) -> AuthResult<ThirdPartyAuthUrlResponse> {
+        let body = MobileThirdPartyAuthUrlRequest {
+            provider,
+            code_challenge: code_challenge.into(),
+            code_challenge_method: "S256".to_string(),
+        };
+        self.post_json("/auth/oauth/mobile/url", &body, None).await
+    }
+
+    /// Native Google sign-in: trade an iOS / Android-issued ID token
+    /// for a session token pair.
+    pub async fn login_by_google_id_token(
+        &self,
+        id_token: impl Into<String>,
+        nonce: Option<String>,
+    ) -> AuthResult<TokenResponse> {
+        let body = GoogleIdTokenLoginRequest {
+            id_token: id_token.into(),
+            nonce,
+        };
+        self.post_json("/auth/oauth/google/id-token", &body, None)
+            .await
     }
 
     async fn post_json<B, R>(&self, path: &str, body: &B, bearer: Option<&str>) -> AuthResult<R>

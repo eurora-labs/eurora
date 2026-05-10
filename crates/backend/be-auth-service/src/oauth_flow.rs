@@ -51,10 +51,60 @@ impl AuthService {
         }
     }
 
+    /// Mobile entry point: build a provider authorisation URL whose
+    /// `state` parameter equals the device's PKCE challenge, and whose
+    /// callback hits the backend's mobile-callback endpoint (not the web
+    /// SPA).
+    ///
+    /// Reusing the device challenge as OAuth `state` removes the need
+    /// for a separate column on `oauth_state`: the same value
+    /// double-duties as CSRF token (Google echoes it back) and as the
+    /// `login_tokens` row key (the backend stamps it after a successful
+    /// callback so the device's pending poll can complete).
+    pub async fn mobile_third_party_auth_url(
+        &self,
+        provider: Provider,
+        device_challenge: &str,
+        challenge_method: &str,
+    ) -> AuthResult<String> {
+        if challenge_method != "S256" {
+            return Err(AuthError::InvalidInput(
+                "Only S256 PKCE method is supported".into(),
+            ));
+        }
+        if !crate::login_token::is_valid_code_challenge(device_challenge) {
+            return Err(AuthError::InvalidInput("Invalid code challenge".into()));
+        }
+
+        match provider {
+            Provider::Google => self.google_mobile_auth_url(device_challenge).await,
+            Provider::Github => self.github_mobile_auth_url(device_challenge).await,
+        }
+    }
+
+    /// Mobile callback completion: pulls the device's stashed challenge
+    /// out of `oauth_state` (it's the `state` parameter), exchanges the
+    /// authorisation code, runs the shared `complete_oauth_login` tail
+    /// passing the challenge as `login_token`, and discards the minted
+    /// session. The device picks tokens up via the existing
+    /// `/auth/login-token/exchange` poll (verifier in hand from before
+    /// the redirect).
+    pub async fn login_third_party_mobile(
+        &self,
+        provider: Provider,
+        code: &str,
+        state: &str,
+    ) -> AuthResult<()> {
+        let _session = match provider {
+            Provider::Google => self.handle_google_login_mobile(code, state).await?,
+            Provider::Github => self.handle_github_login_mobile(code, state).await?,
+        };
+        Ok(())
+    }
+
     async fn google_auth_url(&self) -> AuthResult<String> {
         tracing::info!("Generating Google OAuth URL");
         let google = self.google_oauth()?;
-
         let state = random_hex(OAUTH_STATE_BYTES);
         let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
         let nonce = Nonce::new_random();
@@ -73,6 +123,39 @@ impl AuthService {
             .await?;
 
         Ok(google.authorization_url(&state, pkce_challenge, nonce))
+    }
+
+    async fn google_mobile_auth_url(&self, device_challenge: &str) -> AuthResult<String> {
+        tracing::info!("Generating Google OAuth URL (mobile)");
+        let google = self.google_oauth()?;
+        let mobile_redirect = google.mobile_redirect_uri().ok_or_else(|| {
+            AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
+                "GOOGLE_MOBILE_REDIRECT_URI",
+            ))
+        })?;
+        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+        let nonce = Nonce::new_random();
+
+        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
+        let encrypted_nonce = encrypt_sensitive_string(nonce.secret())?;
+
+        self.db()
+            .create_oauth_state()
+            .state(device_challenge.to_string())
+            .pkce_verifier(encrypted_pkce_verifier)
+            .redirect_uri(mobile_redirect.to_string())
+            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
+            .nonce(encrypted_nonce)
+            .call()
+            .await?;
+
+        google
+            .mobile_authorization_url(device_challenge, pkce_challenge, nonce)
+            .ok_or_else(|| {
+                AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
+                    "GOOGLE_MOBILE_REDIRECT_URI",
+                ))
+            })
     }
 
     async fn github_auth_url(&self) -> AuthResult<String> {
@@ -97,12 +180,67 @@ impl AuthService {
         Ok(github.authorization_url(&state, pkce_challenge.as_str()))
     }
 
+    async fn github_mobile_auth_url(&self, device_challenge: &str) -> AuthResult<String> {
+        tracing::info!("Generating GitHub OAuth URL (mobile)");
+        let github = self.github_oauth()?;
+        let mobile_redirect = github.mobile_redirect_uri().ok_or_else(|| {
+            AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
+                "GITHUB_MOBILE_REDIRECT_URI",
+            ))
+        })?;
+        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+
+        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
+
+        self.db()
+            .create_oauth_state()
+            .state(device_challenge.to_string())
+            .pkce_verifier(encrypted_pkce_verifier)
+            .redirect_uri(mobile_redirect.to_string())
+            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
+            .nonce(Vec::new())
+            .call()
+            .await?;
+
+        github
+            .mobile_authorization_url(device_challenge, pkce_challenge.as_str())
+            .ok_or_else(|| {
+                AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
+                    "GITHUB_MOBILE_REDIRECT_URI",
+                ))
+            })
+    }
+
     async fn handle_google_login(
         &self,
         code: &str,
         state: &str,
         login_token: Option<String>,
     ) -> AuthResult<MintedSession> {
+        let identity = self.exchange_google_code(code, state, false).await?;
+        self.complete_oauth_login(identity, login_token).await
+    }
+
+    async fn handle_google_login_mobile(
+        &self,
+        code: &str,
+        state: &str,
+    ) -> AuthResult<MintedSession> {
+        // For the mobile callback the device's challenge *is* the OAuth
+        // state. We hand it back to `complete_oauth_login` as the
+        // `login_token` so the existing pairing path mints the
+        // `login_tokens` row the device will redeem.
+        let identity = self.exchange_google_code(code, state, true).await?;
+        self.complete_oauth_login(identity, Some(state.to_string()))
+            .await
+    }
+
+    async fn exchange_google_code(
+        &self,
+        code: &str,
+        state: &str,
+        mobile: bool,
+    ) -> AuthResult<NewOAuthIdentity> {
         if code.is_empty() {
             return Err(AuthError::InvalidInput(
                 "Authorization code is required".into(),
@@ -125,7 +263,13 @@ impl AuthService {
         let nonce = Nonce::new(decrypt_sensitive_string(nonce_bytes)?);
 
         let google = self.google_oauth()?;
-        let user_info = google.exchange_code(code, pkce_verifier, &nonce).await?;
+        let user_info = if mobile {
+            google
+                .mobile_exchange_code(code, pkce_verifier, &nonce)
+                .await
+        } else {
+            google.exchange_code(code, pkce_verifier, &nonce).await
+        }?;
 
         if !user_info.verified_email {
             tracing::warn!(
@@ -146,7 +290,7 @@ impl AuthService {
             .expires_in
             .map(|d| Utc::now() + Duration::seconds(d.as_secs() as i64));
 
-        let identity = NewOAuthIdentity {
+        Ok(NewOAuthIdentity {
             provider: OAuthProvider::Google,
             provider_user_id: user_info.id,
             email: user_info.email,
@@ -158,9 +302,7 @@ impl AuthService {
                 access_token_expiry,
                 scope: user_info.scope,
             },
-        };
-
-        self.complete_oauth_login(identity, login_token).await
+        })
     }
 
     async fn handle_github_login(
@@ -169,6 +311,26 @@ impl AuthService {
         state: &str,
         login_token: Option<String>,
     ) -> AuthResult<MintedSession> {
+        let identity = self.exchange_github_code(code, state, false).await?;
+        self.complete_oauth_login(identity, login_token).await
+    }
+
+    async fn handle_github_login_mobile(
+        &self,
+        code: &str,
+        state: &str,
+    ) -> AuthResult<MintedSession> {
+        let identity = self.exchange_github_code(code, state, true).await?;
+        self.complete_oauth_login(identity, Some(state.to_string()))
+            .await
+    }
+
+    async fn exchange_github_code(
+        &self,
+        code: &str,
+        state: &str,
+        mobile: bool,
+    ) -> AuthResult<NewOAuthIdentity> {
         if code.is_empty() {
             return Err(AuthError::InvalidInput(
                 "Authorization code is required".into(),
@@ -185,7 +347,11 @@ impl AuthService {
         let pkce_verifier = decrypt_sensitive_string(&oauth_state.pkce_verifier)?;
 
         let github = self.github_oauth()?;
-        let user_info = github.exchange_code(code, &pkce_verifier).await?;
+        let user_info = if mobile {
+            github.mobile_exchange_code(code, &pkce_verifier).await
+        } else {
+            github.exchange_code(code, &pkce_verifier).await
+        }?;
 
         if !user_info.verified_email {
             tracing::warn!(
@@ -198,8 +364,62 @@ impl AuthService {
         let encrypted_access_token =
             encrypt_sensitive_string(user_info.access_token.expose_secret())?;
 
-        let identity = NewOAuthIdentity {
+        Ok(NewOAuthIdentity {
             provider: OAuthProvider::Github,
+            provider_user_id: user_info.id,
+            email: user_info.email,
+            email_verified: user_info.verified_email,
+            display_name: user_info.display_name,
+            tokens: OAuthTokenBundle {
+                encrypted_access_token,
+                encrypted_refresh_token: None,
+                access_token_expiry: None,
+                scope: user_info.scope,
+            },
+        })
+    }
+
+    /// Native-mobile entry point: trade a Google ID token (issued
+    /// directly by the iOS / Android Google SDKs) for a session.
+    ///
+    /// No `oauth_state` row is touched — there's no browser round-trip,
+    /// so there's no CSRF state to track. The JWT is verified locally
+    /// against Google's JWKS, then `complete_oauth_login` runs the same
+    /// resolve-or-create-user tail as the redirect flows.
+    ///
+    /// `login_token` is left as `None` because the device is the
+    /// session bearer in this flow — the response carries the access /
+    /// refresh tokens directly.
+    pub async fn login_google_id_token(
+        &self,
+        id_token: &str,
+        nonce: Option<String>,
+    ) -> AuthResult<MintedSession> {
+        if id_token.is_empty() {
+            return Err(AuthError::InvalidInput("ID token is required".into()));
+        }
+
+        let google = self.google_oauth()?;
+        let nonce_obj = nonce.map(Nonce::new);
+        let user_info = google.verify_id_token(id_token, nonce_obj.as_ref())?;
+
+        if !user_info.verified_email {
+            tracing::warn!(
+                email_log = ?hash_email_for_log(&user_info.email),
+                "Google ID-token login rejected: email not verified",
+            );
+            return Err(AuthError::EmailNotVerified);
+        }
+
+        // Native flow yields no Google access/refresh — `verify_id_token`
+        // returns an empty `access_token` placeholder. Persist nothing
+        // for the provider tokens; downstream logic tolerates an empty
+        // bundle.
+        let encrypted_access_token =
+            encrypt_sensitive_string(user_info.access_token.expose_secret())?;
+
+        let identity = NewOAuthIdentity {
+            provider: OAuthProvider::Google,
             provider_user_id: user_info.id,
             email: user_info.email,
             email_verified: user_info.verified_email,
@@ -212,7 +432,7 @@ impl AuthService {
             },
         };
 
-        self.complete_oauth_login(identity, login_token).await
+        self.complete_oauth_login(identity, None).await
     }
 
     /// Consume a previously-issued `oauth_state` row, rejecting anything

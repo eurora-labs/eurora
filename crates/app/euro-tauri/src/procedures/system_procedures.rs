@@ -84,18 +84,21 @@ pub struct UpdateInfo {
 /// Single payload the desktop frontend fetches once at startup to bring
 /// up its Sentry / PostHog SDKs. Bundles the user's persisted consent
 /// state, the embedded build-time keys, and the release identity so the
-/// SDKs can tag events with channel + version. Empty strings mean
-/// "disabled" — keeps dev builds quiet without forcing a separate
-/// nullable type per field.
+/// SDKs can tag events with channel + version.
+///
+/// `None` on any field means "this surface is disabled in this build".
+/// `build.rs` enforces all-or-nothing consistency: a build with a DSN
+/// always carries a channel and a release, so the frontend never has
+/// to defend against a half-configured payload.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TelemetryBootstrap {
     pub settings: euro_settings::TelemetrySettings,
-    pub sentry_dsn: String,
-    pub posthog_key: String,
-    pub posthog_host: String,
-    pub channel: String,
-    pub release: String,
+    pub sentry_dsn: Option<String>,
+    pub posthog_key: Option<String>,
+    pub posthog_host: Option<String>,
+    pub channel: Option<String>,
+    pub release: Option<String>,
 }
 
 /// What the desktop frontend should render for a given browser when its
@@ -567,12 +570,22 @@ pub async fn system_get_telemetry_bootstrap(
 
     Ok(TelemetryBootstrap {
         settings: telemetry,
-        sentry_dsn: env!("EURORA_DESKTOP_SENTRY_DSN").to_owned(),
-        posthog_key: env!("EURORA_DESKTOP_POSTHOG_KEY").to_owned(),
-        posthog_host: env!("EURORA_DESKTOP_POSTHOG_HOST").to_owned(),
-        channel: env!("EURORA_RELEASE_CHANNEL").to_owned(),
-        release: env!("CARGO_PKG_VERSION").to_owned(),
+        sentry_dsn: non_empty(env!("EURORA_DESKTOP_SENTRY_DSN")),
+        posthog_key: non_empty(env!("EURORA_DESKTOP_POSTHOG_KEY")),
+        posthog_host: non_empty(env!("EURORA_DESKTOP_POSTHOG_HOST")),
+        channel: non_empty(env!("EURORA_RELEASE_CHANNEL")),
+        release: non_empty(crate::telemetry::RELEASE_VERSION),
     })
+}
+
+/// Compile-time empty strings (build was produced without a given
+/// telemetry secret) become `None` at the IPC boundary.
+fn non_empty(s: &'static str) -> Option<String> {
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.to_owned())
+    }
 }
 
 #[tauri::command]

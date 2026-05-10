@@ -644,17 +644,20 @@ export type SystemMessage = {
  *  Single payload the desktop frontend fetches once at startup to bring
  *  up its Sentry / PostHog SDKs. Bundles the user's persisted consent
  *  state, the embedded build-time keys, and the release identity so the
- *  SDKs can tag events with channel + version. Empty strings mean
- *  "disabled" — keeps dev builds quiet without forcing a separate
- *  nullable type per field.
+ *  SDKs can tag events with channel + version.
+ * 
+ *  `None` on any field means "this surface is disabled in this build".
+ *  `build.rs` enforces all-or-nothing consistency: a build with a DSN
+ *  always carries a channel and a release, so the frontend never has
+ *  to defend against a half-configured payload.
  */
 export type TelemetryBootstrap = {
 	settings: TelemetrySettings,
-	sentryDsn: string,
-	posthogKey: string,
-	posthogHost: string,
-	channel: string,
-	release: string,
+	sentryDsn: string | null,
+	posthogKey: string | null,
+	posthogHost: string | null,
+	channel: string | null,
+	release: string | null,
 };
 
 export type TelemetrySettings = {

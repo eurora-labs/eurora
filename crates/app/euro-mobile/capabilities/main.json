@@ -12,6 +12,7 @@
 		"process:default",
 		"store:default",
 		"appauth:default",
+		"google-auth:default",
 		"http:allow-fetch",
 		{
 			"identifier": "http:default",

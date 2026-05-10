@@ -35,7 +35,7 @@
 		// document.body and freezing the UI. When no bits-ui dismissible layers
 		// remain open, force-clear the lock.
 		const unstickBodyLock = window.setInterval(() => {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			 
 			const layers = (globalThis as any).bitsDismissableLayers;
 			if (layers && layers.size > 0) return;
 			if (document.body.style.pointerEvents === 'none') {
