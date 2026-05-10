@@ -120,7 +120,8 @@
 		"ai": "^6.0.170",
 		"dompurify": "^3.4.1",
 		"formsnap": "^2.0.1",
-		"runed": "^0.37.1",
+		"marked": "^16.2.1",
+		"runed": "catalog:svelte",
 		"shiki": "^3.23.0",
 		"svelte-streamdown": "^3.0.1",
 		"svelte-toolbelt": "^0.10.6"
