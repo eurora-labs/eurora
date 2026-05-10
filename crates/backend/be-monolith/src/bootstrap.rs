@@ -50,12 +50,6 @@ const HTTP_MAX_BODY_SIZE: usize = 50 * 1024 * 1024; // 2 MB
 pub async fn run() -> Result<(), BootstrapError> {
     install_crypto_provider();
 
-    // `dotenv` is best-effort: missing `.env` is fine if the operator
-    // exports vars in their shell. We warn below when `.env` is absent
-    // so a fresh checkout that forgot `just init` gets a friendlier
-    // hint than the first MissingEnv error from `require_env`.
-    let dotenv_loaded = dotenvy::dotenv().is_ok();
-
     let _sentry_guard = init_sentry();
     init_tracing();
 
@@ -75,13 +69,6 @@ pub async fn run() -> Result<(), BootstrapError> {
 
     if DEV_MODE {
         log_dev_banner();
-    }
-
-    if !dotenv_loaded {
-        tracing::warn!(
-            "No `.env` file at the repo root. Run `just init` to create one \
-             from `.env.example`, then re-run."
-        );
     }
 
     let (llm_config, llm_source) = LlmConfig::from_env()?;
