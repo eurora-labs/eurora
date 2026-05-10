@@ -3,6 +3,7 @@
 	import { initDependencies } from '$lib/bootstrap/deps.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
+	import { warmupShikiHighlighter } from '@eurora/ui/components/ai-elements/message/shiki/index';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { ModeWatcher, setMode } from 'mode-watcher';
@@ -18,6 +19,10 @@
 		console.error('Failed to initialize user service:', err);
 		toast.error('Failed to initialize. Please restart the app.');
 	});
+
+	// Boot the syntax-highlighter worker and pre-load common languages so
+	// the first streamed code block doesn't pay grammar-load latency.
+	warmupShikiHighlighter();
 
 	onMount(() => {
 		setMode('dark');

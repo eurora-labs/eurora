@@ -59,6 +59,12 @@ export default defineConfig(({ mode }) => {
 			// stack traces back to the original Svelte/TS sources.
 			sourcemap: true,
 		},
+		worker: {
+			// The Shiki highlighter worker dynamically imports per-language
+			// grammar modules; Vite's default `iife` worker format can't
+			// code-split, so we ship a real ES module worker instead.
+			format: 'es',
+		},
 		optimizeDeps: {
 			exclude: ['@eurora/ui'],
 		},

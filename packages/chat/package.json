@@ -10,6 +10,8 @@
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "vitest run --mode development",
+		"test:watch": "vitest --watch --mode development",
 		"test:e2e:web": "playwright test --config playwright.config.ts"
 	},
 	"files": [
@@ -53,7 +55,9 @@
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"jsdom": "^25.0.1",
 		"publint": "^0.3.17",
+		"runed": "catalog:svelte",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"svelte-sonner": "^1.1.1",
