@@ -54,6 +54,7 @@
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"publint": "^0.3.17",
+		"runed": "^0.23.4",
 		"svelte": "catalog:svelte",
 		"svelte-check": "catalog:svelte",
 		"svelte-sonner": "^1.1.1",

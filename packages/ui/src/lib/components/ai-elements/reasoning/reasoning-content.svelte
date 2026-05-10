@@ -5,14 +5,25 @@
 	import Code from 'svelte-streamdown/code';
 	import SDMath from 'svelte-streamdown/math';
 	import Mermaid from 'svelte-streamdown/mermaid';
+	import StreamingCode from '../message/streaming-code.svelte';
 
 	let {
 		class: className,
 		children,
+		streaming = false,
 		...restProps
-	}: { class?: string; children: string; [key: string]: any } = $props();
+	}: {
+		class?: string;
+		children: string;
+		streaming?: boolean;
+		[key: string]: unknown;
+	} = $props();
 
-	const components = { code: Code, math: SDMath, mermaid: Mermaid };
+	const components = $derived({
+		code: streaming ? StreamingCode : Code,
+		math: SDMath,
+		mermaid: Mermaid,
+	});
 	const theme = {
 		paragraph: { base: 'text-inherit' },
 		strong: { base: 'font-semibold text-inherit' },
@@ -31,5 +42,11 @@
 	)}
 	{...restProps}
 >
-	<Streamdown content={children} {components} {theme} baseTheme="shadcn" />
+	<Streamdown
+		content={children}
+		{components}
+		{theme}
+		baseTheme="shadcn"
+		static={!streaming}
+	/>
 </CollapsibleContent>

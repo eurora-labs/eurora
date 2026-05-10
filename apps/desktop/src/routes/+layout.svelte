@@ -11,6 +11,7 @@
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
+	import { warmupShikiHighlighter } from '@eurora/ui/components/ai-elements/message/shiki/index';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { platform } from '@tauri-apps/plugin-os';
@@ -43,6 +44,10 @@
 
 	const timelineService = inject(TIMELINE_SERVICE);
 	timelineService.init();
+
+	// Boot the syntax-highlighter worker and pre-load common languages so
+	// the first streamed code block doesn't pay grammar-load latency.
+	warmupShikiHighlighter();
 
 	onMount(() => {
 		// All urls open in a separate browser window
