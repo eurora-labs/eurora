@@ -15,7 +15,7 @@ pub mod word;
 
 pub use browser::BrowserStrategy;
 pub use default::DefaultStrategy;
-use euro_native_messaging::NativeMetadata;
+use euro_browser::NativeMetadata;
 pub use no_strategy::NoStrategy;
 pub use preview::PreviewStrategy;
 pub use word::WordStrategy;

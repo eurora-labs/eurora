@@ -1,7 +1,7 @@
 use agent_chain_core::messages::{
     ContentBlock, ContentBlocks, ImageContentBlock, PlainTextContentBlock,
 };
-use euro_native_messaging::types::NativeYoutubeSnapshot;
+use euro_browser::types::NativeYoutubeSnapshot;
 use serde::{Deserialize, Serialize};
 
 use crate::{error::ActivityError, types::SnapshotFunctionality};

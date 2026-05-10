@@ -1,7 +1,7 @@
 use agent_chain_core::messages::ContentBlocks;
 use chrono::{DateTime, Utc};
 use enum_dispatch::enum_dispatch;
-use euro_native_messaging::NativeMessage;
+use euro_browser::NativeMessage;
 use euro_office::WordAsset;
 use euro_pdf::PdfAsset;
 use serde::{Deserialize, Serialize};

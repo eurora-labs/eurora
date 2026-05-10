@@ -1,5 +1,5 @@
 [package]
-name = "euro-native-messaging"
+name = "euro-browser"
 version = "0.0.0"
 edition.workspace = true
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
@@ -35,7 +35,7 @@ name = "euro-native-messaging"
 path = "src/main.rs"
 
 [[bin]]
-name = "euro-native-messaging-codegen"
+name = "euro-browser-codegen"
 path = "src/bin/codegen.rs"
 required-features = ["codegen"]
 
