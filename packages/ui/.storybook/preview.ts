@@ -1,5 +1,5 @@
 import type { Preview } from '@storybook/svelte';
-import '../src/styles/main.css';
+import '../src/styles/preview.css';
 
 document.body.classList.add('dark');
 document.documentElement.classList.add('dark');

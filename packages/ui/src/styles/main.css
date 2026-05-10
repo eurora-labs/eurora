@@ -1,4 +1,20 @@
-@import 'tailwindcss';
+/*
+ * Source-only design tokens, theme overrides, and base styles. Consumers must
+ * own the `@import 'tailwindcss'` themselves and pair it with this file:
+ *
+ *     @import 'tailwindcss';
+ *     @import '@eurora/ui/main.css';
+ *
+ * That ordering matters — when this file is processed alongside a single
+ * Tailwind compile, the `@theme inline` block below overrides Tailwind's
+ * default `--text-*` tokens with the `var(--text-scale)` calc. Importing a
+ * pre-compiled Tailwind bundle here (or letting Tailwind run twice in the
+ * same cascade) re-emits the defaults later in source order and silently
+ * defeats the override. For standalone consumers that don't run their own
+ * Tailwind compile (Storybook, dev playgrounds), import `./preview.css`
+ * instead — it's the same content wrapped in `@import 'tailwindcss'`.
+ */
+
 @import 'tw-animate-css';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';

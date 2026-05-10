@@ -1,0 +1,9 @@
+/*
+ * Standalone entry for consumers that don't run their own Tailwind compile —
+ * Storybook, the chat package's dev playground, and the published
+ * `@eurora/ui/preview.css` bundle. App consumers should import `./main.css`
+ * directly, paired with their own `@import 'tailwindcss'`.
+ */
+
+@import 'tailwindcss';
+@import './main.css';
