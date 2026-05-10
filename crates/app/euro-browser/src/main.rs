@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use anyhow::Result;
 use backon::{ConstantBuilder, Retryable};
-use euro_native_messaging::utils::{read_framed, write_framed};
-use euro_native_messaging::{Frame, FrameKind, RegisterFrame, bridge_url, parent_pid};
+use euro_browser::utils::{read_framed, write_framed};
+use euro_browser::{Frame, FrameKind, RegisterFrame, bridge_url, parent_pid};
 use futures_util::{SinkExt, StreamExt};
 use tokio::io;
 use tokio::sync::{Mutex, broadcast, mpsc};

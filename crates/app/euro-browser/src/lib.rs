@@ -16,8 +16,8 @@
 //! bundled codegen binary:
 //!
 //! ```text
-//! cargo run -p euro-native-messaging --features codegen \
-//!     --bin euro-native-messaging-codegen -- --generate_specta
+//! cargo run -p euro-browser --features codegen \
+//!     --bin euro-browser-codegen -- --generate_specta
 //! ```
 
 pub mod parent_pid;

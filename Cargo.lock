@@ -3697,8 +3697,8 @@ dependencies = [
  "enum_dispatch",
  "euro-auth",
  "euro-bridge",
+ "euro-browser",
  "euro-endpoint",
- "euro-native-messaging",
  "euro-office",
  "euro-pdf",
  "euro-process",
@@ -3790,6 +3790,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-browser"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "backon",
+ "euro-bridge-protocol",
+ "euro-process",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-serde",
+ "specta-typescript",
+ "tokio",
+ "tokio-tungstenite",
+ "tracing",
+ "tracing-subscriber",
+ "winreg 0.56.0",
+]
+
+[[package]]
 name = "euro-debug"
 version = "0.0.0"
 
@@ -3848,27 +3869,6 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "euro-native-messaging"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "backon",
- "euro-bridge-protocol",
- "euro-process",
- "futures-util",
- "serde",
- "serde_json",
- "specta",
- "specta-serde",
- "specta-typescript",
- "tokio",
- "tokio-tungstenite",
- "tracing",
- "tracing-subscriber",
- "winreg 0.56.0",
 ]
 
 [[package]]

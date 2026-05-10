@@ -1,6 +1,6 @@
 use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use async_trait::async_trait;
-use euro_native_messaging::NativeYoutubeAsset;
+use euro_browser::NativeYoutubeAsset;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

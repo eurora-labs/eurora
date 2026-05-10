@@ -13,7 +13,7 @@ chrono = { workspace = true, features = ["serde"] }
 euro-activity = { workspace = true }
 euro-auth = { workspace = true }
 euro-bridge = { workspace = true }
-euro-endpoint = { workspace = true }
+euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 focus-tracker = { workspace = true }
 image = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

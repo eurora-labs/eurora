@@ -41,7 +41,7 @@
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
 		"specta:backend": "cargo run -p euro-api-codegen && turbo run build --filter @eurora/shared --force",
-		"specta:bridge": "cargo run -p euro-bridge-protocol --features codegen -- --generate_specta && cargo run -p euro-native-messaging --features codegen --bin euro-native-messaging-codegen -- --generate_specta",
+		"specta:bridge": "cargo run -p euro-bridge-protocol --features codegen -- --generate_specta && cargo run -p euro-browser --features codegen --bin euro-browser-codegen -- --generate_specta",
 		"specta:office": "cargo run -p euro-office --features codegen -- --generate_specta",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",

@@ -3,8 +3,8 @@
 //! Invoked from the workspace root:
 //!
 //! ```text
-//! cargo run -p euro-native-messaging --features codegen \
-//!     --bin euro-native-messaging-codegen -- --generate_specta
+//! cargo run -p euro-browser --features codegen \
+//!     --bin euro-browser-codegen -- --generate_specta
 //! ```
 
 use std::env;
@@ -13,16 +13,14 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::{Context, Result};
-use euro_native_messaging::type_collection;
+use euro_browser::type_collection;
 use specta_typescript::Typescript;
 
 const TYPESCRIPT_OUT: &str = "apps/browser/src/shared/content/bindings.ts";
 
 fn main() -> ExitCode {
     let mut args = env::args();
-    let program = args
-        .next()
-        .unwrap_or_else(|| "euro-native-messaging-codegen".into());
+    let program = args.next().unwrap_or_else(|| "euro-browser-codegen".into());
 
     match args.next().as_deref() {
         Some("--generate_specta") => match generate_bindings() {

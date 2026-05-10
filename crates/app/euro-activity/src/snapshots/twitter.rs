@@ -1,5 +1,5 @@
 // use agent_chain_core::{AnyMessage, HumanMessage};
-// use euro_native_messaging::types::NativeTwitterSnapshot;
+// use euro_browser::types::NativeTwitterSnapshot;
 // use serde::{Deserialize, Serialize};
 // use uuid::Uuid;
 
