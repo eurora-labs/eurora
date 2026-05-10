@@ -1,8 +1,8 @@
+/* eslint-disable */
+import { buildStyles } from './build-styles.js';
 import { existsSync, watch } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-import { buildStyles } from './build-styles.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');

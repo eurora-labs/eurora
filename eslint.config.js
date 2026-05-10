@@ -174,6 +174,7 @@ export default ts.config(
 			'packages/ui/.storybook',
 			'packages/ui/src/stories',
 			'packages/ui/src/lib/components',
+			'packages/ui/scripts/build-styles.js',
 			'scripts/**',
 			'apps/macos/**',
 			// Storybook Meta type wrapper

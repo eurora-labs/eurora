@@ -351,7 +351,7 @@ fn setup_main_window(
     main_window.on_window_event(move |event| {
         if let tauri::WindowEvent::CloseRequested { api, .. } = event {
             if let Some(w) = handle.get_webview_window(MAIN_WINDOW_LABEL) {
-                let _ = w.minimize();
+                let _ = w.hide();
             }
             api.prevent_close();
         }
@@ -732,23 +732,13 @@ fn main() {
                         tracing::error!("Failed to show main window for second instance: {e}");
                     }
                 }))
-                .on_window_event(|window, event| match event {
-                    #[cfg(target_os = "macos")]
-                    tauri::WindowEvent::CloseRequested { .. } => {
-                        let app_handle = window.app_handle();
-                        if app_handle.webview_windows().len() == 1 {
-                            app_handle.exit(0);
-                        }
-                    }
-                    tauri::WindowEvent::Destroyed => {
+                .on_window_event(|window, event| {
+                    if let tauri::WindowEvent::Destroyed = event {
                         window
                             .app_handle()
                             .state::<WindowState>()
                             .remove(window.label());
                     }
-                    tauri::WindowEvent::Focused(false) => {}
-
-                    _ => {}
                 });
 
             #[cfg(not(target_os = "linux"))]
