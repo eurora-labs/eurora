@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { buildSuggestions } from '$lib/chat/suggestions.js';
+	import WebPromptTools from '$lib/components/WebPromptTools.svelte';
 	import { ChatPromptInput, MessageList } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
@@ -61,5 +62,9 @@
 
 <div class="flex h-full flex-col overflow-hidden">
 	<MessageList onCopy={handleCopy} onEdit={handleEdit} {emptyState} />
-	<ChatPromptInput onSubmit={handleSubmit} {suggestions} />
+	<ChatPromptInput onSubmit={handleSubmit} {suggestions}>
+		{#snippet tools()}
+			<WebPromptTools />
+		{/snippet}
+	</ChatPromptInput>
 </div>

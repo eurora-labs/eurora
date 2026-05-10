@@ -10,6 +10,7 @@ export {
 	type IThreadService,
 } from './services/thread/thread-service.js';
 export type { AssetChip } from './models/messages/index.js';
+export { DEFAULT_MODELS, type ChatModel } from './models/chat-model.js';
 export type { MessageSearchResult, ThreadSearchResult } from './models/search.model.js';
 export type { Suggestion } from './models/suggestion.js';
 export { middleTruncate } from './utils/text.js';

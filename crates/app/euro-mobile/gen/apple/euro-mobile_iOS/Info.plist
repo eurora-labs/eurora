@@ -44,19 +44,6 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
-	<!--
-		Google Sign-In via `tauri-plugin-google-auth` (SimpleGoogleSignIn).
-		The plugin's iOS bridge takes the iOS OAuth client ID at call
-		time (no `GIDClientID` key needed); the only Info.plist
-		requirement is the URL-scheme registration below so the system
-		routes Google's OAuth callback back into the app.
-
-		Replace `YOUR_REVERSED_IOS_CLIENT_ID` with your iOS client ID
-		in reverse-domain notation. E.g. if the client ID is
-		`123456789-abcdef.apps.googleusercontent.com`, the reversed
-		form is `com.googleusercontent.apps.123456789-abcdef`. See
-		`iOS_SETUP.md` in the `tauri-plugin-google-auth` crate.
-	-->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -9,6 +9,7 @@
 		type ContextChip,
 	} from '$lib/bindings/specta.bindings.js';
 	import { buildSuggestions } from '$lib/chat/suggestions.js';
+	import DesktopPromptTools from '$lib/components/DesktopPromptTools.svelte';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { MessageList, ChatPromptInput, middleTruncate } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
@@ -205,6 +206,9 @@
 		{emptyState}
 	/>
 	<ChatPromptInput onSubmit={handleSubmit} {suggestions}>
+		{#snippet tools()}
+			<DesktopPromptTools />
+		{/snippet}
 		{#snippet header()}
 			{#if assets && assets.length > 0}
 				<Attachment.Root variant="inline">
