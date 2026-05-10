@@ -29,8 +29,26 @@
 
 		document.addEventListener('click', handleUrls);
 
+		// Workaround: bits-ui's body-scroll-lock cleanup intermittently fails to
+		// run in production iOS WKWebView builds after a Sheet/Dialog closes,
+		// leaving `pointer-events: none` and `overflow: hidden` stuck on
+		// document.body and freezing the UI. When no bits-ui dismissible layers
+		// remain open, force-clear the lock.
+		const unstickBodyLock = window.setInterval(() => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const layers = (globalThis as any).bitsDismissableLayers;
+			if (layers && layers.size > 0) return;
+			if (document.body.style.pointerEvents === 'none') {
+				document.body.style.pointerEvents = '';
+			}
+			if (document.body.style.overflow === 'hidden') {
+				document.body.style.overflow = '';
+			}
+		}, 200);
+
 		return () => {
 			document.removeEventListener('click', handleUrls);
+			window.clearInterval(unstickBodyLock);
 		};
 	});
 
