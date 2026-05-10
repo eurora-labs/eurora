@@ -45,7 +45,7 @@ function scheduleIdle(callback: () => void, timeout: number): IdleSchedulerHandl
  * Reactive value that mirrors `source` but defers updates to browser idle
  * time while `isLive` is true. New `source` values supersede pending updates
  * — only the latest snapshot is ever committed. When `isLive` flips false,
- * the latest value is flushed synchronously.
+ * the latest value is committed synchronously.
  *
  * Equivalent to React's `useTransition` / `startTransition` pattern: the
  * downstream render is throttled by browser idle scheduling rather than by
@@ -53,39 +53,39 @@ function scheduleIdle(callback: () => void, timeout: number): IdleSchedulerHandl
  * runs when there's spare time.
  */
 export class IdleRef<T> {
-	#current: T = $state()!;
-	#pending: IdleSchedulerHandle | null = null;
+	#current: T | undefined = $state();
 
 	constructor({ source, isLive, timeout = DEFAULT_TIMEOUT_MS }: IdleRefOptions<T>) {
 		this.#current = source();
 
+		// `watch` re-runs the effect body on each `source`/`isLive` change.
+		// The cleanup function we return is invoked both before the next run
+		// AND on host teardown — so cancelling the pending idle callback
+		// covers supersession and unmount with the same code path. No
+		// long-lived `#pending` state is needed.
 		watch(
 			() => [source(), isLive()] as const,
 			([next, live]) => {
 				if (!live) {
-					this.#cancel();
 					this.#current = next;
 					return;
 				}
 
-				this.#cancel();
-				this.#pending = scheduleIdle(() => {
-					this.#pending = null;
+				const handle = scheduleIdle(() => {
 					this.#current = source();
 				}, timeout);
+
+				return () => handle.cancel();
 			},
+			{ lazy: true },
 		);
 	}
 
 	get current(): T {
-		return this.#current;
-	}
-
-	#cancel() {
-		if (this.#pending) {
-			this.#pending.cancel();
-			this.#pending = null;
-		}
+		// The constructor seeds `#current` before any read can happen, so the
+		// observable type is always `T` even though the field is technically
+		// `T | undefined` until the first assignment.
+		return this.#current as T;
 	}
 }
 
