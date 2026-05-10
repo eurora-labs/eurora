@@ -2,7 +2,6 @@ import { IdleRef } from '$lib/utils/throttled.svelte.js';
 import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-
 /**
  * `IdleRef` registers a `watch` effect, which only runs inside an effect
  * root. Each test sets one up, exercises the ref, and tears it down at

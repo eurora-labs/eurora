@@ -8,9 +8,6 @@ use futures::StreamExt;
 
 const DEFAULT_MODEL: &str = "llama3.1";
 const TOOL_MODEL: &str = "gpt-oss:20b";
-fn load_env() {
-    let _ = dotenvy::dotenv();
-}
 
 // =============================================================================
 // Basic invoke/stream tests
@@ -19,7 +16,6 @@ fn load_env() {
 /// Ported from `ChatModelIntegrationTests.test_invoke`.
 #[tokio::test]
 async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -39,7 +35,6 @@ async fn test_invoke() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_ainvoke`.
 #[tokio::test]
 async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -59,7 +54,6 @@ async fn test_ainvoke() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_stream`.
 #[tokio::test]
 async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -92,7 +86,6 @@ async fn test_stream() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_astream`.
 #[tokio::test]
 async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -132,7 +125,6 @@ async fn test_astream() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_conversation`.
 #[tokio::test]
 async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -156,7 +148,6 @@ async fn test_conversation() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_message_with_name`.
 #[tokio::test]
 async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -183,7 +174,6 @@ async fn test_message_with_name() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_usage_metadata`.
 #[tokio::test]
 async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -223,7 +213,6 @@ async fn test_usage_metadata() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_usage_metadata_streaming`.
 #[tokio::test]
 async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -270,7 +259,6 @@ async fn test_usage_metadata_streaming() -> Result<(), Box<dyn std::error::Error
 /// Ported from `ChatModelIntegrationTests.test_stop_sequence`.
 #[tokio::test]
 async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -296,7 +284,6 @@ async fn test_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_tool_calling` (from base class).
 #[tokio::test]
 async fn test_standard_tool_calling() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let tool_schema = serde_json::json!({
         "title": "magic_function",
         "description": "Applies a magic function to an input.",
@@ -333,7 +320,6 @@ async fn test_standard_tool_calling() -> Result<(), Box<dyn std::error::Error>> 
 /// Ported from `ChatModelIntegrationTests.test_tool_calling_async` (from base class).
 #[tokio::test]
 async fn test_standard_tool_calling_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let tool_schema = serde_json::json!({
         "title": "magic_function",
         "description": "Applies a magic function to an input.",
@@ -370,7 +356,6 @@ async fn test_standard_tool_calling_async() -> Result<(), Box<dyn std::error::Er
 /// Ported from `ChatModelIntegrationTests.test_tool_calling_with_no_arguments`.
 #[tokio::test]
 async fn test_standard_tool_calling_no_arguments() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let tool_schema = serde_json::json!({
         "title": "magic_function_no_args",
         "description": "A magic function that takes no arguments.",
@@ -408,7 +393,6 @@ async fn test_standard_tool_calling_no_arguments() -> Result<(), Box<dyn std::er
 /// Ported from `ChatModelIntegrationTests.test_tool_message_histories_string_content`.
 #[tokio::test]
 async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let adder_schema = serde_json::json!({
         "title": "my_adder_tool",
         "description": "Tool that adds two integers. Takes two integers, a and b, and returns their sum.",
@@ -456,7 +440,6 @@ async fn test_tool_message_histories_string_content() -> Result<(), Box<dyn std:
 /// Ported from `ChatModelIntegrationTests.test_tool_message_histories_list_content`.
 #[tokio::test]
 async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let adder_schema = serde_json::json!({
         "title": "my_adder_tool",
         "description": "Tool that adds two integers. Takes two integers, a and b, and returns their sum.",
@@ -514,7 +497,6 @@ async fn test_tool_message_histories_list_content() -> Result<(), Box<dyn std::e
 /// Ported from `ChatModelIntegrationTests.test_tool_message_error_status`.
 #[tokio::test]
 async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let adder_schema = serde_json::json!({
         "title": "my_adder_tool",
         "description": "Tool that adds two integers. Takes two integers, a and b, and returns their sum.",
@@ -567,7 +549,6 @@ async fn test_tool_message_error_status() -> Result<(), Box<dyn std::error::Erro
 /// Ported from `ChatModelIntegrationTests.test_json_mode`.
 #[tokio::test]
 async fn test_standard_json_mode() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::new(DEFAULT_MODEL).json_mode();
 
     let result = llm
@@ -595,7 +576,6 @@ async fn test_standard_json_mode() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_structured_output` (json_schema variant).
 #[tokio::test]
 async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -639,7 +619,6 @@ async fn test_structured_output() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_structured_output_async`.
 #[tokio::test]
 async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -687,7 +666,6 @@ async fn test_structured_output_async() -> Result<(), Box<dyn std::error::Error>
 /// Ported from `ChatModelIntegrationTests.test_image_inputs`.
 #[tokio::test]
 async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -726,7 +704,6 @@ async fn test_image_inputs() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_batch`.
 #[tokio::test]
 async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -754,7 +731,6 @@ async fn test_batch() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_abatch`.
 #[tokio::test]
 async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -791,7 +767,6 @@ async fn test_abatch() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_double_messages_conversation`.
 #[tokio::test]
 async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(DEFAULT_MODEL)
         .temperature(0.0)
@@ -823,8 +798,6 @@ async fn test_double_messages_conversation() -> Result<(), Box<dyn std::error::E
 /// Ported from `ChatModelIntegrationTests.test_tool_choice`.
 #[tokio::test]
 async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-
     let magic_schema = serde_json::json!({
         "title": "magic_function",
         "description": "Applies a magic function to an input.",
@@ -907,8 +880,6 @@ async fn test_tool_choice() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `ChatModelIntegrationTests.test_structured_few_shot_examples`.
 #[tokio::test]
 async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-
     let adder_schema = serde_json::json!({
         "title": "my_adder_tool",
         "description": "Tool that adds two integers.",
@@ -972,8 +943,6 @@ async fn test_structured_few_shot_examples() -> Result<(), Box<dyn std::error::E
 /// Ported from `ChatModelIntegrationTests.test_structured_output_optional_param`.
 #[tokio::test]
 async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -1021,8 +990,6 @@ async fn test_structured_output_optional_param() -> Result<(), Box<dyn std::erro
 /// Ported from `ChatModelIntegrationTests.test_unicode_tool_call_integration`.
 #[tokio::test]
 async fn test_unicode_tool_call_integration() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-
     let unicode_customer_schema = serde_json::json!({
         "title": "unicode_customer",
         "description": "Tool for creating a customer with Unicode name.",
@@ -1121,8 +1088,6 @@ async fn test_unicode_tool_call_integration() -> Result<(), Box<dyn std::error::
 /// Ported from `ChatModelIntegrationTests.test_agent_loop`.
 #[tokio::test]
 async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
-
     let weather_schema = serde_json::json!({
         "title": "get_weather",
         "description": "Get the weather at a location.",

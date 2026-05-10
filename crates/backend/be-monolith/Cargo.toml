@@ -20,7 +20,6 @@ be-remote-db = { workspace = true }
 be-storage = { workspace = true, features = ["encryption"] }
 be-thread-service = { workspace = true }
 be-update-service = { workspace = true }
-dotenvy = { workspace = true }
 llm-core = { workspace = true }
 posthog-rs = { workspace = true }
 rustls = { workspace = true, features = ["aws_lc_rs"] }

@@ -32,9 +32,6 @@ tokio-util = { version = "0.7", features = ["io"] }
 tracing = { workspace = true }
 url = { workspace = true }
 
-[dev-dependencies]
-dotenvy = { workspace = true }
-
 [features]
 default = []
 anthropic = []

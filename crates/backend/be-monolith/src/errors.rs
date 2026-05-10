@@ -20,9 +20,14 @@ pub enum BootstrapError {
 
 The backend reads its configuration from environment variables. This one is required.
 
-  Add it to your `.env` (root of the repo) or export it in your shell, then re-run.
+  - For local dev, run via `just dev` (or another `just` recipe). The
+    justfile loads `.env` and exports every variable to the backend.
+  - To run `cargo run -p be-monolith` directly, export the variable
+    yourself first (`set -a; source .env; set +a; cargo run …`) or use
+    `direnv` (the repo ships an `.envrc`).
+  - In production / CI, inject `{name}` via the platform's secret
+    manager or container env — there is no `.env` fallback.
 
-If you're using `just dev`, the backend picks up `.env` automatically.
 See `crates/backend/be-monolith/README.md` for the full env-var surface."
     )]
     MissingEnv { name: &'static str },
