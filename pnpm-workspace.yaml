@@ -29,6 +29,7 @@ allowBuilds:
   keytar: true
   '@azure/msal-node-runtime': true
   '@ffmpeg-installer/linux-x64': true
+  '@ffmpeg-installer/linux-arm64': true
   edgedriver: true
   geckodriver: true
   '@sentry/cli': false
