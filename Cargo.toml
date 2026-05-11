@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/app/euro-*",
   "crates/backend/be-*",
+  "crates/plugins/*",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
   "crates/common/agent-chain-macros",
@@ -138,7 +139,8 @@ tauri-specta = "=2.0.0-rc.25"
 strum = "0.28.0"
 strum_macros = "0.28.0"
 syn = "2.0"  # collapse 2.0.101, 1.0.109, 1.0.109(build)
-tauri-plugin-appauth = "0.2.0"
+tauri = { version = "2.11.1", default-features = false }
+tauri-plugin-appauth = { path = "crates/plugins/tauri-plugin-appauth" }
 tauri-plugin-google-auth = "0.5"
 tempfile = "3.24"
 thiserror = "2.0.18"
