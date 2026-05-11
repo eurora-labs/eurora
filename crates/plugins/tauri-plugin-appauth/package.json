@@ -30,16 +30,16 @@
         "LICENSE"
     ],
     "scripts": {
-        "build": "bun run build:esm && bun run build:cjs && bun run build:iife && bun run build:types",
-        "build:esm": "bun build guest-js/index.ts --outfile dist-js/index.js --format esm --external @tauri-apps/api",
-        "build:cjs": "bun build guest-js/index.ts --outfile dist-js/index.cjs --format cjs --external @tauri-apps/api",
-        "build:iife": "bun run scripts/build-iife.ts",
-        "build:types": "tsc --emitDeclarationOnly"
+        "build": "pnpm build:lib && pnpm build:iife",
+        "build:lib": "vite build",
+        "build:iife": "vite build --config vite.iife.config.ts"
     },
     "dependencies": {
         "@tauri-apps/api": "^2"
     },
     "devDependencies": {
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vite": "catalog:",
+        "vite-plugin-dts": "^4.5.4"
     }
 }

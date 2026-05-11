@@ -134,7 +134,7 @@ cargo check -p tauri-plugin-appauth
 cargo test -p tauri-plugin-appauth
 cargo clippy -p tauri-plugin-appauth
 
-# TypeScript bindings (requires bun)
+# TypeScript bindings (vite + vite-plugin-dts)
 pnpm --filter @eurora-labs/tauri-plugin-appauth build
 ```
 
