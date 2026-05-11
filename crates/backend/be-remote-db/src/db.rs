@@ -463,6 +463,102 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
+    /// Revoke every still-valid refresh token belonging to a user in a
+    /// single statement and return the count.
+    ///
+    /// Driven by the Apple server-to-server notification flow: when
+    /// Apple tells us consent has been revoked or the Apple ID
+    /// deleted, every active session for that user must be torn down
+    /// atomically. A loop of `revoke_refresh_token` per row would race
+    /// with refresh-token rotation; one statement under PG's row-level
+    /// locking does not.
+    ///
+    /// Returns `Ok(0)` when the user is already fully logged out (no
+    /// active sessions). That is not an error condition — callers log
+    /// the count at info level and move on.
+    #[builder]
+    pub async fn revoke_all_refresh_tokens_for_user(&self, user_id: Uuid) -> DbResult<u64> {
+        let now = Utc::now();
+        let result = sqlx::query(
+            r#"
+            UPDATE refresh_tokens
+            SET revoked = true, updated_at = $2
+            WHERE user_id = $1 AND revoked = false
+            "#,
+        )
+        .bind(user_id)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Delete the `oauth_credentials` row for `(provider, user_id)`.
+    ///
+    /// Idempotent by design — Apple may deliver the same termination
+    /// event multiple times, and the second delivery must not error.
+    /// No return value: callers that need to distinguish "row existed"
+    /// from "row was absent" should look the row up first.
+    #[builder]
+    pub async fn delete_oauth_credentials(
+        &self,
+        provider: OAuthProvider,
+        user_id: Uuid,
+    ) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            DELETE FROM oauth_credentials
+            WHERE provider = $1 AND user_id = $2
+            "#,
+        )
+        .bind(provider)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Cheap existence probe for `password_credentials` by user.
+    ///
+    /// Used by the Apple termination flow to detect "this user just
+    /// lost their only sign-in method" without pulling and discarding
+    /// the password hash. Prefer this over [`Self::get_password_credentials`]
+    /// when only the presence bit is needed — fetching the hash
+    /// pushes it across the trust boundary unnecessarily.
+    #[builder]
+    pub async fn user_has_password_credentials(&self, user_id: Uuid) -> DbResult<bool> {
+        let (exists,): (bool,) = sqlx::query_as(
+            r#"
+            SELECT EXISTS (
+                SELECT 1 FROM password_credentials WHERE user_id = $1
+            )
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(exists)
+    }
+
+    /// Count the user's remaining `oauth_credentials` rows.
+    ///
+    /// Used alongside [`Self::user_has_password_credentials`] by the
+    /// Apple termination flow to flag accounts left with no sign-in
+    /// method. A count is returned (not a bool) so the warning log
+    /// can include the residual provider count for forensics.
+    #[builder]
+    pub async fn count_oauth_credentials_for_user(&self, user_id: Uuid) -> DbResult<i64> {
+        let (count,): (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM oauth_credentials WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(count)
+    }
+
     /// Atomically rotate a refresh token: revoke `old_token_hash` and insert
     /// `new_token_hash` in the same transaction.
     ///

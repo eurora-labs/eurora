@@ -27,6 +27,7 @@ use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::apple_notifications::{AppleNotificationError, AppleNotificationOutcome};
 use crate::cookies::{self, AuthMode};
 use crate::{
     AppState, AuthResult,
@@ -522,6 +523,112 @@ pub(crate) fn parse_apple_form_user(raw: Option<&str>) -> Option<String> {
 // don't need an explicit `into_response()` call.
 #[allow(dead_code)]
 fn _into_response<T: IntoResponse>(_: T) {}
+
+/// Form body Apple POSTs to `/auth/oauth/apple/notifications`.
+///
+/// Apple sends `application/x-www-form-urlencoded` with a single
+/// `payload` field containing the signed notification JWT. We never
+/// look at any other fields — additional ones (if Apple introduces
+/// them) are dropped by serde and ignored. Body shape is
+/// deliberately tiny so the parser can't be tricked into spending
+/// budget on a multi-megabyte form before we discover the JWT is
+/// junk; axum's outer body-size limit is the second line of defence.
+#[derive(Debug, Deserialize)]
+pub struct AppleNotificationForm {
+    payload: String,
+}
+
+/// Apple server-to-server notifications endpoint.
+///
+/// Status-code policy:
+///
+/// - **200**: success or forwards-compat ack (unknown event type,
+///   unknown user, email-flag toggle). Apple stops retrying on 2xx.
+/// - **401**: signature / iss / aud / freshness verification failed.
+///   Apple does not retry; logged loudly so SecOps can pick up forgery
+///   attempts on Apple's webhook URL.
+/// - **503**: genuine internal failure (DB unreachable, Apple
+///   provider not configured). Apple retries; idempotent side-effects
+///   make this safe.
+///
+/// Response body is always empty — Apple isn't a UX surface, and
+/// echoing detail back to a putative attacker (on the 401 path) would
+/// leak verifier internals.
+///
+/// All audit logging for this endpoint lives in this function: the
+/// service method ([`crate::apple_notifications::AuthService::handle_apple_notification`])
+/// is a pure dispatcher. Keeping the policy here means the field set
+/// is consistent across every outcome and ops only has to grep one
+/// span name.
+#[tracing::instrument(skip_all, name = "apple_notification")]
+pub async fn apple_notifications(
+    State(state): State<Arc<AppState>>,
+    Form(body): Form<AppleNotificationForm>,
+) -> Response {
+    match state.auth.handle_apple_notification(&body.payload).await {
+        Ok(outcome) => {
+            log_apple_notification_outcome(&outcome);
+            StatusCode::OK.into_response()
+        }
+        Err(AppleNotificationError::Verification(e)) => {
+            tracing::warn!(error = %e, "Apple notification rejected: verification failed");
+            StatusCode::UNAUTHORIZED.into_response()
+        }
+        Err(AppleNotificationError::Internal(e)) => {
+            tracing::error!(error = %e, "Apple notification processing failed");
+            StatusCode::SERVICE_UNAVAILABLE.into_response()
+        }
+    }
+}
+
+fn log_apple_notification_outcome(outcome: &AppleNotificationOutcome) {
+    match outcome {
+        AppleNotificationOutcome::AccountTerminated {
+            user_id,
+            sessions_revoked,
+            cause,
+            residual_credentials_missing,
+        } => {
+            tracing::info!(
+                user_id = %user_id,
+                sessions_revoked,
+                cause = cause.as_str(),
+                "Apple notification: user terminated",
+            );
+            if *residual_credentials_missing {
+                // Loud warn rather than info — an orphaned account is
+                // both a UX edge case (the user can't log back in) and
+                // a forensic anchor for App-Store-deletion-request audits.
+                tracing::warn!(
+                    user_id = %user_id,
+                    cause = cause.as_str(),
+                    "Apple notification: user has no remaining credentials after termination",
+                );
+            }
+        }
+        AppleNotificationOutcome::EmailFlagToggled { sub, enabled } => {
+            tracing::info!(
+                sub = %sub,
+                enabled,
+                "Apple notification: email flag toggled (no-op)",
+            );
+        }
+        AppleNotificationOutcome::UnknownUser { sub, cause } => {
+            tracing::info!(
+                sub = %sub,
+                cause = cause.as_str(),
+                "Apple notification: unknown user (no-op)",
+            );
+        }
+        AppleNotificationOutcome::UnknownEvent { raw_type, sub } => {
+            tracing::warn!(
+                sub = %sub,
+                raw_type = %raw_type,
+                "Apple notification: unknown event type — ack and log",
+            );
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
