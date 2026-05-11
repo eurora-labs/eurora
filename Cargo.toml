@@ -17,6 +17,7 @@ members = [
   "crates/common/focus-tracker-core",
   "crates/common/llm-core",
   "crates/common/pdf-core",
+  "crates/common/settings-core",
 ]
 
 [workspace.package]
@@ -132,6 +133,7 @@ sentry = { version = "0.48.1", default-features = false }
 serde = "1.0"
 serde_json = "1.0"
 serde_json_lenient = "0.2.4"
+settings-core = { path = "crates/common/settings-core" }
 sha1 = "0.10"
 sha2 = "0.10.9"
 specta = "=2.0.0-rc.25"

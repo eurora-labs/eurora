@@ -1,0 +1,30 @@
+[package]
+name = "settings-core"
+version = "0.0.0"
+edition.workspace = true
+description = "Shared wire types for cloud-synced universal settings. Consumed by be-settings-service, euro-settings, and the workspace TS codegen."
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+chrono = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true }
+# Used only to parse the embedded `defaults.jsonc` (which carries `//`
+# comments for product authors); the wire format itself is plain JSON.
+serde_json_lenient = { workspace = true }
+uuid = { workspace = true, features = ["serde"] }
+
+specta = { workspace = true, optional = true, features = [
+  "derive",
+  "chrono",
+  "uuid",
+  "serde_json",
+] }
+# `Unknown` marker used by `#[specta(type = Unknown)]` on flattened `_extras`
+# maps so TS bindings expose them as an `[key: string]: unknown` index
+# signature rather than the default opaque shape.
+specta-typescript = { version = "0.0.12", optional = true }
+
+[features]
+default = []
+specta = ["dep:specta", "dep:specta-typescript"]
