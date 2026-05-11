@@ -696,6 +696,16 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
 
+  crates/plugins/tauri-plugin-appauth:
+    dependencies:
+      '@tauri-apps/api':
+        specifier: ^2
+        version: 2.10.1
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   e2e:
     dependencies:
       '@eurora/browser':

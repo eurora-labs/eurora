@@ -35,7 +35,14 @@ serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.12" }
 thiserror = { workspace = true }
-tauri = { version = "2.11.1", features = [] }
+tauri = { workspace = true, features = [
+  "wry",
+  "compression",
+  "common-controls-v6",
+  "dynamic-acl",
+  "x11",
+  "dbus",
+] }
 tauri-plugin-http = "2"
 tauri-plugin-appauth = { workspace = true }
 tauri-plugin-google-auth = { workspace = true }

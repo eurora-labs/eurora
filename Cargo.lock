@@ -10920,8 +10920,6 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-appauth"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfe7dff3fa5eba850b73075d1485d74f4f4f06f1a896e117bc6467679c1c087e"
 dependencies = [
  "serde",
  "serde_json",

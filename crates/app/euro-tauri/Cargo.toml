@@ -57,7 +57,15 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
 specta-typescript = { version = "0.0.12" }
-tauri = { version = "2.11.1", features = ["tray-icon"] }
+tauri = { workspace = true, features = [
+  "wry",
+  "compression",
+  "common-controls-v6",
+  "dynamic-acl",
+  "x11",
+  "dbus",
+  "tray-icon",
+] }
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-dialog = "2"
