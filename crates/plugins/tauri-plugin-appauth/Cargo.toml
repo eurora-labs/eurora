@@ -1,0 +1,29 @@
+[package]
+name = "tauri-plugin-appauth"
+version = "0.2.0"
+description = "Tauri 2 mobile plugin that bridges OAuth 2.0 / OIDC flows to AppAuth-iOS and AppAuth-Android."
+edition.workspace = true
+rust-version = "1.95"
+license = "Apache-2.0"
+publish = true
+links = "tauri-plugin-appauth"
+repository = "https://github.com/eurora-labs/eurora"
+keywords = ["tauri", "plugin", "oauth", "oidc", "appauth"]
+categories = ["authentication"]
+
+[lib]
+name = "tauri_plugin_appauth"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { version = "2.5", features = ["build"] }
+
+[dev-dependencies]
+tauri = { workspace = true, features = ["test"] }

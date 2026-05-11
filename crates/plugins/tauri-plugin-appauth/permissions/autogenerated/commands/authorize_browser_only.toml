@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-authorize-browser-only"
+description = "Enables the authorize_browser_only command without any pre-configured scope."
+commands.allow = ["authorize_browser_only"]
+
+[[permission]]
+identifier = "deny-authorize-browser-only"
+description = "Denies the authorize_browser_only command without any pre-configured scope."
+commands.deny = ["authorize_browser_only"]

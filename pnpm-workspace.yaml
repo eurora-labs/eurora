@@ -3,6 +3,7 @@ packages:
     - packages/*
     - packages/prosemirror/*
     - crates/*
+    - crates/plugins/*
     - backend/*
     - e2e
 
