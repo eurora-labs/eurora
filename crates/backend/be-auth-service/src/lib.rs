@@ -105,11 +105,21 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Apple Sign In web-callback. Apple form-posts here directly
         // (not via the SPA) using `response_mode=form_post`. The
         // handler sets session cookies and 303s to the SPA success
-        // page. The mobile-callback / native-iOS routes land in
-        // later PRs.
+        // page.
         .route(
             "/auth/oauth/apple/web-callback",
             post(handlers::apple_web_callback),
+        )
+        // Apple Sign In mobile-callback. Apple form-posts here (POST,
+        // not GET) per `response_mode=form_post`, so this can't share
+        // the path-templated `/auth/oauth/{provider}/mobile-callback`
+        // GET route used by Google/GitHub. On success the handler 303s
+        // to the device's `eurora://` deep-link; the device then
+        // exchanges its PKCE verifier for tokens via
+        // `/auth/login-token/exchange`.
+        .route(
+            "/auth/oauth/apple/mobile-callback",
+            post(handlers::apple_mobile_callback),
         )
         // Apple Sign In server-to-server notifications. Apple POSTs
         // a single `application/x-www-form-urlencoded` body with a

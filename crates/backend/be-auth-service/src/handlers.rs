@@ -207,7 +207,7 @@ pub async fn mobile_oauth_callback(
         "github" => Provider::Github,
         // Apple is intentionally excluded: its mobile callback uses
         // `response_mode=form_post` (POST, not GET) and is handled by a
-        // separate route — see `apple_mobile_callback` (PR 3). Falling
+        // separate route — see [`apple_mobile_callback`]. Falling
         // through here would mismatch verb and shape.
         other => {
             tracing::warn!(provider = %other, "mobile OAuth callback for unknown provider");
@@ -446,6 +446,52 @@ fn apple_cookies_then_redirect(
             refresh_max_age,
         ));
     (jar, Redirect::to(target)).into_response()
+}
+
+/// Apple mobile-callback completion.
+///
+/// Apple's `response_mode=form_post` means the mobile redirect URI is
+/// hit by a POST from Apple — not a GET like Google/GitHub — so this
+/// can't share the path-templated `mobile_oauth_callback` route. The
+/// in-app browser session (Custom Tabs / `ASWebAuthenticationSession`)
+/// follows our 303 to the `eurora://` custom scheme and resolves the
+/// device's awaiting frame.
+///
+/// Bearer-mode by construction: no cookie jar, no JSON body — the
+/// device picks tokens up via the existing `/auth/login-token/exchange`
+/// poll using the same PKCE verifier it generated before opening the
+/// browser. On error we still 303 (rather than returning a status
+/// code) so the browser session resolves cleanly; the device inspects
+/// the `status=` query to decide between completion and surfacing an
+/// error.
+#[tracing::instrument(skip_all, fields(provider = "apple"))]
+pub async fn apple_mobile_callback(
+    State(state): State<Arc<AppState>>,
+    Form(form): Form<AppleFormPost>,
+) -> Redirect {
+    if let Some(err) = form.error {
+        tracing::warn!(error = %err, "Apple returned error on mobile-callback");
+        return Redirect::to(&device_redirect_error(&err));
+    }
+
+    let (Some(code), Some(oauth_state)) = (form.code, form.state) else {
+        tracing::warn!("Apple mobile-callback missing code or state");
+        return Redirect::to(&device_redirect_error("invalid_callback"));
+    };
+    let display_name = parse_apple_form_user(form.user.as_deref());
+
+    match state
+        .auth
+        .handle_apple_login_mobile(&code, &oauth_state, display_name)
+        .await
+    {
+        Ok(()) => Redirect::to(DEVICE_REDIRECT_OK),
+        Err(e) => {
+            let kind = e.error_kind();
+            tracing::warn!(error = %e, kind = %kind, "Apple mobile-callback failed");
+            Redirect::to(&device_redirect_error(kind))
+        }
+    }
 }
 
 /// Maximum length (Unicode scalars) of a display name extracted from
@@ -732,5 +778,67 @@ mod tests {
         // parser on something a forgery could exploit.
         let huge = "x".repeat(super::APPLE_FORM_USER_MAX_BYTES + 1);
         assert!(parse_apple_form_user(Some(&huge)).is_none());
+    }
+
+    // Device-redirect contract pins. The mobile callbacks (Google,
+    // GitHub, Apple) all 303 to the `eurora://` scheme; the device's
+    // `parse_callback_status`
+    // (`crates/app/euro-mobile/src/procedures/auth_procedures.rs`)
+    // dispatches on the `status=` and `error=` query parameters. The
+    // wire format is part of the device ↔ backend contract — pin it
+    // so an accidental rename or escaping change in
+    // `device_redirect_error` fails loudly here rather than at the
+    // device.
+
+    #[test]
+    fn device_redirect_ok_is_unchanged() {
+        assert_eq!(
+            super::DEVICE_REDIRECT_OK,
+            "eurora://mobile/callback?status=ok"
+        );
+    }
+
+    #[test]
+    fn device_redirect_error_carries_kind() {
+        // The kind round-trips verbatim through URL-encoding; the
+        // device's parser reads `error=` as the discriminator.
+        assert_eq!(
+            super::device_redirect_error("invalid_callback"),
+            "eurora://mobile/callback?status=error&error=invalid_callback",
+        );
+    }
+
+    #[test]
+    fn device_redirect_error_passes_apple_error_vocabulary_through() {
+        // Lock in the contract that `apple_mobile_callback` forwards
+        // Apple's `error=` form field verbatim (rather than collapsing
+        // to a generic "oauth_failed"). Apple's documented values are
+        // a small set including `user_cancelled_authorize`,
+        // `invalid_request`, and `invalid_scope`; the device's
+        // `parse_callback_status` surfaces whatever kind we encode
+        // here for its warn-log line.
+        assert_eq!(
+            super::device_redirect_error("user_cancelled_authorize"),
+            "eurora://mobile/callback?status=error&error=user_cancelled_authorize",
+        );
+    }
+
+    #[test]
+    fn device_redirect_error_url_encodes_unsafe_kinds() {
+        // `AuthError::error_kind` returns a small stable set today,
+        // but `device_redirect_error` is also called with raw
+        // provider `error=` values forwarded verbatim from Google,
+        // GitHub, and Apple. URL-encoding means a forwarded value
+        // containing `&`, `=`, or spaces can't smuggle additional
+        // query parameters into the deep-link.
+        let url = super::device_redirect_error("oauth & failed");
+        assert!(
+            url.starts_with("eurora://mobile/callback?status=error&error="),
+            "preserves canonical prefix: {url}",
+        );
+        assert!(
+            !url.contains("oauth & failed"),
+            "raw value must be encoded, not interpolated: {url}",
+        );
     }
 }
