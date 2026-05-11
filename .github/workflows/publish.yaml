@@ -973,15 +973,19 @@ jobs:
                   rsync -avE --prune-empty-dirs --include-from='.github/workflows/publish.include.txt' --exclude='*' release/ release-s3/
                   bash scripts/normalize-spaces.sh ./release-s3
 
-            - uses: shallwefootball/s3-upload-action@0d261a6f15b3b2e209dfebdecace4b100c04f95b # master
-              name: Upload To S3
-              id: S3
+            - uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+              name: Configure AWS credentials
               with:
-                  aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws_bucket: 'releases.eurora-labs.com'
-                  source_dir: 'release-s3/'
-                  destination_dir: 'releases/${{ needs.build-sveltekit.outputs.channel }}/${{ env.version }}-${{ github.run_number }}'
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: us-west-2
+
+            - name: Upload To S3
+              id: S3
+              shell: bash
+              env:
+                  DEST: releases/${{ needs.build-sveltekit.outputs.channel }}/${{ env.version }}-${{ github.run_number }}
+              run: aws s3 sync release-s3/ "s3://releases.eurora-labs.com/${DEST}/" --no-progress
 
             # tell our server to update with the version number
         #   - name: Notify Eurora API of new release
