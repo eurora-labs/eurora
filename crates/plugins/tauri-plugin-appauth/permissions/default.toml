@@ -1,0 +1,14 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Run OAuth 2.0 / OIDC authorization on mobile via AppAuth."
+permissions = [
+  "allow-discover",
+  "allow-authorize",
+  "allow-authorize-browser-only",
+  "allow-refresh",
+  "allow-end-session",
+  "allow-subscribe-events",
+  # `register` (RFC 7591 dynamic client registration) is opt-in: rare,
+  # provider-specific, and risky to leave on by default.
+]

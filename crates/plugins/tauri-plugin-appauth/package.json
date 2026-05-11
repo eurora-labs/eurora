@@ -1,0 +1,45 @@
+{
+    "name": "@eurora-labs/tauri-plugin-appauth",
+    "version": "0.2.0",
+    "description": "Tauri 2 mobile plugin that bridges OAuth 2.0 / OIDC flows to AppAuth-iOS and AppAuth-Android.",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/eurora-labs/eurora.git",
+        "directory": "crates/plugins/tauri-plugin-appauth"
+    },
+    "homepage": "https://github.com/eurora-labs/eurora/tree/main/crates/plugins/tauri-plugin-appauth#readme",
+    "bugs": {
+        "url": "https://github.com/eurora-labs/eurora/issues"
+    },
+    "type": "module",
+    "main": "dist-js/index.cjs",
+    "module": "dist-js/index.js",
+    "types": "dist-js/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist-js/index.d.ts",
+            "import": "./dist-js/index.js",
+            "require": "./dist-js/index.cjs"
+        }
+    },
+    "files": [
+        "dist-js",
+        "api-iife.js",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "bun run build:esm && bun run build:cjs && bun run build:iife && bun run build:types",
+        "build:esm": "bun build guest-js/index.ts --outfile dist-js/index.js --format esm --external @tauri-apps/api",
+        "build:cjs": "bun build guest-js/index.ts --outfile dist-js/index.cjs --format cjs --external @tauri-apps/api",
+        "build:iife": "bun run scripts/build-iife.ts",
+        "build:types": "tsc --emitDeclarationOnly"
+    },
+    "dependencies": {
+        "@tauri-apps/api": "^2"
+    },
+    "devDependencies": {
+        "typescript": "^5.9.3"
+    }
+}

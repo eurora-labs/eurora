@@ -29,7 +29,7 @@ uuid = { workspace = true, features = ["serde", "v7"] }
 # euro-mobile can register the same set of `#[tauri::command]`s.
 async-trait = { workspace = true, optional = true }
 specta = { workspace = true, optional = true, features = ["derive", "function"] }
-tauri = { version = "2.11.1", optional = true, default-features = false }
+tauri = { workspace = true, optional = true }
 tauri-specta = { workspace = true, optional = true, features = ["derive"] }
 
 [features]
