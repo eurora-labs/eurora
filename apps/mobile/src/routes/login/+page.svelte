@@ -4,7 +4,7 @@
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
-	import type { LoginOutcome } from '$lib/bindings/specta.bindings.js';
+	import type { LoginOutcome, Provider } from '$lib/bindings/specta.bindings.js';
 
 	const user = inject(USER_SERVICE);
 
@@ -45,13 +45,15 @@
 		}
 	}
 
-	async function signInWithGitHub() {
+	// Browser-redirect OAuth flow shared by GitHub and Apple. Google
+	// has its own entry point because it tries the native SDK first.
+	async function signInWith(provider: Provider, label: string) {
 		loading = true;
 		error = '';
 		try {
-			handleOutcome(await user.startLogin('github'));
+			handleOutcome(await user.startLogin(provider));
 		} catch (err) {
-			console.error('GitHub sign-in failed:', err);
+			console.error(`${label} sign-in failed:`, err);
 			error = 'Sign-in failed. Please try again.';
 			loading = false;
 		}
@@ -77,8 +79,11 @@
 			{/if}
 
 			<Button class="w-full" onclick={signInWithGoogle}>Continue with Google</Button>
-			<Button class="w-full" variant="outline" onclick={signInWithGitHub}>
+			<Button class="w-full" variant="outline" onclick={() => signInWith('github', 'GitHub')}>
 				Continue with GitHub
+			</Button>
+			<Button class="w-full" variant="outline" onclick={() => signInWith('apple', 'Apple')}>
+				Continue with Apple
 			</Button>
 		</div>
 	{/if}

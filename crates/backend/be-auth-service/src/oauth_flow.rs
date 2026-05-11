@@ -14,11 +14,11 @@
 //!   and mints a session.
 //!
 //! The shared post-resolution tail (`complete_oauth_login`) runs once
-//! per provider so token-issuing logic stays in lockstep. Apple's
-//! form-post flow has one extra entry point —
-//! [`AuthService::handle_apple_login`] — that layers a
-//! `display_name_override` on top of the trait result before delegating
-//! to the same tail.
+//! per provider so token-issuing logic stays in lockstep. Every
+//! redirect-callback path — web/mobile × Google/GitHub/Apple — funnels
+//! through one private completion helper that varies on a
+//! [`CallbackFlow`] discriminant and an optional Apple display-name
+//! override.
 //!
 //! Encryption boundary: the [`OAuthProviderExt`] trait hands the
 //! orchestrator decrypted [`RawOAuthTokens`]. Encryption happens here,
@@ -42,6 +42,26 @@ use crate::service::{AuthService, MintedSession, user_info_from_row};
 use crate::tokens::random_hex;
 
 const OAUTH_STATE_BYTES: usize = 16; // 32 hex chars, ~128 bits of entropy
+
+/// Which callback shape we're completing. Drives where the device-
+/// pairing token comes from and which provider redirect URI we send to
+/// the token endpoint.
+///
+/// - [`CallbackFlow::Web`]: pairing token (if any) was stashed on the
+///   `oauth_state` row at issue time and is read back during code
+///   exchange. The minted session is returned to the caller for
+///   cookie / JSON dispatch.
+/// - [`CallbackFlow::Mobile`]: the device's PKCE challenge **is** the
+///   OAuth `state` and doubles as the pairing token; the
+///   `oauth_state.login_token` column is `None` for these rows by
+///   construction. The device picks tokens up via the existing
+///   `/auth/login-token/exchange` poll; the minted session here is
+///   discarded by the caller.
+#[derive(Clone, Copy)]
+enum CallbackFlow {
+    Web,
+    Mobile,
+}
 
 impl AuthService {
     /// Mint the authorization URL for a web/desktop OAuth start.
@@ -95,12 +115,8 @@ impl AuthService {
         code: &str,
         state: &str,
     ) -> AuthResult<MintedSession> {
-        let client = self.oauth_provider(provider)?;
-        let (raw, login_token) = self
-            .exchange_authorization_code(client.as_ref(), code, state, false)
-            .await?;
-        let identity = build_new_identity(provider.into(), raw, None)?;
-        self.complete_oauth_login(identity, login_token).await
+        self.complete_third_party_login(provider, code, state, CallbackFlow::Web, None)
+            .await
     }
 
     /// Mobile entry point: build a provider authorisation URL whose
@@ -151,9 +167,10 @@ impl AuthService {
             .redirect_uri(mobile_redirect.to_string())
             .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
             .maybe_nonce(encrypted_nonce)
-            // No login_token column for mobile — the `state` *is* the
-            // pairing token; we hand it back to `complete_oauth_login`
-            // explicitly in `login_third_party_mobile`.
+            // No login_token column for mobile — see [`CallbackFlow::Mobile`]:
+            // the `state` *is* the pairing token, handed back to
+            // `complete_oauth_login` directly by the shared completion
+            // path.
             .maybe_login_token(None)
             .call()
             .await?;
@@ -162,10 +179,8 @@ impl AuthService {
     }
 
     /// Mobile callback completion: exchanges the authorisation code,
-    /// runs the shared `complete_oauth_login` tail passing the
-    /// device's stashed challenge (= the OAuth `state`) as the
-    /// pairing `login_token`, and discards the minted session. The
-    /// device picks tokens up via the existing
+    /// runs the shared completion path, and discards the minted
+    /// session. The device picks tokens up via the existing
     /// `/auth/login-token/exchange` poll.
     pub async fn login_third_party_mobile(
         &self,
@@ -173,44 +188,78 @@ impl AuthService {
         code: &str,
         state: &str,
     ) -> AuthResult<()> {
-        let client = self.oauth_provider(provider)?;
-        let (raw, _login_token_on_row) = self
-            .exchange_authorization_code(client.as_ref(), code, state, true)
-            .await?;
-        let identity = build_new_identity(provider.into(), raw, None)?;
-        // For mobile the device's challenge *is* the OAuth state;
-        // pass it through as the pairing token directly. The
-        // `oauth_state.login_token` column is intentionally `None`
-        // for mobile rows.
-        let _session = self
-            .complete_oauth_login(identity, Some(state.to_string()))
+        self.complete_third_party_login(provider, code, state, CallbackFlow::Mobile, None)
             .await?;
         Ok(())
     }
 
     /// Apple web-callback completion.
     ///
-    /// Apple's form-post flow needs a thin wrapper around
-    /// [`login_third_party`] because the `user` blob (containing
-    /// first/last name) is only present in the form-post body — never
-    /// in the ID token, never on subsequent sign-ins. The override is
-    /// only honored at first sign-in: when an existing user matches
-    /// `(Apple, sub)`, `complete_oauth_login` skips the resolve-new
-    /// path so the override never reaches the user row. That guard
-    /// prevents a malicious client from replaying an `id_token` with
-    /// a fabricated `user` field to overwrite an established display
-    /// name.
+    /// Apple's form-post flow carries a `user` blob (first/last name)
+    /// only in the form-post body — never in the ID token, never on
+    /// subsequent sign-ins. The override is only honored at first
+    /// sign-in: when an existing user matches `(Apple, sub)`,
+    /// `complete_oauth_login` skips the resolve-new path so the
+    /// override never reaches the user row. That guard prevents a
+    /// malicious client from replaying an `id_token` with a fabricated
+    /// `user` field to overwrite an established display name.
     pub async fn handle_apple_login(
         &self,
         code: &str,
         state: &str,
         display_name_override: Option<String>,
     ) -> AuthResult<MintedSession> {
-        let client = self.oauth_provider(Provider::Apple)?;
-        let (raw, login_token) = self
-            .exchange_authorization_code(client.as_ref(), code, state, false)
+        self.complete_third_party_login(
+            Provider::Apple,
+            code,
+            state,
+            CallbackFlow::Web,
+            display_name_override,
+        )
+        .await
+    }
+
+    /// Apple mobile-callback completion. Same display-name guard as
+    /// [`AuthService::handle_apple_login`]; same discard-session
+    /// pairing shape as [`AuthService::login_third_party_mobile`].
+    pub async fn handle_apple_login_mobile(
+        &self,
+        code: &str,
+        state: &str,
+        display_name_override: Option<String>,
+    ) -> AuthResult<()> {
+        self.complete_third_party_login(
+            Provider::Apple,
+            code,
+            state,
+            CallbackFlow::Mobile,
+            display_name_override,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Shared completion path for every OAuth redirect callback (web +
+    /// mobile, all providers): consume the `oauth_state` row, exchange
+    /// the code, layer the optional Apple display-name override, and
+    /// run the shared `complete_oauth_login` tail.
+    async fn complete_third_party_login(
+        &self,
+        provider: Provider,
+        code: &str,
+        state: &str,
+        flow: CallbackFlow,
+        display_name_override: Option<String>,
+    ) -> AuthResult<MintedSession> {
+        let client = self.oauth_provider(provider)?;
+        let (raw, login_token_on_row) = self
+            .exchange_authorization_code(client.as_ref(), code, state, flow)
             .await?;
-        let identity = build_new_identity(OAuthProvider::Apple, raw, display_name_override)?;
+        let identity = build_new_identity(provider.into(), raw, display_name_override)?;
+        let login_token = match flow {
+            CallbackFlow::Mobile => Some(state.to_string()),
+            CallbackFlow::Web => login_token_on_row,
+        };
         self.complete_oauth_login(identity, login_token).await
     }
 
@@ -226,7 +275,7 @@ impl AuthService {
         client: &dyn OAuthProviderExt,
         code: &str,
         state: &str,
-        mobile: bool,
+        flow: CallbackFlow,
     ) -> AuthResult<(OAuthIdentityRaw, Option<String>)> {
         if code.is_empty() {
             return Err(AuthError::InvalidInput(
@@ -260,12 +309,13 @@ impl AuthService {
             .map(decrypt_sensitive_string)
             .transpose()?;
 
-        let raw = if mobile {
-            client
-                .mobile_exchange_code(code, pkce_verifier, &nonce)
-                .await?
-        } else {
-            client.exchange_code(code, pkce_verifier, &nonce).await?
+        let raw = match flow {
+            CallbackFlow::Mobile => {
+                client
+                    .mobile_exchange_code(code, pkce_verifier, &nonce)
+                    .await?
+            }
+            CallbackFlow::Web => client.exchange_code(code, pkce_verifier, &nonce).await?,
         };
 
         if !raw.email_verified {
