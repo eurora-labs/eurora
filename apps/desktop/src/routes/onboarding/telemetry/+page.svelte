@@ -52,17 +52,13 @@
 			return;
 		}
 
-		goToLogin();
-	}
-
-	function goToLogin() {
-		goto('/onboarding/login');
+		goto('/');
 	}
 </script>
 
 <div class="flex flex-col justify-center h-full px-8 gap-6">
 	<div>
-		<h1 class="text-3xl font-bold mb-2">Welcome to Eurora!</h1>
+		<h1 class="text-3xl font-bold mb-2">One last step</h1>
 		<p class="text-sm text-muted-foreground mb-2">
 			Eurora uses these metrics strictly to help us improve the app. We do not collect any
 			personal information unless you yourself choose to provide it.
@@ -113,7 +109,7 @@
 			onclick={() => {
 				updateSettings();
 			}}
-			>Continue
+			>Finish
 			<ChevronRight />
 		</Button>
 	</div>

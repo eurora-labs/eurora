@@ -5,9 +5,9 @@
     "telemetry": {
         // Bumped to re-prompt every install for an updated consent. See
         // CURRENT_CONSENT_VERSION in euro-settings.
-        "consentVersion": 0,
-        "anonymousMetrics": true,
-        "anonymousErrors": true,
+        "consentVersion": 1,
+        "anonymousMetrics": false,
+        "anonymousErrors": false,
         "nonAnonymousMetrics": false,
         "distinctId": null
     },

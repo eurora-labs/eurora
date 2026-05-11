@@ -8,10 +8,10 @@
 		(async () => {
 			try {
 				const isAuthenticated = unwrap(await commands.authIsAuthenticated());
-				if (!isAuthenticated) goto('/onboarding');
+				if (!isAuthenticated) goto('/onboarding/login');
 			} catch (error) {
 				console.error('Failed to check authentication:', error);
-				goto('/onboarding');
+				goto('/onboarding/login');
 			}
 		})();
 	});
