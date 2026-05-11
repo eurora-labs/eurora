@@ -38,7 +38,7 @@ pub struct TelemetryConsent {
         feature = "specta",
         specta(type = std::collections::HashMap<String, specta_typescript::Unknown>)
     )]
-    pub _extras: Map<String, Value>,
+    pub extras: Map<String, Value>,
 }
 
 #[cfg(test)]
@@ -56,7 +56,7 @@ mod tests {
         assert!(!t.anonymous_metrics);
         assert!(!t.anonymous_errors);
         assert!(!t.non_anonymous_metrics);
-        assert!(t._extras.is_empty());
+        assert!(t.extras.is_empty());
     }
 
     #[test]
@@ -87,6 +87,6 @@ mod tests {
     fn empty_extras_are_not_emitted() {
         let t = TelemetryConsent::default();
         let s = serde_json::to_string(&t).unwrap();
-        assert!(!s.contains("_extras"), "got: {s}");
+        assert!(!s.contains("extras"), "got: {s}");
     }
 }

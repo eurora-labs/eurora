@@ -14,7 +14,7 @@
 //!
 //! ## Forward-compatibility
 //!
-//! Every leaf section carries a flattened `_extras: serde_json::Map`
+//! Every leaf section carries a flattened `extras: serde_json::Map`
 //! so unknown fields written by a newer client (or a different
 //! platform) round-trip verbatim. Releases can therefore add fields
 //! to any section without bumping the schema version, as long as the

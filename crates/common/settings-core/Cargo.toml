@@ -20,7 +20,7 @@ specta = { workspace = true, optional = true, features = [
   "uuid",
   "serde_json",
 ] }
-# `Unknown` marker used by `#[specta(type = Unknown)]` on flattened `_extras`
+# `Unknown` marker used by `#[specta(type = Unknown)]` on flattened `extras`
 # maps so TS bindings expose them as an `[key: string]: unknown` index
 # signature rather than the default opaque shape.
 specta-typescript = { version = "0.0.12", optional = true }
