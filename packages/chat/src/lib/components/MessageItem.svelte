@@ -32,7 +32,8 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
-	import { onDestroy, tick } from 'svelte';
+	import { useDebounce } from 'runed';
+	import { tick } from 'svelte';
 
 	const {
 		node,
@@ -60,7 +61,9 @@
 	const siblings = $derived(node.children ?? []);
 
 	let copied = $state(false);
-	let copyTimeout: number | null = null;
+	const resetCopiedSoon = useDebounce(() => {
+		copied = false;
+	}, 2000);
 
 	let editing = $state(false);
 	let editText = $state('');
@@ -70,14 +73,8 @@
 
 	function handleCopy() {
 		onCopy?.(content);
-		if (copyTimeout !== null) {
-			clearTimeout(copyTimeout);
-		}
 		copied = true;
-		copyTimeout = window.setTimeout(() => {
-			copied = false;
-			copyTimeout = null;
-		}, 2000);
+		resetCopiedSoon();
 	}
 
 	async function startEdit() {
@@ -111,13 +108,6 @@
 			cancelEdit();
 		}
 	}
-
-	onDestroy(() => {
-		if (copyTimeout !== null) {
-			clearTimeout(copyTimeout);
-			copyTimeout = null;
-		}
-	});
 </script>
 
 {#snippet siblingNav()}

@@ -10,20 +10,18 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onDestroy, onMount } from 'svelte';
+	import { useInterval } from 'runed';
 	import { toast } from 'svelte-sonner';
 
 	const user = inject(USER_SERVICE);
 
-	let interval: ReturnType<typeof setInterval> | undefined;
-
-	function startPolling() {
-		interval = setInterval(async () => {
+	const subscriptionPoll = useInterval(5_000, {
+		callback: async () => {
 			try {
 				const subscribed = unwrap(await commands.paymentIsSubscribed());
 				if (!subscribed) return;
 
-				clearInterval(interval);
+				subscriptionPoll.pause();
 				await user.refreshSession().catch(() => {});
 				const win = getCurrentWindow();
 				await win.setFocus();
@@ -31,15 +29,7 @@
 			} catch (e) {
 				console.warn('Upgrade poll error:', e);
 			}
-		}, 5000);
-	}
-
-	onMount(() => {
-		startPolling();
-	});
-
-	onDestroy(() => {
-		if (interval) clearInterval(interval);
+		},
 	});
 </script>
 

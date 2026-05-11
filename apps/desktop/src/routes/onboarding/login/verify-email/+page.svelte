@@ -5,34 +5,39 @@
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
-	import { onMount, onDestroy } from 'svelte';
+	import { useInterval } from 'runed';
 	import { toast } from 'svelte-sonner';
+
+	const COOLDOWN_SECONDS = 60;
 
 	const user = inject(USER_SERVICE);
 	const redirect = $page.url.searchParams.get('redirect') ?? '/';
 
-	let pollId: ReturnType<typeof setInterval> | null = null;
-	let cooldownId: ReturnType<typeof setInterval> | null = null;
 	let resending = $state(false);
-	let cooldown = $state(0);
 
-	onMount(() => {
-		pollId = setInterval(async () => {
+	const verifyPoll = useInterval(3_000, {
+		callback: async () => {
 			try {
 				const verified = await user.checkVerification();
 				if (verified) {
-					if (pollId) clearInterval(pollId);
+					verifyPoll.pause();
 					goto(redirect);
 				}
 			} catch {
 				// Silently retry on next interval
 			}
-		}, 3_000);
+		},
 	});
 
-	onDestroy(() => {
-		if (pollId) clearInterval(pollId);
-		if (cooldownId) clearInterval(cooldownId);
+	const cooldownTimer = useInterval(1_000, { immediate: false });
+	const cooldown = $derived(
+		cooldownTimer.isActive ? Math.max(0, COOLDOWN_SECONDS - cooldownTimer.counter) : 0,
+	);
+
+	$effect(() => {
+		if (cooldownTimer.isActive && cooldownTimer.counter >= COOLDOWN_SECONDS) {
+			cooldownTimer.pause();
+		}
 	});
 
 	async function resend() {
@@ -40,14 +45,8 @@
 		try {
 			await user.resendVerificationEmail();
 			toast.success('Verification email sent!');
-			cooldown = 60;
-			cooldownId = setInterval(() => {
-				cooldown -= 1;
-				if (cooldown <= 0 && cooldownId) {
-					clearInterval(cooldownId);
-					cooldownId = null;
-				}
-			}, 1000);
+			cooldownTimer.reset();
+			cooldownTimer.resume();
 		} catch (error) {
 			toast.error(`Failed to resend: ${error}`);
 		} finally {

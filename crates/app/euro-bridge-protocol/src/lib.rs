@@ -16,12 +16,18 @@
 //! ## Transport
 //!
 //! The bridge is loopback-only — the desktop binds [`BRIDGE_BIND_IP`]
-//! (`127.0.0.1`) and rejects non-loopback peers at upgrade time, so
-//! the channel never leaves the kernel. With that constraint in place
-//! we serve plaintext: `ws://` carries no confidentiality cost a local
-//! attacker doesn't already have (they'd need user-level code
-//! execution to sniff loopback, at which point reading on-disk state
-//! is strictly easier than decoding our frames). The
+//! (`127.0.0.1`) plus a best-effort `[::1]` listener on the same port,
+//! and rejects non-loopback peers at upgrade time, so the channel
+//! never leaves the kernel. The dual-stack bind matters in practice
+//! because some Windows configurations resolve `localhost` to `::1`
+//! ahead of `127.0.0.1`, and a client that tries the IPv6 address
+//! first must find a listener there.
+//!
+//! With the loopback constraint in place we serve plaintext: `ws://`
+//! carries no confidentiality cost a local attacker doesn't already
+//! have (they'd need user-level code execution to sniff loopback, at
+//! which point reading on-disk state is strictly easier than decoding
+//! our frames). The
 //! [register-frame token check](`crate::frame::RegisterFrame`) is the
 //! authentication boundary, not TLS.
 
@@ -45,9 +51,12 @@ pub use frame::{
 /// [secure-context]: https://w3c.github.io/webappsec-secure-contexts/
 pub const BRIDGE_HOST: &str = "localhost";
 
-/// Loopback IP the desktop binds the listener to. Separate from
-/// [`BRIDGE_HOST`] because the hostname is non-routable on its own
-/// and the listener needs a concrete IP.
+/// Primary loopback IP the desktop binds the listener to. Separate
+/// from [`BRIDGE_HOST`] because the hostname is non-routable on its
+/// own and the listener needs a concrete IP. The bridge service
+/// additionally opens a best-effort `[::1]` listener on the same port
+/// so clients whose resolver returns IPv6 from `localhost` aren't
+/// refused — see `BridgeService::bind_on` in `euro-bridge`.
 pub const BRIDGE_BIND_IP: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
 /// Port the desktop bridge listens on.

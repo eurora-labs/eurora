@@ -198,7 +198,7 @@
 	</Empty.Root>
 {/snippet}
 
-<div class="flex h-full flex-col overflow-hidden">
+<div class="flex h-full flex-col overflow-hidden pb-2">
 	<MessageList
 		onCopy={handleCopy}
 		onEdit={handleEdit}
