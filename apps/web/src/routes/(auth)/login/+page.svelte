@@ -86,6 +86,10 @@
 		}
 	}
 
+	function pendingLoginToken(): string | undefined {
+		return sessionStorage.getItem('loginToken') ?? undefined;
+	}
+
 	async function handleEmailContinue() {
 		if (!email.trim()) return;
 		loading = true;
@@ -94,7 +98,9 @@
 			storeRedirectParam();
 			const result = await auth.checkEmail(email.trim());
 			if (result.status === 'oauth') {
-				window.location.href = await auth.getOAuthRedirectUrl(result.provider);
+				window.location.href = await auth.getOAuthRedirectUrl(result.provider, {
+					loginToken: pendingLoginToken(),
+				});
 				return;
 			}
 			if (result.status === 'not_found') {
@@ -146,35 +152,26 @@
 		}
 	}
 
-	async function handleGoogleLogin() {
+	async function handleOAuthLogin(provider: 'google' | 'github' | 'apple') {
 		loading = true;
 		submitError = null;
 		try {
 			storeRedirectParam();
-			window.location.href = await auth.getOAuthRedirectUrl('google');
+			window.location.href = await auth.getOAuthRedirectUrl(provider, {
+				loginToken: pendingLoginToken(),
+			});
 		} catch (err) {
 			Sentry.captureException(err, {
-				tags: { area: 'auth.oauth-redirect', provider: 'google' },
+				tags: { area: 'auth.oauth-redirect', provider },
 			});
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			loading = false;
 		}
 	}
 
-	async function handleGitHubLogin() {
-		loading = true;
-		submitError = null;
-		try {
-			storeRedirectParam();
-			window.location.href = await auth.getOAuthRedirectUrl('github');
-		} catch (err) {
-			Sentry.captureException(err, {
-				tags: { area: 'auth.oauth-redirect', provider: 'github' },
-			});
-			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
-			loading = false;
-		}
-	}
+	const handleGoogleLogin = () => handleOAuthLogin('google');
+	const handleGitHubLogin = () => handleOAuthLogin('github');
+	const handleAppleLogin = () => handleOAuthLogin('apple');
 </script>
 
 <svelte:head>
@@ -244,6 +241,7 @@
 					disabled={loading}
 					onGoogle={handleGoogleLogin}
 					onGitHub={handleGitHubLogin}
+					onApple={handleAppleLogin}
 				/>
 
 				{#if showRegister}

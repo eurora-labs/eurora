@@ -128,8 +128,12 @@ impl AuthClient {
     pub async fn third_party_auth_url(
         &self,
         provider: auth_core::Provider,
+        login_token: Option<String>,
     ) -> AuthResult<ThirdPartyAuthUrlResponse> {
-        let body = ThirdPartyAuthUrlRequest { provider };
+        let body = ThirdPartyAuthUrlRequest {
+            provider,
+            login_token,
+        };
         self.post_json("/auth/oauth/url", &body, None).await
     }
 

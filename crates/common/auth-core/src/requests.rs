@@ -10,6 +10,14 @@ use crate::Provider;
 /// Encoded as a discriminated union: the `kind` tag selects the
 /// credential variant, mirroring the gRPC `oneof` it replaces while
 /// staying friendly to JSON consumers and TypeScript codegen.
+///
+/// The desktop-pairing `login_token` is **not** part of this body — it
+/// is captured at OAuth URL issue time on
+/// [`ThirdPartyAuthUrlRequest`] and read off the `oauth_state` row
+/// during code exchange. Apple Sign In's form-post flow doesn't surface
+/// `code`/`state` to the SPA, so an at-callback mechanism is structurally
+/// impossible for that provider — moving every provider to the
+/// at-issue-time path keeps the contract uniform.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -22,8 +30,6 @@ pub enum LoginRequest {
         provider: Provider,
         code: String,
         state: String,
-        #[serde(default)]
-        login_token: Option<String>,
     },
 }
 
@@ -38,10 +44,18 @@ pub struct RegisterRequest {
 }
 
 /// Request body for `POST /auth/oauth/url`.
+///
+/// The optional `login_token` is the desktop client's PKCE challenge —
+/// when present, the backend stamps it onto the `oauth_state` row so the
+/// eventual callback can pair the device without the SPA round-tripping
+/// the value through the login request body. Mirrors the convention the
+/// mobile flow already uses via `MobileThirdPartyAuthUrlRequest`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ThirdPartyAuthUrlRequest {
     pub provider: Provider,
+    #[serde(default)]
+    pub login_token: Option<String>,
 }
 
 /// Request body for `POST /auth/oauth/mobile/url`.
@@ -125,36 +139,64 @@ mod tests {
     }
 
     #[test]
-    fn login_third_party_round_trip_with_optional_token() {
+    fn login_third_party_round_trip() {
         let req = LoginRequest::ThirdParty {
             provider: Provider::Google,
             code: "abc".into(),
             state: "xyz".into(),
-            login_token: Some("lt".into()),
         };
         let json = serde_json::to_value(&req).unwrap();
         assert_eq!(json["kind"], "third_party");
         assert_eq!(json["provider"], "google");
-        assert_eq!(json["login_token"], "lt");
+        // `login_token` is no longer part of this body — capture happens
+        // at URL-issue time via `ThirdPartyAuthUrlRequest`.
+        assert!(json.get("login_token").is_none());
         let back: LoginRequest = serde_json::from_value(json).unwrap();
+        match back {
+            LoginRequest::ThirdParty {
+                provider,
+                code,
+                state,
+            } => {
+                assert_eq!(provider.as_str(), "google");
+                assert_eq!(code, "abc");
+                assert_eq!(state, "xyz");
+            }
+            _ => panic!("expected ThirdParty variant"),
+        }
+    }
+
+    #[test]
+    fn login_third_party_rejects_unknown_fields_gracefully() {
+        // A legacy client that still emits `login_token` in this body
+        // round-trips cleanly (the field is silently dropped by serde's
+        // default behaviour) — the wire-compat we keep is permissive
+        // decoding, not preservation of the obsolete field.
+        let raw = r#"{"kind":"third_party","provider":"apple","code":"c","state":"s","login_token":"old"}"#;
+        let back: LoginRequest = serde_json::from_str(raw).unwrap();
         matches!(back, LoginRequest::ThirdParty { .. });
     }
 
     #[test]
-    fn login_third_party_emits_null_login_token() {
-        let req = LoginRequest::ThirdParty {
-            provider: Provider::Github,
-            code: "abc".into(),
-            state: "xyz".into(),
-            login_token: None,
+    fn third_party_auth_url_request_round_trip() {
+        let req = ThirdPartyAuthUrlRequest {
+            provider: Provider::Apple,
+            login_token: Some("lt".into()),
         };
         let json = serde_json::to_value(&req).unwrap();
-        assert_eq!(json["login_token"], serde_json::Value::Null);
-        let back: LoginRequest = serde_json::from_value(json).unwrap();
-        match back {
-            LoginRequest::ThirdParty { login_token, .. } => assert!(login_token.is_none()),
-            _ => panic!("expected ThirdParty variant"),
-        }
+        assert_eq!(json["provider"], "apple");
+        assert_eq!(json["login_token"], "lt");
+        let back: ThirdPartyAuthUrlRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(back.provider.as_str(), "apple");
+        assert_eq!(back.login_token.as_deref(), Some("lt"));
+    }
+
+    #[test]
+    fn third_party_auth_url_request_decodes_without_login_token() {
+        // Forward-compat: older clients omit the field entirely.
+        let back: ThirdPartyAuthUrlRequest =
+            serde_json::from_str(r#"{"provider":"github"}"#).unwrap();
+        assert!(back.login_token.is_none());
     }
 
     #[test]
