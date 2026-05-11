@@ -13,7 +13,7 @@ pub struct WebSettings {
         feature = "specta",
         specta(type = std::collections::HashMap<String, specta_typescript::Unknown>)
     )]
-    pub _extras: Map<String, Value>,
+    pub extras: Map<String, Value>,
 }
 
 #[cfg(test)]

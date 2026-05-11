@@ -47,7 +47,7 @@ pub struct DesktopSettings {
         feature = "specta",
         specta(type = std::collections::HashMap<String, specta_typescript::Unknown>)
     )]
-    pub _extras: Map<String, Value>,
+    pub extras: Map<String, Value>,
 }
 
 impl Default for DesktopSettings {
@@ -56,7 +56,7 @@ impl Default for DesktopSettings {
             interface_scale: DEFAULT_SCALE,
             text_scale: DEFAULT_SCALE,
             telemetry: TelemetryConsent::default(),
-            _extras: Map::new(),
+            extras: Map::new(),
         }
     }
 }
@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn round_trip_preserves_unknown_fields() {
         // Use scale values that are exactly representable in f32 so the
-        // round-trip is bit-exact and the assertion exercises `_extras`
+        // round-trip is bit-exact and the assertion exercises `extras`
         // preservation rather than float precision.
         let raw = serde_json::json!({
             "interfaceScale": 1.25,

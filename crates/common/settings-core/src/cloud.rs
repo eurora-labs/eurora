@@ -30,7 +30,7 @@ static FRESH_INSTALL_DEFAULTS: LazyLock<CloudSettings> = LazyLock::new(|| {
 /// Top-level cloud-synced settings blob. Sections are addressed
 /// individually so clients only touch the fields that apply to their
 /// platform; unknown sections and unknown fields within sections are
-/// preserved verbatim through `_extras` so a newer release of one
+/// preserved verbatim through `extras` so a newer release of one
 /// client never drops fields written by another.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -107,17 +107,17 @@ mod tests {
         assert!(!d.desktop.telemetry.anonymous_errors);
         assert!(!d.desktop.telemetry.non_anonymous_metrics);
 
-        assert!(d.shared._extras.is_empty());
-        assert!(d.desktop._extras.is_empty());
-        assert!(d.mobile._extras.is_empty());
-        assert!(d.web._extras.is_empty());
+        assert!(d.shared.extras.is_empty());
+        assert!(d.desktop.extras.is_empty());
+        assert!(d.mobile.extras.is_empty());
+        assert!(d.web.extras.is_empty());
     }
 
     #[test]
     fn unknown_top_level_section_is_preserved() {
         // A newer client adds fields to known sections; an older client
         // must round-trip them without dropping them. The top-level
-        // struct has no `_extras` itself by design (sections are the
+        // struct has no `extras` itself by design (sections are the
         // extensibility unit), so this test pins that *known* sections
         // preserve their unknown subfields end-to-end through
         // `CloudSettings`.
