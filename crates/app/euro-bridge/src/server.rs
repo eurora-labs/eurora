@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -124,6 +124,10 @@ pub struct ExtensionStateUpdate {
 struct ServerHandle {
     state: ServerState,
     local_addr: SocketAddr,
+    /// Sibling-family loopback listener address — see
+    /// [`BoundServer::secondary_local_addr`]. `None` if the sibling bind
+    /// was skipped or soft-failed.
+    secondary_local_addr: Option<SocketAddr>,
     /// Created in [`BridgeService::bind_on`] so [`BridgeService::stop_server`]
     /// can always signal shutdown — even when a spawned `serve` task hasn't
     /// been polled yet. axum-server stores the shutdown flag on an
@@ -134,6 +138,19 @@ struct ServerHandle {
     /// or by an unserved [`BoundServer`] being dropped. `None` once a
     /// `stop_server` caller has taken it.
     done: Option<oneshot::Receiver<()>>,
+}
+
+/// Pair of bridge listeners owned by a [`BoundServer`]: the primary at
+/// the caller-requested address plus an optional sibling-family loopback
+/// listener bound to the same port. The sibling listener is what lets
+/// the bridge be reachable through both `127.0.0.1` and `[::1]`
+/// regardless of which family a client's resolver returns first.
+struct Listeners {
+    primary: std::net::TcpListener,
+    /// `None` when the primary is not loopback (no canonical sibling
+    /// exists) or when the sibling bind soft-failed (IPv6 disabled,
+    /// port held on the sibling family, sandbox rules).
+    secondary: Option<std::net::TcpListener>,
 }
 
 enum ServerState {
@@ -157,14 +174,20 @@ enum ServerState {
 /// the accept loop yet. Dropping a `BoundServer` without serving
 /// releases the socket and clears the service's bookkeeping — useful
 /// in tests but a programming bug in production paths, hence `#[must_use]`.
-#[must_use = "BoundServer drops the listening socket if not served"]
+#[must_use = "BoundServer drops the listening socket(s) if not served"]
 pub struct BoundServer {
     service: BridgeService,
-    /// `None` only between `serve()` consuming the listener and the
+    /// `None` only between `serve()` consuming the listeners and the
     /// struct being dropped — Drop uses this to detect "served vs
     /// abandoned" so it knows whether to clear the slot.
-    listener: Option<std::net::TcpListener>,
+    listeners: Option<Listeners>,
+    /// Address of the primary listener. Stable across the bind/serve
+    /// transition.
     local_addr: SocketAddr,
+    /// Address of the sibling-family loopback listener, or `None` when
+    /// the sibling bind was skipped or soft-failed. Stable across the
+    /// bind/serve transition.
+    secondary_local_addr: Option<SocketAddr>,
     /// Fires the slot's `done` receiver. Taken by `serve` and fired after
     /// the accept loop exits; otherwise fired by Drop when this struct is
     /// abandoned without serving so any in-flight `stop_server` waiter is
@@ -176,34 +199,48 @@ impl std::fmt::Debug for BoundServer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BoundServer")
             .field("local_addr", &self.local_addr)
+            .field("secondary_local_addr", &self.secondary_local_addr)
             .finish_non_exhaustive()
     }
 }
 
 impl BoundServer {
-    /// Address the listener is bound to. Stable across the bind/serve
+    /// Address of the primary listener. Stable across the bind/serve
     /// transition.
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
     }
 
+    /// Address of the sibling-family loopback listener bound to the same
+    /// port as [`local_addr`](Self::local_addr), or `None` if the
+    /// sibling bind was skipped (non-loopback primary) or soft-failed
+    /// (IPv6 disabled, port held on the sibling family, sandbox rules).
+    /// Stable across the bind/serve transition.
+    pub fn secondary_local_addr(&self) -> Option<SocketAddr> {
+        self.secondary_local_addr
+    }
+
     /// Run the accept loop until the owning service is asked to stop
-    /// (via [`BridgeService::stop_server`]) or the loop exits with an
-    /// error.
+    /// (via [`BridgeService::stop_server`]) or one of the loops exits
+    /// with an error.
     ///
-    /// This future drives the accept loop directly; the typical startup
-    /// pattern is `tokio::spawn(bound.serve())`. Awaiting it inline
-    /// blocks until the loop ends.
+    /// This future drives the accept loop(s) directly; the typical
+    /// startup pattern is `tokio::spawn(bound.serve())`. Awaiting it
+    /// inline blocks until both loops have ended. When a sibling
+    /// listener was bound, both axum servers share the same
+    /// `AxumHandle`, so [`BridgeService::stop_server`] fans its
+    /// graceful-shutdown signal out to both.
     pub async fn serve(mut self) -> Result<(), BridgeError> {
         // Both fields are populated by `bind_on` and only taken here.
         // `serve` consumes `self`, so a second call is statically
         // impossible.
-        let listener = self.listener.take().unwrap();
+        let listeners = self.listeners.take().unwrap();
         let done_tx = self.done_tx.take().unwrap();
         let service = self.service.clone();
         let local_addr = self.local_addr;
+        let secondary_local_addr = self.secondary_local_addr;
         // Drop early so the Drop impl runs before we hand off control —
-        // it sees `listener` is `None` and leaves the slot alone.
+        // it sees `listeners` is `None` and leaves the slot alone.
         drop(self);
 
         let axum_handle = {
@@ -226,10 +263,22 @@ impl BoundServer {
             .route(BRIDGE_PATH, get(ws_upgrade))
             .with_state(service.clone());
 
-        let result = axum_server::from_tcp(listener)
-            .handle(axum_handle)
-            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
-            .await;
+        let serve_primary = axum_server::from_tcp(listeners.primary)
+            .handle(axum_handle.clone())
+            .serve(
+                app.clone()
+                    .into_make_service_with_connect_info::<SocketAddr>(),
+            );
+
+        let result = match listeners.secondary {
+            None => serve_primary.await,
+            Some(secondary) => {
+                let serve_secondary = axum_server::from_tcp(secondary)
+                    .handle(axum_handle)
+                    .serve(app.into_make_service_with_connect_info::<SocketAddr>());
+                tokio::try_join!(serve_primary, serve_secondary).map(|_| ())
+            }
+        };
 
         // Clear the slot before signalling done so a follow-up `bind`
         // observes a clean state immediately.
@@ -241,11 +290,20 @@ impl BoundServer {
 
         match result {
             Ok(()) => {
-                tracing::info!(%local_addr, "Bridge WebSocket server stopped");
+                tracing::info!(
+                    %local_addr,
+                    secondary = ?secondary_local_addr,
+                    "Bridge WebSocket server stopped",
+                );
                 Ok(())
             }
             Err(source) => {
-                tracing::error!(%local_addr, error = %source, "Bridge WebSocket server error");
+                tracing::error!(
+                    %local_addr,
+                    secondary = ?secondary_local_addr,
+                    error = %source,
+                    "Bridge WebSocket server error",
+                );
                 Err(BridgeError::Serve { source })
             }
         }
@@ -254,11 +312,11 @@ impl BoundServer {
 
 impl Drop for BoundServer {
     fn drop(&mut self) {
-        // If `serve` ran, it took the listener and is responsible for
-        // clearing the slot. If we still hold it, the BoundServer is
+        // If `serve` ran, it took the listeners and is responsible for
+        // clearing the slot. If we still hold them, the BoundServer is
         // being abandoned — release the slot so the service is
         // rebindable.
-        if self.listener.is_none() {
+        if self.listeners.is_none() {
             return;
         }
         match self.service.server.lock() {
@@ -270,6 +328,7 @@ impl Drop for BoundServer {
             }
             Err(_) => tracing::warn!(
                 local_addr = %self.local_addr,
+                secondary = ?self.secondary_local_addr,
                 "Bridge server slot poisoned while dropping unserved BoundServer",
             ),
         }
@@ -476,8 +535,21 @@ impl BridgeService {
     /// port; the bound socket address is available via
     /// [`BoundServer::local_addr`] before serving begins.
     ///
-    /// The kernel socket is in `LISTEN` state by the time this returns,
-    /// so clients dialing the address can never race the bind.
+    /// When `bind_addr` is a loopback address, [`bind_on`](Self::bind_on)
+    /// also opens a best-effort sibling-family loopback listener on the
+    /// same port: `[::1]` if the primary is IPv4, `127.0.0.1` if the
+    /// primary is IPv6. This makes the bridge reachable through both
+    /// families regardless of which one a client's resolver returns
+    /// first — the failure mode we hit on Windows machines where
+    /// `localhost` resolves to `::1` ahead of `127.0.0.1`. Sibling-bind
+    /// failures (IPv6 disabled, sibling port held, sandbox rules) log a
+    /// warning and proceed with the primary listener only; callers can
+    /// observe whether the sibling came up via
+    /// [`BoundServer::secondary_local_addr`].
+    ///
+    /// The kernel socket(s) are in `LISTEN` state by the time this
+    /// returns, so clients dialing either address can never race the
+    /// bind.
     ///
     /// If a previous accept loop is still registered on the service,
     /// returns [`BridgeError::AlreadyRunning`] — callers that want
@@ -498,46 +570,66 @@ impl BridgeService {
                 local_addr: handle.local_addr,
             });
         }
-        let listener =
-            std::net::TcpListener::bind(bind_addr).map_err(|source| BridgeError::Bind {
-                addr: bind_addr,
-                source,
-            })?;
-        listener
-            .set_nonblocking(true)
-            .map_err(|source| BridgeError::Bind {
-                addr: bind_addr,
-                source,
-            })?;
-        let local_addr = listener.local_addr().map_err(|source| BridgeError::Bind {
+
+        let primary = bind_loopback_listener(bind_addr).map_err(|source| BridgeError::Bind {
             addr: bind_addr,
             source,
         })?;
+        let local_addr = primary.local_addr().map_err(|source| BridgeError::Bind {
+            addr: bind_addr,
+            source,
+        })?;
+
+        // Sibling-family listener — best-effort. A failure here is
+        // expected on hosts where IPv6 is disabled, the sibling port is
+        // taken by another process, or sandbox rules prevent the bind;
+        // any of those degrades us to single-family operation without
+        // failing startup.
+        let secondary =
+            sibling_loopback_addr(local_addr).and_then(|addr| match bind_loopback_listener(addr) {
+                Ok(listener) => Some(listener),
+                Err(err) => {
+                    tracing::warn!(
+                        sibling = %addr,
+                        error = %err,
+                        "Could not bind sibling-family loopback listener; \
+                         bridge will only accept on primary",
+                    );
+                    None
+                }
+            });
+        let secondary_local_addr = secondary
+            .as_ref()
+            .and_then(|listener| listener.local_addr().ok());
+
         let axum_handle = AxumHandle::new();
         let (done_tx, done_rx) = oneshot::channel::<()>();
         *guard = Some(ServerHandle {
             state: ServerState::Bound,
             local_addr,
+            secondary_local_addr,
             axum_handle,
             done: Some(done_rx),
         });
         drop(guard);
 
         tracing::info!(
-            %local_addr,
+            primary = %local_addr,
+            secondary = ?secondary_local_addr,
             url = %bridge_url_for(local_addr),
-            "Bridge transport bound (plaintext / ws)",
+            "Bridge transport bound (plaintext / ws, dual-stack loopback)",
         );
 
         Ok(BoundServer {
             service: self.clone(),
-            listener: Some(listener),
+            listeners: Some(Listeners { primary, secondary }),
             local_addr,
+            secondary_local_addr,
             done_tx: Some(done_tx),
         })
     }
 
-    /// Address the listener is bound to, or `None` if no listener is
+    /// Address of the primary listener, or `None` if no listener is
     /// currently registered. Becomes `Some` as soon as
     /// [`bind_on`](BridgeService::bind_on) returns a [`BoundServer`]
     /// (whether or not its `serve()` has been polled yet) and stays
@@ -548,6 +640,17 @@ impl BridgeService {
             .expect("server slot poisoned")
             .as_ref()
             .map(|handle| handle.local_addr)
+    }
+
+    /// Address of the sibling-family loopback listener, or `None` when
+    /// no listener is registered, the primary is not loopback, or the
+    /// sibling bind soft-failed. See [`BoundServer::secondary_local_addr`].
+    pub fn secondary_local_addr(&self) -> Option<SocketAddr> {
+        self.server
+            .lock()
+            .expect("server slot poisoned")
+            .as_ref()
+            .and_then(|handle| handle.secondary_local_addr)
     }
 
     /// Signal the running server to shut down, then wait for the
@@ -1086,6 +1189,35 @@ fn handle_extension_state_event(
         app_kind: payload.app_kind,
         state: payload.state,
     });
+}
+
+/// Bind a non-blocking TCP listener at `addr`. Wraps the std bind and
+/// the immediately-following `set_nonblocking` so callers handle a
+/// single `io::Result` instead of two. `axum-server::from_tcp` requires
+/// the listener already be non-blocking.
+fn bind_loopback_listener(addr: SocketAddr) -> std::io::Result<std::net::TcpListener> {
+    let listener = std::net::TcpListener::bind(addr)?;
+    listener.set_nonblocking(true)?;
+    Ok(listener)
+}
+
+/// Canonical sibling-family loopback address for dual-stack bind: the
+/// IPv6 loopback for an IPv4 primary and vice-versa, on the primary's
+/// port. Returns `None` for non-loopback primaries — those bindings are
+/// explicit per-address requests where opening a sibling would surprise
+/// the caller.
+fn sibling_loopback_addr(primary: SocketAddr) -> Option<SocketAddr> {
+    match primary.ip() {
+        IpAddr::V4(ip) if ip.is_loopback() => Some(SocketAddr::new(
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+            primary.port(),
+        )),
+        IpAddr::V6(ip) if ip.is_loopback() => Some(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            primary.port(),
+        )),
+        _ => None,
+    }
 }
 
 fn message_label(message: &Message) -> &'static str {

@@ -262,7 +262,8 @@ async fn bind_on_rejects_double_bind() {
 /// address must succeed even before the `serve()` future has been
 /// polled — this is the property the bind/serve split exists to
 /// guarantee, and it's what eliminates the slow-first-connect race the
-/// add-in used to hit.
+/// add-in used to hit. With dual-stack bind the same guarantee applies
+/// to the sibling listener when it was successfully opened.
 #[tokio::test]
 async fn bind_on_returns_with_port_in_listen_state() {
     let service = BridgeService::new();
@@ -272,6 +273,7 @@ async fn bind_on_returns_with_port_in_listen_state() {
         .await
         .expect("bind");
     let addr = bound.local_addr();
+    let sibling = bound.secondary_local_addr();
 
     // No serve() yet. The TCP connection itself must still complete:
     // we only observe that the SYN gets ACK'd, not that anything
@@ -279,7 +281,146 @@ async fn bind_on_returns_with_port_in_listen_state() {
     let stream = tokio::task::spawn_blocking(move || std::net::TcpStream::connect(addr))
         .await
         .expect("join");
-    stream.expect("port is in LISTEN before serve() is polled");
+    stream.expect("primary port is in LISTEN before serve() is polled");
+
+    if let Some(sibling) = sibling {
+        let stream = tokio::task::spawn_blocking(move || std::net::TcpStream::connect(sibling))
+            .await
+            .expect("join");
+        stream.expect("sibling port is in LISTEN before serve() is polled");
+    }
 
     drop(bound);
+}
+
+/// Dual-stack: a loopback IPv4 primary must come with an IPv6 sibling
+/// on the same port whenever the host supports IPv6 loopback. Clients
+/// dialing either family must reach the bridge — this is the property
+/// that fixes the Windows `localhost`-resolves-to-IPv6 failure mode.
+#[tokio::test]
+async fn dual_stack_listener_accepts_v4_and_v6() {
+    let (service, addr, serve_handle) = common::start_ephemeral_bridge().await;
+
+    // The primary is always reachable.
+    let _v4 = connect_test_client(addr).await;
+
+    // The sibling is best-effort. If it came up, it must also accept
+    // connections on the same port.
+    if let Some(v6_addr) = service.secondary_local_addr() {
+        assert_eq!(
+            v6_addr.port(),
+            addr.port(),
+            "sibling must share the primary's port",
+        );
+        assert!(v6_addr.ip().is_loopback(), "sibling must be loopback");
+        let _v6 = connect_test_client(v6_addr).await;
+    } else {
+        eprintln!(
+            "dual_stack_listener_accepts_v4_and_v6: sibling bind unavailable; \
+             skipping v6 leg",
+        );
+    }
+
+    service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
+}
+
+/// Same property in the reverse direction: a `[::1]` primary must
+/// come with a `127.0.0.1` sibling whenever the v4 bind can be opened.
+/// Skips cleanly on hosts where the v6 primary bind itself fails (rare
+/// CI containers with IPv6 entirely disabled).
+#[tokio::test]
+async fn dual_stack_listener_from_v6_primary() {
+    let service = BridgeService::new();
+    let v6_primary: SocketAddr = "[::1]:0".parse().expect("parse v6 loopback");
+    let bound = match service.bind_on(v6_primary).await {
+        Ok(bound) => bound,
+        Err(err) => {
+            eprintln!(
+                "dual_stack_listener_from_v6_primary: IPv6 loopback bind unavailable \
+                 on this host ({err}); skipping",
+            );
+            return;
+        }
+    };
+    let primary = bound.local_addr();
+    let sibling = bound.secondary_local_addr();
+    assert!(primary.is_ipv6(), "primary should be v6");
+
+    let serve_handle = common::spawn_serve(bound);
+
+    let _v6 = connect_test_client(primary).await;
+
+    if let Some(v4_addr) = sibling {
+        assert!(v4_addr.is_ipv4(), "sibling of v6 primary should be v4");
+        assert_eq!(v4_addr.port(), primary.port());
+        let _v4 = connect_test_client(v4_addr).await;
+    } else {
+        eprintln!(
+            "dual_stack_listener_from_v6_primary: sibling bind unavailable; \
+             skipping v4 leg",
+        );
+    }
+
+    service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
+}
+
+/// Sibling-bind soft-fail: if another process holds the sibling port,
+/// `bind_on` must still succeed on the primary, report `None` for
+/// `secondary_local_addr`, and serve normally. This is the realistic
+/// failure shape we'd hit on a user machine where some other tool
+/// already grabbed `[::1]:1431`.
+#[tokio::test]
+async fn sibling_bind_failure_is_soft() {
+    // Reserve an IPv6 loopback port that the bridge's sibling-bind will
+    // then trip over. If the host can't even open an IPv6 socket,
+    // there's nothing to test — skip cleanly.
+    let v6_squatter = match std::net::TcpListener::bind("[::1]:0") {
+        Ok(listener) => listener,
+        Err(err) => {
+            eprintln!(
+                "sibling_bind_failure_is_soft: IPv6 loopback unavailable ({err}); \
+                 skipping",
+            );
+            return;
+        }
+    };
+    let port = v6_squatter
+        .local_addr()
+        .expect("squatter local_addr")
+        .port();
+
+    let service = BridgeService::new();
+    let bound = service
+        .bind_on(SocketAddr::from(([127, 0, 0, 1], port)))
+        .await
+        .expect("v4 primary bind must succeed even when v6 sibling is held");
+    assert_eq!(
+        bound.local_addr().port(),
+        port,
+        "primary must bind on the requested port",
+    );
+    assert!(
+        bound.secondary_local_addr().is_none(),
+        "sibling bind must soft-fail when the v6 port is held",
+    );
+    let primary_addr = bound.local_addr();
+    let serve_handle = common::spawn_serve(bound);
+
+    // v4 still works — that's what soft-fail buys us.
+    let _v4 = connect_test_client(primary_addr).await;
+
+    service.stop_server().await;
+    serve_handle
+        .await
+        .expect("serve task")
+        .expect("clean shutdown");
+    drop(v6_squatter);
 }

@@ -5,6 +5,7 @@
 	import * as Empty from '@eurora/ui/components/empty/index';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
+	import { Debounced } from 'runed';
 	import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
 
 	interface Props {
@@ -17,46 +18,59 @@
 	const threadService = inject(THREAD_SERVICE);
 
 	let query = $state('');
+	const debouncedQuery = new Debounced(() => query.trim(), 300);
 	let threadResults: ThreadSearchResult[] = $state([]);
 	let messageResults: MessageSearchResult[] = $state([]);
 	let loading = $state(false);
-	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+	// "Searching" covers both the debounce wait *and* the in-flight request,
+	// so the markup never briefly shows "No results" while a query is still
+	// being settled.
+	const searching = $derived(query.trim().length >= 2 && (debouncedQuery.pending || loading));
 
 	$effect(() => {
-		if (!open) {
-			query = '';
-			threadResults = [];
-			messageResults = [];
-		}
+		if (open) return;
+		query = '';
+		// Skip the trailing debounce window when the dialog closes so a
+		// stale query can't trigger a search against an unmounted view.
+		debouncedQuery.setImmediately('');
+		threadResults = [];
+		messageResults = [];
+		loading = false;
 	});
 
 	$effect(() => {
-		const q = query.trim();
-		clearTimeout(debounceTimer);
+		const q = debouncedQuery.current;
 
 		if (q.length < 2) {
 			threadResults = [];
 			messageResults = [];
+			loading = false;
 			return;
 		}
 
 		loading = true;
-		debounceTimer = setTimeout(async () => {
+		let cancelled = false;
+
+		(async () => {
 			try {
 				const [threads, messages] = await Promise.all([
 					threadService.searchThreads(q, 10, 0),
 					threadService.searchMessages(q, 10, 0),
 				]);
+				if (cancelled) return;
 				threadResults = threads;
 				messageResults = messages;
 			} catch (e) {
-				console.error('[search] failed:', e);
+				if (!cancelled) console.error('[search] failed:', e);
 			} finally {
-				loading = false;
+				if (!cancelled) loading = false;
 			}
-		}, 300);
+		})();
 
-		return () => clearTimeout(debounceTimer);
+		return () => {
+			cancelled = true;
+		};
 	});
 
 	function selectThread(id: string) {
@@ -97,7 +111,7 @@
 					>
 				</Empty.Header>
 			</Empty.Root>
-		{:else if loading}
+		{:else if searching}
 			<Empty.Root class="border-none py-10">
 				<Empty.Header>
 					<Empty.Description>Searching...</Empty.Description>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { unwrap } from '$lib/bindings/result.js';
 	import { commands } from '$lib/bindings/specta.bindings.js';
+	import { useDebounce } from 'runed';
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -54,9 +55,9 @@
 		isUpdating = false;
 	}
 
+	const scheduleInitialCheck = useDebounce(checkForUpdate, 2000);
+
 	onMount(() => {
-		// Small delay to ensure the app is fully loaded before checking
-		const timeout = setTimeout(checkForUpdate, 2000);
-		return () => clearTimeout(timeout);
+		scheduleInitialCheck();
 	});
 </script>

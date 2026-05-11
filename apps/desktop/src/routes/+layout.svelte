@@ -17,7 +17,7 @@
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { ModeWatcher } from 'mode-watcher';
-	import { onMount } from 'svelte';
+	import { useEventListener } from 'runed';
 
 	// Set platform class synchronously (before first render) so CSS
 	// variables like --titlebar-height are correct from the start.
@@ -53,14 +53,8 @@
 	// the first streamed code block doesn't pay grammar-load latency.
 	warmupShikiHighlighter();
 
-	onMount(() => {
-		// All urls open in a separate browser window
-		document.addEventListener('click', handleUrls);
-
-		return () => {
-			document.removeEventListener('click', handleUrls);
-		};
-	});
+	// All urls open in a separate browser window
+	useEventListener(() => document, 'click', handleUrls);
 
 	async function handleUrls(event: MouseEvent) {
 		const target = event.target as HTMLElement | null;

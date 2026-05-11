@@ -4,11 +4,14 @@
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import { platform } from '@tauri-apps/plugin-os';
+	import { useDebounce, useInterval } from 'runed';
 	import { onMount } from 'svelte';
 
+	const STARTUP_DELAY_MS = 1_000;
+	const POLL_INTERVAL_MS = 2_000;
+	const MAX_POLL_ATTEMPTS = 30;
+
 	let dialogOpen = $state(false);
-	let checking = $state(false);
-	let cancelled = false;
 
 	async function checkPermission(): Promise<boolean> {
 		try {
@@ -19,48 +22,48 @@
 		}
 	}
 
+	const permissionPoll = useInterval(POLL_INTERVAL_MS, {
+		immediate: false,
+		callback: async (count) => {
+			const granted = await checkPermission();
+			if (granted) {
+				dialogOpen = false;
+				permissionPoll.pause();
+				return;
+			}
+			if (count >= MAX_POLL_ATTEMPTS) {
+				permissionPoll.pause();
+			}
+		},
+	});
+
+	// `checking` is whatever the poll says — single source of truth.
+	const checking = $derived(permissionPoll.isActive);
+
 	async function requestPermission() {
-		checking = true;
-		cancelled = false;
+		permissionPoll.reset();
 		try {
 			await commands.systemRequestAccessibilityPermission();
 		} catch (error) {
 			console.error('Failed to request accessibility permission:', error);
 		}
-		await pollForPermission();
-		checking = false;
-	}
-
-	async function pollForPermission() {
-		for (let i = 0; i < 30; i++) {
-			if (cancelled) return;
-			await new Promise((resolve) => setTimeout(resolve, 2000));
-			if (cancelled) return;
-			const granted = await checkPermission();
-			if (granted) {
-				dialogOpen = false;
-				return;
-			}
-		}
+		permissionPoll.resume();
 	}
 
 	function dismiss() {
-		cancelled = true;
+		permissionPoll.pause();
 		dialogOpen = false;
 	}
+
+	const startupCheck = useDebounce(async () => {
+		const granted = await checkPermission();
+		if (!granted) dialogOpen = true;
+	}, STARTUP_DELAY_MS);
 
 	onMount(() => {
 		// Only relevant on macOS
 		if (platform() !== 'macos') return;
-
-		const timeout = setTimeout(async () => {
-			const granted = await checkPermission();
-			if (!granted) {
-				dialogOpen = true;
-			}
-		}, 1000);
-
-		return () => clearTimeout(timeout);
+		startupCheck();
 	});
 </script>
 

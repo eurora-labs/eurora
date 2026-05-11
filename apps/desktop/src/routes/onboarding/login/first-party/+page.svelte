@@ -6,41 +6,35 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onMount, onDestroy } from 'svelte';
+	import { useInterval } from 'runed';
+	import { onMount } from 'svelte';
 
 	const user = inject(USER_SERVICE);
-	let intervalId: ReturnType<typeof setInterval> | null = null;
 
-	async function openLogin() {
-		const loginToken = await user.getLoginToken();
-		await open(loginToken.url);
-
-		intervalId = setInterval(async () => {
+	const loginPoll = useInterval(5_000, {
+		immediate: false,
+		callback: async () => {
 			const isLoginSuccess = await user.pollForLogin();
-			if (!isLoginSuccess) {
-				return;
-			}
-			clearInterval(intervalId!);
+			if (!isLoginSuccess) return;
+			loginPoll.pause();
 			// Best-effort focus — the user is mid-OAuth, swallow both
 			// SystemError results and IPC rejections rather than blocking
 			// the redirect on a window-focus hiccup.
 			commands.systemFocusMainWindow().catch(() => {});
-			if (user.emailVerified) {
-				goto('/');
-			} else {
-				goto('/onboarding/login/verify-email?redirect=/');
-			}
-		}, 5000);
+			goto(user.emailVerified ? '/' : '/onboarding/login/verify-email?redirect=/');
+		},
+	});
+
+	async function openLogin() {
+		const loginToken = await user.getLoginToken();
+		await open(loginToken.url);
+		loginPoll.resume();
 	}
 
 	onMount(() => {
 		openLogin().catch((err) => {
 			console.error('Error opening login:', err);
 		});
-	});
-
-	onDestroy(() => {
-		if (intervalId) clearInterval(intervalId);
 	});
 </script>
 

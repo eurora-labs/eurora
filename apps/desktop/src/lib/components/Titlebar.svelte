@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import { useTauriListen } from '$lib/utils/use-tauri-listen.js';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
@@ -12,7 +13,6 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { platform } from '@tauri-apps/plugin-os';
-	import { onMount } from 'svelte';
 
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
@@ -40,17 +40,12 @@
 
 	const appWindow = getCurrentWindow();
 
-	onMount(() => {
-		appWindow.isMaximized().then((val) => (maximized = val));
-
-		const unlisten = appWindow.onResized(() => {
-			appWindow.isMaximized().then((val) => (maximized = val));
-		});
-
-		return () => {
-			unlisten.then((fn) => fn());
-		};
-	});
+	appWindow.isMaximized().then((val) => (maximized = val));
+	useTauriListen(() =>
+		appWindow.onResized(async () => {
+			maximized = await appWindow.isMaximized();
+		}),
+	);
 
 	function minimize() {
 		appWindow.minimize();
@@ -74,10 +69,10 @@
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
 	<!--
 		Leading region holds the sidebar trigger. Its width tracks the
-		sidebar so the trigger sits flush with the sidebar's right edge
-		when expanded, and falls back to just past the macOS traffic
-		lights (or the window's left edge on Windows/Linux) when
-		collapsed. Both transitions match the sidebar's 200ms ease-linear.
+		sidebar (see .titlebar-leading) so the trigger's center matches
+		what's beneath it: flush with the sidebar's right edge when
+		expanded, and centered over the sidebar's icon column when
+		collapsed. Transitions match the sidebar's 200ms ease-linear.
 	-->
 	<div data-tauri-drag-region class="titlebar-leading" data-state={sidebar.state}>
 		<Sidebar.Trigger />
@@ -181,39 +176,57 @@
 	}
 
 	/*
-	 * Leading region: hosts the sidebar trigger, right-aligned. The
-	 * region's width is driven by the sidebar's open state so the
-	 * trigger sits flush with the sidebar's right edge when expanded
-	 * and against the window's leading edge when collapsed. The macOS
-	 * traffic-light reservation (76px padding-left, with width grown
-	 * to compensate under border-box) applies only in the collapsed
-	 * state; once expanded, the sidebar background already extends
-	 * past the traffic lights.
+	 * Leading region: hosts the sidebar trigger. Width tracks the
+	 * sidebar's own width tokens (defined on .group/sidebar-wrapper in
+	 * sidebar-provider.svelte) so the trigger lands in two different
+	 * places depending on state:
 	 *
-	 * Collapsed width is `--leading-collapsed-w` (1.75rem trigger +
-	 * 0.25rem right inset = 2rem). Timing matches the sidebar's own
-	 * collapse animation (`transition-[width] duration-200 ease-linear`
-	 * in sidebar.svelte) so the trigger and sidebar move in lockstep.
+	 *   - Expanded: width = --sidebar-width; the trigger is flush
+	 *     against the sidebar's right edge (justify-content: flex-end
+	 *     with a 0.25rem inset).
+	 *   - Collapsed: width = --sidebar-width-icon (3rem); the trigger
+	 *     is centered, which aligns its 1.75rem-wide body with the
+	 *     icon column of Sidebar.MenuButton in icon mode (whose 16px
+	 *     icons center at x = 24px inside the 3rem column).
+	 *
+	 * Both states use justify-content: flex-end and differ only in
+	 * width + padding-right, so the trigger glides smoothly between
+	 * positions instead of snapping (justify-content is not
+	 * animatable). Timing matches sidebar.svelte's own collapse
+	 * animation (transition-[width] duration-200 ease-linear) so the
+	 * trigger and sidebar move in lockstep.
+	 *
+	 * On macOS we reserve 76px on the leading edge when collapsed for
+	 * the traffic lights — the lights occupy what would otherwise be
+	 * the icon column, so we shift the 3rem region to their right and
+	 * keep the trigger centered inside it. Once expanded, the sidebar
+	 * background already extends past the lights so no reservation is
+	 * needed.
 	 */
 	.titlebar-leading {
-		--leading-collapsed-w: 2rem;
+		--trigger-size: 1.75rem; /* Sidebar.Trigger renders as `size-7` */
 		display: flex;
 		flex-shrink: 0;
 		align-items: center;
 		justify-content: flex-end;
-		width: var(--leading-collapsed-w);
-		padding-right: 0.25rem;
 		transition:
 			width 200ms linear,
+			padding-right 200ms linear,
 			padding-left 200ms linear;
 	}
 
 	.titlebar-leading[data-state='expanded'] {
 		width: var(--sidebar-width);
+		padding-right: 0.25rem;
+	}
+
+	.titlebar-leading[data-state='collapsed'] {
+		width: var(--sidebar-width-icon);
+		padding-right: calc((var(--sidebar-width-icon) - var(--trigger-size)) / 2);
 	}
 
 	.titlebar-mac .titlebar-leading[data-state='collapsed'] {
-		width: calc(var(--leading-collapsed-w) + 76px);
+		width: calc(var(--sidebar-width-icon) + 76px);
 		padding-left: 76px;
 	}
 
