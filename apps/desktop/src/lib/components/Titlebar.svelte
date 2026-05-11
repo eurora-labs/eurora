@@ -75,7 +75,7 @@
 		collapsed. Transitions match the sidebar's 200ms ease-linear.
 	-->
 	<div data-tauri-drag-region class="titlebar-leading" data-state={sidebar.state}>
-		<Sidebar.Trigger />
+		<Sidebar.Trigger class="size-8" />
 	</div>
 	<div data-tauri-drag-region class="titlebar-fill"></div>
 	<div data-tauri-drag-region class="titlebar-content">
