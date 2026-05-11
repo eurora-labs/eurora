@@ -9805,6 +9805,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "settings-core"
+version = "0.0.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "serde_json_lenient",
+ "specta",
+ "specta-typescript",
+ "uuid",
+]
+
+[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
