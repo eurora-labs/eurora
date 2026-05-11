@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { copyFile, mkdir } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -29,21 +30,17 @@ export async function buildStyles() {
 	]);
 }
 
-// `node_modules/.bin/postcss` is a shim placed by pnpm; on Windows it's
-// `postcss.cmd`. Resolving it directly avoids `shell: true` (and the
-// associated argument-escaping deprecation) without losing Windows support.
-const postcssBin = join(
-	projectRoot,
-	'node_modules',
-	'.bin',
-	process.platform === 'win32' ? 'postcss.cmd' : 'postcss',
-);
+// Resolve postcss-cli's JS entry directly and run it under the current Node
+// binary. Spawning the pnpm-placed `postcss.cmd` shim instead would trip
+// Node's post-CVE-2024-27980 EINVAL on Windows unless `shell: true` is set.
+const require = createRequire(import.meta.url);
+const postcssCliEntry = join(dirname(require.resolve('postcss-cli/package.json')), 'index.js');
 
 function compileWithPostcss(name) {
 	return new Promise((resolve, reject) => {
 		const child = spawn(
-			postcssBin,
-			[join('./src/styles', name), '-o', join('./dist/styles', name)],
+			process.execPath,
+			[postcssCliEntry, join('./src/styles', name), '-o', join('./dist/styles', name)],
 			{ cwd: projectRoot, stdio: 'inherit' },
 		);
 
