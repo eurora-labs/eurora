@@ -11,8 +11,10 @@
 //! Cross-provider concerns (linking against an existing user, storing
 //! encrypted tokens) live in the `oauth_flow` module on the parent crate.
 
+pub mod apple;
 pub mod github;
 pub mod google;
+pub mod provider_ext;
 
 use chrono::{DateTime, Utc};
 use thiserror::Error;
@@ -28,6 +30,9 @@ pub enum OAuthError {
     #[error("invalid URL: {0}")]
     InvalidUrl(String),
 
+    #[error("invalid OAuth configuration: {0}")]
+    InvalidConfig(&'static str),
+
     #[error("OAuth code exchange failed: {0}")]
     CodeExchange(String),
 
@@ -40,14 +45,27 @@ pub enum OAuthError {
     #[error("OAuth response missing required field: {0}")]
     MissingField(&'static str),
 
+    /// Minting the Apple `client_secret` JWT failed. The underlying
+    /// `jsonwebtoken` error is preserved as a structured source so the
+    /// log boundary can render it without leaking key material into
+    /// `Display` output.
+    #[error("OAuth client-secret JWT mint failed")]
+    ClientSecretMint(#[source] jsonwebtoken::errors::Error),
+
     #[error("OAuth HTTP request failed")]
     Http(#[from] reqwest::Error),
 }
 
 /// OAuth identity tokens, already encrypted at rest under the
 /// PKCE-encryption keyring.
+///
+/// `encrypted_access_token` is `Option` rather than a `Vec<u8>` with
+/// a "treat empty as absent" sentinel: Apple's web flow and the
+/// native-ID-token flows don't hand the relying party a usable access
+/// token at all, and modelling that absence explicitly removes a
+/// class of "did the caller forget to populate it?" bugs.
 pub struct OAuthTokenBundle {
-    pub encrypted_access_token: Vec<u8>,
+    pub encrypted_access_token: Option<Vec<u8>>,
     pub encrypted_refresh_token: Option<Vec<u8>>,
     pub access_token_expiry: Option<DateTime<Utc>>,
     pub scope: String,

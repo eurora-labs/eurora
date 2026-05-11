@@ -1692,9 +1692,11 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "argon2",
+ "async-trait",
  "auth-core",
  "axum",
  "axum-extra",
+ "base64 0.22.1",
  "be-auth-core",
  "be-email-service",
  "be-remote-db",
@@ -1832,6 +1834,7 @@ dependencies = [
 name = "be-remote-db"
 version = "0.0.0"
 dependencies = [
+ "auth-core",
  "bon",
  "chrono",
  "ipnet",

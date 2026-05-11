@@ -524,16 +524,17 @@ impl DatabaseManager {
         redirect_uri: String,
         ip_address: Option<ipnet::IpNet>,
         expires_at: DateTime<Utc>,
-        nonce: Vec<u8>,
+        nonce: Option<Vec<u8>>,
+        login_token: Option<Vec<u8>>,
     ) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
+            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token
             "#,
         )
         .bind(id)
@@ -545,7 +546,8 @@ impl DatabaseManager {
         .bind(now)
         .bind(now)
         .bind(expires_at)
-        .bind(&nonce)
+        .bind(nonce.as_deref())
+        .bind(login_token.as_deref())
         .fetch_one(&self.pool)
         .await?;
 
@@ -556,7 +558,7 @@ impl DatabaseManager {
     pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
+            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token
             FROM oauth_state
             WHERE state = $1 AND consumed = false AND expires_at > now()
             "#,
@@ -577,7 +579,7 @@ impl DatabaseManager {
             UPDATE oauth_state
             SET consumed = true, updated_at = $2
             WHERE state = $1 AND consumed = false AND expires_at > now()
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token
             "#,
         )
         .bind(state)

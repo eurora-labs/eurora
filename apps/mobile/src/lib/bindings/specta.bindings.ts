@@ -63,6 +63,12 @@ export const commands = {
 	authIsAuthenticated: () => typedError<boolean, string>(__TAURI_INVOKE("auth_is_authenticated")),
 	authGetAccessTokenPayload: () => typedError<Claims, string>(__TAURI_INVOKE("auth_get_access_token_payload")),
 	authRefreshSession: () => typedError<null, string>(__TAURI_INVOKE("auth_refresh_session")),
+	settingsGetTelemetry: () => __TAURI_INVOKE<TelemetrySettings>("settings_get_telemetry"),
+	settingsSetTelemetry: (telemetrySettings: TelemetrySettings) => typedError<TelemetrySettings, SettingsError>(__TAURI_INVOKE("settings_set_telemetry", { telemetrySettings })),
+	systemGetTelemetryBootstrap: () => typedError<TelemetryBootstrap, SystemError>(__TAURI_INVOKE("system_get_telemetry_bootstrap")),
+	systemNeedsTelemetryConsent: () => __TAURI_INVOKE<boolean>("system_needs_telemetry_consent"),
+	systemReinitTelemetry: () => __TAURI_INVOKE<void>("system_reinit_telemetry"),
+	systemRotateTelemetryDistinctId: () => typedError<string, SystemError>(__TAURI_INVOKE("system_rotate_telemetry_distinct_id")),
 	threadList: (limit: number, offset: number) => typedError<Thread[], ThreadError>(__TAURI_INVOKE("thread_list", { limit, offset })),
 	threadCreate: () => typedError<Thread, ThreadError>(__TAURI_INVOKE("thread_create")),
 	threadDelete: (threadId: string) => typedError<null, ThreadError>(__TAURI_INVOKE("thread_delete", { threadId })),
@@ -364,10 +370,10 @@ export type PlainTextContentBlock = {
 /**
  *  Third-party identity provider supported by the auth service.
  * 
- *  Wire format is lowercase JSON (`"google"`, `"github"`) so it reads
- *  naturally in URLs and request bodies.
+ *  Wire format is lowercase JSON (`"google"`, `"github"`, `"apple"`)
+ *  so it reads naturally in URLs and request bodies.
  */
-export type Provider = "google" | "github";
+export type Provider = "google" | "github" | "apple";
 
 export type ReasoningContentBlock = {
 	id?: string | null,
@@ -431,6 +437,13 @@ export type ServerToolResult = {
 export type ServerToolStatus = "success" | "error";
 
 /**
+ *  Typed error surface for the `settings_*` IPC commands. Externally
+ *  tagged so the JS side gets `{ type: "Persistence", data: "..." }`
+ *  and can branch on `type` instead of parsing strings.
+ */
+export type SettingsError = { type: "Persistence"; data: string };
+
+/**
  *  Typed error surface for the streaming `chat_*` IPC commands.
  *  Externally tagged so the JS side can branch on `error.type`.
  *  `Cancelled` is split out from the rest so the UI can suppress its
@@ -441,12 +454,47 @@ export type ServerToolStatus = "success" | "error";
  */
 export type StreamError = { type: "Cancelled" } | { type: "Timeout"; data: number } | { type: "Channel"; data: string } | { type: "StateUnavailable"; data: string } | { type: "Thread"; data: ThreadError };
 
+/**
+ *  Typed error surface for the `system_*` IPC commands. Externally
+ *  tagged so the JS side gets `{ type: "Persistence", data: "..." }`
+ *  and can branch on `type` without parsing strings.
+ */
+export type SystemError = { type: "Persistence"; data: string };
+
 export type SystemMessage = {
 	content: ContentBlocks,
 	id?: string | null,
 	name?: string | null,
 	additional_kwargs?: { [key in string]: unknown },
 	response_metadata?: { [key in string]: unknown },
+};
+
+/**
+ *  Single payload the mobile frontend fetches once at startup to bring
+ *  up its Sentry / PostHog SDKs. Bundles the user's persisted consent
+ *  state, the embedded build-time keys, and the release identity so the
+ *  SDKs can tag events with channel + version.
+ * 
+ *  `None` on any field means "this surface is disabled in this build".
+ *  `euro-telemetry/build.rs` enforces all-or-nothing consistency: a
+ *  build with a DSN always carries a channel and a release, so the
+ *  frontend never has to defend against a half-configured payload.
+ */
+export type TelemetryBootstrap = {
+	settings: TelemetrySettings,
+	sentryDsn: string | null,
+	posthogKey: string | null,
+	posthogHost: string | null,
+	channel: string | null,
+	release: string | null,
+};
+
+export type TelemetrySettings = {
+	consentVersion: number,
+	anonymousMetrics: boolean,
+	anonymousErrors: boolean,
+	nonAnonymousMetrics: boolean,
+	distinctId: string | null,
 };
 
 export type TextContentBlock = {

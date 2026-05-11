@@ -18,10 +18,10 @@ use auth_core::{
     ThirdPartyAuthUrlResponse, TokenResponse, UserResponse, VerifyEmailRequest,
 };
 use axum::{
-    Json,
+    Form, Json,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Redirect},
+    response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
@@ -86,11 +86,10 @@ pub async fn login(
             provider,
             code,
             state: oauth_state,
-            login_token,
         } => {
             state
                 .auth
-                .login_third_party(provider, &code, &oauth_state, login_token)
+                .login_third_party(provider, &code, &oauth_state)
                 .await?
         }
     };
@@ -148,7 +147,10 @@ pub async fn oauth_url(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ThirdPartyAuthUrlRequest>,
 ) -> AuthResult<Json<ThirdPartyAuthUrlResponse>> {
-    let url = state.auth.third_party_auth_url(body.provider).await?;
+    let url = state
+        .auth
+        .third_party_auth_url(body.provider, body.login_token)
+        .await?;
     Ok(Json(ThirdPartyAuthUrlResponse { url }))
 }
 
@@ -202,6 +204,10 @@ pub async fn mobile_oauth_callback(
     let provider = match path.provider.as_str() {
         "google" => Provider::Google,
         "github" => Provider::Github,
+        // Apple is intentionally excluded: its mobile callback uses
+        // `response_mode=form_post` (POST, not GET) and is handled by a
+        // separate route — see `apple_mobile_callback` (PR 3). Falling
+        // through here would mismatch verb and shape.
         other => {
             tracing::warn!(provider = %other, "mobile OAuth callback for unknown provider");
             return Redirect::to(&device_redirect_error("invalid_provider"));
@@ -331,8 +337,293 @@ pub async fn email_resend_verification(
     state.auth.resend_verification_email(user_id).await
 }
 
+/// Body Apple POSTs to `/auth/oauth/apple/web-callback`.
+///
+/// Apple uses `response_mode=form_post` (required when scopes include
+/// `name`/`email`), so the callback arrives as
+/// `application/x-www-form-urlencoded` rather than as query params on
+/// a GET. The `user` field is a JSON-encoded string carrying first /
+/// last name — only present on the very first sign-in; absent on
+/// every subsequent one.
+///
+/// Apple also includes an `id_token` in this body. We deliberately
+/// **don't** deserialise it: trusting an SPA-facing claim would
+/// bypass the back-channel code exchange where signature + audience
+/// are verified against Apple's JWKS. Serde silently drops unknown
+/// fields, so the extra field is harmless on the wire.
+#[derive(Debug, Deserialize)]
+pub struct AppleFormPost {
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    state: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    /// Stringified JSON like
+    /// `{"name":{"firstName":"…","lastName":"…"},"email":"…"}`. We
+    /// only consume the name portion; the email comes from the
+    /// verified ID token claims, never from this untrusted body.
+    #[serde(default)]
+    user: Option<String>,
+}
+
+/// Apple web-callback completion.
+///
+/// Apple POSTs here directly (not via the SPA). On success we set the
+/// session cookies and 303 the browser to `${web_base}/auth/apple/done`
+/// — that SPA route rehydrates auth state from `/auth/me` and
+/// completes any pending desktop-pairing redirect.
+#[tracing::instrument(skip_all)]
+pub async fn apple_web_callback(
+    State(state): State<Arc<AppState>>,
+    jar: CookieJar,
+    Form(form): Form<AppleFormPost>,
+) -> Response {
+    let web_base = state.web_base();
+
+    if let Some(err) = form.error {
+        tracing::warn!(error = %err, "Apple returned error on web-callback");
+        return Redirect::to(&format!("{web_base}/login?error=oauth_failed")).into_response();
+    }
+
+    let (code, oauth_state) = match (form.code, form.state) {
+        (Some(c), Some(s)) => (c, s),
+        _ => {
+            tracing::warn!("Apple web-callback missing code or state");
+            return Redirect::to(&format!("{web_base}/login?error=invalid_callback"))
+                .into_response();
+        }
+    };
+    let display_name = parse_apple_form_user(form.user.as_deref());
+
+    match state
+        .auth
+        .handle_apple_login(&code, &oauth_state, display_name)
+        .await
+    {
+        Ok(session) => {
+            let target = if session.was_paired {
+                format!("{web_base}/auth/apple/done?paired=1")
+            } else {
+                format!("{web_base}/auth/apple/done")
+            };
+            apple_cookies_then_redirect(&state, jar, session, &target)
+        }
+        Err(e) => {
+            let kind = e.error_kind();
+            tracing::warn!(error = %e, kind = %kind, "Apple web-callback failed");
+            Redirect::to(&format!("{web_base}/login?error={kind}")).into_response()
+        }
+    }
+}
+
+/// Form-post completion variant of `session_response`.
+///
+/// The shared `session_response` returns `(CookieJar, Json<…>)`
+/// because every other session-minting endpoint responds to a
+/// JSON-over-XHR caller. Apple's form-post is a top-level navigation
+/// that needs cookies + a 303 to the SPA. Cookie mode is the only
+/// sane mode for a browser-redirect flow, so we don't dispatch on
+/// `AuthMode` here.
+fn apple_cookies_then_redirect(
+    state: &AppState,
+    jar: CookieJar,
+    session: MintedSession,
+    target: &str,
+) -> Response {
+    let access_max_age = session.tokens.expires_in;
+    let refresh_max_age = state.jwt_config().refresh_token_expiry_days * 86_400;
+    let jar = jar
+        .add(cookies::access_cookie(
+            &state.cookies,
+            session.tokens.access_token,
+            access_max_age,
+        ))
+        .add(cookies::refresh_cookie(
+            &state.cookies,
+            session.tokens.refresh_token,
+            refresh_max_age,
+        ));
+    (jar, Redirect::to(target)).into_response()
+}
+
+/// Maximum length (Unicode scalars) of a display name extracted from
+/// Apple's form-post `user` blob. Apple's UI imposes a much tighter
+/// limit; we cap defensively because Apple doesn't sign the `user`
+/// blob.
+const APPLE_DISPLAY_NAME_MAX: usize = 128;
+
+/// Byte-size cap on the entire `user` JSON blob before we hand it to
+/// `serde_json`. Apple's real payload is ~100 bytes; 4 KiB is two
+/// orders of magnitude of headroom while still bounding the parser's
+/// work against a maliciously fabricated body. Axum has its own outer
+/// body-size limit but it applies to the whole form, not to this
+/// inner field specifically.
+const APPLE_FORM_USER_MAX_BYTES: usize = 4096;
+
+/// Typed projection of the Apple form-post `user` blob. Apple's
+/// payload looks like:
+/// `{"name":{"firstName":"…","lastName":"…"},"email":"…"}`. We only
+/// consume the name portion; the email is trusted only via the
+/// verified ID-token claim, never via this body.
+#[derive(Debug, Deserialize)]
+struct AppleFormUserBlob {
+    name: Option<AppleFormUserName>,
+    // Apple also sends `email` here on first sign-in. Intentionally
+    // not deserialised: trusting an unsigned blob's email field would
+    // be an account-takeover vector. Treating it as unknown-and-
+    // ignored (rather than `#[serde(deny_unknown_fields)]`) keeps
+    // forwards-compat with future Apple additions.
+}
+
+#[derive(Debug, Deserialize)]
+struct AppleFormUserName {
+    #[serde(rename = "firstName", default)]
+    first_name: Option<String>,
+    #[serde(rename = "lastName", default)]
+    last_name: Option<String>,
+}
+
+/// Project the Apple form-post `user` blob onto an `Option<String>`
+/// display-name override.
+///
+/// Treats the input as fully untrusted: rejects oversize bodies,
+/// oversize or control-character-bearing names, and returns `None`
+/// for any structural failure rather than propagating an error (a
+/// missing display name must not fail the login).
+pub(crate) fn parse_apple_form_user(raw: Option<&str>) -> Option<String> {
+    let raw = raw?;
+    if raw.is_empty() || raw.len() > APPLE_FORM_USER_MAX_BYTES {
+        return None;
+    }
+    let blob: AppleFormUserBlob = serde_json::from_str(raw).ok()?;
+    let name = blob.name?;
+    let first = name.first_name.as_deref().unwrap_or("");
+    let last = name.last_name.as_deref().unwrap_or("");
+    let combined = format!("{first} {last}").trim().to_string();
+    if combined.is_empty() {
+        return None;
+    }
+    // Reject control characters (XSS / log-injection vectors) and cap
+    // length. Don't HTML-escape here — that's the rendering layer's
+    // job, and pre-escaping in storage corrupts user names that
+    // legitimately contain `&` / `<`.
+    if combined.chars().any(char::is_control) {
+        return None;
+    }
+    if combined.chars().count() > APPLE_DISPLAY_NAME_MAX {
+        return None;
+    }
+    Some(combined)
+}
+
 // Re-exported for tests / IDE jump-to-definition; `IntoResponse` is
 // implemented on the `(CookieJar, …)` tuple by axum so handlers above
 // don't need an explicit `into_response()` call.
 #[allow(dead_code)]
 fn _into_response<T: IntoResponse>(_: T) {}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_apple_form_user;
+
+    #[test]
+    fn returns_none_for_no_input() {
+        assert!(parse_apple_form_user(None).is_none());
+    }
+
+    #[test]
+    fn returns_none_for_empty_string() {
+        assert!(parse_apple_form_user(Some("")).is_none());
+    }
+
+    #[test]
+    fn returns_none_for_malformed_json() {
+        assert!(parse_apple_form_user(Some("{not json")).is_none());
+    }
+
+    #[test]
+    fn returns_none_when_name_key_missing() {
+        let raw = r#"{"email":"u@e.com"}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn returns_none_when_both_names_are_empty() {
+        let raw = r#"{"name":{"firstName":"","lastName":""}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn returns_none_when_firstname_is_null() {
+        let raw = r#"{"name":{"firstName":null,"lastName":null}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn rejects_non_string_name_field() {
+        // Typed deserialization rejects the whole blob if any name
+        // field has the wrong shape. Better than silently falling
+        // back to the well-typed half: a body that violates the
+        // contract is more likely to be tampered with than partially
+        // wrong.
+        let raw = r#"{"name":{"firstName":42,"lastName":"Doe"}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn handles_first_only() {
+        let raw = r#"{"name":{"firstName":"Ada","lastName":""}}"#;
+        assert_eq!(parse_apple_form_user(Some(raw)), Some("Ada".to_string()));
+    }
+
+    #[test]
+    fn handles_last_only() {
+        let raw = r#"{"name":{"firstName":"","lastName":"Lovelace"}}"#;
+        assert_eq!(
+            parse_apple_form_user(Some(raw)),
+            Some("Lovelace".to_string())
+        );
+    }
+
+    #[test]
+    fn handles_unicode() {
+        let raw = r#"{"name":{"firstName":"José","lastName":"García"}}"#;
+        assert_eq!(
+            parse_apple_form_user(Some(raw)),
+            Some("José García".to_string())
+        );
+    }
+
+    #[test]
+    fn handles_embedded_quotes() {
+        let raw = r#"{"name":{"firstName":"O\"Brien","lastName":"Smith"}}"#;
+        assert_eq!(
+            parse_apple_form_user(Some(raw)),
+            Some(r#"O"Brien Smith"#.to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_control_characters() {
+        let raw = r#"{"name":{"firstName":"Ada\nLovelace","lastName":""}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn rejects_oversize_display_name() {
+        let huge = "a".repeat(super::APPLE_DISPLAY_NAME_MAX + 1);
+        let raw = format!(r#"{{"name":{{"firstName":"{huge}","lastName":""}}}}"#);
+        assert!(parse_apple_form_user(Some(&raw)).is_none());
+    }
+
+    #[test]
+    fn rejects_oversize_input_before_parsing() {
+        // Outer-body cap kicks in before the JSON parser sees the
+        // input — verify a malformed (would-otherwise-error) body
+        // larger than the cap returns None without crashing the
+        // parser on something a forgery could exploit.
+        let huge = "x".repeat(super::APPLE_FORM_USER_MAX_BYTES + 1);
+        assert!(parse_apple_form_user(Some(&huge)).is_none());
+    }
+}

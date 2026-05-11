@@ -101,6 +101,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/auth/oauth/google/id-token",
             post(handlers::google_id_token_login),
         )
+        // Apple Sign In web-callback. Apple form-posts here directly
+        // (not via the SPA) using `response_mode=form_post`. The
+        // handler sets session cookies and 303s to the SPA success
+        // page. The mobile-callback / native-iOS / notifications
+        // routes land in later PRs.
+        .route(
+            "/auth/oauth/apple/web-callback",
+            post(handlers::apple_web_callback),
+        )
         .route(
             "/auth/login-token/exchange",
             post(handlers::login_token_exchange),
@@ -132,6 +141,11 @@ pub async fn init_auth_service(
 ) -> Result<Router> {
     tracing::debug!("Initializing auth service");
     let oauth_clients = build_oauth_clients().await?;
+    // Cross-config validation: cookie scope + OAuth providers must
+    // agree (e.g. Apple form-post needs at least one SPA web origin
+    // to redirect to). Surface misconfigurations at boot rather than
+    // on the first sign-in.
+    oauth_clients.validate(&cookie_config)?;
     let auth = AuthService::new(db, jwt_config, email_service, oauth_clients);
     let state = Arc::new(AppState::new(auth, cookie_config));
     Ok(create_router(state))

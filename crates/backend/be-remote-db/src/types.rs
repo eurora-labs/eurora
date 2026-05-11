@@ -86,19 +86,46 @@ pub struct PasswordCredentials {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Database-side counterpart to [`auth_core::Provider`].
+///
+/// The two enums are intentionally kept in lockstep: `Provider` is the
+/// wire-level type the auth service hands clients (`serde` lowercase),
+/// `OAuthProvider` is the storage-level type pinned to the
+/// `oauth_provider` Postgres enum. Conversions go through the
+/// [`From`] impls below so the lockstep is enforced by the compiler —
+/// if a new provider lands on one side without the other, this file
+/// will refuse to build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[sqlx(type_name = "oauth_provider", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 pub enum OAuthProvider {
     Google,
     Github,
+    Apple,
 }
 
 impl std::fmt::Display for OAuthProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OAuthProvider::Google => write!(f, "google"),
-            OAuthProvider::Github => write!(f, "github"),
+        f.write_str(auth_core::Provider::from(*self).as_str())
+    }
+}
+
+impl From<auth_core::Provider> for OAuthProvider {
+    fn from(p: auth_core::Provider) -> Self {
+        match p {
+            auth_core::Provider::Google => OAuthProvider::Google,
+            auth_core::Provider::Github => OAuthProvider::Github,
+            auth_core::Provider::Apple => OAuthProvider::Apple,
+        }
+    }
+}
+
+impl From<OAuthProvider> for auth_core::Provider {
+    fn from(p: OAuthProvider) -> Self {
+        match p {
+            OAuthProvider::Google => auth_core::Provider::Google,
+            OAuthProvider::Github => auth_core::Provider::Github,
+            OAuthProvider::Apple => auth_core::Provider::Apple,
         }
     }
 }
@@ -143,6 +170,10 @@ pub struct OAuthState {
     pub expires_at: DateTime<Utc>,
     #[serde(skip_serializing)]
     pub nonce: Option<Vec<u8>>,
+    /// Encrypted desktop-pairing token captured at URL-issue time.
+    /// `None` for flows that don't pair a device (e.g. plain web login).
+    #[serde(skip_serializing)]
+    pub login_token: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
