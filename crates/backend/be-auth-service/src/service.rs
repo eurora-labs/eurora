@@ -160,9 +160,19 @@ pub struct AuthService {
     /// trait-object map because the native ID-token flow (see
     /// [`Self::login_google_id_token`]) calls
     /// [`GoogleOAuthClient::verify_id_token`] — a method outside the
-    /// [`OAuthProviderExt`] surface. When the native Apple flow lands
-    /// it will get an analogous `apple_oauth_client` field.
+    /// [`OAuthProviderExt`] surface.
     google_oauth_client: Option<Arc<GoogleOAuthClient>>,
+    /// Concrete-typed handle on the Apple client.
+    ///
+    /// Mirrors [`Self::google_oauth_client`]: the
+    /// [`OAuthProviderExt`] trait covers the redirect-flow surface
+    /// but Apple has two methods that don't fit it —
+    /// `verify_id_token` for the native iOS path (lands in a later
+    /// PR) and `verify_notification` for the server-to-server
+    /// notifications path. Reaching for the concrete client here
+    /// avoids smearing those methods onto the trait with `Option` /
+    /// `unused_variables` for the other providers.
+    apple_oauth_client: Option<Arc<AppleOAuthClient>>,
 }
 
 #[derive(Default)]
@@ -213,8 +223,8 @@ impl AuthService {
         if let Some(g) = github_oauth_client {
             oauth_providers.insert(Provider::Github, g);
         }
-        if let Some(a) = apple_oauth_client {
-            oauth_providers.insert(Provider::Apple, a);
+        if let Some(a) = &apple_oauth_client {
+            oauth_providers.insert(Provider::Apple, a.clone());
         }
 
         Self {
@@ -223,6 +233,7 @@ impl AuthService {
             email_service,
             oauth_providers,
             google_oauth_client,
+            apple_oauth_client,
         }
     }
 
@@ -253,6 +264,20 @@ impl AuthService {
         self.google_oauth_client.as_deref().ok_or_else(|| {
             AuthError::OAuth(OAuthError::MissingEnvVar(missing_env_var_hint(
                 Provider::Google,
+            )))
+        })
+    }
+
+    /// Concrete-typed access to the Apple client. Used by the
+    /// notifications handler (and, later, the native iOS path) to
+    /// reach `verify_notification` / `verify_id_token` — methods
+    /// outside [`OAuthProviderExt`]. The error path mirrors
+    /// [`Self::google_oauth`] so callers see a consistent "Apple is
+    /// not configured" message regardless of entry point.
+    pub(crate) fn apple_oauth(&self) -> AuthResult<&AppleOAuthClient> {
+        self.apple_oauth_client.as_deref().ok_or_else(|| {
+            AuthError::OAuth(OAuthError::MissingEnvVar(missing_env_var_hint(
+                Provider::Apple,
             )))
         })
     }

@@ -11,6 +11,7 @@
 //! [`auth::RefreshClaims`] extractors using the shared
 //! [`be_auth_core::JwtConfig`].
 
+pub mod apple_notifications;
 pub mod auth;
 pub mod cookies;
 pub mod crypto;
@@ -104,11 +105,22 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Apple Sign In web-callback. Apple form-posts here directly
         // (not via the SPA) using `response_mode=form_post`. The
         // handler sets session cookies and 303s to the SPA success
-        // page. The mobile-callback / native-iOS / notifications
-        // routes land in later PRs.
+        // page. The mobile-callback / native-iOS routes land in
+        // later PRs.
         .route(
             "/auth/oauth/apple/web-callback",
             post(handlers::apple_web_callback),
+        )
+        // Apple Sign In server-to-server notifications. Apple POSTs
+        // a single `application/x-www-form-urlencoded` body with a
+        // signed JWT payload to inform us of consent revocation,
+        // account deletion, and Hide-My-Email flag toggles. The
+        // handler verifies the JWT and tears down the user's Apple
+        // sessions when applicable — see
+        // [`apple_notifications`] for the full status-code policy.
+        .route(
+            "/auth/oauth/apple/notifications",
+            post(handlers::apple_notifications),
         )
         .route(
             "/auth/login-token/exchange",

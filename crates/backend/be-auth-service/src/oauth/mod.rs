@@ -52,6 +52,35 @@ pub enum OAuthError {
     #[error("OAuth client-secret JWT mint failed")]
     ClientSecretMint(#[source] jsonwebtoken::errors::Error),
 
+    /// An Apple server-to-server notification JWT failed verification.
+    ///
+    /// Covers signature mismatch, header rejection (e.g. `alg = none`),
+    /// issuer / audience / expiry validation, missing `kid`, and
+    /// malformed `events` claim. The inner string is the human-readable
+    /// reason — it is logged at the handler boundary but never echoed
+    /// to Apple (the response body is empty).
+    #[error("Apple notification verification failed: {0}")]
+    NotificationVerification(String),
+
+    /// An Apple notification's `iat` is outside the symmetric
+    /// freshness window — either older than the past-side maximum or
+    /// far enough in the future that the signing clock has to be wrong
+    /// (or the payload is replayed with a forged `iat`). Kept distinct
+    /// from `NotificationVerification` so the log line distinguishes
+    /// "replay attempt" from "broken signature"; both still map to
+    /// 401 at the HTTP boundary.
+    ///
+    /// The struct fields are captured purely for logging — they're
+    /// never echoed back to Apple.
+    #[error("Apple notification iat={iat} outside freshness window (now={now})")]
+    NotificationOutsideFreshnessWindow { iat: i64, now: i64 },
+
+    /// Fetching Apple's JWKS failed (network error / non-2xx). The
+    /// underlying transport error is preserved as `source` so the log
+    /// can render the cause without it landing in `Display`.
+    #[error("Apple JWKS fetch failed")]
+    JwksFetch(#[source] reqwest::Error),
+
     #[error("OAuth HTTP request failed")]
     Http(#[from] reqwest::Error),
 }
