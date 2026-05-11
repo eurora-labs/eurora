@@ -175,7 +175,7 @@
 							class="cursor-pointer"
 							onclick={() => {
 								user.logout().then(() => {
-									goto('/onboarding');
+									goto('/onboarding/login');
 								});
 							}}
 						>

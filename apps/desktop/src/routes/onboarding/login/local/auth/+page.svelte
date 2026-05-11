@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { unwrap } from '$lib/bindings/result.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
+	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -10,6 +13,7 @@
 	import { toast } from 'svelte-sonner';
 
 	const user = inject(USER_SERVICE);
+	const telemetry = inject(TELEMETRY_SERVICE);
 
 	let mode: 'login' | 'register' = $state('login');
 	let submitting = $state(false);
@@ -20,7 +24,25 @@
 	let regEmail = $state('');
 	let regPassword = $state('');
 
-	function navigateAfterAuth() {
+	// Local-mode users never see the telemetry prompt, so commit an explicit
+	// all-off consent on their behalf. The backend stamps `record_consent`
+	// inside `settings_set_telemetry`, which clears `needs_consent()` and
+	// keeps the global onboarding guard from ever firing for this install.
+	async function disableTelemetry() {
+		const current = await commands.settingsGetTelemetry();
+		unwrap(
+			await commands.settingsSetTelemetry({
+				...current,
+				anonymousErrors: false,
+				anonymousMetrics: false,
+				nonAnonymousMetrics: false,
+			}),
+		);
+		await telemetry.refresh();
+	}
+
+	async function navigateAfterAuth() {
+		await disableTelemetry();
 		if (!user.emailVerified) {
 			goto('/onboarding/login/verify-email?redirect=/');
 		} else {
@@ -32,7 +54,7 @@
 		submitting = true;
 		try {
 			await user.login(login, password);
-			navigateAfterAuth();
+			await navigateAfterAuth();
 		} catch (error) {
 			toast.error(`Login failed: ${error}`);
 		} finally {
@@ -44,7 +66,7 @@
 		submitting = true;
 		try {
 			await user.register(regEmail, regPassword);
-			navigateAfterAuth();
+			await navigateAfterAuth();
 		} catch (error) {
 			toast.error(`Registration failed: ${error}`);
 		} finally {
