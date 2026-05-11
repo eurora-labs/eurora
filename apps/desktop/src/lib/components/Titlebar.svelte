@@ -204,7 +204,7 @@
 	 * needed.
 	 */
 	.titlebar-leading {
-		--trigger-size: 1.75rem; /* Sidebar.Trigger renders as `size-7` */
+		--trigger-size: 2rem; /* Sidebar.Trigger renders as `size-8` */
 		display: flex;
 		flex-shrink: 0;
 		align-items: center;
