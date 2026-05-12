@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
 use euro_endpoint::EndpointManager;
-use euro_settings::AppSettings;
+use euro_settings::SettingsState;
 use tokio::sync::Mutex;
 
 pub use euro_thread::commands::{ActiveStreamTokens, SharedThreadManager};
 
-pub type SharedAppSettings = Mutex<AppSettings>;
+pub type SharedSettingsState = Mutex<SettingsState>;
 pub type SharedEndpointManager = Arc<EndpointManager>;
 pub type SharedUserController = Mutex<euro_user::UserController>;
 

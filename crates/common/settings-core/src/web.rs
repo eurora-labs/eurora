@@ -8,7 +8,10 @@ use serde_json::{Map, Value};
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default, rename_all = "camelCase")]
 pub struct WebSettings {
-    #[serde(flatten, skip_serializing_if = "Map::is_empty")]
+    // `flatten` of an empty Map already emits nothing — no
+    // `skip_serializing_if` needed, and using it here would force
+    // tauri-specta out of unified mode where the IPC surface lives.
+    #[serde(flatten)]
     #[cfg_attr(
         feature = "specta",
         specta(type = std::collections::HashMap<String, specta_typescript::Unknown>)

@@ -1,12 +1,17 @@
 import { unwrap } from '$lib/bindings/result.js';
-import { commands, type Theme } from '$lib/bindings/specta.bindings.js';
+import {
+	commands,
+	type DesktopSettings,
+	type SharedSettings,
+	type ThemePreference,
+} from '$lib/bindings/specta.bindings.js';
 import { clearAccent } from '$lib/services/accent.js';
 import { InjectionToken } from '@eurora/shared/context';
 import { setMode } from 'mode-watcher';
 
 /**
  * Bounds and identity value for the accessibility scale sliders. Kept in sync
- * with the matching constants in `crates/app/euro-settings/src/appearance_settings.rs`
+ * with the matching constants in `crates/common/settings-core/src/desktop.rs`
  * — the backend re-clamps incoming values, so any drift between the two would
  * silently snap the slider on commit.
  */
@@ -18,6 +23,20 @@ export const SCALE_STEP = 0.05;
 const UI_SCALE_VAR = '--ui-scale';
 const TEXT_SCALE_VAR = '--text-scale';
 
+/**
+ * Re-exported alias kept under the historical name. The wire type lives
+ * in `settings-core` as `ThemePreference`; the alias avoids churn at the
+ * call sites that already speak `Theme`.
+ */
+export type Theme = ThemePreference;
+
+/**
+ * Owns the desktop appearance state. Composes its fields from the cloud
+ * `SharedSettings` section (theme, dynamic accent) and `DesktopSettings`
+ * section (interface and text scales) — there is no app-side composite
+ * type. Reads issue two parallel commands; writes target whichever
+ * section actually changed so we don't churn the unrelated file.
+ */
 export class AppearanceService {
 	theme = $state<Theme>('system');
 	dynamicAccent = $state<boolean>(true);
@@ -25,11 +44,14 @@ export class AppearanceService {
 	textScale = $state<number>(DEFAULT_SCALE);
 
 	async init(): Promise<void> {
-		const settings = await commands.settingsGetAppearance();
-		this.theme = settings.theme;
-		this.dynamicAccent = settings.dynamicAccent;
-		this.interfaceScale = sanitizeScale(settings.interfaceScale);
-		this.textScale = sanitizeScale(settings.textScale);
+		const [shared, desktop] = await Promise.all([
+			commands.settingsGetShared(),
+			commands.settingsGetDesktop(),
+		]);
+		this.theme = shared.theme ?? 'system';
+		this.dynamicAccent = shared.dynamicAccent ?? true;
+		this.interfaceScale = sanitizeScale(desktop.interfaceScale ?? DEFAULT_SCALE);
+		this.textScale = sanitizeScale(desktop.textScale ?? DEFAULT_SCALE);
 		setMode(this.theme);
 		this.applyScale();
 	}
@@ -37,7 +59,7 @@ export class AppearanceService {
 	async setTheme(theme: Theme): Promise<void> {
 		this.theme = theme;
 		setMode(theme);
-		await this.persist();
+		await this.persistShared();
 	}
 
 	async setDynamicAccent(enabled: boolean): Promise<void> {
@@ -45,7 +67,7 @@ export class AppearanceService {
 		if (!enabled) {
 			clearAccent();
 		}
-		await this.persist();
+		await this.persistShared();
 	}
 
 	/**
@@ -72,20 +94,20 @@ export class AppearanceService {
 	async commitInterfaceScale(value: number): Promise<void> {
 		this.interfaceScale = sanitizeScale(value);
 		this.applyScale();
-		await this.persist();
+		await this.persistDesktop();
 	}
 
 	async commitTextScale(value: number): Promise<void> {
 		this.textScale = sanitizeScale(value);
 		this.applyScale();
-		await this.persist();
+		await this.persistDesktop();
 	}
 
 	async resetScales(): Promise<void> {
 		this.interfaceScale = DEFAULT_SCALE;
 		this.textScale = DEFAULT_SCALE;
 		this.applyScale();
-		await this.persist();
+		await this.persistDesktop();
 	}
 
 	private applyScale(): void {
@@ -95,15 +117,25 @@ export class AppearanceService {
 		root.style.setProperty(TEXT_SCALE_VAR, String(this.textScale));
 	}
 
-	private async persist(): Promise<void> {
-		unwrap(
-			await commands.settingsSetAppearance({
-				theme: this.theme,
-				dynamicAccent: this.dynamicAccent,
-				interfaceScale: this.interfaceScale,
-				textScale: this.textScale,
-			}),
-		);
+	private async persistShared(): Promise<void> {
+		const next: SharedSettings = { theme: this.theme, dynamicAccent: this.dynamicAccent };
+		unwrap(await commands.settingsSetShared(next));
+	}
+
+	/**
+	 * Read the current desktop section, patch the scale fields, and write
+	 * it back. The desktop section also carries the telemetry consent
+	 * block; round-tripping the existing value preserves it untouched, so
+	 * scale changes can never accidentally toggle consent.
+	 */
+	private async persistDesktop(): Promise<void> {
+		const current = await commands.settingsGetDesktop();
+		const next: DesktopSettings = {
+			...current,
+			interfaceScale: this.interfaceScale,
+			textScale: this.textScale,
+		};
+		unwrap(await commands.settingsSetDesktop(next));
 	}
 }
 

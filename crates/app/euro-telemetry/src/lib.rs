@@ -15,8 +15,12 @@
 //!
 //! * Tauri IPC commands (`settings_*_telemetry`, `system_*_telemetry*`)
 //!   are duplicated in each app crate — they touch app-specific state
-//!   (`SharedAppSettings`, [`Controller`]) that's wired into the Tauri
+//!   (`SharedSettingsState`, [`Controller`]) that's wired into the Tauri
 //!   `Manager` separately on each side.
+//! * The consent policy. [`Controller`] takes a pre-computed `enabled:
+//!   bool` rather than a `TelemetryConsent`, so the desktop / mobile
+//!   apps own the "should this run?" decision and this crate stays
+//!   settings-agnostic.
 //!
 //! ## Compile-time invariants
 //!

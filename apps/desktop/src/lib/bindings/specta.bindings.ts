@@ -20,15 +20,40 @@ export const commands = {
 	chatCancelQuery: (threadId: string) => typedError<null, StreamError>(__TAURI_INVOKE("chat_cancel_query", { threadId })),
 	paymentCreateCheckoutUrl: () => typedError<string, PaymentError>(__TAURI_INVOKE("payment_create_checkout_url")),
 	paymentIsSubscribed: () => typedError<boolean, PaymentError>(__TAURI_INVOKE("payment_is_subscribed")),
-	settingsGetAll: () => __TAURI_INVOKE<AppSettings>("settings_get_all"),
-	settingsGetTelemetry: () => __TAURI_INVOKE<TelemetrySettings>("settings_get_telemetry"),
-	settingsSetTelemetry: (telemetrySettings: TelemetrySettings) => typedError<TelemetrySettings, SettingsError>(__TAURI_INVOKE("settings_set_telemetry", { telemetrySettings })),
 	settingsGetGeneral: () => __TAURI_INVOKE<GeneralSettings>("settings_get_general"),
 	settingsSetGeneral: (generalSettings: GeneralSettings) => typedError<GeneralSettings, SettingsError>(__TAURI_INVOKE("settings_set_general", { generalSettings })),
 	settingsGetApi: () => __TAURI_INVOKE<APISettings>("settings_get_api"),
 	settingsSetApi: (apiSettings: APISettings) => typedError<APISettings, SettingsError>(__TAURI_INVOKE("settings_set_api", { apiSettings })),
-	settingsGetAppearance: () => __TAURI_INVOKE<AppearanceSettings>("settings_get_appearance"),
-	settingsSetAppearance: (appearanceSettings: AppearanceSettings) => typedError<AppearanceSettings, SettingsError>(__TAURI_INVOKE("settings_set_appearance", { appearanceSettings })),
+	settingsGetShared: () => __TAURI_INVOKE<SharedSettings>("settings_get_shared"),
+	settingsSetShared: (shared: SharedSettings) => typedError<SharedSettings, SettingsError>(__TAURI_INVOKE("settings_set_shared", { shared })),
+	settingsGetDesktop: () => __TAURI_INVOKE<DesktopSettings>("settings_get_desktop"),
+	/**
+	 *  Write the entire desktop section. The frontend's appearance and
+	 *  telemetry pages each operate on a subset of fields; both target this
+	 *  one command, so a partial-section write is achieved by reading the
+	 *  current section, patching the relevant fields, and writing the whole
+	 *  thing back.
+	 * 
+	 *  Side effects: clamps scales via [`DesktopSettings::sanitize`], stamps
+	 *  `telemetry.consent_version` to the current build's value, lazily
+	 *  allocates a local `distinct_id`, and reapplies the native Sentry
+	 *  guard to match the new consent decision.
+	 */
+	settingsSetDesktop: (desktop: DesktopSettings) => typedError<DesktopSettings, SettingsError>(__TAURI_INVOKE("settings_set_desktop", { desktop })),
+	/**
+	 *  Returns the per-install telemetry state — currently just the
+	 *  anonymous distinct id. The cross-device consent toggles live under
+	 *  the cloud `desktop` section and are surfaced via
+	 *  [`settings_get_desktop`].
+	 */
+	settingsGetLocalTelemetry: () => __TAURI_INVOKE<TelemetryLocal>("settings_get_local_telemetry"),
+	/**
+	 *  Convenience read for the early-boot / pre-auth path where the
+	 *  frontend needs only the consent toggles. Equivalent to
+	 *  `settings_get_desktop().telemetry`, but typed so the IPC surface
+	 *  documents that *only* the consent block crosses this boundary.
+	 */
+	settingsGetTelemetryConsent: () => __TAURI_INVOKE<TelemetryConsent>("settings_get_telemetry_consent"),
 	systemCheckBackendConnection: (serverAddress: string | null) => typedError<string, SystemError>(__TAURI_INVOKE("system_check_backend_connection", { serverAddress })),
 	systemGetLlmInfo: () => typedError<RedactedLlmConfig, SystemError>(__TAURI_INVOKE("system_get_llm_info")),
 	/**
@@ -146,34 +171,6 @@ export type AnyMessage = {
 } & ChatMessage | {
 	type: "remove",
 } & RemoveMessage;
-
-export type AppSettings = {
-	general: GeneralSettings,
-	telemetry: TelemetrySettings,
-	/**
-	 *  Falls back to [`APISettings::default`] when the persisted config has
-	 *  never been touched, which lets debug builds land on `localhost` and
-	 *  release builds on the cloud without the `defaults.jsonc` having to
-	 *  know about the build profile.
-	 */
-	api?: APISettings,
-	appearance: AppearanceSettings,
-};
-
-export type AppearanceSettings = {
-	theme: Theme,
-	dynamicAccent: boolean,
-	/**
-	 *  Multiplier applied to the document's root font-size, scaling every
-	 *  rem-anchored design token (text, spacing, controls) together.
-	 */
-	interfaceScale: number | null,
-	/**
-	 *  Additional multiplier layered on top of `interface_scale` that affects
-	 *  only typography utilities, leaving spacing and control sizes alone.
-	 */
-	textScale: number | null,
-};
 
 export type AudioContentBlock = {
 	id?: string | null,
@@ -396,6 +393,41 @@ export type ContextChip = {
 	domain: string | null,
 };
 
+/**
+ *  Desktop-only cloud-synced settings. Mobile and web each have their
+ *  own platform sections to keep concepts that don't translate (window
+ *  chrome scaling, telemetry SDKs that don't run on the other
+ *  platforms) cleanly partitioned.
+ * 
+ *  The custom `Default` impl here is the *wire fallback* used by
+ *  `#[serde(default)]` when a partial blob is read off the network.
+ *  Scales default to [`DEFAULT_SCALE`] rather than the derive-default
+ *  `0.0` because a zero-size UI is unrecoverable; an inert sensible
+ *  value is the only safe fallback. The product-blessed fresh-install
+ *  values live in `assets/defaults.jsonc` and are reached through
+ *  [`crate::CloudSettings::default()`].
+ */
+export type DesktopSettings = {
+	/**
+	 *  Multiplier applied to the document's root font-size, scaling every
+	 *  rem-anchored design token (text, spacing, controls) together.
+	 */
+	interfaceScale?: number | null,
+	/**
+	 *  Additional multiplier layered on top of `interface_scale` that
+	 *  affects only typography utilities, leaving spacing and control
+	 *  sizes alone.
+	 */
+	textScale?: number | null,
+	/**
+	 *  Desktop-scoped telemetry consent. Covers what the desktop
+	 *  client collects (Sentry, PostHog) and nothing else; mobile and
+	 *  web each carry their own record because consent must be
+	 *  specific to the data actually collected.
+	 */
+	telemetry?: TelemetryConsent,
+} & { [key in string]: unknown };
+
 export type FileContentBlock = {
 	id?: string | null,
 	file_id?: string | null,
@@ -607,9 +639,24 @@ export type ServerToolStatus = "success" | "error";
  *  and can branch on `type` instead of parsing strings. Variants are
  *  grouped by failure mode rather than by command, since several
  *  commands share `Persistence` (any setter that hits the on-disk
- *  settings file).
+ *  settings files).
  */
 export type SettingsError = { type: "Persistence"; data: string } | { type: "EndpointSwitch"; data: string };
+
+/**
+ *  Cross-platform cloud-synced settings. Anything in this section
+ *  applies identically on desktop, mobile, and web; per-platform
+ *  concepts live in the platform sections of [`crate::CloudSettings`].
+ * 
+ *  Telemetry consent is deliberately *not* here: each platform ships
+ *  a different telemetry stack and so collects different categories
+ *  of data, which means consent has to be platform-specific (see
+ *  [`crate::TelemetryConsent`]).
+ */
+export type SharedSettings = {
+	theme?: ThemePreference,
+	dynamicAccent?: boolean,
+} & { [key in string]: unknown };
 
 /**
  *  Typed error surface for the streaming `chat_*` IPC commands.
@@ -643,8 +690,9 @@ export type SystemMessage = {
 /**
  *  Single payload the desktop frontend fetches once at startup to bring
  *  up its Sentry / PostHog SDKs. Bundles the user's persisted consent
- *  state, the embedded build-time keys, and the release identity so the
- *  SDKs can tag events with channel + version.
+ *  state, the local anonymous identifier, the embedded build-time keys,
+ *  and the release identity so the SDKs can tag events with channel +
+ *  version.
  * 
  *  `None` on any field means "this surface is disabled in this build".
  *  `build.rs` enforces all-or-nothing consistency: a build with a DSN
@@ -652,7 +700,8 @@ export type SystemMessage = {
  *  to defend against a half-configured payload.
  */
 export type TelemetryBootstrap = {
-	settings: TelemetrySettings,
+	consent: TelemetryConsent,
+	distinctId: string | null,
 	sentryDsn: string | null,
 	posthogKey: string | null,
 	posthogHost: string | null,
@@ -660,12 +709,51 @@ export type TelemetryBootstrap = {
 	release: string | null,
 };
 
-export type TelemetrySettings = {
-	consentVersion: number,
-	anonymousMetrics: boolean,
-	anonymousErrors: boolean,
-	nonAnonymousMetrics: boolean,
-	distinctId: string | null,
+/**
+ *  Per-platform telemetry consent record. Lives under each platform
+ *  section of [`crate::CloudSettings`] — never under `SharedSettings` —
+ *  because consent must be specific to the data actually collected,
+ *  and each platform ships a different telemetry stack (Sentry +
+ *  PostHog on desktop, platform-native SDKs on mobile, etc.). A user
+ *  agreeing on desktop has not seen, and cannot legally cover, what
+ *  mobile or web will collect.
+ * 
+ *  `distinct_id` is intentionally absent — it is an anonymous
+ *  per-install identifier whose rotation must break cross-device
+ *  linkage, and so stays in the platform's local file rather than
+ *  crossing the wire.
+ * 
+ *  `consent_version` records the schema version of the consent prompt
+ *  the user agreed to *on this platform*. Bumping
+ *  `CURRENT_CONSENT_VERSION` in the client forces a re-prompt; because
+ *  the record is per-platform, the bump propagates independently to
+ *  each device.
+ * 
+ *  The derived `Default` here is the *wire fallback* used by
+ *  `#[serde(default)]` when a partial blob is read off the network
+ *  (every field collapses to `false` / `0` — the inert choice). The
+ *  product-blessed fresh-install values live in `assets/defaults.jsonc`
+ *  and are reached through [`crate::CloudSettings::default()`].
+ */
+export type TelemetryConsent = {
+	consentVersion?: number,
+	anonymousMetrics?: boolean,
+	anonymousErrors?: boolean,
+	nonAnonymousMetrics?: boolean,
+} & { [key in string]: unknown };
+
+/**
+ *  Local-only telemetry state. Persisted next to the rest of
+ *  [`crate::LocalSettings`] in `local.json`; never crosses the wire to
+ *  the cloud-sync backend.
+ */
+export type TelemetryLocal = {
+	/**
+	 *  Anonymous per-install identifier. `None` until the user accepts
+	 *  telemetry for the first time, then a fresh UUID v4 that survives
+	 *  until the user explicitly rotates it.
+	 */
+	distinctId?: string | null,
 };
 
 export type TextContentBlock = {
@@ -676,7 +764,11 @@ export type TextContentBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
-export type Theme = "system" | "light" | "dark";
+/**
+ *  User's preferred colour scheme. `System` defers to the OS-level
+ *  setting; `Light` / `Dark` pin it explicitly across devices.
+ */
+export type ThemePreference = "system" | "light" | "dark";
 
 /**  A persisted thread row as returned to the client. */
 export type Thread = {

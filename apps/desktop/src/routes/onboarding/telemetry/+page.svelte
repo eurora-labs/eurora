@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { unwrap } from '$lib/bindings/result.js';
-	import { commands, type TelemetrySettings } from '$lib/bindings/specta.bindings.js';
+	import {
+		commands,
+		type DesktopSettings,
+		type TelemetryConsent,
+	} from '$lib/bindings/specta.bindings.js';
 	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -15,36 +19,40 @@
 	let errorReporting = $state(true);
 	let usageMetrics = $state(true);
 	let nonAnonymousUsageMetrics = $state(false);
-	let telemetrySettings: TelemetrySettings | undefined = $state();
+	let consent: TelemetryConsent | undefined = $state();
 	let saving = $state(false);
 
 	onMount(() => {
 		commands
-			.settingsGetTelemetry()
-			.then((settings) => {
-				telemetrySettings = settings;
-				errorReporting = settings.anonymousErrors;
-				usageMetrics = settings.anonymousMetrics;
-				nonAnonymousUsageMetrics = settings.nonAnonymousMetrics;
+			.settingsGetTelemetryConsent()
+			.then((next) => {
+				consent = next;
+				errorReporting = next.anonymousErrors ?? true;
+				usageMetrics = next.anonymousMetrics ?? true;
+				nonAnonymousUsageMetrics = next.nonAnonymousMetrics ?? false;
 			})
 			.catch((error) => {
-				console.error('Failed to fetch telemetry settings:', error);
+				console.error('Failed to fetch telemetry consent:', error);
 			});
 	});
 
 	async function updateSettings() {
-		if (!telemetrySettings || saving) return;
+		if (!consent || saving) return;
 
 		saving = true;
 		try {
-			telemetrySettings = unwrap(
-				await commands.settingsSetTelemetry({
-					...telemetrySettings,
+			const current = await commands.settingsGetDesktop();
+			const next: DesktopSettings = {
+				...current,
+				telemetry: {
+					...consent,
 					anonymousErrors: errorReporting,
 					anonymousMetrics: usageMetrics,
 					nonAnonymousMetrics: nonAnonymousUsageMetrics,
-				}),
-			);
+				},
+			};
+			const updated = unwrap(await commands.settingsSetDesktop(next));
+			consent = updated.telemetry ?? consent;
 			await telemetry.refresh();
 		} catch (error) {
 			console.error('Failed to update telemetry settings:', error);

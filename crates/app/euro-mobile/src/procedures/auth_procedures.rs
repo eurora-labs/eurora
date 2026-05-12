@@ -10,7 +10,7 @@ use url::Url;
 
 use crate::error::ResultExt;
 use crate::procedures::{auth_manager, user_controller};
-use crate::shared_types::SharedAppSettings;
+use crate::shared_types::SharedSettingsState;
 
 /// Custom URL scheme the in-app browser session is bound to. iOS doesn't
 /// need this in `Info.plist` — `ASWebAuthenticationSession`'s
@@ -46,11 +46,14 @@ fn emit_auth_state(app_handle: &AppHandle, claims: Option<Claims>) {
 }
 
 async fn save_settings(app_handle: &AppHandle) -> Result<(), String> {
-    let state = app_handle.state::<SharedAppSettings>();
+    let state = app_handle.state::<SharedSettingsState>();
     let settings = state.lock().await;
     settings
-        .save_to_default_path()
-        .ctx("Failed to save settings")
+        .save_local_to_default_path()
+        .ctx("Failed to save local settings")?;
+    settings
+        .save_cache_to_default_path()
+        .ctx("Failed to save cloud cache")
 }
 
 /// Inspect the redirect URL captured by the in-app browser. The backend

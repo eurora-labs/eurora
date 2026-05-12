@@ -14,7 +14,7 @@ use crate::{
         Activity, ActivityAsset, Asset, AssetStatus, ClaimedProvisioningJob,
         EmailVerificationToken, LoginToken, Message, OAuthCredentials, OAuthProvider, OAuthState,
         PasswordCredentials, RefreshToken, SearchResultMessage, SearchResultThread, Thread,
-        TokenUsage, User,
+        TokenUsage, UpsertOutcome, User, UserSettingsRow,
     },
 };
 
@@ -2370,5 +2370,115 @@ impl DatabaseManager {
         .await?;
 
         Ok(results)
+    }
+
+    // --- user_settings ----------------------------------------------------
+
+    #[builder]
+    pub async fn get_user_settings(&self, user_id: Uuid) -> DbResult<Option<UserSettingsRow>> {
+        let row = sqlx::query_as::<_, UserSettingsRow>(
+            r#"
+            SELECT user_id, schema_version, settings, created_at, updated_at
+            FROM user_settings
+            WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row)
+    }
+
+    /// Insert or update the user's settings blob with optimistic concurrency.
+    ///
+    /// Contract over `(current_row, base_updated_at)`:
+    ///
+    /// | current_row    | base_updated_at                          | outcome                         |
+    /// |----------------|------------------------------------------|---------------------------------|
+    /// | `None`         | `None`                                   | `Inserted` (fresh first run)    |
+    /// | `None`         | `Some(_)`                                | `Inserted` (recovery insert)    |
+    /// | `Some(row)`    | `None`                                   | `Conflict { current: row }`     |
+    /// | `Some(row)`    | `Some(t)` where `t != row.updated_at`    | `Conflict { current: row }`     |
+    /// | `Some(_)`      | `Some(t)` where `t == row.updated_at`    | `Updated`                       |
+    ///
+    /// The `(None, Some(_))` case is a recovery path: the client thought it
+    /// was updating a row that has since been deleted server-side. Rather
+    /// than fail, we insert and return the fresh row.
+    ///
+    /// Locking: a single transaction wraps `SELECT ... FOR UPDATE` and the
+    /// subsequent write, so two concurrent callers serialize cleanly.
+    #[builder]
+    pub async fn upsert_user_settings(
+        &self,
+        user_id: Uuid,
+        schema_version: i32,
+        settings: serde_json::Value,
+        base_updated_at: Option<DateTime<Utc>>,
+    ) -> DbResult<UpsertOutcome> {
+        let mut tx = self.pool.begin().await?;
+
+        let current = sqlx::query_as::<_, UserSettingsRow>(
+            r#"
+            SELECT user_id, schema_version, settings, created_at, updated_at
+            FROM user_settings
+            WHERE user_id = $1
+            FOR UPDATE
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let outcome = match (current, base_updated_at) {
+            (Some(row), None) => UpsertOutcome::Conflict { current: row },
+            (Some(row), Some(base)) if row.updated_at != base => {
+                UpsertOutcome::Conflict { current: row }
+            }
+            (Some(_), Some(_)) => {
+                let updated = sqlx::query_as::<_, UserSettingsRow>(
+                    r#"
+                    UPDATE user_settings
+                    SET schema_version = $2, settings = $3
+                    WHERE user_id = $1
+                    RETURNING user_id, schema_version, settings, created_at, updated_at
+                    "#,
+                )
+                .bind(user_id)
+                .bind(schema_version)
+                .bind(&settings)
+                .fetch_one(&mut *tx)
+                .await?;
+                UpsertOutcome::Updated(updated)
+            }
+            (None, _) => {
+                let inserted = sqlx::query_as::<_, UserSettingsRow>(
+                    r#"
+                    INSERT INTO user_settings (user_id, schema_version, settings)
+                    VALUES ($1, $2, $3)
+                    RETURNING user_id, schema_version, settings, created_at, updated_at
+                    "#,
+                )
+                .bind(user_id)
+                .bind(schema_version)
+                .bind(&settings)
+                .fetch_one(&mut *tx)
+                .await?;
+                UpsertOutcome::Inserted(inserted)
+            }
+        };
+
+        tx.commit().await?;
+        Ok(outcome)
+    }
+
+    #[builder]
+    pub async fn delete_user_settings(&self, user_id: Uuid) -> DbResult<()> {
+        sqlx::query(r#"DELETE FROM user_settings WHERE user_id = $1"#)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
     }
 }
