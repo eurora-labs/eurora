@@ -1,6 +1,11 @@
 <script lang="ts">
 	import { unwrap } from '$lib/bindings/result.js';
-	import { commands, type TelemetrySettings } from '$lib/bindings/specta.bindings.js';
+	import {
+		commands,
+		type DesktopSettings,
+		type TelemetryConsent,
+		type TelemetryLocal,
+	} from '$lib/bindings/specta.bindings.js';
 	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -12,23 +17,36 @@
 
 	const telemetry = inject(TELEMETRY_SERVICE);
 
-	let settings = $state<TelemetrySettings | null>(null);
+	let consent = $state<TelemetryConsent | null>(null);
+	let local = $state<TelemetryLocal | null>(null);
 	let saving = $state(false);
 	let rotating = $state(false);
 
 	onMount(async () => {
 		try {
-			settings = await commands.settingsGetTelemetry();
+			[consent, local] = await Promise.all([
+				commands.settingsGetTelemetryConsent(),
+				commands.settingsGetLocalTelemetry(),
+			]);
 		} catch (error) {
 			console.error('Failed to load telemetry settings:', error);
 			toast.error('Could not load telemetry settings');
 		}
 	});
 
-	async function persist(next: TelemetrySettings) {
+	/**
+	 * Persist a fresh consent decision. The desktop section also carries
+	 * the scale fields; round-tripping the existing value preserves them
+	 * so a consent toggle can never accidentally reset accessibility
+	 * scales.
+	 */
+	async function persist(nextConsent: TelemetryConsent) {
 		saving = true;
 		try {
-			settings = unwrap(await commands.settingsSetTelemetry(next));
+			const current = await commands.settingsGetDesktop();
+			const next: DesktopSettings = { ...current, telemetry: nextConsent };
+			const updated = unwrap(await commands.settingsSetDesktop(next));
+			consent = updated.telemetry ?? nextConsent;
 			await telemetry.refresh();
 		} catch (error) {
 			console.error('Failed to save telemetry settings:', error);
@@ -38,17 +56,17 @@
 		}
 	}
 
-	async function toggle(field: keyof TelemetrySettings, value: boolean) {
-		if (!settings) return;
-		await persist({ ...settings, [field]: value });
+	async function toggle(field: keyof TelemetryConsent, value: boolean) {
+		if (!consent) return;
+		await persist({ ...consent, [field]: value });
 	}
 
 	async function rotateId() {
-		if (!settings) return;
+		if (!local) return;
 		rotating = true;
 		try {
 			await telemetry.rotateDistinctId();
-			settings = await commands.settingsGetTelemetry();
+			local = await commands.settingsGetLocalTelemetry();
 			toast.success('Telemetry id rotated');
 		} catch (error) {
 			console.error('Failed to rotate telemetry id:', error);
@@ -59,8 +77,8 @@
 	}
 
 	async function copyId() {
-		if (!settings?.distinctId) return;
-		await navigator.clipboard.writeText(settings.distinctId);
+		if (!local?.distinctId) return;
+		await navigator.clipboard.writeText(local.distinctId);
 		toast.success('Telemetry id copied');
 	}
 </script>
@@ -73,7 +91,7 @@
 		</p>
 	</div>
 
-	{#if settings}
+	{#if consent && local}
 		<section class="flex flex-col gap-4">
 			<h2 class="text-sm font-medium text-muted-foreground">Data collection</h2>
 			<Separator />
@@ -86,7 +104,7 @@
 				</div>
 				<Switch
 					id="anon-errors"
-					checked={settings.anonymousErrors}
+					checked={consent.anonymousErrors ?? false}
 					disabled={saving}
 					onCheckedChange={(v) => toggle('anonymousErrors', v)}
 				/>
@@ -100,7 +118,7 @@
 				</div>
 				<Switch
 					id="anon-metrics"
-					checked={settings.anonymousMetrics}
+					checked={consent.anonymousMetrics ?? false}
 					disabled={saving}
 					onCheckedChange={(v) => toggle('anonymousMetrics', v)}
 				/>
@@ -114,8 +132,8 @@
 				</div>
 				<Switch
 					id="non-anon-metrics"
-					checked={settings.nonAnonymousMetrics}
-					disabled={saving || !settings.anonymousMetrics}
+					checked={consent.nonAnonymousMetrics ?? false}
+					disabled={saving || !consent.anonymousMetrics}
 					onCheckedChange={(v) => toggle('nonAnonymousMetrics', v)}
 				/>
 			</div>
@@ -128,14 +146,14 @@
 				<div class="min-w-0 flex-1">
 					<Label class="text-sm">Telemetry id</Label>
 					<p class="truncate font-mono text-xs text-muted-foreground">
-						{settings.distinctId ?? 'not yet generated'}
+						{local.distinctId ?? 'not yet generated'}
 					</p>
 				</div>
 				<div class="flex items-center gap-2">
 					<Button
 						variant="outline"
 						size="sm"
-						disabled={!settings.distinctId}
+						disabled={!local.distinctId}
 						onclick={copyId}
 					>
 						Copy

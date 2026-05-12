@@ -10,7 +10,7 @@ export async function load({ url }) {
 	}
 	try {
 		if (await commands.systemNeedsTelemetryConsent()) {
-			redirect(307, '/onboarding');
+			redirect(307, '/onboarding/telemetry');
 		}
 	} catch (error) {
 		// Let SvelteKit propagate its own redirect error.

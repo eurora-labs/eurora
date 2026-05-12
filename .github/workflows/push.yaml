@@ -147,10 +147,23 @@ jobs:
         runs-on: ubuntu-latest
         container:
             image: ghcr.io/eurora-labs/ci-base-image:latest
+        services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: postgres
+                    POSTGRES_DB: eurora
+                options: >-
+                    --health-cmd "pg_isready -U postgres -d eurora"
+                    --health-interval 5s
+                    --health-timeout 3s
+                    --health-retries 10
         env:
             CARGO_TERM_COLOR: always
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--ld-path=wild
+            DATABASE_URL: postgres://postgres:postgres@postgres:5432/eurora
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:

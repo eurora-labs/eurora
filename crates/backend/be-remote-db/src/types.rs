@@ -339,3 +339,24 @@ pub struct SearchResultThread {
     pub rank: f32,
     pub updated_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct UserSettingsRow {
+    pub user_id: Uuid,
+    pub schema_version: i32,
+    pub settings: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Outcome of [`crate::DatabaseManager::upsert_user_settings`].
+///
+/// `Conflict` carries the current server row so callers can return it to the
+/// client as the resolution view; the optimistic-concurrency contract is
+/// documented on `upsert_user_settings`.
+#[derive(Debug, Clone)]
+pub enum UpsertOutcome {
+    Inserted(UserSettingsRow),
+    Updated(UserSettingsRow),
+    Conflict { current: UserSettingsRow },
+}

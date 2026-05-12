@@ -40,7 +40,7 @@ euro-bridge-protocol = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }
 euro-secret = { workspace = true }
-euro-settings = { workspace = true }
+euro-settings = { workspace = true, features = ["tls-native-roots"] }
 euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
 thread-core = { workspace = true, features = ["specta"] }
