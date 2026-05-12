@@ -8,7 +8,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::procedures::{auth_manager, user_controller};
-use crate::shared_types::SharedAppSettings;
+use crate::shared_types::SharedSettingsState;
 
 /// Typed error surface for the `auth_*` IPC commands. Externally tagged
 /// so the JS side gets `{ type: "NotAuthenticated" }` and can branch on
@@ -94,10 +94,13 @@ fn classify_anyhow_auth_error(err: anyhow::Error) -> AuthError {
 }
 
 async fn save_app_settings(app_handle: &AppHandle) -> Result<(), AuthError> {
-    let state = app_handle.state::<SharedAppSettings>();
+    let state = app_handle.state::<SharedSettingsState>();
     let settings = state.lock().await;
     settings
-        .save_to_default_path()
+        .save_local_to_default_path()
+        .map_err(|e| AuthError::Persistence(e.to_string()))?;
+    settings
+        .save_cache_to_default_path()
         .map_err(|e| AuthError::Persistence(e.to_string()))
 }
 

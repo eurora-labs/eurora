@@ -9,14 +9,16 @@ publish = false
 anyhow = { workspace = true }
 dirs = { workspace = true }
 euro-fs = { workspace = true }
-notify = { version = "8.2.0" }
 serde = { workspace = true, features = ["derive", "std"] }
-serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
+serde_json = { workspace = true, features = ["std"] }
+# Tolerates `//` comments in hand-edited legacy `settings.json` files. The
+# wire format the desktop writes is plain JSON via `serde_json`.
 serde_json_lenient = { workspace = true }
+settings-core = { workspace = true, features = ["specta"] }
 specta = { workspace = true, features = ["derive", "function"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 tracing = { workspace = true }
-uuid = { workspace = true, features = ["v4"] }
+uuid = { workspace = true, features = ["serde", "v4"] }
 
 [dev-dependencies]
 tempfile = { workspace = true }

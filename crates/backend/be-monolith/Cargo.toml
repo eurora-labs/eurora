@@ -17,6 +17,7 @@ be-email-service = { workspace = true }
 be-authz = { workspace = true }
 be-payment-service = { workspace = true }
 be-remote-db = { workspace = true }
+be-settings-service = { workspace = true }
 be-storage = { workspace = true, features = ["encryption"] }
 be-thread-service = { workspace = true }
 be-update-service = { workspace = true }

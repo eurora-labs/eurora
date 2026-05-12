@@ -67,8 +67,12 @@ impl Default for CloudSettings {
 
 impl CloudSettings {
     /// Coerce out-of-range or non-finite numeric fields into their safe
-    /// ranges across every section. Run on the server before write and
-    /// on the client after deserialize.
+    /// ranges across every section.
+    ///
+    /// The server treats the settings document as an opaque JSON blob, so
+    /// enforcement lives entirely on the client: callers must invoke this
+    /// before serializing a [`CloudSettings`] into a `PUT /settings`
+    /// request, and again after deserializing a freshly fetched blob.
     pub fn sanitize(&mut self) {
         self.desktop.sanitize();
     }

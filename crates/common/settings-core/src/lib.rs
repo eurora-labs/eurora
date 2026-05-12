@@ -12,6 +12,17 @@
 //! live here on purpose — pulling this crate into a leaf binary must
 //! not drag in transport plumbing.
 //!
+//! ## Server is blob-opaque
+//!
+//! The server stores the settings document as an opaque JSON blob,
+//! addressed by `(user_id, schema_version, updated_at)`. It never
+//! parses the body, which means clients are responsible for keeping
+//! the document well-formed: call [`CloudSettings::sanitize`] before
+//! serializing into [`PutSettingsRequest`] and again after
+//! deserializing the response payload, and bump
+//! [`CURRENT_SCHEMA_VERSION`] when the structural shape of the blob
+//! changes incompatibly.
+//!
 //! ## Forward-compatibility
 //!
 //! Every leaf section carries a flattened `extras: serde_json::Map`

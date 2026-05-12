@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { type Theme } from '$lib/bindings/specta.bindings.js';
 	import {
 		APPEARANCE_SERVICE,
 		MAX_SCALE,
 		MIN_SCALE,
 		SCALE_STEP,
+		type Theme,
 	} from '$lib/services/appearance-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';

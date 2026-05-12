@@ -33,7 +33,10 @@ pub struct TelemetryConsent {
     pub anonymous_metrics: bool,
     pub anonymous_errors: bool,
     pub non_anonymous_metrics: bool,
-    #[serde(flatten, skip_serializing_if = "Map::is_empty")]
+    // `flatten` of an empty Map already emits nothing — no
+    // `skip_serializing_if` needed, and using it here would force
+    // tauri-specta out of unified mode where the IPC surface lives.
+    #[serde(flatten)]
     #[cfg_attr(
         feature = "specta",
         specta(type = std::collections::HashMap<String, specta_typescript::Unknown>)

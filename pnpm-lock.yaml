@@ -876,8 +876,8 @@ importers:
         specifier: ^3.12.1
         version: 3.12.1
       '@lucide/svelte':
-        specifier: 'catalog:'
-        version: 0.577.0(svelte@5.55.5)
+        specifier: ^1.14.0
+        version: 1.14.0(svelte@5.55.5)
       '@playwright/test':
         specifier: ^1.59.1
         version: 1.59.1
@@ -2319,6 +2319,11 @@ packages:
 
   '@lucide/svelte@0.577.0':
     resolution: {integrity: sha512-0P6mkySd2MapIEgq08tADPmcN4DHndC/02PWwaLkOerXlx5Sv9aT4BxyXLIY+eccr0g/nEyCYiJesqS61YdBZQ==}
+    peerDependencies:
+      svelte: ^5
+
+  '@lucide/svelte@1.14.0':
+    resolution: {integrity: sha512-MVuP5VRCBQa2OaIpaRbuEV4k5OV2dy9MyxA6Tf4Sz/IN0v3zzUU72ObHc9r2Zn/wSMXDg6lLrHrczqI7w7gCzQ==}
     peerDependencies:
       svelte: ^5
 
@@ -11167,13 +11172,14 @@ snapshots:
       picocolors: 1.1.1
     optional: true
 
-  '@covector/apply@0.10.0':
+  '@covector/apply@0.10.0(mocha@10.8.2)':
     dependencies:
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)
       semver: 7.7.4
     transitivePeerDependencies:
       - encoding
+      - mocha
 
   '@covector/assemble@0.12.0':
     dependencies:
@@ -11190,7 +11196,7 @@ snapshots:
       - encoding
       - supports-color
 
-  '@covector/changelog@0.12.0(mocha@10.8.2)':
+  '@covector/changelog@0.12.0':
     dependencies:
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)
@@ -11200,7 +11206,6 @@ snapshots:
       unified: 9.2.2
     transitivePeerDependencies:
       - encoding
-      - mocha
       - supports-color
 
   '@covector/command@0.8.0':
@@ -12114,6 +12119,10 @@ snapshots:
       d3-time-format: 4.1.0
 
   '@lucide/svelte@0.577.0(svelte@5.55.5)':
+    dependencies:
+      svelte: 5.55.5
+
+  '@lucide/svelte@1.14.0(svelte@5.55.5)':
     dependencies:
       svelte: 5.55.5
 
@@ -15927,9 +15936,9 @@ snapshots:
   covector@0.12.4(mocha@10.8.2):
     dependencies:
       '@clack/prompts': 0.7.0
-      '@covector/apply': 0.10.0
+      '@covector/apply': 0.10.0(mocha@10.8.2)
       '@covector/assemble': 0.12.0
-      '@covector/changelog': 0.12.0(mocha@10.8.2)
+      '@covector/changelog': 0.12.0
       '@covector/command': 0.8.0
       '@covector/files': 0.8.0
       effection: 2.0.8(mocha@10.8.2)

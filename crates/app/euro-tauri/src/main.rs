@@ -4,7 +4,7 @@
 )]
 
 use euro_endpoint::EndpointManager;
-use euro_settings::AppSettings;
+use euro_settings::{CloudSettingsCache, SettingsState, wants_errors};
 use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
@@ -285,11 +285,11 @@ fn init_encryption(data_dir: std::path::PathBuf) -> Result<(), Box<dyn std::erro
     Ok(())
 }
 
-fn register_autostart(tauri_app: &mut tauri::App, app_settings: &AppSettings) {
+fn register_autostart(tauri_app: &mut tauri::App, settings: &SettingsState) {
     let should_register = !cfg!(debug_assertions) && !cfg!(target_os = "macos");
     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
 
-    if should_register && app_settings.general.autostart && !started_by_autostart {
+    if should_register && settings.local.general.autostart && !started_by_autostart {
         use tauri_plugin_autostart::MacosLauncher;
         use tauri_plugin_autostart::ManagerExt;
 
@@ -561,9 +561,17 @@ fn main() {
     // of startup are still captured. The controller is then handed to
     // the Tauri app state so the `system.reinit_telemetry` procedure
     // can swap the underlying client when consent changes at runtime.
-    let early_settings = AppSettings::peek_from_default_path();
-    let telemetry_controller =
-        std::sync::Arc::new(TelemetryController::init(&early_settings.telemetry));
+    //
+    // The early peek reads only the cloud cache (which carries the
+    // consent toggles); the `distinct_id` lives in `local.json` and is
+    // applied later, after `SettingsState::load_or_migrate` runs inside
+    // `setup`. The intervening Sentry events are tagged with no user
+    // scope — acceptable for the boot window.
+    let early_cache = CloudSettingsCache::peek_from_default_path();
+    let telemetry_controller = std::sync::Arc::new(TelemetryController::init(
+        wants_errors(&early_cache.settings.desktop.telemetry),
+        None,
+    ));
 
     #[cfg(debug_assertions)]
     {
@@ -640,12 +648,12 @@ fn main() {
                     let started_by_autostart =
                         std::env::args().any(|arg| arg == "--startup-launch");
 
-                    let app_settings = AppSettings::load_from_default_path_creating()?;
+                    let settings = SettingsState::load_or_migrate_from_default_path()?;
                     // The persisted ConnectionMode always resolves to a
                     // non-empty URL, so we never need an env-fallback path.
-                    let endpoint_url = app_settings.api.endpoint();
+                    let endpoint_url = settings.local.api.endpoint();
                     tracing::info!(
-                        mode = ?app_settings.api.mode,
+                        mode = ?settings.local.api.mode,
                         endpoint_url = %endpoint_url,
                         baked_default = euro_settings::DEFAULT_API_URL,
                         "Resolved API endpoint at startup"
@@ -657,7 +665,10 @@ fn main() {
                     // The `peek` may have observed a missing or unreadable
                     // file; this call ensures the runtime telemetry state
                     // matches what's persisted before the app comes up.
-                    telemetry_controller.reapply(&app_settings.telemetry);
+                    telemetry_controller.reapply(
+                        wants_errors(&settings.cache.settings.desktop.telemetry),
+                        settings.local.telemetry.distinct_id.as_deref(),
+                    );
 
                     let http_client: SharedHttpClient = reqwest::Client::builder()
                         .timeout(std::time::Duration::from_secs(5))
@@ -665,7 +676,6 @@ fn main() {
                         .expect("failed to build shared HTTP client");
 
                     tauri_app.manage(endpoint_manager.clone());
-                    tauri_app.manage(Mutex::new(app_settings.clone()));
                     tauri_app.manage(telemetry_controller.clone());
                     tauri_app.manage(WindowState::default());
                     tauri_app.manage(http_client);
@@ -677,7 +687,8 @@ fn main() {
                     // backing manager hasn't been registered yet.
                     init_state(tauri_app, &endpoint_manager)?;
 
-                    register_autostart(tauri_app, &app_settings);
+                    register_autostart(tauri_app, &settings);
+                    tauri_app.manage(Mutex::new(settings));
                     setup_main_window(tauri_app, started_by_autostart)?;
                     setup_tray(tauri_app)?;
 

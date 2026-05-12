@@ -42,7 +42,10 @@ pub struct DesktopSettings {
     /// web each carry their own record because consent must be
     /// specific to the data actually collected.
     pub telemetry: TelemetryConsent,
-    #[serde(flatten, skip_serializing_if = "Map::is_empty")]
+    // `flatten` of an empty Map already emits nothing — no
+    // `skip_serializing_if` needed, and using it here would force
+    // tauri-specta out of unified mode where the IPC surface lives.
+    #[serde(flatten)]
     #[cfg_attr(
         feature = "specta",
         specta(type = std::collections::HashMap<String, specta_typescript::Unknown>)
