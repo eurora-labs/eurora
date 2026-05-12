@@ -102,6 +102,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/auth/oauth/google/id-token",
             post(handlers::google_id_token_login),
         )
+        // Native Apple sign-in (iOS `ASAuthorizationController`):
+        // device hands us an ID token that the backend verifies
+        // against Apple's JWKS. The nonce in the token's claim is
+        // `base64url(sha256(raw_nonce))`; the backend re-derives the
+        // hash from the supplied raw nonce. No browser involved.
+        .route(
+            "/auth/oauth/apple/id-token",
+            post(handlers::apple_id_token_login),
+        )
         // Apple Sign In web-callback. Apple form-posts here directly
         // (not via the SPA) using `response_mode=form_post`. The
         // handler sets session cookies and 303s to the SPA success

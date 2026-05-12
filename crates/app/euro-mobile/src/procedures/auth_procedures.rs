@@ -1,9 +1,14 @@
-use auth_core::{Claims, Provider};
+use auth_core::{AppleNativeUser, Claims, Provider};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use euro_secret::ExposeSecret;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_appauth::{AppAuthExt, BrowserOnlyRequest};
+use tauri_plugin_apple_auth::{
+    AppleAuthExt, AppleSignInOutcome, SignInRequest as AppleSignInRequest,
+};
 use tauri_plugin_google_auth::{GoogleAuthExt, SignInRequest};
 use tauri_specta::Event;
 use url::Url;
@@ -27,11 +32,29 @@ const REDIRECT_URI: &str = "eurora://mobile/callback";
 pub enum LoginOutcome {
     Success,
     Canceled,
-    Rejected,
+    /// Provider or backend refused the sign-in for a non-cancellation
+    /// reason. `reason` is the underlying error category — useful for
+    /// surfacing diagnostics, not for branching on the UI side. The
+    /// frontend should treat every `rejected` outcome the same.
+    Rejected {
+        reason: String,
+    },
     /// Native sign-in is not available on this device (e.g. Android
     /// without Play Services). The frontend should retry via the
     /// in-app browser flow.
     NativeUnavailable,
+}
+
+impl LoginOutcome {
+    /// Build a `Rejected` outcome from any `Display`-able value.
+    /// Centralises the conversion so we never accidentally serialise
+    /// `Debug` formatting (which would leak Rust type names) or
+    /// truncate a context-rich error to a one-word category.
+    fn rejected(reason: impl std::fmt::Display) -> Self {
+        Self::Rejected {
+            reason: reason.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
@@ -153,7 +176,7 @@ pub async fn auth_start_login(
 
     if let Err(kind) = parse_callback_status(&callback.url) {
         tracing::warn!(error = %kind, "mobile OAuth callback returned error");
-        return Ok(LoginOutcome::Rejected);
+        return Ok(LoginOutcome::rejected(kind));
     }
 
     match auth_manager.login_by_login_token(code_verifier).await {
@@ -166,7 +189,7 @@ pub async fn auth_start_login(
         }
         Err(e) => {
             tracing::error!("Login by login token failed: {e}");
-            Ok(LoginOutcome::Rejected)
+            Ok(LoginOutcome::rejected(e))
         }
     }
 }
@@ -216,7 +239,7 @@ pub async fn auth_start_login_google_native(app_handle: AppHandle) -> Result<Log
 
     let Some(id_token) = response.id_token else {
         tracing::warn!("native Google sign-in returned no id_token");
-        return Ok(LoginOutcome::Rejected);
+        return Ok(LoginOutcome::rejected("missing_id_token"));
     };
 
     match auth_manager.login_by_google_id_token(id_token, None).await {
@@ -229,7 +252,7 @@ pub async fn auth_start_login_google_native(app_handle: AppHandle) -> Result<Log
         }
         Err(e) => {
             tracing::error!("Google ID-token login failed: {e}");
-            Ok(LoginOutcome::Rejected)
+            Ok(LoginOutcome::rejected(e))
         }
     }
 }
@@ -264,7 +287,100 @@ fn classify_native_google_error(err: &tauri_plugin_google_auth::Error) -> LoginO
         Error::ConfigurationError(_) | Error::InvalidClientId => LoginOutcome::NativeUnavailable,
         other => {
             tracing::warn!(error = %other, "native Google sign-in failed");
-            LoginOutcome::Rejected
+            LoginOutcome::rejected(other)
+        }
+    }
+}
+
+/// Bytes of OS randomness in the raw Apple nonce. 32 bytes
+/// (256 bits, base64url-encoded) matches what we use for OAuth state
+/// elsewhere and exceeds Apple's recommended floor.
+const APPLE_RAW_NONCE_BYTES: usize = 32;
+
+/// Generate a fresh, opaque raw nonce for an Apple sign-in attempt.
+///
+/// The plugin SHA-256-hashes this before assigning to
+/// `ASAuthorizationAppleIDRequest.nonce`; the backend re-derives the
+/// same hash to match against the ID token's `nonce` claim. Returning
+/// the raw value here means the unhashed nonce lives only in this
+/// awaiting frame and is consumed by the backend exchange below — it
+/// never touches disk.
+fn generate_apple_raw_nonce() -> String {
+    let mut bytes = [0u8; APPLE_RAW_NONCE_BYTES];
+    rand::rng().fill_bytes(&mut bytes);
+    URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// Native Apple sign-in via `tauri-plugin-apple-auth`. On iOS this
+/// drives `ASAuthorizationController` (the system Apple sheet, FaceID /
+/// TouchID, no browser); on every other target the plugin returns
+/// [`AppleSignInOutcome::NativeUnavailable`] and we surface that to the
+/// frontend so it can fall back to [`auth_start_login`].
+///
+/// Unlike Google, the iOS flow does not need a client ID — the
+/// `ASAuthorizationAppleIDProvider` request is bound to the iOS Bundle
+/// ID via the provisioning profile's Sign in with Apple capability.
+/// The backend's dual-audience verifier accepts both
+/// `APPLE_SERVICE_ID` (web) and `APPLE_BUNDLE_ID` (native iOS) audiences,
+/// so the resulting `(provider, sub)` pair lines up with web sign-ins
+/// of the same Apple ID.
+#[tauri::command]
+#[specta::specta]
+pub async fn auth_start_login_apple_native(app_handle: AppHandle) -> Result<LoginOutcome, String> {
+    // Short-circuit on non-iOS: the plugin's `stub` bridge would
+    // return `NativeUnavailable` anyway, but skipping the call keeps
+    // the cfg-gated path free of plugin-bridge serialisation work on
+    // every Android tap.
+    if !cfg!(target_os = "ios") {
+        return Ok(LoginOutcome::NativeUnavailable);
+    }
+
+    let auth_manager = auth_manager(&app_handle).await?;
+    let raw_nonce = generate_apple_raw_nonce();
+
+    let outcome = match app_handle
+        .apple_auth()
+        .sign_in_with_apple(AppleSignInRequest {
+            raw_nonce: raw_nonce.clone(),
+        })
+        .await
+    {
+        Ok(o) => o,
+        Err(e) => {
+            tracing::warn!(code = %e.code(), error = %e, "Apple native sign-in bridge failed");
+            return Ok(LoginOutcome::rejected(e.code()));
+        }
+    };
+
+    let response = match outcome {
+        AppleSignInOutcome::Success(r) => r,
+        AppleSignInOutcome::Cancelled => return Ok(LoginOutcome::Canceled),
+        AppleSignInOutcome::Rejected(reason) => {
+            tracing::warn!(error = %reason, "Apple native sign-in rejected");
+            return Ok(LoginOutcome::rejected(reason));
+        }
+        AppleSignInOutcome::NativeUnavailable => return Ok(LoginOutcome::NativeUnavailable),
+    };
+
+    let user = response.user.map(|u| AppleNativeUser {
+        first_name: u.first_name,
+        last_name: u.last_name,
+    });
+
+    match auth_manager
+        .login_by_apple_id_token(response.id_token, raw_nonce, user)
+        .await
+    {
+        Ok(_) => {
+            if let Ok(claims) = auth_manager.get_access_token_payload() {
+                emit_auth_state(&app_handle, Some(claims));
+            }
+            save_settings(&app_handle).await?;
+            Ok(LoginOutcome::Success)
+        }
+        Err(e) => {
+            tracing::error!("Apple ID-token login failed: {e}");
+            Ok(LoginOutcome::rejected(e))
         }
     }
 }

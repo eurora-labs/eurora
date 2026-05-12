@@ -12,10 +12,11 @@
 use std::sync::Arc;
 
 use auth_core::{
-    AssociateLoginTokenRequest, AuthSuccessResponse, CheckEmailRequest, CheckEmailResponse,
-    GoogleIdTokenLoginRequest, LoginByLoginTokenRequest, LoginRequest,
-    MobileThirdPartyAuthUrlRequest, Provider, RegisterRequest, ThirdPartyAuthUrlRequest,
-    ThirdPartyAuthUrlResponse, TokenResponse, UserResponse, VerifyEmailRequest,
+    AppleIdTokenLoginRequest, AppleNativeUser, AssociateLoginTokenRequest, AuthSuccessResponse,
+    CheckEmailRequest, CheckEmailResponse, GoogleIdTokenLoginRequest, LoginByLoginTokenRequest,
+    LoginRequest, MobileThirdPartyAuthUrlRequest, Provider, RegisterRequest,
+    ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, TokenResponse, UserResponse,
+    VerifyEmailRequest,
 };
 use axum::{
     Form, Json,
@@ -272,6 +273,63 @@ pub async fn google_id_token_login(
         .login_google_id_token(&body.id_token, body.nonce)
         .await?;
     Ok(session_response(&state, &headers, jar, session))
+}
+
+/// Native Apple sign-in: device hands us an ID token from
+/// `ASAuthorizationController`; we verify it against Apple's JWKS,
+/// re-derive the nonce hash, and mint a session.
+///
+/// Bearer-mode by construction — this endpoint is only ever called by
+/// the native iOS app (cookies have nowhere meaningful to live in that
+/// context). Unlike [`login`] / [`google_id_token_login`], we do not
+/// dispatch on [`AuthMode`]; the response is always a [`TokenResponse`].
+#[tracing::instrument(skip_all)]
+pub async fn apple_id_token_login(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<AppleIdTokenLoginRequest>,
+) -> AuthResult<Json<TokenResponse>> {
+    let display_name = project_apple_native_user(body.user.as_ref());
+    let session = state
+        .auth
+        .login_apple_id_token(&body.id_token, &body.raw_nonce, display_name)
+        .await?;
+    Ok(Json(session.tokens))
+}
+
+/// Maximum length (Unicode scalars) of a display name projected from
+/// Apple's native `fullName` credential. Same cap as the form-post
+/// path ([`APPLE_DISPLAY_NAME_MAX`]) so cross-flow behaviour stays
+/// consistent. The native credential is harder to forge than the
+/// form-post `user` blob (it's part of the ID-token-bearing
+/// `ASAuthorizationAppleIDCredential`), but we apply the same defence
+/// to keep the storage shape uniform — first-sign-in-only application
+/// in `complete_oauth_login` is the structural guard against
+/// overwrites.
+const APPLE_NATIVE_DISPLAY_NAME_MAX: usize = APPLE_DISPLAY_NAME_MAX;
+
+/// Project the Apple native `fullName` credential onto an
+/// `Option<String>` display-name override.
+///
+/// Returns `None` when both halves are missing or empty, when either
+/// half contains a control character, or when the combined name
+/// exceeds the cap. Defensive parsing mirrors
+/// [`parse_apple_form_user`]: a malformed name must never block the
+/// login itself, only suppress the override.
+pub(crate) fn project_apple_native_user(user: Option<&AppleNativeUser>) -> Option<String> {
+    let user = user?;
+    let first = user.first_name.as_deref().unwrap_or("");
+    let last = user.last_name.as_deref().unwrap_or("");
+    let combined = format!("{first} {last}").trim().to_string();
+    if combined.is_empty() {
+        return None;
+    }
+    if combined.chars().any(char::is_control) {
+        return None;
+    }
+    if combined.chars().count() > APPLE_NATIVE_DISPLAY_NAME_MAX {
+        return None;
+    }
+    Some(combined)
 }
 
 #[tracing::instrument(skip_all)]
@@ -678,7 +736,73 @@ fn log_apple_notification_outcome(outcome: &AppleNotificationOutcome) {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_apple_form_user;
+    use super::{AppleNativeUser, parse_apple_form_user, project_apple_native_user};
+
+    #[test]
+    fn project_apple_native_user_none_input() {
+        assert!(project_apple_native_user(None).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_both_names() {
+        let u = AppleNativeUser {
+            first_name: Some("Ada".into()),
+            last_name: Some("Lovelace".into()),
+        };
+        assert_eq!(
+            project_apple_native_user(Some(&u)).as_deref(),
+            Some("Ada Lovelace"),
+        );
+    }
+
+    #[test]
+    fn project_apple_native_user_first_only() {
+        let u = AppleNativeUser {
+            first_name: Some("Ada".into()),
+            last_name: None,
+        };
+        assert_eq!(project_apple_native_user(Some(&u)).as_deref(), Some("Ada"));
+    }
+
+    #[test]
+    fn project_apple_native_user_both_empty_returns_none() {
+        let u = AppleNativeUser {
+            first_name: Some(String::new()),
+            last_name: Some(String::new()),
+        };
+        assert!(project_apple_native_user(Some(&u)).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_rejects_control_chars() {
+        let u = AppleNativeUser {
+            first_name: Some("Ada\nLove".into()),
+            last_name: None,
+        };
+        assert!(project_apple_native_user(Some(&u)).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_rejects_oversize() {
+        let huge = "a".repeat(super::APPLE_NATIVE_DISPLAY_NAME_MAX + 1);
+        let u = AppleNativeUser {
+            first_name: Some(huge),
+            last_name: None,
+        };
+        assert!(project_apple_native_user(Some(&u)).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_preserves_unicode() {
+        let u = AppleNativeUser {
+            first_name: Some("José".into()),
+            last_name: Some("García".into()),
+        };
+        assert_eq!(
+            project_apple_native_user(Some(&u)).as_deref(),
+            Some("José García"),
+        );
+    }
 
     #[test]
     fn returns_none_for_no_input() {

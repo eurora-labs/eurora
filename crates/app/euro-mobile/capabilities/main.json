@@ -12,6 +12,7 @@
 		"process:default",
 		"store:default",
 		"appauth:default",
+		"apple-auth:default",
 		"google-auth:default",
 		"http:allow-fetch",
 		{
