@@ -8,9 +8,7 @@
 
 use settings_core::{DesktopSettings, SharedSettings, TelemetryConsent};
 
-use crate::{
-    cloud_cache::CloudSettingsCache, local::LocalSettings, telemetry as telemetry_policy,
-};
+use crate::{cloud_cache::CloudSettingsCache, local::LocalSettings, telemetry as telemetry_policy};
 
 /// Composite read-only view over a [`LocalSettings`] / [`CloudSettingsCache`]
 /// pair held inside a [`crate::SettingsState`].

@@ -1,6 +1,4 @@
-use crate::{
-    cloud_cache::CloudSettingsCache, effective::EffectiveSettings, local::LocalSettings,
-};
+use crate::{cloud_cache::CloudSettingsCache, effective::EffectiveSettings, local::LocalSettings};
 
 /// Single owner of the on-disk settings split. Stored in `tauri::Manager`
 /// state under a `tokio::sync::Mutex`; every settings IPC handler locks
