@@ -19,12 +19,14 @@
 //! | `error`    | Typed [`SyncError`]; classifies into a [`SyncStatus`].            |
 //! | `queue`    | Single-slot coalescing push queue.                                |
 //! | `client`   | HTTP transport trait + [`client::ReqwestTransport`] production.   |
+//! | `identity` | Auth-identity trait + [`identity::AuthManagerIdentity`] prod impl.|
 //! | `migrate`  | Helper that shapes a first-run upload PUT body.                   |
 //! | `engine`   | The reconciliation logic; owns the worker and the watch channel. |
 
 pub mod client;
 mod engine;
 mod error;
+pub mod identity;
 mod migrate;
 mod queue;
 mod status;
@@ -32,4 +34,5 @@ mod status;
 pub use client::{PullOutcome, PushOutcome, ReqwestTransport, SettingsTransport};
 pub use engine::{BackoffConfig, SyncEngine};
 pub use error::{SyncError, SyncResult};
+pub use identity::{AuthIdentity, AuthManagerIdentity};
 pub use status::SyncStatus;
