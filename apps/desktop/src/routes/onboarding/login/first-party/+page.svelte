@@ -21,7 +21,11 @@
 			// SystemError results and IPC rejections rather than blocking
 			// the redirect on a window-focus hiccup.
 			commands.systemFocusMainWindow().catch(() => {});
-			goto(user.emailVerified ? '/' : '/onboarding/login/verify-email?redirect=/');
+			goto(
+				user.emailVerified
+					? '/onboarding/telemetry'
+					: '/onboarding/login/verify-email?redirect=/onboarding/telemetry',
+			);
 		},
 	});
 
@@ -44,6 +48,8 @@
 		<h1 class="text-4xl font-bold drop-shadow-lg">Waiting for you to log in...</h1>
 	</div>
 	<div class="mb-8">
-		<Button variant="outline" size="default" onclick={() => goto('/onboarding')}>Cancel</Button>
+		<Button variant="outline" size="default" onclick={() => goto('/onboarding/login')}
+			>Cancel</Button
+		>
 	</div>
 </div>

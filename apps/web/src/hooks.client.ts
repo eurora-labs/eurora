@@ -1,10 +1,8 @@
 import { dev } from '$app/environment';
 import * as Sentry from '@sentry/sveltekit';
-import {
-	PUBLIC_SENTRY_ENVIRONMENT,
-	PUBLIC_SENTRY_RELEASE,
-	PUBLIC_SENTRY_WEB_DSN,
-} from '$env/static/public';
+import { env } from '$env/dynamic/public';
+
+const { PUBLIC_SENTRY_ENVIRONMENT, PUBLIC_SENTRY_RELEASE, PUBLIC_SENTRY_WEB_DSN } = env;
 
 if (!PUBLIC_SENTRY_WEB_DSN && !dev) {
 	console.warn(

@@ -3,7 +3,7 @@ import { dispatchRequest } from '$lib/bridge/handlers';
 import * as log from '$lib/util/log';
 
 declare global {
-	let onDocumentOpened: ((event: Office.AddinCommands.Event) => void) | undefined;
+	var onDocumentOpened: ((event: Office.AddinCommands.Event) => void) | undefined;
 }
 
 Office.onReady((info) => {

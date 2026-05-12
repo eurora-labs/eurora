@@ -1,4 +1,5 @@
 use auth_core::Claims;
+use euro_auth::AuthEvent;
 use euro_secret::{ExposeSecret, SecretString, secret};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -8,7 +9,7 @@ use thiserror::Error;
 use url::Url;
 
 use crate::procedures::{auth_manager, user_controller};
-use crate::shared_types::SharedAppSettings;
+use crate::shared_types::SharedSettingsState;
 
 /// Typed error surface for the `auth_*` IPC commands. Externally tagged
 /// so the JS side gets `{ type: "NotAuthenticated" }` and can branch on
@@ -53,9 +54,26 @@ pub struct AuthStateChanged {
 
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
 
-fn emit_auth_state(app_handle: &AppHandle, claims: Option<Claims>) {
-    if let Err(e) = (AuthStateChanged { claims }).emit(app_handle) {
+/// Fan an auth-state transition out to both the Tauri-side event (for
+/// the frontend) and the backend [`AuthEvent`] bus on
+/// [`euro_auth::AuthManager`] (for the cloud-settings sync engine and
+/// any other in-process subscriber).
+///
+/// The two publishes are independent — a Tauri-emit failure does not
+/// suppress the backend publish, and a missing `AuthManager` (only
+/// possible during shutdown, after state has been torn down) does not
+/// suppress the Tauri emit. Single chokepoint means every IPC procedure
+/// that flips the auth state hits both surfaces by construction.
+async fn emit_auth_state(app_handle: &AppHandle, claims: Option<Claims>) {
+    if let Err(e) = (AuthStateChanged {
+        claims: claims.clone(),
+    })
+    .emit(app_handle)
+    {
         tracing::warn!("Failed to emit auth state event: {e}");
+    }
+    if let Some(manager) = auth_manager(app_handle).await {
+        manager.publish_auth_event(AuthEvent { claims });
     }
 }
 
@@ -94,10 +112,13 @@ fn classify_anyhow_auth_error(err: anyhow::Error) -> AuthError {
 }
 
 async fn save_app_settings(app_handle: &AppHandle) -> Result<(), AuthError> {
-    let state = app_handle.state::<SharedAppSettings>();
+    let state = app_handle.state::<SharedSettingsState>();
     let settings = state.lock().await;
     settings
-        .save_to_default_path()
+        .save_local_to_default_path()
+        .map_err(|e| AuthError::Persistence(e.to_string()))?;
+    settings
+        .save_cache_to_default_path()
         .map_err(|e| AuthError::Persistence(e.to_string()))
 }
 
@@ -154,7 +175,7 @@ pub async fn auth_poll_for_login(app_handle: AppHandle) -> Result<bool, AuthErro
             })?;
 
             if let Ok(claims) = auth_manager.get_access_token_payload() {
-                emit_auth_state(&app_handle, Some(claims));
+                emit_auth_state(&app_handle, Some(claims)).await;
             }
 
             save_app_settings(&app_handle).await?;
@@ -182,7 +203,7 @@ pub async fn auth_register(
         .map_err(classify_anyhow_auth_error)?;
 
     if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims));
+        emit_auth_state(&app_handle, Some(claims)).await;
     }
 
     save_app_settings(&app_handle).await?;
@@ -204,7 +225,7 @@ pub async fn auth_login(
         .map_err(classify_anyhow_auth_error)?;
 
     if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims));
+        emit_auth_state(&app_handle, Some(claims)).await;
     }
 
     save_app_settings(&app_handle).await?;
@@ -221,7 +242,12 @@ pub async fn auth_logout(app_handle: AppHandle) -> Result<(), AuthError> {
     controller
         .delete_user()
         .map_err(|e| AuthError::Internal(format!("Logout failed: {e}")))?;
-    emit_auth_state(&app_handle, None);
+    // Drop the controller lock before fanning out the auth-state event —
+    // `emit_auth_state` re-enters `auth_manager(...)`, which takes the
+    // same lock to clone out the `AuthManager`. Holding it across the
+    // call would deadlock.
+    drop(controller);
+    emit_auth_state(&app_handle, None).await;
 
     save_app_settings(&app_handle).await?;
     Ok(())
@@ -271,7 +297,7 @@ pub async fn auth_refresh_session(app_handle: AppHandle) -> Result<(), AuthError
         .map_err(classify_auth_error)?;
 
     if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims));
+        emit_auth_state(&app_handle, Some(claims)).await;
     }
 
     Ok(())

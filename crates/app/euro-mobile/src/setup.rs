@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::shared_types::{SharedAppSettings, SharedThreadManager, SharedUserController};
+use crate::shared_types::{SharedSettingsState, SharedThreadManager, SharedUserController};
 use euro_endpoint::EndpointManager;
-use euro_settings::AppSettings;
+use euro_settings::{SettingsState, wants_errors};
 use euro_telemetry::Controller as TelemetryController;
 use euro_thread::commands::{NoopChatContextProvider, SharedChatContextProvider};
 use tauri::Manager;
@@ -13,14 +13,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     let config_dir = app.path().app_config_dir()?;
     std::fs::create_dir_all(&config_dir)?;
-    let config_path = config_dir.join("settings.json");
-    let app_settings = match AppSettings::load(&config_path) {
-        Ok(settings) => settings,
-        Err(e) => {
-            tracing::warn!("Failed to load settings, resetting to defaults: {e}");
-            AppSettings::defaults()
-        }
-    };
+    let settings = SettingsState::load_or_migrate(&config_dir)?;
 
     // Initialize Sentry from the loaded settings. Mobile can't peek
     // before the Tauri builder runs (the config dir resolves through
@@ -28,15 +21,18 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // desktop the panic-capture window only opens here. Held as
     // `Arc<TelemetryController>` so the `system_reinit_telemetry`
     // procedure can swap the underlying client when consent changes.
-    let telemetry_controller = Arc::new(TelemetryController::init(&app_settings.telemetry));
+    let telemetry_controller = Arc::new(TelemetryController::init(
+        wants_errors(&settings.cache.settings.desktop.telemetry),
+        settings.local.telemetry.distinct_id.as_deref(),
+    ));
 
     // The persisted ConnectionMode always resolves to a non-empty URL, so
     // we never need the env-fallback path.
-    let endpoint_url = app_settings.api.endpoint();
+    let endpoint_url = settings.local.api.endpoint();
     let endpoint_manager = std::sync::Arc::new(EndpointManager::new(endpoint_url)?);
 
     app.manage(endpoint_manager.clone());
-    app.manage(SharedAppSettings::new(app_settings));
+    app.manage(SharedSettingsState::new(settings));
     app.manage(telemetry_controller);
 
     init_state(app, &endpoint_manager)?;

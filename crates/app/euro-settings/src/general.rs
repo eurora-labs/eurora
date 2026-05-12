@@ -6,3 +6,9 @@ use specta::Type;
 pub struct GeneralSettings {
     pub autostart: bool,
 }
+
+impl Default for GeneralSettings {
+    fn default() -> Self {
+        Self { autostart: true }
+    }
+}

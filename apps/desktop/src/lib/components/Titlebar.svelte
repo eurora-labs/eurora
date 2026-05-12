@@ -23,6 +23,11 @@
 	// `no-access` subroutes there is no active thread, so suppress the
 	// labels entirely rather than rendering placeholder values.
 	const isChatRoute = $derived(page.route.id === '/(chat)/[[id]]');
+	// The sidebar trigger is meaningful anywhere `MainSidebar` is mounted,
+	// which is the entire `(chat)` route group (chat page plus the
+	// `no-access` subroutes). Outside that group there is no sidebar to
+	// toggle, so the trigger and the leading region collapse away.
+	const showSidebarTrigger = $derived(page.route.id?.startsWith('/(chat)') ?? false);
 	const activeThread = $derived(chatService.activeThread?.thread);
 	const threadTitle = $derived(activeThread?.title ?? 'New Chat');
 	const threadDateIso = $derived(activeThread?.created_at ?? new Date().toISOString());
@@ -74,8 +79,15 @@
 		expanded, and centered over the sidebar's icon column when
 		collapsed. Transitions match the sidebar's 200ms ease-linear.
 	-->
-	<div data-tauri-drag-region class="titlebar-leading" data-state={sidebar.state}>
-		<Sidebar.Trigger class="size-8" />
+	<div
+		data-tauri-drag-region
+		class="titlebar-leading"
+		data-state={sidebar.state}
+		data-trigger={showSidebarTrigger ? 'visible' : 'hidden'}
+	>
+		{#if showSidebarTrigger}
+			<Sidebar.Trigger class="size-8" />
+		{/if}
 	</div>
 	<div data-tauri-drag-region class="titlebar-fill"></div>
 	<div data-tauri-drag-region class="titlebar-content">
@@ -228,6 +240,24 @@
 	.titlebar-mac .titlebar-leading[data-state='collapsed'] {
 		width: calc(var(--sidebar-width-icon) + 76px);
 		padding-left: 76px;
+	}
+
+	/*
+	 * Outside the (chat) route group, `MainSidebar` is not mounted and the
+	 * trigger is hidden. Collapse the leading region so titlebar content
+	 * starts at the window edge. On macOS we still need to clear the
+	 * traffic lights, so reserve the same 76px gutter used for the
+	 * collapsed-sidebar case.
+	 */
+	.titlebar-leading[data-trigger='hidden'] {
+		width: 0;
+		padding-right: 0;
+		padding-left: 0;
+	}
+
+	.titlebar-mac .titlebar-leading[data-trigger='hidden'] {
+		width: 76px;
+		padding-left: 0;
 	}
 
 	.titlebar-fill {

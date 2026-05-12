@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 dirs = { workspace = true }
-euro-settings = { workspace = true }
 sentry = { workspace = true, default-features = false, features = [
   "backtrace",
   "contexts",

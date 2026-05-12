@@ -1,22 +1,28 @@
 //! Settings IPC commands for the mobile app.
 //!
 //! Only the telemetry-touching subset is exposed today — the rest of
-//! `AppSettings` (general, appearance, API endpoint) doesn't yet have a
-//! mobile UI, so adding commands for them is deferred until the
-//! settings refactor lands. The two commands below mirror their desktop
-//! counterparts in `euro-tauri::procedures::settings_procedures` and
-//! must stay shape-compatible so the mobile webview's settings page
-//! can share types with the desktop one.
+//! the local + cloud sections (general, appearance, API endpoint)
+//! doesn't yet have a mobile UI, so adding commands for them is
+//! deferred until the mobile settings page lands. The commands below
+//! mirror their desktop counterparts in
+//! `euro-tauri::procedures::settings_procedures` and must stay
+//! shape-compatible so the mobile webview's settings page can share
+//! types with the desktop one.
+//!
+//! Today the desktop `TelemetryConsent` record (under
+//! `cloud.settings.desktop.telemetry`) doubles as the mobile consent
+//! source. Phase 10 partitions mobile into its own section once a
+//! mobile telemetry stack ships.
 
 use std::sync::Arc;
 
-use euro_settings::TelemetrySettings;
+use euro_settings::{TelemetryConsent, TelemetryLocal, record_consent, wants_errors};
 use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager};
 use thiserror::Error;
 
-use crate::shared_types::SharedAppSettings;
+use crate::shared_types::SharedSettingsState;
 use euro_telemetry::Controller as TelemetryController;
 
 /// Typed error surface for the `settings_*` IPC commands. Externally
@@ -31,40 +37,51 @@ pub enum SettingsError {
 
 #[tauri::command]
 #[specta::specta]
-pub async fn settings_get_telemetry(app_handle: AppHandle) -> TelemetrySettings {
-    let state = app_handle.state::<SharedAppSettings>();
-    let settings = state.lock().await;
-    settings.telemetry.clone()
+pub async fn settings_get_telemetry_consent(app_handle: AppHandle) -> TelemetryConsent {
+    let state = app_handle.state::<SharedSettingsState>();
+    state.lock().await.cache.settings.desktop.telemetry.clone()
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn settings_set_telemetry(
+pub async fn settings_get_local_telemetry(app_handle: AppHandle) -> TelemetryLocal {
+    let state = app_handle.state::<SharedSettingsState>();
+    state.lock().await.local.telemetry.clone()
+}
+
+/// Persist a fresh consent decision. Stamps the consent version, lazily
+/// allocates a stable `distinct_id`, reapplies the native Sentry guard,
+/// and returns the canonical post-stamp consent so the frontend's
+/// optimistic state stays in sync.
+#[tauri::command]
+#[specta::specta]
+pub async fn settings_set_telemetry_consent(
     app_handle: AppHandle,
-    telemetry_settings: TelemetrySettings,
-) -> Result<TelemetrySettings, SettingsError> {
-    let state = app_handle.state::<SharedAppSettings>();
+    consent: TelemetryConsent,
+) -> Result<TelemetryConsent, SettingsError> {
+    let state = app_handle.state::<SharedSettingsState>();
     let mut settings = state.lock().await;
 
-    settings.telemetry = telemetry_settings;
-    // Any save through this procedure is by definition a recorded
-    // consent at the current schema version. Stamping it here (rather
-    // than trusting the frontend) prevents an old client from
-    // accidentally pinning the user at a stale version.
-    settings.telemetry.record_consent();
-    // Allocate a stable id alongside the first consent so an exit
-    // between this call and the next save doesn't drop the id.
-    settings.telemetry.ensure_distinct_id();
+    settings.cache.settings.desktop.telemetry = consent;
+    record_consent(&mut settings.cache.settings.desktop.telemetry);
     settings
-        .save_to_default_path()
+        .save_cache_to_default_path()
         .map_err(|e| SettingsError::Persistence(e.to_string()))?;
 
-    let new_telemetry = settings.telemetry.clone();
+    if settings.local.telemetry.ensure_distinct_id() {
+        settings
+            .save_local_to_default_path()
+            .map_err(|e| SettingsError::Persistence(e.to_string()))?;
+    }
+
+    let consent_out = settings.cache.settings.desktop.telemetry.clone();
+    let enabled = wants_errors(&consent_out);
+    let distinct_id = settings.local.telemetry.distinct_id.clone();
     drop(settings);
 
     if let Some(controller) = app_handle.try_state::<Arc<TelemetryController>>() {
-        controller.reapply(&new_telemetry);
+        controller.reapply(enabled, distinct_id.as_deref());
     }
 
-    Ok(new_telemetry)
+    Ok(consent_out)
 }
