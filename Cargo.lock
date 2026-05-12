@@ -3843,6 +3843,7 @@ dependencies = [
  "anyhow",
  "auth-core",
  "backon",
+ "base64 0.22.1",
  "chrono",
  "euro-auth",
  "euro-endpoint",
@@ -3852,6 +3853,7 @@ dependencies = [
  "euro-thread",
  "euro-user",
  "futures",
+ "rand 0.10.1",
  "serde",
  "serde_json",
  "specta",
@@ -3859,6 +3861,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-appauth",
+ "tauri-plugin-apple-auth",
  "tauri-plugin-google-auth",
  "tauri-plugin-http",
  "tauri-plugin-opener",
@@ -10923,6 +10926,18 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-appauth"
 version = "0.2.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "tauri-plugin-apple-auth"
+version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",

@@ -104,6 +104,24 @@ export class UserService {
 		return native;
 	}
 
+	/**
+	 * Sign in with Apple. On iOS this drives `ASAuthorizationController`
+	 * (the system Apple sheet, FaceID / TouchID, no browser) via
+	 * `tauri-plugin-apple-auth`. On Android and on iOS versions / configs
+	 * where the native path isn't available, falls back to the in-app
+	 * browser flow — the user-visible behaviour mirrors `signInWithGoogle`.
+	 */
+	async signInWithApple(): Promise<LoginOutcome> {
+		const native = unwrap(await commands.authStartLoginAppleNative());
+		if (native.kind === 'native_unavailable') {
+			return await this.startLogin('apple');
+		}
+		if (native.kind === 'success') {
+			await this.fetchProfile();
+		}
+		return native;
+	}
+
 	async refreshSession(): Promise<void> {
 		unwrap(await commands.authRefreshSession());
 	}

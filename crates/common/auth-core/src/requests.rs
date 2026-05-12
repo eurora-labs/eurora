@@ -88,6 +88,48 @@ pub struct GoogleIdTokenLoginRequest {
     pub nonce: Option<String>,
 }
 
+/// Request body for `POST /auth/oauth/apple/id-token`.
+///
+/// Used by mobile after a native iOS Sign in with Apple flow
+/// (`ASAuthorizationController`): the client hands us the ID token
+/// Apple issued directly to the device. The backend verifies the
+/// signature against Apple's JWKS and the nonce against
+/// `base64url(sha256(raw_nonce))` (Apple echoes whatever the client
+/// placed in `request.nonce`, and the iOS plugin hashes before sending).
+///
+/// `raw_nonce` is **required**, not optional like
+/// [`GoogleIdTokenLoginRequest::nonce`]: dropping replay protection on
+/// this endpoint would let a captured `id_token` mint sessions
+/// indefinitely. The native plugin always supplies one.
+///
+/// `user` carries first/last name from `ASAuthorizationAppleIDCredential.fullName`
+/// — Apple only ships this on the very first sign-in for a given user,
+/// and the server-side guard inside `complete_oauth_login` ensures the
+/// override is only applied when no existing user matches `(Apple, sub)`.
+/// A malicious client can therefore not replay a stolen `id_token` with
+/// a fabricated `user` field to overwrite an established display name.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct AppleIdTokenLoginRequest {
+    pub id_token: String,
+    pub raw_nonce: String,
+    #[serde(default)]
+    pub user: Option<AppleNativeUser>,
+}
+
+/// First/last name from `ASAuthorizationAppleIDCredential.fullName`.
+/// Both fields are optional because Apple's `PersonNameComponents`
+/// permits either side to be nil and the user can edit the name shown
+/// in the system sheet before consent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct AppleNativeUser {
+    #[serde(default)]
+    pub first_name: Option<String>,
+    #[serde(default)]
+    pub last_name: Option<String>,
+}
+
 /// Request body for `POST /auth/login-token/exchange`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
@@ -241,5 +283,63 @@ mod tests {
             serde_json::from_str(r#"{"id_token":"eyJ..."}"#).unwrap();
         assert!(back.nonce.is_none());
         assert_eq!(back.id_token, "eyJ...");
+    }
+
+    #[test]
+    fn apple_id_token_login_request_round_trip() {
+        let req = AppleIdTokenLoginRequest {
+            id_token: "eyJ...".into(),
+            raw_nonce: "n0nce".into(),
+            user: Some(AppleNativeUser {
+                first_name: Some("Ada".into()),
+                last_name: Some("Lovelace".into()),
+            }),
+        };
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["id_token"], "eyJ...");
+        assert_eq!(json["raw_nonce"], "n0nce");
+        assert_eq!(json["user"]["first_name"], "Ada");
+        let back: AppleIdTokenLoginRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(back.raw_nonce, "n0nce");
+        let user = back.user.unwrap();
+        assert_eq!(user.first_name.as_deref(), Some("Ada"));
+        assert_eq!(user.last_name.as_deref(), Some("Lovelace"));
+    }
+
+    #[test]
+    fn apple_id_token_login_request_decodes_without_user() {
+        // Apple only sends `user` on first sign-in; subsequent calls
+        // must round-trip without it.
+        let raw = r#"{"id_token":"eyJ...","raw_nonce":"n"}"#;
+        let back: AppleIdTokenLoginRequest = serde_json::from_str(raw).unwrap();
+        assert!(back.user.is_none());
+        assert_eq!(back.raw_nonce, "n");
+    }
+
+    #[test]
+    fn apple_id_token_login_request_rejects_missing_raw_nonce() {
+        // `raw_nonce` is required (replay defence); a body without it
+        // must fail to deserialise rather than silently default to "".
+        let raw = r#"{"id_token":"eyJ..."}"#;
+        let err = serde_json::from_str::<AppleIdTokenLoginRequest>(raw).unwrap_err();
+        assert!(
+            err.to_string().contains("raw_nonce"),
+            "error should name missing field: {err}",
+        );
+    }
+
+    #[test]
+    fn apple_native_user_decodes_partial_names() {
+        // Apple's `PersonNameComponents` may have either side nil; the
+        // user can also edit the name before consent, leaving one half
+        // blank. Both shapes must decode without erroring.
+        let only_first = r#"{"first_name":"Ada"}"#;
+        let parsed: AppleNativeUser = serde_json::from_str(only_first).unwrap();
+        assert_eq!(parsed.first_name.as_deref(), Some("Ada"));
+        assert!(parsed.last_name.is_none());
+
+        let neither = r#"{}"#;
+        let parsed: AppleNativeUser = serde_json::from_str(neither).unwrap();
+        assert!(parsed.first_name.is_none() && parsed.last_name.is_none());
     }
 }

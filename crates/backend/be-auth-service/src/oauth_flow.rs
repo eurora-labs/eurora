@@ -26,10 +26,12 @@
 //! crypto-keyring dependency stays out of the provider-client layer.
 
 use auth_core::{Provider, TokenResponse};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use be_remote_db::{DbError, OAuthProvider};
 use chrono::{Duration, Utc};
 use openidconnect::{Nonce, PkceCodeChallenge};
 use secrecy::ExposeSecret;
+use sha2::{Digest, Sha256};
 
 use crate::OAUTH_STATE_EXPIRY_MINUTES;
 use crate::USERS_EMAIL_UNIQUE_CONSTRAINT;
@@ -381,6 +383,74 @@ impl AuthService {
         self.complete_oauth_login(identity, None).await
     }
 
+    /// Native-iOS entry point: trade an Apple ID token (issued by
+    /// `ASAuthorizationController` running in-process) for a session.
+    ///
+    /// Nonce semantics: Apple echoes the value the client placed in
+    /// `request.nonce` verbatim into the ID token's `nonce` claim. The
+    /// iOS plugin sets that field to `base64url(sha256(raw_nonce))`, so
+    /// the backend must re-derive the same hash and compare against the
+    /// claim — never the raw nonce. Computing the hash here, rather
+    /// than asking the client to pre-hash before sending, keeps the
+    /// authoritative nonce-handling logic on the trusted side.
+    ///
+    /// `display_name_override` (Apple's
+    /// `ASAuthorizationAppleIDCredential.fullName`) is layered onto the
+    /// `OAuthIdentityRaw` *before* projection into a `NewOAuthIdentity`.
+    /// First-sign-in-only application is enforced structurally:
+    /// `create_oauth_user` is the only path that consumes
+    /// `display_name`, so a malicious client cannot replay a stolen
+    /// `id_token` with a fabricated `user` blob to overwrite an
+    /// established name.
+    ///
+    /// No `oauth_state` row is touched (no browser round-trip, no CSRF
+    /// state) and `login_token` is `None` (the device is the session
+    /// bearer; the response carries access / refresh tokens directly).
+    pub async fn login_apple_id_token(
+        &self,
+        id_token: &str,
+        raw_nonce: &str,
+        display_name_override: Option<String>,
+    ) -> AuthResult<MintedSession> {
+        if id_token.is_empty() {
+            return Err(AuthError::InvalidInput("ID token is required".into()));
+        }
+        if raw_nonce.is_empty() {
+            return Err(AuthError::InvalidInput("raw nonce is required".into()));
+        }
+
+        let apple = self.apple_oauth()?;
+        let expected_nonce = expected_apple_native_nonce(raw_nonce);
+        let user_info = apple.verify_id_token(id_token, Some(&expected_nonce))?;
+
+        if !user_info.email_verified {
+            tracing::warn!(
+                email_log = ?hash_email_for_log(&user_info.email),
+                "Apple ID-token login rejected: email not verified",
+            );
+            return Err(AuthError::EmailNotVerified);
+        }
+
+        // Apple never hands the relying party a usable access / refresh
+        // token on the native path; the `oauth_credentials` row is a
+        // pure provider-link record.
+        let raw = OAuthIdentityRaw {
+            provider_user_id: user_info.sub,
+            email: user_info.email,
+            email_verified: user_info.email_verified,
+            display_name: user_info.display_name,
+            tokens: RawOAuthTokens {
+                access_token: None,
+                refresh_token: None,
+                access_token_expiry: None,
+                scope: String::new(),
+            },
+        };
+
+        let identity = build_new_identity(OAuthProvider::Apple, raw, display_name_override)?;
+        self.complete_oauth_login(identity, None).await
+    }
+
     /// Consume a previously-issued `oauth_state` row, rejecting anything
     /// that isn't a fresh, unexpired match. `provider` is used only
     /// for the warn-log so SecOps can tell which callback path failed.
@@ -687,6 +757,20 @@ fn encrypt_token_bundle(tokens: RawOAuthTokens) -> AuthResult<OAuthTokenBundle> 
     })
 }
 
+/// Compute the value Apple's native iOS flow will have placed in the
+/// ID token's `nonce` claim, given the raw nonce the client kept.
+///
+/// `ASAuthorizationAppleIDRequest.nonce` echoes back verbatim, so the
+/// iOS plugin hashes (`base64url(sha256(raw_nonce_bytes))`) before
+/// assignment. The backend re-derives the same hash and byte-compares
+/// against the claim — keeping the authoritative hashing on the trusted
+/// side rules out clients shipping a malformed digest.
+pub(crate) fn expected_apple_native_nonce(raw_nonce: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(raw_nonce.as_bytes());
+    URL_SAFE_NO_PAD.encode(hasher.finalize())
+}
+
 /// Project an `OAuthIdentityRaw` (returned by `OAuthProviderExt`,
 /// plaintext) onto the encrypted [`NewOAuthIdentity`] shape
 /// `complete_oauth_login` consumes.
@@ -710,4 +794,44 @@ fn build_new_identity(
         display_name: display_name_override.or(raw.display_name),
         tokens,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expected_apple_native_nonce_hashes_with_sha256_base64url() {
+        // Fixed-value check: SHA-256 of "raw-nonce" is well-known; the
+        // base64url-no-pad encoding is what Apple's `request.nonce`
+        // expects from the iOS plugin. If either the hash function or
+        // the encoding ever drifts, this test surfaces it before a
+        // real device sees a "nonce mismatch" rejection.
+        let hash = expected_apple_native_nonce("raw-nonce");
+        assert_eq!(hash, "LF0QeTgFOiJ18CLBU8mnH2XuB3VLi8pUPul6DDzGaZA");
+    }
+
+    #[test]
+    fn expected_apple_native_nonce_handles_empty_input() {
+        // Defence-in-depth — the SHA-256 of the empty string is itself
+        // a stable, well-known constant. The handler rejects empty
+        // `raw_nonce` before reaching here, but the helper itself
+        // must not panic.
+        let hash = expected_apple_native_nonce("");
+        assert_eq!(hash, "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU");
+    }
+
+    #[test]
+    fn expected_apple_native_nonce_is_url_safe() {
+        // Apple ferries the nonce through a URL claim — the encoding
+        // must not contain `+`, `/`, or `=`. Sweep across enough
+        // inputs to catch any encoder change.
+        for input in ["", "a", "ada lovelace", "🦀", "/?=+"] {
+            let hash = expected_apple_native_nonce(input);
+            assert!(
+                !hash.contains(['+', '/', '=']),
+                "non-url-safe output for {input:?}: {hash}",
+            );
+        }
+    }
 }

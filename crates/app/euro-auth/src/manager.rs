@@ -243,6 +243,28 @@ impl AuthManager {
 
         Ok(SecretString::from(response.access_token))
     }
+
+    /// Trade an Apple ID token (from `ASAuthorizationController` on
+    /// iOS) for a session. `raw_nonce` is the unhashed nonce the
+    /// plugin generated; the backend re-derives the hash to match
+    /// against the ID token's `nonce` claim. `user` is the
+    /// `fullName` Apple ships on the first sign-in only.
+    pub async fn login_by_apple_id_token(
+        &self,
+        id_token: impl Into<String>,
+        raw_nonce: impl Into<String>,
+        user: Option<auth_core::AppleNativeUser>,
+    ) -> Result<SecretString> {
+        let response = self
+            .auth_client
+            .login_by_apple_id_token(id_token, raw_nonce, user)
+            .await?;
+
+        store_access_token(response.access_token.clone())?;
+        store_refresh_token(response.refresh_token.clone())?;
+
+        Ok(SecretString::from(response.access_token))
+    }
 }
 
 fn store_access_token(token: String) -> Result<()> {

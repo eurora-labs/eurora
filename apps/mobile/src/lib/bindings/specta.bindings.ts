@@ -41,6 +41,22 @@ export const commands = {
 	 */
 	authStartLogin: (provider: Provider) => typedError<LoginOutcome, string>(__TAURI_INVOKE("auth_start_login", { provider })),
 	/**
+	 *  Native Apple sign-in via `tauri-plugin-apple-auth`. On iOS this
+	 *  drives `ASAuthorizationController` (the system Apple sheet, FaceID /
+	 *  TouchID, no browser); on every other target the plugin returns
+	 *  [`AppleSignInOutcome::NativeUnavailable`] and we surface that to the
+	 *  frontend so it can fall back to [`auth_start_login`].
+	 * 
+	 *  Unlike Google, the iOS flow does not need a client ID — the
+	 *  `ASAuthorizationAppleIDProvider` request is bound to the iOS Bundle
+	 *  ID via the provisioning profile's Sign in with Apple capability.
+	 *  The backend's dual-audience verifier accepts both
+	 *  `APPLE_SERVICE_ID` (web) and `APPLE_BUNDLE_ID` (native iOS) audiences,
+	 *  so the resulting `(provider, sub)` pair lines up with web sign-ins
+	 *  of the same Apple ID.
+	 */
+	authStartLoginAppleNative: () => typedError<LoginOutcome, string>(__TAURI_INVOKE("auth_start_login_apple_native")),
+	/**
 	 *  Native Google sign-in via `tauri-plugin-google-auth`. On iOS this
 	 *  drives the GoogleSignIn SDK (account picker, no browser); on Android
 	 *  the Credential Manager API (system bottom sheet). Returns
@@ -326,7 +342,14 @@ export type InvalidToolCallBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
-export type LoginOutcome = { kind: "success" } | { kind: "canceled" } | { kind: "rejected" } | 
+export type LoginOutcome = { kind: "success" } | { kind: "canceled" } | 
+/**
+ *  Provider or backend refused the sign-in for a non-cancellation
+ *  reason. `reason` is the underlying error category — useful for
+ *  surfacing diagnostics, not for branching on the UI side. The
+ *  frontend should treat every `rejected` outcome the same.
+ */
+{ kind: "rejected"; reason: string } | 
 /**
  *  Native sign-in is not available on this device (e.g. Android
  *  without Play Services). The frontend should retry via the

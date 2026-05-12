@@ -65,9 +65,9 @@
 					<Button href="/login" class="mt-4">Go to Sign In</Button>
 				{:else}
 					<div
-						class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100"
+						class="bg-destructive/10 text-destructive mx-auto flex h-12 w-12 items-center justify-center rounded-full"
 					>
-						<CircleX class="h-6 w-6 text-red-600" />
+						<CircleX class="h-6 w-6" />
 					</div>
 					<h2 class="text-xl font-semibold">Verification failed</h2>
 					<p class="text-muted-foreground">{errorMessage}</p>

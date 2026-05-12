@@ -8,7 +8,7 @@
 use procedures::auth_procedures::{
     AuthStateChanged, auth_get_access_token_payload, auth_is_authenticated, auth_login,
     auth_logout, auth_refresh_session, auth_register, auth_start_login,
-    auth_start_login_google_native,
+    auth_start_login_apple_native, auth_start_login_google_native,
 };
 use procedures::settings_procedures::{settings_get_telemetry, settings_set_telemetry};
 use procedures::system_procedures::{
@@ -35,6 +35,7 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
         .disable_serde_phases()
         .commands(tauri_specta::collect_commands![
             auth_start_login,
+            auth_start_login_apple_native,
             auth_start_login_google_native,
             auth_login,
             auth_register,
@@ -136,6 +137,7 @@ pub fn run() {
 
             tauri::Builder::default()
                 .plugin(tauri_plugin_appauth::init())
+                .plugin(tauri_plugin_apple_auth::init())
                 .plugin(tauri_plugin_google_auth::init())
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_http::init())
