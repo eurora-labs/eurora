@@ -10,7 +10,9 @@ use procedures::auth_procedures::{
     auth_logout, auth_refresh_session, auth_register, auth_start_login,
     auth_start_login_apple_native, auth_start_login_google_native,
 };
-use procedures::settings_procedures::{settings_get_telemetry, settings_set_telemetry};
+use procedures::settings_procedures::{
+    settings_get_local_telemetry, settings_get_telemetry_consent, settings_set_telemetry_consent,
+};
 use procedures::system_procedures::{
     system_get_telemetry_bootstrap, system_needs_telemetry_consent, system_reinit_telemetry,
     system_rotate_telemetry_distinct_id,
@@ -43,8 +45,9 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             auth_is_authenticated,
             auth_get_access_token_payload,
             auth_refresh_session,
-            settings_get_telemetry,
-            settings_set_telemetry,
+            settings_get_telemetry_consent,
+            settings_get_local_telemetry,
+            settings_set_telemetry_consent,
             system_get_telemetry_bootstrap,
             system_needs_telemetry_consent,
             system_reinit_telemetry,

@@ -1,5 +1,3 @@
-use cfg_if::cfg_if;
-
 mod app_process;
 mod browser;
 
@@ -8,11 +6,11 @@ pub use browser::{Browser, BrowserStore};
 
 #[inline(always)]
 pub fn os_pick<'a>(_windows: &'a str, _linux: &'a str, _macos: &'a str) -> &'a str {
-    cfg_if! {
-        if #[cfg(target_os = "windows")] { _windows }
-        else if #[cfg(target_os = "linux")] { _linux }
-        else if #[cfg(target_os = "macos")] { _macos }
-        else { compile_error!("Unsupported target OS"); }
+    cfg_select! {
+        target_os = "windows" => { _windows }
+        target_os = "linux" => { _linux }
+        target_os = "macos" => { _macos }
+        _ => { compile_error!("Unsupported target OS") }
     }
 }
 

@@ -25,7 +25,7 @@ euro-auth = { workspace = true }
 rand = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-webpki-roots"] }
 euro-secret = { workspace = true }
-euro-settings = { workspace = true }
+euro-settings = { workspace = true, features = ["tls-webpki-roots"] }
 euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
 euro-user = { workspace = true }

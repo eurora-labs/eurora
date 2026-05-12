@@ -1,9 +1,17 @@
-//! Sentry client lifecycle: build a guard from current settings,
-//! install the panic hook, manage runtime consent toggles.
+//! Sentry client lifecycle: build a guard from the user's consent
+//! decision, install the panic hook, swap the client when consent
+//! changes at runtime.
+//!
+//! The controller is deliberately settings-agnostic. Callers compute
+//! the "should errors be reported?" boolean themselves (in
+//! `euro-settings::telemetry::wants_errors`) and hand it in, alongside
+//! the anonymous distinct id used as the Sentry user. Keeping the
+//! consent policy out of this crate lets the desktop and mobile apps
+//! share one Sentry guard without coupling either to the wire-format
+//! crate.
 
 use std::sync::Mutex;
 
-use euro_settings::TelemetrySettings;
 use sentry::ClientInitGuard;
 
 use crate::{RELEASE_CHANNEL, RELEASE_VERSION, SENTRY_DSN, scrub};
@@ -23,14 +31,19 @@ impl Controller {
     /// Single entry point used at startup. Builds the guard, registers
     /// the panic hook if telemetry is active, and applies the persisted
     /// distinct id as the Sentry user.
+    ///
+    /// `enabled` is the caller's pre-computed "user wants anonymous
+    /// error reports" decision; `distinct_id` is the anonymous
+    /// per-install identifier used as the Sentry user (always — it's
+    /// the operator-side join key, not a PII channel).
     #[must_use]
-    pub fn init(settings: &TelemetrySettings) -> Self {
+    pub fn init(enabled: bool, distinct_id: Option<&str>) -> Self {
         let controller = Self {
-            guard: Mutex::new(build_guard(settings)),
+            guard: Mutex::new(build_guard(enabled)),
         };
         if controller.is_active() {
             register_panic_hook();
-            apply_user_scope(settings);
+            apply_user_scope(distinct_id);
         }
         controller
     }
@@ -46,7 +59,7 @@ impl Controller {
             .is_some()
     }
 
-    /// Apply a freshly loaded `TelemetrySettings`: drop the old guard
+    /// Apply a fresh "enabled / distinct id" pair: drop the old guard
     /// (flushing any buffered events) and start a new client when the
     /// user consents to error reporting.
     ///
@@ -54,8 +67,8 @@ impl Controller {
     /// `ClientInitGuard::Drop` blocks until pending events flush
     /// (default ~2s). Doing that on the calling tokio executor thread
     /// would stall every other in-flight IPC.
-    pub fn reapply(&self, settings: &TelemetrySettings) {
-        let new_guard = build_guard(settings);
+    pub fn reapply(&self, enabled: bool, distinct_id: Option<&str>) {
+        let new_guard = build_guard(enabled);
         let active = new_guard.is_some();
         let old = {
             let mut slot = self.guard.lock().expect("telemetry guard mutex poisoned");
@@ -67,17 +80,17 @@ impl Controller {
         if active {
             register_panic_hook();
         }
-        apply_user_scope(settings);
+        apply_user_scope(distinct_id);
     }
 }
 
-/// Build a Sentry client guard from the current settings. Returns
-/// `None` when telemetry is disabled, the DSN is absent (dev builds),
-/// or — defensively — the channel is empty in a DSN-bearing build
-/// (the build script already prevents this, so the runtime check is a
-/// belt-and-braces guard against a future regression).
-fn build_guard(settings: &TelemetrySettings) -> Option<ClientInitGuard> {
-    if !settings.wants_errors() {
+/// Build a Sentry client guard for the current consent decision.
+/// Returns `None` when telemetry is disabled, the DSN is absent (dev
+/// builds), or — defensively — the channel is empty in a DSN-bearing
+/// build (the build script already prevents this, so the runtime check
+/// is a belt-and-braces guard against a future regression).
+fn build_guard(enabled: bool) -> Option<ClientInitGuard> {
+    if !enabled {
         return None;
     }
     if SENTRY_DSN.is_empty() {
@@ -123,8 +136,8 @@ fn register_panic_hook() {
     });
 }
 
-fn apply_user_scope(settings: &TelemetrySettings) {
-    let id = settings.distinct_id.clone();
+fn apply_user_scope(distinct_id: Option<&str>) {
+    let id = distinct_id.map(str::to_owned);
     sentry::configure_scope(|scope| {
         scope.set_user(id.map(|id| sentry::User {
             id: Some(id),
@@ -139,13 +152,11 @@ mod tests {
 
     /// `Controller::init` must produce an inactive controller whenever
     /// the user hasn't consented, regardless of whether the build has a
-    /// DSN baked in. `wants_errors()` returning `false` short-circuits
-    /// the `build_guard` call before it can touch `sentry::init`.
+    /// DSN baked in. `enabled = false` short-circuits the `build_guard`
+    /// call before it can touch `sentry::init`.
     #[test]
     fn inactive_without_consent() {
-        let settings = TelemetrySettings::default();
-        assert!(!settings.wants_errors());
-        let controller = Controller::init(&settings);
+        let controller = Controller::init(false, None);
         assert!(!controller.is_active());
     }
 
@@ -161,10 +172,7 @@ mod tests {
             // empty DSN so this is the common path.
             return;
         }
-        let mut settings = TelemetrySettings::default();
-        settings.record_consent();
-        assert!(settings.wants_errors());
-        let controller = Controller::init(&settings);
+        let controller = Controller::init(true, Some("test-distinct-id"));
         assert!(!controller.is_active());
     }
 }
