@@ -18,8 +18,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use euro_settings::{
-    BackoffConfig, CloudSettingsCache, PullOutcome, PushOutcome, SettingsState, SettingsTransport,
-    SyncEngine, SyncError, SyncResult, SyncStatus,
+    AuthIdentity, BackoffConfig, CloudSettingsCache, PullOutcome, PushOutcome, SettingsState,
+    SettingsTransport, SyncEngine, SyncError, SyncResult, SyncStatus,
 };
 use reqwest::StatusCode;
 use settings_core::{
@@ -28,6 +28,7 @@ use settings_core::{
 };
 use tempfile::TempDir;
 use tokio::sync::{Mutex, watch};
+use uuid::Uuid;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -120,6 +121,62 @@ impl SettingsTransport for HttpTestTransport {
     }
 }
 
+/// Identity stub mirroring `euro_auth::AuthManager`'s contract without
+/// the keyring. The engine reaches through `AuthIdentity` for the
+/// `Option<Uuid>` it stamps into the cache; tests parameterize this
+/// to model "logged in as X", "logged out", and the transient-error
+/// retry path.
+#[derive(Clone, Debug)]
+enum IdentityScript {
+    User(Uuid),
+    LoggedOut,
+    Transient,
+}
+
+struct ScriptedIdentity {
+    script: IdentityScript,
+}
+
+impl ScriptedIdentity {
+    fn user(uid: Uuid) -> Arc<Self> {
+        Arc::new(Self {
+            script: IdentityScript::User(uid),
+        })
+    }
+
+    fn logged_out() -> Arc<Self> {
+        Arc::new(Self {
+            script: IdentityScript::LoggedOut,
+        })
+    }
+
+    fn transient() -> Arc<Self> {
+        Arc::new(Self {
+            script: IdentityScript::Transient,
+        })
+    }
+}
+
+#[async_trait]
+impl AuthIdentity for ScriptedIdentity {
+    async fn current_user_id(&self) -> SyncResult<Option<Uuid>> {
+        match self.script {
+            IdentityScript::User(uid) => Ok(Some(uid)),
+            IdentityScript::LoggedOut => Ok(None),
+            IdentityScript::Transient => Err(SyncError::Internal(anyhow::anyhow!(
+                "scripted transient identity failure"
+            ))),
+        }
+    }
+}
+
+/// Stable user id used by tests that don't care about distinguishing
+/// "user A" from "user B". Aliased here so the value reads the same in
+/// every test and in the harness defaults.
+fn default_test_user() -> Uuid {
+    Uuid::parse_str("00000000-0000-4000-8000-000000000001").unwrap()
+}
+
 /// Subscribes to the engine's status channel and drops the value
 /// already present at subscribe-time, so [`StatusWatcher::wait_for`]
 /// only resolves on transitions caused by the test's *next* action.
@@ -187,6 +244,17 @@ impl Harness {
     }
 
     async fn with_cache(cache: CloudSettingsCache) -> Self {
+        Self::with_cache_and_identity(cache, ScriptedIdentity::user(default_test_user())).await
+    }
+
+    async fn with_identity(identity: Arc<dyn AuthIdentity>) -> Self {
+        Self::with_cache_and_identity(CloudSettingsCache::default(), identity).await
+    }
+
+    async fn with_cache_and_identity(
+        cache: CloudSettingsCache,
+        identity: Arc<dyn AuthIdentity>,
+    ) -> Self {
         let server = MockServer::start().await;
         let tmp = TempDir::new().expect("tempdir");
 
@@ -202,16 +270,19 @@ impl Harness {
         let state = Arc::new(Mutex::new(loaded));
 
         let transport: Arc<dyn SettingsTransport> = Arc::new(HttpTestTransport::new(&server.uri()));
-        let engine = SyncEngine::with_backoff(
-            state.clone(),
-            transport,
-            tmp.path().to_owned(),
-            BackoffConfig {
-                initial: Duration::from_millis(10),
-                max: Duration::from_millis(40),
-                jitter: 0.0,
-            },
-        );
+        let engine = SyncEngine::builder()
+            .settings(state.clone())
+            .transport(transport)
+            .identity(identity)
+            .config_dir(tmp.path().to_owned())
+            .backoff(
+                BackoffConfig::builder()
+                    .initial(Duration::from_millis(10))
+                    .max(Duration::from_millis(40))
+                    .jitter(0.0)
+                    .build(),
+            )
+            .build();
 
         Self {
             server,
@@ -680,6 +751,310 @@ async fn pull_sanitizes_out_of_range_scales() {
         settings_core::MAX_SCALE
     );
     assert_eq!(cache.settings.desktop.text_scale, settings_core::MIN_SCALE);
+}
+
+// --- Phase 6: auth identity + account isolation ---------------------------
+
+#[tokio::test]
+async fn first_run_upload_stamps_last_user_id() {
+    // Fresh-install cache (no last_user_id, no baseline) + authenticated
+    // user. GET 404 → first-run PUT → 200. After reconcile the cache
+    // must carry the JWT subject and the server's updated_at.
+    let uid = default_test_user();
+    let h = Harness::with_cache_and_identity(
+        CloudSettingsCache::default(),
+        ScriptedIdentity::user(uid),
+    )
+    .await;
+
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(1)
+        .mount(&h.server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(PutSettingsAcceptedResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 8, 1),
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    h.engine.pull_now().await.expect("pull_now ok");
+
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.last_user_id, Some(uid));
+    assert_eq!(cache.base_updated_at, Some(timestamp(2026, 8, 1)));
+
+    // The stamp must also have hit disk so a restart sees the same
+    // owner and the engine doesn't redo the first-run path.
+    let reloaded = SettingsState::load_or_migrate(h.config_path()).unwrap();
+    assert_eq!(reloaded.cache.last_user_id, Some(uid));
+    assert_eq!(reloaded.cache.base_updated_at, Some(timestamp(2026, 8, 1)));
+}
+
+#[tokio::test]
+async fn pull_200_replace_stamps_last_user_id() {
+    // Cache previously owned by user A; user A is still logged in.
+    // Server has fresher data; replace_cache must preserve / restamp
+    // the owner so the round-trip doesn't accidentally clear it.
+    let uid = default_test_user();
+    let prior = CloudSettingsCache {
+        last_user_id: Some(uid),
+        base_updated_at: Some(timestamp(2026, 1, 1)),
+        settings: CloudSettings::default(),
+    };
+    let h = Harness::with_cache_and_identity(prior, ScriptedIdentity::user(uid)).await;
+
+    let server_blob = serde_json::json!({
+        "schemaVersion": CURRENT_SCHEMA_VERSION,
+        "shared": { "theme": "dark", "dynamicAccent": true },
+        "desktop": {
+            "interfaceScale": 1.0,
+            "textScale": 1.0,
+            "telemetry": {
+                "consentVersion": 1,
+                "anonymousMetrics": false,
+                "anonymousErrors": false,
+                "nonAnonymousMetrics": false,
+            },
+        },
+        "mobile": {},
+        "web": {},
+    });
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 9, 1),
+                settings: server_blob,
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    h.engine.pull_now().await.expect("pull_now ok");
+
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.last_user_id, Some(uid));
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
+}
+
+#[tokio::test]
+async fn foreign_cache_is_discarded_before_any_io() {
+    // Machine carries cache stamped for user A (theme: Dark). User B
+    // logs in. Before any HTTP, the engine must in-memory replace
+    // the cache with defaults stamped to B's id. The GET that follows
+    // sees user B's blob and the resulting cache reflects B — A's
+    // theme must not survive.
+    let user_a = Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap();
+    let user_b = Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap();
+
+    let foreign = CloudSettingsCache {
+        last_user_id: Some(user_a),
+        base_updated_at: Some(timestamp(2025, 12, 1)),
+        settings: {
+            let mut s = CloudSettings::default();
+            s.shared.theme = ThemePreference::Dark;
+            s
+        },
+    };
+    let h = Harness::with_cache_and_identity(foreign, ScriptedIdentity::user(user_b)).await;
+
+    // Server-side row for user B uses Light theme.
+    let server_blob = serde_json::json!({
+        "schemaVersion": CURRENT_SCHEMA_VERSION,
+        "shared": { "theme": "light", "dynamicAccent": false },
+        "desktop": {
+            "interfaceScale": 1.0,
+            "textScale": 1.0,
+            "telemetry": {
+                "consentVersion": 1,
+                "anonymousMetrics": false,
+                "anonymousErrors": false,
+                "nonAnonymousMetrics": false,
+            },
+        },
+        "mobile": {},
+        "web": {},
+    });
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 10, 1),
+                settings: server_blob,
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    h.engine.pull_now().await.expect("pull_now ok");
+
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.last_user_id, Some(user_b));
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Light);
+    assert_eq!(cache.base_updated_at, Some(timestamp(2026, 10, 1)));
+
+    // Disk reflects the reset + pulled state; the dark theme is gone.
+    let reloaded = SettingsState::load_or_migrate(h.config_path()).unwrap();
+    assert_eq!(reloaded.cache.settings.shared.theme, ThemePreference::Light);
+    assert_eq!(reloaded.cache.last_user_id, Some(user_b));
+}
+
+#[tokio::test]
+async fn foreign_cache_isolation_persists_before_network_failure() {
+    // Even if the GET fails after isolation, the foreign-cache reset
+    // must already have hit disk so a subsequent restart doesn't see
+    // user A's theme through user B's session.
+    let user_a = Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap();
+    let user_b = Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap();
+
+    let foreign = CloudSettingsCache {
+        last_user_id: Some(user_a),
+        base_updated_at: Some(timestamp(2025, 12, 1)),
+        settings: {
+            let mut s = CloudSettings::default();
+            s.shared.theme = ThemePreference::Dark;
+            s
+        },
+    };
+    let h = Harness::with_cache_and_identity(foreign, ScriptedIdentity::user(user_b)).await;
+
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(ResponseTemplate::new(500).set_body_string("upstream down"))
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    let err = h.engine.pull_now().await.expect_err("pull must fail");
+    assert!(matches!(err, SyncError::Server { .. }));
+
+    // In-memory state and disk both reflect the isolation reset, not
+    // user A's stale data.
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.last_user_id, Some(user_b));
+    assert_eq!(cache.settings.shared.theme, ThemePreference::default());
+    assert!(cache.base_updated_at.is_none());
+
+    let reloaded = SettingsState::load_or_migrate(h.config_path()).unwrap();
+    assert_eq!(reloaded.cache.last_user_id, Some(user_b));
+    assert_eq!(
+        reloaded.cache.settings.shared.theme,
+        ThemePreference::default()
+    );
+}
+
+#[tokio::test]
+async fn pull_skipped_when_unauthenticated() {
+    // Logged-out boot must publish `LocalOnly` and issue zero HTTP
+    // requests. The mock server records every incoming request, so
+    // we can assert "nothing hit it."
+    let h = Harness::with_identity(ScriptedIdentity::logged_out()).await;
+
+    let status = h.engine.pull_now().await.expect("pull_now ok");
+    assert_eq!(status, SyncStatus::LocalOnly);
+    assert_eq!(h.engine.current_status(), SyncStatus::LocalOnly);
+
+    let recorded = h.server.received_requests().await.unwrap_or_default();
+    assert!(
+        recorded.is_empty(),
+        "unauthenticated pull must not hit the network; got {} request(s)",
+        recorded.len()
+    );
+
+    // Cache untouched — no foreign isolation, no first-run upload.
+    let cache = h.cache_clone().await;
+    assert!(cache.last_user_id.is_none());
+    assert!(cache.base_updated_at.is_none());
+}
+
+#[tokio::test]
+async fn pull_propagates_transient_identity_error_as_offline() {
+    // A transport-class failure resolving identity (auth refresh
+    // crashes against a flaky server) must not be misclassified as a
+    // logout. The engine surfaces it as a retryable Offline.
+    let h = Harness::with_identity(ScriptedIdentity::transient()).await;
+
+    let err = h
+        .engine
+        .pull_now()
+        .await
+        .expect_err("transient identity error propagates");
+    assert!(err.is_retryable());
+    assert!(matches!(err, SyncError::Internal(_)));
+    assert!(matches!(
+        h.engine.current_status(),
+        SyncStatus::Offline { .. }
+    ));
+
+    // No requests issued — identity gate fired before any I/O.
+    let recorded = h.server.received_requests().await.unwrap_or_default();
+    assert!(recorded.is_empty());
+}
+
+#[tokio::test]
+async fn reconcile_local_fresher_stamps_user_id_before_push() {
+    // The "cache fresher than server" branch (`request_push`) must
+    // also stamp `last_user_id` so a never-pushed cache transitions
+    // out of the `None` state on first successful pull.
+    let uid = default_test_user();
+    let prior = CloudSettingsCache {
+        last_user_id: None,
+        base_updated_at: Some(timestamp(2026, 3, 1)),
+        settings: {
+            let mut s = CloudSettings::default();
+            s.shared.theme = ThemePreference::Dark;
+            s
+        },
+    };
+    let h = Harness::with_cache_and_identity(prior, ScriptedIdentity::user(uid)).await;
+
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 1, 1),
+                settings: serde_json::to_value(CloudSettings::default()).unwrap(),
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+    // The "cache fresher" branch queues a push; mount a PUT that
+    // accepts it so the worker doesn't loop on retries.
+    Mock::given(method("PUT"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(PutSettingsAcceptedResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 3, 2),
+            }),
+        )
+        .mount(&h.server)
+        .await;
+
+    h.engine.pull_now().await.expect("pull_now ok");
+
+    let cache = h.cache_clone().await;
+    assert_eq!(
+        cache.last_user_id,
+        Some(uid),
+        "pull must stamp owner even on the local-fresher branch"
+    );
+    // Theme stays Dark — the local edits weren't replaced.
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
 }
 
 // --- Decode failure is not retried ----------------------------------------

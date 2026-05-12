@@ -3987,6 +3987,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bon",
  "chrono",
  "dirs 6.0.0",
  "euro-auth",

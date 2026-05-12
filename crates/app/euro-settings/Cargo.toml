@@ -19,6 +19,7 @@ tls-webpki-roots = ["euro-endpoint/tls-webpki-roots"]
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dirs = { workspace = true }
 euro-auth = { workspace = true }

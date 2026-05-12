@@ -14,6 +14,17 @@
 //! to snapshot the cache (for a PUT) or replace it (after a pull or a
 //! 409). Locking is brief — never held across network I/O.
 //!
+//! ## Auth identity
+//!
+//! Every network operation resolves the current user via the injected
+//! [`super::AuthIdentity`] before doing anything else. The engine
+//! enforces account-isolation here: a cache whose `last_user_id`
+//! differs from the live JWT subject is discarded in memory (and on
+//! disk) before any I/O so a shared machine never leaks one user's
+//! appearance / consent into another's session. The freshly-stamped
+//! cache then proceeds through the normal pull / first-run-upload
+//! ladder.
+//!
 //! ## Status surface
 //!
 //! Each operation publishes its progress through a `tokio::sync::watch`
@@ -37,6 +48,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use bon::Builder;
 use chrono::Utc;
 use rand::RngExt;
 use settings_core::{
@@ -45,34 +57,35 @@ use settings_core::{
 };
 use tokio::sync::{Mutex, watch};
 use tokio::task::JoinHandle;
+use uuid::Uuid;
 
 use crate::cloud_cache::CloudSettingsCache;
 use crate::state::SettingsState;
 
 use super::client::{PullOutcome, PushOutcome, SettingsTransport};
 use super::error::{SyncError, SyncResult};
+use super::identity::AuthIdentity;
 use super::migrate;
 use super::queue::PushQueue;
 use super::status::SyncStatus;
 
 /// Exponential-backoff parameters for the push worker's retry loop.
 /// Defaults: 1s initial, 60s cap, ±20% jitter.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Builder)]
 pub struct BackoffConfig {
+    #[builder(default = Duration::from_secs(1))]
     pub initial: Duration,
+    #[builder(default = Duration::from_secs(60))]
     pub max: Duration,
     /// Multiplicative jitter, applied symmetrically. `0.2` means each
     /// computed delay is scaled by a factor in `[0.8, 1.2]`.
+    #[builder(default = 0.2)]
     pub jitter: f64,
 }
 
 impl Default for BackoffConfig {
     fn default() -> Self {
-        Self {
-            initial: Duration::from_secs(1),
-            max: Duration::from_secs(60),
-            jitter: 0.2,
-        }
+        Self::builder().build()
     }
 }
 
@@ -103,6 +116,7 @@ pub struct SyncEngine {
 struct EngineInner {
     settings: Arc<Mutex<SettingsState>>,
     transport: Arc<dyn SettingsTransport>,
+    identity: Arc<dyn AuthIdentity>,
     queue: PushQueue,
     status_tx: watch::Sender<SyncStatus>,
     /// Keepalive receiver: tokio's `watch::Sender::send` only updates
@@ -125,34 +139,31 @@ struct EngineWorkers {
     push: JoinHandle<()>,
 }
 
+#[bon::bon]
 impl SyncEngine {
-    /// Build an engine bound to the shared [`SettingsState`] and a
-    /// settings transport. Production callers should use
-    /// [`super::client::ReqwestTransport`]; engine tests substitute an
-    /// in-memory fake.
-    #[must_use]
+    /// Build an engine bound to the shared [`SettingsState`], a settings
+    /// transport, and an auth-identity resolver. Production callers
+    /// should use [`super::client::ReqwestTransport`] +
+    /// [`super::identity::AuthManagerIdentity`]; engine tests substitute
+    /// in-memory fakes.
+    ///
+    /// `backoff` is optional; omit it for the production defaults
+    /// (1s initial, 60s cap, ±20% jitter) or pass an explicit
+    /// [`BackoffConfig`] to keep test retry loops sub-second.
+    #[builder]
     pub fn new(
         settings: Arc<Mutex<SettingsState>>,
         transport: Arc<dyn SettingsTransport>,
+        identity: Arc<dyn AuthIdentity>,
         config_dir: PathBuf,
-    ) -> Self {
-        Self::with_backoff(settings, transport, config_dir, BackoffConfig::default())
-    }
-
-    /// Same as [`SyncEngine::new`] but with explicit backoff parameters
-    /// — used by integration tests to keep the retry loop sub-second.
-    #[must_use]
-    pub fn with_backoff(
-        settings: Arc<Mutex<SettingsState>>,
-        transport: Arc<dyn SettingsTransport>,
-        config_dir: PathBuf,
-        backoff: BackoffConfig,
+        #[builder(default)] backoff: BackoffConfig,
     ) -> Self {
         let (status_tx, status_rx) = watch::channel(SyncStatus::default());
         Self {
             inner: Arc::new(EngineInner {
                 settings,
                 transport,
+                identity,
                 queue: PushQueue::new(),
                 status_tx,
                 _status_keepalive: status_rx,
@@ -162,7 +173,9 @@ impl SyncEngine {
             }),
         }
     }
+}
 
+impl SyncEngine {
     /// Subscribe to status updates. Each subscriber sees the current
     /// value immediately and every subsequent transition (the watch
     /// channel coalesces missed intermediate values, which matches the
@@ -192,19 +205,28 @@ impl SyncEngine {
     }
 
     /// Spawn the push worker. Idempotent: a second call returns
-    /// immediately.
+    /// immediately without spawning a duplicate.
+    ///
+    /// `start` does *not* trigger the boot pull — that is a separate
+    /// one-shot the caller invokes via [`SyncEngine::pull_now`]. Two
+    /// reasons for the split:
+    ///
+    /// - Production main.rs spawns the boot pull on its own task so
+    ///   window creation never blocks on a server round-trip (the
+    ///   "brief flip from defaults" trade in `plan.md`).
+    /// - Integration tests can exercise the push worker without
+    ///   simultaneously triggering a GET they didn't ask for.
     pub async fn start(&self) {
         let mut workers = self.inner.workers.lock().await;
         if workers.is_some() {
             return;
         }
-        let inner = self.inner.clone();
-        let push = tokio::spawn(push_worker(inner));
+        let push = tokio::spawn(push_worker(self.inner.clone()));
         *workers = Some(EngineWorkers { push });
     }
 
-    /// Stop the push worker. Used by tests to assert the engine
-    /// shutdown cleanly; production tears down at process exit.
+    /// Stop the push worker. Used by tests to assert the engine shuts
+    /// down cleanly; production tears down at process exit.
     pub async fn stop(&self) {
         let mut workers = self.inner.workers.lock().await;
         if let Some(EngineWorkers { push }) = workers.take() {
@@ -216,14 +238,36 @@ impl SyncEngine {
     /// Pull the latest cloud blob and reconcile against the local
     /// cache.
     ///
-    /// Branches:
+    /// Resolution order:
     ///
-    /// - `404` → first-run upload via
-    ///   [`super::migrate::first_run_request`].
-    /// - `200` and server is fresher → replace cache.
-    /// - `200` and cache is fresher → enqueue a push so the local
-    ///   edits propagate.
+    /// 1. Resolve the current authenticated user. `None` → publish
+    ///    `LocalOnly` and return without I/O. `Err` → publish `Offline`
+    ///    and bubble up.
+    /// 2. Enforce account-isolation: if the cache was previously
+    ///    stamped for a different user, discard it in memory and on
+    ///    disk before any network call.
+    /// 3. GET `/settings`, then:
+    ///    - `404` → first-run upload via
+    ///      [`super::migrate::first_run_request`], stamping the current
+    ///      user id onto the cache on success.
+    ///    - `200` and server is fresher → replace cache with the
+    ///      server's row.
+    ///    - `200` and cache is fresher → enqueue a push so the local
+    ///      edits propagate.
     pub async fn pull_now(&self) -> SyncResult<SyncStatus> {
+        let current_uid = match self.resolve_identity().await {
+            Ok(Some(uid)) => uid,
+            Ok(None) => {
+                self.set_status(SyncStatus::LocalOnly);
+                return Ok(SyncStatus::LocalOnly);
+            }
+            Err(err) => return Err(self.publish_error(err)),
+        };
+
+        if let Err(err) = self.enforce_account_isolation(current_uid).await {
+            return Err(self.publish_error(err));
+        }
+
         self.set_status(SyncStatus::Syncing);
 
         let outcome = match self.inner.transport.get().await {
@@ -232,8 +276,8 @@ impl SyncEngine {
         };
 
         let result = match outcome {
-            PullOutcome::NotFound => self.first_run_upload().await,
-            PullOutcome::Found(response) => self.reconcile_pull(response).await,
+            PullOutcome::NotFound => self.first_run_upload(current_uid).await,
+            PullOutcome::Found(response) => self.reconcile_pull(current_uid, response).await,
         };
 
         match result {
@@ -245,26 +289,61 @@ impl SyncEngine {
         }
     }
 
-    async fn first_run_upload(&self) -> SyncResult<SyncStatus> {
+    /// Reset the cache when its `last_user_id` doesn't match the live
+    /// JWT subject. The reset is atomic in memory and persisted to
+    /// disk before any I/O so a foreign cache is never PUT under the
+    /// new user's credentials and never observed by IPC handlers
+    /// reading from `SettingsState`.
+    async fn enforce_account_isolation(&self, current_uid: Uuid) -> SyncResult<()> {
+        let mut state = self.inner.settings.lock().await;
+        let needs_reset = matches!(state.cache.last_user_id, Some(prev) if prev != current_uid);
+        if !needs_reset {
+            return Ok(());
+        }
+        tracing::info!(
+            previous = %state.cache.last_user_id.expect("checked Some above"),
+            current = %current_uid,
+            "Cloud settings cache belonged to a different user; resetting to defaults"
+        );
+        state.cache = CloudSettingsCache {
+            last_user_id: Some(current_uid),
+            base_updated_at: None,
+            settings: CloudSettings::default(),
+        };
+        state
+            .save_cache(&self.inner.config_dir)
+            .map_err(SyncError::Internal)?;
+        Ok(())
+    }
+
+    async fn resolve_identity(&self) -> SyncResult<Option<Uuid>> {
+        self.inner.identity.current_user_id().await
+    }
+
+    async fn first_run_upload(&self, current_uid: Uuid) -> SyncResult<SyncStatus> {
         let snapshot = self.snapshot_settings().await;
         let request = migrate::first_run_request(&snapshot);
 
         match self.inner.transport.put(request).await? {
             PushOutcome::Accepted(accepted) => {
-                self.apply_accepted(accepted).await?;
+                self.apply_accepted(current_uid, accepted).await?;
                 Ok(SyncStatus::Synced { at: Utc::now() })
             }
             PushOutcome::Conflict(conflict) => {
                 // Another client created the row between our 404 GET
                 // and our PUT. We have no basis to claim the local
                 // cache is newer, so the server's row wins.
-                self.apply_conflict(conflict).await?;
+                self.apply_conflict(current_uid, conflict).await?;
                 Ok(SyncStatus::Conflict { at: Utc::now() })
             }
         }
     }
 
-    async fn reconcile_pull(&self, response: GetSettingsResponse) -> SyncResult<SyncStatus> {
+    async fn reconcile_pull(
+        &self,
+        current_uid: Uuid,
+        response: GetSettingsResponse,
+    ) -> SyncResult<SyncStatus> {
         let baseline = {
             let state = self.inner.settings.lock().await;
             state.cache.base_updated_at
@@ -276,6 +355,7 @@ impl SyncEngine {
 
         if server_is_fresher {
             self.replace_cache(
+                current_uid,
                 response.settings,
                 response.schema_version,
                 response.updated_at,
@@ -284,8 +364,11 @@ impl SyncEngine {
             Ok(SyncStatus::Synced { at: Utc::now() })
         } else {
             // Local cache holds edits the server hasn't seen yet.
-            // Queue a push and report `Synced` against the pull
-            // round-trip; the push worker carries it from here.
+            // Stamp the current user id (in case this is the first
+            // time we've successfully resolved identity for an
+            // already-edited cache) and queue a push; the push worker
+            // carries it from here.
+            self.stamp_user_id(current_uid).await?;
             self.request_push();
             Ok(SyncStatus::Synced { at: Utc::now() })
         }
@@ -317,9 +400,10 @@ impl SyncEngine {
     }
 
     /// Apply a 200 response to the local cache: parse the server blob,
-    /// sanitize, stamp the OCC baseline, persist.
+    /// sanitize, stamp the OCC baseline + owner, persist.
     async fn replace_cache(
         &self,
+        current_uid: Uuid,
         settings_value: serde_json::Value,
         schema_version: u32,
         updated_at: chrono::DateTime<Utc>,
@@ -342,7 +426,7 @@ impl SyncEngine {
 
         let mut state = self.inner.settings.lock().await;
         state.cache = CloudSettingsCache {
-            last_user_id: state.cache.last_user_id,
+            last_user_id: Some(current_uid),
             settings: incoming,
             base_updated_at: Some(updated_at),
         };
@@ -352,27 +436,53 @@ impl SyncEngine {
         Ok(())
     }
 
-    /// Apply a 200 response to a `PUT` — only `schema_version` and
-    /// the OCC baseline change; the blob itself was what the client
-    /// just sent. Persisted so the next `base_updated_at` matches the
-    /// server.
-    async fn apply_accepted(&self, accepted: PutSettingsAcceptedResponse) -> SyncResult<()> {
+    /// Apply a 200 response to a `PUT` — `schema_version`, the OCC
+    /// baseline, and the owner stamp change; the blob itself was what
+    /// the client just sent. Persisted so the next `base_updated_at`
+    /// matches the server.
+    async fn apply_accepted(
+        &self,
+        current_uid: Uuid,
+        accepted: PutSettingsAcceptedResponse,
+    ) -> SyncResult<()> {
         let mut state = self.inner.settings.lock().await;
         state.cache.settings.schema_version = accepted.schema_version;
         state.cache.base_updated_at = Some(accepted.updated_at);
+        state.cache.last_user_id = Some(current_uid);
         state
             .save_cache(&self.inner.config_dir)
             .map_err(SyncError::Internal)?;
         Ok(())
     }
 
-    async fn apply_conflict(&self, conflict: PutSettingsConflictResponse) -> SyncResult<()> {
+    async fn apply_conflict(
+        &self,
+        current_uid: Uuid,
+        conflict: PutSettingsConflictResponse,
+    ) -> SyncResult<()> {
         self.replace_cache(
+            current_uid,
             conflict.current,
             conflict.schema_version,
             conflict.updated_at,
         )
         .await
+    }
+
+    /// Stamp `last_user_id` onto the cache without otherwise touching
+    /// it. Used when the engine has just confirmed identity but the
+    /// cache will keep its existing contents (e.g. the "local fresher
+    /// than server" branch of `reconcile_pull`).
+    async fn stamp_user_id(&self, current_uid: Uuid) -> SyncResult<()> {
+        let mut state = self.inner.settings.lock().await;
+        if state.cache.last_user_id == Some(current_uid) {
+            return Ok(());
+        }
+        state.cache.last_user_id = Some(current_uid);
+        state
+            .save_cache(&self.inner.config_dir)
+            .map_err(SyncError::Internal)?;
+        Ok(())
     }
 
     /// Publish `status` to the watch channel, suppressing no-op
@@ -396,11 +506,13 @@ impl SyncEngine {
     }
 }
 
-/// Push-worker body: drain the queue, snapshot the cache, PUT,
-/// reconcile. On transient failures, sleep for a jittered exponential
-/// backoff and retry the same intent; on conflict, replace the local
-/// cache and yield to the next intent; on permanent failures, give up
-/// on this intent and wait for the next request.
+/// Push-worker body: drain the queue, resolve identity, snapshot the
+/// cache, PUT, reconcile. On transient failures, sleep for a jittered
+/// exponential backoff and retry the same intent; on conflict, replace
+/// the local cache and yield to the next intent; on a definitive
+/// logout, drop the in-flight intent and park on the queue; on
+/// permanent failures, give up on this intent and wait for the next
+/// request.
 async fn push_worker(inner: Arc<EngineInner>) {
     let mut retry: u32 = 0;
     loop {
@@ -414,12 +526,46 @@ async fn push_worker(inner: Arc<EngineInner>) {
         let engine = SyncEngine {
             inner: inner.clone(),
         };
+
+        let current_uid = match engine.resolve_identity().await {
+            Ok(Some(uid)) => uid,
+            Ok(None) => {
+                // No authenticated user — drop the intent and park.
+                // The next `request_push` (or AuthStateChanged in
+                // phase 8) wakes the worker again.
+                engine.set_status(SyncStatus::LocalOnly);
+                retry = 0;
+                continue;
+            }
+            Err(err) => {
+                let retryable = err.is_retryable();
+                let _ = engine.publish_error(err);
+                retry = if retryable {
+                    retry.saturating_add(1)
+                } else {
+                    0
+                };
+                continue;
+            }
+        };
+
+        if let Err(err) = engine.enforce_account_isolation(current_uid).await {
+            let retryable = err.is_retryable();
+            let _ = engine.publish_error(err);
+            retry = if retryable {
+                retry.saturating_add(1)
+            } else {
+                0
+            };
+            continue;
+        }
+
         engine.set_status(SyncStatus::Syncing);
 
         let request = engine.snapshot_for_push().await;
         match inner.transport.put(request).await {
             Ok(PushOutcome::Accepted(accepted)) => {
-                if let Err(e) = engine.apply_accepted(accepted).await {
+                if let Err(e) = engine.apply_accepted(current_uid, accepted).await {
                     let _ = engine.publish_error(e);
                     retry = retry.saturating_add(1);
                     continue;
@@ -428,7 +574,7 @@ async fn push_worker(inner: Arc<EngineInner>) {
                 retry = 0;
             }
             Ok(PushOutcome::Conflict(conflict)) => {
-                if let Err(e) = engine.apply_conflict(conflict).await {
+                if let Err(e) = engine.apply_conflict(current_uid, conflict).await {
                     let _ = engine.publish_error(e);
                     retry = retry.saturating_add(1);
                     continue;
@@ -455,6 +601,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::sync::identity::AuthIdentity;
 
     /// Stub transport used by the dedup test: the engine's worker
     /// surface is exercised through the public API in `tests/sync.rs`,
@@ -474,10 +621,26 @@ mod tests {
         }
     }
 
+    /// Identity stub that always reports the same user (or no user).
+    struct StaticIdentity(Option<Uuid>);
+
+    #[async_trait]
+    impl AuthIdentity for StaticIdentity {
+        async fn current_user_id(&self) -> SyncResult<Option<Uuid>> {
+            Ok(self.0)
+        }
+    }
+
     fn engine_for_test() -> SyncEngine {
         let state = Arc::new(Mutex::new(SettingsState::default()));
         let transport: Arc<dyn SettingsTransport> = Arc::new(NoopTransport);
-        SyncEngine::new(state, transport, PathBuf::from("/tmp/euro-settings-test"))
+        let identity: Arc<dyn AuthIdentity> = Arc::new(StaticIdentity(None));
+        SyncEngine::builder()
+            .settings(state)
+            .transport(transport)
+            .identity(identity)
+            .config_dir(PathBuf::from("/tmp/euro-settings-test"))
+            .build()
     }
 
     #[tokio::test]
@@ -519,11 +682,11 @@ mod tests {
 
     #[test]
     fn backoff_caps_at_max() {
-        let cfg = BackoffConfig {
-            initial: Duration::from_millis(10),
-            max: Duration::from_millis(50),
-            jitter: 0.0,
-        };
+        let cfg = BackoffConfig::builder()
+            .initial(Duration::from_millis(10))
+            .max(Duration::from_millis(50))
+            .jitter(0.0)
+            .build();
         assert_eq!(cfg.delay_for(0), Duration::from_millis(10));
         assert_eq!(cfg.delay_for(1), Duration::from_millis(20));
         assert_eq!(cfg.delay_for(2), Duration::from_millis(40));
@@ -533,11 +696,12 @@ mod tests {
 
     #[test]
     fn backoff_jitter_stays_within_band() {
-        let cfg = BackoffConfig {
-            initial: Duration::from_millis(100),
-            max: Duration::from_millis(1000),
-            jitter: 0.2,
-        };
+        // `jitter` is omitted — the builder default (0.2) is exactly
+        // what this test exercises.
+        let cfg = BackoffConfig::builder()
+            .initial(Duration::from_millis(100))
+            .max(Duration::from_millis(1000))
+            .build();
         for _ in 0..200 {
             let d = cfg.delay_for(0);
             // ±20% of 100ms = [80ms, 120ms]; ±1ms for rounding.

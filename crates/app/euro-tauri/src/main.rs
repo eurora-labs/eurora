@@ -699,9 +699,13 @@ fn main() {
                     let settings_state: euro_tauri::shared_types::SharedSettingsState =
                         std::sync::Arc::new(Mutex::new(settings));
 
-                    // Construct the sync engine but do not start it
-                    // here — startup pull / push wiring is the next
-                    // milestone. `SyncEngine` is interior-`Arc` and
+                    // Construct the sync engine and kick it off in the
+                    // background. `start()` returns immediately after
+                    // spawning the push worker and a one-shot boot
+                    // pull, so window creation never waits on a server
+                    // round-trip — the brief default-state flip on
+                    // first paint is the acknowledged trade in
+                    // `plan.md`. `SyncEngine` is interior-`Arc` and
                     // `Clone`, so it can be registered in Tauri state
                     // directly without an outer `Arc`.
                     let config_dir = euro_settings::default_config_dir()?;
@@ -710,11 +714,32 @@ fn main() {
                             endpoint_manager.clone(),
                             auth_manager.clone(),
                         ));
-                    let sync_engine = euro_settings::SyncEngine::new(
-                        settings_state.clone(),
-                        transport,
-                        config_dir,
-                    );
+                    let identity: std::sync::Arc<dyn euro_settings::AuthIdentity> =
+                        std::sync::Arc::new(euro_settings::AuthManagerIdentity::new(
+                            auth_manager.clone(),
+                        ));
+                    let sync_engine = euro_settings::SyncEngine::builder()
+                        .settings(settings_state.clone())
+                        .transport(transport)
+                        .identity(identity)
+                        .config_dir(config_dir)
+                        .build();
+                    // Start the push worker and kick off a one-shot
+                    // boot pull. Both run on the Tauri async runtime
+                    // so window creation isn't blocked: the boot pull
+                    // is allowed a "brief flip from defaults" by
+                    // `plan.md`. If the user is logged out, `pull_now`
+                    // resolves identity, publishes `LocalOnly`, and
+                    // exits without I/O.
+                    {
+                        let engine = sync_engine.clone();
+                        tauri::async_runtime::spawn(async move {
+                            engine.start().await;
+                            if let Err(err) = engine.pull_now().await {
+                                tracing::warn!("Settings boot pull failed: {err}");
+                            }
+                        });
+                    }
 
                     tauri_app.manage(settings_state);
                     tauri_app.manage(sync_engine);

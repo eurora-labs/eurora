@@ -41,8 +41,8 @@ pub use local::LocalSettings;
 pub use persistence::default_config_dir;
 pub use state::SettingsState;
 pub use sync::{
-    BackoffConfig, PullOutcome, PushOutcome, ReqwestTransport, SettingsTransport, SyncEngine,
-    SyncError, SyncResult, SyncStatus,
+    AuthIdentity, AuthManagerIdentity, BackoffConfig, PullOutcome, PushOutcome, ReqwestTransport,
+    SettingsTransport, SyncEngine, SyncError, SyncResult, SyncStatus,
 };
 pub use telemetry::{
     CURRENT_CONSENT_VERSION, TelemetryLocal, needs_consent, record_consent, wants_errors,

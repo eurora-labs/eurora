@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use euro_settings::{
-    APISettings, DesktopSettings, GeneralSettings, SharedSettings, TelemetryConsent,
+    APISettings, DesktopSettings, GeneralSettings, SharedSettings, SyncEngine, TelemetryConsent,
     TelemetryLocal, record_consent, wants_errors,
 };
 use serde::Serialize;
@@ -112,6 +112,8 @@ pub async fn settings_set_shared(
         .save_cache_to_default_path()
         .map_err(|e| SettingsError::Persistence(e.to_string()))?;
 
+    app_handle.state::<SyncEngine>().request_push();
+
     Ok(settings.cache.settings.shared.clone())
 }
 
@@ -153,6 +155,11 @@ pub async fn settings_set_desktop(
     settings
         .save_cache_to_default_path()
         .map_err(|e| SettingsError::Persistence(e.to_string()))?;
+
+    // Queue the push before the local-only `distinct_id` work below:
+    // a failure persisting `local.json` must not suppress propagation
+    // of the cache change we have already committed to `cloud.json`.
+    app_handle.state::<SyncEngine>().request_push();
 
     // Lazily allocate a stable distinct id alongside the first consent
     // so that an exit between this call and the next save doesn't drop
