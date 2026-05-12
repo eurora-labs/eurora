@@ -414,8 +414,15 @@ async fn sibling_bind_failure_is_soft() {
     let primary_addr = bound.local_addr();
     let serve_handle = common::spawn_serve(bound);
 
-    // v4 still works — that's what soft-fail buys us.
-    let _v4 = connect_test_client(primary_addr).await;
+    // v4 still works — that's what soft-fail buys us. Dial the literal
+    // v4 address rather than going through `localhost`: on hosts whose
+    // resolver returns `::1` first, the connect would land on the
+    // squatter (which `listen()`s but never `accept()`s the WS upgrade)
+    // and hang indefinitely instead of reaching the bridge.
+    let url = format!("ws://{primary_addr}/bridge");
+    let (_v4, _resp) = tokio_tungstenite::connect_async(url)
+        .await
+        .expect("connect over plaintext ws to v4 primary");
 
     service.stop_server().await;
     serve_handle
