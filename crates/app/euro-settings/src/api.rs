@@ -18,11 +18,14 @@ pub const DEFAULT_API_URL: &str = env!("BACKEND_URL");
 /// expressible as a stable enum value rather than a magic string.
 /// `Custom` covers everything else (self-hosted homelab, a colleague's
 /// tunnel, a different organisation's infrastructure).
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type, Default)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ConnectionMode {
+    #[default]
     Default,
-    Custom { url: String },
+    Custom {
+        url: String,
+    },
 }
 
 impl ConnectionMode {
@@ -35,7 +38,7 @@ impl ConnectionMode {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct APISettings {
     pub mode: ConnectionMode,
@@ -47,13 +50,5 @@ impl APISettings {
     /// reach into the enum directly.
     pub fn endpoint(&self) -> &str {
         self.mode.endpoint()
-    }
-}
-
-impl Default for APISettings {
-    fn default() -> Self {
-        Self {
-            mode: ConnectionMode::Default,
-        }
     }
 }

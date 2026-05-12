@@ -31,3 +31,10 @@ p, Free, /threads/{thread_id}/preliminary-blocks, POST
 p, Free, /threads/{thread_id}/chat, GET
 p, Free, /threads/search, GET
 p, Free, /threads/messages/search, GET
+
+# Free: cloud-synced settings (per-user blob, optimistic concurrency via
+# `base_updated_at`). PUT returns 200 on accept or 409 on conflict; DELETE
+# is idempotent and used by the "reset cloud settings" UI.
+p, Free, /settings, GET
+p, Free, /settings, PUT
+p, Free, /settings, DELETE

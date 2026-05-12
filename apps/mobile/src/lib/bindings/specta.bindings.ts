@@ -63,6 +63,19 @@ export const commands = {
 	authIsAuthenticated: () => typedError<boolean, string>(__TAURI_INVOKE("auth_is_authenticated")),
 	authGetAccessTokenPayload: () => typedError<Claims, string>(__TAURI_INVOKE("auth_get_access_token_payload")),
 	authRefreshSession: () => typedError<null, string>(__TAURI_INVOKE("auth_refresh_session")),
+	settingsGetTelemetryConsent: () => __TAURI_INVOKE<TelemetryConsent>("settings_get_telemetry_consent"),
+	settingsGetLocalTelemetry: () => __TAURI_INVOKE<TelemetryLocal>("settings_get_local_telemetry"),
+	/**
+	 *  Persist a fresh consent decision. Stamps the consent version, lazily
+	 *  allocates a stable `distinct_id`, reapplies the native Sentry guard,
+	 *  and returns the canonical post-stamp consent so the frontend's
+	 *  optimistic state stays in sync.
+	 */
+	settingsSetTelemetryConsent: (consent: TelemetryConsent) => typedError<TelemetryConsent, SettingsError>(__TAURI_INVOKE("settings_set_telemetry_consent", { consent })),
+	systemGetTelemetryBootstrap: () => typedError<TelemetryBootstrap, SystemError>(__TAURI_INVOKE("system_get_telemetry_bootstrap")),
+	systemNeedsTelemetryConsent: () => __TAURI_INVOKE<boolean>("system_needs_telemetry_consent"),
+	systemReinitTelemetry: () => __TAURI_INVOKE<void>("system_reinit_telemetry"),
+	systemRotateTelemetryDistinctId: () => typedError<string, SystemError>(__TAURI_INVOKE("system_rotate_telemetry_distinct_id")),
 	threadList: (limit: number, offset: number) => typedError<Thread[], ThreadError>(__TAURI_INVOKE("thread_list", { limit, offset })),
 	threadCreate: () => typedError<Thread, ThreadError>(__TAURI_INVOKE("thread_create")),
 	threadDelete: (threadId: string) => typedError<null, ThreadError>(__TAURI_INVOKE("thread_delete", { threadId })),
@@ -431,6 +444,13 @@ export type ServerToolResult = {
 export type ServerToolStatus = "success" | "error";
 
 /**
+ *  Typed error surface for the `settings_*` IPC commands. Externally
+ *  tagged so the JS side gets `{ type: "Persistence", data: "..." }`
+ *  and can branch on `type` instead of parsing strings.
+ */
+export type SettingsError = { type: "Persistence"; data: string };
+
+/**
  *  Typed error surface for the streaming `chat_*` IPC commands.
  *  Externally tagged so the JS side can branch on `error.type`.
  *  `Cancelled` is split out from the rest so the UI can suppress its
@@ -441,12 +461,88 @@ export type ServerToolStatus = "success" | "error";
  */
 export type StreamError = { type: "Cancelled" } | { type: "Timeout"; data: number } | { type: "Channel"; data: string } | { type: "StateUnavailable"; data: string } | { type: "Thread"; data: ThreadError };
 
+/**
+ *  Typed error surface for the `system_*` IPC commands. Externally
+ *  tagged so the JS side gets `{ type: "Persistence", data: "..." }`
+ *  and can branch on `type` without parsing strings.
+ */
+export type SystemError = { type: "Persistence"; data: string };
+
 export type SystemMessage = {
 	content: ContentBlocks,
 	id?: string | null,
 	name?: string | null,
 	additional_kwargs?: { [key in string]: unknown },
 	response_metadata?: { [key in string]: unknown },
+};
+
+/**
+ *  Single payload the mobile frontend fetches once at startup to bring
+ *  up its Sentry / PostHog SDKs. Bundles the user's persisted consent,
+ *  the local anonymous identifier, the embedded build-time keys, and
+ *  the release identity so the SDKs can tag events with channel +
+ *  version.
+ * 
+ *  `None` on any field means "this surface is disabled in this build".
+ *  `euro-telemetry/build.rs` enforces all-or-nothing consistency: a
+ *  build with a DSN always carries a channel and a release, so the
+ *  frontend never has to defend against a half-configured payload.
+ */
+export type TelemetryBootstrap = {
+	consent: TelemetryConsent,
+	distinctId: string | null,
+	sentryDsn: string | null,
+	posthogKey: string | null,
+	posthogHost: string | null,
+	channel: string | null,
+	release: string | null,
+};
+
+/**
+ *  Per-platform telemetry consent record. Lives under each platform
+ *  section of [`crate::CloudSettings`] — never under `SharedSettings` —
+ *  because consent must be specific to the data actually collected,
+ *  and each platform ships a different telemetry stack (Sentry +
+ *  PostHog on desktop, platform-native SDKs on mobile, etc.). A user
+ *  agreeing on desktop has not seen, and cannot legally cover, what
+ *  mobile or web will collect.
+ * 
+ *  `distinct_id` is intentionally absent — it is an anonymous
+ *  per-install identifier whose rotation must break cross-device
+ *  linkage, and so stays in the platform's local file rather than
+ *  crossing the wire.
+ * 
+ *  `consent_version` records the schema version of the consent prompt
+ *  the user agreed to *on this platform*. Bumping
+ *  `CURRENT_CONSENT_VERSION` in the client forces a re-prompt; because
+ *  the record is per-platform, the bump propagates independently to
+ *  each device.
+ * 
+ *  The derived `Default` here is the *wire fallback* used by
+ *  `#[serde(default)]` when a partial blob is read off the network
+ *  (every field collapses to `false` / `0` — the inert choice). The
+ *  product-blessed fresh-install values live in `assets/defaults.jsonc`
+ *  and are reached through [`crate::CloudSettings::default()`].
+ */
+export type TelemetryConsent = {
+	consentVersion?: number,
+	anonymousMetrics?: boolean,
+	anonymousErrors?: boolean,
+	nonAnonymousMetrics?: boolean,
+} & { [key in string]: unknown };
+
+/**
+ *  Local-only telemetry state. Persisted next to the rest of
+ *  [`crate::LocalSettings`] in `local.json`; never crosses the wire to
+ *  the cloud-sync backend.
+ */
+export type TelemetryLocal = {
+	/**
+	 *  Anonymous per-install identifier. `None` until the user accepts
+	 *  telemetry for the first time, then a fresh UUID v4 that survives
+	 *  until the user explicitly rotates it.
+	 */
+	distinctId?: string | null,
 };
 
 export type TextContentBlock = {

@@ -19,6 +19,7 @@ use be_authz::{
 };
 use be_payment_service::{PaymentService, init_payment_service};
 use be_remote_db::DatabaseManager;
+use be_settings_service::init_settings_service;
 use be_storage::StorageService;
 use be_thread_service::init_thread_service;
 use be_update_service::init_update_service;
@@ -43,7 +44,7 @@ const TAURI_WEB_ORIGIN: &str = "tauri://localhost";
 /// without any external setup. Release builds require the full stack.
 pub(crate) const DEV_MODE: bool = cfg!(debug_assertions);
 
-const HTTP_MAX_BODY_SIZE: usize = 50 * 1024 * 1024; // 2 MB
+const HTTP_MAX_BODY_SIZE: usize = 50 * 1024 * 1024; // 50 MiB
 
 /// Boot the backend. Owns every fallible step between "process started" and
 /// "axum is serving HTTP".
@@ -159,6 +160,7 @@ pub async fn run() -> Result<(), BootstrapError> {
     ));
     let activity_router = init_activity_service(db_manager.clone(), core_asset.clone());
     let asset_router = init_asset_service(core_asset.clone());
+    let settings_router = init_settings_service(db_manager.clone());
     let thread_router =
         init_thread_service(db_manager.clone(), core_asset.clone(), llm_config.clone())?;
 
@@ -228,6 +230,7 @@ pub async fn run() -> Result<(), BootstrapError> {
         .merge(payment_router)
         .merge(activity_router)
         .merge(asset_router)
+        .merge(settings_router)
         .merge(thread_router)
         .merge(auth_router)
         .merge(health_route)

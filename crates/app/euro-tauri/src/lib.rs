@@ -48,3 +48,22 @@ pub fn load_env() {
         unsafe { std::env::set_var(key, v) };
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regenerate the TypeScript bindings on every `cargo test` run.
+    /// Mirrors the export `main.rs` runs at app launch but executes on
+    /// the host without booting the full Tauri runtime, so CI and local
+    /// hosts keep `apps/desktop/src/lib/bindings/specta.bindings.ts`
+    /// in sync without having to spin the desktop binary.
+    #[test]
+    fn export_specta_bindings() {
+        let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../apps/desktop/src/lib/bindings/specta.bindings.ts");
+        build_specta()
+            .export(specta_typescript::Typescript::default(), &bindings_path)
+            .expect("Failed to export tauri-specta bindings");
+    }
+}

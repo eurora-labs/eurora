@@ -1,0 +1,34 @@
+[package]
+name = "be-settings-service"
+version = "0.0.0"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+axum = { workspace = true, features = ["macros"] }
+be-auth-core = { workspace = true }
+be-remote-db = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+settings-core = { workspace = true }
+thiserror = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true, features = ["trace"] }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["serde", "v7"] }
+
+[dev-dependencies]
+reqwest = { workspace = true, features = ["json"] }
+sqlx = { version = "0.8.6", features = [
+  "chrono",
+  "json",
+  "macros",
+  "migrate",
+  "postgres",
+  "runtime-tokio",
+  "tls-rustls-aws-lc-rs",
+  "uuid",
+] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tower = { workspace = true, features = ["util"] }
