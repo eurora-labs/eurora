@@ -70,7 +70,6 @@ casbin = { version = "2.20.0", default-features = false, features = [
   "logging",
   "runtime-tokio"
 ] }
-cfg-if = "1.0.4"
 chacha20poly1305 = "0.10.1"
 chrono = "0.4.43"
 dirs = "6.0"
