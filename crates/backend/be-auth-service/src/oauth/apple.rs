@@ -131,10 +131,25 @@ pub struct AppleOAuthConfig {
     /// Optional mobile-flow redirect URI. When unset the mobile path
     /// fails soft at use; mirrors the Google/GitHub convention.
     pub mobile_redirect_uri: Option<String>,
-    /// iOS Bundle ID (e.g. `com.eurora.app`). The expected `aud` of
-    /// native-iOS ID tokens, returned by `ASAuthorizationController`.
-    /// When unset the native-iOS path is unavailable.
-    pub bundle_id: Option<String>,
+    /// iOS Bundle IDs accepted as ID-token audiences on the native
+    /// path. Empty when no `APPLE_BUNDLE_ID` is configured — the
+    /// native-iOS flow then has no acceptable audience and is
+    /// effectively unavailable.
+    ///
+    /// Multiple values let one backend simultaneously accept tokens
+    /// from several iOS builds — typically the production bundle,
+    /// the `.dev` dev-build bundle, and the `.nightly` TestFlight
+    /// bundle. The env-var form is comma-separated:
+    ///
+    /// ```text
+    /// APPLE_BUNDLE_ID=com.eurora-labs.eurora,com.eurora-labs.eurora.dev,com.eurora-labs.eurora.nightly
+    /// ```
+    ///
+    /// Parsed by [`parse_bundle_ids`]; surrounding whitespace and
+    /// empty entries are dropped, duplicates kept as-is (the
+    /// underlying audience-verifier callback short-circuits on the
+    /// first match anyway).
+    pub bundle_ids: Vec<String>,
 }
 
 impl AppleOAuthConfig {
@@ -155,7 +170,10 @@ impl AppleOAuthConfig {
         let mobile_redirect_uri = env::var("APPLE_MOBILE_REDIRECT_URI")
             .ok()
             .filter(|s| !s.is_empty());
-        let bundle_id = env::var("APPLE_BUNDLE_ID").ok().filter(|s| !s.is_empty());
+        let bundle_ids = env::var("APPLE_BUNDLE_ID")
+            .ok()
+            .map(|raw| parse_bundle_ids(&raw))
+            .unwrap_or_default();
 
         Ok(Self {
             team_id,
@@ -164,9 +182,27 @@ impl AppleOAuthConfig {
             private_key_pem,
             web_redirect_uri,
             mobile_redirect_uri,
-            bundle_id,
+            bundle_ids,
         })
     }
+}
+
+/// Parse `APPLE_BUNDLE_ID` into the list of bundle IDs accepted as
+/// ID-token audiences on the native iOS path.
+///
+/// The wire format is a comma-separated list with optional surrounding
+/// whitespace; empty entries (`"a,,b"`, trailing comma) are silently
+/// dropped. Dropping rather than erroring keeps the loader tolerant of
+/// the kinds of accidents that creep in through deployment systems
+/// (trailing commas, accidental double-commas after edits), and
+/// downstream verification will simply reject any audience whose
+/// expected match is missing from the resulting list.
+pub(crate) fn parse_bundle_ids(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Normalise an `APPLE_PRIVATE_KEY` env value.
@@ -200,11 +236,11 @@ pub struct AppleOAuthClient {
     /// `Clone` but not `Debug`, so it's safe to keep here.
     encoding_key: EncodingKey,
     /// Audiences besides `service_id` that ID-token verification
-    /// accepts. Currently populated with `bundle_id` for the native
-    /// iOS path; empty for web-only deployments. Pre-computed at boot
-    /// so `verify_id_token` can install the audience callback with a
-    /// single `.clone()` instead of re-projecting `accepted_audiences[1..]`
-    /// on every call.
+    /// accepts. Currently populated with the configured iOS Bundle IDs
+    /// for the native iOS path; empty for web-only deployments. Pre-
+    /// computed at boot so `verify_id_token` can install the audience
+    /// callback with a single `.clone()` instead of re-projecting
+    /// `accepted_audiences[1..]` on every call.
     extra_audiences: Vec<String>,
     /// Used only for ID-token verification — JWKS-cached, discovered
     /// once at boot. The token endpoint is hit manually so this
@@ -282,7 +318,7 @@ impl AppleOAuthClient {
         )
         .set_redirect_uri(redirect_url);
 
-        let extra_audiences: Vec<String> = config.bundle_id.iter().cloned().collect();
+        let extra_audiences = config.bundle_ids;
 
         // Pre-populate the notification JWKS cache: one extra
         // round-trip at boot keeps the first inbound notification off
@@ -1073,6 +1109,66 @@ q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n\
         // unescaping.
         let raw = "-----BEGIN PRIVATE KEY-----\n// keep \\n\n-----END PRIVATE KEY-----\n";
         assert_eq!(normalize_pem(raw), raw);
+    }
+
+    #[test]
+    fn parse_bundle_ids_handles_single_value() {
+        // Backwards-compat path: a deployment that pre-dates
+        // multi-bundle support uses a single value and continues to
+        // work unchanged.
+        assert_eq!(
+            parse_bundle_ids("com.eurora-labs.eurora"),
+            vec!["com.eurora-labs.eurora"],
+        );
+    }
+
+    #[test]
+    fn parse_bundle_ids_splits_on_commas() {
+        assert_eq!(
+            parse_bundle_ids(
+                "com.eurora-labs.eurora,com.eurora-labs.eurora.dev,com.eurora-labs.eurora.nightly",
+            ),
+            vec![
+                "com.eurora-labs.eurora",
+                "com.eurora-labs.eurora.dev",
+                "com.eurora-labs.eurora.nightly",
+            ],
+        );
+    }
+
+    #[test]
+    fn parse_bundle_ids_trims_whitespace() {
+        // Operator-formatted env files often put spaces after commas
+        // — accept the natural shape rather than forcing a no-space
+        // convention nobody remembers.
+        assert_eq!(
+            parse_bundle_ids("  com.eurora-labs.eurora , com.eurora-labs.eurora.dev  "),
+            vec!["com.eurora-labs.eurora", "com.eurora-labs.eurora.dev"],
+        );
+    }
+
+    #[test]
+    fn parse_bundle_ids_drops_empty_entries() {
+        // Trailing commas, accidental double-commas, and an entirely
+        // whitespace token (`" "`) all reduce to dropped entries —
+        // the alternative (erroring) would brick a backend over an
+        // editor-introduced typo in a Sign-in flow we'd rather see
+        // run.
+        assert_eq!(
+            parse_bundle_ids("com.eurora-labs.eurora,,com.eurora-labs.eurora.dev, ,"),
+            vec!["com.eurora-labs.eurora", "com.eurora-labs.eurora.dev"],
+        );
+    }
+
+    #[test]
+    fn parse_bundle_ids_returns_empty_for_empty_input() {
+        // `APPLE_BUNDLE_ID=""` (set-but-empty) and missing entirely
+        // both reduce to an empty list. The downstream effect — the
+        // native iOS audience set is empty, so no native ID token can
+        // verify — is correct in either case.
+        assert!(parse_bundle_ids("").is_empty());
+        assert!(parse_bundle_ids("   ").is_empty());
+        assert!(parse_bundle_ids(",,, ").is_empty());
     }
 
     #[test]
