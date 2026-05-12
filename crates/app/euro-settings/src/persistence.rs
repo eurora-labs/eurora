@@ -64,9 +64,7 @@ impl SettingsState {
             let (local, cache) = match split_legacy(&legacy_path) {
                 Ok(parts) => parts,
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to parse legacy settings.json ({e}); using defaults"
-                    );
+                    tracing::warn!("Failed to parse legacy settings.json ({e}); using defaults");
                     (LocalSettings::default(), CloudSettingsCache::default())
                 }
             };
@@ -207,7 +205,10 @@ fn split_legacy(path: &Path) -> Result<(LocalSettings, CloudSettingsCache)> {
         if let Some(v) = telemetry.get("anonymousErrors").and_then(Value::as_bool) {
             cloud.desktop.telemetry.anonymous_errors = v;
         }
-        if let Some(v) = telemetry.get("nonAnonymousMetrics").and_then(Value::as_bool) {
+        if let Some(v) = telemetry
+            .get("nonAnonymousMetrics")
+            .and_then(Value::as_bool)
+        {
             cloud.desktop.telemetry.non_anonymous_metrics = v;
         }
     }
@@ -308,7 +309,10 @@ mod tests {
             state.local.api.mode,
             ConnectionMode::Custom { ref url } if url == "https://example.test"
         ));
-        assert_eq!(state.local.telemetry.distinct_id.as_deref(), Some("abc-123"));
+        assert_eq!(
+            state.local.telemetry.distinct_id.as_deref(),
+            Some("abc-123")
+        );
 
         let cloud = &state.cache.settings;
         assert_eq!(cloud.shared.theme, ThemePreference::Dark);
@@ -339,7 +343,10 @@ mod tests {
         let state = SettingsState::load_or_migrate(tmp.path()).unwrap();
         assert!(!state.local.general.autostart);
         assert!(state.local.telemetry.distinct_id.is_none());
-        assert_eq!(state.cache.settings.shared.theme, ThemePreference::default());
+        assert_eq!(
+            state.cache.settings.shared.theme,
+            ThemePreference::default()
+        );
     }
 
     #[test]
@@ -409,7 +416,11 @@ mod tests {
         // A stray legacy file is left untouched once the new layout is
         // in place — we don't re-import it and risk clobbering the
         // user's recent changes.
-        write(tmp.path(), LEGACY_FILE, r#"{"general": {"autostart": true}}"#);
+        write(
+            tmp.path(),
+            LEGACY_FILE,
+            r#"{"general": {"autostart": true}}"#,
+        );
 
         let state = SettingsState::load_or_migrate(tmp.path()).unwrap();
         assert!(!state.local.general.autostart);
