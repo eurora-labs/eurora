@@ -363,12 +363,9 @@ fn setup_main_window(
 fn init_state(
     tauri_app: &tauri::App,
     endpoint_manager: &std::sync::Arc<EndpointManager>,
+    auth_manager: &euro_auth::AuthManager,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = tauri_app.handle();
-
-    // Single shared AuthManager so concurrent refreshes from any consumer
-    // (thread, timeline, user) coalesce through one refresh lock.
-    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
 
     let thread_manager =
         euro_thread::ThreadManager::new(endpoint_manager.clone(), auth_manager.clone());
@@ -385,7 +382,7 @@ fn init_state(
     app_handle.manage(context_provider);
 
     let path = tauri_app.path().app_data_dir()?;
-    let user_controller = euro_user::UserController::new(path, auth_manager);
+    let user_controller = euro_user::UserController::new(path, auth_manager.clone());
     app_handle.manage(SharedUserController::new(user_controller));
     app_handle.manage(ActiveStreamTokens::default());
 
@@ -680,15 +677,48 @@ fn main() {
                     tauri_app.manage(WindowState::default());
                     tauri_app.manage(http_client);
 
+                    // Single shared AuthManager so concurrent refreshes
+                    // from any consumer (thread, timeline, user, sync)
+                    // coalesce through one refresh lock.
+                    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
+
                     // All command-visible state must be in place before the
                     // WebView is created — once the window exists the
                     // frontend starts firing IPC calls, and any procedure
                     // that does `try_state::<...>()` will see `None` if its
                     // backing manager hasn't been registered yet.
-                    init_state(tauri_app, &endpoint_manager)?;
+                    init_state(tauri_app, &endpoint_manager, &auth_manager)?;
 
                     register_autostart(tauri_app, &settings);
-                    tauri_app.manage(Mutex::new(settings));
+
+                    // Wrap settings in `Arc<Mutex<...>>` so the sync
+                    // engine and the IPC handlers share one in-memory
+                    // copy. The engine writes back to it after a pull
+                    // or a 409 reconcile; handlers see those updates
+                    // without re-reading from disk.
+                    let settings_state: euro_tauri::shared_types::SharedSettingsState =
+                        std::sync::Arc::new(Mutex::new(settings));
+
+                    // Construct the sync engine but do not start it
+                    // here — startup pull / push wiring is the next
+                    // milestone. `SyncEngine` is interior-`Arc` and
+                    // `Clone`, so it can be registered in Tauri state
+                    // directly without an outer `Arc`.
+                    let config_dir = euro_settings::default_config_dir()?;
+                    let transport: std::sync::Arc<dyn euro_settings::SettingsTransport> =
+                        std::sync::Arc::new(euro_settings::ReqwestTransport::new(
+                            endpoint_manager.clone(),
+                            auth_manager.clone(),
+                        ));
+                    let sync_engine = euro_settings::SyncEngine::new(
+                        settings_state.clone(),
+                        transport,
+                        config_dir,
+                    );
+
+                    tauri_app.manage(settings_state);
+                    tauri_app.manage(sync_engine);
+
                     setup_main_window(tauri_app, started_by_autostart)?;
                     setup_tray(tauri_app)?;
 

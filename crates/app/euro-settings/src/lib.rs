@@ -8,7 +8,7 @@
 //!   settings blob, persisted to `cloud.json`. The wire shape lives in
 //!   the `settings-core` crate; this file is just a local cache plus
 //!   the `last_user_id` the sync engine uses for account-isolation
-//!   (Phase 6).
+//!   and the OCC baseline (`base_updated_at`) it sends on the next PUT.
 //! - [`SettingsState`] — combined owner held inside `tauri::Manager`
 //!   state under a `tokio::sync::Mutex`. IPC handlers lock it, read or
 //!   mutate, and persist the affected file via [`SettingsState::save_local`]
@@ -30,6 +30,7 @@ pub mod general;
 pub mod local;
 pub mod persistence;
 pub mod state;
+pub mod sync;
 pub mod telemetry;
 
 pub use api::{APISettings, ConnectionMode, DEFAULT_API_URL};
@@ -37,7 +38,12 @@ pub use cloud_cache::CloudSettingsCache;
 pub use effective::EffectiveSettings;
 pub use general::GeneralSettings;
 pub use local::LocalSettings;
+pub use persistence::default_config_dir;
 pub use state::SettingsState;
+pub use sync::{
+    BackoffConfig, PullOutcome, PushOutcome, ReqwestTransport, SettingsTransport, SyncEngine,
+    SyncError, SyncResult, SyncStatus,
+};
 pub use telemetry::{
     CURRENT_CONSENT_VERSION, TelemetryLocal, needs_consent, record_consent, wants_errors,
     wants_identified, wants_metrics,
