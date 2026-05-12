@@ -723,6 +723,12 @@ fn main() {
                         .transport(transport)
                         .identity(identity)
                         .config_dir(config_dir)
+                        // Subscribe to the auth bus *before* `start()`
+                        // so the engine never misses an `AuthEvent`
+                        // emitted between construction and the listener
+                        // spawn. The receiver is moved into the engine
+                        // and consumed inside `start()`.
+                        .auth_events(auth_manager.subscribe())
                         .build();
                     // Start the push worker and kick off a one-shot
                     // boot pull. Both run on the Tauri async runtime

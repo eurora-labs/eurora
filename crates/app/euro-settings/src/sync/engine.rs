@@ -46,16 +46,18 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use std::time::Duration;
 
 use bon::Builder;
 use chrono::Utc;
+use euro_auth::AuthEvent;
 use rand::RngExt;
 use settings_core::{
     CURRENT_SCHEMA_VERSION, CloudSettings, GetSettingsResponse, PutSettingsAcceptedResponse,
     PutSettingsConflictResponse, PutSettingsRequest,
 };
-use tokio::sync::{Mutex, watch};
+use tokio::sync::{Mutex, broadcast, watch};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
@@ -133,10 +135,27 @@ struct EngineInner {
     /// (calling it twice is a no-op).
     workers: Mutex<Option<EngineWorkers>>,
     backoff: BackoffConfig,
+    /// Serialises [`SyncEngine::pull_now`] across concurrent callers
+    /// (boot pull + auth-event listener + future manual refresh). Each
+    /// caller re-resolves identity *after* acquiring the lock, which
+    /// closes the account-switch race: a pull queued behind another
+    /// pull observes the current subject, not the one captured before
+    /// the switch.
+    pull_lock: Mutex<()>,
+    /// Optional auth-event subscription. Some until `start()` consumes
+    /// it to spawn the listener task, then None. Wrapped in a `std`
+    /// `Mutex` (not async) because the only access pattern is
+    /// `take()` under the `workers` guard.
+    auth_events: StdMutex<Option<broadcast::Receiver<AuthEvent>>>,
 }
 
 struct EngineWorkers {
     push: JoinHandle<()>,
+    /// `None` when the engine was built without an auth-event
+    /// subscription (test paths that don't care about
+    /// `AuthStateChanged`). Production always wires one through the
+    /// builder.
+    auth_listener: Option<JoinHandle<()>>,
 }
 
 #[bon::bon]
@@ -150,6 +169,12 @@ impl SyncEngine {
     /// `backoff` is optional; omit it for the production defaults
     /// (1s initial, 60s cap, ±20% jitter) or pass an explicit
     /// [`BackoffConfig`] to keep test retry loops sub-second.
+    ///
+    /// `auth_events` is also optional. Production wires
+    /// [`euro_auth::AuthManager::subscribe`] in so the engine pulls
+    /// on subject changes; tests omit it (or substitute a manually
+    /// driven channel) when the case under test doesn't involve the
+    /// auth bus.
     #[builder]
     pub fn new(
         settings: Arc<Mutex<SettingsState>>,
@@ -157,6 +182,7 @@ impl SyncEngine {
         identity: Arc<dyn AuthIdentity>,
         config_dir: PathBuf,
         #[builder(default)] backoff: BackoffConfig,
+        auth_events: Option<broadcast::Receiver<AuthEvent>>,
     ) -> Self {
         let (status_tx, status_rx) = watch::channel(SyncStatus::default());
         Self {
@@ -170,6 +196,8 @@ impl SyncEngine {
                 config_dir,
                 workers: Mutex::new(None),
                 backoff,
+                pull_lock: Mutex::new(()),
+                auth_events: StdMutex::new(auth_events),
             }),
         }
     }
@@ -204,8 +232,8 @@ impl SyncEngine {
         self.inner.queue.request();
     }
 
-    /// Spawn the push worker. Idempotent: a second call returns
-    /// immediately without spawning a duplicate.
+    /// Spawn the push worker and the auth-event listener. Idempotent:
+    /// a second call returns immediately without spawning duplicates.
     ///
     /// `start` does *not* trigger the boot pull — that is a separate
     /// one-shot the caller invokes via [`SyncEngine::pull_now`]. Two
@@ -216,22 +244,47 @@ impl SyncEngine {
     ///   "brief flip from defaults" trade in `plan.md`).
     /// - Integration tests can exercise the push worker without
     ///   simultaneously triggering a GET they didn't ask for.
+    ///
+    /// The auth listener is only spawned when an
+    /// [`AuthEvent`] receiver was provided to the builder; otherwise
+    /// auth-driven pulls are not scheduled, which is the right
+    /// behaviour for transport-only unit tests.
     pub async fn start(&self) {
         let mut workers = self.inner.workers.lock().await;
         if workers.is_some() {
             return;
         }
         let push = tokio::spawn(push_worker(self.inner.clone()));
-        *workers = Some(EngineWorkers { push });
+        let auth_rx = self
+            .inner
+            .auth_events
+            .lock()
+            .expect("auth_events mutex poisoned")
+            .take();
+        let auth_listener =
+            auth_rx.map(|rx| tokio::spawn(auth_event_listener(self.inner.clone(), rx)));
+        *workers = Some(EngineWorkers {
+            push,
+            auth_listener,
+        });
     }
 
-    /// Stop the push worker. Used by tests to assert the engine shuts
-    /// down cleanly; production tears down at process exit.
+    /// Stop the push worker and any auth listener. Used by tests to
+    /// assert the engine shuts down cleanly; production tears down at
+    /// process exit.
     pub async fn stop(&self) {
         let mut workers = self.inner.workers.lock().await;
-        if let Some(EngineWorkers { push }) = workers.take() {
+        if let Some(EngineWorkers {
+            push,
+            auth_listener,
+        }) = workers.take()
+        {
             push.abort();
             let _ = push.await;
+            if let Some(handle) = auth_listener {
+                handle.abort();
+                let _ = handle.await;
+            }
         }
     }
 
@@ -240,13 +293,19 @@ impl SyncEngine {
     ///
     /// Resolution order:
     ///
-    /// 1. Resolve the current authenticated user. `None` → publish
+    /// 1. Acquire the pull lock. Concurrent callers (boot pull,
+    ///    auth-event listener, manual refresh) are serialised so a
+    ///    pull mid-flight never has its post-network writes interleave
+    ///    with a second pull's writes — especially across an account
+    ///    switch, where the first pull's captured `current_uid` would
+    ///    otherwise overwrite the cache stamped for the new user.
+    /// 2. Resolve the current authenticated user. `None` → publish
     ///    `LocalOnly` and return without I/O. `Err` → publish `Offline`
     ///    and bubble up.
-    /// 2. Enforce account-isolation: if the cache was previously
+    /// 3. Enforce account-isolation: if the cache was previously
     ///    stamped for a different user, discard it in memory and on
     ///    disk before any network call.
-    /// 3. GET `/settings`, then:
+    /// 4. GET `/settings`, then:
     ///    - `404` → first-run upload via
     ///      [`super::migrate::first_run_request`], stamping the current
     ///      user id onto the cache on success.
@@ -255,6 +314,7 @@ impl SyncEngine {
     ///    - `200` and cache is fresher → enqueue a push so the local
     ///      edits propagate.
     pub async fn pull_now(&self) -> SyncResult<SyncStatus> {
+        let _guard = self.inner.pull_lock.lock().await;
         let current_uid = match self.resolve_identity().await {
             Ok(Some(uid)) => uid,
             Ok(None) => {
@@ -590,6 +650,93 @@ async fn push_worker(inner: Arc<EngineInner>) {
                 } else {
                     retry = 0;
                 }
+            }
+        }
+    }
+}
+
+/// Listener body for the auth-event bus.
+///
+/// Tracks the subject of the most recently observed `Some(claims)`
+/// event so a token refresh (same `sub`, new `exp`) does not trigger a
+/// pull. A subject change — including the None → Some transition after
+/// a logout, and a switch from user A to user B — calls
+/// [`SyncEngine::pull_now`]; the pull's internal account-isolation
+/// step is what actually wipes any stale cache.
+///
+/// `last_seen_subject` is seeded from `cache.last_user_id` so the very
+/// first event after boot is a no-op when it matches the persisted
+/// owner (the typical "boot pull already ran, AuthStateChanged for the
+/// same user arrives a moment later" case).
+async fn auth_event_listener(inner: Arc<EngineInner>, mut rx: broadcast::Receiver<AuthEvent>) {
+    let mut last_seen_subject: Option<Uuid> = inner.settings.lock().await.cache.last_user_id;
+
+    loop {
+        match rx.recv().await {
+            Ok(AuthEvent {
+                claims: Some(claims),
+            }) => {
+                let new_subject = match Uuid::parse_str(&claims.sub) {
+                    Ok(uid) => Some(uid),
+                    Err(err) => {
+                        // A non-UUID `sub` is a server-side invariant
+                        // violation. Surface loudly but keep the
+                        // listener alive: the next valid event still
+                        // needs to drive a pull.
+                        tracing::error!(
+                            error = %err,
+                            "AuthEvent carried a non-UUID subject; ignoring"
+                        );
+                        continue;
+                    }
+                };
+
+                if new_subject == last_seen_subject {
+                    // Same subject (token refresh, redundant emit) —
+                    // nothing for the sync engine to do.
+                    continue;
+                }
+
+                let engine = SyncEngine {
+                    inner: inner.clone(),
+                };
+                match engine.pull_now().await {
+                    Ok(_) => {
+                        last_seen_subject = new_subject;
+                    }
+                    Err(err) => {
+                        // Pull failed (transient transport, decode,
+                        // etc.). Don't update `last_seen_subject` —
+                        // the next event for the same user should
+                        // retry rather than be deduped away.
+                        tracing::warn!(
+                            error = %err,
+                            "Settings pull triggered by AuthEvent failed"
+                        );
+                    }
+                }
+            }
+            Ok(AuthEvent { claims: None }) => {
+                // Logout. Per plan.md: flip status to LocalOnly, keep
+                // the cache intact so offline-after-logout reads still
+                // work, and clear `last_seen_subject` so a subsequent
+                // login (even as the same user) re-triggers a pull.
+                let engine = SyncEngine {
+                    inner: inner.clone(),
+                };
+                engine.set_status(SyncStatus::LocalOnly);
+                last_seen_subject = None;
+            }
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                tracing::warn!(
+                    skipped,
+                    "AuthEvent listener lagged behind the bus; resuming"
+                );
+            }
+            Err(broadcast::error::RecvError::Closed) => {
+                // The manager (and therefore the channel) was dropped.
+                // Nothing meaningful to do but exit.
+                return;
             }
         }
     }
