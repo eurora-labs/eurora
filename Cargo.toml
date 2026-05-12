@@ -86,7 +86,7 @@ euro-endpoint = { path = "crates/app/euro-endpoint", default-features = false }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-process = { path = "crates/app/euro-process" }
 euro-secret = { path = "crates/app/euro-secret" }
-euro-settings = { path = "crates/app/euro-settings" }
+euro-settings = { path = "crates/app/euro-settings", default-features = false }
 euro-storage = { path = "crates/app/euro-storage" }
 euro-tauri = { path = "crates/app/euro-tauri" }
 euro-telemetry = { path = "crates/app/euro-telemetry" }
@@ -160,6 +160,7 @@ tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 url = { version = "2.5.8", features = ["serde"] }
 uuid = "1.20.0"
+wiremock = "0.6"
 zeroize = "1.8.2"
 
 [profile.bench]

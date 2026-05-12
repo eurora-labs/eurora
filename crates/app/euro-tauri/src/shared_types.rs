@@ -6,7 +6,12 @@ use tokio::sync::Mutex;
 
 pub use euro_thread::commands::{ActiveStreamTokens, SharedThreadManager};
 
-pub type SharedSettingsState = Mutex<SettingsState>;
+/// Shared owner of the on-disk settings split. Held in an `Arc` so the
+/// sync engine and the Tauri IPC handlers can lock the *same* mutex —
+/// the engine needs to replace `cache` after a pull or a 409 reconcile,
+/// and the IPC handlers need to see the result without re-reading from
+/// disk.
+pub type SharedSettingsState = Arc<Mutex<SettingsState>>;
 pub type SharedEndpointManager = Arc<EndpointManager>;
 pub type SharedUserController = Mutex<euro_user::UserController>;
 

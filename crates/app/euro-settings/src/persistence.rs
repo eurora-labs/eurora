@@ -24,7 +24,14 @@ pub(crate) const CLOUD_FILE: &str = "cloud.json";
 pub(crate) const LEGACY_FILE: &str = "settings.json";
 pub(crate) const LEGACY_BACKUP_FILE: &str = "settings.json.legacy";
 
-fn default_config_dir() -> Result<PathBuf> {
+/// Resolve the per-user platform config directory the desktop app
+/// reads and writes its split settings files into
+/// (`~/.config/eurora/` on Linux, the platform equivalent elsewhere).
+///
+/// Exposed so the sync engine can write `cloud.json` through the same
+/// path that [`SettingsState::load_or_migrate_from_default_path`] uses,
+/// without each call site re-deriving the path independently.
+pub fn default_config_dir() -> Result<PathBuf> {
     Ok(dirs::config_dir()
         .ok_or_else(|| anyhow::anyhow!("no platform config dir"))?
         .join("eurora"))
@@ -240,6 +247,7 @@ fn split_legacy(path: &Path) -> Result<(LocalSettings, CloudSettingsCache)> {
             // has happened, so the imported settings aren't tied to a
             // user id yet — the first authenticated pull will stamp it.
             last_user_id: None,
+            base_updated_at: None,
             settings: cloud,
         },
     ))
