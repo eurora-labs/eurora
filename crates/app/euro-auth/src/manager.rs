@@ -1,5 +1,6 @@
 use crate::client::AuthClient;
 use crate::error::{AuthError, AuthResult};
+use crate::events::AuthEvent;
 use anyhow::{Result, anyhow};
 use auth_core::Claims;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -10,7 +11,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::ops::Deref;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, broadcast};
 
 /// How long before the access-token's `exp` we proactively refresh.
 ///
@@ -34,6 +35,12 @@ impl JwtConfig {
 
 pub const ACCESS_TOKEN_HANDLE: &str = "AUTH_ACCESS_TOKEN";
 pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
+
+/// Capacity of the [`AuthEvent`] broadcast channel. Auth transitions are
+/// infrequent (a handful per session at most) and consumers — the cloud
+/// settings sync engine, a frontend bridge — drain promptly, so a small
+/// buffer absorbs any startup-time ordering without risking `Lagged`.
+const AUTH_EVENT_CAPACITY: usize = 16;
 
 /// Shared authentication state.
 ///
@@ -60,15 +67,50 @@ pub struct AuthManagerInner {
     auth_client: AuthClient,
     jwt_config: JwtConfig,
     refresh_lock: Mutex<()>,
+    /// Backend event bus. Owning the `Sender` here keeps the channel
+    /// alive for the manager's lifetime; subscribers obtain receivers
+    /// via [`AuthManager::subscribe`]. The send path never blocks: a
+    /// missing-receiver error is normal (nobody listening yet) and is
+    /// dropped silently.
+    auth_event_tx: broadcast::Sender<AuthEvent>,
 }
 
 impl AuthManager {
     pub fn new(endpoint_manager: Arc<EndpointManager>) -> Self {
+        let (auth_event_tx, _) = broadcast::channel(AUTH_EVENT_CAPACITY);
         Self(Arc::new(AuthManagerInner {
             auth_client: AuthClient::new(endpoint_manager),
             jwt_config: JwtConfig::new(),
             refresh_lock: Mutex::new(()),
+            auth_event_tx,
         }))
+    }
+
+    /// Subscribe to backend auth-state transitions.
+    ///
+    /// Each subscriber sees every transition published after it
+    /// subscribes; missed events (slow consumer) surface as
+    /// `RecvError::Lagged`, which subscribers should log and continue
+    /// past — auth state is observed via `claims.sub`, not derived from
+    /// a chain of deltas, so a dropped event is recoverable on the next
+    /// one.
+    #[must_use]
+    pub fn subscribe(&self) -> broadcast::Receiver<AuthEvent> {
+        self.0.auth_event_tx.subscribe()
+    }
+
+    /// Publish an auth-state transition to the backend bus.
+    ///
+    /// Callers are the IPC procedures that already emit the Tauri-side
+    /// `AuthStateChanged` event; this is the parallel publish so
+    /// backend subscribers (sync engine, future observability hooks)
+    /// observe the same boundaries without going through the frontend.
+    pub fn publish_auth_event(&self, event: AuthEvent) {
+        // `send` errors only when no receiver is alive — which is the
+        // normal case before any subscriber has connected and is
+        // benign. Subscribers that genuinely fall behind surface
+        // through `Lagged` on `recv`, not through this call.
+        let _ = self.0.auth_event_tx.send(event);
     }
 
     pub async fn login(
@@ -253,4 +295,89 @@ fn store_access_token(token: String) -> Result<()> {
 fn store_refresh_token(token: String) -> Result<()> {
     secret::persist(REFRESH_TOKEN_HANDLE, &SecretString::from(token))
         .map_err(|e| anyhow!("Failed to store refresh token: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use auth_core::Role;
+    use euro_endpoint::EndpointManager;
+
+    fn manager_for_test() -> AuthManager {
+        let endpoint =
+            Arc::new(EndpointManager::new("https://example.invalid").expect("valid endpoint"));
+        AuthManager::new(endpoint)
+    }
+
+    fn claims_for(sub: &str) -> Claims {
+        Claims {
+            sub: sub.to_owned(),
+            email: "test@example.com".to_owned(),
+            display_name: None,
+            exp: 0,
+            iat: 0,
+            token_type: "access".to_owned(),
+            role: Role::Free,
+            aud: String::new(),
+            email_verified: true,
+            jti: String::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn publish_auth_event_delivers_to_subscriber() {
+        let manager = manager_for_test();
+        let mut rx = manager.subscribe();
+
+        manager.publish_auth_event(AuthEvent {
+            claims: Some(claims_for("00000000-0000-4000-8000-000000000001")),
+        });
+        let event = rx.recv().await.expect("event received");
+        assert!(event.claims.is_some());
+        assert_eq!(
+            event.claims.unwrap().sub,
+            "00000000-0000-4000-8000-000000000001"
+        );
+
+        manager.publish_auth_event(AuthEvent { claims: None });
+        let event = rx.recv().await.expect("logout event received");
+        assert!(event.claims.is_none());
+    }
+
+    #[tokio::test]
+    async fn publish_with_no_subscriber_is_a_no_op() {
+        // The bus must tolerate publishes that have no listener — at
+        // startup the procedures publish before any sync engine has
+        // subscribed, and that path must not return an error or panic.
+        let manager = manager_for_test();
+        manager.publish_auth_event(AuthEvent { claims: None });
+    }
+
+    #[tokio::test]
+    async fn subscribers_share_an_independent_event_history() {
+        // `broadcast` channels start each subscriber at the current
+        // tail, so an event published before `subscribe()` is invisible
+        // to that subscriber. Two subscribers established at different
+        // points must observe different prefixes of the stream.
+        let manager = manager_for_test();
+        manager.publish_auth_event(AuthEvent {
+            claims: Some(claims_for("11111111-1111-4111-8111-111111111111")),
+        });
+        let mut rx = manager.subscribe();
+
+        let try_recv = rx.try_recv();
+        assert!(
+            matches!(try_recv, Err(broadcast::error::TryRecvError::Empty)),
+            "subscriber that joined after the publish must not see it; got {try_recv:?}"
+        );
+
+        manager.publish_auth_event(AuthEvent {
+            claims: Some(claims_for("22222222-2222-4222-8222-222222222222")),
+        });
+        let event = rx.recv().await.expect("post-subscribe event received");
+        assert_eq!(
+            event.claims.unwrap().sub,
+            "22222222-2222-4222-8222-222222222222"
+        );
+    }
 }

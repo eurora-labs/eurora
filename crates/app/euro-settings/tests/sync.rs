@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
+use euro_auth::{AuthEvent, Claims, Role};
 use euro_settings::{
     AuthIdentity, BackoffConfig, CloudSettingsCache, PullOutcome, PushOutcome, SettingsState,
     SettingsTransport, SyncEngine, SyncError, SyncResult, SyncStatus,
@@ -27,7 +28,7 @@ use settings_core::{
     PutSettingsConflictResponse, PutSettingsRequest, ThemePreference,
 };
 use tempfile::TempDir;
-use tokio::sync::{Mutex, watch};
+use tokio::sync::{Mutex, broadcast, watch};
 use uuid::Uuid;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -255,6 +256,27 @@ impl Harness {
         cache: CloudSettingsCache,
         identity: Arc<dyn AuthIdentity>,
     ) -> Self {
+        Self::build(cache, identity, None).await
+    }
+
+    /// Build a harness whose engine is wired to an `AuthEvent`
+    /// broadcast channel. The returned `Sender` drives the engine's
+    /// auth-event listener directly, simulating the bus that
+    /// [`euro_auth::AuthManager::subscribe`] feeds in production.
+    async fn with_auth_events(
+        cache: CloudSettingsCache,
+        identity: Arc<dyn AuthIdentity>,
+    ) -> (Self, broadcast::Sender<AuthEvent>) {
+        let (tx, rx) = broadcast::channel(16);
+        let harness = Self::build(cache, identity, Some(rx)).await;
+        (harness, tx)
+    }
+
+    async fn build(
+        cache: CloudSettingsCache,
+        identity: Arc<dyn AuthIdentity>,
+        auth_events: Option<broadcast::Receiver<AuthEvent>>,
+    ) -> Self {
         let server = MockServer::start().await;
         let tmp = TempDir::new().expect("tempdir");
 
@@ -270,6 +292,10 @@ impl Harness {
         let state = Arc::new(Mutex::new(loaded));
 
         let transport: Arc<dyn SettingsTransport> = Arc::new(HttpTestTransport::new(&server.uri()));
+        // bon's type-state builder forces a fixed call order, so we
+        // can't conditionally chain `.auth_events(...)` — instead we
+        // pass through the `maybe_*` setter which accepts the option
+        // directly.
         let engine = SyncEngine::builder()
             .settings(state.clone())
             .transport(transport)
@@ -282,6 +308,7 @@ impl Harness {
                     .jitter(0.0)
                     .build(),
             )
+            .maybe_auth_events(auth_events)
             .build();
 
         Self {
@@ -298,6 +325,72 @@ impl Harness {
 
     async fn cache_clone(&self) -> CloudSettingsCache {
         self.state.lock().await.cache.clone()
+    }
+}
+
+/// Build a minimal `Claims` whose `sub` is the supplied uuid.
+/// Other fields carry inert defaults — the listener only ever reads
+/// `claims.sub`, and tests that exercise other fields should construct
+/// their own claims.
+fn claims_for(uid: Uuid) -> Claims {
+    Claims {
+        sub: uid.to_string(),
+        email: "test@example.com".to_owned(),
+        display_name: None,
+        exp: 0,
+        iat: 0,
+        token_type: "access".to_owned(),
+        role: Role::Free,
+        aud: String::new(),
+        email_verified: true,
+        jti: String::new(),
+    }
+}
+
+/// Poll the cache until `predicate` returns true or the deadline
+/// elapses. Used by the auth-listener tests, which have no direct sync
+/// point with the listener task — the listener consumes events on its
+/// own runtime and writes through the shared `Mutex<SettingsState>`.
+async fn wait_for_cache<F>(h: &Harness, mut predicate: F)
+where
+    F: FnMut(&CloudSettingsCache) -> bool,
+{
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        if predicate(&h.cache_clone().await) {
+            return;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            panic!(
+                "timed out waiting for cache predicate; last seen: {:?}",
+                h.cache_clone().await
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+/// Wait for the engine's status watch to settle on a value matching
+/// `pred`. Mirrors [`StatusWatcher::wait_for`] but takes a fresh
+/// receiver so callers don't need to construct one before driving the
+/// transition.
+async fn wait_for_status<F>(engine: &SyncEngine, mut pred: F)
+where
+    F: FnMut(&SyncStatus) -> bool,
+{
+    let mut rx = engine.subscribe();
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        if pred(&rx.borrow_and_update()) {
+            return;
+        }
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() || tokio::time::timeout(remaining, rx.changed()).await.is_err() {
+            panic!(
+                "timed out waiting for status; last seen: {:?}",
+                *rx.borrow()
+            );
+        }
     }
 }
 
@@ -1080,4 +1173,354 @@ async fn pull_with_garbage_body_classifies_as_decode_and_does_not_retry() {
         h.engine.current_status(),
         SyncStatus::Offline { .. }
     ));
+}
+
+// --- Phase 8: pull serialisation across concurrent callers ----------------
+
+#[tokio::test]
+async fn pull_now_serialises_concurrent_invocations() {
+    // With the `pull_lock`, N concurrent `pull_now` calls must run in
+    // sequence rather than overlap. The mock injects a per-request
+    // delay; serialised pulls take ≈ N × delay, parallel pulls take ≈
+    // delay. We assert the serialised lower bound.
+    let h = Harness::new().await;
+
+    let get_delay = Duration::from_millis(80);
+    let put_delay = Duration::from_millis(80);
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(ResponseTemplate::new(404).set_delay(get_delay))
+        .mount(&h.server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(PutSettingsAcceptedResponse {
+                    schema_version: CURRENT_SCHEMA_VERSION,
+                    updated_at: timestamp(2026, 1, 2),
+                })
+                .set_delay(put_delay),
+        )
+        .mount(&h.server)
+        .await;
+
+    let concurrency = 4;
+    let start = tokio::time::Instant::now();
+    let mut handles = Vec::with_capacity(concurrency);
+    for _ in 0..concurrency {
+        let engine = h.engine.clone();
+        handles.push(tokio::spawn(async move {
+            engine.pull_now().await.expect("pull_now ok")
+        }));
+    }
+    for handle in handles {
+        handle.await.expect("pull task panicked");
+    }
+    let elapsed = start.elapsed();
+
+    // Sequential floor: each pull issues a GET *and* a PUT (the 404
+    // path triggers a first-run upload). Allow some slack for runtime
+    // scheduling overhead but require that we're nowhere near the
+    // fully-parallel timing.
+    let sequential_floor = (get_delay + put_delay) * concurrency as u32 - Duration::from_millis(40);
+    assert!(
+        elapsed >= sequential_floor,
+        "expected serialised pulls (≥{sequential_floor:?}); got elapsed={elapsed:?}"
+    );
+}
+
+// --- Phase 8: auth-event listener -----------------------------------------
+
+#[tokio::test]
+async fn auth_event_with_new_subject_triggers_pull() {
+    // Fresh-install cache (no last_user_id) + listener wired to the
+    // bus. An `AuthEvent { Some(claims) }` whose `sub` differs from
+    // the (None) seed must drive a pull that stamps the cache.
+    let uid = default_test_user();
+    let (h, tx) =
+        Harness::with_auth_events(CloudSettingsCache::default(), ScriptedIdentity::user(uid)).await;
+
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(1)
+        .mount(&h.server)
+        .await;
+    Mock::given(method("PUT"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(PutSettingsAcceptedResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 8, 1),
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    h.engine.start().await;
+    tx.send(AuthEvent {
+        claims: Some(claims_for(uid)),
+    })
+    .expect("listener receiver alive");
+
+    wait_for_cache(&h, |cache| cache.last_user_id == Some(uid)).await;
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.base_updated_at, Some(timestamp(2026, 8, 1)));
+
+    h.engine.stop().await;
+}
+
+#[tokio::test]
+async fn auth_event_same_subject_does_not_trigger_pull() {
+    // Cache already owned by `uid`; the listener seeds
+    // `last_seen_subject = Some(uid)` from the cache, so a refresh
+    // event carrying the same subject must be ignored. We assert
+    // zero HTTP requests hit the mock.
+    let uid = default_test_user();
+    let prior = CloudSettingsCache {
+        last_user_id: Some(uid),
+        base_updated_at: Some(timestamp(2026, 1, 1)),
+        settings: CloudSettings::default(),
+    };
+    let (h, tx) = Harness::with_auth_events(prior, ScriptedIdentity::user(uid)).await;
+
+    h.engine.start().await;
+    tx.send(AuthEvent {
+        claims: Some(claims_for(uid)),
+    })
+    .expect("listener receiver alive");
+
+    // The listener task needs a moment to consume and dedupe the
+    // event. 150ms is well above the runtime's scheduling jitter and
+    // well below anything the listener would do on a subject change
+    // (which would entail an HTTP round-trip through wiremock).
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    let recorded = h.server.received_requests().await.unwrap_or_default();
+    assert!(
+        recorded.is_empty(),
+        "refresh-only AuthEvent must not trigger a network call; got {} request(s)",
+        recorded.len()
+    );
+
+    h.engine.stop().await;
+}
+
+#[tokio::test]
+async fn auth_event_logout_flips_status_to_local_only_without_io() {
+    // A `None` claims event represents a logout. Per plan.md the
+    // listener must publish `LocalOnly`, do no I/O, and keep the
+    // cache intact so offline-after-logout reads still work.
+    let uid = default_test_user();
+    let prior = CloudSettingsCache {
+        last_user_id: Some(uid),
+        base_updated_at: Some(timestamp(2026, 1, 1)),
+        settings: {
+            let mut s = CloudSettings::default();
+            s.shared.theme = ThemePreference::Dark;
+            s
+        },
+    };
+    let (h, tx) = Harness::with_auth_events(prior, ScriptedIdentity::user(uid)).await;
+
+    h.engine.start().await;
+    // Drive the engine off LocalOnly with a "server fresher" pull so
+    // there's a distinct transition back to LocalOnly to observe.
+    // Keeping the theme Dark in the server blob (matching the cache)
+    // also lets us assert the cache survives the logout untouched.
+    let server_blob = serde_json::json!({
+        "schemaVersion": CURRENT_SCHEMA_VERSION,
+        "shared": { "theme": "dark", "dynamicAccent": false },
+        "desktop": {
+            "interfaceScale": 1.0,
+            "textScale": 1.0,
+            "telemetry": {
+                "consentVersion": 1,
+                "anonymousMetrics": false,
+                "anonymousErrors": false,
+                "nonAnonymousMetrics": false,
+            },
+        },
+        "mobile": {},
+        "web": {},
+    });
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                // Strictly fresher than the cache's `base_updated_at`
+                // so reconcile takes `replace_cache` and does not
+                // queue a push that would race the baseline count.
+                updated_at: timestamp(2026, 5, 1),
+                settings: server_blob,
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+    h.engine.pull_now().await.expect("initial pull ok");
+    wait_for_status(&h.engine, |s| matches!(s, SyncStatus::Synced { .. })).await;
+    let baseline_requests = h.server.received_requests().await.unwrap_or_default().len();
+
+    tx.send(AuthEvent { claims: None })
+        .expect("listener receiver alive");
+    wait_for_status(&h.engine, |s| matches!(s, SyncStatus::LocalOnly)).await;
+
+    // Cache still owned by `uid`; nothing wiped on logout.
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.last_user_id, Some(uid));
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
+
+    // No additional HTTP requests after the logout event.
+    let after_logout = h.server.received_requests().await.unwrap_or_default().len();
+    assert_eq!(
+        after_logout, baseline_requests,
+        "logout event must not trigger network I/O"
+    );
+
+    h.engine.stop().await;
+}
+
+#[tokio::test]
+async fn auth_event_login_after_logout_re_triggers_pull() {
+    // A `None` event clears `last_seen_subject`; a subsequent
+    // `Some(uid)` — even for the same user — must re-trigger a pull
+    // so a user who logs back in sees a fresh server snapshot.
+    let uid = default_test_user();
+    let prior = CloudSettingsCache {
+        last_user_id: Some(uid),
+        base_updated_at: Some(timestamp(2026, 1, 1)),
+        settings: CloudSettings::default(),
+    };
+    let (h, tx) = Harness::with_auth_events(prior, ScriptedIdentity::user(uid)).await;
+
+    let server_blob = serde_json::json!({
+        "schemaVersion": CURRENT_SCHEMA_VERSION,
+        "shared": { "theme": "dark", "dynamicAccent": true },
+        "desktop": {
+            "interfaceScale": 1.0,
+            "textScale": 1.0,
+            "telemetry": {
+                "consentVersion": 1,
+                "anonymousMetrics": false,
+                "anonymousErrors": false,
+                "nonAnonymousMetrics": false,
+            },
+        },
+        "mobile": {},
+        "web": {},
+    });
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 9, 1),
+                settings: server_blob,
+            }),
+        )
+        // Exactly one GET — only the post-logout login should hit the
+        // network; the matching-subject seed must keep the listener
+        // quiet on startup.
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    h.engine.start().await;
+
+    // Logout first to clear the listener's tracked subject.
+    tx.send(AuthEvent { claims: None })
+        .expect("listener receiver alive");
+    wait_for_status(&h.engine, |s| matches!(s, SyncStatus::LocalOnly)).await;
+
+    // Log back in as the same user. With `last_seen_subject == None`,
+    // the listener must treat this as a transition and pull.
+    tx.send(AuthEvent {
+        claims: Some(claims_for(uid)),
+    })
+    .expect("listener receiver alive");
+
+    wait_for_cache(&h, |cache| {
+        cache.base_updated_at == Some(timestamp(2026, 9, 1))
+    })
+    .await;
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
+
+    h.engine.stop().await;
+}
+
+#[tokio::test]
+async fn auth_event_subject_change_replaces_cache() {
+    // The cross-account scenario from plan.md: cache stamped for
+    // user A; an `AuthEvent` for user B arrives. The listener pulls;
+    // the pull's account-isolation step wipes A's cache before any
+    // network call; the GET returns B's blob; the cache ends up
+    // stamped for B with B's data.
+    let user_a = Uuid::parse_str("11111111-1111-4111-8111-111111111111").unwrap();
+    let user_b = Uuid::parse_str("22222222-2222-4222-8222-222222222222").unwrap();
+
+    let prior = CloudSettingsCache {
+        last_user_id: Some(user_a),
+        base_updated_at: Some(timestamp(2026, 1, 1)),
+        settings: {
+            let mut s = CloudSettings::default();
+            s.shared.theme = ThemePreference::Dark;
+            s
+        },
+    };
+    // Identity reports user B — i.e. the AuthManager has already
+    // switched to B's session by the time the listener reacts.
+    let (h, tx) = Harness::with_auth_events(prior, ScriptedIdentity::user(user_b)).await;
+
+    let server_blob = serde_json::json!({
+        "schemaVersion": CURRENT_SCHEMA_VERSION,
+        "shared": { "theme": "light", "dynamicAccent": false },
+        "desktop": {
+            "interfaceScale": 1.0,
+            "textScale": 1.0,
+            "telemetry": {
+                "consentVersion": 1,
+                "anonymousMetrics": false,
+                "anonymousErrors": false,
+                "nonAnonymousMetrics": false,
+            },
+        },
+        "mobile": {},
+        "web": {},
+    });
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 10, 1),
+                settings: server_blob,
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    h.engine.start().await;
+    tx.send(AuthEvent {
+        claims: Some(claims_for(user_b)),
+    })
+    .expect("listener receiver alive");
+
+    wait_for_cache(&h, |cache| cache.last_user_id == Some(user_b)).await;
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Light);
+    assert_eq!(cache.base_updated_at, Some(timestamp(2026, 10, 1)));
+
+    // The reset must have hit disk too — a restart under user B
+    // must not observe A's Dark theme.
+    let reloaded = SettingsState::load_or_migrate(h.config_path()).unwrap();
+    assert_eq!(reloaded.cache.last_user_id, Some(user_b));
+    assert_eq!(reloaded.cache.settings.shared.theme, ThemePreference::Light);
+
+    h.engine.stop().await;
 }
