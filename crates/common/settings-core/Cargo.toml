@@ -6,6 +6,7 @@ description = "Shared wire types for cloud-synced universal settings. Consumed b
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true }

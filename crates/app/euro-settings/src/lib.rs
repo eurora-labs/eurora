@@ -54,6 +54,6 @@ pub use telemetry::{
 // single dependency on `euro-settings` without having to also add
 // `settings-core` to their Cargo.toml.
 pub use settings_core::{
-    CURRENT_SCHEMA_VERSION, CloudSettings, DEFAULT_SCALE, DesktopSettings, MAX_SCALE, MIN_SCALE,
-    MobileSettings, SharedSettings, TelemetryConsent, ThemePreference, WebSettings, sanitize_scale,
+    CURRENT_SCHEMA_VERSION, CloudSettings, DEFAULT_SCALE, DesktopSettings, InterfaceScale,
+    MobileSettings, SharedSettings, TelemetryConsent, TextScale, ThemePreference, WebSettings,
 };

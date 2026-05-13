@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use euro_fs::create_dirs_then_write;
 use serde_json::Value;
-use settings_core::{CURRENT_SCHEMA_VERSION, CloudSettings};
+use settings_core::{CURRENT_SCHEMA_VERSION, CloudSettings, InterfaceScale, TextScale};
 
 use crate::{cloud_cache::CloudSettingsCache, local::LocalSettings, state::SettingsState};
 
@@ -230,15 +230,18 @@ fn split_legacy(path: &Path) -> Result<(LocalSettings, CloudSettingsCache)> {
             cloud.shared.dynamic_accent = v;
         }
         if let Some(v) = appearance.get("interfaceScale").and_then(Value::as_f64) {
-            cloud.desktop.interface_scale = v as f32;
+            // `InterfaceScale::from` clamps non-finite / out-of-range
+            // inputs at the type boundary — a legacy file written by a
+            // build that didn't enforce the bounds can't push an
+            // invalid value into the new struct.
+            cloud.desktop.interface_scale = InterfaceScale::from(v as f32);
         }
         if let Some(v) = appearance.get("textScale").and_then(Value::as_f64) {
-            cloud.desktop.text_scale = v as f32;
+            cloud.desktop.text_scale = TextScale::from(v as f32);
         }
     }
 
     cloud.schema_version = CURRENT_SCHEMA_VERSION;
-    cloud.sanitize();
 
     Ok((
         local,
@@ -257,7 +260,7 @@ fn split_legacy(path: &Path) -> Result<(LocalSettings, CloudSettingsCache)> {
 mod tests {
     use super::*;
     use crate::api::ConnectionMode;
-    use settings_core::{MAX_SCALE, MIN_SCALE, ThemePreference};
+    use settings_core::ThemePreference;
 
     fn write(dir: &Path, name: &str, contents: &str) {
         std::fs::write(dir.join(name), contents).expect("write fixture");
@@ -325,8 +328,8 @@ mod tests {
         let cloud = &state.cache.settings;
         assert_eq!(cloud.shared.theme, ThemePreference::Dark);
         assert!(!cloud.shared.dynamic_accent);
-        assert_eq!(cloud.desktop.interface_scale, 1.25);
-        assert_eq!(cloud.desktop.text_scale, 1.1);
+        assert_eq!(cloud.desktop.interface_scale.get(), 1.25);
+        assert_eq!(cloud.desktop.text_scale.get(), 1.1);
         assert_eq!(cloud.desktop.telemetry.consent_version, 1);
         assert!(cloud.desktop.telemetry.anonymous_metrics);
         assert!(cloud.desktop.telemetry.anonymous_errors);
@@ -370,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_with_out_of_range_scales_is_sanitised() {
+    fn legacy_with_out_of_range_scales_is_clamped() {
         let tmp = tempfile::tempdir().unwrap();
         write(
             tmp.path(),
@@ -379,8 +382,11 @@ mod tests {
         );
 
         let state = SettingsState::load_or_migrate(tmp.path()).unwrap();
-        assert_eq!(state.cache.settings.desktop.interface_scale, MAX_SCALE);
-        assert_eq!(state.cache.settings.desktop.text_scale, MIN_SCALE);
+        assert_eq!(
+            state.cache.settings.desktop.interface_scale,
+            InterfaceScale::MAX
+        );
+        assert_eq!(state.cache.settings.desktop.text_scale, TextScale::MIN);
     }
 
     #[test]

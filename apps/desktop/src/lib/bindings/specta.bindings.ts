@@ -34,10 +34,12 @@ export const commands = {
 	 *  current section, patching the relevant fields, and writing the whole
 	 *  thing back.
 	 * 
-	 *  Side effects: clamps scales via [`DesktopSettings::sanitize`], stamps
-	 *  `telemetry.consent_version` to the current build's value, lazily
-	 *  allocates a local `distinct_id`, and reapplies the native Sentry
-	 *  guard to match the new consent decision.
+	 *  Side effects: stamps `telemetry.consent_version` to the current
+	 *  build's value, lazily allocates a local `distinct_id`, and reapplies
+	 *  the native Sentry guard to match the new consent decision. Scale
+	 *  fields are clamped at the IPC boundary by their newtypes
+	 *  (`InterfaceScale` / `TextScale`), so no extra validation pass is
+	 *  required here.
 	 */
 	settingsSetDesktop: (desktop: DesktopSettings) => typedError<DesktopSettings, SettingsError>(__TAURI_INVOKE("settings_set_desktop", { desktop })),
 	/**
@@ -399,26 +401,36 @@ export type ContextChip = {
  *  chrome scaling, telemetry SDKs that don't run on the other
  *  platforms) cleanly partitioned.
  * 
- *  The custom `Default` impl here is the *wire fallback* used by
+ *  The derived `Default` here is the *wire fallback* used by
  *  `#[serde(default)]` when a partial blob is read off the network.
- *  Scales default to [`DEFAULT_SCALE`] rather than the derive-default
- *  `0.0` because a zero-size UI is unrecoverable; an inert sensible
- *  value is the only safe fallback. The product-blessed fresh-install
- *  values live in `assets/defaults.jsonc` and are reached through
+ *  Scales default to [`DEFAULT_SCALE`] (via [`InterfaceScale::DEFAULT`]
+ *  / [`TextScale::DEFAULT`]) rather than `0.0`, because a zero-size UI
+ *  is unrecoverable; an inert sensible value is the only safe
+ *  fallback. The product-blessed fresh-install values live in
+ *  `assets/defaults.jsonc` and are reached through
  *  [`crate::CloudSettings::default()`].
+ * 
+ *  `interface_scale` and `text_scale` carry their invariants in the
+ *  type, not in a separate validation pass: any value of type
+ *  [`InterfaceScale`] or [`TextScale`] is by construction finite and
+ *  within `[MIN, MAX]`. Deserialization, `From<f32>`, and the
+ *  `bon`-generated builder all route through the clamping
+ *  constructor, so a corrupt cloud blob, a misbehaving client, or a
+ *  hand-rolled patch via `extras` all collapse to safe values before
+ *  they ever land in the struct.
  */
 export type DesktopSettings = {
 	/**
 	 *  Multiplier applied to the document's root font-size, scaling every
 	 *  rem-anchored design token (text, spacing, controls) together.
 	 */
-	interfaceScale?: number | null,
+	interfaceScale?: InterfaceScale,
 	/**
 	 *  Additional multiplier layered on top of `interface_scale` that
 	 *  affects only typography utilities, leaving spacing and control
 	 *  sizes alone.
 	 */
-	textScale?: number | null,
+	textScale?: TextScale,
 	/**
 	 *  Desktop-scoped telemetry consent. Covers what the desktop
 	 *  client collects (Sentry, PostHog) and nothing else; mobile and
@@ -465,6 +477,19 @@ export type InputTokenDetails = {
 	cache_creation?: bigint | null,
 	cache_read?: bigint | null,
 } & { [key in string]: bigint };
+
+/**
+ *  Interface-scale multiplier applied to the document's root font-size,
+ *  scaling every rem-anchored design token (text, spacing, controls)
+ *  together. Always finite and within
+ *  `[InterfaceScale::MIN, InterfaceScale::MAX]` by construction.
+ * 
+ *  Bounds are chosen against window chrome: below `MIN` the layout
+ *  drops below useful tap-target sizes on Linux / Windows; above `MAX`
+ *  the fixed-size titlebar and traffic-light buttons start overlapping
+ *  content.
+ */
+export type InterfaceScale = number | null;
 
 export type InvalidToolCall = {
 	name?: string | null,
@@ -763,6 +788,20 @@ export type TextContentBlock = {
 	index?: BlockIndex | null,
 	extras?: { [key in string]: unknown } | null,
 };
+
+/**
+ *  Additional multiplier layered on top of [`InterfaceScale`] that
+ *  affects only typography utilities, leaving spacing and control
+ *  sizes alone. Always finite and within
+ *  `[TextScale::MIN, TextScale::MAX]` by construction.
+ * 
+ *  Bounds currently mirror [`InterfaceScale`] but the type is separate
+ *  so they can diverge — text legibility may eventually want a wider
+ *  range than the chrome-anchored interface bounds allow, and the type
+ *  system already enforces that the two fields can't be swapped at
+ *  call sites.
+ */
+export type TextScale = number | null;
 
 /**
  *  User's preferred colour scheme. `System` defers to the OS-level

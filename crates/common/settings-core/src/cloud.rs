@@ -64,19 +64,6 @@ impl Default for CloudSettings {
     }
 }
 
-impl CloudSettings {
-    /// Coerce out-of-range or non-finite numeric fields into their safe
-    /// ranges across every section.
-    ///
-    /// The server treats the settings document as an opaque JSON blob, so
-    /// enforcement lives entirely on the client: callers must invoke this
-    /// before serializing a [`CloudSettings`] into a `PUT /settings`
-    /// request, and again after deserializing a freshly fetched blob.
-    pub fn sanitize(&mut self) {
-        self.desktop.sanitize();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -101,8 +88,8 @@ mod tests {
         assert_eq!(d.shared.theme, ThemePreference::System);
         assert!(d.shared.dynamic_accent);
 
-        assert_eq!(d.desktop.interface_scale, DEFAULT_SCALE);
-        assert_eq!(d.desktop.text_scale, DEFAULT_SCALE);
+        assert_eq!(d.desktop.interface_scale.get(), DEFAULT_SCALE);
+        assert_eq!(d.desktop.text_scale.get(), DEFAULT_SCALE);
 
         assert_eq!(d.desktop.telemetry.consent_version, 1);
         assert!(!d.desktop.telemetry.anonymous_metrics);
@@ -151,12 +138,23 @@ mod tests {
     }
 
     #[test]
-    fn sanitize_clamps_desktop_scales() {
-        let mut s = CloudSettings::default();
-        s.desktop.interface_scale = 9.0;
-        s.desktop.text_scale = f32::NAN;
-        s.sanitize();
-        assert_eq!(s.desktop.interface_scale, crate::desktop::MAX_SCALE);
-        assert_eq!(s.desktop.text_scale, crate::desktop::DEFAULT_SCALE);
+    fn deserialize_clamps_desktop_scales() {
+        // The clamp is a type-level invariant on `InterfaceScale` /
+        // `TextScale`, exercised at deserialization. A corrupt cloud
+        // blob with an out-of-range scale lands in the struct already
+        // clamped — no separate `sanitize` pass is required.
+        let raw = serde_json::json!({
+            "schemaVersion": CURRENT_SCHEMA_VERSION,
+            "shared": {},
+            "desktop": { "interfaceScale": 9.0, "textScale": 0.1 },
+            "mobile": {},
+            "web": {},
+        });
+        let parsed: CloudSettings = serde_json::from_value(raw).unwrap();
+        assert_eq!(
+            parsed.desktop.interface_scale,
+            crate::desktop::InterfaceScale::MAX
+        );
+        assert_eq!(parsed.desktop.text_scale, crate::desktop::TextScale::MIN);
     }
 }

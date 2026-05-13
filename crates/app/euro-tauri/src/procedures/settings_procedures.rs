@@ -107,7 +107,6 @@ pub async fn settings_set_shared(
     let mut settings = state.lock().await;
 
     settings.cache.settings.shared = shared;
-    settings.cache.settings.sanitize();
     settings
         .save_cache_to_default_path()
         .map_err(|e| SettingsError::Persistence(e.to_string()))?;
@@ -132,10 +131,12 @@ pub async fn settings_get_desktop(app_handle: AppHandle) -> DesktopSettings {
 /// current section, patching the relevant fields, and writing the whole
 /// thing back.
 ///
-/// Side effects: clamps scales via [`DesktopSettings::sanitize`], stamps
-/// `telemetry.consent_version` to the current build's value, lazily
-/// allocates a local `distinct_id`, and reapplies the native Sentry
-/// guard to match the new consent decision.
+/// Side effects: stamps `telemetry.consent_version` to the current
+/// build's value, lazily allocates a local `distinct_id`, and reapplies
+/// the native Sentry guard to match the new consent decision. Scale
+/// fields are clamped at the IPC boundary by their newtypes
+/// (`InterfaceScale` / `TextScale`), so no extra validation pass is
+/// required here.
 #[tauri::command]
 #[specta::specta]
 pub async fn settings_set_desktop(
@@ -146,7 +147,6 @@ pub async fn settings_set_desktop(
     let mut settings = state.lock().await;
 
     settings.cache.settings.desktop = desktop;
-    settings.cache.settings.sanitize();
     // Any save through this procedure is by definition a recorded
     // consent at the current schema version. Stamping it here (rather
     // than trusting the frontend) prevents an older client from
