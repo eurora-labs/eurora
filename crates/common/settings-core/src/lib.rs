@@ -17,11 +17,12 @@
 //! The server stores the settings document as an opaque JSON blob,
 //! addressed by `(user_id, schema_version, updated_at)`. It never
 //! parses the body, which means clients are responsible for keeping
-//! the document well-formed: call [`CloudSettings::sanitize`] before
-//! serializing into [`PutSettingsRequest`] and again after
-//! deserializing the response payload, and bump
-//! [`CURRENT_SCHEMA_VERSION`] when the structural shape of the blob
-//! changes incompatibly.
+//! the document well-formed. Field-level invariants (e.g. UI scale
+//! bounds) are carried by the field *types* themselves — see
+//! [`DesktopSettings::interface_scale`] / [`DesktopSettings::text_scale`],
+//! which are newtypes that clamp on every entry path including
+//! `Deserialize`. Bump [`CURRENT_SCHEMA_VERSION`] when the structural
+//! shape of the blob changes incompatibly.
 //!
 //! ## Forward-compatibility
 //!
@@ -46,7 +47,8 @@
 //!    deliberately *inert* (booleans → `false`, counters → `0`) so a
 //!    missing field can never silently opt a user in. The single
 //!    exception is [`DesktopSettings`], whose scales fall back to
-//!    [`DEFAULT_SCALE`] because zero-size text is unrecoverable.
+//!    [`DEFAULT_SCALE`] (via [`InterfaceScale::DEFAULT`] /
+//!    [`TextScale::DEFAULT`]) because a zero-size UI is unrecoverable.
 //!
 //! The two tiers may diverge intentionally — e.g. `dynamicAccent` is
 //! `true` on a fresh install (JSONC) but `false` as a wire fallback
@@ -62,7 +64,7 @@ pub mod telemetry;
 pub mod web;
 
 pub use cloud::{CURRENT_SCHEMA_VERSION, CloudSettings};
-pub use desktop::{DEFAULT_SCALE, DesktopSettings, MAX_SCALE, MIN_SCALE, sanitize_scale};
+pub use desktop::{DEFAULT_SCALE, DesktopSettings, InterfaceScale, TextScale};
 pub use dto::{
     GetSettingsResponse, PutSettingsAcceptedResponse, PutSettingsConflictResponse,
     PutSettingsRequest,

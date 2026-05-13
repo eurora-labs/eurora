@@ -460,7 +460,9 @@ impl SyncEngine {
     }
 
     /// Apply a 200 response to the local cache: parse the server blob,
-    /// sanitize, stamp the OCC baseline + owner, persist.
+    /// stamp the OCC baseline + owner, persist. Field-level invariants
+    /// (e.g. UI scale bounds) are enforced at deserialization by the
+    /// field types themselves; no separate sanitize pass is needed.
     async fn replace_cache(
         &self,
         current_uid: Uuid,
@@ -482,7 +484,6 @@ impl SyncEngine {
         // newer than the client's `CURRENT_SCHEMA_VERSION` is
         // load-bearing for round-tripping through older clients.
         incoming.schema_version = schema_version;
-        incoming.sanitize();
 
         let mut state = self.inner.settings.lock().await;
         state.cache = CloudSettingsCache {

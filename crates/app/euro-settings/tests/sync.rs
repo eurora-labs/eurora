@@ -493,7 +493,7 @@ async fn pull_200_server_fresher_replaces_cache() {
 
     let cache = h.cache_clone().await;
     assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
-    assert_eq!(cache.settings.desktop.interface_scale, 1.25);
+    assert_eq!(cache.settings.desktop.interface_scale.get(), 1.25);
     assert_eq!(cache.base_updated_at, Some(timestamp(2026, 2, 1)));
 
     // Disk must mirror in-memory cache so subsequent runs hit the
@@ -802,10 +802,10 @@ async fn unknown_fields_round_trip_through_pull_then_push() {
     assert_eq!(body["settings"]["web"]["futureWebKnob"], "z");
 }
 
-// --- Sanitization on pull --------------------------------------------------
+// --- Deserialization clamping on pull --------------------------------------
 
 #[tokio::test]
-async fn pull_sanitizes_out_of_range_scales() {
+async fn pull_clamps_out_of_range_scales() {
     let h = Harness::new().await;
 
     let server_blob = serde_json::json!({
@@ -841,9 +841,12 @@ async fn pull_sanitizes_out_of_range_scales() {
     let cache = h.cache_clone().await;
     assert_eq!(
         cache.settings.desktop.interface_scale,
-        settings_core::MAX_SCALE
+        settings_core::InterfaceScale::MAX
     );
-    assert_eq!(cache.settings.desktop.text_scale, settings_core::MIN_SCALE);
+    assert_eq!(
+        cache.settings.desktop.text_scale,
+        settings_core::TextScale::MIN
+    );
 }
 
 // --- Phase 6: auth identity + account isolation ---------------------------

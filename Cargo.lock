@@ -9805,6 +9805,7 @@ dependencies = [
 name = "settings-core"
 version = "0.0.0"
 dependencies = [
+ "bon",
  "chrono",
  "serde",
  "serde_json",
