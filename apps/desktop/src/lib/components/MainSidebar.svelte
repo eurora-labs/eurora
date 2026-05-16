@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { commands } from '$lib/bindings/specta.bindings.js';
-	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import SearchDialog from '@eurora/chat/components/SearchDialog.svelte';
 	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
@@ -11,7 +10,6 @@
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
@@ -24,7 +22,6 @@
 
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
-	const timelineService = inject(TIMELINE_SERVICE);
 	const sidebarState = Sidebar.useSidebar();
 
 	let quitDialogOpen = $state(false);
@@ -36,10 +33,6 @@
 			searchOpen = true;
 		}
 	}
-	let visibleTimelineItems = $derived.by(() => {
-		const limit = sidebarState.open ? 3 : 1;
-		return timelineService.recent.slice(-limit);
-	});
 
 	function getFirstLetterAndCapitalize(name: string) {
 		if (!name) return '';
@@ -120,22 +113,6 @@
 			<SidebarThreadsList onThreadSelect={handleThreadSelect} />
 		{/if}
 	</Sidebar.Content>
-	{#if visibleTimelineItems.length > 0}
-		<div class="mx-2 border-t border-sidebar-border py-2">
-			<Timeline.Root class="w-full" defaultOpen={false}>
-				{#each visibleTimelineItems as item, i}
-					<Timeline.Item
-						color={item.accent?.hex}
-						iconBg={item.accent?.iconBg}
-						iconColor={item.accent?.iconBg === '#000000' ? '#ffffff' : '#000000'}
-						highlighted={i === visibleTimelineItems.length - 1}
-						iconSrc={item.iconBase64}
-						name={item.name}
-					/>
-				{/each}
-			</Timeline.Root>
-		</div>
-	{/if}
 
 	<Sidebar.Footer>
 		<DropdownMenu.Root>

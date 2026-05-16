@@ -11,42 +11,42 @@
 
 <script lang="ts">
 	let {
-		color = 'white',
-		iconBg = 'white',
-		iconColor = 'black',
+		color = null,
+		iconBg = null,
+		iconColor = null,
 		highlighted = false,
-		iconSrc,
+		iconSrc = null,
 		name = '',
 	}: TimelineItemProps = $props();
 
-	let borderColor = $derived(color === 'white' ? 'black' : (color ?? 'black'));
+	let resolvedConnector = $derived(color ?? 'var(--sidebar-border)');
 	let resolvedIconBg = $derived(iconBg ?? 'white');
 	let resolvedIconColor = $derived(iconColor ?? 'black');
 </script>
 
-<div
-	class="relative min-w-25 group-data-[collapsible=icon]:min-w-0 shrink group-data-[collapsible=icon]:shrink-0 flex items-center justify-center rounded-2xl"
-	style="filter: {highlighted ? 'saturate(2)' : 'saturate(0)'};"
+<li
+	class="flex flex-col items-center"
+	style="filter: {highlighted ? 'saturate(2)' : 'saturate(0.6)'};"
+	title={name}
 >
-	<div
-		class="absolute w-full h-2 rounded-2xl top-1/2 -translate-y-1/2 border-solid border group-data-[collapsible=icon]:hidden"
-		style="background-color: {color}; border-color: {borderColor};"
-	></div>
-	<div class="relative z-10 flex items-center justify-center w-fit text-sm text-center p-0 m-0">
-		{#if iconSrc}
-			<img
-				src={iconSrc}
-				alt={name}
-				class="w-8 h-8 rounded-full p-1"
-				style="background-color: {resolvedIconBg};"
-			/>
-		{:else}
-			<div
-				class="w-8 h-8 rounded-full p-1 flex items-center justify-center"
-				style="background-color: {resolvedIconBg}; color: {resolvedIconColor};"
-			>
-				{name.charAt(0).toUpperCase()}
-			</div>
-		{/if}
-	</div>
-</div>
+	<span
+		class="timeline-connector h-2 w-0.5 rounded-full"
+		style="background-color: {resolvedConnector};"
+		aria-hidden="true"
+	></span>
+	{#if iconSrc}
+		<img
+			src={iconSrc}
+			alt={name}
+			class="size-8 rounded-full p-1"
+			style="background-color: {resolvedIconBg};"
+		/>
+	{:else}
+		<div
+			class="flex size-8 items-center justify-center rounded-full text-sm font-medium"
+			style="background-color: {resolvedIconBg}; color: {resolvedIconColor};"
+		>
+			{name.charAt(0).toUpperCase()}
+		</div>
+	{/if}
+</li>

@@ -2,32 +2,28 @@
 	export interface TimelineProps {
 		class?: string;
 		children?: any;
-		open?: boolean;
-		defaultOpen?: boolean;
 	}
 </script>
 
 <script lang="ts">
-	let {
-		class: className,
-		children,
-		open = $bindable(true),
-		defaultOpen = true,
-	}: TimelineProps = $props();
+	import { cn } from '$lib/utils.js';
 
-	$effect(() => {
-		if (defaultOpen !== undefined) {
-			open = defaultOpen;
-		}
-	});
+	let { class: className, children }: TimelineProps = $props();
 </script>
 
-<div class="flex flex-col {className} ">
-	<div class="relative mb-4 h-8 overflow-hidden group-data-[collapsible=icon]:overflow-visible">
-		<div
-			class="absolute right-[calc(50%-3.125rem)] flex flex-row gap-2 items-center group-data-[collapsible=icon]:static group-data-[collapsible=icon]:justify-center"
-		>
-			{@render children?.()}
-		</div>
-	</div>
-</div>
+<ol class={cn('flex flex-col items-center', className)} aria-label="Activity timeline">
+	{@render children?.()}
+</ol>
+
+<style>
+	/*
+	 * Each Timeline.Item draws a short vertical connector above its icon,
+	 * tinted with the item's accent color, so the column reads as a single
+	 * track. The first item (newest, at the top) has no upstream item, so
+	 * its connector collapses entirely — letting the newest icon sit flush
+	 * with the top of the container instead of leaving a leading gap.
+	 */
+	ol > :global(li:first-child > .timeline-connector) {
+		display: none;
+	}
+</style>

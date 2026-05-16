@@ -62,6 +62,35 @@ body.linux-app {
 	height: 100% !important;
 }
 
+/*
+ * When the TimelineRail is mounted at the left edge of <main>, shift the
+ * absolutely-positioned sidebar container right by the rail's width so it
+ * sits flush against the rail instead of overlapping it. The sidebar
+ * still extends behind the titlebar — only its inline-start is adjusted.
+ * The `has-timeline-rail` body class is toggled by TimelineRail.svelte on
+ * mount/unmount.
+ *
+ * Note: `data-side` lives on the sidebar's outer wrapper
+ * (`[data-slot='sidebar']`), not on the inner positioned container, so we
+ * scope by the wrapper and descend to the container.
+ */
+body.has-timeline-rail [data-slot='sidebar'][data-side='left'] [data-slot='sidebar-container'] {
+	inset-inline-start: 3rem !important;
+}
+
+/*
+ * On Linux and Windows there are no native window controls overlapping the
+ * left edge, so the rail rises through the titlebar's vertical space and
+ * the newest activity icon sits flush with the top of the window. The
+ * z-index lifts the rail above the titlebar (z-20) in the overlapping
+ * region. macOS keeps the rail below the titlebar so the traffic lights
+ * stay unobstructed.
+ */
+body:not(.macos-app) aside[data-slot='timeline-rail'] {
+	height: calc(100% + var(--titlebar-height));
+	margin-top: calc(-1 * var(--titlebar-height));
+}
+
 [data-slot='sidebar-inset'] {
 	overflow: hidden;
 }
