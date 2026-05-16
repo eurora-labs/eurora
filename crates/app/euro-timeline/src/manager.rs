@@ -13,7 +13,7 @@ use crate::{
 
 pub struct TimelineManager {
     pub storage: Arc<Mutex<TimelineStorage>>,
-    pub activity_storage: Arc<Mutex<ActivityStorage>>,
+    pub activity_storage: Arc<ActivityStorage>,
     pub collector: CollectorService,
 }
 
@@ -30,12 +30,13 @@ impl TimelineManager {
             timeline_config.storage.clone(),
         )));
 
-        let collector =
-            CollectorService::new_with_timeline_config(Arc::clone(&storage), timeline_config);
-        let activity_storage = Arc::new(Mutex::new(ActivityStorage::new(
-            endpoint_manager,
-            auth_manager,
-        )));
+        let activity_storage = Arc::new(ActivityStorage::new(endpoint_manager, auth_manager));
+
+        let collector = CollectorService::new_with_timeline_config(
+            Arc::clone(&storage),
+            Arc::clone(&activity_storage),
+            timeline_config,
+        );
 
         Ok(TimelineManager {
             storage,
@@ -51,6 +52,11 @@ impl TimelineManager {
 
     pub async fn stop(&mut self) -> TimelineResult<()> {
         tracing::debug!("Stopping timeline manager");
+        // Override the last heartbeat value with the precise local
+        // `end` timestamp before the process exits. Best-effort and
+        // bounded internally by a short timeout — a slow network must
+        // not stall shutdown.
+        self.collector.flush_current_end().await;
         tracing::info!("Timeline manager stopped");
         Ok(())
     }
@@ -72,12 +78,10 @@ impl TimelineManager {
         };
 
         match activity {
-            Some(activity) => {
-                let activity_storage = self.activity_storage.lock().await;
-                return Ok(activity_storage
-                    .save_assets_to_service_by_ids(&activity, ids)
-                    .await?);
-            }
+            Some(activity) => Ok(self
+                .activity_storage
+                .save_assets_to_service_by_ids(&activity, ids)
+                .await?),
             None => Err(TimelineError::Storage(
                 "No current activity found".to_string(),
             )),
@@ -86,24 +90,6 @@ impl TimelineManager {
 
     pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
         self.collector.refresh_current_activity().await
-    }
-
-    pub async fn save_current_activity_to_service(&self) -> TimelineResult<()> {
-        let activity = {
-            let storage = self.storage.lock().await;
-            storage.get_current_activity().cloned()
-        };
-
-        match activity {
-            Some(activity) => {
-                let activity_storage = self.activity_storage.lock().await;
-                activity_storage.save_activity_to_service(&activity).await?;
-                Ok(())
-            }
-            None => Err(TimelineError::Storage(
-                "No current activity found".to_string(),
-            )),
-        }
     }
 
     pub async fn construct_messages_from_last_snapshot(&self) -> ContentBlocks {

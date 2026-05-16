@@ -89,7 +89,7 @@ impl TryFrom<NativeMessage> for ActivitySnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Activity {
-    pub id: String,
+    pub id: Uuid,
     pub name: String,
     pub title: Option<String>,
     pub url: Option<Url>,
@@ -113,7 +113,7 @@ impl Activity {
         assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::now_v7(),
             name,
             title,
             url: None,
@@ -142,7 +142,7 @@ impl Activity {
         assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::now_v7(),
             name: url.to_string(),
             title,
             url: Some(url),
@@ -158,7 +158,7 @@ impl Activity {
 
     pub fn get_context_chip(&self) -> ContextChip {
         ContextChip {
-            id: self.id.clone(),
+            id: self.id.to_string(),
             name: self.title.clone().unwrap_or_else(|| self.name.clone()),
             icon: None,
             domain: self.url.as_ref().and_then(domain_from_url),
