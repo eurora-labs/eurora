@@ -23,6 +23,11 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
+tauri = { workspace = true, optional = true }
+tauri-specta = { workspace = true, optional = true, features = [
+  "derive",
+  "typescript",
+] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = [
   "fs",
@@ -31,3 +36,12 @@ tokio = { workspace = true, features = [
   "sync",
 ] }
 tracing = { workspace = true }
+
+[features]
+default = []
+## Tauri integration: typed `AuthStateChanged` event, an `install` helper
+## that registers the manager as Tauri-managed state and spawns the
+## bus → frontend bridge, and an `auth_manager` lookup helper. Pulled
+## in by `euro-tauri` and `euro-mobile`; non-Tauri consumers (e.g.
+## `euro-thread`, `euro-timeline`) build without it.
+tauri = ["dep:tauri", "dep:tauri-specta"]

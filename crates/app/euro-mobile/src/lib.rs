@@ -5,10 +5,11 @@
     clippy::too_many_lines
 )]
 
+use euro_auth::tauri::AuthStateChanged;
 use procedures::auth_procedures::{
-    AuthStateChanged, auth_get_access_token_payload, auth_is_authenticated, auth_login,
-    auth_logout, auth_refresh_session, auth_register, auth_start_login,
-    auth_start_login_apple_native, auth_start_login_google_native,
+    auth_get_access_token_payload, auth_is_authenticated, auth_login, auth_logout,
+    auth_refresh_session, auth_register, auth_start_login, auth_start_login_apple_native,
+    auth_start_login_google_native,
 };
 use procedures::settings_procedures::{
     settings_get_local_telemetry, settings_get_telemetry_consent, settings_set_telemetry_consent,

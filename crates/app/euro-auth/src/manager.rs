@@ -1,11 +1,12 @@
 use crate::client::AuthClient;
 use crate::error::{AuthError, AuthResult};
 use crate::events::AuthEvent;
-use anyhow::{Result, anyhow};
-use auth_core::Claims;
+use crate::tokens;
+use anyhow::Result;
+use auth_core::{Claims, TokenResponse};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use euro_endpoint::EndpointManager;
-use euro_secret::{ExposeSecret, SecretString, secret};
+use euro_secret::{ExposeSecret, SecretString};
 use jsonwebtoken::dangerous::insecure_decode;
 use rand::Rng;
 use sha2::{Digest, Sha256};
@@ -33,16 +34,13 @@ impl JwtConfig {
     }
 }
 
-pub const ACCESS_TOKEN_HANDLE: &str = "AUTH_ACCESS_TOKEN";
-pub const REFRESH_TOKEN_HANDLE: &str = "AUTH_REFRESH_TOKEN";
-
 /// Capacity of the [`AuthEvent`] broadcast channel. Auth transitions are
 /// infrequent (a handful per session at most) and consumers — the cloud
 /// settings sync engine, a frontend bridge — drain promptly, so a small
 /// buffer absorbs any startup-time ordering without risking `Lagged`.
 const AUTH_EVENT_CAPACITY: usize = 16;
 
-/// Shared authentication state.
+/// Centralised authentication state.
 ///
 /// `AuthManager` is cheap to clone — all clones share the same inner state via
 /// an `Arc`. In particular, they share a single refresh lock so that concurrent
@@ -51,6 +49,14 @@ const AUTH_EVENT_CAPACITY: usize = 16;
 /// the lock is released. This is critical because the backend invalidates a
 /// refresh token on first use, so naive concurrent refreshes would cause all
 /// but one caller to receive `InvalidToken` and log the user out.
+///
+/// The manager is the *sole* writer of session state: every method that
+/// mutates the stored tokens (`login`, `register`, `login_by_*`,
+/// `refresh_tokens`, `logout`, and the implicit refresh inside
+/// [`get_or_refresh_access_token`]) publishes the resulting transition
+/// on the internal [`AuthEvent`] bus before returning. Consumers observe
+/// state by [`subscribe`]ing rather than by polling, which keeps the
+/// in-process view and any frontend bridge in lock-step with the keyring.
 #[derive(Debug, Clone)]
 pub struct AuthManager(Arc<AuthManagerInner>);
 
@@ -86,7 +92,7 @@ impl AuthManager {
         }))
     }
 
-    /// Subscribe to backend auth-state transitions.
+    /// Subscribe to auth-state transitions.
     ///
     /// Each subscriber sees every transition published after it
     /// subscribes; missed events (slow consumer) surface as
@@ -99,13 +105,12 @@ impl AuthManager {
         self.0.auth_event_tx.subscribe()
     }
 
-    /// Publish an auth-state transition to the backend bus.
+    /// Publish an auth-state transition to the bus.
     ///
-    /// Callers are the IPC procedures that already emit the Tauri-side
-    /// `AuthStateChanged` event; this is the parallel publish so
-    /// backend subscribers (sync engine, future observability hooks)
-    /// observe the same boundaries without going through the frontend.
-    pub fn publish_auth_event(&self, event: AuthEvent) {
+    /// Internal — the manager itself publishes after every successful
+    /// mutation. External callers observe transitions through
+    /// [`subscribe`] rather than driving the bus directly.
+    pub(crate) fn publish_auth_event(&self, event: AuthEvent) {
         // `send` errors only when no receiver is alive — which is the
         // normal case before any subscriber has connected and is
         // benign. Subscribers that genuinely fall behind surface
@@ -113,48 +118,111 @@ impl AuthManager {
         let _ = self.0.auth_event_tx.send(event);
     }
 
+    /// Sign in with email + password. Returns the access-token
+    /// [`Claims`] on success; the new session is already persisted and
+    /// published on the bus by the time this resolves.
     pub async fn login(
         &self,
         login: impl Into<String>,
         password: impl Into<String>,
-    ) -> Result<SecretString> {
+    ) -> Result<Claims> {
         let response = self.auth_client.login_by_password(login, password).await?;
-
-        store_access_token(response.access_token.clone())?;
-        store_refresh_token(response.refresh_token.clone())?;
-
-        Ok(SecretString::from(response.access_token))
+        self.complete_session(response)
     }
 
+    /// Register a new account. Returns the access-token [`Claims`]
+    /// on success; the new session is already persisted and published
+    /// on the bus by the time this resolves.
     pub async fn register(
         &self,
         email: impl Into<String>,
         password: impl Into<String>,
-    ) -> Result<SecretString> {
+    ) -> Result<Claims> {
         let response = self.auth_client.register(email, password, None).await?;
-
-        store_access_token(response.access_token.clone())?;
-        store_refresh_token(response.refresh_token.clone())?;
-
-        Ok(SecretString::from(response.access_token))
+        self.complete_session(response)
     }
 
-    fn get_access_token(&self) -> Result<SecretString> {
-        secret::retrieve(ACCESS_TOKEN_HANDLE)?.ok_or_else(|| anyhow!("No access token found"))
+    /// Exchange a login-token (web-flow PKCE verifier) for a session.
+    pub async fn login_by_login_token(&self, login_token: String) -> Result<Claims> {
+        let response = self.auth_client.login_by_login_token(login_token).await?;
+        self.complete_session(response)
     }
 
-    fn get_refresh_token(&self) -> Result<SecretString> {
-        secret::retrieve(REFRESH_TOKEN_HANDLE)?.ok_or_else(|| anyhow!("No refresh token found"))
+    /// Trade a Google ID token (from the native iOS / Android SDKs) for
+    /// a session.
+    pub async fn login_by_google_id_token(
+        &self,
+        id_token: impl Into<String>,
+        nonce: Option<String>,
+    ) -> Result<Claims> {
+        let response = self
+            .auth_client
+            .login_by_google_id_token(id_token, nonce)
+            .await?;
+        self.complete_session(response)
     }
 
+    /// Trade an Apple ID token (from `ASAuthorizationController` on
+    /// iOS) for a session. `raw_nonce` is the unhashed nonce the
+    /// plugin generated; the backend re-derives the hash to match
+    /// against the ID token's `nonce` claim. `user` is the
+    /// `fullName` Apple ships on the first sign-in only.
+    pub async fn login_by_apple_id_token(
+        &self,
+        id_token: impl Into<String>,
+        raw_nonce: impl Into<String>,
+        user: Option<auth_core::AppleNativeUser>,
+    ) -> Result<Claims> {
+        let response = self
+            .auth_client
+            .login_by_apple_id_token(id_token, raw_nonce, user)
+            .await?;
+        self.complete_session(response)
+    }
+
+    /// Tear down the current session.
+    ///
+    /// Best-effort: the server-side refresh-token revocation and the
+    /// local secret-store wipe are independent steps. If the server is
+    /// unreachable we still clear local credentials — otherwise the user
+    /// would be wedged in a "kinda logged out" state with stale tokens
+    /// on disk. Either step's failure is logged but never propagated,
+    /// since the user's intent ("I'm signed out") is honoured by the
+    /// `AuthEvent { claims: None }` that always fires at the end.
+    pub async fn logout(&self) {
+        if let Ok(refresh_token) = tokens::load_refresh()
+            && let Err(err) = self.auth_client.logout(refresh_token.expose_secret()).await
+        {
+            tracing::warn!(
+                error = %err,
+                "server-side logout failed; clearing local credentials anyway"
+            );
+        }
+        tokens::clear();
+        self.publish_auth_event(AuthEvent { claims: None });
+    }
+
+    /// Decode the current access-token's claims without verifying the
+    /// signature (the issuer's public key isn't available client-side;
+    /// the token has already been validated by the server when it
+    /// minted it). Returns an error when no token is stored or when the
+    /// stored token isn't a parseable JWT.
     pub fn get_access_token_payload(&self) -> Result<Claims> {
-        let token = self.get_access_token()?;
+        let token = tokens::load_access()?;
         let token = insecure_decode::<Claims>(token.expose_secret())?;
         Ok(token.claims)
     }
 
+    /// Convenience for "what's the current session, if any". Returns
+    /// `None` for both the no-token and malformed-token cases — callers
+    /// uniformly treat both as "not signed in".
+    #[must_use]
+    pub fn current_claims(&self) -> Option<Claims> {
+        self.get_access_token_payload().ok()
+    }
+
     pub fn get_refresh_token_payload(&self) -> Result<Claims> {
-        let token = self.get_refresh_token()?;
+        let token = tokens::load_refresh()?;
         let token = insecure_decode::<Claims>(token.expose_secret())?;
         Ok(token.claims)
     }
@@ -170,46 +238,56 @@ impl AuthManager {
         if self.has_fresh_access_token() {
             return self.read_access_token();
         }
-        self.ensure_refresh().await
+        self.ensure_refresh().await?;
+        self.read_access_token()
     }
 
     /// Force a refresh, coalescing with any concurrent refresh already in
     /// flight. If another task completes a refresh while this one is waiting
-    /// for the lock, the freshly stored token is returned without a second
-    /// round-trip to the server.
-    pub async fn refresh_tokens(&self) -> AuthResult<SecretString> {
+    /// for the lock, the freshly stored token's claims are returned without
+    /// a second round-trip to the server.
+    pub async fn refresh_tokens(&self) -> AuthResult<Claims> {
         self.ensure_refresh().await
     }
 
-    async fn ensure_refresh(&self) -> AuthResult<SecretString> {
+    async fn ensure_refresh(&self) -> AuthResult<Claims> {
         let _guard = self.refresh_lock.lock().await;
 
-        // Double-checked: another task may have refreshed while we waited.
+        // Double-checked: another task may have refreshed while we
+        // waited. In that case the bus already fired for the
+        // refresh — we just observe the freshly stored claims.
         if self.has_fresh_access_token() {
-            return self.read_access_token();
+            return self
+                .get_access_token_payload()
+                .map_err(|_| AuthError::MissingAccessToken);
         }
 
-        self.perform_refresh().await?;
-        self.read_access_token()
+        self.perform_refresh().await
     }
 
-    async fn perform_refresh(&self) -> AuthResult<()> {
-        let refresh_token = self
-            .get_refresh_token()
-            .map_err(|_| AuthError::MissingRefreshToken)?;
+    async fn perform_refresh(&self) -> AuthResult<Claims> {
+        let refresh_token = tokens::load_refresh().map_err(|_| AuthError::MissingRefreshToken)?;
         let response = self
             .auth_client
             .refresh_token(refresh_token.expose_secret())
             .await?;
 
-        store_access_token(response.access_token)?;
-        store_refresh_token(response.refresh_token)?;
-        Ok(())
+        self.complete_session(response)
+            .map_err(AuthError::Transient)
+    }
+
+    fn complete_session(&self, response: TokenResponse) -> Result<Claims> {
+        tokens::store_access(response.access_token)?;
+        tokens::store_refresh(response.refresh_token)?;
+        let claims = self.get_access_token_payload()?;
+        self.publish_auth_event(AuthEvent {
+            claims: Some(claims.clone()),
+        });
+        Ok(claims)
     }
 
     fn read_access_token(&self) -> AuthResult<SecretString> {
-        self.get_access_token()
-            .map_err(|_| AuthError::MissingAccessToken)
+        tokens::load_access().map_err(|_| AuthError::MissingAccessToken)
     }
 
     fn has_fresh_access_token(&self) -> bool {
@@ -236,20 +314,11 @@ impl AuthManager {
     }
 
     pub async fn resend_verification_email(&self) -> Result<()> {
-        let access_token = self.get_access_token()?;
+        let access_token = tokens::load_access()?;
         self.auth_client
             .resend_verification_email(access_token.expose_secret())
             .await
             .map_err(anyhow::Error::from)
-    }
-
-    pub async fn login_by_login_token(&self, login_token: String) -> Result<SecretString> {
-        let response = self.auth_client.login_by_login_token(login_token).await?;
-
-        store_access_token(response.access_token.clone())?;
-        store_refresh_token(response.refresh_token.clone())?;
-
-        Ok(SecretString::from(response.access_token))
     }
 
     /// Build a provider-authorisation URL for the mobile in-app browser
@@ -267,56 +336,6 @@ impl AuthManager {
             .await?;
         Ok(response.url)
     }
-
-    /// Trade a Google ID token (from the native iOS / Android SDKs) for
-    /// a session.
-    pub async fn login_by_google_id_token(
-        &self,
-        id_token: impl Into<String>,
-        nonce: Option<String>,
-    ) -> Result<SecretString> {
-        let response = self
-            .auth_client
-            .login_by_google_id_token(id_token, nonce)
-            .await?;
-
-        store_access_token(response.access_token.clone())?;
-        store_refresh_token(response.refresh_token.clone())?;
-
-        Ok(SecretString::from(response.access_token))
-    }
-
-    /// Trade an Apple ID token (from `ASAuthorizationController` on
-    /// iOS) for a session. `raw_nonce` is the unhashed nonce the
-    /// plugin generated; the backend re-derives the hash to match
-    /// against the ID token's `nonce` claim. `user` is the
-    /// `fullName` Apple ships on the first sign-in only.
-    pub async fn login_by_apple_id_token(
-        &self,
-        id_token: impl Into<String>,
-        raw_nonce: impl Into<String>,
-        user: Option<auth_core::AppleNativeUser>,
-    ) -> Result<SecretString> {
-        let response = self
-            .auth_client
-            .login_by_apple_id_token(id_token, raw_nonce, user)
-            .await?;
-
-        store_access_token(response.access_token.clone())?;
-        store_refresh_token(response.refresh_token.clone())?;
-
-        Ok(SecretString::from(response.access_token))
-    }
-}
-
-fn store_access_token(token: String) -> Result<()> {
-    secret::persist(ACCESS_TOKEN_HANDLE, &SecretString::from(token))
-        .map_err(|e| anyhow!("Failed to store access token: {}", e))
-}
-
-fn store_refresh_token(token: String) -> Result<()> {
-    secret::persist(REFRESH_TOKEN_HANDLE, &SecretString::from(token))
-        .map_err(|e| anyhow!("Failed to store refresh token: {}", e))
 }
 
 #[cfg(test)]
@@ -369,7 +388,7 @@ mod tests {
     #[tokio::test]
     async fn publish_with_no_subscriber_is_a_no_op() {
         // The bus must tolerate publishes that have no listener — at
-        // startup the procedures publish before any sync engine has
+        // startup the manager may publish before any sync engine has
         // subscribed, and that path must not return an error or panic.
         let manager = manager_for_test();
         manager.publish_auth_event(AuthEvent { claims: None });
@@ -401,5 +420,14 @@ mod tests {
             event.claims.unwrap().sub,
             "22222222-2222-4222-8222-222222222222"
         );
+    }
+
+    #[tokio::test]
+    async fn current_claims_returns_none_without_a_session() {
+        // No access token stored in this test process's keyring; the
+        // convenience accessor must collapse "missing" and "malformed"
+        // into a single `None` so callers don't need to branch.
+        let manager = manager_for_test();
+        assert!(manager.current_claims().is_none());
     }
 }

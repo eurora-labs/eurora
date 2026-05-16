@@ -21,14 +21,13 @@ base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 auth-core = { workspace = true, features = ["specta"] }
 backon = { workspace = true }
-euro-auth = { workspace = true }
+euro-auth = { workspace = true, features = ["tauri"] }
 rand = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-webpki-roots"] }
 euro-secret = { workspace = true }
 euro-settings = { workspace = true, features = ["tls-webpki-roots"] }
 euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
-euro-user = { workspace = true }
 thread-core = { workspace = true, features = ["specta"] }
 uuid = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
