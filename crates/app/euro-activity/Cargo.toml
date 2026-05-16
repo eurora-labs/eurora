@@ -24,6 +24,7 @@ euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-office = { workspace = true }
 euro-pdf = { workspace = true }
 euro-process = { workspace = true }
+euro-vision = { workspace = true }
 focus-tracker = { workspace = true }
 humantime-serde = { workspace = true }
 image = { workspace = true }

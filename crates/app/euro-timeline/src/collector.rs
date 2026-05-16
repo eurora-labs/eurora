@@ -4,9 +4,7 @@ use crate::{
     storage::TimelineStorage,
     types::ActivityEvent,
 };
-use euro_activity::DefaultStrategy;
-use euro_activity::strategies::ActivityReport;
-use euro_activity::strategies::StrategySupport;
+use euro_activity::strategies::{ActivityReport, StrategySupport};
 use euro_activity::{ContextChip, NoStrategy, strategies::ActivityStrategyFunctionality};
 use focus_tracker::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
 use std::sync::{
@@ -40,9 +38,13 @@ impl CollectorService {
 
         let (activity_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
-        let strategy = Arc::new(RwLock::new(ActivityStrategy::DefaultStrategy(
-            DefaultStrategy,
-        )));
+        // `DefaultStrategy` is window-bound and can't exist without a
+        // focused window, so we boot in `NoStrategy` (a no-op that
+        // refuses to handle any external process). The very first focus
+        // event will cause `handle_process_change` to return `false`,
+        // triggering the redispatch path below and replacing this with
+        // the right strategy for whatever the user is looking at.
+        let strategy = Arc::new(RwLock::new(ActivityStrategy::NoStrategy(NoStrategy)));
 
         Self {
             storage,
@@ -217,7 +219,7 @@ impl CollectorService {
                                         "Strategy can no longer handle: {}",
                                         process_name
                                     );
-                                    match ActivityStrategy::new(&process_name).await {
+                                    match ActivityStrategy::new(&window).await {
                                         Ok(mut new_strategy) => {
                                             let _ = new_strategy
                                                 .start_tracking(&window, activity_tx_inner.clone())
