@@ -1,6 +1,6 @@
 use activity_core::{
-    ActivityErrorResponse, InsertActivityRequest, InsertActivityResponse, UpdateActivityRequest,
-    UpdateActivityResponse,
+    Activity as WireActivity, ActivityErrorResponse, InsertActivityRequest, InsertActivityResponse,
+    ListActivitiesResponse, UpdateActivityRequest, UpdateActivityResponse,
 };
 use asset_core::{Asset, CreateAssetRequest};
 use async_trait::async_trait;
@@ -97,10 +97,7 @@ impl ActivityStorage {
             id: Some(activity.id),
             name: activity.name.clone(),
             process_name: activity.process_name.clone(),
-            window_title: activity
-                .title
-                .clone()
-                .unwrap_or_else(|| activity.name.clone()),
+            window_title: activity.window_title(),
             icon_png_base64,
             started_at: activity.start,
             ended_at: Some(activity.end.unwrap_or_else(Utc::now)),
@@ -125,6 +122,82 @@ impl ActivityStorage {
             ActivityError::network(format!("Failed to decode activity response: {e}"))
         })?;
         Ok(body)
+    }
+
+    /// Fetch the most recent persisted activities for the authenticated user.
+    ///
+    /// The server returns rows in `started_at DESC` order, capped at the
+    /// service-side maximum (`activity_core::MAX_LIST_LIMIT`). Pagination
+    /// parameters are forwarded verbatim — invalid values surface as a
+    /// network error carrying the server's typed `ActivityErrorResponse`
+    /// body.
+    pub async fn list_activities(
+        &self,
+        limit: u32,
+        offset: u32,
+    ) -> ActivityResult<Vec<WireActivity>> {
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .get(self.url("/activities"))
+            .header("Authorization", bearer)
+            .query(&[("limit", limit), ("offset", offset)])
+            .send()
+            .await
+            .map_err(|e| ActivityError::network(format!("activity list request failed: {e}")))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(map_http_error_response(status, response).await);
+        }
+
+        let body: ListActivitiesResponse = response.json().await.map_err(|e| {
+            ActivityError::network(format!("Failed to decode activity list response: {e}"))
+        })?;
+        Ok(body.activities)
+    }
+
+    /// Fetch the raw bytes for an asset by id.
+    ///
+    /// `None` indicates a clean 404 (the asset does not exist, or is not
+    /// owned by the authenticated user — the backend deliberately conflates
+    /// the two so foreign ids can't be probed). Any other non-success
+    /// status surfaces as [`ActivityError::Network`]. The returned MIME
+    /// type mirrors the value recorded at upload time.
+    pub async fn fetch_asset_bytes(
+        &self,
+        asset_id: Uuid,
+    ) -> ActivityResult<Option<(Vec<u8>, String)>> {
+        let bearer = self.bearer().await?;
+        let response = self
+            .http
+            .get(self.url(&format!("/v1/assets/{asset_id}")))
+            .header("Authorization", bearer)
+            .send()
+            .await
+            .map_err(|e| ActivityError::network(format!("asset fetch request failed: {e}")))?;
+
+        let status = response.status();
+        if status == StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        if !status.is_success() {
+            return Err(map_http_error_response(status, response).await);
+        }
+
+        let mime_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|h| h.to_str().ok())
+            .map(|s| s.to_owned())
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| ActivityError::network(format!("Failed to read asset bytes: {e}")))?;
+
+        Ok(Some((bytes.to_vec(), mime_type)))
     }
 
     /// PATCH the activity's `ended_at` on the backend.

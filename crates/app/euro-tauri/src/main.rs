@@ -9,10 +9,12 @@ use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
-        system_procedures::{
+        accent::accent_from_image,
+        activity::{SavedActivity, SavedActivityCreated},
+        system::{
             BrowserExtensionStatusChanged, SAFARI_BRIDGE_APP_KIND, resolve_browser_extension_state,
         },
-        timeline_procedures::{AccentColor, TimelineAppEvent, TimelineAssetsEvent},
+        timeline::{TimelineAppEvent, TimelineAssetsEvent},
     },
     shared_types::{ActiveStreamTokens, SharedHttpClient, SharedThreadManager},
     show_and_focus_main,
@@ -20,6 +22,7 @@ use euro_tauri::{
 use euro_telemetry::{Controller as TelemetryController, sentry_tracing};
 use euro_thread::commands::SharedChatContextProvider;
 use euro_timeline::TimelineManager;
+use euro_vision::rgba_to_base64;
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
@@ -371,6 +374,53 @@ fn init_state(
     Ok(())
 }
 
+/// Drain a `broadcast::Receiver` forever, applying `handler` to each event.
+///
+/// `while let Ok(_) = rx.recv().await` exits the loop on `Lagged`, which
+/// would silently kill the listener for the rest of the process. This
+/// helper distinguishes the two error variants: `Lagged` is a transient
+/// "you dropped N messages" — log and resume; `Closed` means the producer
+/// is gone, end the task.
+async fn forward_broadcast<T, F>(
+    channel: &'static str,
+    mut rx: tokio::sync::broadcast::Receiver<T>,
+    mut handler: F,
+) where
+    T: Clone,
+    F: FnMut(T),
+{
+    use tokio::sync::broadcast::error::RecvError;
+    loop {
+        match rx.recv().await {
+            Ok(event) => handler(event),
+            Err(RecvError::Lagged(skipped)) => {
+                tracing::warn!(channel, skipped, "broadcast receiver lagged");
+            }
+            Err(RecvError::Closed) => {
+                tracing::debug!(channel, "broadcast sender closed; exiting listener");
+                return;
+            }
+        }
+    }
+}
+
+/// Acquire a fresh subscriber by briefly locking the [`TimelineManager`].
+///
+/// Each listener task gets its own receiver so a slow consumer cannot
+/// starve the producer or its siblings. The lock is held only for the
+/// duration of one `subscribe_to_*` call.
+async fn subscribe<T, F>(
+    handle: &tauri::AppHandle,
+    subscribe: F,
+) -> tokio::sync::broadcast::Receiver<T>
+where
+    F: FnOnce(&TimelineManager) -> tokio::sync::broadcast::Receiver<T>,
+{
+    let tl: tauri::State<'_, Mutex<TimelineManager>> = handle.state();
+    let timeline = tl.lock().await;
+    subscribe(&timeline)
+}
+
 /// Bridge `TimelineManager`'s internal broadcast channels to the
 /// frontend by emitting tauri-specta typed events. Each task takes a
 /// fresh receiver from the manager (so a slow consumer can't starve
@@ -378,36 +428,27 @@ fn init_state(
 fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
     let assets_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-        let mut asset_receiver = {
-            let tl: tauri::State<'_, Mutex<TimelineManager>> = assets_handle.state();
-            let timeline = tl.lock().await;
-            timeline.subscribe_to_assets_events()
-        };
-        while let Ok(assets_event) = asset_receiver.recv().await {
+        let rx = subscribe(&assets_handle, TimelineManager::subscribe_to_assets_events).await;
+        forward_broadcast("timeline_assets", rx, |assets_event| {
             let _ = TimelineAssetsEvent(assets_event).emit(&assets_handle);
-        }
+        })
+        .await;
     });
 
     let activity_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-        let mut activity_receiver = {
-            let tl: tauri::State<'_, Mutex<TimelineManager>> = activity_handle.state();
-            let timeline = tl.lock().await;
-            timeline.subscribe_to_activity_events()
-        };
-        while let Ok(activity_event) = activity_receiver.recv().await {
+        let rx = subscribe(
+            &activity_handle,
+            TimelineManager::subscribe_to_activity_events,
+        )
+        .await;
+        forward_broadcast("timeline_activity", rx, |activity_event| {
             tracing::debug!("Activity changed to: {}", activity_event.name);
 
-            let mut accent = None;
-            let mut icon_base64 = None;
-
-            if let Some(icon) = activity_event.icon.as_ref() {
-                accent = color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 1, 2)
-                    .ok()
-                    .and_then(|c| c.into_iter().next())
-                    .map(|c| AccentColor::from_rgb(c.r, c.g, c.b));
-                icon_base64 = euro_vision::rgba_to_base64(icon).ok();
-            }
+            let (accent, icon_base64) = match activity_event.icon.as_ref() {
+                Some(icon) => (accent_from_image(icon), rgba_to_base64(icon).ok()),
+                None => (None, None),
+            };
 
             let _ = TimelineAppEvent {
                 name: activity_event.name.clone(),
@@ -417,7 +458,42 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
                 process_id: activity_event.process_id,
             }
             .emit(&activity_handle);
-        }
+        })
+        .await;
+    });
+
+    // Persisted-activity events: fired by the collector after each
+    // successful `POST /activities`. Carries everything the frontend
+    // needs to prepend the row to the timeline rail without re-polling
+    // `GET /activities`.
+    let saved_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let rx = subscribe(
+            &saved_handle,
+            TimelineManager::subscribe_to_saved_activity_events,
+        )
+        .await;
+        forward_broadcast("timeline_saved_activity", rx, |event| {
+            tracing::debug!(activity_id = %event.id, "Saved activity emitted");
+
+            let (accent, icon_base64) = match event.icon.as_ref() {
+                Some(icon) => (accent_from_image(icon), rgba_to_base64(icon).ok()),
+                None => (None, None),
+            };
+
+            let payload = SavedActivity {
+                id: event.id,
+                name: event.name,
+                process_name: event.process_name,
+                window_title: event.window_title,
+                started_at: event.started_at,
+                ended_at: event.ended_at,
+                accent,
+                icon_base64,
+            };
+            let _ = SavedActivityCreated(payload).emit(&saved_handle);
+        })
+        .await;
     });
 
     tauri::async_runtime::spawn(async move {

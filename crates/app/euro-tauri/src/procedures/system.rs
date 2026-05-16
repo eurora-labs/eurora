@@ -123,7 +123,7 @@ pub struct TelemetryBootstrap {
 /// Pushed from Rust to the frontend whenever the desktop telemetry
 /// consent gate flips. Fired once during startup (in response to
 /// [`frontend_ready`]) with the current state, and again whenever the
-/// gate changes (e.g. after [`crate::procedures::settings_procedures::settings_record_telemetry_consent`]).
+/// gate changes (e.g. after [`crate::procedures::settings::settings_record_telemetry_consent`]).
 ///
 /// The frontend's root layout listens for this event and routes to the
 /// consent prompt when `required` is `true`. No comparison against a

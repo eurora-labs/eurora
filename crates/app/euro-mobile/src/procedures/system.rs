@@ -2,7 +2,7 @@
 //!
 //! Only the telemetry surface is exposed today; everything else lives
 //! on the desktop and isn't reachable on mobile. Commands mirror their
-//! desktop counterparts in `euro-tauri::procedures::system_procedures`
+//! desktop counterparts in `euro-tauri::procedures::system`
 //! and must stay shape-compatible so the mobile webview can share
 //! types with the desktop one.
 
@@ -57,7 +57,7 @@ pub struct TelemetryBootstrap {
 /// Pushed from Rust to the frontend whenever the mobile telemetry
 /// consent gate flips. Fired once during startup (in response to
 /// [`frontend_ready`]) and again whenever the gate changes (e.g. after
-/// [`crate::procedures::settings_procedures::settings_record_telemetry_consent`]).
+/// [`crate::procedures::settings::settings_record_telemetry_consent`]).
 ///
 /// Today mobile shares the `desktop.telemetry` cloud record with the
 /// desktop client; Phase 10 partitions mobile into its own section

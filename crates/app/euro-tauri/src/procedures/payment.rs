@@ -7,7 +7,7 @@ use url::Url;
 
 use euro_auth::tauri::auth_manager;
 
-use crate::procedures::auth_procedures::AuthError;
+use crate::procedures::auth::AuthError;
 use crate::shared_types::{SharedEndpointManager, SharedHttpClient};
 
 /// Typed error surface for the `payment_*` IPC commands. Externally

@@ -5,7 +5,7 @@
 //! doesn't yet have a mobile UI, so adding commands for them is
 //! deferred until the mobile settings page lands. The commands below
 //! mirror their desktop counterparts in
-//! `euro-tauri::procedures::settings_procedures` and must stay
+//! `euro-tauri::procedures::settings` and must stay
 //! shape-compatible so the mobile webview's settings page can share
 //! types with the desktop one.
 //!
@@ -23,7 +23,7 @@ use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use thiserror::Error;
 
-use crate::procedures::system_procedures::ConsentGate;
+use crate::procedures::system::ConsentGate;
 use crate::shared_types::SharedSettingsState;
 use euro_telemetry::Controller as TelemetryController;
 

@@ -7,8 +7,12 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::{
-    ActivityStorage, AssetFunctionality, ContextChip, TimelineError, collector::CollectorService,
-    config::TimelineConfig, error::TimelineResult, storage::TimelineStorage, types::ActivityEvent,
+    ActivityStorage, AssetFunctionality, ContextChip, TimelineError,
+    collector::CollectorService,
+    config::TimelineConfig,
+    error::TimelineResult,
+    storage::TimelineStorage,
+    types::{ActivityEvent, SavedActivityEvent},
 };
 
 pub struct TimelineManager {
@@ -152,5 +156,11 @@ impl TimelineManager {
 
     pub fn subscribe_to_assets_events(&self) -> tokio::sync::broadcast::Receiver<Vec<ContextChip>> {
         self.collector.subscribe_to_assets_events()
+    }
+
+    pub fn subscribe_to_saved_activity_events(
+        &self,
+    ) -> tokio::sync::broadcast::Receiver<SavedActivityEvent> {
+        self.collector.subscribe_to_saved_activity_events()
     }
 }

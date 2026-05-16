@@ -6,15 +6,15 @@
 )]
 
 use euro_auth::tauri::AuthStateChanged;
-use procedures::auth_procedures::{
+use procedures::auth::{
     auth_get_access_token_payload, auth_is_authenticated, auth_login, auth_logout,
     auth_refresh_session, auth_register, auth_start_login, auth_start_login_apple_native,
     auth_start_login_google_native,
 };
-use procedures::settings_procedures::{
+use procedures::settings::{
     settings_get_local_telemetry, settings_get_telemetry_consent, settings_record_telemetry_consent,
 };
-use procedures::system_procedures::{
+use procedures::system::{
     ConsentGate, frontend_ready, system_get_telemetry_bootstrap, system_reinit_telemetry,
     system_rotate_telemetry_distinct_id,
 };
