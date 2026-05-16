@@ -63,7 +63,7 @@ fn should_stop(stop_signal: Option<&AtomicBool>) -> bool {
 fn poll_focus_change(
     prev_state: &mut FocusState,
     icon_cache: &mut IconCache,
-    icon_config: &IconConfig,
+    config: &FocusTrackerConfig,
 ) -> Option<FocusedWindow> {
     let Some(hwnd) = utils::get_foreground_window() else {
         if prev_state.hwnd != 0 {
@@ -80,6 +80,10 @@ fn poll_focus_change(
         }
     };
 
+    if config.windows_ignored_processes.contains(&process_name) {
+        return None;
+    }
+
     let process_id = utils::get_window_process_id(hwnd).unwrap_or_default();
 
     if !prev_state.has_changed(hwnd, process_id, &title) {
@@ -87,7 +91,7 @@ fn poll_focus_change(
     }
 
     let icon = if prev_state.focus_changed(hwnd) {
-        resolve_icon(icon_cache, hwnd, process_id, &process_name, icon_config)
+        resolve_icon(icon_cache, hwnd, process_id, &process_name, &config.icon)
     } else {
         icon_cache.get(&process_name).map(Arc::clone)
     };
@@ -126,7 +130,7 @@ where
             break;
         }
 
-        let pending = poll_focus_change(&mut prev_state, &mut icon_cache, &config.icon);
+        let pending = poll_focus_change(&mut prev_state, &mut icon_cache, config);
 
         if let Some(focused) = pending {
             on_focus(focused).await?;

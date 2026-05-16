@@ -2,6 +2,10 @@ mod client;
 mod error;
 mod events;
 mod manager;
+mod secret_store;
+
+#[cfg(feature = "tauri")]
+pub mod tauri;
 
 pub use auth_core::*;
 pub use client::*;

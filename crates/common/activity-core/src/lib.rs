@@ -60,6 +60,30 @@ pub struct InsertActivityResponse {
     pub activity: Activity,
 }
 
+/// Request body for `PATCH /activities/{id}`.
+///
+/// All fields are optional; missing fields are left untouched on the row.
+/// Used by the desktop client to (a) ratchet `ended_at` forward on every
+/// heartbeat tick and at activity transitions, and (b) correct
+/// `window_title` when a browser strategy reports a title-only update.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct UpdateActivityRequest {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub window_title: Option<String>,
+    #[serde(default)]
+    pub ended_at: Option<DateTime<Utc>>,
+}
+
+/// Response body for `PATCH /activities/{id}`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct UpdateActivityResponse {
+    pub activity: Activity,
+}
+
 /// Default page size when the client omits `limit`.
 pub const DEFAULT_LIST_LIMIT: u32 = 20;
 
@@ -110,6 +134,8 @@ pub fn type_collection() -> specta::Types {
         .register::<Activity>()
         .register::<InsertActivityRequest>()
         .register::<InsertActivityResponse>()
+        .register::<UpdateActivityRequest>()
+        .register::<UpdateActivityResponse>()
         .register::<ListActivitiesQuery>()
         .register::<ListActivitiesResponse>()
         .register::<ActivityErrorResponse>()
@@ -158,6 +184,44 @@ mod tests {
         assert!(q.offset.is_none());
     }
 
+    #[test]
+    fn update_request_round_trips_with_partial_fields() {
+        let req = UpdateActivityRequest {
+            name: None,
+            window_title: None,
+            ended_at: Some(Utc::now()),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"name\":null"));
+        assert!(json.contains("\"window_title\":null"));
+        assert!(json.contains("\"ended_at\":"));
+        let back: UpdateActivityRequest = serde_json::from_str(&json).unwrap();
+        assert!(back.name.is_none());
+        assert!(back.window_title.is_none());
+        assert!(back.ended_at.is_some());
+    }
+
+    #[test]
+    fn update_request_decodes_with_only_ended_at() {
+        // Heartbeat path: PATCH body contains only `ended_at`.
+        let json = r#"{"ended_at":"2026-01-15T12:00:00Z"}"#;
+        let back: UpdateActivityRequest = serde_json::from_str(json).unwrap();
+        assert!(back.name.is_none());
+        assert!(back.window_title.is_none());
+        assert!(back.ended_at.is_some());
+    }
+
+    #[test]
+    fn update_request_decodes_empty_body_as_all_none() {
+        // The handler rejects all-None at the application layer; the
+        // wire type itself must still parse so that error path is
+        // reachable.
+        let back: UpdateActivityRequest = serde_json::from_str("{}").unwrap();
+        assert!(back.name.is_none());
+        assert!(back.window_title.is_none());
+        assert!(back.ended_at.is_none());
+    }
+
     #[cfg(feature = "specta")]
     #[test]
     fn type_collection_contains_all_wire_types() {
@@ -170,6 +234,8 @@ mod tests {
             "Activity",
             "InsertActivityRequest",
             "InsertActivityResponse",
+            "UpdateActivityRequest",
+            "UpdateActivityResponse",
             "ListActivitiesQuery",
             "ListActivitiesResponse",
             "ActivityErrorResponse",

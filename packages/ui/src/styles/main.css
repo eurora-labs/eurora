@@ -94,6 +94,18 @@
 	--sidebar-ring: oklch(0.5676 0.2021 283.0838);
 	--selection: oklch(0.5676 0.2021 283.0838);
 	--selection-foreground: oklch(1 0 0);
+
+	/*
+	 * Theme-agnostic surface tones. Both modes keep these identical because
+	 * they exist to provide a reliable dark-on-X / light-on-X contrast match
+	 * regardless of the active theme (e.g. an icon backdrop that must stay
+	 * dark when the icon glyph is white, even while the app is in light
+	 * mode). Values mirror `--background` from each theme so the surfaces
+	 * read as miniature "light" / "dark" cards.
+	 */
+	--surface-light: oklch(0.9821 0 0);
+	--surface-dark: oklch(0.2303 0.0125 264.2926);
+
 	--font-sans:
 		ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
 		'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',

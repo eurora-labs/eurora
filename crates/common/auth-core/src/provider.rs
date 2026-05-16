@@ -5,14 +5,15 @@ use specta::Type;
 
 /// Third-party identity provider supported by the auth service.
 ///
-/// Wire format is lowercase JSON (`"google"`, `"github"`) so it reads
-/// naturally in URLs and request bodies.
+/// Wire format is lowercase JSON (`"google"`, `"github"`, `"apple"`)
+/// so it reads naturally in URLs and request bodies.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(rename_all = "lowercase")]
 pub enum Provider {
     Google,
     Github,
+    Apple,
 }
 
 impl Provider {
@@ -20,6 +21,7 @@ impl Provider {
         match self {
             Provider::Google => "google",
             Provider::Github => "github",
+            Provider::Apple => "apple",
         }
     }
 }

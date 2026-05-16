@@ -12,21 +12,23 @@
 use std::sync::Arc;
 
 use auth_core::{
-    AssociateLoginTokenRequest, AuthSuccessResponse, CheckEmailRequest, CheckEmailResponse,
-    GoogleIdTokenLoginRequest, LoginByLoginTokenRequest, LoginRequest,
-    MobileThirdPartyAuthUrlRequest, Provider, RegisterRequest, ThirdPartyAuthUrlRequest,
-    ThirdPartyAuthUrlResponse, TokenResponse, UserResponse, VerifyEmailRequest,
+    AppleIdTokenLoginRequest, AppleNativeUser, AssociateLoginTokenRequest, AuthSuccessResponse,
+    CheckEmailRequest, CheckEmailResponse, GoogleIdTokenLoginRequest, LoginByLoginTokenRequest,
+    LoginRequest, MobileThirdPartyAuthUrlRequest, Provider, RegisterRequest,
+    ThirdPartyAuthUrlRequest, ThirdPartyAuthUrlResponse, TokenResponse, UserResponse,
+    VerifyEmailRequest,
 };
 use axum::{
-    Json,
+    Form, Json,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Redirect},
+    response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::extract::cookie::CookieJar;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::apple_notifications::{AppleNotificationError, AppleNotificationOutcome};
 use crate::cookies::{self, AuthMode};
 use crate::{
     AppState, AuthResult,
@@ -86,11 +88,10 @@ pub async fn login(
             provider,
             code,
             state: oauth_state,
-            login_token,
         } => {
             state
                 .auth
-                .login_third_party(provider, &code, &oauth_state, login_token)
+                .login_third_party(provider, &code, &oauth_state)
                 .await?
         }
     };
@@ -148,7 +149,10 @@ pub async fn oauth_url(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ThirdPartyAuthUrlRequest>,
 ) -> AuthResult<Json<ThirdPartyAuthUrlResponse>> {
-    let url = state.auth.third_party_auth_url(body.provider).await?;
+    let url = state
+        .auth
+        .third_party_auth_url(body.provider, body.login_token)
+        .await?;
     Ok(Json(ThirdPartyAuthUrlResponse { url }))
 }
 
@@ -202,6 +206,10 @@ pub async fn mobile_oauth_callback(
     let provider = match path.provider.as_str() {
         "google" => Provider::Google,
         "github" => Provider::Github,
+        // Apple is intentionally excluded: its mobile callback uses
+        // `response_mode=form_post` (POST, not GET) and is handled by a
+        // separate route — see [`apple_mobile_callback`]. Falling
+        // through here would mismatch verb and shape.
         other => {
             tracing::warn!(provider = %other, "mobile OAuth callback for unknown provider");
             return Redirect::to(&device_redirect_error("invalid_provider"));
@@ -265,6 +273,63 @@ pub async fn google_id_token_login(
         .login_google_id_token(&body.id_token, body.nonce)
         .await?;
     Ok(session_response(&state, &headers, jar, session))
+}
+
+/// Native Apple sign-in: device hands us an ID token from
+/// `ASAuthorizationController`; we verify it against Apple's JWKS,
+/// re-derive the nonce hash, and mint a session.
+///
+/// Bearer-mode by construction — this endpoint is only ever called by
+/// the native iOS app (cookies have nowhere meaningful to live in that
+/// context). Unlike [`login`] / [`google_id_token_login`], we do not
+/// dispatch on [`AuthMode`]; the response is always a [`TokenResponse`].
+#[tracing::instrument(skip_all)]
+pub async fn apple_id_token_login(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<AppleIdTokenLoginRequest>,
+) -> AuthResult<Json<TokenResponse>> {
+    let display_name = project_apple_native_user(body.user.as_ref());
+    let session = state
+        .auth
+        .login_apple_id_token(&body.id_token, &body.raw_nonce, display_name)
+        .await?;
+    Ok(Json(session.tokens))
+}
+
+/// Maximum length (Unicode scalars) of a display name projected from
+/// Apple's native `fullName` credential. Same cap as the form-post
+/// path ([`APPLE_DISPLAY_NAME_MAX`]) so cross-flow behaviour stays
+/// consistent. The native credential is harder to forge than the
+/// form-post `user` blob (it's part of the ID-token-bearing
+/// `ASAuthorizationAppleIDCredential`), but we apply the same defence
+/// to keep the storage shape uniform — first-sign-in-only application
+/// in `complete_oauth_login` is the structural guard against
+/// overwrites.
+const APPLE_NATIVE_DISPLAY_NAME_MAX: usize = APPLE_DISPLAY_NAME_MAX;
+
+/// Project the Apple native `fullName` credential onto an
+/// `Option<String>` display-name override.
+///
+/// Returns `None` when both halves are missing or empty, when either
+/// half contains a control character, or when the combined name
+/// exceeds the cap. Defensive parsing mirrors
+/// [`parse_apple_form_user`]: a malformed name must never block the
+/// login itself, only suppress the override.
+pub(crate) fn project_apple_native_user(user: Option<&AppleNativeUser>) -> Option<String> {
+    let user = user?;
+    let first = user.first_name.as_deref().unwrap_or("");
+    let last = user.last_name.as_deref().unwrap_or("");
+    let combined = format!("{first} {last}").trim().to_string();
+    if combined.is_empty() {
+        return None;
+    }
+    if combined.chars().any(char::is_control) {
+        return None;
+    }
+    if combined.chars().count() > APPLE_NATIVE_DISPLAY_NAME_MAX {
+        return None;
+    }
+    Some(combined)
 }
 
 #[tracing::instrument(skip_all)]
@@ -331,8 +396,573 @@ pub async fn email_resend_verification(
     state.auth.resend_verification_email(user_id).await
 }
 
+/// Body Apple POSTs to `/auth/oauth/apple/web-callback`.
+///
+/// Apple uses `response_mode=form_post` (required when scopes include
+/// `name`/`email`), so the callback arrives as
+/// `application/x-www-form-urlencoded` rather than as query params on
+/// a GET. The `user` field is a JSON-encoded string carrying first /
+/// last name — only present on the very first sign-in; absent on
+/// every subsequent one.
+///
+/// Apple also includes an `id_token` in this body. We deliberately
+/// **don't** deserialise it: trusting an SPA-facing claim would
+/// bypass the back-channel code exchange where signature + audience
+/// are verified against Apple's JWKS. Serde silently drops unknown
+/// fields, so the extra field is harmless on the wire.
+#[derive(Debug, Deserialize)]
+pub struct AppleFormPost {
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    state: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    /// Stringified JSON like
+    /// `{"name":{"firstName":"…","lastName":"…"},"email":"…"}`. We
+    /// only consume the name portion; the email comes from the
+    /// verified ID token claims, never from this untrusted body.
+    #[serde(default)]
+    user: Option<String>,
+}
+
+/// Apple web-callback completion.
+///
+/// Apple POSTs here directly (not via the SPA). On success we set the
+/// session cookies and 303 the browser to `${web_base}/auth/apple/done`
+/// — that SPA route rehydrates auth state from `/auth/me` and
+/// completes any pending desktop-pairing redirect.
+#[tracing::instrument(skip_all)]
+pub async fn apple_web_callback(
+    State(state): State<Arc<AppState>>,
+    jar: CookieJar,
+    Form(form): Form<AppleFormPost>,
+) -> Response {
+    let web_base = state.web_base();
+
+    if let Some(err) = form.error {
+        tracing::warn!(error = %err, "Apple returned error on web-callback");
+        return Redirect::to(&format!("{web_base}/login?error=oauth_failed")).into_response();
+    }
+
+    let (code, oauth_state) = match (form.code, form.state) {
+        (Some(c), Some(s)) => (c, s),
+        _ => {
+            tracing::warn!("Apple web-callback missing code or state");
+            return Redirect::to(&format!("{web_base}/login?error=invalid_callback"))
+                .into_response();
+        }
+    };
+    let display_name = parse_apple_form_user(form.user.as_deref());
+
+    match state
+        .auth
+        .handle_apple_login(&code, &oauth_state, display_name)
+        .await
+    {
+        Ok(session) => {
+            let target = if session.was_paired {
+                format!("{web_base}/auth/apple/done?paired=1")
+            } else {
+                format!("{web_base}/auth/apple/done")
+            };
+            apple_cookies_then_redirect(&state, jar, session, &target)
+        }
+        Err(e) => {
+            let kind = e.error_kind();
+            tracing::warn!(error = %e, kind = %kind, "Apple web-callback failed");
+            Redirect::to(&format!("{web_base}/login?error={kind}")).into_response()
+        }
+    }
+}
+
+/// Form-post completion variant of `session_response`.
+///
+/// The shared `session_response` returns `(CookieJar, Json<…>)`
+/// because every other session-minting endpoint responds to a
+/// JSON-over-XHR caller. Apple's form-post is a top-level navigation
+/// that needs cookies + a 303 to the SPA. Cookie mode is the only
+/// sane mode for a browser-redirect flow, so we don't dispatch on
+/// `AuthMode` here.
+fn apple_cookies_then_redirect(
+    state: &AppState,
+    jar: CookieJar,
+    session: MintedSession,
+    target: &str,
+) -> Response {
+    let access_max_age = session.tokens.expires_in;
+    let refresh_max_age = state.jwt_config().refresh_token_expiry_days * 86_400;
+    let jar = jar
+        .add(cookies::access_cookie(
+            &state.cookies,
+            session.tokens.access_token,
+            access_max_age,
+        ))
+        .add(cookies::refresh_cookie(
+            &state.cookies,
+            session.tokens.refresh_token,
+            refresh_max_age,
+        ));
+    (jar, Redirect::to(target)).into_response()
+}
+
+/// Apple mobile-callback completion.
+///
+/// Apple's `response_mode=form_post` means the mobile redirect URI is
+/// hit by a POST from Apple — not a GET like Google/GitHub — so this
+/// can't share the path-templated `mobile_oauth_callback` route. The
+/// in-app browser session (Custom Tabs / `ASWebAuthenticationSession`)
+/// follows our 303 to the `eurora://` custom scheme and resolves the
+/// device's awaiting frame.
+///
+/// Bearer-mode by construction: no cookie jar, no JSON body — the
+/// device picks tokens up via the existing `/auth/login-token/exchange`
+/// poll using the same PKCE verifier it generated before opening the
+/// browser. On error we still 303 (rather than returning a status
+/// code) so the browser session resolves cleanly; the device inspects
+/// the `status=` query to decide between completion and surfacing an
+/// error.
+#[tracing::instrument(skip_all, fields(provider = "apple"))]
+pub async fn apple_mobile_callback(
+    State(state): State<Arc<AppState>>,
+    Form(form): Form<AppleFormPost>,
+) -> Redirect {
+    if let Some(err) = form.error {
+        tracing::warn!(error = %err, "Apple returned error on mobile-callback");
+        return Redirect::to(&device_redirect_error(&err));
+    }
+
+    let (Some(code), Some(oauth_state)) = (form.code, form.state) else {
+        tracing::warn!("Apple mobile-callback missing code or state");
+        return Redirect::to(&device_redirect_error("invalid_callback"));
+    };
+    let display_name = parse_apple_form_user(form.user.as_deref());
+
+    match state
+        .auth
+        .handle_apple_login_mobile(&code, &oauth_state, display_name)
+        .await
+    {
+        Ok(()) => Redirect::to(DEVICE_REDIRECT_OK),
+        Err(e) => {
+            let kind = e.error_kind();
+            tracing::warn!(error = %e, kind = %kind, "Apple mobile-callback failed");
+            Redirect::to(&device_redirect_error(kind))
+        }
+    }
+}
+
+/// Maximum length (Unicode scalars) of a display name extracted from
+/// Apple's form-post `user` blob. Apple's UI imposes a much tighter
+/// limit; we cap defensively because Apple doesn't sign the `user`
+/// blob.
+const APPLE_DISPLAY_NAME_MAX: usize = 128;
+
+/// Byte-size cap on the entire `user` JSON blob before we hand it to
+/// `serde_json`. Apple's real payload is ~100 bytes; 4 KiB is two
+/// orders of magnitude of headroom while still bounding the parser's
+/// work against a maliciously fabricated body. Axum has its own outer
+/// body-size limit but it applies to the whole form, not to this
+/// inner field specifically.
+const APPLE_FORM_USER_MAX_BYTES: usize = 4096;
+
+/// Typed projection of the Apple form-post `user` blob. Apple's
+/// payload looks like:
+/// `{"name":{"firstName":"…","lastName":"…"},"email":"…"}`. We only
+/// consume the name portion; the email is trusted only via the
+/// verified ID-token claim, never via this body.
+#[derive(Debug, Deserialize)]
+struct AppleFormUserBlob {
+    name: Option<AppleFormUserName>,
+    // Apple also sends `email` here on first sign-in. Intentionally
+    // not deserialised: trusting an unsigned blob's email field would
+    // be an account-takeover vector. Treating it as unknown-and-
+    // ignored (rather than `#[serde(deny_unknown_fields)]`) keeps
+    // forwards-compat with future Apple additions.
+}
+
+#[derive(Debug, Deserialize)]
+struct AppleFormUserName {
+    #[serde(rename = "firstName", default)]
+    first_name: Option<String>,
+    #[serde(rename = "lastName", default)]
+    last_name: Option<String>,
+}
+
+/// Project the Apple form-post `user` blob onto an `Option<String>`
+/// display-name override.
+///
+/// Treats the input as fully untrusted: rejects oversize bodies,
+/// oversize or control-character-bearing names, and returns `None`
+/// for any structural failure rather than propagating an error (a
+/// missing display name must not fail the login).
+pub(crate) fn parse_apple_form_user(raw: Option<&str>) -> Option<String> {
+    let raw = raw?;
+    if raw.is_empty() || raw.len() > APPLE_FORM_USER_MAX_BYTES {
+        return None;
+    }
+    let blob: AppleFormUserBlob = serde_json::from_str(raw).ok()?;
+    let name = blob.name?;
+    let first = name.first_name.as_deref().unwrap_or("");
+    let last = name.last_name.as_deref().unwrap_or("");
+    let combined = format!("{first} {last}").trim().to_string();
+    if combined.is_empty() {
+        return None;
+    }
+    // Reject control characters (XSS / log-injection vectors) and cap
+    // length. Don't HTML-escape here — that's the rendering layer's
+    // job, and pre-escaping in storage corrupts user names that
+    // legitimately contain `&` / `<`.
+    if combined.chars().any(char::is_control) {
+        return None;
+    }
+    if combined.chars().count() > APPLE_DISPLAY_NAME_MAX {
+        return None;
+    }
+    Some(combined)
+}
+
 // Re-exported for tests / IDE jump-to-definition; `IntoResponse` is
 // implemented on the `(CookieJar, …)` tuple by axum so handlers above
 // don't need an explicit `into_response()` call.
 #[allow(dead_code)]
 fn _into_response<T: IntoResponse>(_: T) {}
+
+/// Form body Apple POSTs to `/auth/oauth/apple/notifications`.
+///
+/// Apple sends `application/x-www-form-urlencoded` with a single
+/// `payload` field containing the signed notification JWT. We never
+/// look at any other fields — additional ones (if Apple introduces
+/// them) are dropped by serde and ignored. Body shape is
+/// deliberately tiny so the parser can't be tricked into spending
+/// budget on a multi-megabyte form before we discover the JWT is
+/// junk; axum's outer body-size limit is the second line of defence.
+#[derive(Debug, Deserialize)]
+pub struct AppleNotificationForm {
+    payload: String,
+}
+
+/// Apple server-to-server notifications endpoint.
+///
+/// Status-code policy:
+///
+/// - **200**: success or forwards-compat ack (unknown event type,
+///   unknown user, email-flag toggle). Apple stops retrying on 2xx.
+/// - **401**: signature / iss / aud / freshness verification failed.
+///   Apple does not retry; logged loudly so SecOps can pick up forgery
+///   attempts on Apple's webhook URL.
+/// - **503**: genuine internal failure (DB unreachable, Apple
+///   provider not configured). Apple retries; idempotent side-effects
+///   make this safe.
+///
+/// Response body is always empty — Apple isn't a UX surface, and
+/// echoing detail back to a putative attacker (on the 401 path) would
+/// leak verifier internals.
+///
+/// All audit logging for this endpoint lives in this function: the
+/// service method ([`crate::apple_notifications::AuthService::handle_apple_notification`])
+/// is a pure dispatcher. Keeping the policy here means the field set
+/// is consistent across every outcome and ops only has to grep one
+/// span name.
+#[tracing::instrument(skip_all, name = "apple_notification")]
+pub async fn apple_notifications(
+    State(state): State<Arc<AppState>>,
+    Form(body): Form<AppleNotificationForm>,
+) -> Response {
+    match state.auth.handle_apple_notification(&body.payload).await {
+        Ok(outcome) => {
+            log_apple_notification_outcome(&outcome);
+            StatusCode::OK.into_response()
+        }
+        Err(AppleNotificationError::Verification(e)) => {
+            tracing::warn!(error = %e, "Apple notification rejected: verification failed");
+            StatusCode::UNAUTHORIZED.into_response()
+        }
+        Err(AppleNotificationError::Internal(e)) => {
+            tracing::error!(error = %e, "Apple notification processing failed");
+            StatusCode::SERVICE_UNAVAILABLE.into_response()
+        }
+    }
+}
+
+fn log_apple_notification_outcome(outcome: &AppleNotificationOutcome) {
+    match outcome {
+        AppleNotificationOutcome::AccountTerminated {
+            user_id,
+            sessions_revoked,
+            cause,
+            residual_credentials_missing,
+        } => {
+            tracing::info!(
+                user_id = %user_id,
+                sessions_revoked,
+                cause = cause.as_str(),
+                "Apple notification: user terminated",
+            );
+            if *residual_credentials_missing {
+                // Loud warn rather than info — an orphaned account is
+                // both a UX edge case (the user can't log back in) and
+                // a forensic anchor for App-Store-deletion-request audits.
+                tracing::warn!(
+                    user_id = %user_id,
+                    cause = cause.as_str(),
+                    "Apple notification: user has no remaining credentials after termination",
+                );
+            }
+        }
+        AppleNotificationOutcome::EmailFlagToggled { sub, enabled } => {
+            tracing::info!(
+                sub = %sub,
+                enabled,
+                "Apple notification: email flag toggled (no-op)",
+            );
+        }
+        AppleNotificationOutcome::UnknownUser { sub, cause } => {
+            tracing::info!(
+                sub = %sub,
+                cause = cause.as_str(),
+                "Apple notification: unknown user (no-op)",
+            );
+        }
+        AppleNotificationOutcome::UnknownEvent { raw_type, sub } => {
+            tracing::warn!(
+                sub = %sub,
+                raw_type = %raw_type,
+                "Apple notification: unknown event type — ack and log",
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AppleNativeUser, parse_apple_form_user, project_apple_native_user};
+
+    #[test]
+    fn project_apple_native_user_none_input() {
+        assert!(project_apple_native_user(None).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_both_names() {
+        let u = AppleNativeUser {
+            first_name: Some("Ada".into()),
+            last_name: Some("Lovelace".into()),
+        };
+        assert_eq!(
+            project_apple_native_user(Some(&u)).as_deref(),
+            Some("Ada Lovelace"),
+        );
+    }
+
+    #[test]
+    fn project_apple_native_user_first_only() {
+        let u = AppleNativeUser {
+            first_name: Some("Ada".into()),
+            last_name: None,
+        };
+        assert_eq!(project_apple_native_user(Some(&u)).as_deref(), Some("Ada"));
+    }
+
+    #[test]
+    fn project_apple_native_user_both_empty_returns_none() {
+        let u = AppleNativeUser {
+            first_name: Some(String::new()),
+            last_name: Some(String::new()),
+        };
+        assert!(project_apple_native_user(Some(&u)).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_rejects_control_chars() {
+        let u = AppleNativeUser {
+            first_name: Some("Ada\nLove".into()),
+            last_name: None,
+        };
+        assert!(project_apple_native_user(Some(&u)).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_rejects_oversize() {
+        let huge = "a".repeat(super::APPLE_NATIVE_DISPLAY_NAME_MAX + 1);
+        let u = AppleNativeUser {
+            first_name: Some(huge),
+            last_name: None,
+        };
+        assert!(project_apple_native_user(Some(&u)).is_none());
+    }
+
+    #[test]
+    fn project_apple_native_user_preserves_unicode() {
+        let u = AppleNativeUser {
+            first_name: Some("José".into()),
+            last_name: Some("García".into()),
+        };
+        assert_eq!(
+            project_apple_native_user(Some(&u)).as_deref(),
+            Some("José García"),
+        );
+    }
+
+    #[test]
+    fn returns_none_for_no_input() {
+        assert!(parse_apple_form_user(None).is_none());
+    }
+
+    #[test]
+    fn returns_none_for_empty_string() {
+        assert!(parse_apple_form_user(Some("")).is_none());
+    }
+
+    #[test]
+    fn returns_none_for_malformed_json() {
+        assert!(parse_apple_form_user(Some("{not json")).is_none());
+    }
+
+    #[test]
+    fn returns_none_when_name_key_missing() {
+        let raw = r#"{"email":"u@e.com"}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn returns_none_when_both_names_are_empty() {
+        let raw = r#"{"name":{"firstName":"","lastName":""}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn returns_none_when_firstname_is_null() {
+        let raw = r#"{"name":{"firstName":null,"lastName":null}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn rejects_non_string_name_field() {
+        // Typed deserialization rejects the whole blob if any name
+        // field has the wrong shape. Better than silently falling
+        // back to the well-typed half: a body that violates the
+        // contract is more likely to be tampered with than partially
+        // wrong.
+        let raw = r#"{"name":{"firstName":42,"lastName":"Doe"}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn handles_first_only() {
+        let raw = r#"{"name":{"firstName":"Ada","lastName":""}}"#;
+        assert_eq!(parse_apple_form_user(Some(raw)), Some("Ada".to_string()));
+    }
+
+    #[test]
+    fn handles_last_only() {
+        let raw = r#"{"name":{"firstName":"","lastName":"Lovelace"}}"#;
+        assert_eq!(
+            parse_apple_form_user(Some(raw)),
+            Some("Lovelace".to_string())
+        );
+    }
+
+    #[test]
+    fn handles_unicode() {
+        let raw = r#"{"name":{"firstName":"José","lastName":"García"}}"#;
+        assert_eq!(
+            parse_apple_form_user(Some(raw)),
+            Some("José García".to_string())
+        );
+    }
+
+    #[test]
+    fn handles_embedded_quotes() {
+        let raw = r#"{"name":{"firstName":"O\"Brien","lastName":"Smith"}}"#;
+        assert_eq!(
+            parse_apple_form_user(Some(raw)),
+            Some(r#"O"Brien Smith"#.to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_control_characters() {
+        let raw = r#"{"name":{"firstName":"Ada\nLovelace","lastName":""}}"#;
+        assert!(parse_apple_form_user(Some(raw)).is_none());
+    }
+
+    #[test]
+    fn rejects_oversize_display_name() {
+        let huge = "a".repeat(super::APPLE_DISPLAY_NAME_MAX + 1);
+        let raw = format!(r#"{{"name":{{"firstName":"{huge}","lastName":""}}}}"#);
+        assert!(parse_apple_form_user(Some(&raw)).is_none());
+    }
+
+    #[test]
+    fn rejects_oversize_input_before_parsing() {
+        // Outer-body cap kicks in before the JSON parser sees the
+        // input — verify a malformed (would-otherwise-error) body
+        // larger than the cap returns None without crashing the
+        // parser on something a forgery could exploit.
+        let huge = "x".repeat(super::APPLE_FORM_USER_MAX_BYTES + 1);
+        assert!(parse_apple_form_user(Some(&huge)).is_none());
+    }
+
+    // Device-redirect contract pins. The mobile callbacks (Google,
+    // GitHub, Apple) all 303 to the `eurora://` scheme; the device's
+    // `parse_callback_status`
+    // (`crates/app/euro-mobile/src/procedures/auth_procedures.rs`)
+    // dispatches on the `status=` and `error=` query parameters. The
+    // wire format is part of the device ↔ backend contract — pin it
+    // so an accidental rename or escaping change in
+    // `device_redirect_error` fails loudly here rather than at the
+    // device.
+
+    #[test]
+    fn device_redirect_ok_is_unchanged() {
+        assert_eq!(
+            super::DEVICE_REDIRECT_OK,
+            "eurora://mobile/callback?status=ok"
+        );
+    }
+
+    #[test]
+    fn device_redirect_error_carries_kind() {
+        // The kind round-trips verbatim through URL-encoding; the
+        // device's parser reads `error=` as the discriminator.
+        assert_eq!(
+            super::device_redirect_error("invalid_callback"),
+            "eurora://mobile/callback?status=error&error=invalid_callback",
+        );
+    }
+
+    #[test]
+    fn device_redirect_error_passes_apple_error_vocabulary_through() {
+        // Lock in the contract that `apple_mobile_callback` forwards
+        // Apple's `error=` form field verbatim (rather than collapsing
+        // to a generic "oauth_failed"). Apple's documented values are
+        // a small set including `user_cancelled_authorize`,
+        // `invalid_request`, and `invalid_scope`; the device's
+        // `parse_callback_status` surfaces whatever kind we encode
+        // here for its warn-log line.
+        assert_eq!(
+            super::device_redirect_error("user_cancelled_authorize"),
+            "eurora://mobile/callback?status=error&error=user_cancelled_authorize",
+        );
+    }
+
+    #[test]
+    fn device_redirect_error_url_encodes_unsafe_kinds() {
+        // `AuthError::error_kind` returns a small stable set today,
+        // but `device_redirect_error` is also called with raw
+        // provider `error=` values forwarded verbatim from Google,
+        // GitHub, and Apple. URL-encoding means a forwarded value
+        // containing `&`, `=`, or spaces can't smuggle additional
+        // query parameters into the deep-link.
+        let url = super::device_redirect_error("oauth & failed");
+        assert!(
+            url.starts_with("eurora://mobile/callback?status=error&error="),
+            "preserves canonical prefix: {url}",
+        );
+        assert!(
+            !url.contains("oauth & failed"),
+            "raw value must be encoded, not interpolated: {url}",
+        );
+    }
+}

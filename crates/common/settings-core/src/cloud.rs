@@ -1,5 +1,3 @@
-use std::sync::LazyLock;
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -7,23 +5,20 @@ use crate::{
 };
 
 /// Wire schema version of the cloud settings blob. Bump whenever a
-/// breaking change to the JSONB shape is introduced; the server keeps
-/// the value as written so older clients can detect they're behind.
+/// breaking change to the JSONB shape is introduced.
+///
+/// The version travels on the request / response *envelope*
+/// ([`crate::PutSettingsRequest`], [`crate::GetSettingsResponse`]) and
+/// is owned by the server's metadata columns — never inside the blob.
+/// Two reasons to keep it out of [`CloudSettings`]:
+///
+/// 1. Single source of truth. Duplicating the version inside the blob
+///    creates a "what if they disagree?" question with no defensible
+///    answer. Envelope wins, full stop.
+/// 2. Schema-version routing is supposed to happen *before* a reader
+///    commits to a particular Rust shape. Putting the field inside the
+///    blob would invert that ordering.
 pub const CURRENT_SCHEMA_VERSION: u32 = 1;
-
-/// Embedded fresh-install defaults. Product owns this document; the
-/// crate parses it once at first access.
-const DEFAULTS_JSONC: &str = include_str!("../assets/defaults.jsonc");
-
-/// Parsed singleton of [`DEFAULTS_JSONC`] with `schema_version` stamped
-/// from a code constant so the JSONC document stays free of plumbing
-/// concerns.
-static FRESH_INSTALL_DEFAULTS: LazyLock<CloudSettings> = LazyLock::new(|| {
-    let mut s: CloudSettings = serde_json_lenient::from_str(DEFAULTS_JSONC)
-        .expect("embedded settings-core defaults.jsonc must parse into CloudSettings");
-    s.schema_version = CURRENT_SCHEMA_VERSION;
-    s
-});
 
 /// Top-level cloud-synced settings blob. Sections are addressed
 /// individually so clients only touch the fields that apply to their
@@ -32,20 +27,19 @@ static FRESH_INSTALL_DEFAULTS: LazyLock<CloudSettings> = LazyLock::new(|| {
 /// client never drops fields written by another.
 ///
 /// The wire format the server stores is exactly this struct: an opaque
-/// JSON document. The server's `updated_at` metadata column rides on
-/// the response envelope ([`crate::GetSettingsResponse`]), not inside
-/// the blob, so this struct deliberately does not carry a timestamp.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// JSON document. Protocol metadata — schema version, `updated_at`,
+/// optimistic-concurrency baseline — rides on the request / response
+/// envelopes, not inside the blob, so this struct deliberately carries
+/// neither a version nor a timestamp.
+///
+/// Fresh-install defaults are whatever each section's [`Default`] impl
+/// produces. Per-field `#[serde(default)]` rather than struct-level so a
+/// missing wire field falls back to its *type's* `Default::default()`
+/// without going through `CloudSettings::default()` itself.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct CloudSettings {
-    // Per-field `#[serde(default)]` rather than struct-level: a missing
-    // wire field falls back to its *type's* `Default::default()`, never
-    // to `CloudSettings::default()`. The latter is backed by the JSONC
-    // singleton — re-entering it during serde fill-in would deadlock
-    // [`FRESH_INSTALL_DEFAULTS`] mid-initialization.
-    #[serde(default)]
-    pub schema_version: u32,
     #[serde(default)]
     pub shared: SharedSettings,
     #[serde(default)]
@@ -56,31 +50,12 @@ pub struct CloudSettings {
     pub web: WebSettings,
 }
 
-impl Default for CloudSettings {
-    /// Fresh-install defaults: a clone of the values baked into
-    /// `assets/defaults.jsonc`.
-    fn default() -> Self {
-        FRESH_INSTALL_DEFAULTS.clone()
-    }
-}
-
-impl CloudSettings {
-    /// Coerce out-of-range or non-finite numeric fields into their safe
-    /// ranges across every section.
-    ///
-    /// The server treats the settings document as an opaque JSON blob, so
-    /// enforcement lives entirely on the client: callers must invoke this
-    /// before serializing a [`CloudSettings`] into a `PUT /settings`
-    /// request, and again after deserializing a freshly fetched blob.
-    pub fn sanitize(&mut self) {
-        self.desktop.sanitize();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{desktop::DEFAULT_SCALE, shared::ThemePreference};
+    use crate::{
+        desktop::DEFAULT_SCALE, shared::ThemePreference, telemetry::DESKTOP_CONSENT_VERSION,
+    };
 
     #[test]
     fn defaults_round_trip() {
@@ -91,20 +66,22 @@ mod tests {
     }
 
     #[test]
-    fn defaults_match_embedded_jsonc() {
-        // Pin the JSONC content: if product changes a value here, this
-        // test fails loudly so the change is reviewed alongside any code
-        // that assumed the old defaults.
+    fn fresh_install_defaults() {
+        // Pin the product-blessed fresh-install state so a change to any
+        // section's `Default` is reviewed alongside the call sites that
+        // assumed the old value.
         let d = CloudSettings::default();
-        assert_eq!(d.schema_version, CURRENT_SCHEMA_VERSION);
 
         assert_eq!(d.shared.theme, ThemePreference::System);
         assert!(d.shared.dynamic_accent);
 
-        assert_eq!(d.desktop.interface_scale, DEFAULT_SCALE);
-        assert_eq!(d.desktop.text_scale, DEFAULT_SCALE);
+        assert_eq!(d.desktop.interface_scale.get(), DEFAULT_SCALE);
+        assert_eq!(d.desktop.text_scale.get(), DEFAULT_SCALE);
 
-        assert_eq!(d.desktop.telemetry.consent_version, 1);
+        // Fresh install must be below the current consent version so the
+        // user is prompted on first launch. This is the load-bearing
+        // sentinel — see `telemetry::TelemetryConsent`.
+        assert!(d.desktop.telemetry.consent_version < DESKTOP_CONSENT_VERSION);
         assert!(!d.desktop.telemetry.anonymous_metrics);
         assert!(!d.desktop.telemetry.anonymous_errors);
         assert!(!d.desktop.telemetry.non_anonymous_metrics);
@@ -124,7 +101,6 @@ mod tests {
         // preserve their unknown subfields end-to-end through
         // `CloudSettings`.
         let raw = serde_json::json!({
-            "schemaVersion": CURRENT_SCHEMA_VERSION,
             "shared": {
                 "theme": "dark",
                 "dynamicAccent": false,
@@ -151,12 +127,22 @@ mod tests {
     }
 
     #[test]
-    fn sanitize_clamps_desktop_scales() {
-        let mut s = CloudSettings::default();
-        s.desktop.interface_scale = 9.0;
-        s.desktop.text_scale = f32::NAN;
-        s.sanitize();
-        assert_eq!(s.desktop.interface_scale, crate::desktop::MAX_SCALE);
-        assert_eq!(s.desktop.text_scale, crate::desktop::DEFAULT_SCALE);
+    fn deserialize_clamps_desktop_scales() {
+        // The clamp is a type-level invariant on `InterfaceScale` /
+        // `TextScale`, exercised at deserialization. A corrupt cloud
+        // blob with an out-of-range scale lands in the struct already
+        // clamped — no separate `sanitize` pass is required.
+        let raw = serde_json::json!({
+            "shared": {},
+            "desktop": { "interfaceScale": 9.0, "textScale": 0.1 },
+            "mobile": {},
+            "web": {},
+        });
+        let parsed: CloudSettings = serde_json::from_value(raw).unwrap();
+        assert_eq!(
+            parsed.desktop.interface_scale,
+            crate::desktop::InterfaceScale::MAX
+        );
+        assert_eq!(parsed.desktop.text_scale, crate::desktop::TextScale::MIN);
     }
 }

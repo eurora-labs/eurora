@@ -5,9 +5,11 @@
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
+	import { Alert, AlertDescription } from '@eurora/ui/components/alert/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 
@@ -86,6 +88,10 @@
 		}
 	}
 
+	function pendingLoginToken(): string | undefined {
+		return sessionStorage.getItem('loginToken') ?? undefined;
+	}
+
 	async function handleEmailContinue() {
 		if (!email.trim()) return;
 		loading = true;
@@ -94,7 +100,9 @@
 			storeRedirectParam();
 			const result = await auth.checkEmail(email.trim());
 			if (result.status === 'oauth') {
-				window.location.href = await auth.getOAuthRedirectUrl(result.provider);
+				window.location.href = await auth.getOAuthRedirectUrl(result.provider, {
+					loginToken: pendingLoginToken(),
+				});
 				return;
 			}
 			if (result.status === 'not_found') {
@@ -146,30 +154,17 @@
 		}
 	}
 
-	async function handleGoogleLogin() {
+	async function handleOAuthLogin(provider: 'google' | 'github' | 'apple') {
 		loading = true;
 		submitError = null;
 		try {
 			storeRedirectParam();
-			window.location.href = await auth.getOAuthRedirectUrl('google');
-		} catch (err) {
-			Sentry.captureException(err, {
-				tags: { area: 'auth.oauth-redirect', provider: 'google' },
+			window.location.href = await auth.getOAuthRedirectUrl(provider, {
+				loginToken: pendingLoginToken(),
 			});
-			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
-			loading = false;
-		}
-	}
-
-	async function handleGitHubLogin() {
-		loading = true;
-		submitError = null;
-		try {
-			storeRedirectParam();
-			window.location.href = await auth.getOAuthRedirectUrl('github');
 		} catch (err) {
 			Sentry.captureException(err, {
-				tags: { area: 'auth.oauth-redirect', provider: 'github' },
+				tags: { area: 'auth.oauth-redirect', provider },
 			});
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			loading = false;
@@ -204,9 +199,10 @@
 
 			<Card.Root class="p-6">
 				{#if submitError}
-					<div class="mb-4 rounded-md bg-red-50 p-4">
-						<p class="text-sm text-red-800">{submitError}</p>
-					</div>
+					<Alert variant="destructive" class="mb-4">
+						<TriangleAlertIcon />
+						<AlertDescription>{submitError}</AlertDescription>
+					</Alert>
 				{/if}
 
 				<div class="flex flex-col gap-3">
@@ -234,16 +230,18 @@
 
 			<Card.Root class="p-6">
 				{#if submitError}
-					<div class="mb-4 rounded-md bg-red-50 p-4">
-						<p class="text-sm text-red-800">{submitError}</p>
-					</div>
+					<Alert variant="destructive" class="mb-4">
+						<TriangleAlertIcon />
+						<AlertDescription>{submitError}</AlertDescription>
+					</Alert>
 				{/if}
 
 				<SocialAuthButtons
 					mode="login"
 					disabled={loading}
-					onGoogle={handleGoogleLogin}
-					onGitHub={handleGitHubLogin}
+					onGoogle={() => handleOAuthLogin('google')}
+					onGitHub={() => handleOAuthLogin('github')}
+					onApple={() => handleOAuthLogin('apple')}
 				/>
 
 				{#if showRegister}

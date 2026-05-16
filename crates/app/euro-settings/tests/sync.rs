@@ -460,7 +460,6 @@ async fn pull_200_server_fresher_replaces_cache() {
     .await;
 
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "dark", "dynamicAccent": true },
         "desktop": {
             "interfaceScale": 1.25,
@@ -493,7 +492,7 @@ async fn pull_200_server_fresher_replaces_cache() {
 
     let cache = h.cache_clone().await;
     assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
-    assert_eq!(cache.settings.desktop.interface_scale, 1.25);
+    assert_eq!(cache.settings.desktop.interface_scale.get(), 1.25);
     assert_eq!(cache.base_updated_at, Some(timestamp(2026, 2, 1)));
 
     // Disk must mirror in-memory cache so subsequent runs hit the
@@ -568,7 +567,6 @@ async fn put_409_replaces_cache_with_server_current() {
     .await;
 
     let server_current = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "light", "dynamicAccent": false },
         "desktop": {
             "interfaceScale": 1.0,
@@ -725,7 +723,6 @@ async fn unknown_fields_round_trip_through_pull_then_push() {
     .await;
 
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": {
             "theme": "dark",
             "dynamicAccent": true,
@@ -802,14 +799,13 @@ async fn unknown_fields_round_trip_through_pull_then_push() {
     assert_eq!(body["settings"]["web"]["futureWebKnob"], "z");
 }
 
-// --- Sanitization on pull --------------------------------------------------
+// --- Deserialization clamping on pull --------------------------------------
 
 #[tokio::test]
-async fn pull_sanitizes_out_of_range_scales() {
+async fn pull_clamps_out_of_range_scales() {
     let h = Harness::new().await;
 
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "system", "dynamicAccent": true },
         "desktop": {
             "interfaceScale": 9.0,
@@ -841,9 +837,12 @@ async fn pull_sanitizes_out_of_range_scales() {
     let cache = h.cache_clone().await;
     assert_eq!(
         cache.settings.desktop.interface_scale,
-        settings_core::MAX_SCALE
+        settings_core::InterfaceScale::MAX
     );
-    assert_eq!(cache.settings.desktop.text_scale, settings_core::MIN_SCALE);
+    assert_eq!(
+        cache.settings.desktop.text_scale,
+        settings_core::TextScale::MIN
+    );
 }
 
 // --- Phase 6: auth identity + account isolation ---------------------------
@@ -905,7 +904,6 @@ async fn pull_200_replace_stamps_last_user_id() {
     let h = Harness::with_cache_and_identity(prior, ScriptedIdentity::user(uid)).await;
 
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "dark", "dynamicAccent": true },
         "desktop": {
             "interfaceScale": 1.0,
@@ -963,7 +961,6 @@ async fn foreign_cache_is_discarded_before_any_io() {
 
     // Server-side row for user B uses Light theme.
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "light", "dynamicAccent": false },
         "desktop": {
             "interfaceScale": 1.0,
@@ -1331,7 +1328,6 @@ async fn auth_event_logout_flips_status_to_local_only_without_io() {
     // Keeping the theme Dark in the server blob (matching the cache)
     // also lets us assert the cache survives the logout untouched.
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "dark", "dynamicAccent": false },
         "desktop": {
             "interfaceScale": 1.0,
@@ -1398,7 +1394,6 @@ async fn auth_event_login_after_logout_re_triggers_pull() {
     let (h, tx) = Harness::with_auth_events(prior, ScriptedIdentity::user(uid)).await;
 
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "dark", "dynamicAccent": true },
         "desktop": {
             "interfaceScale": 1.0,
@@ -1477,7 +1472,6 @@ async fn auth_event_subject_change_replaces_cache() {
     let (h, tx) = Harness::with_auth_events(prior, ScriptedIdentity::user(user_b)).await;
 
     let server_blob = serde_json::json!({
-        "schemaVersion": CURRENT_SCHEMA_VERSION,
         "shared": { "theme": "light", "dynamicAccent": false },
         "desktop": {
             "interfaceScale": 1.0,
@@ -1511,7 +1505,15 @@ async fn auth_event_subject_change_replaces_cache() {
     })
     .expect("listener receiver alive");
 
-    wait_for_cache(&h, |cache| cache.last_user_id == Some(user_b)).await;
+    // The wipe step stamps `last_user_id = user_b` *before* the network
+    // pull replaces the cache contents (covered by
+    // `foreign_cache_isolation_persists_before_network_failure`), so
+    // waiting on just `last_user_id` races the pull. Pin both fields to
+    // a post-pull state to land on the replaced blob.
+    wait_for_cache(&h, |cache| {
+        cache.last_user_id == Some(user_b) && cache.base_updated_at == Some(timestamp(2026, 10, 1))
+    })
+    .await;
     let cache = h.cache_clone().await;
     assert_eq!(cache.settings.shared.theme, ThemePreference::Light);
     assert_eq!(cache.base_updated_at, Some(timestamp(2026, 10, 1)));
@@ -1523,4 +1525,228 @@ async fn auth_event_subject_change_replaces_cache() {
     assert_eq!(reloaded.cache.settings.shared.theme, ThemePreference::Light);
 
     h.engine.stop().await;
+}
+
+// --- ServerAhead: schema version newer than this build --------------------
+
+#[tokio::test]
+async fn pull_with_future_schema_version_refuses_to_replace_cache() {
+    // Cache holds Dark + a known baseline. Server returns 200 with a
+    // schema version newer than this build. The engine must NOT
+    // adopt the server blob — that would require serialising back
+    // from a partial-shape `CloudSettings`, which has no top-level
+    // `extras` and would silently drop unknown sections. Instead it
+    // raises ServerAhead, leaves the cache alone, and publishes the
+    // matching status.
+    let prior = cache_synced_at(ThemePreference::Dark, timestamp(2026, 1, 1));
+    let h = Harness::with_cache(prior).await;
+
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION + 1,
+                updated_at: timestamp(2026, 11, 1),
+                settings: serde_json::json!({
+                    "shared": { "theme": "light", "dynamicAccent": false },
+                    "desktop": {
+                        "interfaceScale": 1.0,
+                        "textScale": 1.0,
+                        "telemetry": {
+                            "consentVersion": 1,
+                            "anonymousMetrics": false,
+                            "anonymousErrors": false,
+                            "nonAnonymousMetrics": false,
+                        },
+                    },
+                    "mobile": {},
+                    "web": {},
+                }),
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    let err = h
+        .engine
+        .pull_now()
+        .await
+        .expect_err("future schema must surface as ServerAhead");
+    assert!(
+        matches!(
+            err,
+            SyncError::ServerAhead { client, server }
+                if client == CURRENT_SCHEMA_VERSION && server == CURRENT_SCHEMA_VERSION + 1
+        ),
+        "got {err:?}"
+    );
+    assert!(!err.is_retryable());
+    assert_eq!(h.engine.current_status(), SyncStatus::ServerAhead);
+
+    // Cache untouched: still Dark, still baselined to the original
+    // timestamp the harness seeded. The server's row is *not*
+    // adopted in any form — we cannot fully parse it.
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
+    assert_eq!(cache.base_updated_at, Some(timestamp(2026, 1, 1)));
+}
+
+#[tokio::test]
+async fn pushes_short_circuit_after_observing_future_schema_version() {
+    // Once a pull has observed `schema_version > CURRENT`, the engine
+    // latches an in-memory write-lock so the push worker stops issuing
+    // PUTs. The intent is dropped (no retry) and the status reflects
+    // ServerAhead. Without the latch, an older client could still
+    // clobber a v(N+1) blob with a v(N) shape.
+    let prior = cache_synced_at(ThemePreference::Dark, timestamp(2026, 1, 1));
+    let h = Harness::with_cache(prior).await;
+
+    // GET returns a future schema version.
+    Mock::given(method("GET"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(GetSettingsResponse {
+                schema_version: CURRENT_SCHEMA_VERSION + 1,
+                updated_at: timestamp(2026, 11, 1),
+                settings: serde_json::json!({
+                    "shared": { "theme": "light", "dynamicAccent": false },
+                    "desktop": {
+                        "interfaceScale": 1.0,
+                        "textScale": 1.0,
+                        "telemetry": {
+                            "consentVersion": 1,
+                            "anonymousMetrics": false,
+                            "anonymousErrors": false,
+                            "nonAnonymousMetrics": false,
+                        },
+                    },
+                    "mobile": {},
+                    "web": {},
+                }),
+            }),
+        )
+        .mount(&h.server)
+        .await;
+
+    // The pull latches `schema_ahead`; ignore the error here, we only
+    // care about the side effect.
+    let _ = h.engine.pull_now().await;
+    assert_eq!(h.engine.current_status(), SyncStatus::ServerAhead);
+
+    // Track every PUT that lands. There must be zero.
+    let put_mock = Mock::given(method("PUT"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(PutSettingsAcceptedResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 11, 2),
+            }),
+        )
+        .mount_as_scoped(&h.server)
+        .await;
+
+    h.engine.start().await;
+    h.engine.request_push();
+    // Give the worker time to drain the queue. A PUT would land well
+    // inside this window; the latch must short-circuit it before the
+    // request is constructed.
+    wait_for_status(&h.engine, |s| matches!(s, SyncStatus::ServerAhead)).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    h.engine.stop().await;
+
+    let calls = put_mock.received_requests().await;
+    assert!(
+        calls.is_empty(),
+        "schema_ahead latch must suppress all PUTs; got {} request(s)",
+        calls.len()
+    );
+}
+
+#[tokio::test]
+async fn put_409_with_future_schema_version_refuses_to_replace_cache() {
+    // Server returns a 409 carrying a `current` row written under a
+    // newer schema. The engine must refuse to adopt it (same reason
+    // as the GET path) and surface ServerAhead. The push intent is
+    // dropped; no retry — `is_retryable()` is false for ServerAhead.
+    let prior = cache_synced_at(ThemePreference::Dark, timestamp(2026, 1, 1));
+    let h = Harness::with_cache(prior).await;
+
+    Mock::given(method("PUT"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(409).set_body_json(PutSettingsConflictResponse {
+                schema_version: CURRENT_SCHEMA_VERSION + 1,
+                updated_at: timestamp(2026, 11, 1),
+                current: serde_json::json!({
+                    "shared": { "theme": "light", "dynamicAccent": false },
+                    "desktop": {
+                        "interfaceScale": 1.0,
+                        "textScale": 1.0,
+                        "telemetry": {
+                            "consentVersion": 1,
+                            "anonymousMetrics": false,
+                            "anonymousErrors": false,
+                            "nonAnonymousMetrics": false,
+                        },
+                    },
+                    "mobile": {},
+                    "web": {},
+                }),
+            }),
+        )
+        .expect(1)
+        .mount(&h.server)
+        .await;
+
+    h.engine.start().await;
+    h.engine.request_push();
+    wait_for_status(&h.engine, |s| matches!(s, SyncStatus::ServerAhead)).await;
+    h.engine.stop().await;
+
+    // Cache untouched: server's `current` row was not adopted.
+    let cache = h.cache_clone().await;
+    assert_eq!(cache.settings.shared.theme, ThemePreference::Dark);
+    assert_eq!(cache.base_updated_at, Some(timestamp(2026, 1, 1)));
+}
+
+#[tokio::test]
+async fn push_carries_current_schema_version_regardless_of_cache_state() {
+    // The envelope's `schema_version` is unconditionally
+    // `CURRENT_SCHEMA_VERSION` — there is no cache-side version to
+    // round-trip back into the wire format any more. This test pins
+    // the invariant by inspecting the request body that lands on the
+    // mock.
+    let prior = cache_synced_at(ThemePreference::Dark, timestamp(2026, 1, 1));
+    let h = Harness::with_cache(prior).await;
+
+    let put_mock = Mock::given(method("PUT"))
+        .and(path("/settings"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(PutSettingsAcceptedResponse {
+                schema_version: CURRENT_SCHEMA_VERSION,
+                updated_at: timestamp(2026, 11, 1),
+            }),
+        )
+        .expect(1)
+        .mount_as_scoped(&h.server)
+        .await;
+
+    let mut watcher = StatusWatcher::new(&h.engine);
+    h.engine.start().await;
+    h.engine.request_push();
+    watcher
+        .wait_for(|s| matches!(s, SyncStatus::Synced { .. }))
+        .await;
+    h.engine.stop().await;
+
+    let calls = put_mock.received_requests().await;
+    let body: serde_json::Value =
+        serde_json::from_slice(&calls.last().unwrap().body).expect("PUT body JSON");
+    assert_eq!(body["schemaVersion"], CURRENT_SCHEMA_VERSION);
+    // And the inner blob must not duplicate it.
+    assert!(
+        body["settings"].get("schemaVersion").is_none(),
+        "schemaVersion must live on the envelope only, not inside settings"
+    );
 }

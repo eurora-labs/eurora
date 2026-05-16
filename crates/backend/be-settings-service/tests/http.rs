@@ -112,12 +112,13 @@ async fn spawn_app(pool: PgPool) -> AppHarness {
     }
 }
 
-/// Build a `CloudSettings` blob with `theme` overridden, sanitize it, and
-/// serialize to the opaque `serde_json::Value` shape the wire expects.
+/// Build a `CloudSettings` blob with `theme` overridden and serialize
+/// to the opaque `serde_json::Value` shape the wire expects. Field-level
+/// invariants are carried by the field types (`InterfaceScale`,
+/// `TextScale`), so no separate sanitize pass is required.
 fn sample_settings(theme: ThemePreference) -> Value {
     let mut s = CloudSettings::default();
     s.shared.theme = theme;
-    s.sanitize();
     serde_json::to_value(s).expect("serialize sample settings")
 }
 

@@ -4,16 +4,17 @@
 )]
 
 use euro_endpoint::EndpointManager;
-use euro_settings::{CloudSettingsCache, SettingsState, wants_errors};
+use euro_settings::{CloudSettingsCache, SettingsState};
 use euro_tauri::chat_context::TimelineChatContextProvider;
-use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
-        system_procedures::{
+        accent::accent_from_image,
+        activity::{SavedActivity, SavedActivityCreated},
+        system::{
             BrowserExtensionStatusChanged, SAFARI_BRIDGE_APP_KIND, resolve_browser_extension_state,
         },
-        timeline_procedures::{AccentColor, TimelineAppEvent, TimelineAssetsEvent},
+        timeline::{TimelineAppEvent, TimelineAssetsEvent},
     },
     shared_types::{ActiveStreamTokens, SharedHttpClient, SharedThreadManager},
     show_and_focus_main,
@@ -21,6 +22,7 @@ use euro_tauri::{
 use euro_telemetry::{Controller as TelemetryController, sentry_tracing};
 use euro_thread::commands::SharedChatContextProvider;
 use euro_timeline::TimelineManager;
+use euro_vision::rgba_to_base64;
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
@@ -271,20 +273,6 @@ fn bind_and_serve_bridge() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn init_encryption(data_dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(debug_assertions)]
-    let main_key = euro_secret::MainKey::from_bytes([
-        0xA4, 0x1B, 0x7E, 0x3C, 0x92, 0xF0, 0x55, 0xD8, 0x6A, 0xC3, 0x11, 0xBF, 0x48, 0xE7, 0x2D,
-        0x9F, 0x03, 0x86, 0xFA, 0x74, 0xCB, 0x60, 0x1D, 0xA5, 0x39, 0xEE, 0x57, 0x0C, 0xB2, 0x84,
-        0x63, 0xD1,
-    ]);
-    #[cfg(not(debug_assertions))]
-    let main_key = euro_secret::MainKey::new()?;
-
-    euro_secret::secret::init_file_store(*main_key.as_bytes(), data_dir)?;
-    Ok(())
-}
-
 fn register_autostart(tauri_app: &mut tauri::App, settings: &SettingsState) {
     let should_register = !cfg!(debug_assertions) && !cfg!(target_os = "macos");
     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
@@ -381,12 +369,56 @@ fn init_state(
         std::sync::Arc::new(TimelineChatContextProvider::new(app_handle.clone()));
     app_handle.manage(context_provider);
 
-    let path = tauri_app.path().app_data_dir()?;
-    let user_controller = euro_user::UserController::new(path, auth_manager.clone());
-    app_handle.manage(SharedUserController::new(user_controller));
     app_handle.manage(ActiveStreamTokens::default());
 
     Ok(())
+}
+
+/// Drain a `broadcast::Receiver` forever, applying `handler` to each event.
+///
+/// `while let Ok(_) = rx.recv().await` exits the loop on `Lagged`, which
+/// would silently kill the listener for the rest of the process. This
+/// helper distinguishes the two error variants: `Lagged` is a transient
+/// "you dropped N messages" — log and resume; `Closed` means the producer
+/// is gone, end the task.
+async fn forward_broadcast<T, F>(
+    channel: &'static str,
+    mut rx: tokio::sync::broadcast::Receiver<T>,
+    mut handler: F,
+) where
+    T: Clone,
+    F: FnMut(T),
+{
+    use tokio::sync::broadcast::error::RecvError;
+    loop {
+        match rx.recv().await {
+            Ok(event) => handler(event),
+            Err(RecvError::Lagged(skipped)) => {
+                tracing::warn!(channel, skipped, "broadcast receiver lagged");
+            }
+            Err(RecvError::Closed) => {
+                tracing::debug!(channel, "broadcast sender closed; exiting listener");
+                return;
+            }
+        }
+    }
+}
+
+/// Acquire a fresh subscriber by briefly locking the [`TimelineManager`].
+///
+/// Each listener task gets its own receiver so a slow consumer cannot
+/// starve the producer or its siblings. The lock is held only for the
+/// duration of one `subscribe_to_*` call.
+async fn subscribe<T, F>(
+    handle: &tauri::AppHandle,
+    subscribe: F,
+) -> tokio::sync::broadcast::Receiver<T>
+where
+    F: FnOnce(&TimelineManager) -> tokio::sync::broadcast::Receiver<T>,
+{
+    let tl: tauri::State<'_, Mutex<TimelineManager>> = handle.state();
+    let timeline = tl.lock().await;
+    subscribe(&timeline)
 }
 
 /// Bridge `TimelineManager`'s internal broadcast channels to the
@@ -396,36 +428,27 @@ fn init_state(
 fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
     let assets_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-        let mut asset_receiver = {
-            let tl: tauri::State<'_, Mutex<TimelineManager>> = assets_handle.state();
-            let timeline = tl.lock().await;
-            timeline.subscribe_to_assets_events()
-        };
-        while let Ok(assets_event) = asset_receiver.recv().await {
+        let rx = subscribe(&assets_handle, TimelineManager::subscribe_to_assets_events).await;
+        forward_broadcast("timeline_assets", rx, |assets_event| {
             let _ = TimelineAssetsEvent(assets_event).emit(&assets_handle);
-        }
+        })
+        .await;
     });
 
     let activity_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
-        let mut activity_receiver = {
-            let tl: tauri::State<'_, Mutex<TimelineManager>> = activity_handle.state();
-            let timeline = tl.lock().await;
-            timeline.subscribe_to_activity_events()
-        };
-        while let Ok(activity_event) = activity_receiver.recv().await {
+        let rx = subscribe(
+            &activity_handle,
+            TimelineManager::subscribe_to_activity_events,
+        )
+        .await;
+        forward_broadcast("timeline_activity", rx, |activity_event| {
             tracing::debug!("Activity changed to: {}", activity_event.name);
 
-            let mut accent = None;
-            let mut icon_base64 = None;
-
-            if let Some(icon) = activity_event.icon.as_ref() {
-                accent = color_thief::get_palette(icon, color_thief::ColorFormat::Rgba, 1, 2)
-                    .ok()
-                    .and_then(|c| c.into_iter().next())
-                    .map(|c| AccentColor::from_rgb(c.r, c.g, c.b));
-                icon_base64 = euro_vision::rgba_to_base64(icon).ok();
-            }
+            let (accent, icon_base64) = match activity_event.icon.as_ref() {
+                Some(icon) => (accent_from_image(icon), rgba_to_base64(icon).ok()),
+                None => (None, None),
+            };
 
             let _ = TimelineAppEvent {
                 name: activity_event.name.clone(),
@@ -435,7 +458,42 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
                 process_id: activity_event.process_id,
             }
             .emit(&activity_handle);
-        }
+        })
+        .await;
+    });
+
+    // Persisted-activity events: fired by the collector after each
+    // successful `POST /activities`. Carries everything the frontend
+    // needs to prepend the row to the timeline rail without re-polling
+    // `GET /activities`.
+    let saved_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let rx = subscribe(
+            &saved_handle,
+            TimelineManager::subscribe_to_saved_activity_events,
+        )
+        .await;
+        forward_broadcast("timeline_saved_activity", rx, |event| {
+            tracing::debug!(activity_id = %event.id, "Saved activity emitted");
+
+            let (accent, icon_base64) = match event.icon.as_ref() {
+                Some(icon) => (accent_from_image(icon), rgba_to_base64(icon).ok()),
+                None => (None, None),
+            };
+
+            let payload = SavedActivity {
+                id: event.id,
+                name: event.name,
+                process_name: event.process_name,
+                window_title: event.window_title,
+                started_at: event.started_at,
+                ended_at: event.ended_at,
+                accent,
+                icon_base64,
+            };
+            let _ = SavedActivityCreated(payload).emit(&saved_handle);
+        })
+        .await;
     });
 
     tauri::async_runtime::spawn(async move {
@@ -566,7 +624,11 @@ fn main() {
     // scope — acceptable for the boot window.
     let early_cache = CloudSettingsCache::peek_from_default_path();
     let telemetry_controller = std::sync::Arc::new(TelemetryController::init(
-        wants_errors(&early_cache.settings.desktop.telemetry),
+        early_cache
+            .settings
+            .desktop
+            .telemetry
+            .allows_errors_on_desktop(),
         None,
     ));
 
@@ -621,6 +683,13 @@ fn main() {
                     install_office_word_addin(tauri_app);
                     bind_and_serve_bridge()?;
 
+                    // Trigger the OS-level screen-capture permission prompt
+                    // up front (macOS TCC; xdg-desktop-portal on Wayland)
+                    // so the user grants once at startup rather than at
+                    // first chat turn from the `DefaultStrategy`. No-op on
+                    // X11 and Windows.
+                    euro_vision::capture::prime_capture_permission();
+
                     // We just dropped a fresh messenger binary on disk. Any
                     // browser messengers from the previous desktop session
                     // are sitting in their reconnect-backoff loop and will
@@ -640,7 +709,6 @@ fn main() {
                     }
 
                     let data_dir = tauri_app.path().app_data_dir()?;
-                    init_encryption(data_dir)?;
 
                     let started_by_autostart =
                         std::env::args().any(|arg| arg == "--startup-launch");
@@ -663,7 +731,12 @@ fn main() {
                     // file; this call ensures the runtime telemetry state
                     // matches what's persisted before the app comes up.
                     telemetry_controller.reapply(
-                        wants_errors(&settings.cache.settings.desktop.telemetry),
+                        settings
+                            .cache
+                            .settings
+                            .desktop
+                            .telemetry
+                            .allows_errors_on_desktop(),
                         settings.local.telemetry.distinct_id.as_deref(),
                     );
 
@@ -678,9 +751,14 @@ fn main() {
                     tauri_app.manage(http_client);
 
                     // Single shared AuthManager so concurrent refreshes
-                    // from any consumer (thread, timeline, user, sync)
-                    // coalesce through one refresh lock.
-                    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
+                    // from any consumer (thread, timeline, sync) coalesce
+                    // through one refresh lock. `install` registers it as
+                    // Tauri-managed state and spawns the bus → frontend
+                    // bridge that emits `AuthStateChanged` on every
+                    // transition.
+                    let auth_manager =
+                        euro_auth::AuthManager::new(endpoint_manager.clone(), &data_dir)?;
+                    euro_auth::tauri::install(tauri_app.handle(), auth_manager.clone());
 
                     // All command-visible state must be in place before the
                     // WebView is created — once the window exists the

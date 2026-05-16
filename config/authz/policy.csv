@@ -15,8 +15,11 @@ p, Free, /payment/checkout-status, GET
 p, Free, /activities, GET
 p, Free, /activities, POST
 
-# Free: asset endpoints (limited externally by token count)
+# Free: asset endpoints (limited externally by token count). GET serves
+# asset bytes for the owning user only; the handler enforces ownership and
+# surfaces foreign asset ids as 404.
 p, Free, /v1/assets, POST
+p, Free, /v1/assets/{asset_id}, GET
 
 # Free: thread endpoints. The /title and /chat routes additionally pass
 # through `http_token_gate_middleware` which enforces monthly token caps.

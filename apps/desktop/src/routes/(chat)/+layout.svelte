@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import MainSidebar from '$lib/components/MainSidebar.svelte';
 	import Menubar from '$lib/components/Menubar.svelte';
+	import TimelineRail from '$lib/components/TimelineRail.svelte';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
@@ -18,6 +19,7 @@
 </script>
 
 <Menubar />
+<TimelineRail />
 <MainSidebar />
 <Sidebar.Inset>
 	{@render children?.()}

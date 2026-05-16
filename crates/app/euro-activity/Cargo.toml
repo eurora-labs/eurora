@@ -24,13 +24,14 @@ euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-office = { workspace = true }
 euro-pdf = { workspace = true }
 euro-process = { workspace = true }
-euro-secret = { workspace = true }
+euro-vision = { workspace = true }
 focus-tracker = { workspace = true }
 humantime-serde = { workspace = true }
 image = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 resvg = { version = "0.47" }
+secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
@@ -47,7 +48,7 @@ tokio = { workspace = true, features = [
 tracing = { workspace = true }
 url = { workspace = true }
 usvg = { version = "0.47" }
-uuid = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["serde", "v7"] }
 
 [features]
 default = []

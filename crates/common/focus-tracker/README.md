@@ -71,6 +71,41 @@ let config = FocusTrackerConfig::builder()
 let tracker = FocusTracker::builder().config(config).build();
 ```
 
+## Ignoring processes
+
+Each platform exposes its own ignore list. When a focused window's process
+name appears in the list for the current platform, the tracker suppresses
+the event entirely: no `on_focus` callback, no dedup-state update, and no
+icon work. Lists for the other platforms are accepted by the builder (so
+cross-platform consumers don't need `cfg!` scaffolding) and silently
+unused.
+
+```rust
+use focus_tracker::FocusTrackerConfig;
+
+let config = FocusTrackerConfig::builder()
+    .linux_ignored_processes(["firefox", "chrome"])
+    .macos_ignored_processes(["Firefox", "Google Chrome"])
+    .windows_ignored_processes(["firefox.exe", "chrome.exe"])
+    .build();
+```
+
+### Matching is strict
+
+Names are matched **byte-exactly** against `FocusedWindow::process_name` as
+emitted by the platform. There is no case folding, no `.exe` stripping, no
+basename normalization. Provide every spelling you want to suppress.
+
+| Platform | Source of `process_name` | Typical value |
+| -------- | ------------------------ | ------------- |
+| Linux    | `/proc/$pid/comm`, falling back to resolved `/proc/$pid/exe` | `firefox` (or a full path on fallback) |
+| macOS    | `NSRunningApplication.localizedName()` | `Firefox` (localized, can differ by locale) |
+| Windows  | `GetModuleBaseNameW` of the process's main module | `firefox.exe` |
+
+A consequence: on Linux the comm name is capped at 15 bytes by the kernel,
+and the exe-fallback path includes the full filesystem path. If you need
+to ignore a process by both spellings, list both.
+
 ## Examples
 
 Run the included examples:

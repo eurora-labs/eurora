@@ -1,9 +1,12 @@
 //! Desktop implementation of [`euro_thread::commands::ChatContextProvider`].
 //!
 //! Pulls per-turn chat context from the timeline: refreshes the active
-//! activity (best-effort), persists any new asset/snapshot to the
-//! activity service, and surfaces the most recent asset/snapshot
-//! content blocks plus a single context chip for the current activity.
+//! activity (best-effort) so the strategy can attach fresh assets and
+//! snapshots, then surfaces the most recent asset/snapshot content
+//! blocks plus a single context chip for the current activity.
+//!
+//! Activity rows themselves are pushed to the remote service by the
+//! collector at creation time — there is no duplicate upload here.
 //!
 //! Mobile has its own provider (currently `NoopChatContextProvider`)
 //! and will eventually source from native picker state instead.
@@ -40,9 +43,6 @@ impl ChatContextProvider for TimelineChatContextProvider {
         // no fresh context for it.
         if let Err(e) = timeline.refresh_current_activity().await {
             tracing::debug!("collect_context: refresh failed: {e}");
-        }
-        if timeline.save_current_activity_to_service().await.is_err() {
-            return Ok(ChatContext::default());
         }
 
         let asset_blocks = timeline.construct_messages_from_last_asset().await;

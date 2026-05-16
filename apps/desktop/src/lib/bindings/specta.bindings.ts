@@ -14,6 +14,17 @@ export const commands = {
 	authGetAccessTokenPayload: () => typedError<Claims, AuthError>(__TAURI_INVOKE("auth_get_access_token_payload")),
 	authRefreshSession: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_refresh_session")),
 	authResendVerificationEmail: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_resend_verification_email")),
+	/**
+	 *  Fetch the most-recent persisted activities and decorate each with the
+	 *  presentation data the timeline rail needs (accent colour + a
+	 *  `data:`-URL icon).
+	 * 
+	 *  Per-row icon fetches fan out concurrently via `join_all`; reqwest's
+	 *  HTTP/2 pool multiplexes them over a single connection. Failures on a
+	 *  single icon log + degrade to `(accent: None, icon_base64: None)` so
+	 *  one bad asset can't block the rest of the page from rendering.
+	 */
+	activityList: (limit: number, offset: number) => typedError<SavedActivity[], SavedActivityError>(__TAURI_INVOKE("activity_list", { limit, offset })),
 	chatCollectContext: (threadId: string) => typedError<ChatContext, StreamError>(__TAURI_INVOKE("chat_collect_context", { threadId })),
 	chatSendQuery: (threadId: string, channel: Channel<ChatServerMessage>, request: ChatSendRequest) => typedError<null, StreamError>(__TAURI_INVOKE("chat_send_query", { threadId, channel, request })),
 	chatRegenerate: (threadId: string, aiMessageId: string, channel: Channel<ChatServerMessage>) => typedError<null, StreamError>(__TAURI_INVOKE("chat_regenerate", { threadId, aiMessageId, channel })),
@@ -28,18 +39,34 @@ export const commands = {
 	settingsSetShared: (shared: SharedSettings) => typedError<SharedSettings, SettingsError>(__TAURI_INVOKE("settings_set_shared", { shared })),
 	settingsGetDesktop: () => __TAURI_INVOKE<DesktopSettings>("settings_get_desktop"),
 	/**
-	 *  Write the entire desktop section. The frontend's appearance and
-	 *  telemetry pages each operate on a subset of fields; both target this
-	 *  one command, so a partial-section write is achieved by reading the
-	 *  current section, patching the relevant fields, and writing the whole
-	 *  thing back.
+	 *  Write the entire desktop section. Used by the appearance page and
+	 *  anything else that mutates non-consent desktop state — the consent
+	 *  prompt has its own dedicated procedure
+	 *  ([`settings_record_telemetry_consent`]) so this one does **not** stamp
+	 *  a consent version.
 	 * 
-	 *  Side effects: clamps scales via [`DesktopSettings::sanitize`], stamps
-	 *  `telemetry.consent_version` to the current build's value, lazily
-	 *  allocates a local `distinct_id`, and reapplies the native Sentry
-	 *  guard to match the new consent decision.
+	 *  `consent_version` is monotonically non-decreasing: incoming values
+	 *  below the stored version are clamped up. This protects against a
+	 *  misbehaving caller (or an older client) accidentally rolling back
+	 *  the user's recorded consent while editing unrelated fields. Scale
+	 *  fields are clamped at the IPC boundary by their newtypes
+	 *  (`InterfaceScale` / `TextScale`), so no extra validation pass is
+	 *  required here either.
 	 */
 	settingsSetDesktop: (desktop: DesktopSettings) => typedError<DesktopSettings, SettingsError>(__TAURI_INVOKE("settings_set_desktop", { desktop })),
+	/**
+	 *  Persist the user's response to the desktop telemetry consent prompt.
+	 * 
+	 *  The frontend hands the desired toggle state in `consent`; the backend
+	 *  authoritatively stamps the consent version via
+	 *  [`TelemetryConsent::record_for_desktop`] (monotonic — a newer
+	 *  recorded version from another client is left alone). Lazily allocates
+	 *  the local anonymous `distinct_id`, reapplies the native Sentry guard
+	 *  so the new choice takes effect immediately, and emits
+	 *  [`ConsentGate`] with `required: false` so the frontend can route
+	 *  away from the consent page.
+	 */
+	settingsRecordTelemetryConsent: (consent: TelemetryConsent) => typedError<TelemetryConsent, SettingsError>(__TAURI_INVOKE("settings_record_telemetry_consent", { consent })),
 	/**
 	 *  Returns the per-install telemetry state — currently just the
 	 *  anonymous distinct id. The cross-device consent toggles live under
@@ -83,7 +110,16 @@ export const commands = {
 	systemOpenUrlInBrowser: (processId: number, url: string) => typedError<null, SystemError>(__TAURI_INVOKE("system_open_url_in_browser", { processId, url })),
 	systemFocusMainWindow: () => typedError<null, SystemError>(__TAURI_INVOKE("system_focus_main_window")),
 	systemGetTelemetryBootstrap: () => typedError<TelemetryBootstrap, SystemError>(__TAURI_INVOKE("system_get_telemetry_bootstrap")),
-	systemNeedsTelemetryConsent: () => __TAURI_INVOKE<boolean>("system_needs_telemetry_consent"),
+	/**
+	 *  Frontend handshake: called from the root layout once event listeners
+	 *  are attached. The backend reads the current desktop consent state and
+	 *  emits [`ConsentGate`] with `required` set accordingly, so the
+	 *  frontend can route to the consent prompt without ever computing the
+	 *  rule in TypeScript. This is the only entry point that evaluates the
+	 *  gate at startup — emitting from `setup()` would race the listener
+	 *  registration.
+	 */
+	frontendReady: () => typedError<null, SystemError>(__TAURI_INVOKE("frontend_ready")),
 	systemReinitTelemetry: () => __TAURI_INVOKE<void>("system_reinit_telemetry"),
 	systemRotateTelemetryDistinctId: () => typedError<string, SystemError>(__TAURI_INVOKE("system_rotate_telemetry_distinct_id")),
 	threadList: (limit: number, offset: number) => typedError<Thread[], ThreadError>(__TAURI_INVOKE("thread_list", { limit, offset })),
@@ -100,6 +136,8 @@ export const commands = {
 export const events = {
 	authStateChanged: makeEvent<AuthStateChanged>("auth-state-changed"),
 	browserExtensionStatusChanged: makeEvent<BrowserExtensionStatusChanged>("browser-extension-status-changed"),
+	consentGate: makeEvent<ConsentGate>("consent-gate"),
+	savedActivityCreated: makeEvent<SavedActivityCreated>("saved-activity-created"),
 	timelineAppEvent: makeEvent<TimelineAppEvent>("timeline-app-event"),
 	timelineAssetsEvent: makeEvent<TimelineAssetsEvent>("timeline-assets-event"),
 };
@@ -193,6 +231,10 @@ export type AudioContentBlock = {
  */
 export type AuthError = { type: "NotAuthenticated" } | { type: "Backend"; data: string } | { type: "LoginTokenExpired" } | { type: "Config"; data: string } | { type: "Persistence"; data: string } | { type: "StateUnavailable"; data: string } | { type: "Internal"; data: string };
 
+/**
+ *  Backend → frontend auth-state transition. Mirrors the shape of
+ *  [`crate::AuthEvent`] for the JS side; `claims == None` means signed out.
+ */
 export type AuthStateChanged = {
 	claims: Claims | null,
 };
@@ -345,6 +387,21 @@ export type Claims = {
  */
 export type ConnectionMode = { kind: "default" } | { kind: "custom"; url: string };
 
+/**
+ *  Pushed from Rust to the frontend whenever the desktop telemetry
+ *  consent gate flips. Fired once during startup (in response to
+ *  [`frontend_ready`]) with the current state, and again whenever the
+ *  gate changes (e.g. after [`crate::procedures::settings::settings_record_telemetry_consent`]).
+ * 
+ *  The frontend's root layout listens for this event and routes to the
+ *  consent prompt when `required` is `true`. No comparison against a
+ *  consent-version constant lives in TypeScript — that decision is
+ *  entirely Rust's, and the frontend trusts the event payload.
+ */
+export type ConsentGate = {
+	required: boolean,
+};
+
 export type ContentBlock = {
 	type: "text",
 } & TextContentBlock | {
@@ -399,26 +456,37 @@ export type ContextChip = {
  *  chrome scaling, telemetry SDKs that don't run on the other
  *  platforms) cleanly partitioned.
  * 
- *  The custom `Default` impl here is the *wire fallback* used by
- *  `#[serde(default)]` when a partial blob is read off the network.
- *  Scales default to [`DEFAULT_SCALE`] rather than the derive-default
- *  `0.0` because a zero-size UI is unrecoverable; an inert sensible
- *  value is the only safe fallback. The product-blessed fresh-install
- *  values live in `assets/defaults.jsonc` and are reached through
- *  [`crate::CloudSettings::default()`].
+ *  The derived `Default` is both the fresh-install value and the
+ *  per-field fallback used by `#[serde(default)]` when an older client
+ *  wrote a partial blob. Scales default to [`DEFAULT_SCALE`] (via
+ *  [`InterfaceScale::DEFAULT`] / [`TextScale::DEFAULT`]) rather than
+ *  `0.0`, because a zero-size UI is unrecoverable; an inert sensible
+ *  value is the only safe fallback. Telemetry consent defaults to the
+ *  "never asked" sentinel (`consent_version == 0`) so a fresh install
+ *  is routed through the consent prompt rather than silently
+ *  auto-consented — see [`crate::TelemetryConsent`].
+ * 
+ *  `interface_scale` and `text_scale` carry their invariants in the
+ *  type, not in a separate validation pass: any value of type
+ *  [`InterfaceScale`] or [`TextScale`] is by construction finite and
+ *  within `[MIN, MAX]`. Deserialization, `From<f32>`, and the
+ *  `bon`-generated builder all route through the clamping
+ *  constructor, so a corrupt cloud blob, a misbehaving client, or a
+ *  hand-rolled patch via `extras` all collapse to safe values before
+ *  they ever land in the struct.
  */
 export type DesktopSettings = {
 	/**
 	 *  Multiplier applied to the document's root font-size, scaling every
 	 *  rem-anchored design token (text, spacing, controls) together.
 	 */
-	interfaceScale?: number | null,
+	interfaceScale?: InterfaceScale,
 	/**
 	 *  Additional multiplier layered on top of `interface_scale` that
 	 *  affects only typography utilities, leaving spacing and control
 	 *  sizes alone.
 	 */
-	textScale?: number | null,
+	textScale?: TextScale,
 	/**
 	 *  Desktop-scoped telemetry consent. Covers what the desktop
 	 *  client collects (Sentry, PostHog) and nothing else; mobile and
@@ -465,6 +533,19 @@ export type InputTokenDetails = {
 	cache_creation?: bigint | null,
 	cache_read?: bigint | null,
 } & { [key in string]: bigint };
+
+/**
+ *  Interface-scale multiplier applied to the document's root font-size,
+ *  scaling every rem-anchored design token (text, spacing, controls)
+ *  together. Always finite and within
+ *  `[InterfaceScale::MIN, InterfaceScale::MAX]` by construction.
+ * 
+ *  Bounds are chosen against window chrome: below `MIN` the layout
+ *  drops below useful tap-target sizes on Linux / Windows; above `MAX`
+ *  the fixed-size titlebar and traffic-light buttons start overlapping
+ *  content.
+ */
+export type InterfaceScale = number | null;
 
 export type InvalidToolCall = {
 	name?: string | null,
@@ -588,6 +669,48 @@ export type Roles = {
 	vision: ModelRef | null,
 };
 
+/**
+ *  Frontend-facing view of one persisted activity.
+ * 
+ *  `accent` and `icon_base64` are populated by the desktop tauri layer
+ *  (decoded from the asset's PNG bytes); both are `None` whenever the
+ *  activity has no icon or the icon fetch failed — treat them as
+ *  presentation hints, never as load-bearing fields.
+ */
+export type SavedActivity = {
+	id: string,
+	name: string,
+	processName: string,
+	windowTitle: string,
+	startedAt: string,
+	endedAt: string | null,
+	accent: AccentColor | null,
+	/**
+	 *  `data:<mime>;base64,...` URL suitable for direct embedding in
+	 *  `<img src>`. Bare base64 would force the frontend to know the
+	 *  mime out-of-band, which it currently does not.
+	 */
+	iconBase64: string | null,
+};
+
+/**
+ *  Push event fired after the cloud `POST /activities` succeeds for a
+ *  freshly-tracked activity. Lets the desktop frontend prepend the new
+ *  row to the timeline rail without re-polling `GET /activities`.
+ */
+export type SavedActivityCreated = SavedActivity;
+
+/**
+ *  Errors surfaced to the frontend from [`activity_list`].
+ * 
+ *  Externally tagged so the JS side gets `{ type: "Network", data: "..." }`
+ *  and can branch on `type` rather than parsing strings. Variants are
+ *  intentionally narrow — any failure to fetch a *single* icon falls back
+ *  to `accent: None, icon_base64: None` on that row instead of failing
+ *  the whole call.
+ */
+export type SavedActivityError = { type: "StateUnavailable"; data: string } | { type: "Network"; data: string };
+
 /**  One message hit returned by full-text search. */
 export type SearchMessageResult = {
 	id: string,
@@ -652,6 +775,12 @@ export type SettingsError = { type: "Persistence"; data: string } | { type: "End
  *  a different telemetry stack and so collects different categories
  *  of data, which means consent has to be platform-specific (see
  *  [`crate::TelemetryConsent`]).
+ * 
+ *  `dynamic_accent` defaults to `true` — the design pulls the OS / wallpaper
+ *  accent by default and a user who has never touched the toggle should see
+ *  the dynamic behaviour. This is the one field where the product default
+ *  differs from `bool::default()`, which is why this struct has a hand-rolled
+ *  `Default` instead of `#[derive]`.
  */
 export type SharedSettings = {
 	theme?: ThemePreference,
@@ -691,13 +820,20 @@ export type SystemMessage = {
  *  Single payload the desktop frontend fetches once at startup to bring
  *  up its Sentry / PostHog SDKs. Bundles the user's persisted consent
  *  state, the local anonymous identifier, the embedded build-time keys,
- *  and the release identity so the SDKs can tag events with channel +
- *  version.
+ *  the release identity, and **precomputed policy decisions** so the
+ *  frontend doesn't reproduce the consent-gating rules in TypeScript.
  * 
- *  `None` on any field means "this surface is disabled in this build".
- *  `build.rs` enforces all-or-nothing consistency: a build with a DSN
- *  always carries a channel and a release, so the frontend never has
- *  to defend against a half-configured payload.
+ *  `consent` is included verbatim so the settings UI can render which
+ *  toggles are currently set; the SDK init paths consume
+ *  [`Self::allows_errors`] / [`Self::allows_metrics`] /
+ *  [`Self::allows_identification`] instead of reading the consent
+ *  fields directly.
+ * 
+ *  `None` on any of the build-time fields means "this surface is
+ *  disabled in this build". `build.rs` enforces all-or-nothing
+ *  consistency: a build with a DSN always carries a channel and a
+ *  release, so the frontend never has to defend against a
+ *  half-configured payload.
  */
 export type TelemetryBootstrap = {
 	consent: TelemetryConsent,
@@ -707,33 +843,54 @@ export type TelemetryBootstrap = {
 	posthogHost: string | null,
 	channel: string | null,
 	release: string | null,
+	/**
+	 *  `true` when the user has recorded consent at the current desktop
+	 *  version *and* opted into anonymous error reporting.
+	 */
+	allowsErrors: boolean,
+	/**
+	 *  `true` when the user has recorded consent at the current desktop
+	 *  version *and* opted into anonymous metrics.
+	 */
+	allowsMetrics: boolean,
+	/**
+	 *  `true` when, additionally to [`Self::allows_metrics`], the user
+	 *  has opted into non-anonymous identification.
+	 */
+	allowsIdentification: boolean,
 };
 
 /**
  *  Per-platform telemetry consent record. Lives under each platform
- *  section of [`crate::CloudSettings`] — never under `SharedSettings` —
- *  because consent must be specific to the data actually collected,
- *  and each platform ships a different telemetry stack (Sentry +
- *  PostHog on desktop, platform-native SDKs on mobile, etc.). A user
- *  agreeing on desktop has not seen, and cannot legally cover, what
- *  mobile or web will collect.
+ *  section of [`crate::CloudSettings`] — never under
+ *  [`crate::SharedSettings`] — because consent must be specific to the
+ *  data actually collected, and each platform ships a different
+ *  telemetry stack (Sentry + PostHog on desktop, platform-native SDKs
+ *  on mobile, etc.). A user agreeing on desktop has not seen, and
+ *  cannot legally cover, what mobile or web will collect.
  * 
  *  `distinct_id` is intentionally absent — it is an anonymous
  *  per-install identifier whose rotation must break cross-device
  *  linkage, and so stays in the platform's local file rather than
  *  crossing the wire.
  * 
- *  `consent_version` records the schema version of the consent prompt
- *  the user agreed to *on this platform*. Bumping
- *  `CURRENT_CONSENT_VERSION` in the client forces a re-prompt; because
- *  the record is per-platform, the bump propagates independently to
- *  each device.
+ *  ## `consent_version` semantics
  * 
- *  The derived `Default` here is the *wire fallback* used by
- *  `#[serde(default)]` when a partial blob is read off the network
- *  (every field collapses to `false` / `0` — the inert choice). The
- *  product-blessed fresh-install values live in `assets/defaults.jsonc`
- *  and are reached through [`crate::CloudSettings::default()`].
+ *  `consent_version` records the schema version of the consent prompt
+ *  the user agreed to *on this platform*.
+ * 
+ *  - `0` (the `Default`) means the user has **never** seen the prompt.
+ *  - Any value `>= DESKTOP_CONSENT_VERSION` (or the analogue for other
+ *    platforms) means the user has consented to the current schema.
+ *  - A value between `1` and `current - 1` means the user consented to
+ *    an older prompt; the client must re-prompt.
+ * 
+ *  The value is **monotonically non-decreasing** by contract. The only
+ *  writer is the platform's consent procedure, which uses
+ *  [`Self::record_for_desktop`] (analogous methods for other platforms
+ *  will land when those clients ship). Regular settings-page saves
+ *  must *not* touch this field; the IPC layer enforces this by
+ *  clamping incoming values against the stored version.
  */
 export type TelemetryConsent = {
 	consentVersion?: number,
@@ -763,6 +920,20 @@ export type TextContentBlock = {
 	index?: BlockIndex | null,
 	extras?: { [key in string]: unknown } | null,
 };
+
+/**
+ *  Additional multiplier layered on top of [`InterfaceScale`] that
+ *  affects only typography utilities, leaving spacing and control
+ *  sizes alone. Always finite and within
+ *  `[TextScale::MIN, TextScale::MAX]` by construction.
+ * 
+ *  Bounds currently mirror [`InterfaceScale`] but the type is separate
+ *  so they can diverge — text legibility may eventually want a wider
+ *  range than the chrome-anchored interface bounds allow, and the type
+ *  system already enforces that the two fields can't be swapped at
+ *  call sites.
+ */
+export type TextScale = number | null;
 
 /**
  *  User's preferred colour scheme. `System` defers to the OS-level

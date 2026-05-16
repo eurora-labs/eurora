@@ -463,6 +463,102 @@ impl DatabaseManager {
         Ok(refresh_token)
     }
 
+    /// Revoke every still-valid refresh token belonging to a user in a
+    /// single statement and return the count.
+    ///
+    /// Driven by the Apple server-to-server notification flow: when
+    /// Apple tells us consent has been revoked or the Apple ID
+    /// deleted, every active session for that user must be torn down
+    /// atomically. A loop of `revoke_refresh_token` per row would race
+    /// with refresh-token rotation; one statement under PG's row-level
+    /// locking does not.
+    ///
+    /// Returns `Ok(0)` when the user is already fully logged out (no
+    /// active sessions). That is not an error condition — callers log
+    /// the count at info level and move on.
+    #[builder]
+    pub async fn revoke_all_refresh_tokens_for_user(&self, user_id: Uuid) -> DbResult<u64> {
+        let now = Utc::now();
+        let result = sqlx::query(
+            r#"
+            UPDATE refresh_tokens
+            SET revoked = true, updated_at = $2
+            WHERE user_id = $1 AND revoked = false
+            "#,
+        )
+        .bind(user_id)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Delete the `oauth_credentials` row for `(provider, user_id)`.
+    ///
+    /// Idempotent by design — Apple may deliver the same termination
+    /// event multiple times, and the second delivery must not error.
+    /// No return value: callers that need to distinguish "row existed"
+    /// from "row was absent" should look the row up first.
+    #[builder]
+    pub async fn delete_oauth_credentials(
+        &self,
+        provider: OAuthProvider,
+        user_id: Uuid,
+    ) -> DbResult<()> {
+        sqlx::query(
+            r#"
+            DELETE FROM oauth_credentials
+            WHERE provider = $1 AND user_id = $2
+            "#,
+        )
+        .bind(provider)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Cheap existence probe for `password_credentials` by user.
+    ///
+    /// Used by the Apple termination flow to detect "this user just
+    /// lost their only sign-in method" without pulling and discarding
+    /// the password hash. Prefer this over [`Self::get_password_credentials`]
+    /// when only the presence bit is needed — fetching the hash
+    /// pushes it across the trust boundary unnecessarily.
+    #[builder]
+    pub async fn user_has_password_credentials(&self, user_id: Uuid) -> DbResult<bool> {
+        let (exists,): (bool,) = sqlx::query_as(
+            r#"
+            SELECT EXISTS (
+                SELECT 1 FROM password_credentials WHERE user_id = $1
+            )
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(exists)
+    }
+
+    /// Count the user's remaining `oauth_credentials` rows.
+    ///
+    /// Used alongside [`Self::user_has_password_credentials`] by the
+    /// Apple termination flow to flag accounts left with no sign-in
+    /// method. A count is returned (not a bool) so the warning log
+    /// can include the residual provider count for forensics.
+    #[builder]
+    pub async fn count_oauth_credentials_for_user(&self, user_id: Uuid) -> DbResult<i64> {
+        let (count,): (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM oauth_credentials WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(count)
+    }
+
     /// Atomically rotate a refresh token: revoke `old_token_hash` and insert
     /// `new_token_hash` in the same transaction.
     ///
@@ -524,16 +620,17 @@ impl DatabaseManager {
         redirect_uri: String,
         ip_address: Option<ipnet::IpNet>,
         expires_at: DateTime<Utc>,
-        nonce: Vec<u8>,
+        nonce: Option<Vec<u8>>,
+        login_token: Option<Vec<u8>>,
     ) -> DbResult<OAuthState> {
         let id = Uuid::now_v7();
         let now = Utc::now();
 
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
+            INSERT INTO oauth_state (id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token
             "#,
         )
         .bind(id)
@@ -545,7 +642,8 @@ impl DatabaseManager {
         .bind(now)
         .bind(now)
         .bind(expires_at)
-        .bind(&nonce)
+        .bind(nonce.as_deref())
+        .bind(login_token.as_deref())
         .fetch_one(&self.pool)
         .await?;
 
@@ -556,7 +654,7 @@ impl DatabaseManager {
     pub async fn get_oauth_state_by_state(&self, state: &str) -> DbResult<OAuthState> {
         let oauth_state = sqlx::query_as::<_, OAuthState>(
             r#"
-            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
+            SELECT id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token
             FROM oauth_state
             WHERE state = $1 AND consumed = false AND expires_at > now()
             "#,
@@ -577,7 +675,7 @@ impl DatabaseManager {
             UPDATE oauth_state
             SET consumed = true, updated_at = $2
             WHERE state = $1 AND consumed = false AND expires_at > now()
-            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce
+            RETURNING id, state, pkce_verifier, redirect_uri, ip_address, consumed, created_at, updated_at, expires_at, nonce, login_token
             "#,
         )
         .bind(state)
@@ -1062,6 +1160,29 @@ impl DatabaseManager {
         .bind(&metadata)
         .bind(now)
         .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(asset)
+    }
+
+    /// Fetch an asset row scoped to its owner.
+    ///
+    /// The `user_id` predicate is in the WHERE clause (not a separate
+    /// authorization check) so a row belonging to a different user
+    /// surfaces as `NotFound` rather than `Forbidden` — that avoids
+    /// leaking existence of another user's assets.
+    #[builder]
+    pub async fn get_asset_for_user(&self, asset_id: Uuid, user_id: Uuid) -> DbResult<Asset> {
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
+            FROM assets
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(asset_id)
+        .bind(user_id)
         .fetch_one(&self.pool)
         .await?;
 

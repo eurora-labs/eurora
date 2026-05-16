@@ -8,9 +8,9 @@
 use std::sync::Arc;
 
 use auth_core::{
-    AssociateLoginTokenRequest, AuthErrorResponse, CheckEmailRequest, CheckEmailResponse,
-    GoogleIdTokenLoginRequest, LoginByLoginTokenRequest, LoginRequest,
-    MobileThirdPartyAuthUrlRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    AppleIdTokenLoginRequest, AppleNativeUser, AssociateLoginTokenRequest, AuthErrorResponse,
+    CheckEmailRequest, CheckEmailResponse, GoogleIdTokenLoginRequest, LoginByLoginTokenRequest,
+    LoginRequest, MobileThirdPartyAuthUrlRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
     ThirdPartyAuthUrlResponse, TokenResponse, VerifyEmailRequest,
 };
 use euro_endpoint::EndpointManager;
@@ -128,8 +128,12 @@ impl AuthClient {
     pub async fn third_party_auth_url(
         &self,
         provider: auth_core::Provider,
+        login_token: Option<String>,
     ) -> AuthResult<ThirdPartyAuthUrlResponse> {
-        let body = ThirdPartyAuthUrlRequest { provider };
+        let body = ThirdPartyAuthUrlRequest {
+            provider,
+            login_token,
+        };
         self.post_json("/auth/oauth/url", &body, None).await
     }
 
@@ -162,6 +166,29 @@ impl AuthClient {
             nonce,
         };
         self.post_json("/auth/oauth/google/id-token", &body, None)
+            .await
+    }
+
+    /// Native Apple sign-in: trade an ID token from
+    /// `ASAuthorizationController` for a session token pair.
+    ///
+    /// `raw_nonce` is the unhashed nonce the client generated; the
+    /// backend re-derives `base64url(sha256(raw_nonce))` to match
+    /// against the ID token's `nonce` claim (Apple echoes the value
+    /// the iOS plugin placed in `request.nonce`, which is the hash).
+    /// `user` is `Some` only on the very first sign-in.
+    pub async fn login_by_apple_id_token(
+        &self,
+        id_token: impl Into<String>,
+        raw_nonce: impl Into<String>,
+        user: Option<AppleNativeUser>,
+    ) -> AuthResult<TokenResponse> {
+        let body = AppleIdTokenLoginRequest {
+            id_token: id_token.into(),
+            raw_nonce: raw_nonce.into(),
+            user,
+        };
+        self.post_json("/auth/oauth/apple/id-token", &body, None)
             .await
     }
 

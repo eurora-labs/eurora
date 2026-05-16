@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset},
     error::ActivityResult,
-    snapshots::*,
+    snapshots::{ArticleSnapshot, DefaultSnapshot, YoutubeSnapshot},
     storage::SaveableAsset,
 };
 
@@ -89,7 +89,7 @@ impl TryFrom<NativeMessage> for ActivitySnapshot {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Activity {
-    pub id: String,
+    pub id: Uuid,
     pub name: String,
     pub title: Option<String>,
     pub url: Option<Url>,
@@ -113,7 +113,7 @@ impl Activity {
         assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::now_v7(),
             name,
             title,
             url: None,
@@ -142,7 +142,7 @@ impl Activity {
         assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::now_v7(),
             name: url.to_string(),
             title,
             url: Some(url),
@@ -158,11 +158,18 @@ impl Activity {
 
     pub fn get_context_chip(&self) -> ContextChip {
         ContextChip {
-            id: self.id.clone(),
-            name: self.title.clone().unwrap_or_else(|| self.name.clone()),
+            id: self.id.to_string(),
+            name: self.window_title(),
             icon: None,
             domain: self.url.as_ref().and_then(domain_from_url),
         }
+    }
+
+    /// Title to render alongside the activity. `title` is the OS-reported
+    /// window title; when absent (some platforms / strategies don't
+    /// populate it) we fall back to `name`, which is always set.
+    pub fn window_title(&self) -> String {
+        self.title.clone().unwrap_or_else(|| self.name.clone())
     }
 
     /// Replace the URL and the URL-derived `name` in one step.

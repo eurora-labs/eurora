@@ -1,3 +1,4 @@
+import { ACTIVITY_SERVICE, ActivityService } from '$lib/services/activity-service.svelte.js';
 import { APPEARANCE_SERVICE, AppearanceService } from '$lib/services/appearance-service.svelte.js';
 import { GENERAL_SERVICE, GeneralService } from '$lib/services/general-service.svelte.js';
 import { TELEMETRY_SERVICE, TelemetryService } from '$lib/services/telemetry-service.svelte.js';
@@ -20,5 +21,6 @@ export function initDependencies() {
 		[APPEARANCE_SERVICE, appearance],
 		[GENERAL_SERVICE, new GeneralService()],
 		[TIMELINE_SERVICE, new TimelineService(appearance)],
+		[ACTIVITY_SERVICE, new ActivityService()],
 	]);
 }
