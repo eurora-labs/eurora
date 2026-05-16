@@ -4,13 +4,14 @@ import { applyAccent, clearAccent } from '$lib/services/accent.js';
 import { InjectionToken } from '@eurora/shared/context';
 import type { AppearanceService } from '$lib/services/appearance-service.svelte.js';
 
-const RECENT_LIMIT = 5;
+const RECENT_LIMIT = 100;
 
 export class TimelineService {
 	recent: TimelineAppEvent[] = $state([]);
 	readonly latest: TimelineAppEvent | null = $derived(
 		this.recent.length > 0 ? this.recent[this.recent.length - 1] : null,
 	);
+	readonly recentDesc: TimelineAppEvent[] = $derived(this.recent.slice().reverse());
 
 	private readonly appearance: AppearanceService;
 	private readonly listeners = new ListenerBag();

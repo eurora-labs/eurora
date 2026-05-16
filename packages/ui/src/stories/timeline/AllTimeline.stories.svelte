@@ -9,7 +9,8 @@
 		parameters: {
 			docs: {
 				description: {
-					component: 'A showcase of process timeline component',
+					component:
+						'A vertical activity timeline. The first item (top) is the most recent; older items extend downward.',
 				},
 			},
 			controls: { disable: true },
@@ -17,22 +18,16 @@
 	});
 </script>
 
-<script lang="ts">
-	import { StorybookContainer } from '$lib/custom-components/storybook-container/index.js';
-</script>
-
 <Story name="Basic Timeline">
 	{#snippet children()}
-		<div class="h-[600px] w-full">
-			<div class="h-full p-6 w-screen">
-				<Timeline.Root class="p-6">
-					<Timeline.Item color="yellow" name="GitHub" />
-					<Timeline.Item color="red" name="StackOverflow" />
-					<Timeline.Item color="blue" name="Reddit" />
-					<Timeline.Item name="Slack" />
-					<Timeline.Item name="Blender" />
-				</Timeline.Root>
-			</div>
+		<div class="h-[600px] w-12 border-r p-2">
+			<Timeline.Root>
+				<Timeline.Item color="#22c55e" name="Blender" highlighted />
+				<Timeline.Item color="#3b82f6" name="Slack" />
+				<Timeline.Item color="#ef4444" name="Reddit" />
+				<Timeline.Item color="#f59e0b" name="StackOverflow" />
+				<Timeline.Item color="#a855f7" name="GitHub" />
+			</Timeline.Root>
 		</div>
 	{/snippet}
 </Story>
