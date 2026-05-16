@@ -24,8 +24,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use euro_auth::AuthManager;
 use euro_endpoint::EndpointManager;
-use euro_secret::ExposeSecret;
 use reqwest::StatusCode;
+use secrecy::ExposeSecret;
 use serde::de::DeserializeOwned;
 use settings_core::{
     GetSettingsResponse, PutSettingsAcceptedResponse, PutSettingsConflictResponse,

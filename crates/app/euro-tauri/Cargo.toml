@@ -39,7 +39,6 @@ euro-bridge = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }
-euro-secret = { workspace = true }
 euro-settings = { workspace = true, features = ["tls-native-roots"] }
 euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
@@ -52,6 +51,7 @@ llm-core = { workspace = true, features = ["specta"] }
 parking_lot = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 rustls = { workspace = true }
+secrecy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }

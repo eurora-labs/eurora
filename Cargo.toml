@@ -84,7 +84,6 @@ euro-debug = { path = "crates/app/euro-debug" }
 euro-endpoint = { path = "crates/app/euro-endpoint", default-features = false }
 euro-fs = { path = "crates/app/euro-fs" }
 euro-process = { path = "crates/app/euro-process" }
-euro-secret = { path = "crates/app/euro-secret" }
 euro-settings = { path = "crates/app/euro-settings", default-features = false }
 euro-storage = { path = "crates/app/euro-storage" }
 euro-tauri = { path = "crates/app/euro-tauri" }

@@ -1,6 +1,6 @@
 use auth_core::Claims;
 use euro_auth::tauri::auth_manager;
-use euro_secret::{ExposeSecret, SecretString, secret};
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
@@ -44,8 +44,6 @@ pub struct LoginToken {
     pub expires_in: u32,
     pub url: String,
 }
-
-const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
 
 fn resolve_auth_manager(app_handle: &AppHandle) -> Result<euro_auth::AuthManager, AuthError> {
     auth_manager(app_handle).ok_or(AuthError::StateUnavailable("auth manager"))
@@ -99,11 +97,7 @@ pub async fn auth_get_login_token(app_handle: AppHandle) -> Result<LoginToken, A
     // has been removed in favour of the explicit Cloud / Local / Custom
     // picker in `APISettings::mode`.
     let auth_manager = resolve_auth_manager(&app_handle)?;
-    let (code_verifier, code_challenge) = auth_manager
-        .get_login_tokens()
-        .await
-        .map_err(classify_anyhow_auth_error)?;
-    let expires_in: u32 = 60 * 20;
+    let challenge = auth_manager.begin_login().map_err(classify_auth_error)?;
 
     // `WEB_URL` is baked into the binary by `build.rs` and injected into
     // the process env by `euro_tauri::load_env`, so a runtime miss here
@@ -113,13 +107,12 @@ pub async fn auth_get_login_token(app_handle: AppHandle) -> Result<LoginToken, A
     let mut url = Url::parse(&format!("{base_url}/login"))
         .map_err(|e| AuthError::Config(format!("Invalid WEB_URL: {e}")))?;
     url.query_pairs_mut()
-        .append_pair("code_challenge", &code_challenge)
+        .append_pair("code_challenge", &challenge.code_challenge)
         .append_pair("code_challenge_method", "S256");
-    secret::persist(LOGIN_CODE_VERIFIER, &SecretString::from(code_verifier))
-        .map_err(|e| AuthError::Persistence(format!("Failed to persist code verifier: {e}")))?;
+
     Ok(LoginToken {
-        code_challenge: code_challenge.to_string(),
-        expires_in,
+        code_challenge: challenge.code_challenge,
+        expires_in: challenge.expires_in,
         url: url.to_string(),
     })
 }
@@ -129,21 +122,12 @@ pub async fn auth_get_login_token(app_handle: AppHandle) -> Result<LoginToken, A
 pub async fn auth_poll_for_login(app_handle: AppHandle) -> Result<bool, AuthError> {
     let auth_manager = resolve_auth_manager(&app_handle)?;
 
-    let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
-        .map_err(|e| AuthError::Persistence(format!("Failed to retrieve login token: {e}")))?
-        .ok_or(AuthError::LoginTokenExpired)?;
-
-    match auth_manager
-        .login_by_login_token(login_token.expose_secret().to_owned())
-        .await
-    {
+    match auth_manager.complete_login().await {
         Ok(_) => {
-            secret::delete(LOGIN_CODE_VERIFIER).map_err(|e| {
-                AuthError::Persistence(format!("Failed to remove login token: {e}"))
-            })?;
             save_app_settings(&app_handle).await?;
             Ok(true)
         }
+        Err(euro_auth::AuthError::LoginChallengeExpired) => Err(AuthError::LoginTokenExpired),
         Err(e) => {
             tracing::error!("Login by login token failed: {e}");
             Ok(false)

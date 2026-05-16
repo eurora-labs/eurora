@@ -270,20 +270,6 @@ fn bind_and_serve_bridge() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn init_encryption(data_dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(debug_assertions)]
-    let main_key = euro_secret::MainKey::from_bytes([
-        0xA4, 0x1B, 0x7E, 0x3C, 0x92, 0xF0, 0x55, 0xD8, 0x6A, 0xC3, 0x11, 0xBF, 0x48, 0xE7, 0x2D,
-        0x9F, 0x03, 0x86, 0xFA, 0x74, 0xCB, 0x60, 0x1D, 0xA5, 0x39, 0xEE, 0x57, 0x0C, 0xB2, 0x84,
-        0x63, 0xD1,
-    ]);
-    #[cfg(not(debug_assertions))]
-    let main_key = euro_secret::MainKey::new()?;
-
-    euro_secret::secret::init_file_store(*main_key.as_bytes(), data_dir)?;
-    Ok(())
-}
-
 fn register_autostart(tauri_app: &mut tauri::App, settings: &SettingsState) {
     let should_register = !cfg!(debug_assertions) && !cfg!(target_os = "macos");
     let started_by_autostart = std::env::args().any(|arg| arg == "--startup-launch");
@@ -640,7 +626,6 @@ fn main() {
                     }
 
                     let data_dir = tauri_app.path().app_data_dir()?;
-                    init_encryption(data_dir)?;
 
                     let started_by_autostart =
                         std::env::args().any(|arg| arg == "--startup-launch");
@@ -688,7 +673,8 @@ fn main() {
                     // Tauri-managed state and spawns the bus → frontend
                     // bridge that emits `AuthStateChanged` on every
                     // transition.
-                    let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
+                    let auth_manager =
+                        euro_auth::AuthManager::new(endpoint_manager.clone(), &data_dir)?;
                     euro_auth::tauri::install(tauri_app.handle(), auth_manager.clone());
 
                     // All command-visible state must be in place before the

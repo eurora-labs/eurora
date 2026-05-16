@@ -2,8 +2,8 @@ use auth_core::{AppleNativeUser, Claims, Provider};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use euro_auth::AuthManager;
 use euro_auth::tauri::auth_manager;
-use euro_secret::ExposeSecret;
 use rand::Rng;
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
@@ -135,10 +135,7 @@ pub async fn auth_start_login(
 ) -> Result<LoginOutcome, String> {
     let auth_manager = resolve_auth_manager(&app_handle)?;
 
-    let (code_verifier, code_challenge) = auth_manager
-        .get_login_tokens()
-        .await
-        .ctx("Failed to get login tokens")?;
+    let (code_verifier, code_challenge) = auth_manager.generate_pkce_pair();
 
     let auth_url = auth_manager
         .mobile_third_party_auth_url(provider, code_challenge)

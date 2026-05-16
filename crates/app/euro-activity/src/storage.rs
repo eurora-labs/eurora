@@ -5,8 +5,8 @@ use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
 use euro_auth::AuthManager;
 use euro_endpoint::EndpointManager;
-use euro_secret::ExposeSecret;
 use reqwest::StatusCode;
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use std::{io::Cursor, path::PathBuf, sync::Arc};
 
