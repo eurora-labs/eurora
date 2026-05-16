@@ -32,7 +32,6 @@ pub struct CloudSettingsCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use settings_core::CURRENT_SCHEMA_VERSION;
 
     #[test]
     fn defaults_round_trip() {
@@ -47,7 +46,7 @@ mod tests {
         let c = CloudSettingsCache::default();
         assert!(c.last_user_id.is_none());
         assert!(c.base_updated_at.is_none());
-        assert_eq!(c.settings.schema_version, CURRENT_SCHEMA_VERSION);
+        assert_eq!(c.settings, CloudSettings::default());
     }
 
     #[test]

@@ -28,6 +28,11 @@ use specta::Type;
 /// - [`SyncStatus::Conflict { at }`] — a PUT raced another client and
 ///   the server's row replaced the local cache. The UI shows this
 ///   until the next successful round-trip clears it.
+/// - [`SyncStatus::ServerAhead`] — the server is on a newer schema
+///   version than this build understands. The engine refuses to write
+///   so it cannot silently downgrade fields it could not parse; the UI
+///   should surface an upgrade prompt. Cleared by restart on a build
+///   that supports the server's version.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum SyncStatus {
@@ -43,6 +48,7 @@ pub enum SyncStatus {
     Conflict {
         at: DateTime<Utc>,
     },
+    ServerAhead,
 }
 
 impl SyncStatus {

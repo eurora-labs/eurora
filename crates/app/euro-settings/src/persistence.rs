@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use euro_fs::create_dirs_then_write;
 use serde_json::Value;
-use settings_core::{CURRENT_SCHEMA_VERSION, CloudSettings, InterfaceScale, TextScale};
+use settings_core::{CloudSettings, InterfaceScale, TextScale};
 
 use crate::{cloud_cache::CloudSettingsCache, local::LocalSettings, state::SettingsState};
 
@@ -241,8 +241,6 @@ fn split_legacy(path: &Path) -> Result<(LocalSettings, CloudSettingsCache)> {
         }
     }
 
-    cloud.schema_version = CURRENT_SCHEMA_VERSION;
-
     Ok((
         local,
         CloudSettingsCache {
@@ -334,7 +332,6 @@ mod tests {
         assert!(cloud.desktop.telemetry.anonymous_metrics);
         assert!(cloud.desktop.telemetry.anonymous_errors);
         assert!(!cloud.desktop.telemetry.non_anonymous_metrics);
-        assert_eq!(cloud.schema_version, CURRENT_SCHEMA_VERSION);
 
         assert!(tmp.path().join(LOCAL_FILE).exists());
         assert!(tmp.path().join(CLOUD_FILE).exists());

@@ -7,22 +7,29 @@ use crate::{
 };
 
 /// Wire schema version of the cloud settings blob. Bump whenever a
-/// breaking change to the JSONB shape is introduced; the server keeps
-/// the value as written so older clients can detect they're behind.
+/// breaking change to the JSONB shape is introduced.
+///
+/// The version travels on the request / response *envelope*
+/// ([`crate::PutSettingsRequest`], [`crate::GetSettingsResponse`]) and
+/// is owned by the server's metadata columns — never inside the blob.
+/// Two reasons to keep it out of [`CloudSettings`]:
+///
+/// 1. Single source of truth. Duplicating the version inside the blob
+///    creates a "what if they disagree?" question with no defensible
+///    answer. Envelope wins, full stop.
+/// 2. Schema-version routing is supposed to happen *before* a reader
+///    commits to a particular Rust shape. Putting the field inside the
+///    blob would invert that ordering.
 pub const CURRENT_SCHEMA_VERSION: u32 = 1;
 
 /// Embedded fresh-install defaults. Product owns this document; the
 /// crate parses it once at first access.
 const DEFAULTS_JSONC: &str = include_str!("../assets/defaults.jsonc");
 
-/// Parsed singleton of [`DEFAULTS_JSONC`] with `schema_version` stamped
-/// from a code constant so the JSONC document stays free of plumbing
-/// concerns.
+/// Parsed singleton of [`DEFAULTS_JSONC`].
 static FRESH_INSTALL_DEFAULTS: LazyLock<CloudSettings> = LazyLock::new(|| {
-    let mut s: CloudSettings = serde_json_lenient::from_str(DEFAULTS_JSONC)
-        .expect("embedded settings-core defaults.jsonc must parse into CloudSettings");
-    s.schema_version = CURRENT_SCHEMA_VERSION;
-    s
+    serde_json_lenient::from_str(DEFAULTS_JSONC)
+        .expect("embedded settings-core defaults.jsonc must parse into CloudSettings")
 });
 
 /// Top-level cloud-synced settings blob. Sections are addressed
@@ -32,9 +39,10 @@ static FRESH_INSTALL_DEFAULTS: LazyLock<CloudSettings> = LazyLock::new(|| {
 /// client never drops fields written by another.
 ///
 /// The wire format the server stores is exactly this struct: an opaque
-/// JSON document. The server's `updated_at` metadata column rides on
-/// the response envelope ([`crate::GetSettingsResponse`]), not inside
-/// the blob, so this struct deliberately does not carry a timestamp.
+/// JSON document. Protocol metadata — schema version, `updated_at`,
+/// optimistic-concurrency baseline — rides on the request / response
+/// envelopes, not inside the blob, so this struct deliberately carries
+/// neither a version nor a timestamp.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
@@ -44,8 +52,6 @@ pub struct CloudSettings {
     // to `CloudSettings::default()`. The latter is backed by the JSONC
     // singleton — re-entering it during serde fill-in would deadlock
     // [`FRESH_INSTALL_DEFAULTS`] mid-initialization.
-    #[serde(default)]
-    pub schema_version: u32,
     #[serde(default)]
     pub shared: SharedSettings,
     #[serde(default)]
@@ -83,7 +89,6 @@ mod tests {
         // test fails loudly so the change is reviewed alongside any code
         // that assumed the old defaults.
         let d = CloudSettings::default();
-        assert_eq!(d.schema_version, CURRENT_SCHEMA_VERSION);
 
         assert_eq!(d.shared.theme, ThemePreference::System);
         assert!(d.shared.dynamic_accent);
@@ -111,7 +116,6 @@ mod tests {
         // preserve their unknown subfields end-to-end through
         // `CloudSettings`.
         let raw = serde_json::json!({
-            "schemaVersion": CURRENT_SCHEMA_VERSION,
             "shared": {
                 "theme": "dark",
                 "dynamicAccent": false,
@@ -144,7 +148,6 @@ mod tests {
         // blob with an out-of-range scale lands in the struct already
         // clamped — no separate `sanitize` pass is required.
         let raw = serde_json::json!({
-            "schemaVersion": CURRENT_SCHEMA_VERSION,
             "shared": {},
             "desktop": { "interfaceScale": 9.0, "textScale": 0.1 },
             "mobile": {},

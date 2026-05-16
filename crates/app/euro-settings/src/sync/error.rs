@@ -52,6 +52,13 @@ pub enum SyncError {
     #[error("conflict; server row at {}", .0.updated_at)]
     Conflict(PutSettingsConflictResponse),
 
+    /// Server is on a schema version newer than this client understands.
+    /// The cache is treated as read-only until the client is upgraded;
+    /// further pushes would risk silently downgrading fields the client
+    /// never parsed.
+    #[error("server schema version {server} is ahead of client {client}")]
+    ServerAhead { client: u32, server: u32 },
+
     /// JSON decode failure when interpreting a successful response. Rare
     /// in practice; almost always means a wire-incompatible deploy.
     #[error("decode: {0}")]
@@ -93,6 +100,7 @@ impl SyncError {
             | SyncError::Decode(_)
             | SyncError::Internal(_) => SyncStatus::Offline { since: Utc::now() },
             SyncError::Conflict(_) => SyncStatus::Conflict { at: Utc::now() },
+            SyncError::ServerAhead { .. } => SyncStatus::ServerAhead,
         }
     }
 
@@ -102,7 +110,10 @@ impl SyncError {
     #[must_use]
     pub fn is_retryable(&self) -> bool {
         match self {
-            SyncError::NotAuthenticated | SyncError::Conflict(_) | SyncError::Decode(_) => false,
+            SyncError::NotAuthenticated
+            | SyncError::Conflict(_)
+            | SyncError::Decode(_)
+            | SyncError::ServerAhead { .. } => false,
             SyncError::Auth(e) => !e.is_logged_out(),
             SyncError::Transport(_) | SyncError::Io(_) | SyncError::Internal(_) => true,
             SyncError::Server { status, .. } => status.is_server_error(),
@@ -137,6 +148,16 @@ mod tests {
     fn auth_logged_out_classifies_as_local_only() {
         let err = SyncError::Auth(euro_auth::AuthError::InvalidRefreshToken);
         assert!(matches!(err.into_status(), SyncStatus::LocalOnly));
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn server_ahead_classifies_as_server_ahead_status_and_is_not_retryable() {
+        let err = SyncError::ServerAhead {
+            client: 1,
+            server: 2,
+        };
+        assert_eq!(err.into_status(), SyncStatus::ServerAhead);
         assert!(!err.is_retryable());
     }
 

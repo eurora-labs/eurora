@@ -3,10 +3,9 @@
 // single source of truth for what a brand-new user sees before they touch
 // any toggle.
 //
-// `schemaVersion` is NOT listed here — it is stamped by
-// `CloudSettings::default()` from `CURRENT_SCHEMA_VERSION`. Keeping it out
-// of the document means product can edit values without having to also
-// bump the code constant.
+// Schema version is intentionally absent: it lives on the request /
+// response envelope (`PutSettingsRequest`, `GetSettingsResponse`) and
+// the server's metadata column, never inside the blob.
 //
 // Telemetry consent lives under each *platform* section, not under
 // `shared` — consent must be specific to the data actually collected, and

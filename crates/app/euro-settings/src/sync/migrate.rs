@@ -56,11 +56,16 @@ mod tests {
         let settings_obj = body.settings.as_object().expect("settings is an object");
         // Pin the top-level keys so an inadvertent breaking refactor of
         // CloudSettings is caught here as well as in settings-core.
-        for key in ["schemaVersion", "shared", "desktop", "mobile", "web"] {
+        for key in ["shared", "desktop", "mobile", "web"] {
             assert!(
                 settings_obj.contains_key(key),
                 "expected {key} in first-run payload, got {settings_obj:?}"
             );
         }
+        // Schema version lives on the envelope, never inside the blob.
+        assert!(
+            !settings_obj.contains_key("schemaVersion"),
+            "schemaVersion must not appear inside the settings blob, got {settings_obj:?}"
+        );
     }
 }
