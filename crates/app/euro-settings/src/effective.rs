@@ -8,7 +8,7 @@
 
 use settings_core::{DesktopSettings, SharedSettings, TelemetryConsent};
 
-use crate::{cloud_cache::CloudSettingsCache, local::LocalSettings, telemetry as telemetry_policy};
+use crate::{cloud_cache::CloudSettingsCache, local::LocalSettings};
 
 /// Composite read-only view over a [`LocalSettings`] / [`CloudSettingsCache`]
 /// pair held inside a [`crate::SettingsState`].
@@ -38,15 +38,15 @@ impl<'a> EffectiveSettings<'a> {
         self.local.telemetry.distinct_id.as_deref()
     }
 
-    /// `true` when the user must be shown the consent prompt before any
-    /// telemetry runs on this platform.
+    /// `true` when the user must be shown the desktop consent prompt
+    /// before any telemetry runs on this platform.
     pub fn needs_telemetry_consent(&self) -> bool {
-        telemetry_policy::needs_consent(self.telemetry_consent())
+        self.telemetry_consent().needs_prompt_for_desktop()
     }
 
     /// `true` when the user has consented and opted into anonymous error
     /// reporting. Drives the native Sentry guard.
     pub fn wants_telemetry_errors(&self) -> bool {
-        telemetry_policy::wants_errors(self.telemetry_consent())
+        self.telemetry_consent().allows_errors_on_desktop()
     }
 }

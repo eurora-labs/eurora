@@ -2,13 +2,15 @@ use std::sync::Arc;
 
 use euro_settings::{
     APISettings, DesktopSettings, GeneralSettings, SharedSettings, SyncEngine, TelemetryConsent,
-    TelemetryLocal, record_consent, wants_errors,
+    TelemetryLocal,
 };
 use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager};
+use tauri_specta::Event;
 use thiserror::Error;
 
+use crate::procedures::system_procedures::ConsentGate;
 use crate::shared_types::{SharedEndpointManager, SharedSettingsState};
 use euro_telemetry::Controller as TelemetryController;
 
@@ -125,18 +127,19 @@ pub async fn settings_get_desktop(app_handle: AppHandle) -> DesktopSettings {
     state.lock().await.cache.settings.desktop.clone()
 }
 
-/// Write the entire desktop section. The frontend's appearance and
-/// telemetry pages each operate on a subset of fields; both target this
-/// one command, so a partial-section write is achieved by reading the
-/// current section, patching the relevant fields, and writing the whole
-/// thing back.
+/// Write the entire desktop section. Used by the appearance page and
+/// anything else that mutates non-consent desktop state — the consent
+/// prompt has its own dedicated procedure
+/// ([`settings_record_telemetry_consent`]) so this one does **not** stamp
+/// a consent version.
 ///
-/// Side effects: stamps `telemetry.consent_version` to the current
-/// build's value, lazily allocates a local `distinct_id`, and reapplies
-/// the native Sentry guard to match the new consent decision. Scale
+/// `consent_version` is monotonically non-decreasing: incoming values
+/// below the stored version are clamped up. This protects against a
+/// misbehaving caller (or an older client) accidentally rolling back
+/// the user's recorded consent while editing unrelated fields. Scale
 /// fields are clamped at the IPC boundary by their newtypes
 /// (`InterfaceScale` / `TextScale`), so no extra validation pass is
-/// required here.
+/// required here either.
 #[tauri::command]
 #[specta::specta]
 pub async fn settings_set_desktop(
@@ -146,32 +149,65 @@ pub async fn settings_set_desktop(
     let state = app_handle.state::<SharedSettingsState>();
     let mut settings = state.lock().await;
 
+    let prior_consent_version = settings.cache.settings.desktop.telemetry.consent_version;
     settings.cache.settings.desktop = desktop;
-    // Any save through this procedure is by definition a recorded
-    // consent at the current schema version. Stamping it here (rather
-    // than trusting the frontend) prevents an older client from
-    // accidentally pinning the user at a stale version.
-    record_consent(&mut settings.cache.settings.desktop.telemetry);
+    settings.cache.settings.desktop.telemetry.consent_version = settings
+        .cache
+        .settings
+        .desktop
+        .telemetry
+        .consent_version
+        .max(prior_consent_version);
+
     settings
         .save_cache_to_default_path()
         .map_err(|e| SettingsError::Persistence(e.to_string()))?;
 
-    // Queue the push before the local-only `distinct_id` work below:
-    // a failure persisting `local.json` must not suppress propagation
-    // of the cache change we have already committed to `cloud.json`.
     app_handle.state::<SyncEngine>().request_push();
 
-    // Lazily allocate a stable distinct id alongside the first consent
-    // so that an exit between this call and the next save doesn't drop
-    // the id. Touches only `local.json`, so it's a separate write.
+    Ok(settings.cache.settings.desktop.clone())
+}
+
+/// Persist the user's response to the desktop telemetry consent prompt.
+///
+/// The frontend hands the desired toggle state in `consent`; the backend
+/// authoritatively stamps the consent version via
+/// [`TelemetryConsent::record_for_desktop`] (monotonic — a newer
+/// recorded version from another client is left alone). Lazily allocates
+/// the local anonymous `distinct_id`, reapplies the native Sentry guard
+/// so the new choice takes effect immediately, and emits
+/// [`ConsentGate`] with `required: false` so the frontend can route
+/// away from the consent page.
+#[tauri::command]
+#[specta::specta]
+pub async fn settings_record_telemetry_consent(
+    app_handle: AppHandle,
+    consent: TelemetryConsent,
+) -> Result<TelemetryConsent, SettingsError> {
+    let state = app_handle.state::<SharedSettingsState>();
+    let mut settings = state.lock().await;
+
+    settings.cache.settings.desktop.telemetry = consent;
+    settings
+        .cache
+        .settings
+        .desktop
+        .telemetry
+        .record_for_desktop();
+    settings
+        .save_cache_to_default_path()
+        .map_err(|e| SettingsError::Persistence(e.to_string()))?;
+
+    app_handle.state::<SyncEngine>().request_push();
+
     if settings.local.telemetry.ensure_distinct_id() {
         settings
             .save_local_to_default_path()
             .map_err(|e| SettingsError::Persistence(e.to_string()))?;
     }
 
-    let desktop_clone = settings.cache.settings.desktop.clone();
-    let enabled = wants_errors(&desktop_clone.telemetry);
+    let consent_out = settings.cache.settings.desktop.telemetry.clone();
+    let enabled = consent_out.allows_errors_on_desktop();
     let distinct_id = settings.local.telemetry.distinct_id.clone();
     drop(settings);
 
@@ -179,7 +215,11 @@ pub async fn settings_set_desktop(
         controller.reapply(enabled, distinct_id.as_deref());
     }
 
-    Ok(desktop_clone)
+    // Recording consent always clears the gate. Emitted after persistence
+    // so a listener that immediately re-queries observes the new state.
+    let _ = ConsentGate { required: false }.emit(&app_handle);
+
+    Ok(consent_out)
 }
 
 // --- Telemetry (local) ----------------------------------------------------

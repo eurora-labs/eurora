@@ -204,7 +204,12 @@ fn split_legacy(path: &Path) -> Result<(LocalSettings, CloudSettingsCache)> {
             local.telemetry.distinct_id = Some(distinct_id.to_owned());
         }
         if let Some(v) = telemetry.get("consentVersion").and_then(Value::as_u64) {
-            cloud.desktop.telemetry.consent_version = v.try_into().unwrap_or(u32::MAX);
+            // Garbage above `u32::MAX` collapses to 0 ("never asked")
+            // rather than `u32::MAX`. A saturating clamp would permanently
+            // pin the user above any future consent-version bump, which
+            // is the opposite of what a recovering-from-corruption path
+            // should do; 0 routes through the consent prompt instead.
+            cloud.desktop.telemetry.consent_version = v.try_into().unwrap_or(0);
         }
         if let Some(v) = telemetry.get("anonymousMetrics").and_then(Value::as_bool) {
             cloud.desktop.telemetry.anonymous_metrics = v;
@@ -437,6 +442,24 @@ mod tests {
         assert!(!state.local.general.autostart);
         assert!(tmp.path().join(LEGACY_FILE).exists());
         assert!(!tmp.path().join(LEGACY_BACKUP_FILE).exists());
+    }
+
+    #[test]
+    fn legacy_consent_version_overflow_collapses_to_zero() {
+        // A legacy file with a corrupted `consentVersion` above `u32::MAX`
+        // must collapse to 0 ("never asked") rather than `u32::MAX`. The
+        // latter would permanently pin the user above any future
+        // `DESKTOP_CONSENT_VERSION` bump, which is the opposite of what a
+        // recovering-from-corruption path should do.
+        let tmp = tempfile::tempdir().unwrap();
+        write(
+            tmp.path(),
+            LEGACY_FILE,
+            r#"{ "telemetry": { "consentVersion": 9999999999 } }"#,
+        );
+
+        let state = SettingsState::load_or_migrate(tmp.path()).unwrap();
+        assert_eq!(state.cache.settings.desktop.telemetry.consent_version, 0);
     }
 
     #[test]

@@ -25,20 +25,18 @@
 	let regPassword = $state('');
 
 	// Local-mode users never see the telemetry prompt, so commit an explicit
-	// all-off consent on their behalf. The backend stamps `record_consent`
-	// inside `settings_set_desktop`, which clears `needs_consent()` and
-	// keeps the global onboarding guard from ever firing for this install.
+	// all-off consent on their behalf via the dedicated consent IPC. The
+	// backend stamps the desktop consent version monotonically, which
+	// clears the consent gate so the global onboarding guard never fires
+	// for this install.
 	async function disableTelemetry() {
-		const current = await commands.settingsGetDesktop();
+		const current = await commands.settingsGetTelemetryConsent();
 		unwrap(
-			await commands.settingsSetDesktop({
+			await commands.settingsRecordTelemetryConsent({
 				...current,
-				telemetry: {
-					...(current.telemetry ?? {}),
-					anonymousErrors: false,
-					anonymousMetrics: false,
-					nonAnonymousMetrics: false,
-				},
+				anonymousErrors: false,
+				anonymousMetrics: false,
+				nonAnonymousMetrics: false,
 			}),
 		);
 		await telemetry.refresh();

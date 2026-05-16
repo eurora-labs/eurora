@@ -12,10 +12,10 @@ use procedures::auth_procedures::{
     auth_start_login_google_native,
 };
 use procedures::settings_procedures::{
-    settings_get_local_telemetry, settings_get_telemetry_consent, settings_set_telemetry_consent,
+    settings_get_local_telemetry, settings_get_telemetry_consent, settings_record_telemetry_consent,
 };
 use procedures::system_procedures::{
-    system_get_telemetry_bootstrap, system_needs_telemetry_consent, system_reinit_telemetry,
+    ConsentGate, frontend_ready, system_get_telemetry_bootstrap, system_reinit_telemetry,
     system_rotate_telemetry_distinct_id,
 };
 
@@ -48,9 +48,9 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             auth_refresh_session,
             settings_get_telemetry_consent,
             settings_get_local_telemetry,
-            settings_set_telemetry_consent,
+            settings_record_telemetry_consent,
             system_get_telemetry_bootstrap,
-            system_needs_telemetry_consent,
+            frontend_ready,
             system_reinit_telemetry,
             system_rotate_telemetry_distinct_id,
             euro_thread::commands::thread::thread_list,
@@ -66,7 +66,7 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             euro_thread::commands::chat::chat_regenerate,
             euro_thread::commands::chat::chat_cancel_query,
         ])
-        .events(tauri_specta::collect_events![AuthStateChanged])
+        .events(tauri_specta::collect_events![AuthStateChanged, ConsentGate])
 }
 
 #[cfg(mobile)]

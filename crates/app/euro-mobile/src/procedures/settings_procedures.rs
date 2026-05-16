@@ -16,12 +16,14 @@
 
 use std::sync::Arc;
 
-use euro_settings::{TelemetryConsent, TelemetryLocal, record_consent, wants_errors};
+use euro_settings::{TelemetryConsent, TelemetryLocal};
 use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager};
+use tauri_specta::Event;
 use thiserror::Error;
 
+use crate::procedures::system_procedures::ConsentGate;
 use crate::shared_types::SharedSettingsState;
 use euro_telemetry::Controller as TelemetryController;
 
@@ -49,13 +51,16 @@ pub async fn settings_get_local_telemetry(app_handle: AppHandle) -> TelemetryLoc
     state.lock().await.local.telemetry.clone()
 }
 
-/// Persist a fresh consent decision. Stamps the consent version, lazily
-/// allocates a stable `distinct_id`, reapplies the native Sentry guard,
-/// and returns the canonical post-stamp consent so the frontend's
-/// optimistic state stays in sync.
+/// Persist the user's response to the telemetry consent prompt. Stamps
+/// the consent version monotonically via
+/// [`TelemetryConsent::record_for_desktop`], lazily allocates a stable
+/// `distinct_id`, reapplies the native Sentry guard, emits
+/// [`ConsentGate`] with `required: false` so the frontend can route
+/// away from the prompt, and returns the canonical post-stamp consent
+/// so the frontend's optimistic state stays in sync.
 #[tauri::command]
 #[specta::specta]
-pub async fn settings_set_telemetry_consent(
+pub async fn settings_record_telemetry_consent(
     app_handle: AppHandle,
     consent: TelemetryConsent,
 ) -> Result<TelemetryConsent, SettingsError> {
@@ -63,7 +68,12 @@ pub async fn settings_set_telemetry_consent(
     let mut settings = state.lock().await;
 
     settings.cache.settings.desktop.telemetry = consent;
-    record_consent(&mut settings.cache.settings.desktop.telemetry);
+    settings
+        .cache
+        .settings
+        .desktop
+        .telemetry
+        .record_for_desktop();
     settings
         .save_cache_to_default_path()
         .map_err(|e| SettingsError::Persistence(e.to_string()))?;
@@ -75,13 +85,15 @@ pub async fn settings_set_telemetry_consent(
     }
 
     let consent_out = settings.cache.settings.desktop.telemetry.clone();
-    let enabled = wants_errors(&consent_out);
+    let enabled = consent_out.allows_errors_on_desktop();
     let distinct_id = settings.local.telemetry.distinct_id.clone();
     drop(settings);
 
     if let Some(controller) = app_handle.try_state::<Arc<TelemetryController>>() {
         controller.reapply(enabled, distinct_id.as_deref());
     }
+
+    let _ = ConsentGate { required: false }.emit(&app_handle);
 
     Ok(consent_out)
 }

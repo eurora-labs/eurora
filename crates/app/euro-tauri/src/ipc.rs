@@ -9,7 +9,7 @@
 //! pass fully qualified paths to `collect_commands!` and let
 //! module-relative macro resolution find them.
 
-use crate::procedures::system_procedures::BrowserExtensionStatusChanged;
+use crate::procedures::system_procedures::{BrowserExtensionStatusChanged, ConsentGate};
 use crate::procedures::timeline_procedures::{TimelineAppEvent, TimelineAssetsEvent};
 use euro_auth::tauri::AuthStateChanged;
 
@@ -45,6 +45,7 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             crate::procedures::settings_procedures::settings_set_shared,
             crate::procedures::settings_procedures::settings_get_desktop,
             crate::procedures::settings_procedures::settings_set_desktop,
+            crate::procedures::settings_procedures::settings_record_telemetry_consent,
             crate::procedures::settings_procedures::settings_get_local_telemetry,
             crate::procedures::settings_procedures::settings_get_telemetry_consent,
             crate::procedures::system_procedures::system_check_backend_connection,
@@ -62,7 +63,7 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             crate::procedures::system_procedures::system_open_url_in_browser,
             crate::procedures::system_procedures::system_focus_main_window,
             crate::procedures::system_procedures::system_get_telemetry_bootstrap,
-            crate::procedures::system_procedures::system_needs_telemetry_consent,
+            crate::procedures::system_procedures::frontend_ready,
             crate::procedures::system_procedures::system_reinit_telemetry,
             crate::procedures::system_procedures::system_rotate_telemetry_distinct_id,
             euro_thread::commands::thread::thread_list,
@@ -79,5 +80,6 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             TimelineAppEvent,
             TimelineAssetsEvent,
             BrowserExtensionStatusChanged,
+            ConsentGate,
         ])
 }

@@ -1,5 +1,3 @@
-use std::sync::LazyLock;
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -22,16 +20,6 @@ use crate::{
 ///    blob would invert that ordering.
 pub const CURRENT_SCHEMA_VERSION: u32 = 1;
 
-/// Embedded fresh-install defaults. Product owns this document; the
-/// crate parses it once at first access.
-const DEFAULTS_JSONC: &str = include_str!("../assets/defaults.jsonc");
-
-/// Parsed singleton of [`DEFAULTS_JSONC`].
-static FRESH_INSTALL_DEFAULTS: LazyLock<CloudSettings> = LazyLock::new(|| {
-    serde_json_lenient::from_str(DEFAULTS_JSONC)
-        .expect("embedded settings-core defaults.jsonc must parse into CloudSettings")
-});
-
 /// Top-level cloud-synced settings blob. Sections are addressed
 /// individually so clients only touch the fields that apply to their
 /// platform; unknown sections and unknown fields within sections are
@@ -43,15 +31,15 @@ static FRESH_INSTALL_DEFAULTS: LazyLock<CloudSettings> = LazyLock::new(|| {
 /// optimistic-concurrency baseline — rides on the request / response
 /// envelopes, not inside the blob, so this struct deliberately carries
 /// neither a version nor a timestamp.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+///
+/// Fresh-install defaults are whatever each section's [`Default`] impl
+/// produces. Per-field `#[serde(default)]` rather than struct-level so a
+/// missing wire field falls back to its *type's* `Default::default()`
+/// without going through `CloudSettings::default()` itself.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "camelCase")]
 pub struct CloudSettings {
-    // Per-field `#[serde(default)]` rather than struct-level: a missing
-    // wire field falls back to its *type's* `Default::default()`, never
-    // to `CloudSettings::default()`. The latter is backed by the JSONC
-    // singleton — re-entering it during serde fill-in would deadlock
-    // [`FRESH_INSTALL_DEFAULTS`] mid-initialization.
     #[serde(default)]
     pub shared: SharedSettings,
     #[serde(default)]
@@ -62,18 +50,12 @@ pub struct CloudSettings {
     pub web: WebSettings,
 }
 
-impl Default for CloudSettings {
-    /// Fresh-install defaults: a clone of the values baked into
-    /// `assets/defaults.jsonc`.
-    fn default() -> Self {
-        FRESH_INSTALL_DEFAULTS.clone()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{desktop::DEFAULT_SCALE, shared::ThemePreference};
+    use crate::{
+        desktop::DEFAULT_SCALE, shared::ThemePreference, telemetry::DESKTOP_CONSENT_VERSION,
+    };
 
     #[test]
     fn defaults_round_trip() {
@@ -84,10 +66,10 @@ mod tests {
     }
 
     #[test]
-    fn defaults_match_embedded_jsonc() {
-        // Pin the JSONC content: if product changes a value here, this
-        // test fails loudly so the change is reviewed alongside any code
-        // that assumed the old defaults.
+    fn fresh_install_defaults() {
+        // Pin the product-blessed fresh-install state so a change to any
+        // section's `Default` is reviewed alongside the call sites that
+        // assumed the old value.
         let d = CloudSettings::default();
 
         assert_eq!(d.shared.theme, ThemePreference::System);
@@ -96,7 +78,10 @@ mod tests {
         assert_eq!(d.desktop.interface_scale.get(), DEFAULT_SCALE);
         assert_eq!(d.desktop.text_scale.get(), DEFAULT_SCALE);
 
-        assert_eq!(d.desktop.telemetry.consent_version, 1);
+        // Fresh install must be below the current consent version so the
+        // user is prompted on first launch. This is the load-bearing
+        // sentinel — see `telemetry::TelemetryConsent`.
+        assert!(d.desktop.telemetry.consent_version < DESKTOP_CONSENT_VERSION);
         assert!(!d.desktop.telemetry.anonymous_metrics);
         assert!(!d.desktop.telemetry.anonymous_errors);
         assert!(!d.desktop.telemetry.non_anonymous_metrics);

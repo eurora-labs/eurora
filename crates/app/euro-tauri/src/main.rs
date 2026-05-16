@@ -4,7 +4,7 @@
 )]
 
 use euro_endpoint::EndpointManager;
-use euro_settings::{CloudSettingsCache, SettingsState, wants_errors};
+use euro_settings::{CloudSettingsCache, SettingsState};
 use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
@@ -562,7 +562,11 @@ fn main() {
     // scope — acceptable for the boot window.
     let early_cache = CloudSettingsCache::peek_from_default_path();
     let telemetry_controller = std::sync::Arc::new(TelemetryController::init(
-        wants_errors(&early_cache.settings.desktop.telemetry),
+        early_cache
+            .settings
+            .desktop
+            .telemetry
+            .allows_errors_on_desktop(),
         None,
     ));
 
@@ -659,7 +663,12 @@ fn main() {
                     // file; this call ensures the runtime telemetry state
                     // matches what's persisted before the app comes up.
                     telemetry_controller.reapply(
-                        wants_errors(&settings.cache.settings.desktop.telemetry),
+                        settings
+                            .cache
+                            .settings
+                            .desktop
+                            .telemetry
+                            .allows_errors_on_desktop(),
                         settings.local.telemetry.distinct_id.as_deref(),
                     );
 

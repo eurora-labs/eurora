@@ -44,16 +44,17 @@ pub use sync::{
     AuthIdentity, AuthManagerIdentity, BackoffConfig, PullOutcome, PushOutcome, ReqwestTransport,
     SettingsTransport, SyncEngine, SyncError, SyncResult, SyncStatus,
 };
-pub use telemetry::{
-    CURRENT_CONSENT_VERSION, TelemetryLocal, needs_consent, record_consent, wants_errors,
-    wants_identified, wants_metrics,
-};
+pub use telemetry::TelemetryLocal;
 
 // Wire types from settings-core that IPC handlers and the frontend
 // bindings consume directly. Re-exported so app crates can take a
 // single dependency on `euro-settings` without having to also add
-// `settings-core` to their Cargo.toml.
+// `settings-core` to their Cargo.toml. The consent policy
+// (`needs_prompt_for_desktop`, `allows_*_on_desktop`,
+// `record_for_desktop`) lives as inherent methods on `TelemetryConsent`
+// in `settings-core`, so call sites use it through this re-export.
 pub use settings_core::{
-    CURRENT_SCHEMA_VERSION, CloudSettings, DEFAULT_SCALE, DesktopSettings, InterfaceScale,
-    MobileSettings, SharedSettings, TelemetryConsent, TextScale, ThemePreference, WebSettings,
+    CURRENT_SCHEMA_VERSION, CloudSettings, DEFAULT_SCALE, DESKTOP_CONSENT_VERSION, DesktopSettings,
+    InterfaceScale, MobileSettings, SharedSettings, TelemetryConsent, TextScale, ThemePreference,
+    WebSettings,
 };

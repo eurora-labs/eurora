@@ -10,9 +10,6 @@ bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true }
-# Used only to parse the embedded `defaults.jsonc` (which carries `//`
-# comments for product authors); the wire format itself is plain JSON.
-serde_json_lenient = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 
 specta = { workspace = true, optional = true, features = [

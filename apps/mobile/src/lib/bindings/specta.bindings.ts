@@ -82,14 +82,23 @@ export const commands = {
 	settingsGetTelemetryConsent: () => __TAURI_INVOKE<TelemetryConsent>("settings_get_telemetry_consent"),
 	settingsGetLocalTelemetry: () => __TAURI_INVOKE<TelemetryLocal>("settings_get_local_telemetry"),
 	/**
-	 *  Persist a fresh consent decision. Stamps the consent version, lazily
-	 *  allocates a stable `distinct_id`, reapplies the native Sentry guard,
-	 *  and returns the canonical post-stamp consent so the frontend's
-	 *  optimistic state stays in sync.
+	 *  Persist the user's response to the telemetry consent prompt. Stamps
+	 *  the consent version monotonically via
+	 *  [`TelemetryConsent::record_for_desktop`], lazily allocates a stable
+	 *  `distinct_id`, reapplies the native Sentry guard, emits
+	 *  [`ConsentGate`] with `required: false` so the frontend can route
+	 *  away from the prompt, and returns the canonical post-stamp consent
+	 *  so the frontend's optimistic state stays in sync.
 	 */
-	settingsSetTelemetryConsent: (consent: TelemetryConsent) => typedError<TelemetryConsent, SettingsError>(__TAURI_INVOKE("settings_set_telemetry_consent", { consent })),
+	settingsRecordTelemetryConsent: (consent: TelemetryConsent) => typedError<TelemetryConsent, SettingsError>(__TAURI_INVOKE("settings_record_telemetry_consent", { consent })),
 	systemGetTelemetryBootstrap: () => typedError<TelemetryBootstrap, SystemError>(__TAURI_INVOKE("system_get_telemetry_bootstrap")),
-	systemNeedsTelemetryConsent: () => __TAURI_INVOKE<boolean>("system_needs_telemetry_consent"),
+	/**
+	 *  Frontend handshake: called from the root layout once event listeners
+	 *  are attached. The backend reads the current consent state and emits
+	 *  [`ConsentGate`] with `required` set accordingly. See the desktop
+	 *  equivalent for the design rationale.
+	 */
+	frontendReady: () => typedError<null, SystemError>(__TAURI_INVOKE("frontend_ready")),
 	systemReinitTelemetry: () => __TAURI_INVOKE<void>("system_reinit_telemetry"),
 	systemRotateTelemetryDistinctId: () => typedError<string, SystemError>(__TAURI_INVOKE("system_rotate_telemetry_distinct_id")),
 	threadList: (limit: number, offset: number) => typedError<Thread[], ThreadError>(__TAURI_INVOKE("thread_list", { limit, offset })),
@@ -109,6 +118,7 @@ export const commands = {
 /** Events */
 export const events = {
 	authStateChanged: makeEvent<AuthStateChanged>("auth-state-changed"),
+	consentGate: makeEvent<ConsentGate>("consent-gate"),
 };
 
 /* Types */
@@ -170,6 +180,10 @@ export type AudioContentBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
+/**
+ *  Backend → frontend auth-state transition. Mirrors the shape of
+ *  [`crate::AuthEvent`] for the JS side; `claims == None` means signed out.
+ */
 export type AuthStateChanged = {
 	claims: Claims | null,
 };
@@ -248,6 +262,20 @@ export type Claims = {
 	 *  after hashing (see refresh-token rotation).
 	 */
 	jti?: string,
+};
+
+/**
+ *  Pushed from Rust to the frontend whenever the mobile telemetry
+ *  consent gate flips. Fired once during startup (in response to
+ *  [`frontend_ready`]) and again whenever the gate changes (e.g. after
+ *  [`crate::procedures::settings_procedures::settings_record_telemetry_consent`]).
+ * 
+ *  Today mobile shares the `desktop.telemetry` cloud record with the
+ *  desktop client; Phase 10 partitions mobile into its own section
+ *  once a mobile telemetry stack ships.
+ */
+export type ConsentGate = {
+	required: boolean,
 };
 
 export type ContentBlock = {
@@ -502,14 +530,15 @@ export type SystemMessage = {
 /**
  *  Single payload the mobile frontend fetches once at startup to bring
  *  up its Sentry / PostHog SDKs. Bundles the user's persisted consent,
- *  the local anonymous identifier, the embedded build-time keys, and
- *  the release identity so the SDKs can tag events with channel +
- *  version.
+ *  the local anonymous identifier, the embedded build-time keys, the
+ *  release identity, and **precomputed policy decisions** so the
+ *  frontend doesn't reproduce the consent-gating rules in TypeScript.
  * 
- *  `None` on any field means "this surface is disabled in this build".
- *  `euro-telemetry/build.rs` enforces all-or-nothing consistency: a
- *  build with a DSN always carries a channel and a release, so the
- *  frontend never has to defend against a half-configured payload.
+ *  `None` on any build-time field means "this surface is disabled in
+ *  this build". `euro-telemetry/build.rs` enforces all-or-nothing
+ *  consistency: a build with a DSN always carries a channel and a
+ *  release, so the frontend never has to defend against a
+ *  half-configured payload.
  */
 export type TelemetryBootstrap = {
 	consent: TelemetryConsent,
@@ -519,33 +548,42 @@ export type TelemetryBootstrap = {
 	posthogHost: string | null,
 	channel: string | null,
 	release: string | null,
+	allowsErrors: boolean,
+	allowsMetrics: boolean,
+	allowsIdentification: boolean,
 };
 
 /**
  *  Per-platform telemetry consent record. Lives under each platform
- *  section of [`crate::CloudSettings`] — never under `SharedSettings` —
- *  because consent must be specific to the data actually collected,
- *  and each platform ships a different telemetry stack (Sentry +
- *  PostHog on desktop, platform-native SDKs on mobile, etc.). A user
- *  agreeing on desktop has not seen, and cannot legally cover, what
- *  mobile or web will collect.
+ *  section of [`crate::CloudSettings`] — never under
+ *  [`crate::SharedSettings`] — because consent must be specific to the
+ *  data actually collected, and each platform ships a different
+ *  telemetry stack (Sentry + PostHog on desktop, platform-native SDKs
+ *  on mobile, etc.). A user agreeing on desktop has not seen, and
+ *  cannot legally cover, what mobile or web will collect.
  * 
  *  `distinct_id` is intentionally absent — it is an anonymous
  *  per-install identifier whose rotation must break cross-device
  *  linkage, and so stays in the platform's local file rather than
  *  crossing the wire.
  * 
- *  `consent_version` records the schema version of the consent prompt
- *  the user agreed to *on this platform*. Bumping
- *  `CURRENT_CONSENT_VERSION` in the client forces a re-prompt; because
- *  the record is per-platform, the bump propagates independently to
- *  each device.
+ *  ## `consent_version` semantics
  * 
- *  The derived `Default` here is the *wire fallback* used by
- *  `#[serde(default)]` when a partial blob is read off the network
- *  (every field collapses to `false` / `0` — the inert choice). The
- *  product-blessed fresh-install values live in `assets/defaults.jsonc`
- *  and are reached through [`crate::CloudSettings::default()`].
+ *  `consent_version` records the schema version of the consent prompt
+ *  the user agreed to *on this platform*.
+ * 
+ *  - `0` (the `Default`) means the user has **never** seen the prompt.
+ *  - Any value `>= DESKTOP_CONSENT_VERSION` (or the analogue for other
+ *    platforms) means the user has consented to the current schema.
+ *  - A value between `1` and `current - 1` means the user consented to
+ *    an older prompt; the client must re-prompt.
+ * 
+ *  The value is **monotonically non-decreasing** by contract. The only
+ *  writer is the platform's consent procedure, which uses
+ *  [`Self::record_for_desktop`] (analogous methods for other platforms
+ *  will land when those clients ship). Regular settings-page saves
+ *  must *not* touch this field; the IPC layer enforces this by
+ *  clamping incoming values against the stored version.
  */
 export type TelemetryConsent = {
 	consentVersion?: number,

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::shared_types::{SharedSettingsState, SharedThreadManager};
 use euro_endpoint::EndpointManager;
-use euro_settings::{SettingsState, wants_errors};
+use euro_settings::SettingsState;
 use euro_telemetry::Controller as TelemetryController;
 use euro_thread::commands::{NoopChatContextProvider, SharedChatContextProvider};
 use tauri::Manager;
@@ -22,7 +22,12 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // `Arc<TelemetryController>` so the `system_reinit_telemetry`
     // procedure can swap the underlying client when consent changes.
     let telemetry_controller = Arc::new(TelemetryController::init(
-        wants_errors(&settings.cache.settings.desktop.telemetry),
+        settings
+            .cache
+            .settings
+            .desktop
+            .telemetry
+            .allows_errors_on_desktop(),
         settings.local.telemetry.distinct_id.as_deref(),
     ));
 
