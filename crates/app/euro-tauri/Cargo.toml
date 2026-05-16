@@ -25,34 +25,36 @@ path = "src/main.rs"
 test = false
 
 [dependencies]
+activity-core = { workspace = true }
 agent-chain-core = { workspace = true }
 async-trait = { workspace = true }
 auth-core = { workspace = true, features = ["specta"] }
 anyhow = { workspace = true }
 backtrace = { version = "0.3.76", optional = true }
+base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 color-thief = "0.2.2"
 dirs = { workspace = true }
 euro-activity = { workspace = true }
-euro-auth = { workspace = true }
+euro-auth = { workspace = true, features = ["tauri"] }
 euro-bridge = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-process = { workspace = true }
-euro-secret = { workspace = true }
 euro-settings = { workspace = true, features = ["tls-native-roots"] }
 euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
 thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
-euro-user = { workspace = true }
 euro-vision = { workspace = true }
 futures = { workspace = true }
+image = { workspace = true }
 keyring = { workspace = true }
 llm-core = { workspace = true, features = ["specta"] }
 parking_lot = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 rustls = { workspace = true }
+secrecy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }

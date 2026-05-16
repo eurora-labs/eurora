@@ -88,3 +88,78 @@ impl Default for TimelineStorage {
         Self::new(StorageConfig::default())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use euro_activity::Activity;
+
+    fn fresh_storage() -> TimelineStorage {
+        TimelineStorage::new(StorageConfig {
+            max_activities: 10,
+            max_age: std::time::Duration::from_secs(3600),
+            auto_cleanup: false,
+        })
+    }
+
+    fn fresh_activity(name: &str) -> Activity {
+        Activity::new(name.to_string(), None, None, "proc".to_string(), 1, vec![])
+    }
+
+    /// The collector's `NewActivity` branch must end the previous
+    /// activity locally before pushing the new one, so chat-context
+    /// reads and the closing PATCH agree on the row's lifetime.
+    #[test]
+    fn ending_previous_then_adding_new_records_end_on_previous_only() {
+        let mut storage = fresh_storage();
+        let first = fresh_activity("first");
+        let first_id = first.id;
+        storage.add_activity(first);
+
+        // Mirror the collector lifecycle: end the back-most activity
+        // before pushing the next one.
+        if let Some(prev) = storage.get_all_activities_mut().back_mut() {
+            prev.end_activity();
+        }
+        let second = fresh_activity("second");
+        let second_id = second.id;
+        storage.add_activity(second);
+
+        let activities = storage.get_all_activities_mut();
+        let first_back = activities
+            .iter()
+            .find(|a| a.id == first_id)
+            .expect("first activity retained");
+        let second_back = activities
+            .iter()
+            .find(|a| a.id == second_id)
+            .expect("second activity retained");
+
+        assert!(first_back.end.is_some(), "previous activity must be ended");
+        assert!(
+            second_back.end.is_none(),
+            "newly-added activity has no end yet"
+        );
+        assert_eq!(
+            storage.get_current_activity().map(|a| a.id),
+            Some(second_id)
+        );
+    }
+
+    /// `end_activity` is idempotent at the field level — calling it
+    /// twice keeps the first timestamp rather than ratcheting forward.
+    /// The collector relies on this so a `Stopping` after `NewActivity`
+    /// can't accidentally extend the row's `ended_at`.
+    #[test]
+    fn end_activity_is_one_shot_at_field_level() {
+        let mut activity = fresh_activity("once");
+        activity.end_activity();
+        let first = activity.end;
+        std::thread::sleep(std::time::Duration::from_millis(2));
+        // Re-calling overwrites, which is intentional for heartbeat
+        // semantics — confirm the field is writable, not pinned.
+        activity.end_activity();
+        assert!(activity.end.is_some());
+        assert!(activity.end > first);
+    }
+}

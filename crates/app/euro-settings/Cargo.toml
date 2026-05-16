@@ -25,9 +25,9 @@ dirs = { workspace = true }
 euro-auth = { workspace = true }
 euro-endpoint = { workspace = true }
 euro-fs = { workspace = true }
-euro-secret = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
+secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive", "std"] }
 serde_json = { workspace = true, features = ["std"] }
 # Tolerates `//` comments in hand-edited legacy `settings.json` files. The

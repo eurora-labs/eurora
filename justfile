@@ -11,6 +11,7 @@
 #   just dev               full stack (backend hot-reloads via watchexec)
 #   just ios               full stack with mobile on an iOS simulator (macOS only)
 #   just ios-device        full stack with mobile on a physical iPhone (macOS only)
+#   just ios-specta        regenerate mobile Specta bindings (desktop boot, no simulator)
 #   just dev-backend       backend only (Postgres + watchexec)
 #   just dev-backend-once  backend only, no auto-restart (debugger / profiling)
 #   just dev-web           web auth UI only
@@ -126,6 +127,22 @@ ios: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
 [macos]
 _dev-ios-after-backend: _wait-for-backend
     pnpm dev:ios
+
+# ─── Specta binding regeneration ───────────────────────────────────────────
+#
+# Boots the mobile crate as a desktop Tauri window so the Specta export
+# in euro-mobile's startup rewrites apps/mobile/src/lib/bindings/
+# specta.bindings.ts — without Xcode / simulator.
+#
+# No postgres / backend deps: the bindings come from Rust types alone,
+# and the dev binary doesn't need the DB to boot far enough for the
+# export call to run. Env (WEB_URL, optional GOOGLE_CLIENT_ID*) is
+# supplied by `set dotenv-load` + the workspace `export` lines at the
+# top of this file — same as `just ios`.
+
+[macos]
+ios-specta: doctor
+    cd crates/app/euro-mobile && pnpm tauri dev
 
 # ─── Full stack (iOS device) ───────────────────────────────────────────────
 #

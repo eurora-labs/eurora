@@ -1,9 +1,5 @@
 import { unwrap } from '$lib/bindings/result.js';
-import {
-	commands,
-	type TelemetryBootstrap,
-	type TelemetryConsent,
-} from '$lib/bindings/specta.bindings.js';
+import { commands, type TelemetryBootstrap } from '$lib/bindings/specta.bindings.js';
 import { InjectionToken } from '@eurora/shared/context';
 import * as Sentry from '@sentry/svelte';
 import { posthog, type PostHogInterface } from 'posthog-js';
@@ -19,16 +15,17 @@ const SENSITIVE_HEADER_NAMES = new Set([
 /**
  * Owns the lifecycle of Sentry + PostHog in the desktop app.
  *
- * Reads bootstrap data once at startup (consent + anonymous id + embedded
- * keys), then keeps the SDKs in sync with the user's preferences. When
- * the user toggles a switch in the settings UI, [`refresh`] re-runs the
- * gating logic without a process restart. The Rust client is reapplied
- * through `system.reinit_telemetry` so both surfaces stay coherent.
+ * Reads bootstrap data once at startup (precomputed policy + anonymous id
+ * + embedded keys), then keeps the SDKs in sync with the user's
+ * preferences. When the user toggles a switch in the settings UI,
+ * [`refresh`] re-runs the gating logic without a process restart. The
+ * Rust client is reapplied through `system.reinitTelemetry` so both
+ * surfaces stay coherent.
  *
- * Consent and the anonymous distinct id are stored separately on the
- * Rust side (consent travels with the user via the cloud cache;
- * distinct_id stays local). This service composes the two into the
- * `bootstrap` mirror it serves to the rest of the app.
+ * The consent rule itself lives entirely in Rust:
+ * [`TelemetryBootstrap.allowsErrors`] / `allowsMetrics` /
+ * `allowsIdentification` are precomputed by the backend and consumed
+ * verbatim — no `consent_version` comparison runs in TypeScript.
  *
  * `applySdks` and its callers are async because tearing down a Sentry
  * client involves flushing buffered events; serializing the close ↔ init
@@ -41,10 +38,6 @@ export class TelemetryService {
 	private sentryStarted = false;
 	private posthogStarted = false;
 	private identifiedUserId: string | null = null;
-
-	get consent(): TelemetryConsent | null {
-		return this.bootstrap?.consent ?? null;
-	}
 
 	get distinctId(): string | null {
 		return this.bootstrap?.distinctId ?? null;
@@ -61,22 +54,14 @@ export class TelemetryService {
 	}
 
 	/**
-	 * Re-fetch consent + distinct id from the Rust side and reapply both
-	 * SDKs. Called after the settings UI persists a change so
-	 * opt-in/opt-out takes effect immediately.
+	 * Re-fetch the precomputed policy + distinct id from the Rust side and
+	 * reapply both SDKs. Called after the consent prompt persists a change
+	 * so opt-in/opt-out takes effect immediately.
 	 */
 	async refresh(): Promise<void> {
 		if (!this.bootstrap) return;
 		try {
-			const [consent, local] = await Promise.all([
-				commands.settingsGetTelemetryConsent(),
-				commands.settingsGetLocalTelemetry(),
-			]);
-			this.bootstrap = {
-				...this.bootstrap,
-				consent,
-				distinctId: local.distinctId ?? null,
-			};
+			this.bootstrap = unwrap(await commands.systemGetTelemetryBootstrap());
 			await this.applySdks();
 			await commands.systemReinitTelemetry();
 		} catch (error) {
@@ -91,9 +76,7 @@ export class TelemetryService {
 	 * the operator-side join key, not a PII channel.
 	 */
 	identify(user: { email: string; displayName: string | null; role: string }): void {
-		const consent = this.consent;
-		if (!consent || !this.posthogStarted) return;
-		if (!consent.nonAnonymousMetrics) return;
+		if (!this.bootstrap?.allowsIdentification || !this.posthogStarted) return;
 
 		const distinctId = this.distinctId;
 		if (!distinctId) return;
@@ -135,7 +118,7 @@ export class TelemetryService {
 	}
 
 	capture(event: string, properties?: Record<string, unknown>): void {
-		if (!this.consent?.anonymousMetrics || !this.posthogStarted) return;
+		if (!this.bootstrap?.allowsMetrics || !this.posthogStarted) return;
 		posthog.capture(event, properties);
 	}
 
@@ -145,16 +128,11 @@ export class TelemetryService {
 		this.applyPostHog();
 	}
 
-	private hasConsented(): boolean {
-		return (this.consent?.consentVersion ?? 0) > 0;
-	}
-
 	private async applySentry(): Promise<void> {
 		if (!this.bootstrap) return;
-		const { sentryDsn, channel, release } = this.bootstrap;
-		const wantsErrors = this.hasConsented() && this.consent?.anonymousErrors;
+		const { sentryDsn, channel, release, allowsErrors } = this.bootstrap;
 
-		if (!wantsErrors || !sentryDsn) {
+		if (!allowsErrors || !sentryDsn) {
 			if (this.sentryStarted) {
 				// Await so a subsequent re-init doesn't race the flush.
 				await Sentry.getClient()?.close(2_000);
@@ -192,12 +170,9 @@ export class TelemetryService {
 
 	private applyPostHog(): void {
 		if (!this.bootstrap) return;
-		const consent = this.consent;
-		if (!consent) return;
-		const { posthogKey, posthogHost } = this.bootstrap;
-		const wantsMetrics = this.hasConsented() && consent.anonymousMetrics;
+		const { posthogKey, posthogHost, allowsMetrics, allowsIdentification } = this.bootstrap;
 
-		if (!wantsMetrics || !posthogKey) {
+		if (!allowsMetrics || !posthogKey) {
 			if (this.posthogStarted) {
 				posthog.opt_out_capturing();
 			}
@@ -236,7 +211,7 @@ export class TelemetryService {
 		// If the user hasn't opted into non-anonymous metrics but we'd
 		// previously identified them, drop the link so subsequent events
 		// flow under the anonymous distinct id only.
-		if (!consent.nonAnonymousMetrics && this.identifiedUserId) {
+		if (!allowsIdentification && this.identifiedUserId) {
 			posthog.reset();
 			this.identifiedUserId = null;
 		}

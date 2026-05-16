@@ -10,9 +10,9 @@ use std::sync::Arc;
 
 use euro_auth::AuthManager;
 use euro_endpoint::EndpointManager;
-use euro_secret::ExposeSecret;
 use futures::{SinkExt, StreamExt};
 use reqwest::header;
+use secrecy::ExposeSecret;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use thread_core::{

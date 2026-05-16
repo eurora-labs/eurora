@@ -25,9 +25,11 @@ pub struct GetSettingsResponse {
 /// `PUT /settings` — request body.
 ///
 /// `schema_version` rides at the top level so the server can index it
-/// without parsing the blob. `settings` is opaque JSON: clients are
-/// responsible for calling [`CloudSettings::sanitize`](crate::CloudSettings::sanitize)
-/// before serializing, since the server does not interpret the document.
+/// without parsing the blob. `settings` is opaque JSON: the server does
+/// not interpret the document, so well-formedness is the client's
+/// concern. Field-level invariants (e.g. UI scale bounds) are carried
+/// by the field types themselves — see [`crate::DesktopSettings`] —
+/// so a serialized [`crate::CloudSettings`] is always within range.
 ///
 /// `base_updated_at` is the `updated_at` the client last observed on the
 /// server. `None` means "this is a first write; only succeed if no row

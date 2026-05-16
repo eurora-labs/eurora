@@ -1,66 +1,136 @@
 //! Third-party (OAuth) authentication flow.
 //!
-//! Lives behind two public entry points on [`AuthService`]:
+//! Two public entry points on [`AuthService`]:
 //!
 //! - [`AuthService::third_party_auth_url`] mints the authorisation URL
 //!   the desktop / web client redirects the user to. Stores a single
-//!   `oauth_state` row containing the encrypted PKCE verifier and (for
-//!   OIDC providers) the encrypted nonce.
+//!   `oauth_state` row containing the encrypted PKCE verifier, the
+//!   encrypted OIDC nonce, and the optional encrypted desktop-pairing
+//!   `login_token`. All three live on the row; the callback never has
+//!   to thread any of them through user-controlled state.
 //! - [`AuthService::login_third_party`] handles the callback: consumes
-//!   the state row, exchanges the code with the provider, resolves /
-//!   creates the user, and mints a session.
+//!   the state row, exchanges the code with the provider via the
+//!   shared [`OAuthProviderExt`] trait, resolves / creates the user,
+//!   and mints a session.
 //!
 //! The shared post-resolution tail (`complete_oauth_login`) runs once
-//! per provider so token-issuing logic stays in lockstep.
+//! per provider so token-issuing logic stays in lockstep. Every
+//! redirect-callback path — web/mobile × Google/GitHub/Apple — funnels
+//! through one private completion helper that varies on a
+//! [`CallbackFlow`] discriminant and an optional Apple display-name
+//! override.
+//!
+//! Encryption boundary: the [`OAuthProviderExt`] trait hands the
+//! orchestrator decrypted [`RawOAuthTokens`]. Encryption happens here,
+//! in [`AuthService::exchange_authorization_code`], so the
+//! crypto-keyring dependency stays out of the provider-client layer.
 
 use auth_core::{Provider, TokenResponse};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use be_remote_db::{DbError, OAuthProvider};
 use chrono::{Duration, Utc};
 use openidconnect::{Nonce, PkceCodeChallenge};
 use secrecy::ExposeSecret;
+use sha2::{Digest, Sha256};
 
 use crate::OAUTH_STATE_EXPIRY_MINUTES;
 use crate::USERS_EMAIL_UNIQUE_CONSTRAINT;
 use crate::crypto::{decrypt_sensitive_string, encrypt_sensitive_string};
 use crate::error::{AuthError, AuthResult};
 use crate::log_redaction::hash_email_for_log;
+use crate::oauth::provider_ext::{OAuthIdentityRaw, OAuthProviderExt, RawOAuthTokens};
 use crate::oauth::{NewOAuthIdentity, OAuthTokenBundle};
 use crate::service::{AuthService, MintedSession, user_info_from_row};
 use crate::tokens::random_hex;
 
 const OAUTH_STATE_BYTES: usize = 16; // 32 hex chars, ~128 bits of entropy
 
+/// Which callback shape we're completing. Drives where the device-
+/// pairing token comes from and which provider redirect URI we send to
+/// the token endpoint.
+///
+/// - [`CallbackFlow::Web`]: pairing token (if any) was stashed on the
+///   `oauth_state` row at issue time and is read back during code
+///   exchange. The minted session is returned to the caller for
+///   cookie / JSON dispatch.
+/// - [`CallbackFlow::Mobile`]: the device's PKCE challenge **is** the
+///   OAuth `state` and doubles as the pairing token; the
+///   `oauth_state.login_token` column is `None` for these rows by
+///   construction. The device picks tokens up via the existing
+///   `/auth/login-token/exchange` poll; the minted session here is
+///   discarded by the caller.
+#[derive(Clone, Copy)]
+enum CallbackFlow {
+    Web,
+    Mobile,
+}
+
 impl AuthService {
-    pub async fn third_party_auth_url(&self, provider: Provider) -> AuthResult<String> {
-        match provider {
-            Provider::Google => self.google_auth_url().await,
-            Provider::Github => self.github_auth_url().await,
-        }
+    /// Mint the authorization URL for a web/desktop OAuth start.
+    ///
+    /// The optional `login_token` (the desktop client's PKCE
+    /// challenge) is encrypted and stamped onto the new `oauth_state`
+    /// row. On callback the value is read back off the row inside
+    /// `complete_oauth_login`'s pairing step — there is no user-
+    /// controlled path threading it through the callback body any
+    /// more.
+    pub async fn third_party_auth_url(
+        &self,
+        provider: Provider,
+        login_token: Option<String>,
+    ) -> AuthResult<String> {
+        tracing::info!(?provider, "Generating OAuth URL");
+        let client = self.oauth_provider(provider)?;
+
+        let state = random_hex(OAUTH_STATE_BYTES);
+        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+        let nonce = Nonce::new_random();
+
+        let url = client.authorization_url(&state, &pkce_challenge, &nonce);
+
+        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
+        let encrypted_nonce = Some(encrypt_sensitive_string(nonce.secret())?);
+        let encrypted_login_token = login_token
+            .as_deref()
+            .map(encrypt_sensitive_string)
+            .transpose()?;
+
+        self.db()
+            .create_oauth_state()
+            .state(state)
+            .pkce_verifier(encrypted_pkce_verifier)
+            .redirect_uri(client.web_redirect_uri().to_string())
+            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
+            .maybe_nonce(encrypted_nonce)
+            .maybe_login_token(encrypted_login_token)
+            .call()
+            .await?;
+
+        Ok(url)
     }
 
+    /// Web/desktop OAuth callback completion. State + PKCE verifier +
+    /// pairing token all come off the consumed `oauth_state` row.
     pub async fn login_third_party(
         &self,
         provider: Provider,
         code: &str,
         state: &str,
-        login_token: Option<String>,
     ) -> AuthResult<MintedSession> {
-        match provider {
-            Provider::Google => self.handle_google_login(code, state, login_token).await,
-            Provider::Github => self.handle_github_login(code, state, login_token).await,
-        }
+        self.complete_third_party_login(provider, code, state, CallbackFlow::Web, None)
+            .await
     }
 
     /// Mobile entry point: build a provider authorisation URL whose
     /// `state` parameter equals the device's PKCE challenge, and whose
-    /// callback hits the backend's mobile-callback endpoint (not the web
-    /// SPA).
+    /// callback hits the backend's mobile-callback endpoint (not the
+    /// web SPA).
     ///
     /// Reusing the device challenge as OAuth `state` removes the need
     /// for a separate column on `oauth_state`: the same value
-    /// double-duties as CSRF token (Google echoes it back) and as the
-    /// `login_tokens` row key (the backend stamps it after a successful
-    /// callback so the device's pending poll can complete).
+    /// double-duties as CSRF token (provider echoes it back) and as
+    /// the `login_tokens` row key (the backend stamps it after a
+    /// successful callback so the device's pending poll can complete).
     pub async fn mobile_third_party_auth_url(
         &self,
         provider: Provider,
@@ -76,171 +146,139 @@ impl AuthService {
             return Err(AuthError::InvalidInput("Invalid code challenge".into()));
         }
 
-        match provider {
-            Provider::Google => self.google_mobile_auth_url(device_challenge).await,
-            Provider::Github => self.github_mobile_auth_url(device_challenge).await,
-        }
+        let client = self.oauth_provider(provider)?;
+        let env_var = client.mobile_redirect_env_var();
+        let mobile_redirect = client
+            .mobile_redirect_uri()
+            .ok_or_else(|| AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(env_var)))?;
+
+        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+        let nonce = Nonce::new_random();
+
+        let url = client
+            .mobile_authorization_url(device_challenge, &pkce_challenge, &nonce)
+            .ok_or_else(|| AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(env_var)))?;
+
+        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
+        let encrypted_nonce = Some(encrypt_sensitive_string(nonce.secret())?);
+
+        self.db()
+            .create_oauth_state()
+            .state(device_challenge.to_string())
+            .pkce_verifier(encrypted_pkce_verifier)
+            .redirect_uri(mobile_redirect.to_string())
+            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
+            .maybe_nonce(encrypted_nonce)
+            // No login_token column for mobile — see [`CallbackFlow::Mobile`]:
+            // the `state` *is* the pairing token, handed back to
+            // `complete_oauth_login` directly by the shared completion
+            // path.
+            .maybe_login_token(None)
+            .call()
+            .await?;
+
+        Ok(url)
     }
 
-    /// Mobile callback completion: pulls the device's stashed challenge
-    /// out of `oauth_state` (it's the `state` parameter), exchanges the
-    /// authorisation code, runs the shared `complete_oauth_login` tail
-    /// passing the challenge as `login_token`, and discards the minted
+    /// Mobile callback completion: exchanges the authorisation code,
+    /// runs the shared completion path, and discards the minted
     /// session. The device picks tokens up via the existing
-    /// `/auth/login-token/exchange` poll (verifier in hand from before
-    /// the redirect).
+    /// `/auth/login-token/exchange` poll.
     pub async fn login_third_party_mobile(
         &self,
         provider: Provider,
         code: &str,
         state: &str,
     ) -> AuthResult<()> {
-        let _session = match provider {
-            Provider::Google => self.handle_google_login_mobile(code, state).await?,
-            Provider::Github => self.handle_github_login_mobile(code, state).await?,
-        };
+        self.complete_third_party_login(provider, code, state, CallbackFlow::Mobile, None)
+            .await?;
         Ok(())
     }
 
-    async fn google_auth_url(&self) -> AuthResult<String> {
-        tracing::info!("Generating Google OAuth URL");
-        let google = self.google_oauth()?;
-        let state = random_hex(OAUTH_STATE_BYTES);
-        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-        let nonce = Nonce::new_random();
-
-        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
-        let encrypted_nonce = encrypt_sensitive_string(nonce.secret())?;
-
-        self.db()
-            .create_oauth_state()
-            .state(state.clone())
-            .pkce_verifier(encrypted_pkce_verifier)
-            .redirect_uri(google.redirect_uri().to_string())
-            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
-            .nonce(encrypted_nonce)
-            .call()
-            .await?;
-
-        Ok(google.authorization_url(&state, pkce_challenge, nonce))
-    }
-
-    async fn google_mobile_auth_url(&self, device_challenge: &str) -> AuthResult<String> {
-        tracing::info!("Generating Google OAuth URL (mobile)");
-        let google = self.google_oauth()?;
-        let mobile_redirect = google.mobile_redirect_uri().ok_or_else(|| {
-            AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
-                "GOOGLE_MOBILE_REDIRECT_URI",
-            ))
-        })?;
-        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-        let nonce = Nonce::new_random();
-
-        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
-        let encrypted_nonce = encrypt_sensitive_string(nonce.secret())?;
-
-        self.db()
-            .create_oauth_state()
-            .state(device_challenge.to_string())
-            .pkce_verifier(encrypted_pkce_verifier)
-            .redirect_uri(mobile_redirect.to_string())
-            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
-            .nonce(encrypted_nonce)
-            .call()
-            .await?;
-
-        google
-            .mobile_authorization_url(device_challenge, pkce_challenge, nonce)
-            .ok_or_else(|| {
-                AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
-                    "GOOGLE_MOBILE_REDIRECT_URI",
-                ))
-            })
-    }
-
-    async fn github_auth_url(&self) -> AuthResult<String> {
-        tracing::info!("Generating GitHub OAuth URL");
-        let github = self.github_oauth()?;
-
-        let state = random_hex(OAUTH_STATE_BYTES);
-        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-
-        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
-
-        self.db()
-            .create_oauth_state()
-            .state(state.clone())
-            .pkce_verifier(encrypted_pkce_verifier)
-            .redirect_uri(github.redirect_uri().to_string())
-            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
-            .nonce(Vec::new())
-            .call()
-            .await?;
-
-        Ok(github.authorization_url(&state, pkce_challenge.as_str()))
-    }
-
-    async fn github_mobile_auth_url(&self, device_challenge: &str) -> AuthResult<String> {
-        tracing::info!("Generating GitHub OAuth URL (mobile)");
-        let github = self.github_oauth()?;
-        let mobile_redirect = github.mobile_redirect_uri().ok_or_else(|| {
-            AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
-                "GITHUB_MOBILE_REDIRECT_URI",
-            ))
-        })?;
-        let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-
-        let encrypted_pkce_verifier = encrypt_sensitive_string(pkce_verifier.secret())?;
-
-        self.db()
-            .create_oauth_state()
-            .state(device_challenge.to_string())
-            .pkce_verifier(encrypted_pkce_verifier)
-            .redirect_uri(mobile_redirect.to_string())
-            .expires_at(Utc::now() + Duration::minutes(OAUTH_STATE_EXPIRY_MINUTES))
-            .nonce(Vec::new())
-            .call()
-            .await?;
-
-        github
-            .mobile_authorization_url(device_challenge, pkce_challenge.as_str())
-            .ok_or_else(|| {
-                AuthError::OAuth(crate::oauth::OAuthError::MissingEnvVar(
-                    "GITHUB_MOBILE_REDIRECT_URI",
-                ))
-            })
-    }
-
-    async fn handle_google_login(
+    /// Apple web-callback completion.
+    ///
+    /// Apple's form-post flow carries a `user` blob (first/last name)
+    /// only in the form-post body — never in the ID token, never on
+    /// subsequent sign-ins. The override is only honored at first
+    /// sign-in: when an existing user matches `(Apple, sub)`,
+    /// `complete_oauth_login` skips the resolve-new path so the
+    /// override never reaches the user row. That guard prevents a
+    /// malicious client from replaying an `id_token` with a fabricated
+    /// `user` field to overwrite an established display name.
+    pub async fn handle_apple_login(
         &self,
         code: &str,
         state: &str,
-        login_token: Option<String>,
+        display_name_override: Option<String>,
     ) -> AuthResult<MintedSession> {
-        let identity = self.exchange_google_code(code, state, false).await?;
+        self.complete_third_party_login(
+            Provider::Apple,
+            code,
+            state,
+            CallbackFlow::Web,
+            display_name_override,
+        )
+        .await
+    }
+
+    /// Apple mobile-callback completion. Same display-name guard as
+    /// [`AuthService::handle_apple_login`]; same discard-session
+    /// pairing shape as [`AuthService::login_third_party_mobile`].
+    pub async fn handle_apple_login_mobile(
+        &self,
+        code: &str,
+        state: &str,
+        display_name_override: Option<String>,
+    ) -> AuthResult<()> {
+        self.complete_third_party_login(
+            Provider::Apple,
+            code,
+            state,
+            CallbackFlow::Mobile,
+            display_name_override,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Shared completion path for every OAuth redirect callback (web +
+    /// mobile, all providers): consume the `oauth_state` row, exchange
+    /// the code, layer the optional Apple display-name override, and
+    /// run the shared `complete_oauth_login` tail.
+    async fn complete_third_party_login(
+        &self,
+        provider: Provider,
+        code: &str,
+        state: &str,
+        flow: CallbackFlow,
+        display_name_override: Option<String>,
+    ) -> AuthResult<MintedSession> {
+        let client = self.oauth_provider(provider)?;
+        let (raw, login_token_on_row) = self
+            .exchange_authorization_code(client.as_ref(), code, state, flow)
+            .await?;
+        let identity = build_new_identity(provider.into(), raw, display_name_override)?;
+        let login_token = match flow {
+            CallbackFlow::Mobile => Some(state.to_string()),
+            CallbackFlow::Web => login_token_on_row,
+        };
         self.complete_oauth_login(identity, login_token).await
     }
 
-    async fn handle_google_login_mobile(
+    /// Shared inner: consume an `oauth_state` row, decrypt PKCE +
+    /// nonce + optional login_token, dispatch to the trait's
+    /// `exchange_code` (web or mobile), and return the raw identity
+    /// plus the decrypted pairing token (if any).
+    ///
+    /// The trait returns plaintext provider tokens; encryption to
+    /// `OAuthTokenBundle` happens downstream in [`build_new_identity`].
+    async fn exchange_authorization_code(
         &self,
+        client: &dyn OAuthProviderExt,
         code: &str,
         state: &str,
-    ) -> AuthResult<MintedSession> {
-        // For the mobile callback the device's challenge *is* the OAuth
-        // state. We hand it back to `complete_oauth_login` as the
-        // `login_token` so the existing pairing path mints the
-        // `login_tokens` row the device will redeem.
-        let identity = self.exchange_google_code(code, state, true).await?;
-        self.complete_oauth_login(identity, Some(state.to_string()))
-            .await
-    }
-
-    async fn exchange_google_code(
-        &self,
-        code: &str,
-        state: &str,
-        mobile: bool,
-    ) -> AuthResult<NewOAuthIdentity> {
+        flow: CallbackFlow,
+    ) -> AuthResult<(OAuthIdentityRaw, Option<String>)> {
         if code.is_empty() {
             return Err(AuthError::InvalidInput(
                 "Authorization code is required".into(),
@@ -252,131 +290,46 @@ impl AuthService {
             ));
         }
 
-        let oauth_state = self.consume_oauth_state(state, "Google").await?;
+        let provider_db = client.provider();
+        let provider: Provider = provider_db.into();
+        let oauth_state = self.consume_oauth_state(state, provider).await?;
 
         let pkce_verifier = decrypt_sensitive_string(&oauth_state.pkce_verifier)?;
 
-        let nonce_bytes = oauth_state
-            .nonce
+        // OIDC providers (Google, Apple) require a nonce; GitHub
+        // doesn't but the trait method takes one unconditionally —
+        // synth a random one when the column is empty so the call
+        // stays uniform.
+        let nonce = match oauth_state.nonce.as_deref() {
+            Some(bytes) => Nonce::new(decrypt_sensitive_string(bytes)?),
+            None => Nonce::new_random(),
+        };
+
+        let login_token = oauth_state
+            .login_token
             .as_deref()
-            .ok_or_else(|| AuthError::InvalidInput("Missing nonce for OIDC verification".into()))?;
-        let nonce = Nonce::new(decrypt_sensitive_string(nonce_bytes)?);
-
-        let google = self.google_oauth()?;
-        let user_info = if mobile {
-            google
-                .mobile_exchange_code(code, pkce_verifier, &nonce)
-                .await
-        } else {
-            google.exchange_code(code, pkce_verifier, &nonce).await
-        }?;
-
-        if !user_info.verified_email {
-            tracing::warn!(
-                email_log = ?hash_email_for_log(&user_info.email),
-                "Google login rejected: email not verified",
-            );
-            return Err(AuthError::EmailNotVerified);
-        }
-
-        let encrypted_access_token =
-            encrypt_sensitive_string(user_info.access_token.expose_secret())?;
-        let encrypted_refresh_token = user_info
-            .refresh_token
-            .as_ref()
-            .map(|t| encrypt_sensitive_string(t.expose_secret()))
+            .map(decrypt_sensitive_string)
             .transpose()?;
-        let access_token_expiry = user_info
-            .expires_in
-            .map(|d| Utc::now() + Duration::seconds(d.as_secs() as i64));
 
-        Ok(NewOAuthIdentity {
-            provider: OAuthProvider::Google,
-            provider_user_id: user_info.id,
-            email: user_info.email,
-            email_verified: user_info.verified_email,
-            display_name: user_info.display_name,
-            tokens: OAuthTokenBundle {
-                encrypted_access_token,
-                encrypted_refresh_token,
-                access_token_expiry,
-                scope: user_info.scope,
-            },
-        })
-    }
+        let raw = match flow {
+            CallbackFlow::Mobile => {
+                client
+                    .mobile_exchange_code(code, pkce_verifier, &nonce)
+                    .await?
+            }
+            CallbackFlow::Web => client.exchange_code(code, pkce_verifier, &nonce).await?,
+        };
 
-    async fn handle_github_login(
-        &self,
-        code: &str,
-        state: &str,
-        login_token: Option<String>,
-    ) -> AuthResult<MintedSession> {
-        let identity = self.exchange_github_code(code, state, false).await?;
-        self.complete_oauth_login(identity, login_token).await
-    }
-
-    async fn handle_github_login_mobile(
-        &self,
-        code: &str,
-        state: &str,
-    ) -> AuthResult<MintedSession> {
-        let identity = self.exchange_github_code(code, state, true).await?;
-        self.complete_oauth_login(identity, Some(state.to_string()))
-            .await
-    }
-
-    async fn exchange_github_code(
-        &self,
-        code: &str,
-        state: &str,
-        mobile: bool,
-    ) -> AuthResult<NewOAuthIdentity> {
-        if code.is_empty() {
-            return Err(AuthError::InvalidInput(
-                "Authorization code is required".into(),
-            ));
-        }
-        if state.is_empty() {
-            return Err(AuthError::InvalidInput(
-                "State parameter is required".into(),
-            ));
-        }
-
-        let oauth_state = self.consume_oauth_state(state, "GitHub").await?;
-
-        let pkce_verifier = decrypt_sensitive_string(&oauth_state.pkce_verifier)?;
-
-        let github = self.github_oauth()?;
-        let user_info = if mobile {
-            github.mobile_exchange_code(code, &pkce_verifier).await
-        } else {
-            github.exchange_code(code, &pkce_verifier).await
-        }?;
-
-        if !user_info.verified_email {
+        if !raw.email_verified {
             tracing::warn!(
-                email_log = ?hash_email_for_log(&user_info.email),
-                "GitHub login rejected: email not verified",
+                ?provider_db,
+                email_log = ?hash_email_for_log(&raw.email),
+                "OAuth login rejected: email not verified",
             );
             return Err(AuthError::EmailNotVerified);
         }
 
-        let encrypted_access_token =
-            encrypt_sensitive_string(user_info.access_token.expose_secret())?;
-
-        Ok(NewOAuthIdentity {
-            provider: OAuthProvider::Github,
-            provider_user_id: user_info.id,
-            email: user_info.email,
-            email_verified: user_info.verified_email,
-            display_name: user_info.display_name,
-            tokens: OAuthTokenBundle {
-                encrypted_access_token,
-                encrypted_refresh_token: None,
-                access_token_expiry: None,
-                scope: user_info.scope,
-            },
-        })
+        Ok((raw, login_token))
     }
 
     /// Native-mobile entry point: trade a Google ID token (issued
@@ -411,38 +364,100 @@ impl AuthService {
             return Err(AuthError::EmailNotVerified);
         }
 
-        // Native flow yields no Google access/refresh — `verify_id_token`
-        // returns an empty `access_token` placeholder. Persist nothing
-        // for the provider tokens; downstream logic tolerates an empty
-        // bundle.
-        let encrypted_access_token =
-            encrypt_sensitive_string(user_info.access_token.expose_secret())?;
-
-        let identity = NewOAuthIdentity {
-            provider: OAuthProvider::Google,
+        // Native flow yields no Google access/refresh — the
+        // `oauth_credentials` row is a pure provider-link record.
+        let raw = OAuthIdentityRaw {
             provider_user_id: user_info.id,
             email: user_info.email,
             email_verified: user_info.verified_email,
             display_name: user_info.display_name,
-            tokens: OAuthTokenBundle {
-                encrypted_access_token,
-                encrypted_refresh_token: None,
+            tokens: RawOAuthTokens {
+                access_token: user_info.access_token,
+                refresh_token: user_info.refresh_token,
                 access_token_expiry: None,
                 scope: user_info.scope,
             },
         };
 
+        let identity = build_new_identity(OAuthProvider::Google, raw, None)?;
+        self.complete_oauth_login(identity, None).await
+    }
+
+    /// Native-iOS entry point: trade an Apple ID token (issued by
+    /// `ASAuthorizationController` running in-process) for a session.
+    ///
+    /// Nonce semantics: Apple echoes the value the client placed in
+    /// `request.nonce` verbatim into the ID token's `nonce` claim. The
+    /// iOS plugin sets that field to `base64url(sha256(raw_nonce))`, so
+    /// the backend must re-derive the same hash and compare against the
+    /// claim — never the raw nonce. Computing the hash here, rather
+    /// than asking the client to pre-hash before sending, keeps the
+    /// authoritative nonce-handling logic on the trusted side.
+    ///
+    /// `display_name_override` (Apple's
+    /// `ASAuthorizationAppleIDCredential.fullName`) is layered onto the
+    /// `OAuthIdentityRaw` *before* projection into a `NewOAuthIdentity`.
+    /// First-sign-in-only application is enforced structurally:
+    /// `create_oauth_user` is the only path that consumes
+    /// `display_name`, so a malicious client cannot replay a stolen
+    /// `id_token` with a fabricated `user` blob to overwrite an
+    /// established name.
+    ///
+    /// No `oauth_state` row is touched (no browser round-trip, no CSRF
+    /// state) and `login_token` is `None` (the device is the session
+    /// bearer; the response carries access / refresh tokens directly).
+    pub async fn login_apple_id_token(
+        &self,
+        id_token: &str,
+        raw_nonce: &str,
+        display_name_override: Option<String>,
+    ) -> AuthResult<MintedSession> {
+        if id_token.is_empty() {
+            return Err(AuthError::InvalidInput("ID token is required".into()));
+        }
+        if raw_nonce.is_empty() {
+            return Err(AuthError::InvalidInput("raw nonce is required".into()));
+        }
+
+        let apple = self.apple_oauth()?;
+        let expected_nonce = expected_apple_native_nonce(raw_nonce);
+        let user_info = apple.verify_id_token(id_token, Some(&expected_nonce))?;
+
+        if !user_info.email_verified {
+            tracing::warn!(
+                email_log = ?hash_email_for_log(&user_info.email),
+                "Apple ID-token login rejected: email not verified",
+            );
+            return Err(AuthError::EmailNotVerified);
+        }
+
+        // Apple never hands the relying party a usable access / refresh
+        // token on the native path; the `oauth_credentials` row is a
+        // pure provider-link record.
+        let raw = OAuthIdentityRaw {
+            provider_user_id: user_info.sub,
+            email: user_info.email,
+            email_verified: user_info.email_verified,
+            display_name: user_info.display_name,
+            tokens: RawOAuthTokens {
+                access_token: None,
+                refresh_token: None,
+                access_token_expiry: None,
+                scope: String::new(),
+            },
+        };
+
+        let identity = build_new_identity(OAuthProvider::Apple, raw, display_name_override)?;
         self.complete_oauth_login(identity, None).await
     }
 
     /// Consume a previously-issued `oauth_state` row, rejecting anything
-    /// that isn't a fresh, unexpired match. The provider name is used
-    /// only for the warn-log so SecOps can tell which callback path
-    /// failed.
+    /// that isn't a fresh, unexpired match. `provider` is used only
+    /// for the warn-log so SecOps can tell which callback path failed.
     async fn consume_oauth_state(
         &self,
         state: &str,
-        provider: &'static str,
+        provider: Provider,
     ) -> AuthResult<be_remote_db::OAuthState> {
         self.db()
             .consume_oauth_state()
@@ -451,7 +466,7 @@ impl AuthService {
             .await
             .map_err(|e| {
                 if e.is_not_found() {
-                    tracing::warn!(provider, "Invalid or expired OAuth state");
+                    tracing::warn!(?provider, "Invalid or expired OAuth state");
                     AuthError::InvalidInput("Invalid or expired state parameter".into())
                 } else {
                     AuthError::Database(e)
@@ -461,11 +476,18 @@ impl AuthService {
 
     /// Shared tail for every OAuth-flow handler:
     ///
-    /// 1. resolve / create the user,
+    /// 1. resolve / create the user (apply `display_name` only on
+    ///    create — never overwrite an existing row),
     /// 2. reconcile `email_verified` with what the provider asserted,
-    /// 3. (best-effort) attach a device-pairing login token,
+    /// 3. attach a device-pairing login token if one was stashed on
+    ///    the state row (or supplied by the mobile callback shim),
     /// 4. ensure the user has a plan row and resolve their role,
     /// 5. mint and persist an access/refresh token pair.
+    ///
+    /// The returned [`MintedSession`] carries
+    /// [`MintedSession::was_paired`] so the Apple web-callback can
+    /// communicate the pairing outcome through a top-level navigation
+    /// (the SPA can't see the response body of the form-post 303).
     async fn complete_oauth_login(
         &self,
         identity: NewOAuthIdentity,
@@ -477,17 +499,24 @@ impl AuthService {
             .sync_oauth_email_verified(&user, provider_verified)
             .await?;
 
+        let paired = login_token.is_some();
         if let Some(token) = login_token {
-            // Device-pairing failures must propagate — silently dropping
-            // the row leaves the polling client waiting forever.
+            // Device-pairing failures must propagate — silently
+            // dropping the row leaves the polling client waiting
+            // forever.
             self.associate_login_token_with_user(&user, &token).await?;
         }
 
         let role = self
             .ensure_plan_and_resolve_role(user.id, &user.email)
             .await?;
-        self.mint_session_with_verified_override(&user, role, email_verified)
-            .await
+        let mut session = self
+            .mint_session_with_verified_override(&user, role, email_verified)
+            .await?;
+        if paired {
+            session = session.mark_paired();
+        }
+        Ok(session)
     }
 
     /// Resolve the user for an OAuth-provided identity.
@@ -549,6 +578,15 @@ impl AuthService {
         provider: OAuthProvider,
         tokens: OAuthTokenBundle,
     ) {
+        // Apple's web flow / native-ID-token flows hand the relying
+        // party no access token; skip the update entirely rather than
+        // overwriting a possibly-still-useful past value. The
+        // `oauth_credentials` row is preserved as a pure provider-link
+        // record.
+        let Some(encrypted_access_token) = tokens.encrypted_access_token else {
+            return;
+        };
+
         let oauth_creds = match self
             .db()
             .get_oauth_credentials_by_provider_and_user()
@@ -573,7 +611,7 @@ impl AuthService {
             .db()
             .update_oauth_credentials()
             .id(oauth_creds.id)
-            .access_token(tokens.encrypted_access_token)
+            .access_token(encrypted_access_token)
             .maybe_refresh_token(tokens.encrypted_refresh_token)
             .maybe_access_token_expiry(tokens.access_token_expiry)
             .scope(tokens.scope)
@@ -610,7 +648,7 @@ impl AuthService {
             .email_verified(email_verified)
             .provider(provider)
             .provider_user_id(provider_user_id)
-            .access_token(tokens.encrypted_access_token)
+            .maybe_access_token(tokens.encrypted_access_token)
             .maybe_refresh_token(tokens.encrypted_refresh_token)
             .maybe_access_token_expiry(tokens.access_token_expiry)
             .scope(tokens.scope)
@@ -690,5 +728,110 @@ impl AuthService {
         };
         let user_info = user_info_from_row(user, role, override_email_verified);
         Ok(MintedSession::new(tokens, user_info))
+    }
+}
+
+/// Encrypt provider-issued plaintext tokens into the storage shape.
+///
+/// Sole encryption chokepoint for the OAuth flow: the
+/// [`OAuthProviderExt`] trait deliberately hands back plaintext
+/// secrets so the crypto-keyring dependency stays out of the
+/// provider-client layer. Anyone reaching for these encrypted bytes
+/// must go through this function.
+fn encrypt_token_bundle(tokens: RawOAuthTokens) -> AuthResult<OAuthTokenBundle> {
+    let encrypted_access_token = tokens
+        .access_token
+        .as_ref()
+        .map(|t| encrypt_sensitive_string(t.expose_secret()))
+        .transpose()?;
+    let encrypted_refresh_token = tokens
+        .refresh_token
+        .as_ref()
+        .map(|t| encrypt_sensitive_string(t.expose_secret()))
+        .transpose()?;
+    Ok(OAuthTokenBundle {
+        encrypted_access_token,
+        encrypted_refresh_token,
+        access_token_expiry: tokens.access_token_expiry,
+        scope: tokens.scope,
+    })
+}
+
+/// Compute the value Apple's native iOS flow will have placed in the
+/// ID token's `nonce` claim, given the raw nonce the client kept.
+///
+/// `ASAuthorizationAppleIDRequest.nonce` echoes back verbatim, so the
+/// iOS plugin hashes (`base64url(sha256(raw_nonce_bytes))`) before
+/// assignment. The backend re-derives the same hash and byte-compares
+/// against the claim — keeping the authoritative hashing on the trusted
+/// side rules out clients shipping a malformed digest.
+pub(crate) fn expected_apple_native_nonce(raw_nonce: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(raw_nonce.as_bytes());
+    URL_SAFE_NO_PAD.encode(hasher.finalize())
+}
+
+/// Project an `OAuthIdentityRaw` (returned by `OAuthProviderExt`,
+/// plaintext) onto the encrypted [`NewOAuthIdentity`] shape
+/// `complete_oauth_login` consumes.
+///
+/// `display_name_override` is the provider-specific override the
+/// caller wants applied — Apple is the only case (today) where
+/// display name doesn't come from the ID token but from the
+/// form-post / native credential. When `Some`, it supersedes any
+/// value the trait already set.
+fn build_new_identity(
+    provider: OAuthProvider,
+    raw: OAuthIdentityRaw,
+    display_name_override: Option<String>,
+) -> AuthResult<NewOAuthIdentity> {
+    let tokens = encrypt_token_bundle(raw.tokens)?;
+    Ok(NewOAuthIdentity {
+        provider,
+        provider_user_id: raw.provider_user_id,
+        email: raw.email,
+        email_verified: raw.email_verified,
+        display_name: display_name_override.or(raw.display_name),
+        tokens,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expected_apple_native_nonce_hashes_with_sha256_base64url() {
+        // Fixed-value check: SHA-256 of "raw-nonce" is well-known; the
+        // base64url-no-pad encoding is what Apple's `request.nonce`
+        // expects from the iOS plugin. If either the hash function or
+        // the encoding ever drifts, this test surfaces it before a
+        // real device sees a "nonce mismatch" rejection.
+        let hash = expected_apple_native_nonce("raw-nonce");
+        assert_eq!(hash, "LF0QeTgFOiJ18CLBU8mnH2XuB3VLi8pUPul6DDzGaZA");
+    }
+
+    #[test]
+    fn expected_apple_native_nonce_handles_empty_input() {
+        // Defence-in-depth — the SHA-256 of the empty string is itself
+        // a stable, well-known constant. The handler rejects empty
+        // `raw_nonce` before reaching here, but the helper itself
+        // must not panic.
+        let hash = expected_apple_native_nonce("");
+        assert_eq!(hash, "47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU");
+    }
+
+    #[test]
+    fn expected_apple_native_nonce_is_url_safe() {
+        // Apple ferries the nonce through a URL claim — the encoding
+        // must not contain `+`, `/`, or `=`. Sweep across enough
+        // inputs to catch any encoder change.
+        for input in ["", "a", "ada lovelace", "🦀", "/?=+"] {
+            let hash = expected_apple_native_nonce(input);
+            assert!(
+                !hash.contains(['+', '/', '=']),
+                "non-url-safe output for {input:?}: {hash}",
+            );
+        }
     }
 }

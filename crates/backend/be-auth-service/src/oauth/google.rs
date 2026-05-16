@@ -277,7 +277,9 @@ impl GoogleOAuthClient {
             .and_then(|localized| localized.get(None).map(|v| v.to_string()))
             .filter(|s| !s.is_empty());
 
-        let access_token = SecretString::from(token_response.access_token().secret().to_string());
+        let access_token = Some(SecretString::from(
+            token_response.access_token().secret().to_string(),
+        ));
         let refresh_token = token_response
             .refresh_token()
             .map(|t| SecretString::from(t.secret().to_string()));
@@ -366,18 +368,16 @@ impl GoogleOAuthClient {
             .filter(|s| !s.is_empty());
 
         // Native ID-token flows don't yield a Google access/refresh
-        // token (we only need the identity). The `oauth_credentials`
-        // row therefore stores no provider tokens — leave the encrypted
-        // bytes empty and let the row exist as a pure provider-link
-        // record. The downstream `complete_oauth_login` writes an
-        // `OAuthTokenBundle` regardless, so we synthesise one with
-        // empty secrets here.
+        // token — the `oauth_credentials` row exists as a pure
+        // provider-link record. Modelled as `None` rather than an
+        // empty `SecretString` so callers can't accidentally encrypt
+        // and persist a zero-length token.
         Ok(GoogleUserInfo {
             id,
             email,
             verified_email,
             display_name,
-            access_token: SecretString::from(String::new()),
+            access_token: None,
             refresh_token: None,
             expires_in: None,
             scope: "openid email profile".to_string(),
@@ -391,7 +391,10 @@ pub struct GoogleUserInfo {
     pub email: String,
     pub verified_email: bool,
     pub display_name: Option<String>,
-    pub access_token: SecretString,
+    /// `None` for the native-ID-token flow (no token endpoint
+    /// round-trip happened); `Some` for the redirect/code-exchange
+    /// flow.
+    pub access_token: Option<SecretString>,
     pub refresh_token: Option<SecretString>,
     pub expires_in: Option<std::time::Duration>,
     pub scope: String,

@@ -13,7 +13,6 @@ pub use euro_thread::commands::{ActiveStreamTokens, SharedThreadManager};
 /// disk.
 pub type SharedSettingsState = Arc<Mutex<SettingsState>>;
 pub type SharedEndpointManager = Arc<EndpointManager>;
-pub type SharedUserController = Mutex<euro_user::UserController>;
 
 /// Process-wide HTTP client used by every backend-touching procedure
 /// (`payment_*`, `system_test_backend_url`, `system_get_llm_info`, …).

@@ -67,6 +67,12 @@ impl AssetServiceError {
 
 fn render_asset(err: &AssetError) -> Rendered {
     match err {
+        AssetError::NotFound => Rendered {
+            status: StatusCode::NOT_FOUND,
+            kind: "not_found",
+            message: Cow::Borrowed("Asset not found"),
+            details: None,
+        },
         AssetError::EmptyContent => Rendered {
             status: StatusCode::BAD_REQUEST,
             kind: "empty_content",
@@ -115,6 +121,24 @@ fn render_asset(err: &AssetError) -> Rendered {
                 status: StatusCode::INTERNAL_SERVER_ERROR,
                 kind: "database_link_activity",
                 message: Cow::Borrowed("Failed to link asset to activity"),
+                details: None,
+            }
+        }
+        AssetError::DatabaseRead(e) => {
+            tracing::error!(error = %e, "database read failed");
+            Rendered {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                kind: "database_read",
+                message: Cow::Borrowed("Failed to read asset from database"),
+                details: None,
+            }
+        }
+        AssetError::StorageDownload(e) => {
+            tracing::error!(error = %e, "storage download failed");
+            Rendered {
+                status: StatusCode::BAD_GATEWAY,
+                kind: "storage_download",
+                message: Cow::Borrowed("Failed to download asset from storage"),
                 details: None,
             }
         }

@@ -1,30 +1,50 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+/// Version of the desktop telemetry consent prompt. Bumping forces every
+/// stored consent record on desktop to re-prompt: the gate compares the
+/// user's stored [`TelemetryConsent::consent_version`] against this
+/// value and the user is sent through the prompt again whenever stored
+/// is below current.
+///
+/// Lives alongside the field it ratchets against so a bump can't drift
+/// from the comparison. When mobile and web ship their own consent
+/// flows, declare their own `MOBILE_CONSENT_VERSION` / `WEB_CONSENT_VERSION`
+/// constants in this module — the [`TelemetryConsent`] struct is shared
+/// but the "current version" is per-platform because each platform's
+/// consent prompt is a separate document.
+pub const DESKTOP_CONSENT_VERSION: u32 = 1;
+
 /// Per-platform telemetry consent record. Lives under each platform
-/// section of [`crate::CloudSettings`] — never under `SharedSettings` —
-/// because consent must be specific to the data actually collected,
-/// and each platform ships a different telemetry stack (Sentry +
-/// PostHog on desktop, platform-native SDKs on mobile, etc.). A user
-/// agreeing on desktop has not seen, and cannot legally cover, what
-/// mobile or web will collect.
+/// section of [`crate::CloudSettings`] — never under
+/// [`crate::SharedSettings`] — because consent must be specific to the
+/// data actually collected, and each platform ships a different
+/// telemetry stack (Sentry + PostHog on desktop, platform-native SDKs
+/// on mobile, etc.). A user agreeing on desktop has not seen, and
+/// cannot legally cover, what mobile or web will collect.
 ///
 /// `distinct_id` is intentionally absent — it is an anonymous
 /// per-install identifier whose rotation must break cross-device
 /// linkage, and so stays in the platform's local file rather than
 /// crossing the wire.
 ///
-/// `consent_version` records the schema version of the consent prompt
-/// the user agreed to *on this platform*. Bumping
-/// `CURRENT_CONSENT_VERSION` in the client forces a re-prompt; because
-/// the record is per-platform, the bump propagates independently to
-/// each device.
+/// ## `consent_version` semantics
 ///
-/// The derived `Default` here is the *wire fallback* used by
-/// `#[serde(default)]` when a partial blob is read off the network
-/// (every field collapses to `false` / `0` — the inert choice). The
-/// product-blessed fresh-install values live in `assets/defaults.jsonc`
-/// and are reached through [`crate::CloudSettings::default()`].
+/// `consent_version` records the schema version of the consent prompt
+/// the user agreed to *on this platform*.
+///
+/// - `0` (the `Default`) means the user has **never** seen the prompt.
+/// - Any value `>= DESKTOP_CONSENT_VERSION` (or the analogue for other
+///   platforms) means the user has consented to the current schema.
+/// - A value between `1` and `current - 1` means the user consented to
+///   an older prompt; the client must re-prompt.
+///
+/// The value is **monotonically non-decreasing** by contract. The only
+/// writer is the platform's consent procedure, which uses
+/// [`Self::record_for_desktop`] (analogous methods for other platforms
+/// will land when those clients ship). Regular settings-page saves
+/// must *not* touch this field; the IPC layer enforces this by
+/// clamping incoming values against the stored version.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default, rename_all = "camelCase")]
@@ -44,22 +64,131 @@ pub struct TelemetryConsent {
     pub extras: Map<String, Value>,
 }
 
+impl TelemetryConsent {
+    /// `true` when the user has agreed to the current desktop consent
+    /// prompt and the SDKs may run subject to the individual toggles.
+    /// `false` while the user has either never seen the prompt
+    /// (`consent_version == 0`) or only agreed to an older one.
+    #[must_use]
+    pub fn is_recorded_for_desktop(&self) -> bool {
+        self.consent_version >= DESKTOP_CONSENT_VERSION
+    }
+
+    /// Inverse of [`Self::is_recorded_for_desktop`]. Drives the gate
+    /// that redirects users to the consent prompt before any other
+    /// route can render.
+    #[must_use]
+    pub fn needs_prompt_for_desktop(&self) -> bool {
+        !self.is_recorded_for_desktop()
+    }
+
+    /// `true` when anonymous error reporting may run on desktop.
+    /// Requires both a recorded consent at the current version and the
+    /// user's explicit opt-in.
+    #[must_use]
+    pub fn allows_errors_on_desktop(&self) -> bool {
+        self.is_recorded_for_desktop() && self.anonymous_errors
+    }
+
+    /// `true` when anonymous usage metrics may run on desktop.
+    #[must_use]
+    pub fn allows_metrics_on_desktop(&self) -> bool {
+        self.is_recorded_for_desktop() && self.anonymous_metrics
+    }
+
+    /// `true` when the user has opted into non-anonymous identification
+    /// on top of anonymous metrics. The anonymous metrics check is a
+    /// precondition because turning identification on without metrics
+    /// would still produce zero events to identify against.
+    #[must_use]
+    pub fn allows_identification_on_desktop(&self) -> bool {
+        self.allows_metrics_on_desktop() && self.non_anonymous_metrics
+    }
+
+    /// Stamp the consent version for desktop, monotonically. Called by
+    /// the desktop consent procedure after writing the user's toggle
+    /// choices. Never downgrades: a stored value above
+    /// [`DESKTOP_CONSENT_VERSION`] (written by a newer client) is left
+    /// alone, so an older client running the same procedure can't roll
+    /// back the user's recorded consent.
+    pub fn record_for_desktop(&mut self) {
+        self.consent_version = self.consent_version.max(DESKTOP_CONSENT_VERSION);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn wire_fallback_default_is_inert() {
-        // Derived `Default` is the partial-JSON fallback, not the
-        // fresh-install default. It must be inert — every toggle off,
-        // every counter zero — so an older client's missing fields
-        // can't silently opt a user in to anything.
-        let t = TelemetryConsent::default();
-        assert_eq!(t.consent_version, 0);
-        assert!(!t.anonymous_metrics);
-        assert!(!t.anonymous_errors);
-        assert!(!t.non_anonymous_metrics);
-        assert!(t.extras.is_empty());
+    fn default_needs_prompt() {
+        // The load-bearing sentinel: a fresh `TelemetryConsent` must
+        // require the prompt. `consent_version` defaults to 0 via
+        // `u32::default()` and 0 is below every defined `*_CONSENT_VERSION`.
+        let c = TelemetryConsent::default();
+        assert_eq!(c.consent_version, 0);
+        assert!(c.needs_prompt_for_desktop());
+        assert!(!c.is_recorded_for_desktop());
+        assert!(!c.allows_errors_on_desktop());
+        assert!(!c.allows_metrics_on_desktop());
+        assert!(!c.allows_identification_on_desktop());
+        assert!(c.extras.is_empty());
+    }
+
+    #[test]
+    fn record_advances_to_current_version() {
+        let mut c = TelemetryConsent::default();
+        c.record_for_desktop();
+        assert_eq!(c.consent_version, DESKTOP_CONSENT_VERSION);
+        assert!(c.is_recorded_for_desktop());
+    }
+
+    #[test]
+    fn record_is_monotonic() {
+        // A newer client stamped a higher version; the older client's
+        // record call must not downgrade it.
+        let mut c = TelemetryConsent {
+            consent_version: DESKTOP_CONSENT_VERSION + 5,
+            ..Default::default()
+        };
+        c.record_for_desktop();
+        assert_eq!(c.consent_version, DESKTOP_CONSENT_VERSION + 5);
+    }
+
+    #[test]
+    fn allows_gates_require_recorded_consent() {
+        // Toggles set to `true` are inert until consent is recorded.
+        // Prevents an older client with stale toggles from silently
+        // enabling capture before the user re-confirms.
+        let mut c = TelemetryConsent {
+            consent_version: 0,
+            anonymous_metrics: true,
+            anonymous_errors: true,
+            non_anonymous_metrics: true,
+            ..Default::default()
+        };
+        assert!(!c.allows_errors_on_desktop());
+        assert!(!c.allows_metrics_on_desktop());
+        assert!(!c.allows_identification_on_desktop());
+
+        c.record_for_desktop();
+        assert!(c.allows_errors_on_desktop());
+        assert!(c.allows_metrics_on_desktop());
+        assert!(c.allows_identification_on_desktop());
+    }
+
+    #[test]
+    fn identification_requires_anonymous_metrics() {
+        let mut c = TelemetryConsent {
+            anonymous_metrics: false,
+            anonymous_errors: true,
+            non_anonymous_metrics: true,
+            ..Default::default()
+        };
+        c.record_for_desktop();
+        assert!(!c.allows_identification_on_desktop());
+        c.anonymous_metrics = true;
+        assert!(c.allows_identification_on_desktop());
     }
 
     #[test]

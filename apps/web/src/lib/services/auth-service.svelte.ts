@@ -68,18 +68,12 @@ export class AuthService {
 		this.#setSession(resp.user);
 	}
 
-	async loginWithOAuth(
-		provider: OAuthProvider,
-		code: string,
-		state: string,
-		opts?: { loginToken?: string },
-	): Promise<void> {
+	async loginWithOAuth(provider: OAuthProvider, code: string, state: string): Promise<void> {
 		const body: LoginRequest = {
 			kind: 'third_party',
 			provider,
 			code,
 			state,
-			login_token: opts?.loginToken ?? null,
 		};
 		const resp = await this.#api.fetch<UserResponse, LoginRequest>('/auth/login', { body });
 		this.#setSession(resp.user);
@@ -117,13 +111,43 @@ export class AuthService {
 		}
 	}
 
-	async getOAuthRedirectUrl(provider: OAuthProvider): Promise<string> {
-		const body: ThirdPartyAuthUrlRequest = { provider };
+	/**
+	 * Build a provider OAuth start URL. When `opts.loginToken` is set,
+	 * the backend stamps it onto the `oauth_state` row so the eventual
+	 * callback can complete a desktop-pairing flow without the SPA
+	 * round-tripping the value through the login request body — this
+	 * is the only path that threads the pairing token now (formerly
+	 * also possible via `loginWithOAuth`, which Apple's form-post flow
+	 * structurally cannot use).
+	 */
+	async getOAuthRedirectUrl(
+		provider: OAuthProvider,
+		opts?: { loginToken?: string },
+	): Promise<string> {
+		const body: ThirdPartyAuthUrlRequest = {
+			provider,
+			login_token: opts?.loginToken ?? null,
+		};
 		const resp = await this.#api.fetch<ThirdPartyAuthUrlResponse, ThirdPartyAuthUrlRequest>(
 			'/auth/oauth/url',
 			{ body },
 		);
 		return resp.url;
+	}
+
+	/**
+	 * Re-probe `/auth/me` to refresh local auth state.
+	 *
+	 * The constructor sets a `ready` promise that resolves after the
+	 * first probe completes. The Apple success page mounts *after*
+	 * cookies have been set by a backend-initiated 303, so the SPA's
+	 * already-resolved `ready` promise still says "logged out" — the
+	 * page needs to re-trigger the probe explicitly. Other callers
+	 * (typically post-OAuth or post-pairing) can use this for the
+	 * same reason.
+	 */
+	async rehydrate(): Promise<void> {
+		await this.#hydrate();
 	}
 
 	async associateAppLogin(loginToken: string): Promise<void> {

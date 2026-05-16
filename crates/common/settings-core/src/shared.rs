@@ -21,7 +21,13 @@ pub enum ThemePreference {
 /// a different telemetry stack and so collects different categories
 /// of data, which means consent has to be platform-specific (see
 /// [`crate::TelemetryConsent`]).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+///
+/// `dynamic_accent` defaults to `true` — the design pulls the OS / wallpaper
+/// accent by default and a user who has never touched the toggle should see
+/// the dynamic behaviour. This is the one field where the product default
+/// differs from `bool::default()`, which is why this struct has a hand-rolled
+/// `Default` instead of `#[derive]`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default, rename_all = "camelCase")]
 pub struct SharedSettings {
@@ -38,6 +44,16 @@ pub struct SharedSettings {
     pub extras: Map<String, Value>,
 }
 
+impl Default for SharedSettings {
+    fn default() -> Self {
+        Self {
+            theme: ThemePreference::default(),
+            dynamic_accent: true,
+            extras: Map::new(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,6 +64,14 @@ mod tests {
         let v = serde_json::to_value(&s).unwrap();
         let back: SharedSettings = serde_json::from_value(v).unwrap();
         assert_eq!(back, s);
+    }
+
+    #[test]
+    fn default_enables_dynamic_accent() {
+        // The one field where the product default diverges from
+        // `bool::default()`. If you change this, audit the
+        // appearance-page UI for assumptions about the initial toggle.
+        assert!(SharedSettings::default().dynamic_accent);
     }
 
     #[test]

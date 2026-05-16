@@ -2,7 +2,6 @@
 	import { unwrap } from '$lib/bindings/result.js';
 	import {
 		commands,
-		type DesktopSettings,
 		type TelemetryConsent,
 		type TelemetryLocal,
 	} from '$lib/bindings/specta.bindings.js';
@@ -35,18 +34,17 @@
 	});
 
 	/**
-	 * Persist a fresh consent decision. The desktop section also carries
-	 * the scale fields; round-tripping the existing value preserves them
-	 * so a consent toggle can never accidentally reset accessibility
-	 * scales.
+	 * Persist a fresh consent decision through the dedicated consent IPC.
+	 * The backend stamps the consent version monotonically, lazily
+	 * allocates a `distinct_id`, and reapplies the native Sentry guard —
+	 * none of which `settings_set_desktop` does, since that procedure is
+	 * scoped to non-consent desktop state.
 	 */
 	async function persist(nextConsent: TelemetryConsent) {
 		saving = true;
 		try {
-			const current = await commands.settingsGetDesktop();
-			const next: DesktopSettings = { ...current, telemetry: nextConsent };
-			const updated = unwrap(await commands.settingsSetDesktop(next));
-			consent = updated.telemetry ?? nextConsent;
+			const updated = unwrap(await commands.settingsRecordTelemetryConsent(nextConsent));
+			consent = updated;
 			await telemetry.refresh();
 		} catch (error) {
 			console.error('Failed to save telemetry settings:', error);

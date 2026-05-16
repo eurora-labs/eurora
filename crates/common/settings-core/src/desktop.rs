@@ -1,46 +1,182 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
 use crate::telemetry::TelemetryConsent;
 
-/// Lower bound for interface and text scaling. Below this, the layout
-/// drops below useful tap-target sizes on Linux / Windows.
-pub const MIN_SCALE: f32 = 0.85;
-
-/// Upper bound for interface and text scaling. Beyond this, fixed-size
-/// chrome (titlebar, traffic lights) starts overlapping content.
-pub const MAX_SCALE: f32 = 1.5;
-
-/// Identity scale — the value the UI is designed against.
+/// Identity scale — the value the UI is designed against. Used as the
+/// `Default` for both [`InterfaceScale`] and [`TextScale`] so a missing
+/// field on the wire never resolves to a zero-size UI.
 pub const DEFAULT_SCALE: f32 = 1.0;
+
+/// Interface-scale multiplier applied to the document's root font-size,
+/// scaling every rem-anchored design token (text, spacing, controls)
+/// together. Always finite and within
+/// `[InterfaceScale::MIN, InterfaceScale::MAX]` by construction.
+///
+/// Bounds are chosen against window chrome: below `MIN` the layout
+/// drops below useful tap-target sizes on Linux / Windows; above `MAX`
+/// the fixed-size titlebar and traffic-light buttons start overlapping
+/// content.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(transparent)]
+#[cfg_attr(feature = "specta", specta(transparent))]
+pub struct InterfaceScale(f32);
+
+impl InterfaceScale {
+    /// Below this, the layout drops below useful tap-target sizes on Linux / Windows.
+    pub const MIN: Self = Self(0.85);
+    /// Beyond this, fixed-size chrome (titlebar, traffic lights) overlaps content.
+    pub const MAX: Self = Self(1.5);
+    /// Identity scale — the value the UI is designed against.
+    pub const DEFAULT: Self = Self(DEFAULT_SCALE);
+
+    /// Build a value, clamping to `[MIN, MAX]`. Non-finite inputs
+    /// (`NaN`, `±∞`) collapse to [`Self::DEFAULT`] — the rendering
+    /// pipeline can't recover from a zero-size or undefined scale, and
+    /// the user can't reach this screen to fix it once the chrome
+    /// disappears.
+    pub fn new(value: f32) -> Self {
+        if value.is_finite() {
+            Self(value.clamp(Self::MIN.0, Self::MAX.0))
+        } else {
+            Self::DEFAULT
+        }
+    }
+
+    /// Underlying `f32`. The value is always finite and within
+    /// `[MIN, MAX]` — no further checks are required at use sites.
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for InterfaceScale {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl From<f32> for InterfaceScale {
+    fn from(value: f32) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<InterfaceScale> for f32 {
+    fn from(value: InterfaceScale) -> Self {
+        value.0
+    }
+}
+
+impl<'de> Deserialize<'de> for InterfaceScale {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        f32::deserialize(deserializer).map(Self::new)
+    }
+}
+
+/// Additional multiplier layered on top of [`InterfaceScale`] that
+/// affects only typography utilities, leaving spacing and control
+/// sizes alone. Always finite and within
+/// `[TextScale::MIN, TextScale::MAX]` by construction.
+///
+/// Bounds currently mirror [`InterfaceScale`] but the type is separate
+/// so they can diverge — text legibility may eventually want a wider
+/// range than the chrome-anchored interface bounds allow, and the type
+/// system already enforces that the two fields can't be swapped at
+/// call sites.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(transparent)]
+#[cfg_attr(feature = "specta", specta(transparent))]
+pub struct TextScale(f32);
+
+impl TextScale {
+    /// Below this, body text falls below readable sizes.
+    pub const MIN: Self = Self(0.85);
+    /// Beyond this, body text grows large enough to break line wrapping in fixed panels.
+    pub const MAX: Self = Self(1.5);
+    /// Identity scale — the value the UI is designed against.
+    pub const DEFAULT: Self = Self(DEFAULT_SCALE);
+
+    pub fn new(value: f32) -> Self {
+        if value.is_finite() {
+            Self(value.clamp(Self::MIN.0, Self::MAX.0))
+        } else {
+            Self::DEFAULT
+        }
+    }
+
+    pub const fn get(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for TextScale {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl From<f32> for TextScale {
+    fn from(value: f32) -> Self {
+        Self::new(value)
+    }
+}
+
+impl From<TextScale> for f32 {
+    fn from(value: TextScale) -> Self {
+        value.0
+    }
+}
+
+impl<'de> Deserialize<'de> for TextScale {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        f32::deserialize(deserializer).map(Self::new)
+    }
+}
 
 /// Desktop-only cloud-synced settings. Mobile and web each have their
 /// own platform sections to keep concepts that don't translate (window
 /// chrome scaling, telemetry SDKs that don't run on the other
 /// platforms) cleanly partitioned.
 ///
-/// The custom `Default` impl here is the *wire fallback* used by
-/// `#[serde(default)]` when a partial blob is read off the network.
-/// Scales default to [`DEFAULT_SCALE`] rather than the derive-default
-/// `0.0` because a zero-size UI is unrecoverable; an inert sensible
-/// value is the only safe fallback. The product-blessed fresh-install
-/// values live in `assets/defaults.jsonc` and are reached through
-/// [`crate::CloudSettings::default()`].
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// The derived `Default` is both the fresh-install value and the
+/// per-field fallback used by `#[serde(default)]` when an older client
+/// wrote a partial blob. Scales default to [`DEFAULT_SCALE`] (via
+/// [`InterfaceScale::DEFAULT`] / [`TextScale::DEFAULT`]) rather than
+/// `0.0`, because a zero-size UI is unrecoverable; an inert sensible
+/// value is the only safe fallback. Telemetry consent defaults to the
+/// "never asked" sentinel (`consent_version == 0`) so a fresh install
+/// is routed through the consent prompt rather than silently
+/// auto-consented — see [`crate::TelemetryConsent`].
+///
+/// `interface_scale` and `text_scale` carry their invariants in the
+/// type, not in a separate validation pass: any value of type
+/// [`InterfaceScale`] or [`TextScale`] is by construction finite and
+/// within `[MIN, MAX]`. Deserialization, `From<f32>`, and the
+/// `bon`-generated builder all route through the clamping
+/// constructor, so a corrupt cloud blob, a misbehaving client, or a
+/// hand-rolled patch via `extras` all collapse to safe values before
+/// they ever land in the struct.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, bon::Builder)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(default, rename_all = "camelCase")]
 pub struct DesktopSettings {
     /// Multiplier applied to the document's root font-size, scaling every
     /// rem-anchored design token (text, spacing, controls) together.
-    pub interface_scale: f32,
+    #[builder(into, default)]
+    pub interface_scale: InterfaceScale,
     /// Additional multiplier layered on top of `interface_scale` that
     /// affects only typography utilities, leaving spacing and control
     /// sizes alone.
-    pub text_scale: f32,
+    #[builder(into, default)]
+    pub text_scale: TextScale,
     /// Desktop-scoped telemetry consent. Covers what the desktop
     /// client collects (Sentry, PostHog) and nothing else; mobile and
     /// web each carry their own record because consent must be
     /// specific to the data actually collected.
+    #[builder(default)]
     pub telemetry: TelemetryConsent,
     // `flatten` of an empty Map already emits nothing — no
     // `skip_serializing_if` needed, and using it here would force
@@ -50,41 +186,8 @@ pub struct DesktopSettings {
         feature = "specta",
         specta(type = std::collections::HashMap<String, specta_typescript::Unknown>)
     )]
+    #[builder(default)]
     pub extras: Map<String, Value>,
-}
-
-impl Default for DesktopSettings {
-    fn default() -> Self {
-        Self {
-            interface_scale: DEFAULT_SCALE,
-            text_scale: DEFAULT_SCALE,
-            telemetry: TelemetryConsent::default(),
-            extras: Map::new(),
-        }
-    }
-}
-
-impl DesktopSettings {
-    /// Clamp scale fields into the supported range and replace any
-    /// non-finite values with [`DEFAULT_SCALE`]. Called at the API
-    /// boundary so a corrupt cloud blob or a misbehaving client cannot
-    /// push the UI into a state from which the user can't recover with
-    /// the mouse.
-    pub fn sanitize(&mut self) {
-        self.interface_scale = sanitize_scale(self.interface_scale);
-        self.text_scale = sanitize_scale(self.text_scale);
-    }
-}
-
-/// Coerce a single scale value into the supported range. Non-finite
-/// values collapse to [`DEFAULT_SCALE`]; finite values are clamped to
-/// `[MIN_SCALE, MAX_SCALE]`.
-pub fn sanitize_scale(value: f32) -> f32 {
-    if value.is_finite() {
-        value.clamp(MIN_SCALE, MAX_SCALE)
-    } else {
-        DEFAULT_SCALE
-    }
 }
 
 #[cfg(test)]
@@ -92,48 +195,106 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sanitize_replaces_nan_with_default() {
-        let mut s = DesktopSettings {
-            interface_scale: f32::NAN,
-            text_scale: f32::INFINITY,
-            ..DesktopSettings::default()
-        };
-        s.sanitize();
-        assert_eq!(s.interface_scale, DEFAULT_SCALE);
-        assert_eq!(s.text_scale, DEFAULT_SCALE);
+    fn interface_scale_clamps_out_of_range() {
+        assert_eq!(InterfaceScale::new(0.1), InterfaceScale::MIN);
+        assert_eq!(InterfaceScale::new(9.0), InterfaceScale::MAX);
+        assert_eq!(
+            InterfaceScale::new(InterfaceScale::MIN.get() - 0.01),
+            InterfaceScale::MIN
+        );
+        assert_eq!(
+            InterfaceScale::new(InterfaceScale::MAX.get() + 0.01),
+            InterfaceScale::MAX
+        );
     }
 
     #[test]
-    fn sanitize_clamps_out_of_range() {
-        let mut s = DesktopSettings {
-            interface_scale: 0.1,
-            text_scale: 9.0,
-            ..DesktopSettings::default()
-        };
-        s.sanitize();
-        assert_eq!(s.interface_scale, MIN_SCALE);
-        assert_eq!(s.text_scale, MAX_SCALE);
+    fn interface_scale_preserves_in_range_values() {
+        assert_eq!(InterfaceScale::new(1.15).get(), 1.15);
+        assert_eq!(
+            InterfaceScale::new(InterfaceScale::MIN.get()),
+            InterfaceScale::MIN
+        );
+        assert_eq!(
+            InterfaceScale::new(InterfaceScale::MAX.get()),
+            InterfaceScale::MAX
+        );
     }
 
     #[test]
-    fn sanitize_preserves_in_range_values() {
-        let mut s = DesktopSettings {
-            interface_scale: 1.15,
-            text_scale: 0.9,
-            ..DesktopSettings::default()
-        };
-        s.sanitize();
-        assert_eq!(s.interface_scale, 1.15);
-        assert_eq!(s.text_scale, 0.9);
+    fn interface_scale_collapses_non_finite_to_default() {
+        assert_eq!(InterfaceScale::new(f32::NAN), InterfaceScale::DEFAULT);
+        assert_eq!(InterfaceScale::new(f32::INFINITY), InterfaceScale::DEFAULT);
+        assert_eq!(
+            InterfaceScale::new(f32::NEG_INFINITY),
+            InterfaceScale::DEFAULT
+        );
     }
 
     #[test]
-    fn sanitize_scale_pins_boundaries() {
-        assert_eq!(sanitize_scale(MIN_SCALE - 0.01), MIN_SCALE);
-        assert_eq!(sanitize_scale(MAX_SCALE + 0.01), MAX_SCALE);
-        assert_eq!(sanitize_scale(MIN_SCALE), MIN_SCALE);
-        assert_eq!(sanitize_scale(MAX_SCALE), MAX_SCALE);
-        assert_eq!(sanitize_scale(f32::NEG_INFINITY), DEFAULT_SCALE);
+    fn text_scale_clamps_out_of_range() {
+        assert_eq!(TextScale::new(0.1), TextScale::MIN);
+        assert_eq!(TextScale::new(9.0), TextScale::MAX);
+    }
+
+    #[test]
+    fn text_scale_collapses_non_finite_to_default() {
+        assert_eq!(TextScale::new(f32::NAN), TextScale::DEFAULT);
+    }
+
+    #[test]
+    fn deserialize_clamps_out_of_range_scales() {
+        let raw = serde_json::json!({
+            "interfaceScale": 9.0,
+            "textScale": 0.1,
+        });
+        let parsed: DesktopSettings = serde_json::from_value(raw).unwrap();
+        assert_eq!(parsed.interface_scale, InterfaceScale::MAX);
+        assert_eq!(parsed.text_scale, TextScale::MIN);
+    }
+
+    #[test]
+    fn from_f32_clamps_at_the_type_boundary() {
+        // The IPC surface and tests both hand the type raw `f32`s
+        // through `From<f32>`; pin that the clamping path matches the
+        // explicit `::new` constructor.
+        let nan: InterfaceScale = f32::NAN.into();
+        let inf: TextScale = f32::INFINITY.into();
+        assert_eq!(nan, InterfaceScale::DEFAULT);
+        assert_eq!(inf, TextScale::DEFAULT);
+    }
+
+    #[test]
+    fn builder_clamps_via_into_setter() {
+        // `#[builder(into)]` routes raw `f32` through `From<f32>`,
+        // which clamps. Callers writing tests or migrators can hand
+        // the builder a raw `f32` and rely on the same invariant as
+        // the deserialize path.
+        let s = DesktopSettings::builder()
+            .interface_scale(9.0_f32)
+            .text_scale(0.1_f32)
+            .build();
+        assert_eq!(s.interface_scale, InterfaceScale::MAX);
+        assert_eq!(s.text_scale, TextScale::MIN);
+    }
+
+    #[test]
+    fn builder_defaults_match_default_impl() {
+        // An empty builder must reproduce `Default::default()` exactly —
+        // otherwise the partial-JSON deserialise path (which goes through
+        // `Default::default()` per-field) and the explicit-builder path
+        // would diverge.
+        assert_eq!(
+            DesktopSettings::builder().build(),
+            DesktopSettings::default()
+        );
+    }
+
+    #[test]
+    fn default_uses_default_scale() {
+        let s = DesktopSettings::default();
+        assert_eq!(s.interface_scale.get(), DEFAULT_SCALE);
+        assert_eq!(s.text_scale.get(), DEFAULT_SCALE);
     }
 
     #[test]

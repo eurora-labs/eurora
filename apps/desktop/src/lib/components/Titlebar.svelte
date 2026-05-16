@@ -237,6 +237,21 @@
 		padding-right: calc((var(--sidebar-width-icon) - var(--trigger-size)) / 2);
 	}
 
+	/*
+	 * When the TimelineRail occupies the left edge of <main>, the sidebar
+	 * is shifted right by the rail's width (see styles.css). Mirror that
+	 * shift on the leading region so the sidebar trigger remains centered
+	 * over the sidebar's icon column / flush with its right edge.
+	 *
+	 * On macOS the leading region already reserves 76px for the traffic
+	 * lights, which is wider than the 3rem (48px) rail — so no extra
+	 * shift is needed and the trigger keeps its existing position
+	 * immediately to the right of the lights.
+	 */
+	:global(body.has-timeline-rail:not(.macos-app)) .titlebar-leading {
+		margin-inline-start: 3rem;
+	}
+
 	.titlebar-mac .titlebar-leading[data-state='collapsed'] {
 		width: calc(var(--sidebar-width-icon) + 76px);
 		padding-left: 76px;

@@ -1,11 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { unwrap } from '$lib/bindings/result.js';
-	import {
-		commands,
-		type DesktopSettings,
-		type TelemetryConsent,
-	} from '$lib/bindings/specta.bindings.js';
+	import { commands, type TelemetryConsent } from '$lib/bindings/specta.bindings.js';
 	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -41,18 +37,18 @@
 
 		saving = true;
 		try {
-			const current = await commands.settingsGetDesktop();
-			const next: DesktopSettings = {
-				...current,
-				telemetry: {
-					...consent,
-					anonymousErrors: errorReporting,
-					anonymousMetrics: usageMetrics,
-					nonAnonymousMetrics: nonAnonymousUsageMetrics,
-				},
+			// Dedicated consent IPC: the backend stamps the consent version
+			// monotonically and emits the gate event, so the frontend doesn't
+			// touch the version or compute the rule. `anonymousErrors` etc.
+			// are the only fields this page authoritatively writes.
+			const next: TelemetryConsent = {
+				...consent,
+				anonymousErrors: errorReporting,
+				anonymousMetrics: usageMetrics,
+				nonAnonymousMetrics: nonAnonymousUsageMetrics,
 			};
-			const updated = unwrap(await commands.settingsSetDesktop(next));
-			consent = updated.telemetry ?? consent;
+			const updated = unwrap(await commands.settingsRecordTelemetryConsent(next));
+			consent = updated;
 			await telemetry.refresh();
 		} catch (error) {
 			console.error('Failed to update telemetry settings:', error);

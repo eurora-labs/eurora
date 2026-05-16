@@ -9,6 +9,17 @@ use be_remote_db::DatabaseManager;
 use be_storage::StorageService;
 use uuid::Uuid;
 
+/// Raw bytes for an asset paired with the MIME type recorded at upload.
+///
+/// Returned by [`AssetService::get_asset_bytes`] so callers can drive a
+/// `Content-Type` header (HTTP surface) or pick an image decoder
+/// (in-process consumers) without re-querying the database.
+#[derive(Debug, Clone)]
+pub struct AssetBytes {
+    pub bytes: Vec<u8>,
+    pub mime_type: String,
+}
+
 const ALLOWED_MIME_TYPES: &[&str] = &[
     "image/png",
     "image/jpeg",
@@ -208,6 +219,52 @@ impl AssetService {
         tracing::debug!("Created asset {}", asset.id);
 
         Ok(Self::db_asset_to_dto(asset))
+    }
+
+    /// Read an asset's raw bytes scoped to its owner.
+    ///
+    /// The `user_id` predicate is enforced inside the DB query
+    /// (`get_asset_for_user`), so attempting to read another user's asset
+    /// surfaces as [`AssetError::NotFound`] — never as a permission error
+    /// that would leak the asset's existence. Bytes are pulled through the
+    /// `StorageService`, which dispatches to the configured backend
+    /// (filesystem in dev, S3 in prod) and transparently decrypts when the
+    /// `encryption` feature is enabled.
+    pub async fn get_asset_bytes(&self, asset_id: Uuid, user_id: Uuid) -> AssetResult<AssetBytes> {
+        let asset = self
+            .db
+            .get_asset_for_user()
+            .asset_id(asset_id)
+            .user_id(user_id)
+            .call()
+            .await
+            .map_err(|e| {
+                if e.is_not_found() {
+                    AssetError::NotFound
+                } else {
+                    AssetError::DatabaseRead(e)
+                }
+            })?;
+
+        let bytes = self
+            .storage
+            .download(&asset.storage_uri)
+            .await
+            .map_err(|e| {
+                if e.is_not_found() {
+                    // The DB row points at storage that no longer holds
+                    // the blob — surface as `NotFound` so HTTP callers
+                    // render a clean 404 instead of a 500.
+                    AssetError::NotFound
+                } else {
+                    AssetError::StorageDownload(e)
+                }
+            })?;
+
+        Ok(AssetBytes {
+            bytes,
+            mime_type: asset.mime_type,
+        })
     }
 }
 

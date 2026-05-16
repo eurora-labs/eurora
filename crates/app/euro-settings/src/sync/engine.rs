@@ -47,6 +47,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use bon::Builder;
@@ -147,6 +148,14 @@ struct EngineInner {
     /// `Mutex` (not async) because the only access pattern is
     /// `take()` under the `workers` guard.
     auth_events: StdMutex<Option<broadcast::Receiver<AuthEvent>>>,
+    /// Latched `true` once any server response (200 GET / 409 PUT)
+    /// reports a schema version newer than [`CURRENT_SCHEMA_VERSION`].
+    /// Subsequent pushes short-circuit to [`SyncStatus::ServerAhead`]
+    /// instead of writing — this build cannot have parsed unknown
+    /// sections (no top-level `extras` on [`CloudSettings`]), so
+    /// pushing back risks dropping fields the server already holds.
+    /// In-memory only; cleared by restart on an upgraded build.
+    schema_ahead: AtomicBool,
 }
 
 struct EngineWorkers {
@@ -198,6 +207,7 @@ impl SyncEngine {
                 backoff,
                 pull_lock: Mutex::new(()),
                 auth_events: StdMutex::new(auth_events),
+                schema_ahead: AtomicBool::new(false),
             }),
         }
     }
@@ -404,6 +414,21 @@ impl SyncEngine {
         current_uid: Uuid,
         response: GetSettingsResponse,
     ) -> SyncResult<SyncStatus> {
+        if response.schema_version > CURRENT_SCHEMA_VERSION {
+            // The server's row was written under a schema this build
+            // does not understand. Adopting it would mean serialising
+            // back from a partial-shape `CloudSettings` — there is no
+            // top-level `extras`, so unknown sections would be dropped
+            // outright. Refuse to mutate the cache and latch
+            // `schema_ahead` so the push worker stops writing too. The
+            // user is told to upgrade.
+            self.inner.schema_ahead.store(true, Ordering::Relaxed);
+            return Err(SyncError::ServerAhead {
+                client: CURRENT_SCHEMA_VERSION,
+                server: response.schema_version,
+            });
+        }
+
         let baseline = {
             let state = self.inner.settings.lock().await;
             state.cache.base_updated_at
@@ -414,13 +439,8 @@ impl SyncEngine {
         let server_is_fresher = baseline.is_none_or(|base| response.updated_at > base);
 
         if server_is_fresher {
-            self.replace_cache(
-                current_uid,
-                response.settings,
-                response.schema_version,
-                response.updated_at,
-            )
-            .await?;
+            self.replace_cache(current_uid, response.settings, response.updated_at)
+                .await?;
             Ok(SyncStatus::Synced { at: Utc::now() })
         } else {
             // Local cache holds edits the server hasn't seen yet.
@@ -445,6 +465,11 @@ impl SyncEngine {
     /// so the server can detect a race; an unset baseline means we
     /// have never observed a server-side row and the server treats
     /// this as a fresh insert.
+    ///
+    /// The envelope's `schema_version` is unconditionally
+    /// [`CURRENT_SCHEMA_VERSION`]: a client only ever writes blobs
+    /// under the schema it was built against. Anything else would be a
+    /// lie about which fields the cache actually understands.
     async fn snapshot_for_push(&self) -> PutSettingsRequest {
         let state = self.inner.settings.lock().await;
         let settings = state.cache.settings.clone();
@@ -452,7 +477,7 @@ impl SyncEngine {
         drop(state);
 
         PutSettingsRequest {
-            schema_version: settings.schema_version.max(CURRENT_SCHEMA_VERSION),
+            schema_version: CURRENT_SCHEMA_VERSION,
             settings: serde_json::to_value(&settings)
                 .expect("CloudSettings serialises into serde_json::Value"),
             base_updated_at: base,
@@ -460,29 +485,21 @@ impl SyncEngine {
     }
 
     /// Apply a 200 response to the local cache: parse the server blob,
-    /// sanitize, stamp the OCC baseline + owner, persist.
+    /// stamp the OCC baseline + owner, persist. Field-level invariants
+    /// (e.g. UI scale bounds) are enforced at deserialization by the
+    /// field types themselves; no separate sanitize pass is needed.
+    ///
+    /// The envelope's `schema_version` is not threaded through here —
+    /// callers must already have rejected ahead-of-schema responses
+    /// before invoking this, so anything reaching `replace_cache` is
+    /// guaranteed parseable under the current shape.
     async fn replace_cache(
         &self,
         current_uid: Uuid,
         settings_value: serde_json::Value,
-        schema_version: u32,
         updated_at: chrono::DateTime<Utc>,
     ) -> SyncResult<()> {
-        let mut incoming: CloudSettings = serde_json::from_value(settings_value)?;
-        if schema_version > CURRENT_SCHEMA_VERSION {
-            tracing::warn!(
-                client = CURRENT_SCHEMA_VERSION,
-                server = schema_version,
-                "Server pushed a newer settings schema than this build understands; \
-                 unknown fields will round-trip through `extras` but the schema_version \
-                 column is being preserved verbatim."
-            );
-        }
-        // Preserve the server's `schema_version` verbatim — a value
-        // newer than the client's `CURRENT_SCHEMA_VERSION` is
-        // load-bearing for round-tripping through older clients.
-        incoming.schema_version = schema_version;
-        incoming.sanitize();
+        let incoming: CloudSettings = serde_json::from_value(settings_value)?;
 
         let mut state = self.inner.settings.lock().await;
         state.cache = CloudSettingsCache {
@@ -496,17 +513,16 @@ impl SyncEngine {
         Ok(())
     }
 
-    /// Apply a 200 response to a `PUT` — `schema_version`, the OCC
-    /// baseline, and the owner stamp change; the blob itself was what
-    /// the client just sent. Persisted so the next `base_updated_at`
-    /// matches the server.
+    /// Apply a 200 response to a `PUT` — the OCC baseline and the
+    /// owner stamp change; the blob itself was what the client just
+    /// sent. Persisted so the next `base_updated_at` matches the
+    /// server.
     async fn apply_accepted(
         &self,
         current_uid: Uuid,
         accepted: PutSettingsAcceptedResponse,
     ) -> SyncResult<()> {
         let mut state = self.inner.settings.lock().await;
-        state.cache.settings.schema_version = accepted.schema_version;
         state.cache.base_updated_at = Some(accepted.updated_at);
         state.cache.last_user_id = Some(current_uid);
         state
@@ -520,13 +536,20 @@ impl SyncEngine {
         current_uid: Uuid,
         conflict: PutSettingsConflictResponse,
     ) -> SyncResult<()> {
-        self.replace_cache(
-            current_uid,
-            conflict.current,
-            conflict.schema_version,
-            conflict.updated_at,
-        )
-        .await
+        if conflict.schema_version > CURRENT_SCHEMA_VERSION {
+            // Same reasoning as `reconcile_pull`: the server's current
+            // row is on a schema we cannot fully parse. Latch
+            // `schema_ahead` and stop writing — the previous push has
+            // already been rejected by the server, so the cache's edits
+            // are simply lost; the user must upgrade to recover.
+            self.inner.schema_ahead.store(true, Ordering::Relaxed);
+            return Err(SyncError::ServerAhead {
+                client: CURRENT_SCHEMA_VERSION,
+                server: conflict.schema_version,
+            });
+        }
+        self.replace_cache(current_uid, conflict.current, conflict.updated_at)
+            .await
     }
 
     /// Stamp `last_user_id` onto the cache without otherwise touching
@@ -620,14 +643,29 @@ async fn push_worker(inner: Arc<EngineInner>) {
             continue;
         }
 
+        // A previous response told us the server is ahead of this
+        // build's schema. Drop the intent and park rather than write
+        // back from a partial-shape cache; the latch clears only on
+        // restart with an upgraded build.
+        if inner.schema_ahead.load(Ordering::Relaxed) {
+            engine.set_status(SyncStatus::ServerAhead);
+            retry = 0;
+            continue;
+        }
+
         engine.set_status(SyncStatus::Syncing);
 
         let request = engine.snapshot_for_push().await;
         match inner.transport.put(request).await {
             Ok(PushOutcome::Accepted(accepted)) => {
                 if let Err(e) = engine.apply_accepted(current_uid, accepted).await {
+                    let retryable = e.is_retryable();
                     let _ = engine.publish_error(e);
-                    retry = retry.saturating_add(1);
+                    retry = if retryable {
+                        retry.saturating_add(1)
+                    } else {
+                        0
+                    };
                     continue;
                 }
                 engine.set_status(SyncStatus::Synced { at: Utc::now() });
@@ -635,8 +673,13 @@ async fn push_worker(inner: Arc<EngineInner>) {
             }
             Ok(PushOutcome::Conflict(conflict)) => {
                 if let Err(e) = engine.apply_conflict(current_uid, conflict).await {
+                    let retryable = e.is_retryable();
                     let _ = engine.publish_error(e);
-                    retry = retry.saturating_add(1);
+                    retry = if retryable {
+                        retry.saturating_add(1)
+                    } else {
+                        0
+                    };
                     continue;
                 }
                 engine.set_status(SyncStatus::Conflict { at: Utc::now() });
