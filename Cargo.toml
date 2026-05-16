@@ -91,7 +91,6 @@ euro-tauri = { path = "crates/app/euro-tauri" }
 euro-telemetry = { path = "crates/app/euro-telemetry" }
 euro-thread = { path = "crates/app/euro-thread" }
 euro-timeline = { path = "crates/app/euro-timeline" }
-euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
 euro-office = { path = "crates/app/euro-office" }
 euro-pdf = { path = "crates/app/euro-pdf" }

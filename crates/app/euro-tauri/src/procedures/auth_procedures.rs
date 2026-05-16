@@ -1,14 +1,12 @@
 use auth_core::Claims;
-use euro_auth::AuthEvent;
+use euro_auth::tauri::auth_manager;
 use euro_secret::{ExposeSecret, SecretString, secret};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
-use tauri_specta::Event;
 use thiserror::Error;
 use url::Url;
 
-use crate::procedures::{auth_manager, user_controller};
 use crate::shared_types::SharedSettingsState;
 
 /// Typed error surface for the `auth_*` IPC commands. Externally tagged
@@ -47,40 +45,10 @@ pub struct LoginToken {
     pub url: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
-pub struct AuthStateChanged {
-    pub claims: Option<Claims>,
-}
-
 const LOGIN_CODE_VERIFIER: &str = "LOGIN_CODE_VERIFIER";
 
-/// Fan an auth-state transition out to both the Tauri-side event (for
-/// the frontend) and the backend [`AuthEvent`] bus on
-/// [`euro_auth::AuthManager`] (for the cloud-settings sync engine and
-/// any other in-process subscriber).
-///
-/// The two publishes are independent — a Tauri-emit failure does not
-/// suppress the backend publish, and a missing `AuthManager` (only
-/// possible during shutdown, after state has been torn down) does not
-/// suppress the Tauri emit. Single chokepoint means every IPC procedure
-/// that flips the auth state hits both surfaces by construction.
-async fn emit_auth_state(app_handle: &AppHandle, claims: Option<Claims>) {
-    if let Err(e) = (AuthStateChanged {
-        claims: claims.clone(),
-    })
-    .emit(app_handle)
-    {
-        tracing::warn!("Failed to emit auth state event: {e}");
-    }
-    if let Some(manager) = auth_manager(app_handle).await {
-        manager.publish_auth_event(AuthEvent { claims });
-    }
-}
-
-async fn resolve_auth_manager(app_handle: &AppHandle) -> Result<euro_user::AuthManager, AuthError> {
-    auth_manager(app_handle)
-        .await
-        .ok_or(AuthError::StateUnavailable("user controller"))
+fn resolve_auth_manager(app_handle: &AppHandle) -> Result<euro_auth::AuthManager, AuthError> {
+    auth_manager(app_handle).ok_or(AuthError::StateUnavailable("auth manager"))
 }
 
 /// Categorise an upstream `euro_auth::AuthError` into the IPC error
@@ -130,7 +98,7 @@ pub async fn auth_get_login_token(app_handle: AppHandle) -> Result<LoginToken, A
     // self-hosted login impossible from a release build; that override
     // has been removed in favour of the explicit Cloud / Local / Custom
     // picker in `APISettings::mode`.
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     let (code_verifier, code_challenge) = auth_manager
         .get_login_tokens()
         .await
@@ -159,7 +127,7 @@ pub async fn auth_get_login_token(app_handle: AppHandle) -> Result<LoginToken, A
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_poll_for_login(app_handle: AppHandle) -> Result<bool, AuthError> {
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
 
     let login_token = secret::retrieve(LOGIN_CODE_VERIFIER)
         .map_err(|e| AuthError::Persistence(format!("Failed to retrieve login token: {e}")))?
@@ -173,11 +141,6 @@ pub async fn auth_poll_for_login(app_handle: AppHandle) -> Result<bool, AuthErro
             secret::delete(LOGIN_CODE_VERIFIER).map_err(|e| {
                 AuthError::Persistence(format!("Failed to remove login token: {e}"))
             })?;
-
-            if let Ok(claims) = auth_manager.get_access_token_payload() {
-                emit_auth_state(&app_handle, Some(claims)).await;
-            }
-
             save_app_settings(&app_handle).await?;
             Ok(true)
         }
@@ -195,19 +158,14 @@ pub async fn auth_register(
     email: String,
     password: String,
 ) -> Result<(), AuthError> {
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
 
     auth_manager
         .register(&email, &password)
         .await
         .map_err(classify_anyhow_auth_error)?;
 
-    if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims)).await;
-    }
-
-    save_app_settings(&app_handle).await?;
-    Ok(())
+    save_app_settings(&app_handle).await
 }
 
 #[tauri::command]
@@ -217,46 +175,28 @@ pub async fn auth_login(
     login: String,
     password: String,
 ) -> Result<(), AuthError> {
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
 
     auth_manager
         .login(&login, &password)
         .await
         .map_err(classify_anyhow_auth_error)?;
 
-    if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims)).await;
-    }
-
-    save_app_settings(&app_handle).await?;
-    Ok(())
+    save_app_settings(&app_handle).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_logout(app_handle: AppHandle) -> Result<(), AuthError> {
-    let user_state =
-        user_controller(&app_handle).ok_or(AuthError::StateUnavailable("user controller"))?;
-    let controller = user_state.lock().await;
-
-    controller
-        .delete_user()
-        .map_err(|e| AuthError::Internal(format!("Logout failed: {e}")))?;
-    // Drop the controller lock before fanning out the auth-state event —
-    // `emit_auth_state` re-enters `auth_manager(...)`, which takes the
-    // same lock to clone out the `AuthManager`. Holding it across the
-    // call would deadlock.
-    drop(controller);
-    emit_auth_state(&app_handle, None).await;
-
-    save_app_settings(&app_handle).await?;
-    Ok(())
+    let auth_manager = resolve_auth_manager(&app_handle)?;
+    auth_manager.logout().await;
+    save_app_settings(&app_handle).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_is_authenticated(app_handle: AppHandle) -> Result<bool, AuthError> {
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     match auth_manager.get_or_refresh_access_token().await {
         Ok(token) => Ok(!token.expose_secret().is_empty()),
         // Definitively logged out — surface as `false` so the frontend
@@ -269,7 +209,7 @@ pub async fn auth_is_authenticated(app_handle: AppHandle) -> Result<bool, AuthEr
             tracing::warn!(
                 "is_authenticated: transient auth error, assuming last-known state: {e}"
             );
-            Ok(auth_manager.get_access_token_payload().is_ok())
+            Ok(auth_manager.current_claims().is_some())
         }
     }
 }
@@ -277,7 +217,7 @@ pub async fn auth_is_authenticated(app_handle: AppHandle) -> Result<bool, AuthEr
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_get_access_token_payload(app_handle: AppHandle) -> Result<Claims, AuthError> {
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     auth_manager
         .get_or_refresh_access_token()
         .await
@@ -290,23 +230,18 @@ pub async fn auth_get_access_token_payload(app_handle: AppHandle) -> Result<Clai
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_refresh_session(app_handle: AppHandle) -> Result<(), AuthError> {
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     auth_manager
         .refresh_tokens()
         .await
         .map_err(classify_auth_error)?;
-
-    if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims)).await;
-    }
-
     Ok(())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_resend_verification_email(app_handle: AppHandle) -> Result<(), AuthError> {
-    let auth_manager = resolve_auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     auth_manager
         .resend_verification_email()
         .await

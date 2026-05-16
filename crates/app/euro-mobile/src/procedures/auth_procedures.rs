@@ -1,5 +1,7 @@
 use auth_core::{AppleNativeUser, Claims, Provider};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use euro_auth::AuthManager;
+use euro_auth::tauri::auth_manager;
 use euro_secret::ExposeSecret;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -10,12 +12,14 @@ use tauri_plugin_apple_auth::{
     AppleAuthExt, AppleSignInOutcome, SignInRequest as AppleSignInRequest,
 };
 use tauri_plugin_google_auth::{GoogleAuthExt, SignInRequest};
-use tauri_specta::Event;
 use url::Url;
 
 use crate::error::ResultExt;
-use crate::procedures::{auth_manager, user_controller};
 use crate::shared_types::SharedSettingsState;
+
+fn resolve_auth_manager(app_handle: &AppHandle) -> Result<AuthManager, String> {
+    auth_manager(app_handle).ok_or_else(|| "auth manager not available".to_string())
+}
 
 /// Custom URL scheme the in-app browser session is bound to. iOS doesn't
 /// need this in `Info.plist` — `ASWebAuthenticationSession`'s
@@ -54,17 +58,6 @@ impl LoginOutcome {
         Self::Rejected {
             reason: reason.to_string(),
         }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
-pub struct AuthStateChanged {
-    pub claims: Option<Claims>,
-}
-
-fn emit_auth_state(app_handle: &AppHandle, claims: Option<Claims>) {
-    if let Err(e) = (AuthStateChanged { claims }).emit(app_handle) {
-        tracing::warn!("Failed to emit auth state event: {e}");
     }
 }
 
@@ -140,7 +133,7 @@ pub async fn auth_start_login(
     app_handle: AppHandle,
     provider: Provider,
 ) -> Result<LoginOutcome, String> {
-    let auth_manager = auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
 
     let (code_verifier, code_challenge) = auth_manager
         .get_login_tokens()
@@ -184,9 +177,6 @@ pub async fn auth_start_login(
 
     match auth_manager.login_by_login_token(code_verifier).await {
         Ok(_) => {
-            if let Ok(claims) = auth_manager.get_access_token_payload() {
-                emit_auth_state(&app_handle, Some(claims));
-            }
             save_settings(&app_handle).await?;
             Ok(LoginOutcome::Success)
         }
@@ -218,7 +208,7 @@ pub async fn auth_start_login_google_native(app_handle: AppHandle) -> Result<Log
         return Ok(LoginOutcome::NativeUnavailable);
     };
 
-    let auth_manager = auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
 
     let response = match app_handle.google_auth().sign_in(SignInRequest {
         client_id,
@@ -247,9 +237,6 @@ pub async fn auth_start_login_google_native(app_handle: AppHandle) -> Result<Log
 
     match auth_manager.login_by_google_id_token(id_token, None).await {
         Ok(_) => {
-            if let Ok(claims) = auth_manager.get_access_token_payload() {
-                emit_auth_state(&app_handle, Some(claims));
-            }
             save_settings(&app_handle).await?;
             Ok(LoginOutcome::Success)
         }
@@ -338,7 +325,7 @@ pub async fn auth_start_login_apple_native(app_handle: AppHandle) -> Result<Logi
         return Ok(LoginOutcome::NativeUnavailable);
     }
 
-    let auth_manager = auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     let raw_nonce = generate_apple_raw_nonce();
 
     let outcome = match app_handle
@@ -375,9 +362,6 @@ pub async fn auth_start_login_apple_native(app_handle: AppHandle) -> Result<Logi
         .await
     {
         Ok(_) => {
-            if let Ok(claims) = auth_manager.get_access_token_payload() {
-                emit_auth_state(&app_handle, Some(claims));
-            }
             save_settings(&app_handle).await?;
             Ok(LoginOutcome::Success)
         }
@@ -395,16 +379,12 @@ pub async fn auth_login(
     login: String,
     password: String,
 ) -> Result<(), String> {
-    let auth_manager = auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
 
     auth_manager
         .login(&login, &password)
         .await
         .ctx("Login failed")?;
-
-    if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims));
-    }
 
     save_settings(&app_handle).await
 }
@@ -416,16 +396,12 @@ pub async fn auth_register(
     email: String,
     password: String,
 ) -> Result<(), String> {
-    let auth_manager = auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
 
     auth_manager
         .register(&email, &password)
         .await
         .ctx("Registration failed")?;
-
-    if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims));
-    }
 
     save_settings(&app_handle).await
 }
@@ -433,39 +409,34 @@ pub async fn auth_register(
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_logout(app_handle: AppHandle) -> Result<(), String> {
-    let user_state = user_controller(&app_handle)?;
-    let controller = user_state.lock().await;
-
-    controller.delete_user().ctx("Logout failed")?;
-    emit_auth_state(&app_handle, None);
-
+    let auth_manager = resolve_auth_manager(&app_handle)?;
+    auth_manager.logout().await;
     save_settings(&app_handle).await
 }
 
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_is_authenticated(app_handle: AppHandle) -> Result<bool, String> {
-    use crate::shared_types::SharedUserController;
     use backon::{ConstantBuilder, Retryable};
 
-    let result = (|| async {
-        app_handle
-            .try_state::<SharedUserController>()
-            .ok_or("User state not initialized")
-    })
-    .retry(
-        ConstantBuilder::default()
-            .with_delay(std::time::Duration::from_millis(100))
-            .with_max_times(50),
-    )
-    .sleep(tokio::time::sleep)
-    .await;
+    // Mobile fires IPC calls as soon as the WebView paints, which can
+    // race the `install` step in `setup`. Retry the state lookup for a
+    // few seconds before giving up — same shape as the desktop
+    // procedure, just relevant here because the cold-launch window is
+    // larger on mobile.
+    let manager = (|| async { auth_manager(&app_handle).ok_or("auth manager not yet available") })
+        .retry(
+            ConstantBuilder::default()
+                .with_delay(std::time::Duration::from_millis(100))
+                .with_max_times(50),
+        )
+        .sleep(tokio::time::sleep)
+        .await;
 
-    if result.is_err() {
+    let Ok(auth_manager) = manager else {
         return Ok(false);
-    }
+    };
 
-    let auth_manager = auth_manager(&app_handle).await?;
     match auth_manager.get_or_refresh_access_token().await {
         Ok(token) => Ok(!token.expose_secret().is_empty()),
         // Definitively logged out — surface as `false` so the frontend
@@ -478,7 +449,7 @@ pub async fn auth_is_authenticated(app_handle: AppHandle) -> Result<bool, String
             tracing::warn!(
                 "is_authenticated: transient auth error, assuming last-known state: {e}"
             );
-            Ok(auth_manager.get_access_token_payload().is_ok())
+            Ok(auth_manager.current_claims().is_some())
         }
     }
 }
@@ -486,7 +457,7 @@ pub async fn auth_is_authenticated(app_handle: AppHandle) -> Result<bool, String
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_get_access_token_payload(app_handle: AppHandle) -> Result<Claims, String> {
-    let auth_manager = auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     auth_manager
         .get_or_refresh_access_token()
         .await
@@ -499,15 +470,11 @@ pub async fn auth_get_access_token_payload(app_handle: AppHandle) -> Result<Clai
 #[tauri::command]
 #[specta::specta]
 pub async fn auth_refresh_session(app_handle: AppHandle) -> Result<(), String> {
-    let auth_manager = auth_manager(&app_handle).await?;
+    let auth_manager = resolve_auth_manager(&app_handle)?;
     auth_manager
         .refresh_tokens()
         .await
         .ctx("Failed to refresh session")?;
-
-    if let Ok(claims) = auth_manager.get_access_token_payload() {
-        emit_auth_state(&app_handle, Some(claims));
-    }
 
     Ok(())
 }

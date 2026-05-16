@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::shared_types::{SharedSettingsState, SharedThreadManager, SharedUserController};
+use crate::shared_types::{SharedSettingsState, SharedThreadManager};
 use euro_endpoint::EndpointManager;
 use euro_settings::{SettingsState, wants_errors};
 use euro_telemetry::Controller as TelemetryController;
@@ -60,17 +60,16 @@ fn init_state(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.handle();
 
-    // Single shared AuthManager so concurrent refreshes coalesce through one
-    // refresh lock, regardless of which consumer initiates the refresh.
+    // Single shared AuthManager so concurrent refreshes coalesce through
+    // one refresh lock, regardless of which consumer initiates the
+    // refresh. `install` registers it as Tauri-managed state and spawns
+    // the bus → frontend bridge that emits `AuthStateChanged` on every
+    // transition.
     let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
+    euro_auth::tauri::install(app_handle, auth_manager.clone());
 
-    let thread_manager =
-        euro_thread::ThreadManager::new(endpoint_manager.clone(), auth_manager.clone());
+    let thread_manager = euro_thread::ThreadManager::new(endpoint_manager.clone(), auth_manager);
     app_handle.manage(SharedThreadManager::new(thread_manager));
-
-    let path = app.path().app_data_dir()?;
-    let user_controller = euro_user::UserController::new(path, auth_manager);
-    app_handle.manage(SharedUserController::new(user_controller));
 
     app_handle.manage(crate::shared_types::ActiveStreamTokens::default());
 

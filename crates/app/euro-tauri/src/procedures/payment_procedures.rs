@@ -5,7 +5,8 @@ use tauri::{AppHandle, Manager};
 use thiserror::Error;
 use url::Url;
 
-use crate::procedures::auth_manager;
+use euro_auth::tauri::auth_manager;
+
 use crate::procedures::auth_procedures::AuthError;
 use crate::shared_types::{SharedEndpointManager, SharedHttpClient};
 
@@ -67,9 +68,7 @@ fn http_client(app_handle: &AppHandle) -> reqwest::Client {
 }
 
 async fn resolve_token(app_handle: &AppHandle) -> Result<euro_secret::SecretString, PaymentError> {
-    let manager = auth_manager(app_handle)
-        .await
-        .ok_or(AuthError::StateUnavailable("user controller"))?;
+    let manager = auth_manager(app_handle).ok_or(AuthError::StateUnavailable("auth manager"))?;
     manager.get_or_refresh_access_token().await.map_err(|e| {
         if e.is_logged_out() {
             AuthError::NotAuthenticated.into()

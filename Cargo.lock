@@ -3807,6 +3807,8 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "specta",
+ "tauri",
+ "tauri-specta",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -3902,7 +3904,6 @@ dependencies = [
  "euro-settings",
  "euro-telemetry",
  "euro-thread",
- "euro-user",
  "futures",
  "rand 0.10.1",
  "serde",
@@ -4040,7 +4041,6 @@ dependencies = [
  "euro-telemetry",
  "euro-thread",
  "euro-timeline",
- "euro-user",
  "euro-vision",
  "futures",
  "keyring",
@@ -4141,20 +4141,6 @@ dependencies = [
  "tokio",
  "tracing",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "euro-user"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "chrono",
- "euro-auth",
- "euro-secret",
- "euro-storage",
- "serde",
- "serde_json",
- "uuid",
 ]
 
 [[package]]

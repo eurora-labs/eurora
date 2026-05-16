@@ -34,7 +34,7 @@ chrono = { workspace = true, features = ["serde"] }
 color-thief = "0.2.2"
 dirs = { workspace = true }
 euro-activity = { workspace = true }
-euro-auth = { workspace = true }
+euro-auth = { workspace = true, features = ["tauri"] }
 euro-bridge = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
@@ -45,7 +45,6 @@ euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
 thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
-euro-user = { workspace = true }
 euro-vision = { workspace = true }
 futures = { workspace = true }
 keyring = { workspace = true }

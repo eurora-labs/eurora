@@ -9,9 +9,9 @@
 //! pass fully qualified paths to `collect_commands!` and let
 //! module-relative macro resolution find them.
 
-use crate::procedures::auth_procedures::AuthStateChanged;
 use crate::procedures::system_procedures::BrowserExtensionStatusChanged;
 use crate::procedures::timeline_procedures::{TimelineAppEvent, TimelineAssetsEvent};
+use euro_auth::tauri::AuthStateChanged;
 
 /// Assemble the tauri-specta IPC surface — every typed command and event
 /// the desktop frontend talks to. Returned as a [`tauri_specta::Builder`]

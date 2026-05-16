@@ -6,7 +6,6 @@
 use euro_endpoint::EndpointManager;
 use euro_settings::{CloudSettingsCache, SettingsState, wants_errors};
 use euro_tauri::chat_context::TimelineChatContextProvider;
-use euro_tauri::shared_types::SharedUserController;
 use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
@@ -381,9 +380,6 @@ fn init_state(
         std::sync::Arc::new(TimelineChatContextProvider::new(app_handle.clone()));
     app_handle.manage(context_provider);
 
-    let path = tauri_app.path().app_data_dir()?;
-    let user_controller = euro_user::UserController::new(path, auth_manager.clone());
-    app_handle.manage(SharedUserController::new(user_controller));
     app_handle.manage(ActiveStreamTokens::default());
 
     Ok(())
@@ -678,9 +674,13 @@ fn main() {
                     tauri_app.manage(http_client);
 
                     // Single shared AuthManager so concurrent refreshes
-                    // from any consumer (thread, timeline, user, sync)
-                    // coalesce through one refresh lock.
+                    // from any consumer (thread, timeline, sync) coalesce
+                    // through one refresh lock. `install` registers it as
+                    // Tauri-managed state and spawns the bus → frontend
+                    // bridge that emits `AuthStateChanged` on every
+                    // transition.
                     let auth_manager = euro_auth::AuthManager::new(endpoint_manager.clone());
+                    euro_auth::tauri::install(tauri_app.handle(), auth_manager.clone());
 
                     // All command-visible state must be in place before the
                     // WebView is created — once the window exists the
