@@ -1642,7 +1642,11 @@ dependencies = [
  "be-auth-core",
  "be-remote-db",
  "be-storage",
+ "chrono",
+ "reqwest 0.12.28",
  "serde_json",
+ "sqlx",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tower",
@@ -4258,6 +4262,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "uuid",
  "windows-sys 0.61.2",
 ]
 

@@ -27,3 +27,17 @@ pub fn track_activities_list_failed(error_kind: &str) {
     event.insert_prop("error_kind", error_kind).ok();
     capture_async(event);
 }
+
+pub fn track_activity_updated(set_ended_at: bool, set_window_title: bool, set_name: bool) {
+    let mut event = Event::new_anon("activity_updated");
+    event.insert_prop("set_ended_at", set_ended_at).ok();
+    event.insert_prop("set_window_title", set_window_title).ok();
+    event.insert_prop("set_name", set_name).ok();
+    capture_async(event);
+}
+
+pub fn track_activity_update_failed(error_kind: &str) {
+    let mut event = Event::new_anon("activity_update_failed");
+    event.insert_prop("error_kind", error_kind).ok();
+    capture_async(event);
+}
