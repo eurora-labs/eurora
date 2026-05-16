@@ -2,7 +2,7 @@ mod client;
 mod error;
 mod events;
 mod manager;
-mod tokens;
+mod secret_store;
 
 #[cfg(feature = "tauri")]
 pub mod tauri;

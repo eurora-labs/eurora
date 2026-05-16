@@ -1,4 +1,4 @@
-use euro_secret::ExposeSecret;
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::{AppHandle, Manager};
@@ -67,7 +67,7 @@ fn http_client(app_handle: &AppHandle) -> reqwest::Client {
     app_handle.state::<SharedHttpClient>().inner().clone()
 }
 
-async fn resolve_token(app_handle: &AppHandle) -> Result<euro_secret::SecretString, PaymentError> {
+async fn resolve_token(app_handle: &AppHandle) -> Result<SecretString, PaymentError> {
     let manager = auth_manager(app_handle).ok_or(AuthError::StateUnavailable("auth manager"))?;
     manager.get_or_refresh_access_token().await.map_err(|e| {
         if e.is_logged_out() {

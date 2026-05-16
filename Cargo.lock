@@ -3754,13 +3754,13 @@ dependencies = [
  "euro-office",
  "euro-pdf",
  "euro-process",
- "euro-secret",
  "focus-tracker",
  "humantime-serde",
  "image",
  "regex",
  "reqwest 0.12.28",
  "resvg",
+ "secrecy",
  "serde",
  "serde_json",
  "specta",
@@ -3796,22 +3796,26 @@ dependencies = [
  "anyhow",
  "auth-core",
  "base64 0.22.1",
+ "chacha20poly1305",
  "chrono",
  "euro-endpoint",
- "euro-secret",
  "humantime-serde",
  "jsonwebtoken",
+ "keyring",
  "rand 0.10.1",
  "reqwest 0.12.28",
+ "secrecy",
  "serde",
  "serde_json",
  "sha2 0.10.9",
  "specta",
  "tauri",
  "tauri-specta",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]
@@ -3900,12 +3904,12 @@ dependencies = [
  "chrono",
  "euro-auth",
  "euro-endpoint",
- "euro-secret",
  "euro-settings",
  "euro-telemetry",
  "euro-thread",
  "futures",
  "rand 0.10.1",
+ "secrecy",
  "serde",
  "serde_json",
  "specta",
@@ -3971,21 +3975,6 @@ name = "euro-process"
 version = "0.0.0"
 
 [[package]]
-name = "euro-secret"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "chacha20poly1305",
- "keyring",
- "rand 0.10.1",
- "secrecy",
- "serde_json",
- "tracing",
- "zeroize",
-]
-
-[[package]]
 name = "euro-settings"
 version = "0.0.0"
 dependencies = [
@@ -3997,9 +3986,9 @@ dependencies = [
  "euro-auth",
  "euro-endpoint",
  "euro-fs",
- "euro-secret",
  "rand 0.10.1",
  "reqwest 0.12.28",
+ "secrecy",
  "serde",
  "serde_json",
  "serde_json_lenient",
@@ -4036,7 +4025,6 @@ dependencies = [
  "euro-bridge-protocol",
  "euro-endpoint",
  "euro-process",
- "euro-secret",
  "euro-settings",
  "euro-telemetry",
  "euro-thread",
@@ -4048,6 +4036,7 @@ dependencies = [
  "parking_lot",
  "reqwest 0.12.28",
  "rustls 0.23.40",
+ "secrecy",
  "serde",
  "serde_json",
  "specta",
@@ -4103,9 +4092,9 @@ dependencies = [
  "chrono",
  "euro-auth",
  "euro-endpoint",
- "euro-secret",
  "futures",
  "reqwest 0.12.28",
+ "secrecy",
  "serde",
  "serde_json",
  "specta",

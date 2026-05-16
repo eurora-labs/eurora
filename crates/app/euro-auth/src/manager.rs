@@ -1,16 +1,17 @@
 use crate::client::AuthClient;
 use crate::error::{AuthError, AuthResult};
 use crate::events::AuthEvent;
-use crate::tokens;
+use crate::secret_store::SecretStore;
 use anyhow::Result;
 use auth_core::{Claims, TokenResponse};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use euro_endpoint::EndpointManager;
-use euro_secret::{ExposeSecret, SecretString};
 use jsonwebtoken::dangerous::insecure_decode;
 use rand::Rng;
+use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
 use std::ops::Deref;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::{Mutex, broadcast};
 
@@ -39,6 +40,28 @@ impl JwtConfig {
 /// settings sync engine, a frontend bridge — drain promptly, so a small
 /// buffer absorbs any startup-time ordering without risking `Lagged`.
 const AUTH_EVENT_CAPACITY: usize = 16;
+
+/// Hint to UI callers describing how long the PKCE verifier slot is
+/// considered valid. The backend enforces the actual expiry on the
+/// challenge it stamps as OAuth `state`; this value just shapes the
+/// "your link expires in N minutes" copy on the device. 20 minutes
+/// matches the previous hard-coded value in the Tauri IPC layer.
+const LOGIN_CHALLENGE_TTL_SECS: u32 = 60 * 20;
+
+/// Returned by [`AuthManager::begin_login`]; consumed by the caller to
+/// build the web sign-in URL.
+///
+/// Carries only the public PKCE challenge — the verifier stays inside
+/// the secret store until [`AuthManager::complete_login`] redeems it.
+#[derive(Debug, Clone)]
+pub struct LoginChallenge {
+    /// SHA-256 hash of the verifier, base64url-encoded. The backend
+    /// stamps this as the OAuth `state` for the web sign-in flow.
+    pub code_challenge: String,
+    /// How long callers should treat this challenge as valid, in
+    /// seconds. Advisory: see [`LOGIN_CHALLENGE_TTL_SECS`].
+    pub expires_in: u32,
+}
 
 /// Centralised authentication state.
 ///
@@ -73,6 +96,10 @@ pub struct AuthManagerInner {
     auth_client: AuthClient,
     jwt_config: JwtConfig,
     refresh_lock: Mutex<()>,
+    /// Encrypted file-backed store for session state. Owned here so
+    /// the manager is the sole writer; external crates observe state
+    /// through `AuthEvent` subscriptions, not by reaching into storage.
+    secret_store: SecretStore,
     /// Backend event bus. Owning the `Sender` here keeps the channel
     /// alive for the manager's lifetime; subscribers obtain receivers
     /// via [`AuthManager::subscribe`]. The send path never blocks: a
@@ -82,14 +109,21 @@ pub struct AuthManagerInner {
 }
 
 impl AuthManager {
-    pub fn new(endpoint_manager: Arc<EndpointManager>) -> Self {
+    /// Open the encrypted secret store under `data_dir` and build a
+    /// manager around it. Fallible because the store can fail to
+    /// initialise — usually that means the OS keychain is unavailable
+    /// on a build where the main key is keychain-backed, and there's
+    /// nothing the caller can do beyond surfacing it.
+    pub fn new(endpoint_manager: Arc<EndpointManager>, data_dir: &Path) -> Result<Self, AuthError> {
+        let secret_store = SecretStore::open(data_dir)?;
         let (auth_event_tx, _) = broadcast::channel(AUTH_EVENT_CAPACITY);
-        Self(Arc::new(AuthManagerInner {
+        Ok(Self(Arc::new(AuthManagerInner {
             auth_client: AuthClient::new(endpoint_manager),
             jwt_config: JwtConfig::new(),
             refresh_lock: Mutex::new(()),
+            secret_store,
             auth_event_tx,
-        }))
+        })))
     }
 
     /// Subscribe to auth-state transitions.
@@ -190,7 +224,7 @@ impl AuthManager {
     /// since the user's intent ("I'm signed out") is honoured by the
     /// `AuthEvent { claims: None }` that always fires at the end.
     pub async fn logout(&self) {
-        if let Ok(refresh_token) = tokens::load_refresh()
+        if let Some(refresh_token) = self.refresh_token_silent()
             && let Err(err) = self.auth_client.logout(refresh_token.expose_secret()).await
         {
             tracing::warn!(
@@ -198,7 +232,9 @@ impl AuthManager {
                 "server-side logout failed; clearing local credentials anyway"
             );
         }
-        tokens::clear();
+        if let Err(err) = self.secret_store.wipe() {
+            tracing::warn!(error = %err, "failed to wipe secret store on logout");
+        }
         self.publish_auth_event(AuthEvent { claims: None });
     }
 
@@ -208,7 +244,10 @@ impl AuthManager {
     /// minted it). Returns an error when no token is stored or when the
     /// stored token isn't a parseable JWT.
     pub fn get_access_token_payload(&self) -> Result<Claims> {
-        let token = tokens::load_access()?;
+        let token = self
+            .secret_store
+            .access_token()?
+            .ok_or_else(|| anyhow::anyhow!("no access token stored"))?;
         let token = insecure_decode::<Claims>(token.expose_secret())?;
         Ok(token.claims)
     }
@@ -222,7 +261,10 @@ impl AuthManager {
     }
 
     pub fn get_refresh_token_payload(&self) -> Result<Claims> {
-        let token = tokens::load_refresh()?;
+        let token = self
+            .secret_store
+            .refresh_token()?
+            .ok_or_else(|| anyhow::anyhow!("no refresh token stored"))?;
         let token = insecure_decode::<Claims>(token.expose_secret())?;
         Ok(token.claims)
     }
@@ -266,7 +308,10 @@ impl AuthManager {
     }
 
     async fn perform_refresh(&self) -> AuthResult<Claims> {
-        let refresh_token = tokens::load_refresh().map_err(|_| AuthError::MissingRefreshToken)?;
+        let refresh_token = self
+            .secret_store
+            .refresh_token()?
+            .ok_or(AuthError::MissingRefreshToken)?;
         let response = self
             .auth_client
             .refresh_token(refresh_token.expose_secret())
@@ -277,8 +322,10 @@ impl AuthManager {
     }
 
     fn complete_session(&self, response: TokenResponse) -> Result<Claims> {
-        tokens::store_access(response.access_token)?;
-        tokens::store_refresh(response.refresh_token)?;
+        self.secret_store
+            .set_access_token(SecretString::from(response.access_token))?;
+        self.secret_store
+            .set_refresh_token(SecretString::from(response.refresh_token))?;
         let claims = self.get_access_token_payload()?;
         self.publish_auth_event(AuthEvent {
             claims: Some(claims.clone()),
@@ -287,7 +334,25 @@ impl AuthManager {
     }
 
     fn read_access_token(&self) -> AuthResult<SecretString> {
-        tokens::load_access().map_err(|_| AuthError::MissingAccessToken)
+        self.secret_store
+            .access_token()?
+            .ok_or(AuthError::MissingAccessToken)
+    }
+
+    /// Like [`secret_store::SecretStore::refresh_token`] but collapses
+    /// I/O errors into `None`. Used by [`AuthManager::logout`], where a
+    /// failing read shouldn't block local credential cleanup.
+    fn refresh_token_silent(&self) -> Option<SecretString> {
+        match self.secret_store.refresh_token() {
+            Ok(token) => token,
+            Err(err) => {
+                tracing::warn!(
+                    error = %err,
+                    "failed to read refresh token from secret store"
+                );
+                None
+            }
+        }
     }
 
     fn has_fresh_access_token(&self) -> bool {
@@ -300,21 +365,78 @@ impl AuthManager {
             .saturating_sub(self.jwt_config.refresh_offset_seconds)
     }
 
-    pub async fn get_login_tokens(&self) -> Result<(String, String)> {
-        let mut verifier_bytes = vec![0u8; 32];
+    /// Generate a fresh PKCE `(verifier, challenge)` pair.
+    ///
+    /// Pure function — does not persist anything. Use this for flows
+    /// where the verifier lives only in the awaiting frame and is
+    /// handed straight to [`AuthManager::login_by_login_token`] (e.g.
+    /// the mobile in-app browser session, where the redirect resolves
+    /// synchronously and the verifier never needs to outlive the
+    /// process). For the desktop flow — where the browser hand-off
+    /// crosses a process boundary and the verifier must survive — use
+    /// [`AuthManager::begin_login`] / [`AuthManager::complete_login`].
+    #[must_use]
+    pub fn generate_pkce_pair(&self) -> (String, String) {
+        let mut verifier_bytes = [0u8; 32];
         rand::rng().fill_bytes(&mut verifier_bytes);
-
         let code_verifier = URL_SAFE_NO_PAD.encode(verifier_bytes);
+
         let mut hasher = Sha256::new();
         hasher.update(&code_verifier);
-        let code_challenge_raw = hasher.finalize();
-        let code_challenge = URL_SAFE_NO_PAD.encode(code_challenge_raw);
+        let code_challenge = URL_SAFE_NO_PAD.encode(hasher.finalize());
 
-        Ok((code_verifier, code_challenge))
+        (code_verifier, code_challenge)
+    }
+
+    /// Start a desktop-style PKCE login.
+    ///
+    /// Generates a fresh PKCE pair, persists the verifier in the
+    /// secret store, and returns the corresponding challenge. The
+    /// caller hands the challenge to the web sign-in page; once the
+    /// user completes the flow there, [`AuthManager::complete_login`]
+    /// redeems the stored verifier for a session.
+    ///
+    /// Calling `begin_login` while a previous challenge is still
+    /// outstanding overwrites it — only one login attempt can be in
+    /// flight at a time. That matches the UX: the verifier slot is
+    /// the device's single "I'm trying to sign in right now" hand.
+    pub fn begin_login(&self) -> AuthResult<LoginChallenge> {
+        let (verifier, challenge) = self.generate_pkce_pair();
+        self.secret_store
+            .set_pkce_verifier(SecretString::from(verifier))?;
+        Ok(LoginChallenge {
+            code_challenge: challenge,
+            expires_in: LOGIN_CHALLENGE_TTL_SECS,
+        })
+    }
+
+    /// Complete a desktop-style PKCE login.
+    ///
+    /// Reads the verifier persisted by [`AuthManager::begin_login`],
+    /// exchanges it for a session, and clears the verifier on success.
+    /// On failure the verifier is left in place so the caller can
+    /// retry without re-running `begin_login`.
+    ///
+    /// Returns [`AuthError::LoginChallengeExpired`] when there's no
+    /// stored verifier — either the user never started a login on
+    /// this device or the slot was already consumed.
+    pub async fn complete_login(&self) -> AuthResult<Claims> {
+        let verifier = self
+            .secret_store
+            .pkce_verifier()?
+            .ok_or(AuthError::LoginChallengeExpired)?;
+        let claims = self
+            .login_by_login_token(verifier.expose_secret().to_owned())
+            .await?;
+        self.secret_store.clear_pkce_verifier()?;
+        Ok(claims)
     }
 
     pub async fn resend_verification_email(&self) -> Result<()> {
-        let access_token = tokens::load_access()?;
+        let access_token = self
+            .secret_store
+            .access_token()?
+            .ok_or_else(|| anyhow::anyhow!("no access token stored"))?;
         self.auth_client
             .resend_verification_email(access_token.expose_secret())
             .await
@@ -344,10 +466,12 @@ mod tests {
     use auth_core::Role;
     use euro_endpoint::EndpointManager;
 
-    fn manager_for_test() -> AuthManager {
+    fn manager_for_test() -> (AuthManager, tempfile::TempDir) {
         let endpoint =
             Arc::new(EndpointManager::new("https://example.invalid").expect("valid endpoint"));
-        AuthManager::new(endpoint)
+        let data_dir = tempfile::tempdir().expect("temp dir");
+        let manager = AuthManager::new(endpoint, data_dir.path()).expect("construct AuthManager");
+        (manager, data_dir)
     }
 
     fn claims_for(sub: &str) -> Claims {
@@ -367,7 +491,7 @@ mod tests {
 
     #[tokio::test]
     async fn publish_auth_event_delivers_to_subscriber() {
-        let manager = manager_for_test();
+        let (manager, _dir) = manager_for_test();
         let mut rx = manager.subscribe();
 
         manager.publish_auth_event(AuthEvent {
@@ -390,7 +514,7 @@ mod tests {
         // The bus must tolerate publishes that have no listener — at
         // startup the manager may publish before any sync engine has
         // subscribed, and that path must not return an error or panic.
-        let manager = manager_for_test();
+        let (manager, _dir) = manager_for_test();
         manager.publish_auth_event(AuthEvent { claims: None });
     }
 
@@ -400,7 +524,7 @@ mod tests {
         // tail, so an event published before `subscribe()` is invisible
         // to that subscriber. Two subscribers established at different
         // points must observe different prefixes of the stream.
-        let manager = manager_for_test();
+        let (manager, _dir) = manager_for_test();
         manager.publish_auth_event(AuthEvent {
             claims: Some(claims_for("11111111-1111-4111-8111-111111111111")),
         });
@@ -424,10 +548,45 @@ mod tests {
 
     #[tokio::test]
     async fn current_claims_returns_none_without_a_session() {
-        // No access token stored in this test process's keyring; the
-        // convenience accessor must collapse "missing" and "malformed"
-        // into a single `None` so callers don't need to branch.
-        let manager = manager_for_test();
+        // Fresh secret store has no access token; the convenience
+        // accessor must collapse "missing" and "malformed" into a
+        // single `None` so callers don't need to branch.
+        let (manager, _dir) = manager_for_test();
         assert!(manager.current_claims().is_none());
+    }
+
+    #[tokio::test]
+    async fn begin_login_persists_verifier_and_complete_login_consumes_it() {
+        let (manager, _dir) = manager_for_test();
+
+        // No challenge in flight → `complete_login` reports expiry
+        // rather than firing a network call.
+        let err = manager
+            .complete_login()
+            .await
+            .expect_err("complete_login without begin_login");
+        assert!(matches!(err, AuthError::LoginChallengeExpired));
+
+        let challenge = manager.begin_login().expect("begin_login");
+        assert!(!challenge.code_challenge.is_empty());
+        assert_eq!(challenge.expires_in, LOGIN_CHALLENGE_TTL_SECS);
+
+        // Round-tripping `begin_login` overwrites the previous verifier
+        // — only one in-flight challenge per device.
+        let next = manager.begin_login().expect("second begin_login");
+        assert_ne!(next.code_challenge, challenge.code_challenge);
+    }
+
+    #[test]
+    fn generate_pkce_pair_emits_distinct_random_pairs() {
+        let (manager, _dir) = manager_for_test();
+        let (v1, c1) = manager.generate_pkce_pair();
+        let (v2, c2) = manager.generate_pkce_pair();
+        assert_ne!(v1, v2);
+        assert_ne!(c1, c2);
+        // S256 challenges are base64url-encoded SHA-256 digests, which
+        // are always 43 chars at no-pad.
+        assert_eq!(c1.len(), 43);
+        assert_eq!(c2.len(), 43);
     }
 }
