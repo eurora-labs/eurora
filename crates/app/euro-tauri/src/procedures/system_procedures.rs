@@ -16,7 +16,7 @@ use tokio::sync::Mutex;
 use url::Url;
 
 use crate::shared_types::{SharedEndpointManager, SharedHttpClient, SharedSettingsState};
-use euro_settings::{TelemetryConsent, wants_errors};
+use euro_settings::TelemetryConsent;
 use euro_telemetry::Controller as TelemetryController;
 
 /// `RequestFrame.action` the desktop sends to the macOS launcher to
@@ -85,13 +85,20 @@ pub struct UpdateInfo {
 /// Single payload the desktop frontend fetches once at startup to bring
 /// up its Sentry / PostHog SDKs. Bundles the user's persisted consent
 /// state, the local anonymous identifier, the embedded build-time keys,
-/// and the release identity so the SDKs can tag events with channel +
-/// version.
+/// the release identity, and **precomputed policy decisions** so the
+/// frontend doesn't reproduce the consent-gating rules in TypeScript.
 ///
-/// `None` on any field means "this surface is disabled in this build".
-/// `build.rs` enforces all-or-nothing consistency: a build with a DSN
-/// always carries a channel and a release, so the frontend never has
-/// to defend against a half-configured payload.
+/// `consent` is included verbatim so the settings UI can render which
+/// toggles are currently set; the SDK init paths consume
+/// [`Self::allows_errors`] / [`Self::allows_metrics`] /
+/// [`Self::allows_identification`] instead of reading the consent
+/// fields directly.
+///
+/// `None` on any of the build-time fields means "this surface is
+/// disabled in this build". `build.rs` enforces all-or-nothing
+/// consistency: a build with a DSN always carries a channel and a
+/// release, so the frontend never has to defend against a
+/// half-configured payload.
 #[derive(Clone, Debug, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TelemetryBootstrap {
@@ -102,6 +109,30 @@ pub struct TelemetryBootstrap {
     pub posthog_host: Option<String>,
     pub channel: Option<String>,
     pub release: Option<String>,
+    /// `true` when the user has recorded consent at the current desktop
+    /// version *and* opted into anonymous error reporting.
+    pub allows_errors: bool,
+    /// `true` when the user has recorded consent at the current desktop
+    /// version *and* opted into anonymous metrics.
+    pub allows_metrics: bool,
+    /// `true` when, additionally to [`Self::allows_metrics`], the user
+    /// has opted into non-anonymous identification.
+    pub allows_identification: bool,
+}
+
+/// Pushed from Rust to the frontend whenever the desktop telemetry
+/// consent gate flips. Fired once during startup (in response to
+/// [`frontend_ready`]) with the current state, and again whenever the
+/// gate changes (e.g. after [`crate::procedures::settings_procedures::settings_record_telemetry_consent`]).
+///
+/// The frontend's root layout listens for this event and routes to the
+/// consent prompt when `required` is `true`. No comparison against a
+/// consent-version constant lives in TypeScript — that decision is
+/// entirely Rust's, and the frontend trusts the event payload.
+#[derive(Clone, Debug, Serialize, Deserialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsentGate {
+    pub required: bool,
 }
 
 /// What the desktop frontend should render for a given browser when its
@@ -557,12 +588,13 @@ pub async fn system_get_telemetry_bootstrap(
     // bootstraps after consent. Persist immediately so a crash before
     // the next save doesn't lose the id and accidentally generate a
     // fresh one on the next run.
-    let needs_consent = euro_settings::needs_consent(&settings.cache.settings.desktop.telemetry);
-    let id_changed = if needs_consent {
-        false
-    } else {
-        settings.local.telemetry.ensure_distinct_id()
-    };
+    let consent_recorded = settings
+        .cache
+        .settings
+        .desktop
+        .telemetry
+        .is_recorded_for_desktop();
+    let id_changed = consent_recorded && settings.local.telemetry.ensure_distinct_id();
     if id_changed {
         settings.save_local_to_default_path().map_err(|e| {
             SystemError::Persistence(format!("Failed to persist telemetry distinct id: {e}"))
@@ -574,6 +606,9 @@ pub async fn system_get_telemetry_bootstrap(
     drop(settings);
 
     Ok(TelemetryBootstrap {
+        allows_errors: consent.allows_errors_on_desktop(),
+        allows_metrics: consent.allows_metrics_on_desktop(),
+        allows_identification: consent.allows_identification_on_desktop(),
         consent,
         distinct_id,
         sentry_dsn: euro_telemetry::non_empty(euro_telemetry::SENTRY_DSN).map(str::to_owned),
@@ -584,12 +619,28 @@ pub async fn system_get_telemetry_bootstrap(
     })
 }
 
+/// Frontend handshake: called from the root layout once event listeners
+/// are attached. The backend reads the current desktop consent state and
+/// emits [`ConsentGate`] with `required` set accordingly, so the
+/// frontend can route to the consent prompt without ever computing the
+/// rule in TypeScript. This is the only entry point that evaluates the
+/// gate at startup — emitting from `setup()` would race the listener
+/// registration.
 #[tauri::command]
 #[specta::specta]
-pub async fn system_needs_telemetry_consent(app_handle: AppHandle) -> bool {
+pub async fn frontend_ready(app_handle: AppHandle) -> Result<(), SystemError> {
     let state = app_handle.state::<SharedSettingsState>();
-    let settings = state.lock().await;
-    euro_settings::needs_consent(&settings.cache.settings.desktop.telemetry)
+    let required = {
+        let settings = state.lock().await;
+        settings
+            .cache
+            .settings
+            .desktop
+            .telemetry
+            .needs_prompt_for_desktop()
+    };
+    let _ = ConsentGate { required }.emit(&app_handle);
+    Ok(())
 }
 
 #[tauri::command]
@@ -599,7 +650,12 @@ pub async fn system_reinit_telemetry(app_handle: AppHandle) {
     let (enabled, distinct_id) = {
         let settings = settings_state.lock().await;
         (
-            wants_errors(&settings.cache.settings.desktop.telemetry),
+            settings
+                .cache
+                .settings
+                .desktop
+                .telemetry
+                .allows_errors_on_desktop(),
             settings.local.telemetry.distinct_id.clone(),
         )
     };
@@ -624,7 +680,12 @@ pub async fn system_rotate_telemetry_distinct_id(
         .distinct_id
         .clone()
         .expect("rotate_distinct_id always populates the id");
-    let enabled = wants_errors(&settings.cache.settings.desktop.telemetry);
+    let enabled = settings
+        .cache
+        .settings
+        .desktop
+        .telemetry
+        .allows_errors_on_desktop();
     drop(settings);
 
     let controller = app_handle.state::<Arc<TelemetryController>>();

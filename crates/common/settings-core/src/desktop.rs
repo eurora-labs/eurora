@@ -141,14 +141,15 @@ impl<'de> Deserialize<'de> for TextScale {
 /// chrome scaling, telemetry SDKs that don't run on the other
 /// platforms) cleanly partitioned.
 ///
-/// The derived `Default` here is the *wire fallback* used by
-/// `#[serde(default)]` when a partial blob is read off the network.
-/// Scales default to [`DEFAULT_SCALE`] (via [`InterfaceScale::DEFAULT`]
-/// / [`TextScale::DEFAULT`]) rather than `0.0`, because a zero-size UI
-/// is unrecoverable; an inert sensible value is the only safe
-/// fallback. The product-blessed fresh-install values live in
-/// `assets/defaults.jsonc` and are reached through
-/// [`crate::CloudSettings::default()`].
+/// The derived `Default` is both the fresh-install value and the
+/// per-field fallback used by `#[serde(default)]` when an older client
+/// wrote a partial blob. Scales default to [`DEFAULT_SCALE`] (via
+/// [`InterfaceScale::DEFAULT`] / [`TextScale::DEFAULT`]) rather than
+/// `0.0`, because a zero-size UI is unrecoverable; an inert sensible
+/// value is the only safe fallback. Telemetry consent defaults to the
+/// "never asked" sentinel (`consent_version == 0`) so a fresh install
+/// is routed through the consent prompt rather than silently
+/// auto-consented — see [`crate::TelemetryConsent`].
 ///
 /// `interface_scale` and `text_scale` carry their invariants in the
 /// type, not in a separate validation pass: any value of type
@@ -278,10 +279,11 @@ mod tests {
     }
 
     #[test]
-    fn builder_defaults_match_wire_fallback() {
-        // An empty builder must reproduce the wire-fallback `Default`
-        // exactly — otherwise the partial-JSON and explicit-builder
-        // paths would diverge.
+    fn builder_defaults_match_default_impl() {
+        // An empty builder must reproduce `Default::default()` exactly —
+        // otherwise the partial-JSON deserialise path (which goes through
+        // `Default::default()` per-field) and the explicit-builder path
+        // would diverge.
         assert_eq!(
             DesktopSettings::builder().build(),
             DesktopSettings::default()

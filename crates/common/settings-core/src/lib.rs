@@ -33,27 +33,26 @@
 //! field has a sensible default. [`CURRENT_SCHEMA_VERSION`] only
 //! advances when the *structural* shape changes incompatibly.
 //!
-//! ## Two tiers of defaults
+//! ## Defaults
 //!
-//! Defaults serve two distinct roles, which this crate keeps separate:
+//! Each section's `Default` impl is both the fresh-install value and
+//! the per-field fallback used by `#[serde(default)]` when an older
+//! client wrote a partial blob. Booleans collapse to `false` and
+//! counters to `0` so a missing field can never silently opt a user
+//! in; [`SharedSettings`] is the one section whose `Default` is
+//! hand-rolled to set `dynamic_accent: true` (the product default),
+//! and [`DesktopSettings`] scales fall back to [`DEFAULT_SCALE`]
+//! because a zero-size UI is unrecoverable.
 //!
-//! 1. **Fresh-install defaults** — what a brand-new user sees on first
-//!    launch. Owned by `assets/defaults.jsonc`. Reached through
-//!    [`CloudSettings::default()`]. Edit the JSONC to change them.
+//! ## Telemetry consent
 //!
-//! 2. **Wire fallback defaults** — what `#[serde(default)]` fills in
-//!    when an older client wrote a partial blob and a newer field is
-//!    missing. Owned by each leaf section's `Default` impl. These are
-//!    deliberately *inert* (booleans → `false`, counters → `0`) so a
-//!    missing field can never silently opt a user in. The single
-//!    exception is [`DesktopSettings`], whose scales fall back to
-//!    [`DEFAULT_SCALE`] (via [`InterfaceScale::DEFAULT`] /
-//!    [`TextScale::DEFAULT`]) because a zero-size UI is unrecoverable.
-//!
-//! The two tiers may diverge intentionally — e.g. `dynamicAccent` is
-//! `true` on a fresh install (JSONC) but `false` as a wire fallback
-//! (derived `Default`). Callers wanting "the product default" must use
-//! [`CloudSettings::default()`], not leaf `Default` impls.
+//! [`TelemetryConsent`] lives under each *platform* section, never
+//! under [`SharedSettings`]: consent must be specific to the data
+//! actually collected, and each platform ships a different telemetry
+//! stack. The "current consent version" is per-platform too — see
+//! [`DESKTOP_CONSENT_VERSION`]. The struct enforces monotonic recording
+//! on the type itself ([`TelemetryConsent::record_for_desktop`]) so an
+//! older client cannot roll back a newer client's stored consent.
 
 pub mod cloud;
 pub mod desktop;
@@ -71,7 +70,7 @@ pub use dto::{
 };
 pub use mobile::MobileSettings;
 pub use shared::{SharedSettings, ThemePreference};
-pub use telemetry::TelemetryConsent;
+pub use telemetry::{DESKTOP_CONSENT_VERSION, TelemetryConsent};
 pub use web::WebSettings;
 
 /// Build a [`specta::Types`] containing every settings wire type the

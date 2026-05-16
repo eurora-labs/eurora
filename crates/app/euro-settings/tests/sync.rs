@@ -1505,7 +1505,15 @@ async fn auth_event_subject_change_replaces_cache() {
     })
     .expect("listener receiver alive");
 
-    wait_for_cache(&h, |cache| cache.last_user_id == Some(user_b)).await;
+    // The wipe step stamps `last_user_id = user_b` *before* the network
+    // pull replaces the cache contents (covered by
+    // `foreign_cache_isolation_persists_before_network_failure`), so
+    // waiting on just `last_user_id` races the pull. Pin both fields to
+    // a post-pull state to land on the replaced blob.
+    wait_for_cache(&h, |cache| {
+        cache.last_user_id == Some(user_b) && cache.base_updated_at == Some(timestamp(2026, 10, 1))
+    })
+    .await;
     let cache = h.cache_clone().await;
     assert_eq!(cache.settings.shared.theme, ThemePreference::Light);
     assert_eq!(cache.base_updated_at, Some(timestamp(2026, 10, 1)));
