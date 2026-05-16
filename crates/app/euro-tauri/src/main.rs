@@ -607,6 +607,13 @@ fn main() {
                     install_office_word_addin(tauri_app);
                     bind_and_serve_bridge()?;
 
+                    // Trigger the OS-level screen-capture permission prompt
+                    // up front (macOS TCC; xdg-desktop-portal on Wayland)
+                    // so the user grants once at startup rather than at
+                    // first chat turn from the `DefaultStrategy`. No-op on
+                    // X11 and Windows.
+                    euro_vision::capture::prime_capture_permission();
+
                     // We just dropped a fresh messenger binary on disk. Any
                     // browser messengers from the previous desktop session
                     // are sitting in their reconnect-backoff loop and will

@@ -9,3 +9,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 anyhow = { workspace = true }
 base64 = { workspace = true }
 image = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+tracing = { workspace = true }
+xcap = { workspace = true }

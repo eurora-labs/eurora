@@ -83,7 +83,7 @@ pub enum ActivityStrategy {
 }
 
 impl ActivityStrategy {
-    /// Build the strategy responsible for the given focused process.
+    /// Build the strategy responsible for the given focused window.
     ///
     /// Strategies are tried in priority order: [`NoStrategy`] suppresses
     /// tracking for Eurora's own processes, [`BrowserStrategy`] handles
@@ -91,7 +91,14 @@ impl ActivityStrategy {
     /// integration, [`PreviewStrategy`] handles macOS Preview.app (and
     /// is a no-op on other targets), and any other process falls through
     /// to [`DefaultStrategy`].
-    pub async fn new(process_name: &str) -> ActivityResult<ActivityStrategy> {
+    ///
+    /// The full [`FocusedWindow`] is threaded through (rather than just
+    /// the process name) because [`DefaultStrategy`] is window-bound at
+    /// construction — it cannot exist without a target window. The
+    /// specialised strategies still match by process name only and pick
+    /// up their per-window state via `start_tracking`.
+    pub async fn new(focus_window: &FocusedWindow) -> ActivityResult<ActivityStrategy> {
+        let process_name = focus_window.process_name.as_str();
         if NoStrategy::matches_process(process_name) {
             return NoStrategy::create().await;
         }
@@ -104,7 +111,9 @@ impl ActivityStrategy {
         if PreviewStrategy::matches_process(process_name) {
             return PreviewStrategy::create().await;
         }
-        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy))
+        Ok(ActivityStrategy::DefaultStrategy(DefaultStrategy::new(
+            focus_window.clone(),
+        )))
     }
 }
 

@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset},
     error::ActivityResult,
-    snapshots::*,
+    snapshots::{ArticleSnapshot, DefaultSnapshot, YoutubeSnapshot},
     storage::SaveableAsset,
 };
 
