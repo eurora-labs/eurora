@@ -10,7 +10,7 @@ use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 use thiserror::Error;
 
-use crate::procedures::system_procedures::ConsentGate;
+use crate::procedures::system::ConsentGate;
 use crate::shared_types::{SharedEndpointManager, SharedSettingsState};
 use euro_telemetry::Controller as TelemetryController;
 

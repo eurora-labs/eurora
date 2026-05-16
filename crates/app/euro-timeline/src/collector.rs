@@ -2,7 +2,7 @@ use crate::{
     ActivityStorage, ActivityStrategy,
     error::{TimelineError, TimelineResult},
     storage::TimelineStorage,
-    types::ActivityEvent,
+    types::{ActivityEvent, SavedActivityEvent},
 };
 use chrono::{DateTime, Utc};
 use euro_activity::strategies::{ActivityReport, StrategySupport};
@@ -50,6 +50,7 @@ pub struct CollectorService {
     heartbeat: Arc<Mutex<Option<JoinHandle<()>>>>,
     activity_event_tx: broadcast::Sender<ActivityEvent>,
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
+    saved_activity_event_tx: broadcast::Sender<SavedActivityEvent>,
 }
 
 impl CollectorService {
@@ -65,6 +66,7 @@ impl CollectorService {
 
         let (activity_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
+        let (saved_activity_event_tx, _) = broadcast::channel(100);
         // `DefaultStrategy` is window-bound and can't exist without a
         // focused window, so we boot in `NoStrategy` (a no-op that
         // refuses to handle any external process). The very first focus
@@ -84,6 +86,7 @@ impl CollectorService {
             heartbeat: Arc::new(Mutex::new(None)),
             activity_event_tx,
             assets_event_tx,
+            saved_activity_event_tx,
         }
     }
 
@@ -111,6 +114,10 @@ impl CollectorService {
 
     pub fn subscribe_to_assets_events(&self) -> broadcast::Receiver<Vec<ContextChip>> {
         self.assets_event_tx.subscribe()
+    }
+
+    pub fn subscribe_to_saved_activity_events(&self) -> broadcast::Receiver<SavedActivityEvent> {
+        self.saved_activity_event_tx.subscribe()
     }
 
     pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
@@ -190,6 +197,7 @@ impl CollectorService {
         let sync_permits = Arc::clone(&self.sync_permits);
         let heartbeat = Arc::clone(&self.heartbeat);
         let assets_event_tx_for_reports = assets_event_tx.clone();
+        let saved_activity_event_tx_for_reports = self.saved_activity_event_tx.clone();
         self.current_task = Some(tokio::spawn(async move {
             let activity_event_tx_inner = activity_event_tx.clone();
             let mut last_activity_name: Option<String> = None;
@@ -254,7 +262,12 @@ impl CollectorService {
                         // `ended_at = now()` so a crash before the
                         // first heartbeat still leaves a bounded row.
                         let new_id = activity.id;
-                        spawn_insert(&activity_storage, &sync_permits, activity);
+                        spawn_insert(
+                            &activity_storage,
+                            &sync_permits,
+                            &saved_activity_event_tx_for_reports,
+                            activity,
+                        );
 
                         restart_heartbeat(&heartbeat, &activity_storage, &sync_permits, new_id)
                             .await;
@@ -416,9 +429,21 @@ impl Drop for CollectorService {
 /// Spawn a bounded-concurrency tokio task that POSTs the activity.
 /// Failures log-and-drop; the collector loop must never block on the
 /// network. Offline resilience is intentionally out of scope here.
-fn spawn_insert(storage: &Arc<ActivityStorage>, permits: &Arc<Semaphore>, activity: Activity) {
+///
+/// On a successful insert the task fires [`SavedActivityEvent`] on
+/// `saved_tx` so subscribers (the desktop tauri layer in particular)
+/// can surface the freshly-persisted row in the timeline rail without
+/// re-polling `GET /activities`. The send is best-effort: a closed
+/// channel (no listeners) is normal during boot and not an error.
+fn spawn_insert(
+    storage: &Arc<ActivityStorage>,
+    permits: &Arc<Semaphore>,
+    saved_tx: &broadcast::Sender<SavedActivityEvent>,
+    activity: Activity,
+) {
     let storage = Arc::clone(storage);
     let permits = Arc::clone(permits);
+    let saved_tx = saved_tx.clone();
     let id = activity.id;
     let name = activity.name.clone();
     tokio::spawn(async move {
@@ -433,13 +458,27 @@ fn spawn_insert(storage: &Arc<ActivityStorage>, permits: &Arc<Semaphore>, activi
                 return;
             }
         };
-        if let Err(err) = storage.save_activity_to_service(&activity).await {
-            tracing::warn!(
-                activity_id = %id,
-                name = %name,
-                error = %err,
-                "Activity insert failed",
-            );
+        match storage.save_activity_to_service(&activity).await {
+            Ok(_) => {
+                let event = SavedActivityEvent {
+                    id: activity.id,
+                    name: activity.name.clone(),
+                    process_name: activity.process_name.clone(),
+                    window_title: activity.window_title(),
+                    started_at: activity.start,
+                    ended_at: activity.end,
+                    icon: activity.icon.clone(),
+                };
+                let _ = saved_tx.send(event);
+            }
+            Err(err) => {
+                tracing::warn!(
+                    activity_id = %id,
+                    name = %name,
+                    error = %err,
+                    "Activity insert failed",
+                );
+            }
         }
     });
 }

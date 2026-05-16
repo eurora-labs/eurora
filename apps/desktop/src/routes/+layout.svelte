@@ -5,6 +5,7 @@
 	import ResizeHandles from '$lib/components/ResizeHandles.svelte';
 	import Titlebar from '$lib/components/Titlebar.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
+	import { ACTIVITY_SERVICE } from '$lib/services/activity-service.svelte.js';
 	import { APPEARANCE_SERVICE } from '$lib/services/appearance-service.svelte.js';
 	import { GENERAL_SERVICE } from '$lib/services/general-service.svelte.js';
 	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
@@ -48,6 +49,9 @@
 
 	const timelineService = inject(TIMELINE_SERVICE);
 	timelineService.init();
+
+	const activityService = inject(ACTIVITY_SERVICE);
+	activityService.init();
 
 	// Boot the syntax-highlighter worker and pre-load common languages so
 	// the first streamed code block doesn't pay grammar-load latency.

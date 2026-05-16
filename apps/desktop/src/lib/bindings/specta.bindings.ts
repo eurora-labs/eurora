@@ -14,6 +14,17 @@ export const commands = {
 	authGetAccessTokenPayload: () => typedError<Claims, AuthError>(__TAURI_INVOKE("auth_get_access_token_payload")),
 	authRefreshSession: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_refresh_session")),
 	authResendVerificationEmail: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_resend_verification_email")),
+	/**
+	 *  Fetch the most-recent persisted activities and decorate each with the
+	 *  presentation data the timeline rail needs (accent colour + a
+	 *  `data:`-URL icon).
+	 * 
+	 *  Per-row icon fetches fan out concurrently via `join_all`; reqwest's
+	 *  HTTP/2 pool multiplexes them over a single connection. Failures on a
+	 *  single icon log + degrade to `(accent: None, icon_base64: None)` so
+	 *  one bad asset can't block the rest of the page from rendering.
+	 */
+	activityList: (limit: number, offset: number) => typedError<SavedActivity[], SavedActivityError>(__TAURI_INVOKE("activity_list", { limit, offset })),
 	chatCollectContext: (threadId: string) => typedError<ChatContext, StreamError>(__TAURI_INVOKE("chat_collect_context", { threadId })),
 	chatSendQuery: (threadId: string, channel: Channel<ChatServerMessage>, request: ChatSendRequest) => typedError<null, StreamError>(__TAURI_INVOKE("chat_send_query", { threadId, channel, request })),
 	chatRegenerate: (threadId: string, aiMessageId: string, channel: Channel<ChatServerMessage>) => typedError<null, StreamError>(__TAURI_INVOKE("chat_regenerate", { threadId, aiMessageId, channel })),
@@ -126,6 +137,7 @@ export const events = {
 	authStateChanged: makeEvent<AuthStateChanged>("auth-state-changed"),
 	browserExtensionStatusChanged: makeEvent<BrowserExtensionStatusChanged>("browser-extension-status-changed"),
 	consentGate: makeEvent<ConsentGate>("consent-gate"),
+	savedActivityCreated: makeEvent<SavedActivityCreated>("saved-activity-created"),
 	timelineAppEvent: makeEvent<TimelineAppEvent>("timeline-app-event"),
 	timelineAssetsEvent: makeEvent<TimelineAssetsEvent>("timeline-assets-event"),
 };
@@ -379,7 +391,7 @@ export type ConnectionMode = { kind: "default" } | { kind: "custom"; url: string
  *  Pushed from Rust to the frontend whenever the desktop telemetry
  *  consent gate flips. Fired once during startup (in response to
  *  [`frontend_ready`]) with the current state, and again whenever the
- *  gate changes (e.g. after [`crate::procedures::settings_procedures::settings_record_telemetry_consent`]).
+ *  gate changes (e.g. after [`crate::procedures::settings::settings_record_telemetry_consent`]).
  * 
  *  The frontend's root layout listens for this event and routes to the
  *  consent prompt when `required` is `true`. No comparison against a
@@ -656,6 +668,48 @@ export type Roles = {
 	title: ModelRef,
 	vision: ModelRef | null,
 };
+
+/**
+ *  Frontend-facing view of one persisted activity.
+ * 
+ *  `accent` and `icon_base64` are populated by the desktop tauri layer
+ *  (decoded from the asset's PNG bytes); both are `None` whenever the
+ *  activity has no icon or the icon fetch failed — treat them as
+ *  presentation hints, never as load-bearing fields.
+ */
+export type SavedActivity = {
+	id: string,
+	name: string,
+	processName: string,
+	windowTitle: string,
+	startedAt: string,
+	endedAt: string | null,
+	accent: AccentColor | null,
+	/**
+	 *  `data:<mime>;base64,...` URL suitable for direct embedding in
+	 *  `<img src>`. Bare base64 would force the frontend to know the
+	 *  mime out-of-band, which it currently does not.
+	 */
+	iconBase64: string | null,
+};
+
+/**
+ *  Push event fired after the cloud `POST /activities` succeeds for a
+ *  freshly-tracked activity. Lets the desktop frontend prepend the new
+ *  row to the timeline rail without re-polling `GET /activities`.
+ */
+export type SavedActivityCreated = SavedActivity;
+
+/**
+ *  Errors surfaced to the frontend from [`activity_list`].
+ * 
+ *  Externally tagged so the JS side gets `{ type: "Network", data: "..." }`
+ *  and can branch on `type` rather than parsing strings. Variants are
+ *  intentionally narrow — any failure to fetch a *single* icon falls back
+ *  to `accent: None, icon_base64: None` on that row instead of failing
+ *  the whole call.
+ */
+export type SavedActivityError = { type: "StateUnavailable"; data: string } | { type: "Network"; data: string };
 
 /**  One message hit returned by full-text search. */
 export type SearchMessageResult = {

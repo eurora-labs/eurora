@@ -1166,6 +1166,29 @@ impl DatabaseManager {
         Ok(asset)
     }
 
+    /// Fetch an asset row scoped to its owner.
+    ///
+    /// The `user_id` predicate is in the WHERE clause (not a separate
+    /// authorization check) so a row belonging to a different user
+    /// surfaces as `NotFound` rather than `Forbidden` — that avoids
+    /// leaking existence of another user's assets.
+    #[builder]
+    pub async fn get_asset_for_user(&self, asset_id: Uuid, user_id: Uuid) -> DbResult<Asset> {
+        let asset = sqlx::query_as::<_, Asset>(
+            r#"
+            SELECT id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, metadata, created_at, updated_at
+            FROM assets
+            WHERE id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(asset_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(asset)
+    }
+
     #[builder]
     pub async fn link_asset_to_activity(
         &self,

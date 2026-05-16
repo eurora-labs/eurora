@@ -159,10 +159,17 @@ impl Activity {
     pub fn get_context_chip(&self) -> ContextChip {
         ContextChip {
             id: self.id.to_string(),
-            name: self.title.clone().unwrap_or_else(|| self.name.clone()),
+            name: self.window_title(),
             icon: None,
             domain: self.url.as_ref().and_then(domain_from_url),
         }
+    }
+
+    /// Title to render alongside the activity. `title` is the OS-reported
+    /// window title; when absent (some platforms / strategies don't
+    /// populate it) we fall back to `name`, which is always set.
+    pub fn window_title(&self) -> String {
+        self.title.clone().unwrap_or_else(|| self.name.clone())
     }
 
     /// Replace the URL and the URL-derived `name` in one step.

@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
+	import { ACTIVITY_SERVICE } from '$lib/services/activity-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as ScrollArea from '@eurora/ui/components/scroll-area/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import { onMount } from 'svelte';
 
-	const timelineService = inject(TIMELINE_SERVICE);
+	const activityService = inject(ACTIVITY_SERVICE);
 
 	// Tag <body> while the rail is mounted so peer chrome (sidebar, titlebar
 	// leading region) can shift over to make room. A body class is more
@@ -39,7 +39,7 @@
 >
 	<ScrollArea.Root class="min-h-0 flex-1" scrollbarYClasses="w-1.5">
 		<Timeline.Root>
-			{#each timelineService.recentDesc as item, i (`${item.processId}-${i}`)}
+			{#each activityService.recent as item, i (item.id)}
 				{@const { bg, fg } = surfaces(item.accent?.iconBg)}
 				<Timeline.Item
 					color={item.accent?.hex}

@@ -1,3 +1,3 @@
-pub mod auth_procedures;
-pub mod settings_procedures;
-pub mod system_procedures;
+pub mod auth;
+pub mod settings;
+pub mod system;
