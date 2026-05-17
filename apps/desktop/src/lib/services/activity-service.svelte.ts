@@ -1,10 +1,6 @@
 import { ListenerBag } from '$lib/bindings/listeners.js';
 import { unwrap } from '$lib/bindings/result.js';
-import {
-	commands,
-	events,
-	type SavedActivity,
-} from '$lib/bindings/specta.bindings.js';
+import { commands, events, type SavedActivity } from '$lib/bindings/specta.bindings.js';
 import { InjectionToken } from '@eurora/shared/context';
 
 /**
@@ -60,10 +56,7 @@ export class ActivityService {
 
 	private applyActivity(incoming: SavedActivity): void {
 		// ISO-8601 timestamps compare lexicographically; no Date parsing needed.
-		const merged = [
-			incoming,
-			...this.recent.filter((a) => a.id !== incoming.id),
-		];
+		const merged = [incoming, ...this.recent.filter((a) => a.id !== incoming.id)];
 		merged.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 		this.recent = merged.slice(0, RECENT_LIMIT);
 	}
