@@ -38,13 +38,14 @@
 		{buttonText[mode].github}
 	</Button>
 	<!--
+		Apple sign-in hidden: backend flow not finished for release.
 		Apple's logo isn't in Simple Icons (trademark-protected), and
 		Apple's brand guidelines require a specific glyph + spacing for
 		the Sign-in-with-Apple button. UI styling is deferred to a
 		follow-up — for now we ship the functional button with an inline
 		SVG that approximates the system glyph.
 	-->
-	<Button variant="outline" class="w-full" onclick={onApple} {disabled}>
+	<Button variant="outline" class="w-full hidden" onclick={onApple} {disabled}>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			width="16"
