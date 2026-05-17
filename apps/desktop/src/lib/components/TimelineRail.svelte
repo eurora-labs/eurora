@@ -32,11 +32,12 @@
 	const LOG_REF_LONG = Math.log(REF_LONG_SECONDS);
 
 	function connectorHeightFor(startedAt: string, endedAt: string | null): number {
-		// `endedAt` is null for the in-progress activity. That row is almost
-		// always the first item (its connector is hidden by Timeline.Root's
-		// :first-child rule), so a precise value here is cosmetic at best.
-		// Falling back to MIN avoids needing a ticking clock for a
-		// degenerate case.
+		// `endedAt: null` uniquely identifies the in-progress activity:
+		// once a row stops being current, the `savedActivityEnded` event
+		// patches its `endedAt` in place (see ActivityService.applyEnded).
+		// The in-progress row's connector is hidden by Timeline.Root's
+		// :first-child rule, so a precise value here is cosmetic at best
+		// — falling back to MIN avoids needing a ticking clock for it.
 		if (endedAt === null) return MIN_CONNECTOR_HEIGHT_PX;
 
 		const durationSeconds = (Date.parse(endedAt) - Date.parse(startedAt)) / 1000;

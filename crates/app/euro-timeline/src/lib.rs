@@ -6,7 +6,7 @@ pub use euro_activity::{
     AssetFunctionality, ContextChip,
 };
 pub use manager::TimelineManager;
-pub use types::{ActivityEvent, SavedActivityEvent};
+pub use types::{ActivityEvent, SavedActivityEndedEvent, SavedActivityEvent};
 
 mod collector;
 mod config;

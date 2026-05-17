@@ -2,7 +2,7 @@ use crate::{
     ActivityStorage, ActivityStrategy,
     error::{TimelineError, TimelineResult},
     storage::TimelineStorage,
-    types::{ActivityEvent, SavedActivityEvent},
+    types::{ActivityEvent, SavedActivityEndedEvent, SavedActivityEvent},
 };
 use chrono::{DateTime, Utc};
 use euro_activity::strategies::{ActivityReport, StrategySupport};
@@ -51,6 +51,7 @@ pub struct CollectorService {
     activity_event_tx: broadcast::Sender<ActivityEvent>,
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
     saved_activity_event_tx: broadcast::Sender<SavedActivityEvent>,
+    saved_activity_ended_event_tx: broadcast::Sender<SavedActivityEndedEvent>,
 }
 
 impl CollectorService {
@@ -67,6 +68,7 @@ impl CollectorService {
         let (activity_event_tx, _) = broadcast::channel(100);
         let (assets_event_tx, _) = broadcast::channel(100);
         let (saved_activity_event_tx, _) = broadcast::channel(100);
+        let (saved_activity_ended_event_tx, _) = broadcast::channel(100);
         // `DefaultStrategy` is window-bound and can't exist without a
         // focused window, so we boot in `NoStrategy` (a no-op that
         // refuses to handle any external process). The very first focus
@@ -87,6 +89,7 @@ impl CollectorService {
             activity_event_tx,
             assets_event_tx,
             saved_activity_event_tx,
+            saved_activity_ended_event_tx,
         }
     }
 
@@ -118,6 +121,12 @@ impl CollectorService {
 
     pub fn subscribe_to_saved_activity_events(&self) -> broadcast::Receiver<SavedActivityEvent> {
         self.saved_activity_event_tx.subscribe()
+    }
+
+    pub fn subscribe_to_saved_activity_ended_events(
+        &self,
+    ) -> broadcast::Receiver<SavedActivityEndedEvent> {
+        self.saved_activity_ended_event_tx.subscribe()
     }
 
     pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
@@ -198,6 +207,7 @@ impl CollectorService {
         let heartbeat = Arc::clone(&self.heartbeat);
         let assets_event_tx_for_reports = assets_event_tx.clone();
         let saved_activity_event_tx_for_reports = self.saved_activity_event_tx.clone();
+        let saved_activity_ended_event_tx_for_reports = self.saved_activity_ended_event_tx.clone();
         self.current_task = Some(tokio::spawn(async move {
             let activity_event_tx_inner = activity_event_tx.clone();
             let mut last_activity_name: Option<String> = None;
@@ -253,6 +263,7 @@ impl CollectorService {
                             spawn_patch_end(
                                 &activity_storage,
                                 &sync_permits,
+                                &saved_activity_ended_event_tx_for_reports,
                                 prev_id,
                                 prev_ended_at,
                             );
@@ -305,7 +316,13 @@ impl CollectorService {
                                 })
                         };
                         if let Some((id, ended_at)) = ending {
-                            spawn_patch_end(&activity_storage, &sync_permits, id, ended_at);
+                            spawn_patch_end(
+                                &activity_storage,
+                                &sync_permits,
+                                &saved_activity_ended_event_tx_for_reports,
+                                id,
+                                ended_at,
+                            );
                         }
                     }
                 }
@@ -483,14 +500,26 @@ fn spawn_insert(
     });
 }
 
+/// PATCH the closing `ended_at` for `id` and, on success, fan out a
+/// [`SavedActivityEndedEvent`] so subscribers (the desktop tauri layer in
+/// particular) can patch the row's `endedAt` in place. Without that
+/// event the frontend keeps `endedAt: null` for every row it received
+/// via [`SavedActivityEvent`] and the timeline rail collapses them all
+/// to the minimum connector height until the next page reload.
+///
+/// The broadcast is fire-and-forget: a closed channel (no listeners) is
+/// normal during boot and a `Lagged` consumer is handled on the receive
+/// side, so we don't propagate either back up to the patch task.
 fn spawn_patch_end(
     storage: &Arc<ActivityStorage>,
     permits: &Arc<Semaphore>,
+    ended_tx: &broadcast::Sender<SavedActivityEndedEvent>,
     id: Uuid,
     ended_at: DateTime<Utc>,
 ) {
     let storage = Arc::clone(storage);
     let permits = Arc::clone(permits);
+    let ended_tx = ended_tx.clone();
     tokio::spawn(async move {
         let _permit = match permits.try_acquire_owned() {
             Ok(p) => p,
@@ -499,8 +528,13 @@ fn spawn_patch_end(
                 return;
             }
         };
-        if let Err(err) = storage.update_activity_end(id, ended_at).await {
-            tracing::warn!(activity_id = %id, error = %err, "Activity end PATCH failed");
+        match storage.update_activity_end(id, ended_at).await {
+            Ok(_) => {
+                let _ = ended_tx.send(SavedActivityEndedEvent { id, ended_at });
+            }
+            Err(err) => {
+                tracing::warn!(activity_id = %id, error = %err, "Activity end PATCH failed");
+            }
         }
     });
 }

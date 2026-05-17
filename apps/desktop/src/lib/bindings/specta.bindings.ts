@@ -138,6 +138,7 @@ export const events = {
 	browserExtensionStatusChanged: makeEvent<BrowserExtensionStatusChanged>("browser-extension-status-changed"),
 	consentGate: makeEvent<ConsentGate>("consent-gate"),
 	savedActivityCreated: makeEvent<SavedActivityCreated>("saved-activity-created"),
+	savedActivityEnded: makeEvent<SavedActivityEnded>("saved-activity-ended"),
 	timelineAppEvent: makeEvent<TimelineAppEvent>("timeline-app-event"),
 	timelineAssetsEvent: makeEvent<TimelineAssetsEvent>("timeline-assets-event"),
 };
@@ -699,6 +700,22 @@ export type SavedActivity = {
  *  row to the timeline rail without re-polling `GET /activities`.
  */
 export type SavedActivityCreated = SavedActivity;
+
+/**
+ *  Push event fired after the cloud closing PATCH of `ended_at` succeeds
+ *  for a previously-tracked activity. Lets the desktop frontend update
+ *  the matching row's `endedAt` in place — without it the row keeps the
+ *  `null` it was created with and the timeline rail's duration-based
+ *  connector height stays clamped to the minimum until the next reload.
+ * 
+ *  Payload is intentionally minimal: the frontend already has the rest
+ *  of the row in memory, so only the id and the now-known end timestamp
+ *  are shipped over the wire.
+ */
+export type SavedActivityEnded = {
+	id: string,
+	endedAt: string,
+};
 
 /**
  *  Errors surfaced to the frontend from [`activity_list`].

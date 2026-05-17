@@ -10,7 +10,7 @@ use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
         accent::accent_from_image,
-        activity::{SavedActivity, SavedActivityCreated},
+        activity::{SavedActivity, SavedActivityCreated, SavedActivityEnded},
         system::{
             BrowserExtensionStatusChanged, SAFARI_BRIDGE_APP_KIND, resolve_browser_extension_state,
         },
@@ -492,6 +492,29 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
                 icon_base64,
             };
             let _ = SavedActivityCreated(payload).emit(&saved_handle);
+        })
+        .await;
+    });
+
+    // Activity-end events: fired by the collector after each successful
+    // closing PATCH of `ended_at`. The frontend uses this to patch the
+    // row's `endedAt` in place — without it the timeline rail keeps
+    // `endedAt: null` and renders every non-current row at the minimum
+    // connector height until the next reload.
+    let ended_handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let rx = subscribe(
+            &ended_handle,
+            TimelineManager::subscribe_to_saved_activity_ended_events,
+        )
+        .await;
+        forward_broadcast("timeline_saved_activity_ended", rx, |event| {
+            tracing::debug!(activity_id = %event.id, "Saved activity end emitted");
+            let _ = SavedActivityEnded {
+                id: event.id,
+                ended_at: event.ended_at,
+            }
+            .emit(&ended_handle);
         })
         .await;
     });
