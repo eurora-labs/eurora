@@ -330,6 +330,7 @@ jobs:
               shell: bash
               if: runner.os == 'Linux'
               run: |
+                  sudo add-apt-repository -y ppa:pipewire-debian/pipewire-upstream;
                   sudo apt update;
                   sudo apt install -y \
                     build-essential \
