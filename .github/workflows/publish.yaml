@@ -452,6 +452,65 @@ jobs:
                     pnpm tauri signer sign "$msi"
                   done
 
+            - name: Bundle libappindicator into AppImage
+              if: runner.os == 'Linux'
+              shell: bash
+              env:
+                  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+                  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+                  APPIMAGE_KEY_ID: ${{ secrets.APPIMAGE_KEY_ID }}
+                  APPIMAGE_KEY_PASSPHRASE: ${{ secrets.APPIMAGE_KEY_PASSPHRASE }}
+              run: |
+                  set -euo pipefail
+
+                  arch="$(uname -m)"
+                  multiarch="${arch}-linux-gnu"
+                  release_dir="release/linux/${arch}"
+
+                  appimage="$(find "$release_dir" -maxdepth 1 -name '*.AppImage' ! -name '*.sig' -print -quit)"
+                  if [ -z "${appimage:-}" ]; then
+                    echo "::error::No AppImage found in $release_dir"
+                    exit 1
+                  fi
+                  appimage_abs="$(readlink -f "$appimage")"
+                  appimage_name="$(basename "$appimage_abs")"
+
+                  work="$(mktemp -d)"
+                  cp "$appimage_abs" "$work/$appimage_name"
+                  pushd "$work" >/dev/null
+                  chmod +x "$appimage_name"
+                  "./$appimage_name" --appimage-extract >/dev/null
+
+                  for lib in libappindicator3.so.1 libdbusmenu-glib.so.4 libdbusmenu-gtk3.so.4; do
+                    src="/usr/lib/${multiarch}/${lib}"
+                    if [ ! -f "$src" ]; then
+                      echo "::error::missing $src on runner"
+                      exit 1
+                    fi
+                    cp -v "$src" "squashfs-root/usr/lib/${lib}"
+                  done
+
+                  curl -fL --retry 3 -o appimagetool \
+                    "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${arch}.AppImage"
+                  chmod +x appimagetool
+
+                  sign_args=()
+                  if [ -n "${APPIMAGE_KEY_ID:-}" ]; then
+                    export APPIMAGETOOL_SIGN_PASSPHRASE="$APPIMAGE_KEY_PASSPHRASE"
+                    sign_args+=(--sign --sign-key "$APPIMAGE_KEY_ID")
+                  fi
+
+                  rm -f "$appimage_name"
+                  ARCH="$arch" APPIMAGE_EXTRACT_AND_RUN=1 \
+                    ./appimagetool "${sign_args[@]}" squashfs-root "$appimage_name"
+
+                  popd >/dev/null
+                  mv -f "$work/$appimage_name" "$appimage_abs"
+                  rm -f "${appimage_abs}.sig"
+                  rm -rf "$work"
+
+                  pnpm tauri signer sign "$appimage_abs"
+
             - name: Import Apple certificate
               if: runner.os == 'macOS'
               shell: bash
