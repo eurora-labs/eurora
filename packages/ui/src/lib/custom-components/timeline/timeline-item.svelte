@@ -33,23 +33,38 @@
 	let lineHeight = $derived(resolvedConnectorHeight + ICON_PX);
 </script>
 
-<li
-	class="grid place-items-center"
-	style="filter: {highlighted ? 'saturate(2)' : 'saturate(0.6)'};"
-	title={name}
->
-	<span
-		class="timeline-connector col-start-1 row-start-1 w-[1.4rem] rounded-full"
-		style="background-color: {resolvedConnector}; height: {lineHeight}px;"
-		aria-hidden="true"
-	></span>
-	{#if iconSrc}
-		<img src={iconSrc} alt={name} class="col-start-1 row-start-1 size-8" />
-	{:else}
-		<div
-			class="text-sidebar-foreground col-start-1 row-start-1 flex size-8 items-center justify-center text-sm font-medium"
-		>
-			{name.charAt(0).toUpperCase()}
-		</div>
-	{/if}
+<li class="bg-sidebar" title={name}>
+	<!--
+		`filter` stays on this inner wrapper, not the <li>: filter on the
+		<li> promotes it to a composited layer that escapes the app-shell's
+		rounded clip on transparent Linux/WebKitGTK windows.
+	-->
+	<div
+		class="grid place-items-center"
+		style="filter: {highlighted ? 'saturate(2)' : 'saturate(0.6)'};"
+	>
+		<span
+			class="timeline-connector col-start-1 row-start-1 w-4 rounded-full"
+			style="background-color: {resolvedConnector}; height: {lineHeight}px;"
+			aria-hidden="true"
+		></span>
+		<span
+			class="col-start-1 row-start-1 size-8 rounded-md shadow-md"
+			style="background-color: {resolvedConnector};"
+			aria-hidden="true"
+		></span>
+		{#if iconSrc}
+			<img
+				src={iconSrc}
+				alt={name}
+				class="col-start-1 row-start-1 size-8 drop-shadow-[0_0_6px_#00000040]"
+			/>
+		{:else}
+			<div
+				class="text-sidebar-foreground col-start-1 row-start-1 flex size-8 items-center justify-center text-sm font-medium"
+			>
+				{name.charAt(0).toUpperCase()}
+			</div>
+		{/if}
+	</div>
 </li>
