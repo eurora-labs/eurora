@@ -35,18 +35,6 @@ pub struct OriginGuardConfig {
 }
 
 impl OriginGuardConfig {
-    pub fn from_env() -> Self {
-        let origins: HashSet<String> = std::env::var("WEB_ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| "https://www.eurora-labs.com".into())
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        Self {
-            web_origins: origins,
-        }
-    }
-
     pub fn new(web_origins: HashSet<String>) -> Self {
         Self { web_origins }
     }

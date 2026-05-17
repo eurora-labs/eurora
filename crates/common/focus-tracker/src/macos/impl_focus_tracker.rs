@@ -51,6 +51,14 @@ where
 
         match utils::get_frontmost_window_basic_info() {
             Ok(mut window) => {
+                if config
+                    .macos_ignored_processes
+                    .contains(&window.process_name)
+                {
+                    tokio::time::sleep(config.poll_interval).await;
+                    continue;
+                }
+
                 if prev_state.has_changed(&window) {
                     if let Some(cached) = icon_cache.get(&window.process_name) {
                         window.icon = Some(Arc::clone(cached));

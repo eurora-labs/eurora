@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
@@ -18,10 +19,13 @@
 		...restProps
 	}: Props = $props();
 
-	let context = new WebPreviewContext({
-		url: defaultUrl,
-		onUrlChange,
-	});
+	const context = untrack(
+		() =>
+			new WebPreviewContext({
+				initialUrl: defaultUrl,
+				onUrlChange: () => onUrlChange,
+			}),
+	);
 
 	setWebPreviewContext(context);
 </script>

@@ -3,10 +3,6 @@ use agent_chain_core::embeddings::Embeddings;
 
 const DEFAULT_MODEL: &str = "llama3.1";
 
-fn load_env() {
-    let _ = dotenv::dotenv();
-}
-
 // =============================================================================
 // Ported from integration_tests/test_embeddings.py
 // =============================================================================
@@ -14,7 +10,6 @@ fn load_env() {
 /// Ported from `TestOllamaEmbeddings.test_embed_documents`.
 #[tokio::test]
 async fn test_embed_documents() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let embeddings = OllamaEmbeddings::new(DEFAULT_MODEL);
 
     let texts = vec!["Hello world".to_string(), "The meaning of life".to_string()];
@@ -33,7 +28,6 @@ async fn test_embed_documents() -> Result<(), Box<dyn std::error::Error>> {
 /// Ported from `TestOllamaEmbeddings.test_embed_query`.
 #[tokio::test]
 async fn test_embed_query() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let embeddings = OllamaEmbeddings::new(DEFAULT_MODEL);
 
     let result = embeddings.embed_query("Hello world").await?;

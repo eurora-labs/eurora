@@ -1,27 +1,36 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
-	import { CHAT_SERVICE, type ViewMode } from '@eurora/chat/services/chat/chat-service.svelte';
+	import { useTauriListen } from '$lib/utils/use-tauri-listen.js';
+	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import * as Tabs from '@eurora/ui/components/tabs/index';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import CopyIcon from '@lucide/svelte/icons/copy';
-	import GitForkIcon from '@lucide/svelte/icons/git-fork';
-	import ListIcon from '@lucide/svelte/icons/list';
 	import MinusIcon from '@lucide/svelte/icons/minus';
 	import SquareIcon from '@lucide/svelte/icons/square';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { platform } from '@tauri-apps/plugin-os';
-	import { onMount } from 'svelte';
 
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
+	const sidebar = Sidebar.useSidebar();
 
-	const hasMessages = $derived((chatService.activeThread?.messages.length ?? 0) > 0);
+	// Thread title and date are meaningful only on the chat page
+	// (`(chat)/[[id]]/+page.svelte`). On onboarding, settings, and the
+	// `no-access` subroutes there is no active thread, so suppress the
+	// labels entirely rather than rendering placeholder values.
+	const isChatRoute = $derived(page.route.id === '/(chat)/[[id]]');
+	// The sidebar trigger is meaningful anywhere `MainSidebar` is mounted,
+	// which is the entire `(chat)` route group (chat page plus the
+	// `no-access` subroutes). Outside that group there is no sidebar to
+	// toggle, so the trigger and the leading region collapse away.
+	const showSidebarTrigger = $derived(page.route.id?.startsWith('/(chat)') ?? false);
 	const activeThread = $derived(chatService.activeThread?.thread);
 	const threadTitle = $derived(activeThread?.title ?? 'New Chat');
-	const threadDateIso = $derived(activeThread?.createdAt ?? new Date().toISOString());
+	const threadDateIso = $derived(activeThread?.created_at ?? new Date().toISOString());
 
 	const dateFormatter = new Intl.DateTimeFormat('en', {
 		month: 'short',
@@ -36,17 +45,12 @@
 
 	const appWindow = getCurrentWindow();
 
-	onMount(() => {
-		appWindow.isMaximized().then((val) => (maximized = val));
-
-		const unlisten = appWindow.onResized(() => {
-			appWindow.isMaximized().then((val) => (maximized = val));
-		});
-
-		return () => {
-			unlisten.then((fn) => fn());
-		};
-	});
+	appWindow.isMaximized().then((val) => (maximized = val));
+	useTauriListen(() =>
+		appWindow.onResized(async () => {
+			maximized = await appWindow.isMaximized();
+		}),
+	);
 
 	function minimize() {
 		appWindow.minimize();
@@ -64,43 +68,45 @@
 <!--
 	Tauri's drag-region handler reads `data-tauri-drag-region` on `e.target`
 	directly (no ancestor walk), so every non-interactive child of the bar
-	carries the attribute. Interactive controls (Tabs, Min/Max/Close) omit
-	it so they remain clickable.
+	carries the attribute. Interactive controls (Tabs, Sidebar.Trigger,
+	Min/Max/Close) omit it so they remain clickable.
 -->
 <div data-tauri-drag-region class="titlebar bg-background" class:titlebar-mac={isMac}>
+	<!--
+		Leading region holds the sidebar trigger. Its width tracks the
+		sidebar (see .titlebar-leading) so the trigger's center matches
+		what's beneath it: flush with the sidebar's right edge when
+		expanded, and centered over the sidebar's icon column when
+		collapsed. Transitions match the sidebar's 200ms ease-linear.
+	-->
+	<div
+		data-tauri-drag-region
+		class="titlebar-leading"
+		data-state={sidebar.state}
+		data-trigger={showSidebarTrigger ? 'visible' : 'hidden'}
+	>
+		{#if showSidebarTrigger}
+			<Sidebar.Trigger class="size-8" />
+		{/if}
+	</div>
 	<div data-tauri-drag-region class="titlebar-fill"></div>
 	<div data-tauri-drag-region class="titlebar-content">
-		{#if hasMessages}
-			<Tabs.Root
-				value={chatService.viewMode}
-				onValueChange={(v) => (chatService.viewMode = v as ViewMode)}
+		{#if isChatRoute}
+			<span
+				data-tauri-drag-region
+				class="truncate text-xs font-medium max-w-[28ch]"
+				title={threadTitle}
 			>
-				<Tabs.List class="h-7">
-					<Tabs.Trigger value="list" class="h-5 gap-1 px-2 text-xs">
-						<ListIcon size={12} />
-						List
-					</Tabs.Trigger>
-					<Tabs.Trigger value="graph" class="h-5 gap-1 px-2 text-xs">
-						<GitForkIcon size={12} />
-						Graph
-					</Tabs.Trigger>
-				</Tabs.List>
-			</Tabs.Root>
+				{threadTitle}
+			</span>
+			<time
+				data-tauri-drag-region
+				class="text-xs text-muted-foreground whitespace-nowrap"
+				datetime={threadDateIso}
+			>
+				{threadDateLabel}
+			</time>
 		{/if}
-		<span
-			data-tauri-drag-region
-			class="truncate text-xs font-medium max-w-[28ch]"
-			title={threadTitle}
-		>
-			{threadTitle}
-		</span>
-		<time
-			data-tauri-drag-region
-			class="text-xs text-muted-foreground whitespace-nowrap"
-			datetime={threadDateIso}
-		>
-			{threadDateLabel}
-		</time>
 		{#if user.authenticated}
 			<Badge
 				data-tauri-drag-region
@@ -151,6 +157,15 @@
 <style lang="postcss">
 	.titlebar {
 		display: flex;
+		z-index: 20;
+		/*
+		 * The expanded sidebar (z-10, absolute at top:0 of app-shell)
+		 * extends up under the Titlebar. Lift the bar above it so the
+		 * trigger and window controls remain hittable; the sidebar
+		 * background is the same token as bg-background, so visually
+		 * the trigger still reads as part of the sidebar.
+		 */
+		position: relative;
 		flex-shrink: 0;
 		align-items: stretch;
 		height: var(--titlebar-height);
@@ -159,9 +174,105 @@
 		-webkit-user-select: none;
 	}
 
-	/* Reserve room for the native macOS traffic lights at the top-left. */
+	/*
+	 * macOS traffic lights center slightly above the geometric center
+	 * of a 32px bar (their button center sits ~1px above y=16). Borrow
+	 * 2px from the bottom via padding so all centered children shift
+	 * up by 1px and meet the lights' visual center. The bar's outer
+	 * box stays 32px (with `box-sizing: border-box`), so the sidebar's
+	 * `padding-top: var(--titlebar-height)` and the app-shell layout
+	 * are unaffected.
+	 */
 	.titlebar-mac {
+		padding-bottom: 4px;
+	}
+
+	/*
+	 * Leading region: hosts the sidebar trigger. Width tracks the
+	 * sidebar's own width tokens (defined on .group/sidebar-wrapper in
+	 * sidebar-provider.svelte) so the trigger lands in two different
+	 * places depending on state:
+	 *
+	 *   - Expanded: width = --sidebar-width; the trigger is flush
+	 *     against the sidebar's right edge (justify-content: flex-end
+	 *     with a 0.25rem inset).
+	 *   - Collapsed: width = --sidebar-width-icon (3rem); the trigger
+	 *     is centered, which aligns its 1.75rem-wide body with the
+	 *     icon column of Sidebar.MenuButton in icon mode (whose 16px
+	 *     icons center at x = 24px inside the 3rem column).
+	 *
+	 * Both states use justify-content: flex-end and differ only in
+	 * width + padding-right, so the trigger glides smoothly between
+	 * positions instead of snapping (justify-content is not
+	 * animatable). Timing matches sidebar.svelte's own collapse
+	 * animation (transition-[width] duration-200 ease-linear) so the
+	 * trigger and sidebar move in lockstep.
+	 *
+	 * On macOS we reserve 76px on the leading edge when collapsed for
+	 * the traffic lights — the lights occupy what would otherwise be
+	 * the icon column, so we shift the 3rem region to their right and
+	 * keep the trigger centered inside it. Once expanded, the sidebar
+	 * background already extends past the lights so no reservation is
+	 * needed.
+	 */
+	.titlebar-leading {
+		--trigger-size: 2rem; /* Sidebar.Trigger renders as `size-8` */
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: flex-end;
+		transition:
+			width 200ms linear,
+			padding-right 200ms linear,
+			padding-left 200ms linear;
+	}
+
+	.titlebar-leading[data-state='expanded'] {
+		width: var(--sidebar-width);
+		padding-right: 0.25rem;
+	}
+
+	.titlebar-leading[data-state='collapsed'] {
+		width: var(--sidebar-width-icon);
+		padding-right: calc((var(--sidebar-width-icon) - var(--trigger-size)) / 2);
+	}
+
+	/*
+	 * When the TimelineRail occupies the left edge of <main>, the sidebar
+	 * is shifted right by the rail's width (see styles.css). Mirror that
+	 * shift on the leading region so the sidebar trigger remains centered
+	 * over the sidebar's icon column / flush with its right edge.
+	 *
+	 * On macOS the leading region already reserves 76px for the traffic
+	 * lights, which is wider than the 3rem (48px) rail — so no extra
+	 * shift is needed and the trigger keeps its existing position
+	 * immediately to the right of the lights.
+	 */
+	:global(body.has-timeline-rail:not(.macos-app)) .titlebar-leading {
+		margin-inline-start: 3rem;
+	}
+
+	.titlebar-mac .titlebar-leading[data-state='collapsed'] {
+		width: calc(var(--sidebar-width-icon) + 76px);
 		padding-left: 76px;
+	}
+
+	/*
+	 * Outside the (chat) route group, `MainSidebar` is not mounted and the
+	 * trigger is hidden. Collapse the leading region so titlebar content
+	 * starts at the window edge. On macOS we still need to clear the
+	 * traffic lights, so reserve the same 76px gutter used for the
+	 * collapsed-sidebar case.
+	 */
+	.titlebar-leading[data-trigger='hidden'] {
+		width: 0;
+		padding-right: 0;
+		padding-left: 0;
+	}
+
+	.titlebar-mac .titlebar-leading[data-trigger='hidden'] {
+		width: 76px;
+		padding-left: 0;
 	}
 
 	.titlebar-fill {

@@ -1,6 +1,1 @@
-export interface Thread {
-	id: string;
-	title: string;
-	createdAt?: string;
-	updatedAt?: string;
-}
+export type { Thread } from '@eurora/shared/bindings/thread';

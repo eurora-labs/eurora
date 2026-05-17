@@ -232,7 +232,7 @@ if [ -n "$TARGET" ]; then
 
 	# Build native messaging with the same target
 	info "Building native messaging for target: $TARGET"
-	cargo build --package euro-native-messaging --release --target "$TARGET"
+	cargo build --package euro-browser --release --target "$TARGET"
 
 	# Copy the binary with the target-triple suffix for Tauri's externalBin
 	# Tauri expects binaries named like: binary-name-<target-triple>[.exe]
@@ -264,7 +264,7 @@ else
 
 	# Build native messaging without target (default)
 	info "Building native messaging for default target: $DEFAULT_TARGET"
-	cargo build --package euro-native-messaging --release
+	cargo build --package euro-browser --release
 
 	# Copy the binary with the target-triple suffix for Tauri's externalBin
 	if [ "$OS" = "windows" ]; then

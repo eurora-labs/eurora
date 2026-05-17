@@ -2,19 +2,19 @@ import { getContext, setContext } from 'svelte';
 
 const CODE_BLOCK_CONTEXT_KEY = Symbol.for('code-block-context');
 
+export interface CodeBlockStateOptions {
+	code: () => string;
+}
+
 export class CodeBlockState {
-	#code = $state('');
+	readonly #opts: CodeBlockStateOptions;
 
-	constructor(code: string) {
-		this.#code = code;
+	constructor(opts: CodeBlockStateOptions) {
+		this.#opts = opts;
 	}
 
-	get code() {
-		return this.#code;
-	}
-
-	set code(value: string) {
-		this.#code = value;
+	get code(): string {
+		return this.#opts.code();
 	}
 }
 

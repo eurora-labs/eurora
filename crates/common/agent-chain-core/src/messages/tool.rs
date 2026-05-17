@@ -1,34 +1,50 @@
 use bon::bon;
-use serde::de::{self, MapAccess, Visitor};
-use serde::ser::SerializeMap;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
-use std::fmt;
+
+#[cfg(feature = "specta")]
+use specta_typescript::Unknown;
 
 use super::base::{
-    AnyMessage, BaseMessage, BaseMessageChunk, get_msg_title_repr, is_interactive_env,
+    AnyMessage, BaseMessage, BaseMessageChunk, MergeError, get_msg_title_repr, is_interactive_env,
 };
 use super::content::{ContentBlock, ContentBlocks};
 use crate::load::Serializable;
 use crate::utils::merge::{merge_dicts, merge_lists, merge_obj};
 
-fn deserialize_tool_call_id(value: &serde_json::Value) -> String {
+#[cfg(feature = "specta")]
+type JsonObjectTs = HashMap<String, Unknown>;
+
+/// Permissive `tool_call_id` deserializer. Some providers send the field as a
+/// number or null; coerce both to a string so downstream consumers always see
+/// `String` (matching the JS reference implementation's behavior).
+fn deserialize_tool_call_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
     match value {
-        serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Number(n) => n.to_string(),
-        serde_json::Value::Null => String::new(),
-        other => other.to_string(),
+        serde_json::Value::String(s) => Ok(s),
+        serde_json::Value::Number(n) => Ok(n.to_string()),
+        serde_json::Value::Null => Ok(String::new()),
+        other => Ok(other.to_string()),
     }
 }
 
 pub trait ToolOutputMixin {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolCall {
+    #[serde(default)]
     pub id: Option<String>,
     pub name: String,
+    /// Always a JSON object on the wire. The struct-side type stays
+    /// `serde_json::Value` for ergonomic constructor input, but the specta-
+    /// generated TS type is `Record<string, unknown>` to reflect that.
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub args: serde_json::Value,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type", default)]
     pub call_type: Option<String>,
 }
 
@@ -51,16 +67,17 @@ impl ToolCall {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolCallChunk {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub args: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<i32>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type", default)]
     pub chunk_type: Option<String>,
 }
 
@@ -84,16 +101,17 @@ impl ToolCallChunk {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InvalidToolCall {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub args: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub error: Option<String>,
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type", default)]
     pub call_type: Option<String>,
 }
 
@@ -116,15 +134,27 @@ impl InvalidToolCall {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolMessage {
     pub content: ContentBlocks,
+    #[serde(deserialize_with = "deserialize_tool_call_id")]
+    #[cfg_attr(feature = "specta", specta(type = String))]
     pub tool_call_id: String,
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub status: ToolStatus,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub artifact: Option<serde_json::Value>,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub response_metadata: HashMap<String, serde_json::Value>,
 }
 
@@ -158,107 +188,8 @@ impl BaseMessage for ToolMessage {
     }
 }
 
-impl Serialize for ToolMessage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut field_count = 6;
-        if self.name.is_some() {
-            field_count += 1;
-        }
-        if self.artifact.is_some() {
-            field_count += 1;
-        }
-        field_count += 1;
-
-        let mut map = serializer.serialize_map(Some(field_count))?;
-        map.serialize_entry("type", "tool")?;
-        map.serialize_entry("content", &self.content)?;
-        map.serialize_entry("tool_call_id", &self.tool_call_id)?;
-        map.serialize_entry("id", &self.id)?;
-        if self.name.is_some() {
-            map.serialize_entry("name", &self.name)?;
-        }
-        map.serialize_entry("status", &self.status)?;
-        if self.artifact.is_some() {
-            map.serialize_entry("artifact", &self.artifact)?;
-        }
-        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
-        map.serialize_entry("response_metadata", &self.response_metadata)?;
-
-        map.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for ToolMessage {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ToolMessageVisitor;
-
-        impl<'de> Visitor<'de> for ToolMessageVisitor {
-            type Value = ToolMessage;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a ToolMessage object")
-            }
-
-            fn visit_map<M>(self, mut map: M) -> Result<ToolMessage, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut content: Option<ContentBlocks> = None;
-                let mut tool_call_id: Option<serde_json::Value> = None;
-                let mut id: Option<String> = None;
-                let mut name: Option<String> = None;
-                let mut status: Option<ToolStatus> = None;
-                let mut artifact: Option<serde_json::Value> = None;
-                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
-                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "content" => content = Some(map.next_value()?),
-                        "tool_call_id" => tool_call_id = Some(map.next_value()?),
-                        "id" => id = map.next_value()?,
-                        "name" => name = map.next_value()?,
-                        "status" => status = Some(map.next_value()?),
-                        "artifact" => artifact = map.next_value()?,
-                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
-                        "response_metadata" => response_metadata = Some(map.next_value()?),
-                        "type" => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                        _ => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                    }
-                }
-
-                let tool_call_id = tool_call_id
-                    .map(|v| deserialize_tool_call_id(&v))
-                    .ok_or_else(|| de::Error::missing_field("tool_call_id"))?;
-
-                Ok(ToolMessage {
-                    content: content.unwrap_or_default(),
-                    tool_call_id,
-                    id,
-                    name,
-                    status: status.unwrap_or(ToolStatus::Success),
-                    artifact,
-                    additional_kwargs: additional_kwargs.unwrap_or_default(),
-                    response_metadata: response_metadata.unwrap_or_default(),
-                })
-            }
-        }
-
-        deserializer.deserialize_map(ToolMessageVisitor)
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum ToolStatus {
     #[default]
@@ -353,116 +284,28 @@ impl ToolMessage {
 
 impl ToolOutputMixin for ToolMessage {}
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolMessageChunk {
     pub content: ContentBlocks,
+    #[serde(deserialize_with = "deserialize_tool_call_id")]
+    #[cfg_attr(feature = "specta", specta(type = String))]
     pub tool_call_id: String,
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub status: ToolStatus,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub artifact: Option<serde_json::Value>,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub additional_kwargs: HashMap<String, serde_json::Value>,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub response_metadata: HashMap<String, serde_json::Value>,
-}
-
-impl Serialize for ToolMessageChunk {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut field_count = 6;
-        if self.name.is_some() {
-            field_count += 1;
-        }
-        if self.artifact.is_some() {
-            field_count += 1;
-        }
-        field_count += 1;
-
-        let mut map = serializer.serialize_map(Some(field_count))?;
-        map.serialize_entry("type", "ToolMessageChunk")?;
-        map.serialize_entry("content", &self.content)?;
-        map.serialize_entry("tool_call_id", &self.tool_call_id)?;
-        map.serialize_entry("id", &self.id)?;
-        if self.name.is_some() {
-            map.serialize_entry("name", &self.name)?;
-        }
-        map.serialize_entry("status", &self.status)?;
-        if self.artifact.is_some() {
-            map.serialize_entry("artifact", &self.artifact)?;
-        }
-        map.serialize_entry("additional_kwargs", &self.additional_kwargs)?;
-        map.serialize_entry("response_metadata", &self.response_metadata)?;
-
-        map.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for ToolMessageChunk {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ToolMessageChunkVisitor;
-
-        impl<'de> Visitor<'de> for ToolMessageChunkVisitor {
-            type Value = ToolMessageChunk;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a ToolMessageChunk object")
-            }
-
-            fn visit_map<M>(self, mut map: M) -> Result<ToolMessageChunk, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut content: Option<ContentBlocks> = None;
-                let mut tool_call_id: Option<serde_json::Value> = None;
-                let mut id: Option<String> = None;
-                let mut name: Option<String> = None;
-                let mut status: Option<ToolStatus> = None;
-                let mut artifact: Option<serde_json::Value> = None;
-                let mut additional_kwargs: Option<HashMap<String, serde_json::Value>> = None;
-                let mut response_metadata: Option<HashMap<String, serde_json::Value>> = None;
-
-                while let Some(key) = map.next_key::<String>()? {
-                    match key.as_str() {
-                        "content" => content = Some(map.next_value()?),
-                        "tool_call_id" => tool_call_id = Some(map.next_value()?),
-                        "id" => id = map.next_value()?,
-                        "name" => name = map.next_value()?,
-                        "status" => status = Some(map.next_value()?),
-                        "artifact" => artifact = map.next_value()?,
-                        "additional_kwargs" => additional_kwargs = Some(map.next_value()?),
-                        "response_metadata" => response_metadata = Some(map.next_value()?),
-                        "type" => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                        _ => {
-                            let _ = map.next_value::<de::IgnoredAny>()?;
-                        }
-                    }
-                }
-
-                let tool_call_id = tool_call_id
-                    .map(|v| deserialize_tool_call_id(&v))
-                    .ok_or_else(|| de::Error::missing_field("tool_call_id"))?;
-
-                Ok(ToolMessageChunk {
-                    content: content.unwrap_or_default(),
-                    tool_call_id,
-                    id,
-                    name,
-                    status: status.unwrap_or(ToolStatus::Success),
-                    artifact,
-                    additional_kwargs: additional_kwargs.unwrap_or_default(),
-                    response_metadata: response_metadata.unwrap_or_default(),
-                })
-            }
-        }
-
-        deserializer.deserialize_map(ToolMessageChunkVisitor)
-    }
 }
 
 #[bon]
@@ -491,7 +334,7 @@ impl ToolMessageChunk {
     }
 
     pub fn message_type(&self) -> &'static str {
-        "ToolMessageChunk"
+        "tool_chunk"
     }
 
     pub fn text(&self) -> String {
@@ -505,27 +348,25 @@ impl ToolMessageChunk {
             .join(" ")
     }
 
-    pub fn concat(&self, other: &ToolMessageChunk) -> ToolMessageChunk {
+    /// Concatenate two tool chunks. Returns
+    /// [`MergeError::MismatchedToolCallId`] when the chunks belong to
+    /// different tool calls — those have no semantically meaningful merge.
+    pub fn try_concat(&self, other: &ToolMessageChunk) -> Result<ToolMessageChunk, MergeError> {
         if self.tool_call_id != other.tool_call_id {
-            panic!("Cannot concatenate ToolMessageChunks with different names.");
+            return Err(MergeError::MismatchedToolCallId {
+                left: self.tool_call_id.clone(),
+                right: other.tool_call_id.clone(),
+            });
         }
 
-        let left: Vec<serde_json::Value> = self
-            .content
-            .iter()
-            .filter_map(|b| serde_json::to_value(b).ok())
-            .collect();
-        let right: Vec<serde_json::Value> = other
-            .content
-            .iter()
-            .filter_map(|b| serde_json::to_value(b).ok())
-            .collect();
+        let left = self.content.as_json_values();
+        let right = other.content.as_json_values();
 
         let content: ContentBlocks =
             match merge_lists(Some(left.clone()), vec![Some(right.clone())]) {
                 Ok(Some(merged)) => merged
                     .into_iter()
-                    .filter_map(|v| serde_json::from_value(v).ok())
+                    .map(ContentBlock::from_value_or_non_standard)
                     .collect(),
                 _ => {
                     let mut blocks = self.content.clone();
@@ -559,7 +400,7 @@ impl ToolMessageChunk {
             }
         };
 
-        ToolMessageChunk {
+        Ok(ToolMessageChunk {
             content,
             tool_call_id: self.tool_call_id.clone(),
             id: self.id.clone(),
@@ -568,7 +409,7 @@ impl ToolMessageChunk {
             artifact,
             additional_kwargs,
             response_metadata,
-        }
+        })
     }
 
     pub fn to_message(&self) -> ToolMessage {
@@ -588,8 +429,12 @@ impl ToolMessageChunk {
 impl std::ops::Add for ToolMessageChunk {
     type Output = ToolMessageChunk;
 
+    /// Convenience wrapper around [`ToolMessageChunk::try_concat`]. Panics if
+    /// the two chunks have different `tool_call_id`s — that's a programming
+    /// error. Use `try_concat` for explicit error handling.
     fn add(self, other: ToolMessageChunk) -> ToolMessageChunk {
-        self.concat(&other)
+        self.try_concat(&other)
+            .expect("merging ToolMessageChunks with mismatched tool_call_id")
     }
 }
 
@@ -618,7 +463,7 @@ impl BaseMessageChunk for ToolMessageChunk {
         self.id = Some(id);
     }
     fn message_type(&self) -> &'static str {
-        "ToolMessageChunk"
+        "tool_chunk"
     }
     fn additional_kwargs(&self) -> &HashMap<String, serde_json::Value> {
         &self.additional_kwargs

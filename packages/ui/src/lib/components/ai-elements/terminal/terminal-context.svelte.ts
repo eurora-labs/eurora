@@ -2,54 +2,34 @@ import { getContext, setContext } from 'svelte';
 
 const TERMINAL_CONTEXT_KEY = Symbol.for('ai-terminal');
 
+export interface TerminalStateOptions {
+	output?: () => string;
+	isStreaming?: () => boolean;
+	autoScroll?: () => boolean;
+	onClear?: () => (() => void) | undefined;
+}
+
 export class TerminalState {
-	#output = $state('');
-	#isStreaming = $state(false);
-	#autoScroll = $state(true);
-	#onClear: (() => void) | undefined;
+	readonly #opts: TerminalStateOptions;
 
-	constructor(options: {
-		output?: string;
-		isStreaming?: boolean;
-		autoScroll?: boolean;
-		onClear?: () => void;
-	}) {
-		this.#output = options.output ?? '';
-		this.#isStreaming = options.isStreaming ?? false;
-		this.#autoScroll = options.autoScroll ?? true;
-		this.#onClear = options.onClear;
+	constructor(opts: TerminalStateOptions) {
+		this.#opts = opts;
 	}
 
-	get output() {
-		return this.#output;
+	get output(): string {
+		return this.#opts.output?.() ?? '';
 	}
 
-	set output(value: string) {
-		this.#output = value;
+	get isStreaming(): boolean {
+		return this.#opts.isStreaming?.() ?? false;
 	}
 
-	get isStreaming() {
-		return this.#isStreaming;
+	get autoScroll(): boolean {
+		return this.#opts.autoScroll?.() ?? true;
 	}
 
-	set isStreaming(value: boolean) {
-		this.#isStreaming = value;
-	}
-
-	get autoScroll() {
-		return this.#autoScroll;
-	}
-
-	set autoScroll(value: boolean) {
-		this.#autoScroll = value;
-	}
-
-	get onClear() {
-		return this.#onClear;
-	}
-
-	set onClear(value: (() => void) | undefined) {
-		this.#onClear = value;
+	get onClear(): (() => void) | undefined {
+		return this.#opts.onClear?.();
 	}
 }
 

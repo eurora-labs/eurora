@@ -1,15 +1,20 @@
+import { dev } from '$app/environment';
 import * as Sentry from '@sentry/sveltekit';
-import { env } from '$env/dynamic/private';
+import { env } from '$env/dynamic/public';
 
-const dsn = env.SENTRY_DSN;
+const { PUBLIC_SENTRY_ENVIRONMENT, PUBLIC_SENTRY_RELEASE, PUBLIC_SENTRY_WEB_DSN } = env;
 
-if (dsn) {
-	Sentry.init({
-		dsn,
-		environment: env.SENTRY_ENVIRONMENT || 'production',
-		release: env.SENTRY_RELEASE || undefined,
-		tracesSampleRate: 0.05,
-		enableLogs: true,
-		sendDefaultPii: false,
-	});
+if (!PUBLIC_SENTRY_WEB_DSN && !dev) {
+	console.warn(
+		'[sentry] PUBLIC_SENTRY_WEB_DSN is not set; server-side errors will not be reported.',
+	);
 }
+
+Sentry.init({
+	dsn: PUBLIC_SENTRY_WEB_DSN || undefined,
+	environment: PUBLIC_SENTRY_ENVIRONMENT || (dev ? 'development' : 'production'),
+	release: PUBLIC_SENTRY_RELEASE || undefined,
+	tracesSampleRate: 0.05,
+	enableLogs: true,
+	sendDefaultPii: false,
+});

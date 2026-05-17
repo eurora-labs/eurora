@@ -53,13 +53,9 @@ where
         if let Ok(Some(window)) = get_active_window(&conn, root, atoms.net_active_window) {
             match get_window_info(&conn, window, &atoms) {
                 Ok(mut focused_window) => {
-                    if let Ok(icon) =
-                        get_icon_data(&conn, window, atoms.net_wm_icon, &config_clone.icon)
-                    {
-                        let icon = Arc::new(icon);
-                        icon_cache.insert(focused_window.process_name.clone(), Arc::clone(&icon));
-                        focused_window.icon = Some(icon);
-                    }
+                    let ignored = config_clone
+                        .linux_ignored_processes
+                        .contains(&focused_window.process_name);
 
                     current_focused_window = Some(window);
                     if let Err(e) = conn.change_window_attributes(
@@ -72,13 +68,29 @@ where
                         tracing::info!("Failed to flush after initial monitoring: {e}");
                     }
 
-                    prev_process_id = Some(focused_window.process_id);
-                    prev_window_title = focused_window.window_title.clone();
-                    if tx.send(focused_window).is_err() {
-                        tracing::info!(
-                            "Async task dropped before initial event, stopping X11 event loop"
+                    if ignored {
+                        tracing::debug!(
+                            "Ignoring initial focus on process: {}",
+                            focused_window.process_name
                         );
-                        return Ok(());
+                    } else {
+                        if let Ok(icon) =
+                            get_icon_data(&conn, window, atoms.net_wm_icon, &config_clone.icon)
+                        {
+                            let icon = Arc::new(icon);
+                            icon_cache
+                                .insert(focused_window.process_name.clone(), Arc::clone(&icon));
+                            focused_window.icon = Some(icon);
+                        }
+
+                        prev_process_id = Some(focused_window.process_id);
+                        prev_window_title = focused_window.window_title.clone();
+                        if tx.send(focused_window).is_err() {
+                            tracing::info!(
+                                "Async task dropped before initial event, stopping X11 event loop"
+                            );
+                            return Ok(());
+                        }
                     }
                 }
                 Err(e) => {
@@ -151,6 +163,13 @@ where
             if should_emit_focus_event && let Some(window) = new_window {
                 match get_window_info(&conn, window, &atoms) {
                     Ok(mut focused_window) => {
+                        if config_clone
+                            .linux_ignored_processes
+                            .contains(&focused_window.process_name)
+                        {
+                            continue;
+                        }
+
                         if is_focus_change {
                             if let Some(cached) = icon_cache.get(&focused_window.process_name) {
                                 focused_window.icon = Some(Arc::clone(cached));

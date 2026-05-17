@@ -1,10 +1,7 @@
 use enum_dispatch::enum_dispatch;
-use serde::de::{self, MapAccess, Visitor};
-use serde::ser::Serializer;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fmt;
 
 use super::ai::{AIMessage, AIMessageChunk};
 use super::chat::{ChatMessage, ChatMessageChunk};
@@ -26,109 +23,29 @@ pub trait BaseMessage {
     fn response_metadata(&self) -> &HashMap<String, serde_json::Value>;
 }
 
+/// Tagged union of every message variant. Wire format is internally tagged on
+/// the `type` field — `{"type": "human", "content": ..., ...}` etc. The inner
+/// per-variant structs (`HumanMessage`, `AIMessage`, ...) deliberately do NOT
+/// carry their own `type` field; the discriminant is added at the union level
+/// and only there. This keeps the Rust types and the specta-generated TS types
+/// in lockstep with the actual JSON shape.
 #[enum_dispatch(BaseMessage)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(tag = "type")]
 pub enum AnyMessage {
-    HumanMessage,
-    SystemMessage,
-    AIMessage,
-    ToolMessage,
-    ChatMessage,
-    RemoveMessage,
-}
-
-impl Serialize for AnyMessage {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            AnyMessage::HumanMessage(m) => m.serialize(serializer),
-            AnyMessage::SystemMessage(m) => m.serialize(serializer),
-            AnyMessage::AIMessage(m) => m.serialize(serializer),
-            AnyMessage::ToolMessage(m) => m.serialize(serializer),
-            AnyMessage::ChatMessage(m) => m.serialize(serializer),
-            AnyMessage::RemoveMessage(m) => m.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for AnyMessage {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct BaseMessageVisitor;
-
-        impl<'de> Visitor<'de> for BaseMessageVisitor {
-            type Value = AnyMessage;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a message object with a 'type' field")
-            }
-
-            fn visit_map<M>(self, mut map: M) -> Result<AnyMessage, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut message_type: Option<String> = None;
-                let mut fields: serde_json::Map<String, Value> = serde_json::Map::new();
-
-                while let Some(key) = map.next_key::<String>()? {
-                    let value: Value = map.next_value()?;
-                    if key == "type" {
-                        message_type = value.as_str().map(|s| s.to_string());
-                    }
-                    fields.insert(key, value);
-                }
-
-                let message_type = message_type.ok_or_else(|| de::Error::missing_field("type"))?;
-
-                let json_value = Value::Object(fields);
-
-                match message_type.as_str() {
-                    "human" => {
-                        let msg: HumanMessage =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessage::HumanMessage(msg))
-                    }
-                    "system" => {
-                        let msg: SystemMessage =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessage::SystemMessage(msg))
-                    }
-                    "ai" => {
-                        let msg: AIMessage =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessage::AIMessage(msg))
-                    }
-                    "tool" => {
-                        let msg: ToolMessage =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessage::ToolMessage(msg))
-                    }
-                    "chat" => {
-                        let msg: ChatMessage =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessage::ChatMessage(msg))
-                    }
-                    "remove" => {
-                        let msg: RemoveMessage =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessage::RemoveMessage(msg))
-                    }
-                    _ => Err(de::Error::unknown_variant(
-                        &message_type,
-                        &[
-                            "human", "system", "ai", "tool", "chat", "function", "remove",
-                        ],
-                    )),
-                }
-            }
-        }
-
-        deserializer.deserialize_map(BaseMessageVisitor)
-    }
+    #[serde(rename = "human")]
+    HumanMessage(HumanMessage),
+    #[serde(rename = "system")]
+    SystemMessage(SystemMessage),
+    #[serde(rename = "ai")]
+    AIMessage(AIMessage),
+    #[serde(rename = "tool")]
+    ToolMessage(ToolMessage),
+    #[serde(rename = "chat")]
+    ChatMessage(ChatMessage),
+    #[serde(rename = "remove")]
+    RemoveMessage(RemoveMessage),
 }
 
 impl AnyMessage {
@@ -183,144 +100,76 @@ pub trait BaseMessageChunk {
     fn to_message(&self) -> AnyMessage;
 }
 
+/// Tagged union of every chunk variant. Variants carry the same chunk-style
+/// `type` value the consumer sees on the wire (`"ai_chunk"`, `"human_chunk"`,
+/// ...) — symmetric with [`AnyMessage`]'s `"ai"`, `"human"`, ... and a clean
+/// snake_case scheme across the board.
 #[enum_dispatch(BaseMessageChunk)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(tag = "type")]
 pub enum AnyMessageChunk {
-    AIMessageChunk,
-    HumanMessageChunk,
-    SystemMessageChunk,
-    ToolMessageChunk,
-    ChatMessageChunk,
-}
-
-impl Serialize for AnyMessageChunk {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            AnyMessageChunk::AIMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::HumanMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::SystemMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::ToolMessageChunk(m) => m.serialize(serializer),
-            AnyMessageChunk::ChatMessageChunk(m) => m.serialize(serializer),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for AnyMessageChunk {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct AnyMessageChunkVisitor;
-
-        impl<'de> Visitor<'de> for AnyMessageChunkVisitor {
-            type Value = AnyMessageChunk;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a message chunk object with a 'type' field")
-            }
-
-            fn visit_map<M>(self, mut map: M) -> Result<AnyMessageChunk, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut message_type: Option<String> = None;
-                let mut fields: serde_json::Map<String, Value> = serde_json::Map::new();
-
-                while let Some(key) = map.next_key::<String>()? {
-                    let value: Value = map.next_value()?;
-                    if key == "type" {
-                        message_type = value.as_str().map(|s| s.to_string());
-                    }
-                    fields.insert(key, value);
-                }
-
-                let message_type = message_type.ok_or_else(|| de::Error::missing_field("type"))?;
-
-                let json_value = Value::Object(fields);
-
-                match message_type.as_str() {
-                    "AIMessageChunk" => {
-                        let msg: AIMessageChunk =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessageChunk::AIMessageChunk(msg))
-                    }
-                    "HumanMessageChunk" => {
-                        let msg: HumanMessageChunk =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessageChunk::HumanMessageChunk(msg))
-                    }
-                    "SystemMessageChunk" => {
-                        let msg: SystemMessageChunk =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessageChunk::SystemMessageChunk(msg))
-                    }
-                    "ToolMessageChunk" => {
-                        let msg: ToolMessageChunk =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessageChunk::ToolMessageChunk(msg))
-                    }
-                    "ChatMessageChunk" => {
-                        let msg: ChatMessageChunk =
-                            serde_json::from_value(json_value).map_err(de::Error::custom)?;
-                        Ok(AnyMessageChunk::ChatMessageChunk(msg))
-                    }
-                    _ => Err(de::Error::unknown_variant(
-                        &message_type,
-                        &[
-                            "AIMessageChunk",
-                            "HumanMessageChunk",
-                            "SystemMessageChunk",
-                            "ToolMessageChunk",
-                            "ChatMessageChunk",
-                        ],
-                    )),
-                }
-            }
-        }
-
-        deserializer.deserialize_map(AnyMessageChunkVisitor)
-    }
+    #[serde(rename = "ai_chunk")]
+    AIMessageChunk(AIMessageChunk),
+    #[serde(rename = "human_chunk")]
+    HumanMessageChunk(HumanMessageChunk),
+    #[serde(rename = "system_chunk")]
+    SystemMessageChunk(SystemMessageChunk),
+    #[serde(rename = "tool_chunk")]
+    ToolMessageChunk(ToolMessageChunk),
+    #[serde(rename = "chat_chunk")]
+    ChatMessageChunk(ChatMessageChunk),
 }
 
 impl AnyMessageChunk {
     pub fn text(&self) -> String {
         self.content().to_string()
     }
-}
 
-impl std::ops::Add for AnyMessageChunk {
-    type Output = AnyMessageChunk;
-
-    fn add(self, other: AnyMessageChunk) -> AnyMessageChunk {
+    /// Concatenate two chunks of the same variant. Returns
+    /// [`MergeError::MismatchedVariant`] across variants and propagates per-variant
+    /// merge failures (e.g. mismatched chat role / tool_call_id).
+    pub fn try_concat(self, other: Self) -> Result<Self, MergeError> {
         match (self, other) {
             (AnyMessageChunk::AIMessageChunk(a), AnyMessageChunk::AIMessageChunk(b)) => {
-                AnyMessageChunk::AIMessageChunk(a + b)
+                Ok(AnyMessageChunk::AIMessageChunk(a + b))
             }
             (AnyMessageChunk::HumanMessageChunk(a), AnyMessageChunk::HumanMessageChunk(b)) => {
-                AnyMessageChunk::HumanMessageChunk(a + b)
+                Ok(AnyMessageChunk::HumanMessageChunk(a + b))
             }
             (AnyMessageChunk::SystemMessageChunk(a), AnyMessageChunk::SystemMessageChunk(b)) => {
-                AnyMessageChunk::SystemMessageChunk(a + b)
+                Ok(AnyMessageChunk::SystemMessageChunk(a + b))
             }
             (AnyMessageChunk::ToolMessageChunk(a), AnyMessageChunk::ToolMessageChunk(b)) => {
-                AnyMessageChunk::ToolMessageChunk(a + b)
+                a.try_concat(&b).map(AnyMessageChunk::ToolMessageChunk)
             }
             (AnyMessageChunk::ChatMessageChunk(a), AnyMessageChunk::ChatMessageChunk(b)) => {
-                AnyMessageChunk::ChatMessageChunk(a + b)
+                a.try_concat(&b).map(AnyMessageChunk::ChatMessageChunk)
             }
-            (left, right) => {
-                panic!(
-                    "unsupported operand type(s) for +: \"{}\" and \"{}\"",
-                    left.message_type(),
-                    right.message_type()
-                );
-            }
+            (left, right) => Err(MergeError::MismatchedVariant {
+                left: left.message_type(),
+                right: right.message_type(),
+            }),
         }
     }
+}
+
+/// Errors returned when merging chunks. Used by the chunk types whose `concat`
+/// is not total (`ChatMessageChunk` requires identical `role`,
+/// `ToolMessageChunk` requires identical `tool_call_id`) and by
+/// [`AnyMessageChunk::try_concat`] for cross-variant pairs.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum MergeError {
+    #[error("cannot merge chunks of different variants: {left} vs {right}")]
+    MismatchedVariant {
+        left: &'static str,
+        right: &'static str,
+    },
+    #[error("cannot merge ChatMessageChunks with different roles: {left:?} vs {right:?}")]
+    MismatchedRole { left: String, right: String },
+    #[error("cannot merge ToolMessageChunks with different tool_call_id: {left:?} vs {right:?}")]
+    MismatchedToolCallId { left: String, right: String },
 }
 
 impl From<&str> for AnyMessage {
@@ -479,6 +328,10 @@ pub fn merge_content_vec(first: Vec<Value>, second: Vec<Value>) -> Vec<Value> {
     result
 }
 
+/// Wrap a message into the `{ "type": <kind>, "data": { ... } }` envelope used
+/// by langchain-style dump/load. Internally `serde_json::to_value(msg)` already
+/// emits the discriminant via the `AnyMessage` enum's internal tag, so we strip
+/// it from the inner data to avoid duplication and let the wrapper carry it.
 pub fn message_to_dict(message: &AnyMessage) -> Value {
     let mut data = serde_json::to_value(message).unwrap_or_default();
 

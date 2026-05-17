@@ -7,6 +7,7 @@
 		placeholder?: string;
 		header?: Snippet;
 		footer?: Snippet;
+		tools?: Snippet;
 		onSubmit: (text: string) => void;
 	}
 </script>
@@ -14,11 +15,8 @@
 <script lang="ts">
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
-	import * as ModelSelector from '@eurora/ui/components/ai-elements/model-selector/index';
 	import * as PromptInput from '@eurora/ui/components/ai-elements/prompt-input/index';
 	import * as SuggestionUI from '@eurora/ui/components/ai-elements/suggestion/index';
-	import BrainIcon from '@lucide/svelte/icons/brain';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import type { PromptInputMessage } from '@eurora/ui/components/ai-elements/prompt-input/index';
 
 	let {
@@ -26,6 +24,7 @@
 		placeholder = 'What can I help you with?',
 		header,
 		footer,
+		tools,
 		onSubmit,
 	}: Props = $props();
 
@@ -35,14 +34,6 @@
 	const showSuggestions = $derived(
 		suggestions.length > 0 && (chatService.activeThread?.messages.length ?? 0) === 0,
 	);
-
-	const models = [{ id: 'glm-5.1', name: 'GLM-5.1: Multimodal', provider: 'zai' }];
-
-	let selectedModelId = $state(models[0].id);
-	let searchEnabled = $state(true);
-	let thinkingEnabled = $state(true);
-
-	const selectedModel = $derived(models.find((m) => m.id === selectedModelId) ?? models[0]);
 
 	function handleSubmit(message: PromptInputMessage) {
 		const text = message.text.trim();
@@ -62,7 +53,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="w-full cursor-text px-4 pb-4"
+		class="w-full cursor-text px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
 		onclick={(e) => {
 			if (
 				e.target === e.currentTarget ||
@@ -83,30 +74,11 @@
 				<PromptInput.Textarea {placeholder} />
 			</PromptInput.Body>
 			<PromptInput.Footer>
-				<PromptInput.Tools>
-					<PromptInput.Button size="sm" variant="ghost">
-						<ModelSelector.Logo provider={selectedModel.provider} />
-						<ModelSelector.Name>{selectedModel.name}</ModelSelector.Name>
-					</PromptInput.Button>
-					<PromptInput.Button
-						size="sm"
-						variant={searchEnabled ? 'default' : 'ghost'}
-						aria-pressed={searchEnabled}
-						onclick={() => (searchEnabled = !searchEnabled)}
-					>
-						<GlobeIcon size={16} />
-						<span>Search</span>
-					</PromptInput.Button>
-					<PromptInput.Button
-						size="sm"
-						variant={thinkingEnabled ? 'default' : 'ghost'}
-						aria-pressed={thinkingEnabled}
-						onclick={() => (thinkingEnabled = !thinkingEnabled)}
-					>
-						<BrainIcon size={16} />
-						<span>Thinking</span>
-					</PromptInput.Button>
-				</PromptInput.Tools>
+				<div class="flex min-w-0 items-center gap-1">
+					{#if tools}
+						{@render tools()}
+					{/if}
+				</div>
 				<div class="flex items-center gap-1">
 					{#if footer}
 						{@render footer()}

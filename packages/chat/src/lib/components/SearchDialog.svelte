@@ -1,0 +1,182 @@
+<script lang="ts">
+	import { THREAD_SERVICE } from '$lib/services/thread/thread-service.js';
+	import { inject } from '@eurora/shared/context';
+	import * as Command from '@eurora/ui/components/command/index';
+	import * as Empty from '@eurora/ui/components/empty/index';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
+	import { Debounced } from 'runed';
+	import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
+
+	interface Props {
+		open?: boolean;
+		onSelect?: (threadId: string) => void;
+	}
+
+	let { open = $bindable(false), onSelect }: Props = $props();
+
+	const threadService = inject(THREAD_SERVICE);
+
+	let query = $state('');
+	const debouncedQuery = new Debounced(() => query.trim(), 300);
+	let threadResults: ThreadSearchResult[] = $state([]);
+	let messageResults: MessageSearchResult[] = $state([]);
+	let loading = $state(false);
+
+	// "Searching" covers both the debounce wait *and* the in-flight request,
+	// so the markup never briefly shows "No results" while a query is still
+	// being settled.
+	const searching = $derived(query.trim().length >= 2 && (debouncedQuery.pending || loading));
+
+	$effect(() => {
+		if (open) return;
+		query = '';
+		// Skip the trailing debounce window when the dialog closes so a
+		// stale query can't trigger a search against an unmounted view.
+		debouncedQuery.setImmediately('');
+		threadResults = [];
+		messageResults = [];
+		loading = false;
+	});
+
+	$effect(() => {
+		const q = debouncedQuery.current;
+
+		if (q.length < 2) {
+			threadResults = [];
+			messageResults = [];
+			loading = false;
+			return;
+		}
+
+		loading = true;
+		let cancelled = false;
+
+		(async () => {
+			try {
+				const [threads, messages] = await Promise.all([
+					threadService.searchThreads(q, 10, 0),
+					threadService.searchMessages(q, 10, 0),
+				]);
+				if (cancelled) return;
+				threadResults = threads;
+				messageResults = messages;
+			} catch (e) {
+				if (!cancelled) console.error('[search] failed:', e);
+			} finally {
+				if (!cancelled) loading = false;
+			}
+		})();
+
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	function selectThread(id: string) {
+		open = false;
+		onSelect?.(id);
+	}
+
+	function sanitizeSnippet(html: string): string {
+		return html
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;')
+			.replace(/&lt;mark&gt;/g, '<mark>')
+			.replace(/&lt;\/mark&gt;/g, '</mark>');
+	}
+</script>
+
+<Command.Dialog
+	bind:open
+	title="Search"
+	description="Search through chats and messages"
+	shouldFilter={false}
+>
+	<Command.Input
+		placeholder="Search chats and messages..."
+		bind:value={query}
+		class="border-0! shadow-none! ring-0! outline-none!"
+	/>
+	<Command.List>
+		{#if query.trim().length < 2}
+			<Empty.Root class="border-none py-10">
+				<Empty.Header>
+					<Empty.Title>Search your chats</Empty.Title>
+					<Empty.Description
+						>Type at least 2 characters to search through your chats and messages</Empty.Description
+					>
+				</Empty.Header>
+			</Empty.Root>
+		{:else if searching}
+			<Empty.Root class="border-none py-10">
+				<Empty.Header>
+					<Empty.Description>Searching...</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{:else if threadResults.length === 0 && messageResults.length === 0}
+			<Empty.Root class="border-none py-10">
+				<Empty.Header>
+					<Empty.Title>No results found</Empty.Title>
+					<Empty.Description>Try a different search term</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{/if}
+
+		{#if threadResults.length > 0}
+			<Command.Group heading="Chats">
+				{#each threadResults as thread}
+					<Command.Item
+						value="thread-{thread.id}"
+						onSelect={() => selectThread(thread.id)}
+					>
+						<FileTextIcon class="size-4 text-foreground" />
+						<span>{thread.title}</span>
+					</Command.Item>
+				{/each}
+			</Command.Group>
+		{/if}
+
+		{#if messageResults.length > 0}
+			<Command.Group heading="Messages">
+				{#each messageResults as message}
+					<Command.Item
+						value="msg-{message.id}"
+						onSelect={() => selectThread(message.thread_id)}
+					>
+						<MessageSquareIcon class="size-4 text-foreground" />
+						<div class="flex flex-col gap-0.5 min-w-0">
+							<span class="text-xs">{message.message_type}</span>
+							<span class="line-clamp-2 text-sm"
+								>{@html sanitizeSnippet(message.snippet)}</span
+							>
+						</div>
+					</Command.Item>
+				{/each}
+			</Command.Group>
+		{/if}
+	</Command.List>
+</Command.Dialog>
+
+<style>
+	:global([data-slot='dialog-content']:has([data-slot='command'])) {
+		top: 25% !important;
+		width: 90% !important;
+		max-width: 680px !important;
+		translate: -50% 0 !important;
+	}
+
+	:global([data-slot='dialog-content'] [data-slot='command-list']) {
+		max-height: 400px;
+	}
+
+	:global([data-command-item] mark) {
+		padding: 0 2px;
+		border-radius: 2px;
+		background-color: var(--accent);
+		color: var(--accent-foreground);
+	}
+</style>

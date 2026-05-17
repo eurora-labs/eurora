@@ -1,38 +1,28 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { consumeAppRedirectUri, storeAppRedirectUri } from '$lib/auth/redirect-uri';
 	import SocialAuthButtons from '$lib/components/SocialAuthButtons.svelte';
 	import { AUTH_SERVICE } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
+	import { Alert, AlertDescription } from '@eurora/ui/components/alert/index';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Card from '@eurora/ui/components/card/index';
 	import { Input } from '@eurora/ui/components/input/index';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import * as Sentry from '@sentry/sveltekit';
 	import { onMount } from 'svelte';
 
 	const auth = inject(AUTH_SERVICE);
 
-	let desktopLoginDone = $state(false);
-	let pendingDesktopLogin = $state<string | null>(null);
+	let appLoginDone = $state(false);
+	let pendingAppLogin = $state<string | null>(null);
 	let loading = $state(false);
 	let submitError = $state<string | null>(null);
 	let email = $state('');
 	let password = $state('');
 	let showPassword = $state(false);
 	let showRegister = $state(false);
-
-	function storeDeviceRedirectUri() {
-		const redirectUri = page.url.searchParams.get('redirect_uri');
-		if (redirectUri && redirectUri.startsWith('eurora://')) {
-			sessionStorage.setItem('deviceRedirectUri', redirectUri);
-		}
-	}
-
-	function consumeDeviceRedirectUri(): string | null {
-		const uri = sessionStorage.getItem('deviceRedirectUri');
-		if (uri) sessionStorage.removeItem('deviceRedirectUri');
-		return uri;
-	}
 
 	function storeRedirectParam() {
 		const redirect = page.url.searchParams.get('redirect');
@@ -50,52 +40,56 @@
 			if (loginToken.length !== 43 || challengeMethod !== 'S256') {
 				Sentry.captureMessage('Invalid login token or challenge method', {
 					level: 'warning',
-					tags: { area: 'auth.desktop-login' },
+					tags: { area: 'auth.app-login' },
 				});
 				goto('/login?error=invalid_login_token');
 				return;
 			}
 			sessionStorage.setItem('loginToken', loginToken);
 			sessionStorage.setItem('challengeMethod', challengeMethod);
-			storeDeviceRedirectUri();
+			storeAppRedirectUri(page.url.searchParams.get('redirect_uri'));
 
 			await auth.ready;
 			if (auth.isAuthenticated) {
-				pendingDesktopLogin = loginToken;
+				pendingAppLogin = loginToken;
 			}
 		} catch (error) {
-			Sentry.captureException(error, { tags: { area: 'auth.desktop-login' } });
+			Sentry.captureException(error, { tags: { area: 'auth.app-login' } });
 			goto('/login?error=invalid_login_token');
 		}
 	});
 
-	async function tryAssociateDesktopLogin(): Promise<boolean> {
-		const associated = await auth.associateDesktopLoginIfPending({ consumeRedirect: true });
-		if (associated) desktopLoginDone = true;
+	async function tryAssociateAppLogin(): Promise<boolean> {
+		const associated = await auth.associateAppLoginIfPending({ consumeRedirect: true });
+		if (associated) appLoginDone = true;
 		return associated;
 	}
 
-	async function handleConfirmDesktopLogin() {
-		if (!pendingDesktopLogin) return;
+	async function handleConfirmAppLogin() {
+		if (!pendingAppLogin) return;
 		loading = true;
 		submitError = null;
 
 		try {
-			await auth.associateDesktopLogin(pendingDesktopLogin);
-			desktopLoginDone = true;
-			pendingDesktopLogin = null;
+			await auth.associateAppLogin(pendingAppLogin);
+			appLoginDone = true;
+			pendingAppLogin = null;
 
-			const redirectUri = consumeDeviceRedirectUri();
+			const redirectUri = consumeAppRedirectUri();
 			if (redirectUri) {
 				window.location.href = redirectUri;
 				return;
 			}
 		} catch (err) {
-			Sentry.captureException(err, { tags: { area: 'auth.associate-desktop' } });
-			submitError = 'Failed to authorize desktop app. Please try again.';
+			Sentry.captureException(err, { tags: { area: 'auth.associate-app' } });
+			submitError = 'Failed to authorize the Eurora app. Please try again.';
 		} finally {
 			loading = false;
 		}
+	}
+
+	function pendingLoginToken(): string | undefined {
+		return sessionStorage.getItem('loginToken') ?? undefined;
 	}
 
 	async function handleEmailContinue() {
@@ -106,7 +100,9 @@
 			storeRedirectParam();
 			const result = await auth.checkEmail(email.trim());
 			if (result.status === 'oauth') {
-				window.location.href = await auth.getOAuthRedirectUrl(result.provider);
+				window.location.href = await auth.getOAuthRedirectUrl(result.provider, {
+					loginToken: pendingLoginToken(),
+				});
 				return;
 			}
 			if (result.status === 'not_found') {
@@ -129,7 +125,7 @@
 		submitError = null;
 		try {
 			await auth.login(email.trim(), password);
-			if (await tryAssociateDesktopLogin()) return;
+			if (await tryAssociateAppLogin()) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -146,7 +142,7 @@
 		submitError = null;
 		try {
 			await auth.register(email.trim(), password);
-			if (await tryAssociateDesktopLogin()) return;
+			if (await tryAssociateAppLogin()) return;
 			const redirect = sessionStorage.getItem('postLoginRedirect');
 			sessionStorage.removeItem('postLoginRedirect');
 			goto(redirect || '/');
@@ -158,30 +154,17 @@
 		}
 	}
 
-	async function handleGoogleLogin() {
+	async function handleOAuthLogin(provider: 'google' | 'github' | 'apple') {
 		loading = true;
 		submitError = null;
 		try {
 			storeRedirectParam();
-			window.location.href = await auth.getOAuthRedirectUrl('google');
-		} catch (err) {
-			Sentry.captureException(err, {
-				tags: { area: 'auth.oauth-redirect', provider: 'google' },
+			window.location.href = await auth.getOAuthRedirectUrl(provider, {
+				loginToken: pendingLoginToken(),
 			});
-			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
-			loading = false;
-		}
-	}
-
-	async function handleGitHubLogin() {
-		loading = true;
-		submitError = null;
-		try {
-			storeRedirectParam();
-			window.location.href = await auth.getOAuthRedirectUrl('github');
 		} catch (err) {
 			Sentry.captureException(err, {
-				tags: { area: 'auth.oauth-redirect', provider: 'github' },
+				tags: { area: 'auth.oauth-redirect', provider },
 			});
 			submitError = err instanceof Error ? err.message : 'Login failed. Please try again.';
 			loading = false;
@@ -199,30 +182,31 @@
 
 <div class="flex min-h-screen items-start justify-center px-4 pt-[25vh]">
 	<div class="w-full max-w-md space-y-8">
-		{#if desktopLoginDone}
+		{#if appLoginDone}
 			<div class="text-center">
 				<h1 class="text-3xl font-bold tracking-tight">App connected</h1>
 				<p class="text-muted-foreground mt-2">
 					You can close this tab and return to the app.
 				</p>
 			</div>
-		{:else if pendingDesktopLogin}
+		{:else if pendingAppLogin}
 			<div class="text-center">
-				<h1 class="text-3xl font-bold tracking-tight">Authorize desktop app</h1>
+				<h1 class="text-3xl font-bold tracking-tight">Authorize the Eurora app</h1>
 				<p class="text-muted-foreground mt-2">
-					Sign in to the Eurora desktop app as <strong>{auth.user?.email}</strong>?
+					Sign in to the Eurora app as <strong>{auth.user?.email}</strong>?
 				</p>
 			</div>
 
 			<Card.Root class="p-6">
 				{#if submitError}
-					<div class="mb-4 rounded-md bg-red-50 p-4">
-						<p class="text-sm text-red-800">{submitError}</p>
-					</div>
+					<Alert variant="destructive" class="mb-4">
+						<TriangleAlertIcon />
+						<AlertDescription>{submitError}</AlertDescription>
+					</Alert>
 				{/if}
 
 				<div class="flex flex-col gap-3">
-					<Button class="w-full" disabled={loading} onclick={handleConfirmDesktopLogin}>
+					<Button class="w-full" disabled={loading} onclick={handleConfirmAppLogin}>
 						{loading ? 'Authorizing...' : 'Authorize'}
 					</Button>
 					<Button
@@ -231,7 +215,7 @@
 						disabled={loading}
 						onclick={async () => {
 							await auth.logout();
-							pendingDesktopLogin = null;
+							pendingAppLogin = null;
 						}}
 					>
 						Log out
@@ -246,16 +230,18 @@
 
 			<Card.Root class="p-6">
 				{#if submitError}
-					<div class="mb-4 rounded-md bg-red-50 p-4">
-						<p class="text-sm text-red-800">{submitError}</p>
-					</div>
+					<Alert variant="destructive" class="mb-4">
+						<TriangleAlertIcon />
+						<AlertDescription>{submitError}</AlertDescription>
+					</Alert>
 				{/if}
 
 				<SocialAuthButtons
 					mode="login"
 					disabled={loading}
-					onGoogle={handleGoogleLogin}
-					onGitHub={handleGitHubLogin}
+					onGoogle={() => handleOAuthLogin('google')}
+					onGitHub={() => handleOAuthLogin('github')}
+					onApple={() => handleOAuthLogin('apple')}
 				/>
 
 				{#if showRegister}

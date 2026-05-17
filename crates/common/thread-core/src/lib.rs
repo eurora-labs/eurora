@@ -10,23 +10,17 @@
 //! adds `specta::Type` so the same definitions can be re-exported as TS.
 //! No HTTP, database, gRPC, or LLM dependencies live here on purpose.
 //!
-//! Where rich `agent-chain` payloads cross the wire (message bodies, content
-//! blocks, AI message chunks), they are typed as [`serde_json::Value`]. They
-//! are produced/consumed via `agent-chain`'s existing `serde` impls on the
-//! Rust side; on the TypeScript side the existing `message-converter` layer
-//! consumes them as opaque JSON and yields typed domain models. Embedding the
-//! agent-chain types directly here would require draping specta over the
-//! crate's hand-rolled serde, which is out of scope for the wire contract.
+//! Rich `agent-chain` payloads (message bodies, content blocks, AI message
+//! chunks) are typed end-to-end via the `agent-chain-core` types so the
+//! TypeScript bindings emit proper discriminated unions instead of `unknown`.
 
+use agent_chain_core::messages::{AIMessageChunk, AnyMessage, ContentBlock};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use uuid::Uuid;
 
 #[cfg(feature = "specta")]
 use specta::Type;
-#[cfg(feature = "specta")]
-use specta_typescript::Unknown;
 
 /// A persisted thread row as returned to the client.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -37,7 +31,7 @@ pub struct Thread {
     pub title: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub active_leaf_id: Option<Uuid>,
 }
 
@@ -45,7 +39,7 @@ pub struct Thread {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct CreateThreadRequest {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub title: Option<String>,
 }
 
@@ -60,9 +54,9 @@ pub struct CreateThreadResponse {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ListThreadsQuery {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -86,23 +80,13 @@ pub struct GetThreadResponse {
 pub struct DeleteThreadResponse {}
 
 /// One node in the message tree returned by message-list endpoints.
-///
-/// `message` is an `agent_chain::AnyMessage` serialized as JSON. We type the
-/// field as [`serde_json::Value`] so this crate stays free of the agent-chain
-/// dependency, and override the TypeScript representation to `unknown` so
-/// the frontend converter narrows it explicitly. The same trick on
-/// `children` works around `specta-typescript`'s lack of recursive type
-/// references at this version (it would inline the type and stack-overflow);
-/// the runtime JSON shape is still a real recursive `MessageNode` tree.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct MessageNode {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parent_id: Option<Uuid>,
-    #[cfg_attr(feature = "specta", specta(type = Unknown))]
-    pub message: Value,
     #[serde(default)]
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
+    pub parent_id: Option<Uuid>,
+    pub message: AnyMessage,
+    #[serde(default)]
     pub children: Vec<MessageNode>,
     pub sibling_index: i32,
     pub depth: i32,
@@ -112,12 +96,10 @@ pub struct MessageNode {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct GetMessagesQuery {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub offset: Option<u32>,
     #[serde(default)]
-    pub all_variants: bool,
+    pub limit: Option<u32>,
+    #[serde(default)]
+    pub offset: Option<u32>,
 }
 
 /// Response body for endpoints that return the message tree.
@@ -159,9 +141,9 @@ pub struct GenerateThreadTitleResponse {
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct SearchThreadsQuery {
     pub q: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -187,9 +169,9 @@ pub struct SearchThreadResult {
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct SearchMessagesQuery {
     pub q: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub limit: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub offset: Option<u32>,
 }
 
@@ -212,61 +194,53 @@ pub struct SearchMessageResult {
     pub snippet: String,
 }
 
-/// Request body for `POST /threads/{thread_id}/preliminary-blocks`.
-///
-/// `content_blocks` carries `agent_chain` `ContentBlock` JSON values; the
-/// service rewrites large in-line payloads into asset references and returns
-/// the rewritten blocks.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "specta", derive(Type))]
-pub struct SavePreliminaryContentBlocksRequest {
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
-    pub content_blocks: Vec<Value>,
-}
-
-/// Response body for `POST /threads/{thread_id}/preliminary-blocks`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[cfg_attr(feature = "specta", derive(Type))]
-pub struct SavePreliminaryContentBlocksResponse {
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
-    pub content_blocks: Vec<Value>,
-}
-
 /// Frame sent by the client over the chat WebSocket.
 ///
-/// Bidirectional from day one; the current set is `Send` (start a turn) and
-/// `Cancel` (interrupt the in-flight turn). New variants can be added without
-/// breaking older clients because serde rejects unknown tagged variants only
-/// on deserialize, never on encode.
+/// Bidirectional from day one; the current set is `Send` (start a turn from
+/// a new human message), `Regenerate` (re-roll an existing AI response under
+/// the same human parent so it becomes a sibling variant), and `Cancel`
+/// (interrupt the in-flight turn). New variants can be added without breaking
+/// older clients because serde rejects unknown tagged variants only on
+/// deserialize, never on encode.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ChatClientMessage {
     Send(ChatSendRequest),
+    Regenerate(RegenerateRequest),
     Cancel,
 }
 
 /// Payload of a [`ChatClientMessage::Send`] frame.
 ///
-/// `content_blocks` carries a `Vec<agent_chain::ContentBlock>` as JSON. When
-/// `parent_message_id` is present the turn is interpreted as an edit of an
-/// existing branch; the service rewinds `active_leaf` accordingly.
+/// When `parent_message_id` is present the turn is interpreted as an edit of
+/// an existing branch; the service rewinds `active_leaf` accordingly.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ChatSendRequest {
-    #[cfg_attr(feature = "specta", specta(type = Vec<Unknown>))]
-    pub content_blocks: Vec<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_blocks: Vec<ContentBlock>,
+    #[serde(default)]
     pub parent_message_id: Option<Uuid>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub asset_chips_json: Option<String>,
+}
+
+/// Payload of a [`ChatClientMessage::Regenerate`] frame.
+///
+/// The server resolves the AI message's parent (a human message), rewinds
+/// `active_leaf` to that parent, and runs the agent loop on the existing
+/// context. The newly produced AI message lands as a sibling of the original.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct RegenerateRequest {
+    pub ai_message_id: Uuid,
 }
 
 /// Frame sent by the server over the chat WebSocket.
 ///
-/// `chunk` carries an `AIMessageChunk` JSON; the client should accumulate
-/// chunks (using agent-chain's chunk-merge semantics) and replace placeholder
-/// state with the `final_messages` payload when the turn ends.
+/// Clients should accumulate `Chunk` payloads (using agent-chain's chunk-merge
+/// semantics) and replace placeholder state with the `Final.messages` payload
+/// when the turn ends.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -274,10 +248,7 @@ pub enum ChatServerMessage {
     /// The user's message has been persisted; clients should display it.
     ConfirmedHumanMessage { message: MessageNode },
     /// One streaming chunk from the AI.
-    Chunk {
-        #[cfg_attr(feature = "specta", specta(type = Unknown))]
-        chunk: Value,
-    },
+    Chunk { chunk: AIMessageChunk },
     /// The turn ended successfully; tree positions for everything that was
     /// persisted during this turn (human + AI + any tool messages).
     Final { messages: Vec<MessageNode> },
@@ -294,15 +265,31 @@ pub enum ChatServerMessage {
 pub struct ThreadErrorResponse {
     pub error: String,
     pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub details: Option<String>,
 }
 
-/// Build a [`specta::TypeCollection`] containing every thread wire type the
-/// desktop app needs. Used by the codegen binary to emit `thread.ts`.
+/// Per-asset context chip surfaced alongside [`ChatContext`] content blocks.
+///
+/// Lives here (rather than in `euro-activity`) because both desktop and
+/// mobile chat IPC layers emit it: desktop populates it from the timeline,
+/// mobile populates it from native pickers. Keeping the wire shape in
+/// `thread-core` lets the IPC commands stay app-agnostic and avoids
+/// dragging the desktop-only `euro-activity` graph into mobile.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct ContextChip {
+    pub id: String,
+    pub name: String,
+    pub icon: Option<String>,
+    pub domain: Option<String>,
+}
+
+/// Build a [`specta::Types`] containing every thread wire type the desktop
+/// app needs. Used by the codegen binary to emit `thread.ts`.
 #[cfg(feature = "specta")]
-pub fn type_collection() -> specta::TypeCollection {
-    specta::TypeCollection::default()
+pub fn type_collection() -> specta::Types {
+    specta::Types::default()
         .register::<Thread>()
         .register::<CreateThreadRequest>()
         .register::<CreateThreadResponse>()
@@ -322,10 +309,9 @@ pub fn type_collection() -> specta::TypeCollection {
         .register::<SearchMessagesQuery>()
         .register::<SearchMessagesResponse>()
         .register::<SearchMessageResult>()
-        .register::<SavePreliminaryContentBlocksRequest>()
-        .register::<SavePreliminaryContentBlocksResponse>()
         .register::<ChatClientMessage>()
         .register::<ChatSendRequest>()
+        .register::<RegenerateRequest>()
         .register::<ChatServerMessage>()
         .register::<ThreadErrorResponse>()
 }
@@ -333,13 +319,21 @@ pub fn type_collection() -> specta::TypeCollection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     #[test]
-    fn create_thread_request_omits_optional_title() {
+    fn create_thread_request_serializes_optional_title_as_null() {
         let req = CreateThreadRequest::default();
         let s = serde_json::to_string(&req).unwrap();
-        assert_eq!(s, "{}");
+        assert_eq!(s, r#"{"title":null}"#);
+        let back: CreateThreadRequest = serde_json::from_str(&s).unwrap();
+        assert!(back.title.is_none());
+    }
+
+    #[test]
+    fn create_thread_request_decodes_with_missing_title() {
+        // Forward-compat: older clients that omit the field still parse.
+        let back: CreateThreadRequest = serde_json::from_str("{}").unwrap();
+        assert!(back.title.is_none());
     }
 
     #[test]
@@ -353,11 +347,31 @@ mod tests {
         assert_eq!(q, back);
     }
 
+    fn sample_human_message() -> AnyMessage {
+        AnyMessage::HumanMessage(
+            agent_chain_core::messages::HumanMessage::builder()
+                .content("hi")
+                .build(),
+        )
+    }
+
+    fn sample_text_block() -> ContentBlock {
+        ContentBlock::Text(
+            agent_chain_core::messages::TextContentBlock::builder()
+                .text("hi")
+                .build(),
+        )
+    }
+
+    fn sample_ai_chunk() -> AIMessageChunk {
+        AIMessageChunk::builder().content("").build()
+    }
+
     #[test]
     fn message_node_round_trips() {
         let node = MessageNode {
             parent_id: Some(Uuid::nil()),
-            message: json!({"type": "human", "content": [{"type": "text", "text": "hi"}]}),
+            message: sample_human_message(),
             children: vec![],
             sibling_index: 0,
             depth: 0,
@@ -370,7 +384,7 @@ mod tests {
     #[test]
     fn chat_client_message_serializes_send_with_tag() {
         let m = ChatClientMessage::Send(ChatSendRequest {
-            content_blocks: vec![json!({"type": "text", "text": "hi"})],
+            content_blocks: vec![sample_text_block()],
             parent_message_id: None,
             asset_chips_json: None,
         });
@@ -386,18 +400,32 @@ mod tests {
     }
 
     #[test]
+    fn chat_client_message_serializes_regenerate_with_tag() {
+        let m = ChatClientMessage::Regenerate(RegenerateRequest {
+            ai_message_id: Uuid::nil(),
+        });
+        let s = serde_json::to_string(&m).unwrap();
+        assert!(s.contains("\"type\":\"regenerate\""));
+        assert!(s.contains("\"ai_message_id\""));
+        let back: ChatClientMessage = serde_json::from_str(&s).unwrap();
+        assert_eq!(m, back);
+    }
+
+    #[test]
     fn chat_server_message_round_trips_each_variant() {
         let cases = vec![
             ChatServerMessage::ConfirmedHumanMessage {
                 message: MessageNode {
                     parent_id: None,
-                    message: json!({}),
+                    message: sample_human_message(),
                     children: vec![],
                     sibling_index: 0,
                     depth: 0,
                 },
             },
-            ChatServerMessage::Chunk { chunk: json!({}) },
+            ChatServerMessage::Chunk {
+                chunk: sample_ai_chunk(),
+            },
             ChatServerMessage::Final { messages: vec![] },
             ChatServerMessage::Error {
                 kind: "internal".into(),
@@ -417,7 +445,7 @@ mod tests {
         let types = type_collection();
         let names: Vec<String> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().to_string())
+            .map(|ndt| ndt.name.to_string())
             .collect();
         for expected in [
             "Thread",

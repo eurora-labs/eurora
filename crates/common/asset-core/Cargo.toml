@@ -18,7 +18,7 @@ specta = { workspace = true, optional = true, features = [
 # `specta-typescript` exports the `Unknown` marker type used by `#[specta(type =
 # Unknown)]` attributes on `serde_json::Value` fields, so it must be available
 # whenever the `specta` feature is on.
-specta-typescript = { version = "0.0.10", optional = true }
+specta-typescript = { version = "0.0.12", optional = true }
 uuid = { workspace = true, features = ["serde"] }
 
 [features]

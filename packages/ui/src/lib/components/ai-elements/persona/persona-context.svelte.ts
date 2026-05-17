@@ -41,35 +41,29 @@ export const sources: Record<
 	},
 };
 
+export interface PersonaContextOptions {
+	variant?: () => PersonaVariant;
+	state?: () => PersonaState;
+}
+
 export class PersonaContext {
-	#variant = $state<PersonaVariant>('obsidian');
-	#state = $state<PersonaState>('idle');
+	readonly #opts: PersonaContextOptions;
 	#colorRgb = $state<[number, number, number]>([0, 0, 0]);
 
-	constructor(
-		options: {
-			variant?: PersonaVariant;
-			state?: PersonaState;
-		} = {},
-	) {
-		this.#variant = options.variant ?? 'obsidian';
-		this.#state = options.state ?? 'idle';
+	constructor(opts: PersonaContextOptions = {}) {
+		this.#opts = opts;
 	}
 
-	get variant() {
-		return this.#variant;
+	get variant(): PersonaVariant {
+		return this.#opts.variant?.() ?? 'obsidian';
 	}
 
-	set variant(value: PersonaVariant) {
-		this.#variant = value;
+	get state(): PersonaState {
+		return this.#opts.state?.() ?? 'idle';
 	}
 
-	get state() {
-		return this.#state;
-	}
-
-	set state(value: PersonaState) {
-		this.#state = value;
+	get source() {
+		return sources[this.variant];
 	}
 
 	get colorRgb() {
@@ -78,10 +72,6 @@ export class PersonaContext {
 
 	set colorRgb(value: [number, number, number]) {
 		this.#colorRgb = value;
-	}
-
-	get source() {
-		return sources[this.#variant];
 	}
 }
 

@@ -22,24 +22,13 @@
 		...rest
 	}: Props = $props();
 
-	let ctx = new TerminalState({ output, isStreaming, autoScroll, onClear });
+	const ctx = new TerminalState({
+		output: () => output,
+		isStreaming: () => isStreaming,
+		autoScroll: () => autoScroll,
+		onClear: () => onClear,
+	});
 	setTerminalContext(ctx);
-
-	$effect(() => {
-		ctx.output = output;
-	});
-
-	$effect(() => {
-		ctx.isStreaming = isStreaming;
-	});
-
-	$effect(() => {
-		ctx.autoScroll = autoScroll;
-	});
-
-	$effect(() => {
-		ctx.onClear = onClear;
-	});
 </script>
 
 <div

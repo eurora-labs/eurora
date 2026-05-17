@@ -1,6 +1,6 @@
 pub(crate) const REST_BYPASS_PREFIXES: &[&str] =
     &["/releases/", "/extensions/", "/download/", "/auth/"];
-pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook", "/health"];
+pub(crate) const REST_BYPASS_EXACT: &[&str] = &["/payment/webhook", "/health", "/llm/info"];
 
 /// REST paths that still require a valid JWT but do not require
 /// `email_verified` to be true. Distinct from `REST_BYPASS_*`, which skips

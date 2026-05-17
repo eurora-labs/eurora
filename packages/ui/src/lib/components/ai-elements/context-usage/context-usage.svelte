@@ -32,25 +32,13 @@
 		...rest
 	}: Props = $props();
 
-	let ctx = new ContextUsageState({ usedTokens, maxTokens, usage, modelId });
-
+	const ctx = new ContextUsageState({
+		usedTokens: () => usedTokens,
+		maxTokens: () => maxTokens,
+		usage: () => usage,
+		modelId: () => modelId,
+	});
 	setContextUsageContext(ctx);
-
-	$effect(() => {
-		ctx.usedTokens = usedTokens;
-	});
-
-	$effect(() => {
-		ctx.maxTokens = maxTokens;
-	});
-
-	$effect(() => {
-		ctx.usage = usage;
-	});
-
-	$effect(() => {
-		ctx.modelId = modelId;
-	});
 </script>
 
 <HoverCard bind:open {closeDelay} {openDelay} {...rest}>

@@ -12,7 +12,7 @@
 
 <div
 	data-slot="test-case-error"
-	class={cn('mt-2 rounded-md bg-red-50 p-3 dark:bg-red-900/20', className)}
+	class={cn('mt-2 rounded-md bg-destructive/10 p-3 text-destructive', className)}
 	{...rest}
 >
 	{@render children?.()}

@@ -24,8 +24,14 @@ fn test_content_is_empty_string() {
 fn test_serialization_roundtrip() {
     let msg = RemoveMessage::builder().id("msg-to-remove").build();
 
+    // Bare-message JSON omits "type" and "content" — the discriminant lives on
+    // AnyMessage and RemoveMessage carries no content field.
     let serialized = serde_json::to_value(&msg).unwrap();
-    assert_eq!(serialized.get("type").unwrap().as_str().unwrap(), "remove");
+    assert!(serialized.get("type").is_none());
+    assert!(serialized.get("content").is_none());
+
+    let wrapped = serde_json::to_value(AnyMessage::RemoveMessage(msg.clone())).unwrap();
+    assert_eq!(wrapped.get("type").unwrap().as_str().unwrap(), "remove");
 
     let deserialized: RemoveMessage = serde_json::from_value(serialized).unwrap();
     assert_eq!(deserialized.id, "msg-to-remove");
@@ -193,16 +199,19 @@ fn test_pretty_repr_html() {
 #[test]
 fn test_model_dump_snapshot() {
     let msg = RemoveMessage::builder().id("msg-dump-1").build();
-    let dumped = serde_json::to_value(&msg).unwrap();
+    // Wrap in AnyMessage so the discriminant is present; bare-message JSON
+    // intentionally has no "type" field.
+    let dumped = serde_json::to_value(AnyMessage::RemoveMessage(msg)).unwrap();
     let obj = dumped.as_object().unwrap();
 
-    assert!(obj.contains_key("content"));
     assert!(obj.contains_key("id"));
     assert!(obj.contains_key("type"));
     assert!(obj.contains_key("additional_kwargs"));
     assert!(obj.contains_key("response_metadata"));
+    // RemoveMessage has no content field — the synthetic empty string emitted
+    // by the legacy custom Serialize is gone now.
+    assert!(!obj.contains_key("content"));
 
-    assert_eq!(obj["content"].as_str().unwrap(), "");
     assert_eq!(obj["id"].as_str().unwrap(), "msg-dump-1");
     assert_eq!(obj["type"].as_str().unwrap(), "remove");
 }

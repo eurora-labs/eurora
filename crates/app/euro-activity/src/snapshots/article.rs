@@ -1,5 +1,5 @@
 use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
-use euro_native_messaging::types::NativeArticleSnapshot;
+use euro_browser::types::NativeArticleSnapshot;
 use serde::{Deserialize, Serialize};
 
 use crate::{ActivityResult, types::SnapshotFunctionality};

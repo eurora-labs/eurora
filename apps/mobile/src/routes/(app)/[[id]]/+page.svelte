@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import MobilePromptTools from '$lib/components/MobilePromptTools.svelte';
 	import { MessageList, ChatPromptInput, type Suggestion } from '@eurora/chat';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
@@ -27,16 +28,22 @@
 		}
 	});
 
+	function errMsg(e: unknown): string {
+		return e instanceof Error ? e.message : String(e);
+	}
+
 	function handleCopy(content: string) {
-		navigator.clipboard.writeText(content).catch((e) => toast.error(`Failed to copy: ${e}`));
+		navigator.clipboard
+			.writeText(content)
+			.catch((e) => toast.error(`Failed to copy: ${errMsg(e)}`));
 	}
 
 	function handleSubmit(text: string) {
-		chatService.sendMessage(text).catch((e) => toast.error(String(e)));
+		chatService.sendMessage(text).catch((e) => toast.error(errMsg(e)));
 	}
 
 	function handleEdit(messageId: string, newText: string) {
-		chatService.editMessage(messageId, newText).catch((e) => toast.error(String(e)));
+		chatService.editMessage(messageId, newText).catch((e) => toast.error(errMsg(e)));
 	}
 
 	const suggestions: Suggestion[] = [
@@ -55,7 +62,11 @@
 	</Empty.Root>
 {/snippet}
 
-<div class="flex h-full flex-col overflow-hidden">
+<div class="flex min-h-0 flex-1 flex-col overflow-hidden">
 	<MessageList onCopy={handleCopy} onEdit={handleEdit} {emptyState} />
-	<ChatPromptInput onSubmit={handleSubmit} {suggestions} />
+	<ChatPromptInput onSubmit={handleSubmit} {suggestions}>
+		{#snippet tools()}
+			<MobilePromptTools />
+		{/snippet}
+	</ChatPromptInput>
 </div>

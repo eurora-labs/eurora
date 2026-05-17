@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
@@ -16,7 +17,13 @@
 		onBranchChange?: (branchIndex: number) => void;
 	} = $props();
 
-	const branchState = new MessageBranchState(defaultBranch, onBranchChange);
+	const branchState = untrack(
+		() =>
+			new MessageBranchState({
+				defaultBranch,
+				onBranchChange: () => onBranchChange,
+			}),
+	);
 	setMessageBranchContext(branchState);
 </script>
 

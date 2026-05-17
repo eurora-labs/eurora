@@ -1,8 +1,12 @@
+<!-- TODO: This needs to be remade completely -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { type APISettings } from '$lib/bindings/bindings.js';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { inject } from '@eurora/shared/context';
+	import { unwrap } from '$lib/bindings/result.js';
+	import {
+		commands,
+		type APISettings,
+		type ConnectionMode,
+	} from '$lib/bindings/specta.bindings.js';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Input } from '@eurora/ui/components/input/index';
 	import { Label } from '@eurora/ui/components/label/index';
@@ -12,27 +16,38 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
-
-	let endpoint = $state('http://localhost:39051');
+	let endpoint = $state('http://localhost:3000');
 	let connecting = $state(false);
 
+	function modeFor(url: string): ConnectionMode {
+		// localhost:3000 is the canonical Local mode URL — store as Local so
+		// the persisted config survives a future port-default change.
+		if (url === 'http://localhost:3000' || url === 'http://127.0.0.1:3000') {
+			return { kind: 'custom', url: 'http://localhost:3000' };
+		}
+		return { kind: 'custom', url };
+	}
+
 	onMount(async () => {
-		const settings = await taurpc.settings.get_api_settings();
-		if (settings.endpoint) {
-			endpoint = settings.endpoint;
+		const settings = await commands.settingsGetApi();
+		if (settings.mode.kind === 'custom') {
+			endpoint = settings.mode.url;
+		} else if (settings.mode.kind === 'default') {
+			endpoint = 'http://localhost:3000';
 		}
 	});
 
 	async function connect() {
 		connecting = true;
 		try {
-			await taurpc.system.check_grpc_server_connection(endpoint);
+			// `test_backend_url` hits /llm/info which fails fast if the URL
+			// doesn't speak Eurora's protocol — better than the old TCP-only
+			// reachability check, which would happily greenlight a random
+			// HTTP server on the same port.
+			unwrap(await commands.systemTestBackendUrl(endpoint));
 
-			const settings: APISettings = {
-				endpoint,
-			};
-			await taurpc.settings.set_api_settings(settings);
+			const settings: APISettings = { mode: modeFor(endpoint) };
+			unwrap(await commands.settingsSetApi(settings));
 			goto('/onboarding/login/local/auth');
 		} catch (error) {
 			toast.error(`Could not connect to ${endpoint}. Error: ${error}`);
@@ -63,7 +78,7 @@
 		<Label for="endpoint" class="text-sm font-medium">API Endpoint</Label>
 		<Input
 			id="endpoint"
-			placeholder="http://localhost:39051"
+			placeholder="http://localhost:3000"
 			bind:value={endpoint}
 			disabled={connecting}
 		/>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { unwrap } from '$lib/bindings/result.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
@@ -9,21 +10,18 @@
 	import ExternalLink from '@lucide/svelte/icons/external-link';
 	import { getCurrentWindow } from '@tauri-apps/api/window';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onDestroy, onMount } from 'svelte';
+	import { useInterval } from 'runed';
 	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const user = inject(USER_SERVICE);
 
-	let interval: ReturnType<typeof setInterval> | undefined;
-
-	function startPolling() {
-		interval = setInterval(async () => {
+	const subscriptionPoll = useInterval(5_000, {
+		callback: async () => {
 			try {
-				const subscribed = await taurpc.payment.is_subscribed();
+				const subscribed = unwrap(await commands.paymentIsSubscribed());
 				if (!subscribed) return;
 
-				clearInterval(interval);
+				subscriptionPoll.pause();
 				await user.refreshSession().catch(() => {});
 				const win = getCurrentWindow();
 				await win.setFocus();
@@ -31,15 +29,7 @@
 			} catch (e) {
 				console.warn('Upgrade poll error:', e);
 			}
-		}, 5000);
-	}
-
-	onMount(() => {
-		startPolling();
-	});
-
-	onDestroy(() => {
-		if (interval) clearInterval(interval);
+		},
 	});
 </script>
 
@@ -66,7 +56,7 @@
 				class="w-fit"
 				onclick={async () => {
 					try {
-						const url = await taurpc.payment.create_checkout_url();
+						const url = unwrap(await commands.paymentCreateCheckoutUrl());
 						await open(url);
 					} catch (e) {
 						toast.error(`Failed to open checkout: ${e}`);

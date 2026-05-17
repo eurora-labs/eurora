@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    AppAuth-Android ships its own `net.openid.appauth.RedirectUriReceiverActivity`
+    in its AAR for the full `authorize` / `endSession` flows; manifest merging
+    registers it in the host app automatically. Consumers configure the scheme
+    via `manifestPlaceholders["appAuthRedirectScheme"]` in their app
+    `build.gradle.kts`.
+
+    For `authorizeBrowserOnly` (Eurora-style backend-mediated flows), the
+    plugin ships `BrowserSessionActivity` below. Host apps configure its scheme
+    via `manifestPlaceholders["tauriBrowserRedirectScheme"]` and may set it to
+    the same value as `appAuthRedirectScheme` only when they don't use the
+    full authorize flow (otherwise the OS routes redirects to whichever
+    activity it picks first).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="app.tauri.appauth.BrowserSessionActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="${tauriBrowserRedirectScheme}" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

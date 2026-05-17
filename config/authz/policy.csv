@@ -14,9 +14,13 @@ p, Free, /payment/checkout-status, GET
 # Free: activity endpoints (limited externally by token count)
 p, Free, /activities, GET
 p, Free, /activities, POST
+p, Free, /activities/{id}, PATCH
 
-# Free: asset endpoints (limited externally by token count)
+# Free: asset endpoints (limited externally by token count). GET serves
+# asset bytes for the owning user only; the handler enforces ownership and
+# surfaces foreign asset ids as 404.
 p, Free, /v1/assets, POST
+p, Free, /v1/assets/{asset_id}, GET
 
 # Free: thread endpoints. The /title and /chat routes additionally pass
 # through `http_token_gate_middleware` which enforces monthly token caps.
@@ -31,3 +35,10 @@ p, Free, /threads/{thread_id}/preliminary-blocks, POST
 p, Free, /threads/{thread_id}/chat, GET
 p, Free, /threads/search, GET
 p, Free, /threads/messages/search, GET
+
+# Free: cloud-synced settings (per-user blob, optimistic concurrency via
+# `base_updated_at`). PUT returns 200 on accept or 409 on conflict; DELETE
+# is idempotent and used by the "reset cloud settings" UI.
+p, Free, /settings, GET
+p, Free, /settings, PUT
+p, Free, /settings, DELETE

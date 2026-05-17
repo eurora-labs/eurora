@@ -14,81 +14,66 @@ const TEST_RESULTS_CONTEXT_KEY = Symbol.for('ai-test-results');
 const TEST_SUITE_CONTEXT_KEY = Symbol.for('ai-test-suite');
 const TEST_CASE_CONTEXT_KEY = Symbol.for('ai-test-case');
 
+export interface TestResultsStateOptions {
+	summary?: () => TestResultsSummary | undefined;
+}
+
 export class TestResultsState {
-	#summary = $state<TestResultsSummary | undefined>(undefined);
+	readonly #opts: TestResultsStateOptions;
 
-	constructor(options: { summary?: TestResultsSummary }) {
-		this.#summary = options.summary;
+	constructor(opts: TestResultsStateOptions) {
+		this.#opts = opts;
 	}
 
-	get summary() {
-		return this.#summary;
+	get summary(): TestResultsSummary | undefined {
+		return this.#opts.summary?.();
 	}
+}
 
-	set summary(value: TestResultsSummary | undefined) {
-		this.#summary = value;
-	}
+export interface TestSuiteStateOptions {
+	name: () => string;
+	status: () => TestStatus;
 }
 
 export class TestSuiteState {
-	#name = $state('');
-	#status = $state<TestStatus>('passed');
+	readonly #opts: TestSuiteStateOptions;
 
-	constructor(options: { name: string; status: TestStatus }) {
-		this.#name = options.name;
-		this.#status = options.status;
+	constructor(opts: TestSuiteStateOptions) {
+		this.#opts = opts;
 	}
 
-	get name() {
-		return this.#name;
+	get name(): string {
+		return this.#opts.name();
 	}
 
-	set name(value: string) {
-		this.#name = value;
-	}
-
-	get status() {
-		return this.#status;
-	}
-
-	set status(value: TestStatus) {
-		this.#status = value;
+	get status(): TestStatus {
+		return this.#opts.status();
 	}
 }
 
+export interface TestCaseStateOptions {
+	name: () => string;
+	status: () => TestStatus;
+	duration?: () => number | undefined;
+}
+
 export class TestCaseState {
-	#name = $state('');
-	#status = $state<TestStatus>('passed');
-	#duration = $state<number | undefined>(undefined);
+	readonly #opts: TestCaseStateOptions;
 
-	constructor(options: { name: string; status: TestStatus; duration?: number }) {
-		this.#name = options.name;
-		this.#status = options.status;
-		this.#duration = options.duration;
+	constructor(opts: TestCaseStateOptions) {
+		this.#opts = opts;
 	}
 
-	get name() {
-		return this.#name;
+	get name(): string {
+		return this.#opts.name();
 	}
 
-	set name(value: string) {
-		this.#name = value;
+	get status(): TestStatus {
+		return this.#opts.status();
 	}
 
-	get status() {
-		return this.#status;
-	}
-
-	set status(value: TestStatus) {
-		this.#status = value;
-	}
-
-	get duration() {
-		return this.#duration;
-	}
-
-	set duration(value: number | undefined) {
-		this.#duration = value;
+	get duration(): number | undefined {
+		return this.#opts.duration?.();
 	}
 }
 

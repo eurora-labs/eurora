@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/app/euro-*",
   "crates/backend/be-*",
+  "crates/plugins/*",
   "crates/common/agent-chain",
   "crates/common/agent-chain-core",
   "crates/common/agent-chain-macros",
@@ -14,7 +15,9 @@ members = [
   "crates/common/thread-core",
   "crates/common/focus-tracker",
   "crates/common/focus-tracker-core",
+  "crates/common/llm-core",
   "crates/common/pdf-core",
+  "crates/common/settings-core",
 ]
 
 [workspace.package]
@@ -43,20 +46,19 @@ axum-extra = { version = "0.10", default-features = false, features = ["cookie"]
 axum-server = { version = "0.7", default-features = false, features = ["tls-rustls-no-provider"] }
 backon = "1.6"
 base64 = "0.22.1"
-# taurpc = { path = "../TauRPC/taurpc" }
-taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "fix/mobile-compilation" }
 be-activity-service = { path = "crates/backend/be-activity-service" }
 be-analytics = { path = "crates/backend/be-analytics" }
 be-asset = { path = "crates/backend/be-asset" }
 be-asset-service = { path = "crates/backend/be-asset-service" }
 be-auth-core = { path = "crates/backend/be-auth-core" }
-be-email-service = { path = "crates/backend/be-email-service" }
 be-auth-service = { path = "crates/backend/be-auth-service" }
 be-authz = { path = "crates/backend/be-authz" }
+be-email-service = { path = "crates/backend/be-email-service" }
 be-encrypt = { path = "crates/backend/be-encrypt" }
 be-monolith = { path = "crates/backend/be-monolith" }
 be-payment-service = { path = "crates/backend/be-payment-service" }
 be-remote-db = { path = "crates/backend/be-remote-db" }
+be-settings-service = { path = "crates/backend/be-settings-service" }
 be-storage = { path = "crates/backend/be-storage" }
 be-thread-service = { path = "crates/backend/be-thread-service" }
 be-update-service = { path = "crates/backend/be-update-service" }
@@ -68,30 +70,26 @@ casbin = { version = "2.20.0", default-features = false, features = [
   "logging",
   "runtime-tokio"
 ] }
-cfg-if = "1.0.4"
 chacha20poly1305 = "0.10.1"
 chrono = "0.4.43"
 dirs = "6.0"
-dotenv = "0.15.0"
 email_address = "0.2"
 enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
+euro-bridge = { path = "crates/app/euro-bridge" }
 euro-bridge-protocol = { path = "crates/app/euro-bridge-protocol" }
 euro-browser = { path = "crates/app/euro-browser" }
 euro-debug = { path = "crates/app/euro-debug" }
-euro-encrypt = { path = "crates/app/euro-encrypt" }
 euro-endpoint = { path = "crates/app/euro-endpoint", default-features = false }
 euro-fs = { path = "crates/app/euro-fs" }
-euro-native-messaging = { path = "crates/app/euro-native-messaging" }
 euro-process = { path = "crates/app/euro-process" }
-euro-secret = { path = "crates/app/euro-secret" }
-euro-settings = { path = "crates/app/euro-settings" }
+euro-settings = { path = "crates/app/euro-settings", default-features = false }
 euro-storage = { path = "crates/app/euro-storage" }
 euro-tauri = { path = "crates/app/euro-tauri" }
+euro-telemetry = { path = "crates/app/euro-telemetry" }
 euro-thread = { path = "crates/app/euro-thread" }
 euro-timeline = { path = "crates/app/euro-timeline" }
-euro-user = { path = "crates/app/euro-user" }
 euro-vision = { path = "crates/app/euro-vision" }
 euro-office = { path = "crates/app/euro-office" }
 euro-pdf = { path = "crates/app/euro-pdf" }
@@ -108,6 +106,7 @@ indexmap = "2.13"  # collapse 2.10, 1.9
 insta = "1.41.1"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 lettermint-rs = { version = "0.3.1", features = ["reqwest-rustls"] }
+llm-core = { path = "crates/common/llm-core" }
 keyring = "3.6.3"
 once_cell = "1.21"
 openidconnect = "4"
@@ -128,15 +127,21 @@ rustix = "1.1.3"  # collapse 0.38, 1.0, 0.38(build)
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
 scraper = "0.26.0"
 secrecy = "0.10.3"
+sentry = { version = "0.48.1", default-features = false }
 serde = "1.0"
 serde_json = "1.0"
 serde_json_lenient = "0.2.4"
+settings-core = { path = "crates/common/settings-core" }
 sha1 = "0.10"
 sha2 = "0.10.9"
-specta = "=2.0.0-rc.23"
+specta = "=2.0.0-rc.25"
+tauri-specta = "=2.0.0-rc.25"
 strum = "0.28.0"
 strum_macros = "0.28.0"
 syn = "2.0"  # collapse 2.0.101, 1.0.109, 1.0.109(build)
+tauri = { version = "2.11.1", default-features = false }
+tauri-plugin-appauth = { path = "crates/plugins/tauri-plugin-appauth" }
+tauri-plugin-google-auth = "0.5"
 tempfile = "3.24"
 thiserror = "2.0.18"
 time = "0.3"
@@ -152,6 +157,8 @@ tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 url = { version = "2.5.8", features = ["serde"] }
 uuid = "1.20.0"
+wiremock = "0.6"
+xcap = { version = "0.9.4", default-features = false, features = ["image"] }
 zeroize = "1.8.2"
 
 [profile.bench]
@@ -162,6 +169,18 @@ codegen-units = 256
 [profile.dev]
 overflow-checks = false
 incremental = true
+# Keep file:line info for backtraces/panics, drop variable inspection.
+# Cuts debug `.so` size 3-5x — directly shrinks the Android APK that gets
+# transferred to the emulator on every `pnpm dev:android` cycle.
+debug = "line-tables-only"
+
+# Light opt + no debug info for all third-party deps. Speeds up linking and
+# shrinks the resulting binary. First-time dep compile is slightly slower;
+# every iteration after is faster. Workspace crates are unaffected (the `*`
+# glob only matches non-workspace packages).
+[profile.dev.package."*"]
+opt-level = 1
+debug = false
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3

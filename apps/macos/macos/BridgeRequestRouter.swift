@@ -84,6 +84,13 @@ final class BridgeRequestRouter: @unchecked Sendable {
                 id: 0,
                 message: "Register frames are not accepted from the extension"
             )))
+
+        case .shutdown:
+            logger.warning("Ignoring Shutdown from extension")
+            completion(Frame(ErrorFrame(
+                id: 0,
+                message: "Shutdown frames are not accepted from the extension"
+            )))
         }
     }
 

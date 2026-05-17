@@ -1,0 +1,63 @@
+# Local development stack for Eurora.
+#
+# Brings up Postgres (and an optional one-shot seed container) so you can run
+# the backend natively via `just dev:backend` (which is `cargo run -p
+# be-monolith`). Running the backend on the host keeps the inner-loop fast
+# — no Docker image to rebuild on every code change.
+#
+# `just dev`         — start Postgres + run backend + start the desktop app
+# `just dev:reset`   — wipe the database volume and re-seed the dev user
+#
+# Postgres user/password/db and the host-bound port are hardcoded here:
+# they're conventions of the dev stack, not user config. The backend reads
+# `REMOTE_DATABASE_URL` from `.env`; if you change the host port below,
+# update that URL too.
+#
+# The seed loader at `scripts/seed/seed.sh` is idempotent (it TRUNCATEs first)
+# so it only runs when you opt in via `--profile seed` (driven by the
+# justfile recipes).
+
+services:
+    postgres:
+        image: postgres:16
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: eurora
+        ports:
+            - '5434:5432'
+        volumes:
+            - eurora-pgdata:/var/lib/postgresql/data
+        healthcheck:
+            # `$$` escapes compose's own interpolation so the variable
+            # is resolved at run time inside the container, where the
+            # postgres image has already populated POSTGRES_USER /
+            # POSTGRES_DB from the values above.
+            test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+            interval: 5s
+            timeout: 3s
+            retries: 10
+
+    # Idempotent dev-data seeder. `restart: no` and the explicit profile mean
+    # this only runs when you ask for it (`docker compose --profile seed up`).
+    seed:
+        image: postgres:16
+        profiles: ['seed']
+        depends_on:
+            postgres:
+                condition: service_healthy
+        environment:
+            # Composed from the same hardcoded credentials the postgres
+            # service uses. The host (`postgres:5432`) is the
+            # compose-network hostname, not the host-published port that
+            # the backend on the host reaches via `REMOTE_DATABASE_URL`.
+            REMOTE_DATABASE_URL: postgresql://postgres:postgres@postgres:5432/eurora
+            EURORA_SEED_FORCE: '1'
+        volumes:
+            - ./scripts/seed:/seed:ro
+        entrypoint: ['/bin/bash', '/seed/seed.sh']
+        restart: 'no'
+
+volumes:
+    eurora-pgdata:

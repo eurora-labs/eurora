@@ -1,83 +1,60 @@
-import { spawn } from 'child_process';
-import { watch } from 'fs';
-import { existsSync, mkdirSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+/* eslint-disable */
+import { buildStyles } from './build-styles.js';
+import { existsSync, watch } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
-const distStylesDir = join(projectRoot, 'dist', 'styles');
-const distStylesFile = join(distStylesDir, 'main.css');
+const srcStylesDir = join(projectRoot, 'src', 'styles');
+const distStylesFile = join(projectRoot, 'dist', 'styles', 'main.css');
 
 let isBuilding = false;
 let buildQueued = false;
 
-function buildStyles() {
+async function runBuild() {
 	if (isBuilding) {
 		buildQueued = true;
 		return;
 	}
 
 	isBuilding = true;
-	// eslint-disable-next-line no-console
 	console.log('[watch-styles] Building styles...');
 
-	const build = spawn(
-		'pnpm',
-		['exec', 'postcss', './src/styles/main.css', '-o', './dist/styles/main.css'],
-		{
-			cwd: projectRoot,
-			stdio: 'inherit',
-			shell: true,
-		},
-	);
-
-	build.on('close', (code) => {
+	try {
+		await buildStyles();
+		console.log('[watch-styles] Styles built successfully');
+	} catch (error) {
+		console.error('[watch-styles]', error);
+	} finally {
 		isBuilding = false;
-		if (code === 0) {
-			// eslint-disable-next-line no-console
-			console.log('[watch-styles] Styles built successfully');
-		} else {
-			console.error(`[watch-styles] Build failed with code ${code}`);
-		}
-
 		if (buildQueued) {
 			buildQueued = false;
-			buildStyles();
+			runBuild();
 		}
-	});
+	}
 }
 
-// Initial build
-buildStyles();
+await runBuild();
 
-// Watch source files
-// eslint-disable-next-line no-console
 console.log('[watch-styles] Watching src/styles/ for changes...');
-watch(join(projectRoot, 'src', 'styles'), { recursive: true }, (eventType, filename) => {
+watch(srcStylesDir, { recursive: true }, (_eventType, filename) => {
 	if (filename && filename.endsWith('.css')) {
-		// eslint-disable-next-line no-console
 		console.log(`[watch-styles] Detected change in ${filename}`);
-		buildStyles();
+		runBuild();
 	}
 });
 
-// Watch dist directory for deletion/recreation
-// eslint-disable-next-line no-console
+// `svelte-package --watch` wipes `dist/` whenever it republishes the package,
+// which races our copy and would otherwise leave consumers without a CSS
+// bundle until the next manual change. Poll for the marker file and rebuild
+// on its absence so the sibling Svelte build can't silently win the race.
 console.log('[watch-styles] Watching dist/styles/...');
-
-// Check periodically if the styles file exists, rebuild if missing
 setInterval(() => {
 	if (!existsSync(distStylesFile)) {
-		// eslint-disable-next-line no-console
 		console.log('[watch-styles] Styles file missing, rebuilding...');
-		// Ensure directory exists
-		if (!existsSync(distStylesDir)) {
-			mkdirSync(distStylesDir, { recursive: true });
-		}
-		buildStyles();
+		runBuild();
 	}
-}, 1000); // Check every second
+}, 1000);
 
-// eslint-disable-next-line no-console
 console.log('[watch-styles] Style watcher started');

@@ -1,26 +1,26 @@
-import { createTauRPCProxy } from '$lib/bindings/bindings.js';
-import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+import { ACTIVITY_SERVICE, ActivityService } from '$lib/services/activity-service.svelte.js';
 import { APPEARANCE_SERVICE, AppearanceService } from '$lib/services/appearance-service.svelte.js';
 import { GENERAL_SERVICE, GeneralService } from '$lib/services/general-service.svelte.js';
-// import { MESSAGE_SERVICE, MessageService } from '$lib/services/message-service.svelte.js';
-import { THREAD_SERVICE, ThreadService } from '$lib/services/thread-service.svelte.js';
+import { TELEMETRY_SERVICE, TelemetryService } from '$lib/services/telemetry-service.svelte.js';
+import { ThreadService } from '$lib/services/thread-service.svelte.js';
 import { TIMELINE_SERVICE, TimelineService } from '$lib/services/timeline-service.svelte.js';
 import { USER_SERVICE, UserService } from '$lib/services/user-service.svelte.js';
 import { ChatService, CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
+import { THREAD_SERVICE } from '@eurora/chat/services/thread/thread-service';
 import { provideAll } from '@eurora/shared/context';
 
 export function initDependencies() {
-	const taurpc = createTauRPCProxy();
-	const threadClient = new ThreadService(taurpc);
-	const appearance = new AppearanceService(taurpc);
+	const threadClient = new ThreadService();
+	const appearance = new AppearanceService();
+	const telemetry = new TelemetryService();
 	return provideAll([
-		[TAURPC_SERVICE, taurpc],
+		[TELEMETRY_SERVICE, telemetry],
 		[THREAD_SERVICE, threadClient],
-		// [MESSAGE_SERVICE, new MessageService(taurpc)],
-		[USER_SERVICE, new UserService(taurpc)],
+		[USER_SERVICE, new UserService(telemetry)],
 		[CHAT_SERVICE, new ChatService(threadClient)],
 		[APPEARANCE_SERVICE, appearance],
-		[GENERAL_SERVICE, new GeneralService(taurpc)],
-		[TIMELINE_SERVICE, new TimelineService(taurpc, appearance)],
+		[GENERAL_SERVICE, new GeneralService()],
+		[TIMELINE_SERVICE, new TimelineService(appearance)],
+		[ACTIVITY_SERVICE, new ActivityService()],
 	]);
 }

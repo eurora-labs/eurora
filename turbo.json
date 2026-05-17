@@ -8,7 +8,16 @@
 		"build": {
 			"dependsOn": ["package"],
 			"passThroughEnv": ["SENTRY_AUTH_TOKEN", "GITHUB_TOKEN"],
-			"env": ["SENTRY_RELEASE"],
+			"env": [
+				"SENTRY_RELEASE",
+				"BACKEND_URL",
+				"WEB_URL",
+				"PUBLIC_SENTRY_WEB_DSN",
+				"PUBLIC_SENTRY_ENVIRONMENT",
+				"PUBLIC_SENTRY_RELEASE",
+				"SENTRY_ORG",
+				"SENTRY_PROJECT"
+			],
 			"outputs": [
 				".svelte-kit/**",
 				"!.sveltekit/types",
@@ -23,14 +32,16 @@
 			"persistent": true
 		},
 		"check": {
-			"dependsOn": ["package"]
+			"dependsOn": ["package"],
+			"env": ["BACKEND_URL", "WEB_URL"]
 		},
 		"check-types": {
 			"dependsOn": ["package"]
 		},
 		"playwright:install": {},
 		"test": {
-			"dependsOn": ["package", "playwright:install"]
+			"dependsOn": ["package", "playwright:install"],
+			"env": ["BACKEND_URL", "WEB_URL"]
 		},
 		"test:e2e:web": {
 			"env": ["PLAYWRIGHT_BROWSERS_PATH"],

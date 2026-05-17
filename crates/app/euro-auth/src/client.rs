@@ -8,8 +8,9 @@
 use std::sync::Arc;
 
 use auth_core::{
-    AssociateLoginTokenRequest, AuthErrorResponse, CheckEmailRequest, CheckEmailResponse,
-    LoginByLoginTokenRequest, LoginRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
+    AppleIdTokenLoginRequest, AppleNativeUser, AssociateLoginTokenRequest, AuthErrorResponse,
+    CheckEmailRequest, CheckEmailResponse, GoogleIdTokenLoginRequest, LoginByLoginTokenRequest,
+    LoginRequest, MobileThirdPartyAuthUrlRequest, RegisterRequest, ThirdPartyAuthUrlRequest,
     ThirdPartyAuthUrlResponse, TokenResponse, VerifyEmailRequest,
 };
 use euro_endpoint::EndpointManager;
@@ -127,9 +128,68 @@ impl AuthClient {
     pub async fn third_party_auth_url(
         &self,
         provider: auth_core::Provider,
+        login_token: Option<String>,
     ) -> AuthResult<ThirdPartyAuthUrlResponse> {
-        let body = ThirdPartyAuthUrlRequest { provider };
+        let body = ThirdPartyAuthUrlRequest {
+            provider,
+            login_token,
+        };
         self.post_json("/auth/oauth/url", &body, None).await
+    }
+
+    /// Mobile OAuth start: hand the backend a PKCE challenge and get
+    /// back a provider-authorisation URL that, once the user finishes,
+    /// 302s through `/auth/oauth/{provider}/mobile-callback` and lands
+    /// on the device's `eurora://` scheme.
+    pub async fn mobile_third_party_auth_url(
+        &self,
+        provider: auth_core::Provider,
+        code_challenge: impl Into<String>,
+    ) -> AuthResult<ThirdPartyAuthUrlResponse> {
+        let body = MobileThirdPartyAuthUrlRequest {
+            provider,
+            code_challenge: code_challenge.into(),
+            code_challenge_method: "S256".to_string(),
+        };
+        self.post_json("/auth/oauth/mobile/url", &body, None).await
+    }
+
+    /// Native Google sign-in: trade an iOS / Android-issued ID token
+    /// for a session token pair.
+    pub async fn login_by_google_id_token(
+        &self,
+        id_token: impl Into<String>,
+        nonce: Option<String>,
+    ) -> AuthResult<TokenResponse> {
+        let body = GoogleIdTokenLoginRequest {
+            id_token: id_token.into(),
+            nonce,
+        };
+        self.post_json("/auth/oauth/google/id-token", &body, None)
+            .await
+    }
+
+    /// Native Apple sign-in: trade an ID token from
+    /// `ASAuthorizationController` for a session token pair.
+    ///
+    /// `raw_nonce` is the unhashed nonce the client generated; the
+    /// backend re-derives `base64url(sha256(raw_nonce))` to match
+    /// against the ID token's `nonce` claim (Apple echoes the value
+    /// the iOS plugin placed in `request.nonce`, which is the hash).
+    /// `user` is `Some` only on the very first sign-in.
+    pub async fn login_by_apple_id_token(
+        &self,
+        id_token: impl Into<String>,
+        raw_nonce: impl Into<String>,
+        user: Option<AppleNativeUser>,
+    ) -> AuthResult<TokenResponse> {
+        let body = AppleIdTokenLoginRequest {
+            id_token: id_token.into(),
+            raw_nonce: raw_nonce.into(),
+            user,
+        };
+        self.post_json("/auth/oauth/apple/id-token", &body, None)
+            .await
     }
 
     async fn post_json<B, R>(&self, path: &str, body: &B, bearer: Option<&str>) -> AuthResult<R>
@@ -152,8 +212,10 @@ impl AuthClient {
 async fn send_typed<R: DeserializeOwned>(builder: RequestBuilder) -> AuthResult<R> {
     let response = builder.send().await.map_err(AuthError::from_transport)?;
     let status = response.status();
+    let url = response.url().to_string();
     if !status.is_success() {
         let body = decode_error_body(response).await;
+        tracing::warn!(%url, %status, ?body, "auth client: non-success response");
         return Err(AuthError::from_http_response(status, body));
     }
     let bytes = response.bytes().await.map_err(AuthError::from_transport)?;
@@ -164,8 +226,10 @@ async fn send_typed<R: DeserializeOwned>(builder: RequestBuilder) -> AuthResult<
 async fn send_unit(builder: RequestBuilder) -> AuthResult<()> {
     let response = builder.send().await.map_err(AuthError::from_transport)?;
     let status = response.status();
+    let url = response.url().to_string();
     if !status.is_success() {
         let body = decode_error_body(response).await;
+        tracing::warn!(%url, %status, ?body, "auth client: non-success response");
         return Err(AuthError::from_http_response(status, body));
     }
     Ok(())

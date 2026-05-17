@@ -2,7 +2,7 @@ use agent_chain_core::messages::{
     ContentBlock, ContentBlocks, ImageContentBlock, PlainTextContentBlock,
 };
 use async_trait::async_trait;
-use euro_native_messaging::{NativeImage, NativeTwitterAsset, NativeTwitterTweet, ParseResult};
+use euro_browser::{NativeImage, NativeTwitterAsset, NativeTwitterTweet, ParseResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

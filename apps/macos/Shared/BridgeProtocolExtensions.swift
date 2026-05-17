@@ -32,7 +32,7 @@ public enum BridgeProtocol {
 
     /// Cap on the size of any single JSON frame on the bridge. Matches the
     /// `max_message_size` configured by the desktop in
-    /// `crates/app/euro-browser/src/server.rs`.
+    /// `crates/app/euro-bridge/src/server.rs`.
     public static let maxFrameSize = 16 * 1024 * 1024
 
     /// Backoff between reconnect attempts.
@@ -74,6 +74,10 @@ public extension Frame {
 
     init(_ register: RegisterFrame) {
         self.init(kind: .register(register))
+    }
+
+    init(_ shutdown: ShutdownFrame) {
+        self.init(kind: .shutdown(shutdown))
     }
 }
 
@@ -129,7 +133,7 @@ public enum BridgeProtocolError: Error, LocalizedError {
 
 /// String constants that pin both ends of the bridge to the same wire
 /// vocabulary. Mirrors the constants on the Rust side
-/// (`euro_browser::EXTENSION_STATE_EVENT`, `OPEN_BROWSER_EXTENSION_SETTINGS_ACTION`);
+/// (`euro_bridge::EXTENSION_STATE_EVENT`, `OPEN_BROWSER_EXTENSION_SETTINGS_ACTION`);
 /// the build can't enforce that automatically, so these values are
 /// duplicated by hand and a regression here is caught at runtime by the
 /// frame-handler tests.
@@ -152,7 +156,7 @@ public enum BridgeAction {
 /// `ExtensionStateEventPayload.appKind` we publish.
 public let kSafariBridgeAppKind = "safari"
 
-/// Mirrors `euro_browser::BundledExtensionState` on the Rust side.
+/// Mirrors `euro_bridge::BundledExtensionState` on the Rust side.
 /// Encoded as a snake-case string in the `state` field of the
 /// [`BridgeAction.extensionStateChanged`] event payload.
 public enum BundledExtensionState: String, Codable {
@@ -205,6 +209,7 @@ public extension FrameKind {
         case .error: "Error"
         case .cancel: "Cancel"
         case .register: "Register"
+        case .shutdown: "Shutdown"
         }
     }
 }
@@ -228,6 +233,11 @@ public extension Frame {
                 return "Register(host=\(register.hostPid), app=\(register.appPid), kind=\(kind))"
             }
             return "Register(host=\(register.hostPid), app=\(register.appPid))"
+        case let .shutdown(shutdown):
+            if let reason = shutdown.reason {
+                return "Shutdown(reason=\(reason))"
+            }
+            return "Shutdown"
         }
     }
 }

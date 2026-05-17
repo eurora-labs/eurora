@@ -1,84 +1,129 @@
+import { unwrap } from '$lib/bindings/result.js';
+import {
+	commands,
+	events,
+	type LoginOutcome,
+	type Provider,
+} from '$lib/bindings/specta.bindings.js';
 import { InjectionToken } from '@eurora/shared/context';
-import type { LoginToken } from '$lib/bindings/bindings.js';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
 
 export class UserService {
 	authenticated = $state(false);
+	initialized = $state(false);
 	email = $state('');
 	displayName = $state<string | null>(null);
 	role = $state('');
 
-	private readonly taurpc: TaurpcService;
 	private readonly unlisteners: Promise<() => void>[] = [];
 
-	constructor(taurpc: TaurpcService) {
-		this.taurpc = taurpc;
-	}
-
 	private async fetchProfile() {
-		const [e, d, r] = await Promise.all([
-			this.taurpc.auth.get_email(),
-			this.taurpc.auth.get_display_name(),
-			this.taurpc.auth.get_role(),
-		]);
+		const claims = unwrap(await commands.authGetAccessTokenPayload());
 		this.authenticated = true;
-		this.email = e;
-		this.displayName = d;
-		this.role = r;
+		this.email = claims.email;
+		this.displayName = claims.display_name ?? null;
+		this.role = claims.role;
 	}
 
 	async init() {
-		const isAuth = await this.taurpc.auth.is_authenticated();
+		try {
+			this.unlisteners.push(
+				events.authStateChanged.listen((event) => {
+					const { claims } = event.payload;
+					if (claims) {
+						this.authenticated = true;
+						this.email = claims.email;
+						this.displayName = claims.display_name ?? null;
+						this.role = claims.role;
+					} else {
+						this.authenticated = false;
+						this.email = '';
+						this.displayName = null;
+						this.role = '';
+					}
+				}),
+			);
 
-		if (isAuth) {
-			await this.fetchProfile();
+			const isAuth = unwrap(await commands.authIsAuthenticated());
+			if (isAuth) {
+				await this.fetchProfile();
+			}
+		} finally {
+			this.initialized = true;
 		}
-
-		this.unlisteners.push(
-			this.taurpc.auth.auth_state_changed.on((claims) => {
-				if (claims) {
-					this.authenticated = true;
-					this.email = claims.email;
-					this.displayName = claims.display_name;
-					this.role = claims.role;
-				} else {
-					this.authenticated = false;
-					this.email = '';
-					this.displayName = null;
-					this.role = '';
-				}
-			}),
-		);
 	}
 
 	async login(login: string, password: string): Promise<void> {
-		await this.taurpc.auth.login(login, password);
+		unwrap(await commands.authLogin(login, password));
 		await this.fetchProfile();
 	}
 
 	async register(email: string, password: string): Promise<void> {
-		await this.taurpc.auth.register(email, password);
+		unwrap(await commands.authRegister(email, password));
 		await this.fetchProfile();
 	}
 
 	async logout(): Promise<void> {
-		await this.taurpc.auth.logout();
+		unwrap(await commands.authLogout());
 	}
 
-	async getLoginToken(): Promise<LoginToken> {
-		return this.taurpc.auth.get_login_token();
-	}
-
-	async pollForLogin(): Promise<boolean> {
-		const success = await this.taurpc.auth.poll_for_login();
-		if (success) {
+	/**
+	 * Drives the in-app browser OAuth flow on the Rust side: gets a
+	 * provider authorization URL from the backend (built around a fresh
+	 * PKCE pair), opens it via `tauri-plugin-appauth`, and exchanges
+	 * the verifier for tokens once the redirect fires.
+	 *
+	 * The Rust side never throws for `USER_CANCELED` — it returns
+	 * `{ kind: 'canceled' }` so the UI can silently return to idle without
+	 * surfacing an error.
+	 */
+	async startLogin(provider: Provider = 'google'): Promise<LoginOutcome> {
+		const outcome = unwrap(await commands.authStartLogin(provider));
+		if (outcome.kind === 'success') {
 			await this.fetchProfile();
 		}
-		return success;
+		return outcome;
+	}
+
+	/**
+	 * Sign in with Google. Tries the native iOS / Android Google SDK
+	 * first (via `tauri-plugin-google-auth`) and falls back to the
+	 * in-app browser flow when the native path isn't available
+	 * (Android without Play Services, missing client-ID configuration,
+	 * desktop dev builds). The user only ever sees the fallback if the
+	 * native path can't run — successful native sign-in returns
+	 * immediately without surfacing the browser.
+	 */
+	async signInWithGoogle(): Promise<LoginOutcome> {
+		const native = unwrap(await commands.authStartLoginGoogleNative());
+		if (native.kind === 'native_unavailable') {
+			return await this.startLogin('google');
+		}
+		if (native.kind === 'success') {
+			await this.fetchProfile();
+		}
+		return native;
+	}
+
+	/**
+	 * Sign in with Apple. On iOS this drives `ASAuthorizationController`
+	 * (the system Apple sheet, FaceID / TouchID, no browser) via
+	 * `tauri-plugin-apple-auth`. On Android and on iOS versions / configs
+	 * where the native path isn't available, falls back to the in-app
+	 * browser flow — the user-visible behaviour mirrors `signInWithGoogle`.
+	 */
+	async signInWithApple(): Promise<LoginOutcome> {
+		const native = unwrap(await commands.authStartLoginAppleNative());
+		if (native.kind === 'native_unavailable') {
+			return await this.startLogin('apple');
+		}
+		if (native.kind === 'success') {
+			await this.fetchProfile();
+		}
+		return native;
 	}
 
 	async refreshSession(): Promise<void> {
-		await this.taurpc.auth.refresh_session();
+		unwrap(await commands.authRefreshSession());
 	}
 
 	destroy() {

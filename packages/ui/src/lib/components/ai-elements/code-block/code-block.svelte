@@ -24,12 +24,8 @@
 		...rest
 	}: Props = $props();
 
-	let ctx = new CodeBlockState(code);
+	const ctx = new CodeBlockState({ code: () => code });
 	setCodeBlockContext(ctx);
-
-	$effect(() => {
-		ctx.code = code;
-	});
 </script>
 
 <CodeBlockContainer data-slot="code-block" {language} class={className} {...rest}>

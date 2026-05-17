@@ -747,12 +747,16 @@ fn test_backwards_compat_invalid_json_becomes_invalid_tool_calls() {
 
 #[test]
 fn test_ai_message_chunk_type_field() {
+    use agent_chain_core::messages::AnyMessageChunk;
     let chunk = AIMessageChunk::builder().content("hi").build();
+
+    // Bare-chunk JSON omits "type"; the discriminant lives on AnyMessageChunk.
     let serialized = serde_json::to_value(&chunk).unwrap();
-    assert_eq!(
-        serialized.get("type").unwrap().as_str().unwrap(),
-        "AIMessageChunk"
-    );
+    assert!(serialized.get("type").is_none());
+
+    // The union-level wrapper carries the snake_case tag.
+    let wrapped = serde_json::to_value(AnyMessageChunk::AIMessageChunk(chunk)).unwrap();
+    assert_eq!(wrapped.get("type").unwrap().as_str().unwrap(), "ai_chunk");
 }
 
 #[test]

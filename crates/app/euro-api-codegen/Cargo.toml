@@ -12,5 +12,6 @@ auth-core = { workspace = true, features = ["specta"] }
 thread-core = { workspace = true, features = ["specta"] }
 
 anyhow = { workspace = true }
-specta = { workspace = true, features = ["derive", "function"] }
-specta-typescript = "0.0.10"
+specta = { workspace = true, features = ["derive"] }
+specta-serde = "0.0.12"
+specta-typescript = "0.0.12"

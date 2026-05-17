@@ -16,3 +16,20 @@ thiserror = { workspace = true }
 tower-http = { workspace = true, features = ["trace"] }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v4"] }
+
+[dev-dependencies]
+be-remote-db = { workspace = true }
+be-storage = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+sqlx = { version = "0.8.6", features = [
+  "chrono",
+  "json",
+  "macros",
+  "migrate",
+  "postgres",
+  "runtime-tokio",
+  "tls-rustls-aws-lc-rs",
+  "uuid",
+] }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }

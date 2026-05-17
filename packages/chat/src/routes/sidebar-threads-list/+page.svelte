@@ -29,20 +29,22 @@
 				const id = `thread-${Date.now()}`;
 				fakeService.threads.unshift({
 					id,
+					user_id: '',
 					title,
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-				});
+					created_at: new Date().toISOString(),
+					updated_at: new Date().toISOString(),
+				} as never);
 				await chatService.loadThreads(20, 0);
 			},
 			async addUntitledThread() {
 				const id = `thread-${Date.now()}`;
 				fakeService.threads.unshift({
 					id,
-					title: null as any,
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-				});
+					user_id: '',
+					title: null as never,
+					created_at: new Date().toISOString(),
+					updated_at: new Date().toISOString(),
+				} as never);
 				await chatService.loadThreads(20, 0);
 			},
 			setDeleteDelay(ms: number) {

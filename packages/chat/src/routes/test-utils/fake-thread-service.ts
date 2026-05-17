@@ -1,24 +1,27 @@
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { MessageNode } from '$lib/models/messages/index.js';
-import type { ChatStreamEvent } from '$lib/models/streaming.js';
+import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
+import type { ChatServerMessage } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type {
 	BranchDirection,
+	ChatContext,
 	IThreadService,
-	SendMessageOptions,
 } from '$lib/services/thread/thread-service.js';
 
 let nextId = 1;
 
 function makeThread(overrides?: Partial<Thread>): Thread {
 	const id = `thread-${nextId++}`;
+	const now = new Date().toISOString();
 	return {
 		id,
+		user_id: '',
 		title: `Thread ${id}`,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
+		created_at: now,
+		updated_at: now,
 		...overrides,
-	};
+	} as Thread;
 }
 
 export function makeMessageNode(
@@ -29,11 +32,11 @@ export function makeMessageNode(
 ): MessageNode {
 	const content: ContentBlock[] =
 		text.length > 0
-			? [{ type: 'text', id: null, text, annotations: [], index: null, extras: null }]
+			? [{ type: 'text', id: null, text, annotations: null, index: null, extras: null }]
 			: [];
 
 	const base: MessageNode = {
-		parentId: null,
+		parent_id: null,
 		message:
 			type === 'human'
 				? {
@@ -41,23 +44,22 @@ export function makeMessageNode(
 						content,
 						id,
 						name: null,
-						additionalKwargs: null,
-						responseMetadata: null,
-						assetChips: [],
+						additional_kwargs: {},
+						response_metadata: {},
 					}
 				: {
 						type: 'ai',
 						content,
 						id,
 						name: null,
-						toolCalls: [],
-						invalidToolCalls: [],
-						usageMetadata: null,
-						additionalKwargs: null,
-						responseMetadata: null,
+						tool_calls: [],
+						invalid_tool_calls: [],
+						usage_metadata: null,
+						additional_kwargs: {},
+						response_metadata: {},
 					},
 		children: [],
-		siblingIndex: 0,
+		sibling_index: 0,
 		depth: 0,
 	};
 	return { ...base, ...overrides };
@@ -68,23 +70,30 @@ export function makeReasoningNode(id: string, reasoning: string, text: string): 
 		{ type: 'reasoning', id: null, reasoning, index: null, extras: null },
 	];
 	if (text) {
-		content.push({ type: 'text', id: null, text, annotations: [], index: null, extras: null });
+		content.push({
+			type: 'text',
+			id: null,
+			text,
+			annotations: null,
+			index: null,
+			extras: null,
+		});
 	}
 	return {
-		parentId: null,
+		parent_id: null,
 		message: {
 			type: 'ai',
 			content,
 			id,
 			name: null,
-			toolCalls: [],
-			invalidToolCalls: [],
-			usageMetadata: null,
-			additionalKwargs: null,
-			responseMetadata: null,
+			tool_calls: [],
+			invalid_tool_calls: [],
+			usage_metadata: null,
+			additional_kwargs: {},
+			response_metadata: {},
 		},
 		children: [],
-		siblingIndex: 0,
+		sibling_index: 0,
 		depth: 0,
 	};
 }
@@ -97,8 +106,10 @@ export class FakeThreadService implements IThreadService {
 	deleteDelay = 0;
 	shouldFailDelete = false;
 
-	streamChunks: ChatStreamEvent[] = [];
+	streamFrames: ChatServerMessage[] = [];
 	streamDelay = 0;
+
+	context: ChatContext = { contentBlocks: [], assetChips: [] };
 
 	seed(count: number): void {
 		this.threads = Array.from({ length: count }, (_, i) =>
@@ -110,12 +121,7 @@ export class FakeThreadService implements IThreadService {
 		return this.threads.slice(offset, offset + limit);
 	}
 
-	async getMessages(
-		threadId: string,
-		_limit: number,
-		_offset: number,
-		_allVariants: boolean,
-	): Promise<MessageNode[]> {
+	async getMessages(threadId: string, _limit: number, _offset: number): Promise<MessageNode[]> {
 		return this.messagesByThread.get(threadId) ?? [];
 	}
 
@@ -149,16 +155,54 @@ export class FakeThreadService implements IThreadService {
 		return { ...thread, title: `Generated title for ${threadId}` };
 	}
 
+	async searchThreads(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<ThreadSearchResult[]> {
+		const needle = query.trim().toLowerCase();
+		if (!needle) return [];
+		return this.threads
+			.filter((t) => t.title.toLowerCase().includes(needle))
+			.slice(offset, offset + limit)
+			.map((t) => ({ id: t.id, title: t.title, rank: 1, updated_at: t.updated_at }));
+	}
+
+	async searchMessages(
+		_query: string,
+		_limit: number,
+		_offset: number,
+	): Promise<MessageSearchResult[]> {
+		return [];
+	}
+
+	async collectContext(_threadId: string): Promise<ChatContext> {
+		return this.context;
+	}
+
 	async *sendMessage(
 		_threadId: string,
-		_text: string,
-		_options?: SendMessageOptions,
-	): AsyncIterable<ChatStreamEvent> {
-		for (const chunk of this.streamChunks) {
+		_request: unknown,
+		_signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		for (const frame of this.streamFrames) {
 			if (this.streamDelay > 0) {
 				await new Promise((r) => setTimeout(r, this.streamDelay));
 			}
-			yield chunk;
+			yield frame;
+		}
+	}
+
+	async *regenerateAi(
+		_threadId: string,
+		_aiMessageId: string,
+		_signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		for (const frame of this.streamFrames) {
+			if (this.streamDelay > 0) {
+				await new Promise((r) => setTimeout(r, this.streamDelay));
+			}
+			yield frame;
 		}
 	}
 }

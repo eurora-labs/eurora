@@ -18,6 +18,7 @@ mod error;
 mod handlers;
 mod llm;
 mod message_projection;
+mod preliminary;
 mod service;
 mod tools;
 
@@ -27,9 +28,11 @@ use axum::Router;
 use axum::routing::{get, post};
 use be_asset::AssetService;
 use be_remote_db::DatabaseManager;
+use llm_core::LlmConfig;
 use tower_http::trace::TraceLayer;
 
 pub use error::{ThreadServiceError, ThreadServiceResult};
+pub use llm::BuildError;
 pub use service::AppState;
 
 /// Build the thread router with the supplied dependencies.
@@ -59,10 +62,6 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             "/threads/{thread_id}/messages/switch-branch",
             post(handlers::messages::switch_branch),
         )
-        .route(
-            "/threads/{thread_id}/preliminary-blocks",
-            post(handlers::messages::save_preliminary_content_blocks),
-        )
         .route("/threads/{thread_id}/chat", get(handlers::chat::chat_ws))
         .route("/threads/search", get(handlers::search::search_threads))
         .route(
@@ -75,7 +74,16 @@ pub fn create_router(state: Arc<AppState>) -> Router {
 
 /// Wire up application state and return the router ready to merge into the
 /// monolith HTTP pipeline.
-pub fn init_thread_service(db: Arc<DatabaseManager>, asset_service: Arc<AssetService>) -> Router {
+///
+/// `llm_config` carries the resolved [`LlmConfig`]; the caller is expected
+/// to load it once at startup (typically via [`LlmConfig::from_env`]) and
+/// share it across services.
+pub fn init_thread_service(
+    db: Arc<DatabaseManager>,
+    asset_service: Arc<AssetService>,
+    llm_config: Arc<LlmConfig>,
+) -> Result<Router, BuildError> {
     tracing::debug!("Initializing thread service");
-    create_router(Arc::new(AppState::new(db, asset_service)))
+    let state = Arc::new(AppState::try_new(db, asset_service, llm_config)?);
+    Ok(create_router(state))
 }

@@ -433,13 +433,22 @@ pub fn merge_message_runs(messages: &[AnyMessage], chunk_separator: &str) -> Vec
                 }
             }
 
-            let mut merged_chunk = last_chunk + curr_chunk;
-
-            if let AnyMessageChunk::AIMessageChunk(ref mut ai_chunk) = merged_chunk {
-                ai_chunk.init_tool_calls();
+            // Same enum variant + non-tool messages have already been
+            // filtered above; the only remaining failure mode is a
+            // sub-variant mismatch (e.g. Chat chunks with different roles),
+            // in which case the two messages stay separate.
+            match last_chunk.try_concat(curr_chunk) {
+                Ok(mut merged_chunk) => {
+                    if let AnyMessageChunk::AIMessageChunk(ref mut ai_chunk) = merged_chunk {
+                        ai_chunk.init_tool_calls();
+                    }
+                    merged.push(merged_chunk.to_message());
+                }
+                Err(_) => {
+                    merged.push(last);
+                    merged.push(msg.clone());
+                }
             }
-
-            merged.push(merged_chunk.to_message());
         }
     }
 

@@ -1,0 +1,29 @@
+[package]
+name = "tauri-plugin-apple-auth"
+version = "0.1.0"
+description = "Tauri 2 mobile plugin that bridges Sign in with Apple (ASAuthorizationController) on iOS."
+edition.workspace = true
+rust-version = "1.95"
+license = "Apache-2.0"
+publish = false
+links = "tauri-plugin-apple-auth"
+repository = "https://github.com/eurora-labs/eurora"
+keywords = ["tauri", "plugin", "apple", "oidc", "sign-in-with-apple"]
+categories = ["authentication"]
+
+[lib]
+name = "tauri_plugin_apple_auth"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tauri = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[build-dependencies]
+tauri-plugin = { version = "2.5", features = ["build"] }
+
+[dev-dependencies]
+tauri = { workspace = true, features = ["test"] }

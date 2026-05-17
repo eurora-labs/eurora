@@ -164,7 +164,7 @@ fn code_verifier_to_challenge(code_verifier: &str) -> String {
 
 /// Per RFC 7636 §4.2: the S256 code challenge is exactly 43
 /// base64url-without-padding characters from the unreserved set.
-fn is_valid_code_challenge(s: &str) -> bool {
+pub(crate) fn is_valid_code_challenge(s: &str) -> bool {
     s.len() == 43
         && s.bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')

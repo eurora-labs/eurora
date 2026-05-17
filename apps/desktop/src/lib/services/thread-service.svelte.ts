@@ -1,105 +1,97 @@
-import { toChatStreamEvent, toMessageNodes } from '$lib/services/converters/message-converter.js';
-import { InjectionToken } from '@eurora/shared/context';
-import type { ContextChip, Query } from '$lib/bindings/bindings.js';
-import type { TaurpcService } from '$lib/bindings/taurpcService.js';
-import type { AssetChip, MessageNode } from '@eurora/chat/models/messages/index';
-import type { ChatStreamEvent } from '@eurora/chat/models/streaming';
+import { CommandError, unwrap, type CommandResult } from '$lib/bindings/result.js';
+import { commands, type StreamError } from '$lib/bindings/specta.bindings.js';
+import { Channel } from '@tauri-apps/api/core';
+
+import type { MessageNode } from '@eurora/chat/models/messages/index';
+import type { MessageSearchResult, ThreadSearchResult } from '@eurora/chat/models/search.model';
+import type { ChatServerMessage } from '@eurora/chat/models/streaming';
 import type { Thread } from '@eurora/chat/models/thread.model';
 import type {
+	BranchDirection,
+	ChatContext,
 	IThreadService,
-	SendMessageOptions,
 } from '@eurora/chat/services/thread/thread-service';
-
-type ExtendedQuery = Query & { preserved_asset_chips: ContextChip[] | null };
-
-function toContextChip(chip: AssetChip): ContextChip {
-	return { id: chip.id, name: chip.name, icon: chip.icon, domain: chip.domain };
-}
+import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
 
 export class ThreadService implements IThreadService {
-	private readonly taurpc: TaurpcService;
-
-	constructor(taurpc: TaurpcService) {
-		this.taurpc = taurpc;
-	}
-
 	async listThreads(limit: number, offset: number): Promise<Thread[]> {
-		return (await this.taurpc.thread.list(limit, offset)).map(
-			(thread) =>
-				({
-					id: thread.id,
-					title: thread.title,
-					createdAt: thread.created_at,
-					updatedAt: thread.updated_at,
-				}) as Thread,
-		);
+		return unwrap(await commands.threadList(limit, offset));
 	}
 
-	async getMessages(
-		threadId: string,
-		limit: number,
-		offset: number,
-		allVariants: boolean,
-	): Promise<MessageNode[]> {
-		const raw = (await this.taurpc.thread.get_messages(
-			threadId,
-			limit,
-			offset,
-			allVariants,
-		)) as unknown[];
-		return toMessageNodes(raw);
+	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
+		return unwrap(await commands.threadGetMessages(threadId, limit, offset));
 	}
 
 	async switchBranch(
 		threadId: string,
 		messageId: string,
-		direction: number,
+		direction: BranchDirection,
 	): Promise<MessageNode[]> {
-		const raw = (await this.taurpc.thread.switch_branch(
-			threadId,
-			messageId,
-			direction,
-		)) as unknown[];
-		return toMessageNodes(raw);
+		return unwrap(await commands.threadSwitchBranch(threadId, messageId, direction));
 	}
 
 	async deleteThread(threadId: string): Promise<void> {
-		await this.taurpc.thread.delete(threadId);
+		unwrap(await commands.threadDelete(threadId));
 	}
 
 	async createThread(): Promise<Thread> {
-		const raw = await this.taurpc.thread.create();
-		return {
-			id: raw.id!,
-			title: raw.title,
-			createdAt: raw.created_at,
-			updatedAt: raw.updated_at,
-		};
+		return unwrap(await commands.threadCreate());
 	}
 
 	async generateTitle(threadId: string): Promise<Thread> {
-		const raw = await this.taurpc.thread.generate_title(threadId);
-		return {
-			id: raw.id!,
-			title: raw.title,
-			createdAt: raw.created_at,
-			updatedAt: raw.updated_at,
-		};
+		return unwrap(await commands.threadGenerateTitle(threadId));
 	}
 
-	async *sendMessage(
+	async searchThreads(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<ThreadSearchResult[]> {
+		return unwrap(await commands.threadSearchThreads(query, limit, offset));
+	}
+
+	async searchMessages(
+		query: string,
+		limit: number,
+		offset: number,
+	): Promise<MessageSearchResult[]> {
+		return unwrap(await commands.threadSearchMessages(query, limit, offset));
+	}
+
+	async collectContext(threadId: string): Promise<ChatContext> {
+		return unwrap(await commands.chatCollectContext(threadId));
+	}
+
+	sendMessage(
 		threadId: string,
-		text: string,
-		options: SendMessageOptions = {},
-	): AsyncIterable<ChatStreamEvent> {
-		const { parentMessageId, signal, assetChips, preservedAssetChips } = options;
-		const query: ExtendedQuery = {
-			text,
-			assets: assetChips?.map((c) => c.id) ?? [],
-			parent_message_id: parentMessageId ?? null,
-			preserved_asset_chips: preservedAssetChips?.map(toContextChip) ?? null,
-		};
-		const buffer: ChatStreamEvent[] = [];
+		request: ChatSendRequest,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		return this.#streamChat(
+			threadId,
+			(channel) => commands.chatSendQuery(threadId, channel, request),
+			signal,
+		);
+	}
+
+	regenerateAi(
+		threadId: string,
+		aiMessageId: string,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		return this.#streamChat(
+			threadId,
+			(channel) => commands.chatRegenerate(threadId, aiMessageId, channel),
+			signal,
+		);
+	}
+
+	async *#streamChat(
+		threadId: string,
+		open: (channel: Channel<ChatServerMessage>) => Promise<CommandResult<null, StreamError>>,
+		signal?: AbortSignal,
+	): AsyncIterable<ChatServerMessage> {
+		const buffer: ChatServerMessage[] = [];
 		let resolve: ((value: void) => void) | null = null;
 		let finished = false;
 		let error: unknown = null;
@@ -109,27 +101,24 @@ export class ThreadService implements IThreadService {
 			resolve = null;
 		}
 
-		// The Tauri channel emits raw JSON wire frames (`ChatServerMessage`);
-		// the converter is responsible for narrowing them. An `Error` variant
-		// throws inside the converter, which we propagate to the consumer via
-		// the existing `error` channel.
-		function onEvent(response: unknown) {
-			try {
-				buffer.push(toChatStreamEvent(response));
-			} catch (e) {
-				error = e;
-				finished = true;
-			}
+		const channel = new Channel<ChatServerMessage>();
+		channel.onmessage = (response) => {
+			buffer.push(response);
 			notify();
-		}
+		};
 
 		function onAbort() {
 			notify();
 		}
 		signal?.addEventListener('abort', onAbort, { once: true });
 
-		this.taurpc.chat.send_query(threadId, onEvent, query).then(
-			() => {
+		open(channel).then(
+			(result) => {
+				// `Cancelled` is the user-driven AbortSignal path racing the
+				// server — surface as a clean stream end, not an error.
+				if (result.status === 'error' && result.error.type !== 'Cancelled') {
+					error = new CommandError(result.error);
+				}
 				finished = true;
 				notify();
 			},
@@ -155,18 +144,17 @@ export class ThreadService implements IThreadService {
 				});
 			}
 
-			while (buffer.length > 0) {
-				yield buffer.shift()!;
-			}
+			while (buffer.length > 0) yield buffer.shift()!;
 
 			if (error) throw error;
 		} finally {
 			signal?.removeEventListener('abort', onAbort);
 			if (!finished) {
-				this.taurpc.chat.cancel_query(threadId).catch(() => {});
+				commands
+					.chatCancelQuery(threadId)
+					.then(unwrap)
+					.catch(() => {});
 			}
 		}
 	}
 }
-
-export const THREAD_SERVICE = new InjectionToken<ThreadService>('ThreadService');

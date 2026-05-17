@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
@@ -24,26 +25,21 @@
 		...rest
 	}: Props = $props();
 
-	let ctx = new StackTraceState({
-		raw: trace,
-		isOpen: open ?? defaultOpen,
-		onFilePathClick,
+	let internalOpen = $state(untrack(() => open ?? defaultOpen));
+
+	const ctx = new StackTraceState({
+		raw: () => trace,
+		isOpen: () => open ?? internalOpen,
+		setOpen: (value) => {
+			internalOpen = value;
+			if (open !== undefined) {
+				open = value;
+			}
+			onOpenChange?.(value);
+		},
+		onFilePathClick: () => onFilePathClick,
 	});
 	setStackTraceContext(ctx);
-
-	$effect(() => {
-		ctx.raw = trace;
-	});
-
-	$effect(() => {
-		if (open !== undefined) {
-			ctx.isOpen = open;
-		}
-	});
-
-	$effect(() => {
-		ctx.onFilePathClick = onFilePathClick;
-	});
 </script>
 
 <div

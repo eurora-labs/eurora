@@ -5,16 +5,20 @@
 	import ResizeHandles from '$lib/components/ResizeHandles.svelte';
 	import Titlebar from '$lib/components/Titlebar.svelte';
 	import UpdateChecker from '$lib/components/UpdateChecker.svelte';
+	import { ACTIVITY_SERVICE } from '$lib/services/activity-service.svelte.js';
 	import { APPEARANCE_SERVICE } from '$lib/services/appearance-service.svelte.js';
 	import { GENERAL_SERVICE } from '$lib/services/general-service.svelte.js';
+	import { TELEMETRY_SERVICE } from '$lib/services/telemetry-service.svelte.js';
 	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
+	import { warmupShikiHighlighter } from '@eurora/ui/components/ai-elements/message/shiki/index';
+	import * as Sidebar from '@eurora/ui/components/sidebar/index';
 	import { Toaster } from '@eurora/ui/components/sonner/index';
 	import { openUrl } from '@tauri-apps/plugin-opener';
 	import { platform } from '@tauri-apps/plugin-os';
 	import { ModeWatcher } from 'mode-watcher';
-	import { onMount } from 'svelte';
+	import { useEventListener } from 'runed';
 
 	// Set platform class synchronously (before first render) so CSS
 	// variables like --titlebar-height are correct from the start.
@@ -24,6 +28,15 @@
 	let { children } = $props();
 
 	initDependencies();
+
+	// Kick off telemetry first. `init()` is async — it round-trips an IPC
+	// to fetch the consent state and embedded keys before `Sentry.init`
+	// runs — so errors that happen synchronously above this line, or
+	// between here and the IPC resolving, won't be captured. The Rust
+	// side has its own panic hook installed earlier in `main()`, which
+	// covers anything serious during the same window.
+	const telemetryService = inject(TELEMETRY_SERVICE);
+	telemetryService.init();
 
 	const userService = inject(USER_SERVICE);
 	userService.init();
@@ -37,14 +50,15 @@
 	const timelineService = inject(TIMELINE_SERVICE);
 	timelineService.init();
 
-	onMount(() => {
-		// All urls open in a separate browser window
-		document.addEventListener('click', handleUrls);
+	const activityService = inject(ACTIVITY_SERVICE);
+	activityService.init();
 
-		return () => {
-			document.removeEventListener('click', handleUrls);
-		};
-	});
+	// Boot the syntax-highlighter worker and pre-load common languages so
+	// the first streamed code block doesn't pay grammar-load latency.
+	warmupShikiHighlighter();
+
+	// All urls open in a separate browser window
+	useEventListener(() => document, 'click', handleUrls);
 
 	async function handleUrls(event: MouseEvent) {
 		const target = event.target as HTMLElement | null;
@@ -71,12 +85,14 @@
 
 <ModeWatcher defaultMode="system" />
 
-<div class="app-shell flex flex-col overflow-hidden bg-background">
-	<Titlebar />
-	<main class="flex-1 min-h-0 bg-background">
-		{@render children?.()}
-	</main>
-</div>
+<Sidebar.Provider open={true}>
+	<div class="app-shell flex flex-col overflow-hidden bg-background">
+		<Titlebar />
+		<main class="flex flex-1 min-h-0 bg-background">
+			{@render children?.()}
+		</main>
+	</div>
+</Sidebar.Provider>
 
 <AccessibilityPermission />
 <UpdateChecker />
@@ -96,5 +112,24 @@
 		position: fixed;
 		inset: 0;
 		border-radius: var(--shell-radius);
+		/*
+		 * `overflow: hidden` (Tailwind utility on the element) plus
+		 * `border-radius` is the usual rounded-shell idiom, but in
+		 * Chromium that clip is not reliably re-applied to a child's
+		 * compositing layer. The timeline rail's first activity row uses
+		 * `filter: saturate(...)` for the highlight, which forces it
+		 * onto its own layer; without this backstop the rectangular
+		 * layer overrides the rounded clip at the top-left, and since
+		 * the LI is mostly transparent the corner reads as a square
+		 * cutout through the window's OS-level transparency.
+		 *
+		 * `clip-path` is applied after compositing, so it enforces the
+		 * rounded shape against escaping child layers regardless of
+		 * filter/transform/opacity etc. On platforms where
+		 * `--shell-radius: 0px` (macOS, Windows) this collapses to a
+		 * no-op `inset(0 round 0)` — same shape as the original
+		 * untouched rectangle.
+		 */
+		/*clip-path: inset(0 round var(--shell-radius));*/
 	}
 </style>

@@ -17,33 +17,42 @@ test = false
 [dependencies]
 agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
+base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
-dotenv = { workspace = true }
 auth-core = { workspace = true, features = ["specta"] }
 backon = { workspace = true }
-euro-auth = { workspace = true }
-euro-encrypt = { workspace = true }
+euro-auth = { workspace = true, features = ["tauri"] }
+rand = { workspace = true }
 euro-endpoint = { workspace = true, features = ["tls-webpki-roots"] }
-euro-secret = { workspace = true }
-euro-settings = { workspace = true }
-euro-thread = { workspace = true }
-euro-user = { workspace = true }
+euro-settings = { workspace = true, features = ["tls-webpki-roots"] }
+euro-telemetry = { workspace = true }
+euro-thread = { workspace = true, features = ["tauri"] }
 thread-core = { workspace = true, features = ["specta"] }
 uuid = { workspace = true, features = ["serde"] }
 futures = { workspace = true }
+secrecy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
-specta-typescript = { version = "0.0.10" }
-tauri = { version = "2.11.1", features = [] }
+specta-typescript = { version = "0.0.12" }
+thiserror = { workspace = true }
+tauri = { workspace = true, features = [
+  "wry",
+  "compression",
+  "common-controls-v6",
+  "dynamic-acl",
+  "x11",
+  "dbus",
+] }
 tauri-plugin-http = "2"
-tauri-plugin-deep-link = "2"
+tauri-plugin-apple-auth = { path = "../../plugins/tauri-plugin-apple-auth" }
+tauri-plugin-appauth = { workspace = true }
+tauri-plugin-google-auth = { workspace = true }
 tauri-plugin-opener = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-store = "2"
-# taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
-taurpc = { workspace = true }
+tauri-specta = { workspace = true, features = ["derive", "typescript"] }
 tokio = { workspace = true, features = ["parking_lot", "rt-multi-thread"] }
 tokio-util = "0.7"
 tracing = { workspace = true }
@@ -53,7 +62,7 @@ url = { workspace = true }
 tauri-build = { version = "2", features = [] }
 
 [features]
-default = ["custom-protocol", "devtools"]
+default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 devtools = ["tauri/devtools"]
 
