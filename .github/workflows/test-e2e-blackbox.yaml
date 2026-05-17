@@ -2,6 +2,8 @@ name: E2E Blackbox Tests
 env:
     RUST_BACKTRACE: full
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
+    BACKEND_URL: http://localhost:3000
+    WEB_URL: http://localhost:5173
 
 on:
     push:
