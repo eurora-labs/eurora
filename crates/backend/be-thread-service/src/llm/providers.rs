@@ -1,14 +1,46 @@
+//! Materialise [`agent_chain::BaseChatModel`] instances from a typed
+//! [`llm_core::LlmConfig`].
+//!
+//! Provider selection lives entirely in `llm-core`; this module is the bridge
+//! between that schema and the concrete `agent-chain` clients used at
+//! runtime. Adding a new provider kind means adding an arm to
+//! [`build_chat_model`] (and pulling in the relevant `agent-chain` provider
+//! feature flag in `Cargo.toml`).
+//!
+//! `Anthropic`, `Google`, and `Bedrock` arms of [`llm_core::Provider`] are
+//! valid in the schema but currently rejected here with
+//! [`BuildError::KindNotYetWired`] — the env loader doesn't emit them today,
+//! so this only fires for future config-file paths.
 use std::sync::Arc;
 
-use agent_chain::{BaseChatModel, BaseTool, ollama::ChatOllama, openai::ChatOpenAI};
+use agent_chain::{BaseChatModel, BaseTool, openai::ChatOpenAI};
+use llm_core::{LlmConfig, ModelRef, Provider, ProviderId};
+use secrecy::ExposeSecret;
 
 use crate::tools::firecrawl_tools;
 
-const BASE_NEBUL_URL: &str = "https://api.inference.nebul.io/v1";
+/// Errors raised while turning [`LlmConfig`] into a concrete [`Providers`].
+#[derive(Debug, thiserror::Error)]
+pub enum BuildError {
+    #[error("role `{role}` references unknown provider `{provider}`")]
+    UnknownProvider {
+        role: &'static str,
+        provider: ProviderId,
+    },
 
-/// LLM providers selected at startup. The chat and title providers always
-/// exist; the vision provider is only present in cloud mode and brings its
-/// own bundled tool set (Firecrawl).
+    #[error(
+        "provider kind `{kind}` is recognised in the schema but the runtime client is not yet \
+         wired in be-thread-service"
+    )]
+    KindNotYetWired { kind: &'static str },
+
+    #[error(
+        "provider `{provider}` carries non-empty `headers` or `overrides`, which are not yet \
+         honoured by the underlying agent-chain OpenAI client"
+    )]
+    UnsupportedFeature { provider: ProviderId },
+}
+
 pub struct Providers {
     pub chat: Arc<dyn BaseChatModel + Send + Sync>,
     pub title: Arc<dyn BaseChatModel + Send + Sync>,
@@ -20,68 +52,97 @@ pub struct VisionConfig {
     pub default_tools: Vec<Arc<dyn BaseTool>>,
 }
 
-/// Construct provider clients from environment variables.
+/// Construct provider clients for each role in [`LlmConfig::roles`].
 ///
-/// Local mode (`RUNNING_EURORA_FULLY_LOCAL=true`) uses Ollama for both chat
-/// and title generation and disables vision/tools. Cloud mode uses Nebul's
-/// OpenAI-compatible inference endpoint and binds Firecrawl tools to the
-/// vision model.
-pub fn build_providers() -> Providers {
-    let local_mode = std::env::var("RUNNING_EURORA_FULLY_LOCAL")
-        .map(|v| v.eq_ignore_ascii_case("true"))
-        .unwrap_or(false);
-
-    if local_mode {
-        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
-        let host = std::env::var("OLLAMA_HOST")
-            .unwrap_or_else(|_| "http://host.docker.internal:11434".to_string());
-        let chat: Arc<dyn BaseChatModel + Send + Sync> =
-            Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
-        let title: Arc<dyn BaseChatModel + Send + Sync> =
-            Arc::new(ChatOllama::builder().model(&model).base_url(&host).build());
-        Providers {
-            chat,
-            title,
-            vision: None,
+/// Vision tools are attached when the deployment has both a vision role and
+/// a `FIRECRAWL_API_KEY` env var set — without the key the tools would fail
+/// on every call, so we'd rather hand the model a tool-less context than
+/// pretend the tools work.
+pub fn build_providers(cfg: &LlmConfig) -> Result<Providers, BuildError> {
+    let chat = build_chat_model(cfg, "chat", &cfg.roles.chat)?;
+    let title = build_chat_model(cfg, "title", &cfg.roles.title)?;
+    let vision = match cfg.roles.vision.as_ref() {
+        Some(role) => {
+            let model = build_chat_model(cfg, "vision", role)?;
+            let default_tools = if std::env::var("FIRECRAWL_API_KEY").is_ok_and(|v| !v.is_empty()) {
+                firecrawl_tools()
+            } else {
+                tracing::info!(
+                    "Vision role configured but FIRECRAWL_API_KEY is unset — \
+                     skipping firecrawl tool registration"
+                );
+                Vec::new()
+            };
+            Some(VisionConfig {
+                model,
+                default_tools,
+            })
         }
-    } else {
-        let api_key =
-            std::env::var("NEBUL_API_KEY").expect("NEBUL_API_KEY environment variable must be set");
+        None => None,
+    };
 
-        let chat: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
-            ChatOpenAI::builder()
-                .model(std::env::var("NEBUL_MODEL").expect("NEBUL_MODEL must be set"))
-                .reasoning_effort("medium")
-                .api_base(BASE_NEBUL_URL)
-                .api_key(&api_key)
-                .use_responses_api(false)
-                .build(),
-        );
+    Ok(Providers {
+        chat,
+        title,
+        vision,
+    })
+}
 
-        let title: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
-            ChatOpenAI::builder()
-                .model(std::env::var("NEBUL_TITLE_MODEL").expect("NEBUL_TITLE_MODEL must be set"))
-                .api_base(BASE_NEBUL_URL)
-                .api_key(&api_key)
-                .build(),
-        );
+fn build_chat_model(
+    cfg: &LlmConfig,
+    role: &'static str,
+    model_ref: &ModelRef,
+) -> Result<Arc<dyn BaseChatModel + Send + Sync>, BuildError> {
+    let provider =
+        cfg.providers
+            .get(&model_ref.provider)
+            .ok_or_else(|| BuildError::UnknownProvider {
+                role,
+                provider: model_ref.provider.clone(),
+            })?;
 
-        let vision_model: Arc<dyn BaseChatModel + Send + Sync> = Arc::new(
-            ChatOpenAI::builder()
-                .model(std::env::var("NEBUL_VISION_MODEL").expect("NEBUL_VISION_MODEL must be set"))
-                .api_base(BASE_NEBUL_URL)
-                .api_key(&api_key)
-                .use_responses_api(false)
-                .build(),
-        );
-
-        Providers {
-            chat,
-            title,
-            vision: Some(VisionConfig {
-                model: vision_model,
-                default_tools: firecrawl_tools(),
-            }),
+    match provider {
+        Provider::OpenAI {
+            api_key,
+            base_url,
+            organization,
+        } => {
+            let model = ChatOpenAI::builder()
+                .model(model_ref.model.clone())
+                .api_key(api_key.expose_secret().to_string())
+                .maybe_api_base(base_url.as_ref().map(|u| u.as_str().to_string()))
+                .maybe_organization(organization.clone())
+                .build();
+            Ok(Arc::new(model))
         }
+        Provider::OpenAiCompatible {
+            base_url,
+            api_key,
+            headers,
+            overrides,
+        } => {
+            if !headers.is_empty() || !overrides.is_empty() {
+                return Err(BuildError::UnsupportedFeature {
+                    provider: model_ref.provider.clone(),
+                });
+            }
+            // Pass an explicit placeholder when no key is configured: the
+            // alternative is `ChatOpenAI` falling back to `OPENAI_API_KEY`
+            // from the environment, which would silently send the operator's
+            // OpenAI key to whatever local server they configured.
+            let api_key_value = api_key
+                .as_ref()
+                .map(|k| k.expose_secret().to_string())
+                .unwrap_or_else(|| "not-needed".to_string());
+            let model = ChatOpenAI::builder()
+                .model(model_ref.model.clone())
+                .api_base(base_url.as_str().to_string())
+                .api_key(api_key_value)
+                .build();
+            Ok(Arc::new(model))
+        }
+        Provider::Anthropic { .. } => Err(BuildError::KindNotYetWired { kind: "anthropic" }),
+        Provider::Google { .. } => Err(BuildError::KindNotYetWired { kind: "google" }),
+        Provider::Bedrock { .. } => Err(BuildError::KindNotYetWired { kind: "bedrock" }),
     }
 }

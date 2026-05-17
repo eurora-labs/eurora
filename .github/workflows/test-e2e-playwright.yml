@@ -15,7 +15,8 @@ concurrency:
 
 env:
     PUBLIC_STRIPE_KEY: ${{ secrets.PUBLIC_STRIPE_KEY }}
-    VITE_API_URL: http://localhost:3000
+    BACKEND_URL: http://localhost:3000
+    WEB_URL: http://localhost:5173
 
 jobs:
     test:

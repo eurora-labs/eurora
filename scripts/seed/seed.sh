@@ -4,7 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="$SCRIPT_DIR/data"
 
-DB_URL="${REMOTE_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/eurora}"
+# REMOTE_DATABASE_URL is the single source of truth — the justfile
+# loads `.env` and propagates it; the docker-compose seed container
+# composes its own from POSTGRES_{USER,PASSWORD,DB}. There is no
+# in-script fallback by design (see .env.example).
+: "${REMOTE_DATABASE_URL:?REMOTE_DATABASE_URL is required (run \`just init\` to create .env)}"
+DB_URL="$REMOTE_DATABASE_URL"
 
 if [[ "$DB_URL" =~ ^postgresql://([^:]+):([^@]+)@([^:]+):([0-9]+)/(.+)$ ]]; then
     PGUSER="${BASH_REMATCH[1]}"
@@ -19,8 +24,8 @@ fi
 
 export PGPASSWORD
 
-if [[ "$PGHOST" != "localhost" && "$PGHOST" != "127.0.0.1" ]]; then
-    echo "Error: seed script refuses to run against non-localhost database ($PGHOST)" >&2
+if [[ "$PGHOST" != "localhost" && "$PGHOST" != "127.0.0.1" && "${EURORA_SEED_FORCE:-0}" != "1" ]]; then
+    echo "Error: seed script refuses to run against non-localhost database ($PGHOST). Set EURORA_SEED_FORCE=1 to override (used by the docker-compose seed service)." >&2
     exit 1
 fi
 
@@ -60,6 +65,9 @@ $PSQL -c "\COPY plans (id, name, description, created_at, updated_at, monthly_to
 
 echo "  Loading users..."
 $PSQL -c "\COPY users (id, email, display_name, email_verified, created_at, updated_at, stripe_customer_id, plan_id) FROM '$DATA_DIR/users.csv' WITH (FORMAT csv, HEADER true);"
+
+echo "  Loading password_credentials..."
+$PSQL -c "\COPY password_credentials (user_id, password_hash, created_at, updated_at) FROM '$DATA_DIR/password_credentials.csv' WITH (FORMAT csv, HEADER true);"
 
 echo "  Loading assets..."
 $PSQL -c "\COPY assets (id, user_id, name, mime_type, size_bytes, checksum_sha256, storage_backend, storage_uri, status, created_at, updated_at, metadata) FROM '$DATA_DIR/assets.csv' WITH (FORMAT csv, HEADER true);"

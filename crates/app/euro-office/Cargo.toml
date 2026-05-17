@@ -7,8 +7,8 @@ description = "Asset types and TypeScript bindings for the Eurora Office add-in 
 
 [dependencies]
 bon = { workspace = true }
+euro-bridge = { workspace = true }
 euro-bridge-protocol = { workspace = true }
-euro-browser = { workspace = true }
 euro-process = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -17,7 +17,8 @@ tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 
 anyhow = { workspace = true, optional = true }
-specta-typescript = { version = "0.0.10", optional = true }
+specta-serde = { version = "0.0.12", optional = true }
+specta-typescript = { version = "0.0.12", optional = true }
 
 [dev-dependencies]
 futures-util = { workspace = true }
@@ -27,7 +28,7 @@ tokio-tungstenite = { workspace = true }
 
 [features]
 default = []
-codegen = ["dep:anyhow", "dep:specta-typescript"]
+codegen = ["dep:anyhow", "dep:specta-serde", "dep:specta-typescript"]
 
 [[bin]]
 name = "euro-office"

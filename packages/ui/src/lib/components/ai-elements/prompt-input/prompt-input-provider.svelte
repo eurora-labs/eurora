@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import {
 		PromptInputControllerState,
@@ -14,7 +15,7 @@
 		children?: Snippet;
 	} = $props();
 
-	const controller = new PromptInputControllerState(initialInput);
+	const controller = untrack(() => new PromptInputControllerState(initialInput));
 	setPromptInputController(controller);
 	setProviderAttachments(controller.attachments);
 </script>

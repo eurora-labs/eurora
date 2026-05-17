@@ -1,22 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import SearchDialog from '$lib/components/SearchDialog.svelte';
-	import { TIMELINE_SERVICE } from '$lib/services/timeline-service.svelte.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
+	import SearchDialog from '@eurora/chat/components/SearchDialog.svelte';
 	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
 	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
-	import { useSidebar } from '@eurora/ui/components/sidebar/index';
 	import * as Sidebar from '@eurora/ui/components/sidebar/index';
-	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import LogoutIcon from '@lucide/svelte/icons/log-out';
-	import PanelLeftIcon from '@lucide/svelte/icons/panel-left';
 	import PowerIcon from '@lucide/svelte/icons/power';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -24,13 +20,10 @@
 	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	const taurpc = inject(TAURPC_SERVICE);
 	const chatService = inject(CHAT_SERVICE);
 	const user = inject(USER_SERVICE);
-	const timelineService = inject(TIMELINE_SERVICE);
-	const sidebarState = useSidebar();
+	const sidebarState = Sidebar.useSidebar();
 
-	let logoHovered = $state(false);
 	let quitDialogOpen = $state(false);
 	let searchOpen = $state(false);
 
@@ -40,10 +33,6 @@
 			searchOpen = true;
 		}
 	}
-	let visibleTimelineItems = $derived.by(() => {
-		const limit = sidebarState.open ? 3 : 1;
-		return timelineService.recent.slice(-limit);
-	});
 
 	function getFirstLetterAndCapitalize(name: string) {
 		if (!name) return '';
@@ -80,7 +69,7 @@
 
 	async function quit() {
 		quitDialogOpen = false;
-		taurpc.system.quit().catch((error) => {
+		commands.systemQuit().catch((error) => {
 			console.error('Failed to quit application:', error);
 			toast.error(`The app encountered the following error: ${error}`, {
 				description: 'Please quit manually from the tray menu.',
@@ -90,7 +79,6 @@
 					onClick: () => {},
 				},
 			});
-			console.error('Failed to quit application:', error);
 		});
 	}
 
@@ -105,72 +93,26 @@
 
 <Sidebar.Root collapsible="icon" class="border-none">
 	<Sidebar.Header>
-		<div class="flex items-center justify-between">
-			{#if sidebarState.open}
-				<EuroraLogo class="size-7" />
-			{:else}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="size-7"
-					onmouseenter={() => (logoHovered = true)}
-					onmouseleave={() => (logoHovered = false)}
-					onclick={() => {
-						sidebarState.toggle();
-						logoHovered = false;
-					}}
-				>
-					<PanelLeftIcon class={logoHovered ? 'size-4' : 'hidden'} />
-					<EuroraLogo class={logoHovered ? 'hidden' : 'size-7'} />
-				</Button>
-			{/if}
-
-			<div data-tauri-drag-region class="flex-1 self-stretch"></div>
-
-			{#if sidebarState.open}
-				<Sidebar.Trigger />
-			{/if}
-		</div>
+		<Sidebar.Menu>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton onclick={() => createChat()}>
+					<SquarePenIcon />
+					<span>New chat</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+			<Sidebar.MenuItem>
+				<Sidebar.MenuButton onclick={() => (searchOpen = true)}>
+					<SearchIcon />
+					<span>Search</span>
+				</Sidebar.MenuButton>
+			</Sidebar.MenuItem>
+		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<Sidebar.Group>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={() => createChat()}>
-							<SquarePenIcon />
-							<span>New chat</span>
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-					<Sidebar.MenuItem>
-						<Sidebar.MenuButton onclick={() => (searchOpen = true)}>
-							<SearchIcon />
-							<span>Search</span>
-						</Sidebar.MenuButton>
-					</Sidebar.MenuItem>
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
 		{#if sidebarState.open}
 			<SidebarThreadsList onThreadSelect={handleThreadSelect} />
 		{/if}
 	</Sidebar.Content>
-	{#if visibleTimelineItems.length > 0}
-		<div class="px-2 py-2">
-			<Timeline.Root class="w-full" defaultOpen={false}>
-				{#each visibleTimelineItems as item, i}
-					<Timeline.Item
-						color={item.accent?.hex}
-						iconBg={item.accent?.icon_bg}
-						iconColor={item.accent?.icon_bg === '#000000' ? '#ffffff' : '#000000'}
-						highlighted={i === visibleTimelineItems.length - 1}
-						iconSrc={item.icon_base64}
-						name={item.name}
-					/>
-				{/each}
-			</Timeline.Root>
-		</div>
-	{/if}
 
 	<Sidebar.Footer>
 		<DropdownMenu.Root>
@@ -210,7 +152,7 @@
 							class="cursor-pointer"
 							onclick={() => {
 								user.logout().then(() => {
-									goto('/onboarding');
+									goto('/onboarding/login');
 								});
 							}}
 						>
@@ -233,7 +175,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<SearchDialog bind:open={searchOpen} />
+<SearchDialog bind:open={searchOpen} onSelect={(threadId) => goto(`/${threadId}`)} />
 
 <Dialog.Root bind:open={quitDialogOpen}>
 	<Dialog.Content class="sm:max-w-100">

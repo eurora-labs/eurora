@@ -11,6 +11,7 @@
 </script>
 
 <script lang="ts">
+	import { Alert, AlertDescription } from '$lib/components/alert/index.js';
 	import { Button } from '$lib/components/button/index.js';
 	import * as Card from '$lib/components/card/index.js';
 	import * as Form from '$lib/components/form/index.js';
@@ -21,6 +22,7 @@
 	import EyeIcon from '@lucide/svelte/icons/eye';
 	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { superForm } from 'sveltekit-superforms';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { z } from 'zod';
@@ -70,9 +72,10 @@
 
 	<form use:enhance method="POST" {onsubmit} class="space-y-4">
 		{#if submitError}
-			<div class="rounded-md bg-red-50 p-4">
-				<p class="text-sm text-red-800">{submitError}</p>
-			</div>
+			<Alert variant="destructive">
+				<TriangleAlertIcon />
+				<AlertDescription>{submitError}</AlertDescription>
+			</Alert>
 		{/if}
 
 		<Form.Field {form} name="login">

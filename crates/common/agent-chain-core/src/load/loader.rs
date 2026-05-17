@@ -454,7 +454,11 @@ mod tests {
                     panic!("Unexpected content format");
                 };
                 assert_eq!(text, "Hello, world!");
-                assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+                // The bare-message JSON no longer carries the "type" tag —
+                // that lives on AnyMessage now. The reviver returns the raw
+                // struct shape, and the variant identity is encoded in the
+                // constructor id passed in.
+                assert!(v.get("type").is_none());
             }
             RevivedValue::Constructor(info) => {
                 assert_eq!(info.name, "AIMessage");
@@ -493,7 +497,8 @@ mod tests {
                     panic!("Unexpected content format");
                 };
                 assert_eq!(text, "Hello!");
-                assert_eq!(v.get("type").and_then(|v| v.as_str()), Some("ai"));
+                // See above: bare-message JSON omits the discriminant.
+                assert!(v.get("type").is_none());
             }
             RevivedValue::Constructor(info) => {
                 assert_eq!(info.name, "AIMessage");

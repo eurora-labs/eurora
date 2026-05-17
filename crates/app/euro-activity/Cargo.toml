@@ -6,7 +6,7 @@ description = "Refactored activity system with enum-based type-safe design"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [package.metadata.cargo-machete]
-ignored = ["humantime-serde", "specta"]
+ignored = ["humantime-serde"]
 
 [dependencies]
 activity-core = { workspace = true }
@@ -18,26 +18,26 @@ base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 enum_dispatch = { workspace = true }
 euro-auth = { workspace = true }
+euro-bridge = { workspace = true }
 euro-browser = { workspace = true }
-euro-encrypt = { workspace = true }
-euro-endpoint = { workspace = true }
-euro-native-messaging = { workspace = true }
+euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-office = { workspace = true }
 euro-pdf = { workspace = true }
 euro-process = { workspace = true }
-euro-secret = { workspace = true }
+euro-vision = { workspace = true }
 focus-tracker = { workspace = true }
 humantime-serde = { workspace = true }
 image = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 resvg = { version = "0.47" }
+secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 specta = { workspace = true, features = ["derive", "function"] }
-# taurpc = { git = "https://github.com/AndreRoelofs/TauRPC.git", branch = "chore/specta-bump" }
-taurpc = { workspace = true }
+tauri-specta = { workspace = true }
 thiserror = { workspace = true }
+thread-core = { workspace = true, features = ["specta"] }
 tiny-skia = "0.12"
 tokio = { workspace = true, features = [
   "fs",
@@ -48,7 +48,7 @@ tokio = { workspace = true, features = [
 tracing = { workspace = true }
 url = { workspace = true }
 usvg = { version = "0.47" }
-uuid = { workspace = true, features = ["serde"] }
+uuid = { workspace = true, features = ["serde", "v7"] }
 
 [features]
 default = []

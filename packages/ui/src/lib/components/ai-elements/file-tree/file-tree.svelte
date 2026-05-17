@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
@@ -22,7 +23,7 @@
 		children?: Snippet;
 	} = $props();
 
-	let internalExpanded = $state(defaultExpanded);
+	let internalExpanded = $state(untrack(() => defaultExpanded));
 	let expandedPaths = $derived(controlledExpanded ?? internalExpanded);
 
 	setFileTree({

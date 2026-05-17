@@ -11,7 +11,7 @@
 		"dev:package:styles": "node ./scripts/watch-styles.js",
 		"package": "pnpm run --sequential \"/^package:.*/\"",
 		"package:svelte": "svelte-kit sync && svelte-package",
-		"package:styles": "postcss ./src/styles/main.css -o ./dist/styles/main.css",
+		"package:styles": "node ./scripts/build-styles.js",
 		"design-tokens:build": "npx tz build && prettier --write ./src/lib/data/design-tokens.json ./src/styles/core/design-tokens.css",
 		"prepublishOnly": "pnpm run package",
 		"prepare": "svelte-kit sync",
@@ -29,7 +29,7 @@
 		"@eslint/js": "^9.39.4",
 		"@eurora/shared": "workspace:*",
 		"@internationalized/date": "^3.12.1",
-		"@lucide/svelte": "^0.577.0",
+		"@lucide/svelte": "^1.14.0",
 		"@playwright/test": "^1.59.1",
 		"@storybook/addon-docs": "^10.3.6",
 		"@storybook/addon-links": "^10.3.6",
@@ -47,7 +47,6 @@
 		"@tanstack/table-core": "^8.21.3",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.3.1",
-		"@xyflow/svelte": "^1.5.2",
 		"bits-ui": "^2.18.1",
 		"clsx": "^2.1.1",
 		"embla-carousel-svelte": "^8.6.0",
@@ -103,7 +102,8 @@
 			"import": "./dist/*.json",
 			"types": "./dist/*.json"
 		},
-		"./main.css": "./dist/styles/main.css"
+		"./main.css": "./dist/styles/main.css",
+		"./preview.css": "./dist/styles/preview.css"
 	},
 	"files": [
 		"./dist/*.svelte",
@@ -121,7 +121,8 @@
 		"ai": "^6.0.175",
 		"dompurify": "^3.4.2",
 		"formsnap": "^2.0.1",
-		"runed": "^0.37.1",
+		"marked": "^16.2.1",
+		"runed": "catalog:svelte",
 		"shiki": "^3.23.0",
 		"svelte-streamdown": "^3.0.1",
 		"svelte-toolbelt": "^0.10.6"

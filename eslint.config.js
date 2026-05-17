@@ -169,9 +169,13 @@ export default ts.config(
 			'apps/browser/scripts/**',
 			'apps/office-addin/scripts/**',
 			'packages/ui/storybook-static',
+			'apps/desktop/src/lib/bindings/specta.bindings.ts',
+			'apps/mobile/src/lib/bindings/specta.bindings.ts',
 			'packages/ui/.storybook',
 			'packages/ui/src/stories',
 			'packages/ui/src/lib/components',
+			'packages/ui/scripts/build-styles.js',
+			'scripts/**',
 			'apps/macos/**',
 			// Storybook Meta type wrapper
 			'packages/ui/src/stories/**/*.stories.ts',

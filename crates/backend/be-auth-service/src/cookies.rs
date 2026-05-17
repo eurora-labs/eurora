@@ -38,8 +38,10 @@ pub struct CookieConfig {
     /// sibling-subdomain deployments where multiple API hosts must
     /// share a session.
     pub domain: Option<String>,
-    /// Whether to emit the `Secure` attribute. Defaults to `true`;
-    /// disabled only in local development over plain HTTP.
+    /// Whether to emit the `Secure` attribute. Production deploys
+    /// must set `AUTH_COOKIE_SECURE=true` so cookies are only sent
+    /// over HTTPS; local dev sets `false` because the stack runs
+    /// without TLS.
     pub secure: bool,
     /// Set of browser origins (`scheme://host[:port]`) the SPA is
     /// served from. A request whose `Origin` matches one of these
@@ -48,30 +50,55 @@ pub struct CookieConfig {
     pub web_origins: HashSet<String>,
 }
 
+/// Failure modes when reading [`CookieConfig`] from the environment.
+///
+/// Each variant carries enough context (the variable name, the
+/// rejected value) for the caller's startup error printer to produce
+/// a remediation message without re-deriving what went wrong.
+#[derive(Debug, thiserror::Error)]
+pub enum CookieConfigError {
+    #[error("`{name}` is unset or empty")]
+    MissingEnv { name: &'static str },
+
+    #[error("invalid `AUTH_COOKIE_SECURE` value `{value}` (expected `true` or `false`)")]
+    InvalidCookieSecure { value: String },
+}
+
 impl CookieConfig {
-    pub fn from_env() -> Self {
+    /// Build a [`CookieConfig`] reading the cookie-shape knobs
+    /// (`AUTH_COOKIE_SECURE`, `AUTH_COOKIE_DOMAIN`) from the
+    /// environment, with the SPA-origin allow-list passed in by the
+    /// caller. Origins are derived from the workspace's canonical
+    /// `BACKEND_URL` / `WEB_URL` primitives — see
+    /// [`be_monolith::bootstrap`]'s `compose_web_origins` — so this
+    /// type does not own that contract.
+    pub fn from_env(web_origins: HashSet<String>) -> Result<Self, CookieConfigError> {
         let domain = std::env::var("AUTH_COOKIE_DOMAIN")
             .ok()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
 
-        let secure = std::env::var("AUTH_COOKIE_SECURE")
+        let raw_secure = std::env::var("AUTH_COOKIE_SECURE")
             .ok()
-            .map(|v| !v.eq_ignore_ascii_case("false"))
-            .unwrap_or(true);
-
-        let web_origins: HashSet<String> = std::env::var("WEB_ALLOWED_ORIGINS")
-            .unwrap_or_else(|_| "https://www.eurora-labs.com".into())
-            .split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
-            .collect();
+            .ok_or(CookieConfigError::MissingEnv {
+                name: "AUTH_COOKIE_SECURE",
+            })?;
 
-        Self {
+        let secure = if raw_secure.eq_ignore_ascii_case("true") {
+            true
+        } else if raw_secure.eq_ignore_ascii_case("false") {
+            false
+        } else {
+            return Err(CookieConfigError::InvalidCookieSecure { value: raw_secure });
+        };
+
+        Ok(Self {
             domain,
             secure,
             web_origins,
-        }
+        })
     }
 
     pub fn is_web_origin(&self, origin: &str) -> bool {

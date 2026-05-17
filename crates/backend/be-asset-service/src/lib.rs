@@ -13,7 +13,11 @@ mod service;
 
 use std::sync::Arc;
 
-use axum::{Router, extract::DefaultBodyLimit, routing::post};
+use axum::{
+    Router,
+    extract::DefaultBodyLimit,
+    routing::{get, post},
+};
 use be_asset::AssetService as CoreAssetService;
 use tower_http::trace::TraceLayer;
 
@@ -28,6 +32,10 @@ const MAX_ASSET_REQUEST_SIZE: usize = 1500 * 1024 * 1024;
 pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/v1/assets", post(handlers::create_asset_handler))
+        .route(
+            "/v1/assets/{asset_id}",
+            get(handlers::get_asset_bytes_handler),
+        )
         .layer(DefaultBodyLimit::max(MAX_ASSET_REQUEST_SIZE))
         .layer(TraceLayer::new_for_http())
         .with_state(state)

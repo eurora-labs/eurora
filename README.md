@@ -61,6 +61,28 @@ Main points of Sustainable Use License (SUL) are:
 
 Please download the version for your platform on https://www.eurora-labs.com/
 
+## Running locally
+
+The full stack — Postgres, the backend, the web auth UI, and the desktop app — comes up from a single command. You'll need [Docker](https://www.docker.com/), [Rust](https://rustup.rs/), [pnpm](https://pnpm.io/) (`corepack enable` works), and [`just`](https://just.systems/).
+
+```sh
+just init             # copies .env.example to .env, runs pnpm install
+$EDITOR .env          # paste your OPENAI_API_KEY
+just dev              # Postgres + backend + web + desktop, supervised together
+```
+
+Everything reads from a single `.env` at the repo root — there is no per-app env file. Sensible dev defaults (Postgres URL, JWT secrets, CORS origins, asset storage) are baked into debug builds; the only value `just dev` needs you to set is `OPENAI_API_KEY`. See `.env.example` for the full surface, including optional Sentry/Stripe/self-hosted-LLM blocks.
+
+Other recipes:
+
+```sh
+just dev:backend      # Postgres + cargo run -p be-monolith only
+just dev:web          # SvelteKit web/auth UI only
+just dev:desktop      # Tauri desktop app only
+just dev:reset        # nuke the DB volume and re-seed
+just doctor           # validate .env / tooling without starting anything
+```
+
 ## Star History
 
 <a href="https://www.star-history.com/?repos=eurora-labs%2Feurora&type=date&legend=top-left">

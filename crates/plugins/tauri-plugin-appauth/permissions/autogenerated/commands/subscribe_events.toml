@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-subscribe-events"
+description = "Enables the subscribe_events command without any pre-configured scope."
+commands.allow = ["subscribe_events"]
+
+[[permission]]
+identifier = "deny-subscribe-events"
+description = "Denies the subscribe_events command without any pre-configured scope."
+commands.deny = ["subscribe_events"]

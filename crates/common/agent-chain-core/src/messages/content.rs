@@ -2,7 +2,17 @@ use bon::bon;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[cfg(feature = "specta")]
+use specta_typescript::{BigInt, Unknown};
+
+/// TypeScript-side type for `HashMap<String, serde_json::Value>` map fields that
+/// are guaranteed to be JSON objects on the wire. Renders as
+/// `{ [key: string]: unknown }` (i.e. `Record<string, unknown>`).
+#[cfg(feature = "specta")]
+type JsonObjectTs = HashMap<String, Unknown>;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum ImageDetail {
     Low,
@@ -11,7 +21,12 @@ pub enum ImageDetail {
     Auto,
 }
 
+/// Discriminated union for image references. Used by provider adapters
+/// (e.g. Ollama) that need a single typed representation of "url vs base64
+/// vs file id" — `ImageContentBlock` flattens all three into optional fields,
+/// so this type is the explicit tagged form when a provider needs it.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ImageSource {
     Url {
@@ -28,9 +43,13 @@ pub enum ImageSource {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(untagged)]
 pub enum BlockIndex {
-    Int(i64),
+    // `i64` on the wire to match upstream provider payloads, but the TS
+    // export sees `i32` — block indexes are small ordinals in practice and
+    // we don't want frontends to reach for `bigint`.
+    Int(#[cfg_attr(feature = "specta", specta(type = i32))] i64),
     Str(String),
 }
 
@@ -65,29 +84,34 @@ impl From<&str> for BlockIndex {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type")]
 pub enum Annotation {
     #[serde(rename = "citation")]
     Citation {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
         id: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
         url: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
         title: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
         start_index: Option<i64>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        #[cfg_attr(feature = "specta", specta(type = Option<BigInt>))]
         end_index: Option<i64>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
         cited_text: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
+        #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
         extras: Option<HashMap<String, serde_json::Value>>,
     },
     #[serde(rename = "non_standard_annotation")]
     NonStandardAnnotation {
-        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(default)]
         id: Option<String>,
+        #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
         value: HashMap<String, serde_json::Value>,
     },
 }
@@ -122,15 +146,17 @@ impl Annotation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct TextContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
     pub text: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub annotations: Option<Vec<Annotation>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -155,13 +181,18 @@ impl TextContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolCallBlock {
+    #[serde(default)]
     pub id: Option<String>,
     pub name: String,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub args: HashMap<String, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -186,13 +217,18 @@ impl ToolCallBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolCallChunkBlock {
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub args: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -223,14 +259,20 @@ impl Default for ToolCallChunkBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InvalidToolCallBlock {
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
     pub name: Option<String>,
+    #[serde(default)]
     pub args: Option<String>,
+    #[serde(default)]
     pub error: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -263,13 +305,17 @@ impl Default for InvalidToolCallBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ServerToolCall {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub args: HashMap<String, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -292,16 +338,18 @@ impl ServerToolCall {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ServerToolCallChunk {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub args: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -332,6 +380,7 @@ impl Default for ServerToolCallChunk {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(rename_all = "lowercase")]
 pub enum ServerToolStatus {
     Success,
@@ -339,16 +388,19 @@ pub enum ServerToolStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ServerToolResult {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
     pub tool_call_id: String,
     pub status: ServerToolStatus,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub output: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -380,14 +432,16 @@ impl ServerToolResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ReasoningContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub reasoning: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -414,20 +468,22 @@ impl ReasoningContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ImageContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub file_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub mime_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub base64: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -463,20 +519,22 @@ impl ImageContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct VideoContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub file_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub mime_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub base64: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -517,20 +575,22 @@ impl VideoContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct AudioContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub file_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub mime_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub base64: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -571,25 +631,27 @@ impl AudioContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct PlainTextContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub file_id: Option<String>,
     pub mime_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub base64: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub text: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub context: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -630,20 +692,22 @@ impl Default for PlainTextContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct FileContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub file_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub mime_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub base64: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = Option<JsonObjectTs>))]
     pub extras: Option<HashMap<String, serde_json::Value>>,
 }
 
@@ -684,11 +748,14 @@ impl FileContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct NonStandardContentBlock {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub id: Option<String>,
+    #[serde(default)]
+    #[cfg_attr(feature = "specta", specta(type = JsonObjectTs))]
     pub value: HashMap<String, serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub index: Option<BlockIndex>,
 }
 
@@ -705,6 +772,7 @@ impl NonStandardContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type")]
 pub enum DataContentBlock {
     #[serde(rename = "image")]
@@ -720,6 +788,7 @@ pub enum DataContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type")]
 pub enum ToolContentBlock {
     #[serde(rename = "tool_call")]
@@ -735,6 +804,8 @@ pub enum ToolContentBlock {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(transparent)]
 pub struct ContentBlocks(Vec<ContentBlock>);
 
 impl<'de> serde::Deserialize<'de> for ContentBlocks {
@@ -771,18 +842,7 @@ impl<'de> serde::Deserialize<'de> for ContentBlocks {
                             TextContentBlock::builder().text(text).build(),
                         ));
                     } else {
-                        match serde_json::from_value::<ContentBlock>(value.clone()) {
-                            Ok(block) => blocks.push(block),
-                            Err(_) => {
-                                let mut error_value = HashMap::new();
-                                error_value.insert("original_json".to_string(), value);
-                                blocks.push(ContentBlock::NonStandard(
-                                    NonStandardContentBlock::builder()
-                                        .value(error_value)
-                                        .build(),
-                                ));
-                            }
-                        }
+                        blocks.push(ContentBlock::from_value_or_non_standard(value));
                     }
                 }
                 Ok(ContentBlocks(blocks))
@@ -1020,6 +1080,7 @@ impl PartialEq<&str> for ContentBlocks {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 #[serde(tag = "type")]
 pub enum ContentBlock {
     #[serde(rename = "text")]
@@ -1050,6 +1111,88 @@ pub enum ContentBlock {
     ServerToolCallChunk(ServerToolCallChunk),
     #[serde(rename = "server_tool_result")]
     ServerToolResult(ServerToolResult),
+}
+
+impl ContentBlock {
+    /// Decode a JSON value into a `ContentBlock`, falling back to
+    /// `ContentBlock::NonStandard` (with diagnostic context attached) when the
+    /// `"type"` discriminant is unknown or the typed deserialize fails.
+    ///
+    /// Used by every `*Message::content_blocks()` and by `ContentBlocks`'
+    /// custom deserializer to keep the dispatch logic in one place.
+    pub fn from_value_or_non_standard(value: serde_json::Value) -> Self {
+        let block_type = value
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let result: Result<Self, serde_json::Error> = match block_type.as_str() {
+            "text" => serde_json::from_value(value.clone()).map(Self::Text),
+            "reasoning" => serde_json::from_value(value.clone()).map(Self::Reasoning),
+            "tool_call" => serde_json::from_value(value.clone()).map(Self::ToolCall),
+            "invalid_tool_call" => serde_json::from_value(value.clone()).map(Self::InvalidToolCall),
+            "tool_call_chunk" => serde_json::from_value(value.clone()).map(Self::ToolCallChunk),
+            "image" => serde_json::from_value(value.clone()).map(Self::Image),
+            "audio" => serde_json::from_value(value.clone()).map(Self::Audio),
+            "video" => serde_json::from_value(value.clone()).map(Self::Video),
+            "file" => serde_json::from_value(value.clone()).map(Self::File),
+            "text-plain" => serde_json::from_value(value.clone()).map(Self::PlainText),
+            "server_tool_call" => serde_json::from_value(value.clone()).map(Self::ServerToolCall),
+            "server_tool_call_chunk" => {
+                serde_json::from_value(value.clone()).map(Self::ServerToolCallChunk)
+            }
+            "server_tool_result" => {
+                serde_json::from_value(value.clone()).map(Self::ServerToolResult)
+            }
+            "non_standard" => serde_json::from_value(value.clone()).map(Self::NonStandard),
+            _ => {
+                tracing::warn!(
+                    block_type = %block_type,
+                    json = %value,
+                    "Unknown content block type, treating as non_standard"
+                );
+                return Self::wrap_as_non_standard(value, &block_type, None);
+            }
+        };
+
+        result.unwrap_or_else(|err| {
+            tracing::warn!(
+                block_type = %block_type,
+                error = %err,
+                json = %value,
+                "Failed to decode content block, wrapping as non_standard"
+            );
+            Self::wrap_as_non_standard(value, &block_type, Some(err.to_string()))
+        })
+    }
+
+    fn wrap_as_non_standard(
+        value: serde_json::Value,
+        original_type: &str,
+        deserialization_error: Option<String>,
+    ) -> Self {
+        let mut wrapped = HashMap::new();
+        let index = value
+            .get("index")
+            .and_then(|i| serde_json::from_value(i.clone()).ok());
+        wrapped.insert(
+            "original_type".to_string(),
+            serde_json::Value::String(original_type.to_string()),
+        );
+        if let Some(err) = deserialization_error {
+            wrapped.insert(
+                "deserialization_error".to_string(),
+                serde_json::Value::String(err),
+            );
+        }
+        wrapped.insert("original_json".to_string(), value);
+        Self::NonStandard(NonStandardContentBlock {
+            id: None,
+            value: wrapped,
+            index,
+        })
+    }
 }
 
 impl From<PlainTextContentBlock> for ContentBlock {
@@ -1390,6 +1533,36 @@ mod tests {
                 assert_eq!(title, Some("Title".to_string()));
             }
             _ => panic!("Expected Citation variant"),
+        }
+    }
+
+    #[test]
+    fn test_from_value_or_non_standard_known_type() {
+        let block = ContentBlock::from_value_or_non_standard(serde_json::json!({
+            "type": "text",
+            "text": "hello",
+        }));
+        match block {
+            ContentBlock::Text(t) => assert_eq!(t.text, "hello"),
+            other => panic!("Expected Text, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_from_value_or_non_standard_unknown_type() {
+        let block = ContentBlock::from_value_or_non_standard(serde_json::json!({
+            "type": "completely_unknown_type",
+            "payload": "data",
+        }));
+        match block {
+            ContentBlock::NonStandard(ns) => {
+                assert_eq!(
+                    ns.value.get("original_type").unwrap().as_str().unwrap(),
+                    "completely_unknown_type"
+                );
+                assert!(ns.value.contains_key("original_json"));
+            }
+            other => panic!("Expected NonStandard, got {other:?}"),
         }
     }
 }

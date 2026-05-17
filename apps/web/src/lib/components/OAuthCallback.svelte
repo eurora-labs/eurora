@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { consumeAppRedirectUri } from '$lib/auth/redirect-uri';
 	import { AUTH_SERVICE, type OAuthProvider } from '$lib/services/auth-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import * as Sentry from '@sentry/sveltekit';
@@ -35,18 +36,24 @@
 			return;
 		}
 
-		const loginToken = sessionStorage.getItem('loginToken') ?? undefined;
-		if (loginToken) sessionStorage.removeItem('loginToken');
+		// Pairing token is now consumed at URL-issue time (stamped
+		// onto `oauth_state` server-side), so the callback no longer
+		// needs to thread it through `loginWithOAuth`. We still clear
+		// the sessionStorage entries — they were set by the login
+		// page before redirecting to the provider — and we check
+		// whether a pairing flow was in progress to decide whether to
+		// consume the app redirect URI.
+		const hadLoginToken = sessionStorage.getItem('loginToken') !== null;
+		sessionStorage.removeItem('loginToken');
 		sessionStorage.removeItem('challengeMethod');
 
 		try {
-			await auth.loginWithOAuth(provider, code, state, { loginToken });
+			await auth.loginWithOAuth(provider, code, state);
 
-			if (loginToken) {
-				const deviceRedirectUri = sessionStorage.getItem('deviceRedirectUri');
-				if (deviceRedirectUri) {
-					sessionStorage.removeItem('deviceRedirectUri');
-					window.location.href = deviceRedirectUri;
+			if (hadLoginToken) {
+				const redirectUri = consumeAppRedirectUri();
+				if (redirectUri) {
+					window.location.href = redirectUri;
 					return;
 				}
 			}

@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use activity_core::{
     Activity as WireActivity, DEFAULT_LIST_LIMIT, InsertActivityRequest, InsertActivityResponse,
-    ListActivitiesQuery, ListActivitiesResponse, MAX_LIST_LIMIT,
+    ListActivitiesQuery, ListActivitiesResponse, MAX_LIST_LIMIT, UpdateActivityRequest,
+    UpdateActivityResponse,
 };
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::{Path, Query, State},
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use be_asset::CreateAssetInput;
@@ -137,6 +138,61 @@ pub async fn insert_activity(
     analytics::track_activity_inserted(has_icon, has_ended_at, &activity.process_name);
 
     Ok(Json(InsertActivityResponse {
+        activity: db_to_wire(activity),
+    }))
+}
+
+#[tracing::instrument(skip_all, fields(user_id, activity_id = %activity_id, has_ended_at, has_window_title, has_name))]
+pub async fn patch_activity(
+    State(state): State<Arc<AppState>>,
+    user: AuthUser,
+    Path(activity_id): Path<Uuid>,
+    Json(body): Json<UpdateActivityRequest>,
+) -> ActivityResult<Json<UpdateActivityResponse>> {
+    let user_id = user.user_id()?;
+
+    let span = tracing::Span::current();
+    span.record("user_id", tracing::field::display(user_id));
+    span.record("has_ended_at", body.ended_at.is_some());
+    span.record("has_window_title", body.window_title.is_some());
+    span.record("has_name", body.name.is_some());
+
+    let UpdateActivityRequest {
+        name,
+        window_title,
+        ended_at,
+    } = body;
+
+    if name.is_none() && window_title.is_none() && ended_at.is_none() {
+        return Err(ActivityServiceError::invalid_argument(
+            "PATCH body must set at least one of: name, window_title, ended_at",
+        ));
+    }
+
+    let set_name = name.is_some();
+    let set_window_title = window_title.is_some();
+    let set_ended_at = ended_at.is_some();
+
+    let activity = state
+        .db
+        .update_activity()
+        .id(activity_id)
+        .user_id(user_id)
+        .maybe_name(name)
+        .maybe_window_title(window_title)
+        .maybe_ended_at(ended_at)
+        .call()
+        .await
+        .map_err(|e| {
+            let err = ActivityServiceError::from(e);
+            analytics::track_activity_update_failed(err.error_kind());
+            err
+        })?;
+
+    tracing::debug!(activity_id = %activity.id, "Patched activity");
+    analytics::track_activity_updated(set_ended_at, set_window_title, set_name);
+
+    Ok(Json(UpdateActivityResponse {
         activity: db_to_wire(activity),
     }))
 }

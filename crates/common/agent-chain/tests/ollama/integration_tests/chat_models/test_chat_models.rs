@@ -6,9 +6,6 @@ use futures::StreamExt;
 
 const DEFAULT_MODEL: &str = "llama3.1";
 const REASONING_MODEL: &str = "gpt-oss:20b";
-fn load_env() {
-    let _ = dotenv::dotenv();
-}
 
 // =============================================================================
 
@@ -17,7 +14,6 @@ fn load_env() {
 #[tokio::test]
 
 async fn test_init_model_not_found() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model("non-existent-model-xyz-12345")
         .validate_model_on_init(true)
@@ -42,7 +38,6 @@ async fn test_init_model_not_found() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_init_connection_error() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model("any-model")
         .base_url("http://localhost:1")
@@ -69,7 +64,6 @@ async fn test_init_connection_error() -> Result<(), Box<dyn std::error::Error>> 
 #[tokio::test]
 
 async fn test_init_response_error() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     // Point to a URL that returns HTTP errors (not an Ollama server)
     let llm = ChatOllama::builder()
         .model("any-model")
@@ -94,7 +88,6 @@ async fn test_init_response_error() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_structured_output_function_calling() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -132,7 +125,6 @@ async fn test_structured_output_function_calling() -> Result<(), Box<dyn std::er
 #[tokio::test]
 
 async fn test_structured_output_json_schema() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let joke_schema = serde_json::json!({
         "title": "Joke",
         "description": "Joke to tell user.",
@@ -174,7 +166,6 @@ async fn test_structured_output_json_schema() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_structured_output_deeply_nested() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let data_schema = serde_json::json!({
         "title": "Data",
         "description": "Extracted data about people.",
@@ -230,7 +221,6 @@ async fn test_structured_output_deeply_nested() -> Result<(), Box<dyn std::error
 #[tokio::test]
 
 async fn test_tool_streaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let weather_tool = serde_json::json!({
         "title": "get_current_weather",
         "description": "Gets the current weather in a given location.",
@@ -276,7 +266,6 @@ async fn test_tool_streaming() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_tool_astreaming() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let weather_tool = serde_json::json!({
         "title": "get_current_weather",
         "description": "Gets the current weather in a given location.",
@@ -322,7 +311,6 @@ async fn test_tool_astreaming() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let weather_tool = serde_json::json!({
         "title": "get_weather",
         "description": "Get the weather for a location.",
@@ -399,7 +387,6 @@ async fn test_agent_loop() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 
 async fn test_agent_loop_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let weather_tool = serde_json::json!({
         "title": "get_weather",
         "description": "Get the weather for a location.",

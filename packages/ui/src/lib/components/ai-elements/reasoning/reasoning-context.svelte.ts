@@ -2,39 +2,29 @@ import { getContext, setContext } from 'svelte';
 
 const REASONING_CONTEXT_KEY = Symbol.for('reasoning-context');
 
+export interface ReasoningStateOptions {
+	isStreaming?: () => boolean;
+	isOpen?: () => boolean;
+	duration?: () => number | undefined;
+}
+
 export class ReasoningState {
-	#isStreaming = $state(false);
-	#isOpen = $state(false);
-	#duration = $state<number | undefined>(undefined);
+	readonly #opts: ReasoningStateOptions;
 
-	constructor(options: { isStreaming?: boolean; isOpen?: boolean; duration?: number }) {
-		this.#isStreaming = options.isStreaming ?? false;
-		this.#isOpen = options.isOpen ?? false;
-		this.#duration = options.duration;
+	constructor(opts: ReasoningStateOptions) {
+		this.#opts = opts;
 	}
 
-	get isStreaming() {
-		return this.#isStreaming;
+	get isStreaming(): boolean {
+		return this.#opts.isStreaming?.() ?? false;
 	}
 
-	set isStreaming(value: boolean) {
-		this.#isStreaming = value;
+	get isOpen(): boolean {
+		return this.#opts.isOpen?.() ?? false;
 	}
 
-	get isOpen() {
-		return this.#isOpen;
-	}
-
-	set isOpen(value: boolean) {
-		this.#isOpen = value;
-	}
-
-	get duration() {
-		return this.#duration;
-	}
-
-	set duration(value: number | undefined) {
-		this.#duration = value;
+	get duration(): number | undefined {
+		return this.#opts.duration?.();
 	}
 }
 

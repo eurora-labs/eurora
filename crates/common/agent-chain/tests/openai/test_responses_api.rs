@@ -6,10 +6,6 @@ use agent_chain_core::messages::{AIMessage, HumanMessage};
 use futures::StreamExt;
 use std::collections::HashMap;
 
-fn load_env() {
-    let _ = dotenv::dotenv();
-}
-
 // =============================================================================
 // Responses API integration tests
 // Ported from langchain_openai/tests/integration_tests/chat_models/test_responses_api.py
@@ -35,7 +31,6 @@ fn check_response(response: &AIMessage) {
 #[tokio::test]
 
 async fn test_responses_incomplete_response() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let model = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .use_responses_api(true)
@@ -107,7 +102,6 @@ async fn test_responses_incomplete_response() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_responses_web_search_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .output_version("responses/v1")
@@ -162,7 +156,6 @@ async fn test_responses_web_search_responses_v1() -> Result<(), Box<dyn std::err
 #[tokio::test]
 
 async fn test_responses_web_search_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .output_version("v1")
@@ -190,7 +183,6 @@ async fn test_responses_web_search_v1() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 
 async fn test_responses_web_search_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .output_version("v0")
@@ -238,7 +230,6 @@ async fn test_responses_web_search_async() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_responses_function_calling_v0() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let multiply_schema = serde_json::json!({
         "title": "multiply",
         "description": "return x * y",
@@ -296,7 +287,6 @@ async fn test_responses_function_calling_v0() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_responses_function_calling_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let multiply_schema = serde_json::json!({
         "title": "multiply",
         "description": "return x * y",
@@ -340,7 +330,6 @@ async fn test_responses_function_calling_responses_v1() -> Result<(), Box<dyn st
 #[tokio::test]
 
 async fn test_responses_function_calling_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let multiply_schema = serde_json::json!({
         "title": "multiply",
         "description": "return x * y",
@@ -384,7 +373,6 @@ async fn test_responses_function_calling_v1() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_responses_parsed_schema_v0() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let foo_schema = serde_json::json!({
         "type": "json_schema",
         "json_schema": {
@@ -423,7 +411,6 @@ async fn test_responses_parsed_schema_v0() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_responses_parsed_schema_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let foo_schema = serde_json::json!({
         "type": "json_schema",
         "json_schema": {
@@ -462,7 +449,6 @@ async fn test_responses_parsed_schema_responses_v1() -> Result<(), Box<dyn std::
 #[tokio::test]
 
 async fn test_responses_parsed_schema_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let foo_schema = serde_json::json!({
         "type": "json_schema",
         "json_schema": {
@@ -501,7 +487,6 @@ async fn test_responses_parsed_schema_v1() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_responses_parsed_schema_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let foo_schema = serde_json::json!({
         "type": "json_schema",
         "json_schema": {
@@ -539,7 +524,6 @@ async fn test_responses_parsed_schema_async() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_responses_parsed_dict_schema() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let schema = serde_json::json!({
         "title": "Foo",
         "type": "object",
@@ -570,7 +554,6 @@ async fn test_responses_parsed_dict_schema() -> Result<(), Box<dyn std::error::E
 #[tokio::test]
 
 async fn test_responses_parsed_strict() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let _valid_schema = serde_json::json!({
         "type": "json_schema",
         "json_schema": {
@@ -647,7 +630,6 @@ async fn test_responses_parsed_strict() -> Result<(), Box<dyn std::error::Error>
 #[tokio::test]
 
 async fn test_responses_parsed_dict_schema_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let schema = serde_json::json!({
         "title": "Foo",
         "type": "object",
@@ -679,7 +661,6 @@ async fn test_responses_parsed_dict_schema_async() -> Result<(), Box<dyn std::er
 
 async fn test_responses_fn_calling_and_structured_output() -> Result<(), Box<dyn std::error::Error>>
 {
-    load_env();
     let multiply_schema = serde_json::json!({
         "title": "multiply",
         "description": "return x * y",
@@ -741,7 +722,6 @@ async fn test_responses_fn_calling_and_structured_output() -> Result<(), Box<dyn
 #[tokio::test]
 
 async fn test_responses_reasoning_v0() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("low"));
 
@@ -767,7 +747,6 @@ async fn test_responses_reasoning_v0() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 
 async fn test_responses_reasoning_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("low"));
 
@@ -793,7 +772,6 @@ async fn test_responses_reasoning_responses_v1() -> Result<(), Box<dyn std::erro
 #[tokio::test]
 
 async fn test_responses_reasoning_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("low"));
 
@@ -819,7 +797,6 @@ async fn test_responses_reasoning_v1() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 
 async fn test_responses_stateful_api() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .use_responses_api(true)
@@ -872,7 +849,6 @@ async fn test_responses_stateful_api() -> Result<(), Box<dyn std::error::Error>>
 #[tokio::test]
 
 async fn test_responses_route_from_model_kwargs() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut kwargs = HashMap::new();
     kwargs.insert(
         "text".to_string(),
@@ -906,7 +882,6 @@ async fn test_responses_route_from_model_kwargs() -> Result<(), Box<dyn std::err
 #[tokio::test]
 
 async fn test_responses_computer_calls() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("computer-use-preview")
         .truncation("auto")
@@ -941,7 +916,6 @@ async fn test_responses_computer_calls() -> Result<(), Box<dyn std::error::Error
 #[tokio::test]
 
 async fn test_responses_file_search_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let vector_store_id = match std::env::var("OPENAI_VECTOR_STORE_ID") {
         Ok(id) => id,
         Err(_) => {
@@ -983,7 +957,6 @@ async fn test_responses_file_search_responses_v1() -> Result<(), Box<dyn std::er
 #[tokio::test]
 
 async fn test_responses_file_search_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let vector_store_id = match std::env::var("OPENAI_VECTOR_STORE_ID") {
         Ok(id) => id,
         Err(_) => {
@@ -1023,7 +996,6 @@ async fn test_responses_file_search_v1() -> Result<(), Box<dyn std::error::Error
 #[tokio::test]
 
 async fn test_responses_stream_reasoning_summary_v0() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("medium"));
     reasoning.insert("summary".to_string(), serde_json::json!("auto"));
@@ -1062,7 +1034,6 @@ async fn test_responses_stream_reasoning_summary_v0() -> Result<(), Box<dyn std:
 
 async fn test_responses_stream_reasoning_summary_responses_v1()
 -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("medium"));
     reasoning.insert("summary".to_string(), serde_json::json!("auto"));
@@ -1100,7 +1071,6 @@ async fn test_responses_stream_reasoning_summary_responses_v1()
 #[tokio::test]
 
 async fn test_responses_stream_reasoning_summary_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let mut reasoning = HashMap::new();
     reasoning.insert("effort".to_string(), serde_json::json!("medium"));
     reasoning.insert("summary".to_string(), serde_json::json!("auto"));
@@ -1138,7 +1108,6 @@ async fn test_responses_stream_reasoning_summary_v1() -> Result<(), Box<dyn std:
 #[tokio::test]
 
 async fn test_responses_code_interpreter_v0() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("o4-mini")
         .use_responses_api(true)
@@ -1167,7 +1136,6 @@ async fn test_responses_code_interpreter_v0() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_responses_code_interpreter_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("o4-mini")
         .use_responses_api(true)
@@ -1196,7 +1164,6 @@ async fn test_responses_code_interpreter_responses_v1() -> Result<(), Box<dyn st
 #[tokio::test]
 
 async fn test_responses_code_interpreter_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("o4-mini")
         .use_responses_api(true)
@@ -1225,7 +1192,6 @@ async fn test_responses_code_interpreter_v1() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_responses_mcp_builtin() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("o4-mini")
         .use_responses_api(true)
@@ -1259,7 +1225,6 @@ async fn test_responses_mcp_builtin() -> Result<(), Box<dyn std::error::Error>> 
 #[tokio::test]
 
 async fn test_responses_mcp_builtin_zdr() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .use_responses_api(true)
@@ -1305,7 +1270,6 @@ async fn test_responses_mcp_builtin_zdr() -> Result<(), Box<dyn std::error::Erro
 #[tokio::test]
 
 async fn test_responses_mcp_builtin_zdr_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .output_version("v1")
@@ -1350,7 +1314,6 @@ async fn test_responses_mcp_builtin_zdr_v1() -> Result<(), Box<dyn std::error::E
 #[tokio::test]
 
 async fn test_responses_image_gen_streaming_v0() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4.1")
         .use_responses_api(true)
@@ -1393,7 +1356,6 @@ async fn test_responses_image_gen_streaming_v0() -> Result<(), Box<dyn std::erro
 
 async fn test_responses_image_gen_streaming_responses_v1() -> Result<(), Box<dyn std::error::Error>>
 {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4.1")
         .use_responses_api(true)
@@ -1434,7 +1396,6 @@ async fn test_responses_image_gen_streaming_responses_v1() -> Result<(), Box<dyn
 #[tokio::test]
 
 async fn test_responses_image_gen_streaming_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4.1")
         .use_responses_api(true)
@@ -1475,7 +1436,6 @@ async fn test_responses_image_gen_streaming_v1() -> Result<(), Box<dyn std::erro
 #[tokio::test]
 
 async fn test_responses_image_gen_multi_turn_v0() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4.1")
         .use_responses_api(true)
@@ -1511,7 +1471,6 @@ async fn test_responses_image_gen_multi_turn_v0() -> Result<(), Box<dyn std::err
 
 async fn test_responses_image_gen_multi_turn_responses_v1() -> Result<(), Box<dyn std::error::Error>>
 {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4.1")
         .use_responses_api(true)
@@ -1546,7 +1505,6 @@ async fn test_responses_image_gen_multi_turn_responses_v1() -> Result<(), Box<dy
 #[tokio::test]
 
 async fn test_responses_image_gen_multi_turn_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4.1")
         .use_responses_api(true)
@@ -1581,7 +1539,6 @@ async fn test_responses_image_gen_multi_turn_v1() -> Result<(), Box<dyn std::err
 #[tokio::test]
 
 async fn test_responses_verbosity_parameter() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOpenAI::builder()
         .model("gpt-4o-mini")
         .verbosity("medium")
@@ -1608,7 +1565,6 @@ async fn test_responses_verbosity_parameter() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_responses_custom_tool_responses_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let execute_code_schema = serde_json::json!({
         "title": "execute_code",
         "description": "Execute python code.",
@@ -1667,7 +1623,6 @@ async fn test_responses_custom_tool_responses_v1() -> Result<(), Box<dyn std::er
 #[tokio::test]
 
 async fn test_responses_custom_tool_v1() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let execute_code_schema = serde_json::json!({
         "title": "execute_code",
         "description": "Execute python code.",

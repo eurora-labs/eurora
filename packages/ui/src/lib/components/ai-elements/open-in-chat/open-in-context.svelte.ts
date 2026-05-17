@@ -1,17 +1,25 @@
 import { getContext, setContext } from 'svelte';
 
-class OpenInState {
-	query = $state('');
+export interface OpenInStateOptions {
+	query: () => string;
+}
 
-	constructor(query: string) {
-		this.query = query;
+class OpenInState {
+	readonly #opts: OpenInStateOptions;
+
+	constructor(opts: OpenInStateOptions) {
+		this.#opts = opts;
+	}
+
+	get query(): string {
+		return this.#opts.query();
 	}
 }
 
 const SYMBOL_KEY = 'ai-open-in';
 
-export function setOpenInContext(query: string): OpenInState {
-	const state = new OpenInState(query);
+export function setOpenInContext(opts: OpenInStateOptions): OpenInState {
+	const state = new OpenInState(opts);
 	setContext(Symbol.for(SYMBOL_KEY), state);
 	return state;
 }

@@ -2,7 +2,7 @@
 
 Headless Microsoft Office add-in that bridges Microsoft Word into the Eurora desktop. The
 runtime is a Shared Runtime page (no UI surface inside Word) that holds a WebSocket to the
-local bridge server hosted by `crates/app/euro-browser` and answers desktop-initiated
+local bridge server hosted by `crates/app/euro-bridge` and answers desktop-initiated
 `GET_ASSETS` / `GET_METADATA` requests with content scraped from the active document.
 
 ## Layout
@@ -113,7 +113,7 @@ don't reach (real Office, real OS catalog state, real reconnect).
    registers in the desktop's bridge logs as
    `app_kind=microsoft-word`. The line to look for is
    `Bridge client registered: … app_kind=Some("microsoft-word")` from
-   `crates/app/euro-browser/src/server.rs`.
+   `crates/app/euro-bridge/src/server.rs`.
 4. **Round-trip check** — trigger asset generation from the desktop
    (the Word strategy fires on focus) and confirm `body.text` arrives
    on the desktop side as a `WordDocumentAsset` (no `NativeMessage`

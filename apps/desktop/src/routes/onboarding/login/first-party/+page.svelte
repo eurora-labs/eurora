@@ -1,44 +1,44 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import { open } from '@tauri-apps/plugin-shell';
-	import { onMount, onDestroy } from 'svelte';
+	import { useInterval } from 'runed';
+	import { onMount } from 'svelte';
 
 	const user = inject(USER_SERVICE);
-	const taurpc = inject(TAURPC_SERVICE);
-	let intervalId: ReturnType<typeof setInterval> | null = null;
+
+	const loginPoll = useInterval(5_000, {
+		immediate: false,
+		callback: async () => {
+			const isLoginSuccess = await user.pollForLogin();
+			if (!isLoginSuccess) return;
+			loginPoll.pause();
+			// Best-effort focus — the user is mid-OAuth, swallow both
+			// SystemError results and IPC rejections rather than blocking
+			// the redirect on a window-focus hiccup.
+			commands.systemFocusMainWindow().catch(() => {});
+			goto(
+				user.emailVerified
+					? '/onboarding/telemetry'
+					: '/onboarding/login/verify-email?redirect=/onboarding/telemetry',
+			);
+		},
+	});
 
 	async function openLogin() {
 		const loginToken = await user.getLoginToken();
 		await open(loginToken.url);
-
-		intervalId = setInterval(async () => {
-			const isLoginSuccess = await user.pollForLogin();
-			if (!isLoginSuccess) {
-				return;
-			}
-			clearInterval(intervalId!);
-			taurpc.system.focus_main_window().catch(() => {});
-			if (user.emailVerified) {
-				goto('/');
-			} else {
-				goto('/onboarding/login/verify-email?redirect=/');
-			}
-		}, 5000);
+		loginPoll.resume();
 	}
 
 	onMount(() => {
 		openLogin().catch((err) => {
 			console.error('Error opening login:', err);
 		});
-	});
-
-	onDestroy(() => {
-		if (intervalId) clearInterval(intervalId);
 	});
 </script>
 
@@ -48,6 +48,8 @@
 		<h1 class="text-4xl font-bold drop-shadow-lg">Waiting for you to log in...</h1>
 	</div>
 	<div class="mb-8">
-		<Button variant="outline" size="default" onclick={() => goto('/onboarding')}>Cancel</Button>
+		<Button variant="outline" size="default" onclick={() => goto('/onboarding/login')}
+			>Cancel</Button
+		>
 	</div>
 </div>

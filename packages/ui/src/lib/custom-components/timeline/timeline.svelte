@@ -2,32 +2,23 @@
 	export interface TimelineProps {
 		class?: string;
 		children?: any;
-		open?: boolean;
-		defaultOpen?: boolean;
 	}
 </script>
 
 <script lang="ts">
-	let {
-		class: className,
-		children,
-		open = $bindable(true),
-		defaultOpen = true,
-	}: TimelineProps = $props();
+	import { cn } from '$lib/utils.js';
 
-	$effect(() => {
-		if (defaultOpen !== undefined) {
-			open = defaultOpen;
-		}
-	});
+	let { class: className, children }: TimelineProps = $props();
 </script>
 
-<div class="flex flex-col {className} ">
-	<div class="relative mb-4 h-8 overflow-hidden group-data-[collapsible=icon]:overflow-visible">
-		<div
-			class="absolute right-[calc(50%-3.125rem)] flex flex-row gap-2 items-center group-data-[collapsible=icon]:static group-data-[collapsible=icon]:justify-center"
-		>
-			{@render children?.()}
-		</div>
-	</div>
-</div>
+<ol class={cn('flex flex-col items-center', className)} aria-label="Activity timeline">
+	{@render children?.()}
+</ol>
+
+<!--
+ Each Timeline.Item renders one continuous vertical line with the icon
+ stacked on top of its midpoint (via single-cell grid placement). The icon
+ occludes the middle of the line, so adjacent items' lines abut to form a
+ continuous track without any per-item visibility tricks at the Timeline
+ level.
+-->

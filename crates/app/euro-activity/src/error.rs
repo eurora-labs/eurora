@@ -26,9 +26,6 @@ pub enum ActivityError {
     #[error("Configuration error: {0}")]
     Configuration(String),
 
-    #[error("Encryption error: {0}")]
-    Encryption(#[from] euro_encrypt::EncryptError),
-
     #[error("Invalid asset type: {0}")]
     InvalidAssetType(String),
 

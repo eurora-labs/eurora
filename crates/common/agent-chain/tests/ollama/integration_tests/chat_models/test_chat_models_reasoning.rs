@@ -5,9 +5,6 @@ use futures::StreamExt;
 
 const REASONING_MODEL: &str = "deepseek-r1:1.5b";
 const SAMPLE_PROMPT: &str = "What is 3^3?";
-fn load_env() {
-    let _ = dotenv::dotenv();
-}
 
 // =============================================================================
 // test_chat_models_reasoning.py — Reasoning mode tests
@@ -17,7 +14,6 @@ fn load_env() {
 #[tokio::test]
 
 async fn test_reasoning_stream_no_reasoning_sync() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -59,7 +55,6 @@ async fn test_reasoning_stream_no_reasoning_sync() -> Result<(), Box<dyn std::er
 #[tokio::test]
 
 async fn test_reasoning_stream_no_reasoning_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -95,7 +90,6 @@ async fn test_reasoning_stream_no_reasoning_async() -> Result<(), Box<dyn std::e
 #[tokio::test]
 
 async fn test_reasoning_stream_none_sync() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -129,7 +123,6 @@ async fn test_reasoning_stream_none_sync() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_reasoning_stream_none_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -162,7 +155,6 @@ async fn test_reasoning_stream_none_async() -> Result<(), Box<dyn std::error::Er
 #[tokio::test]
 
 async fn test_reasoning_stream_enabled_sync() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -198,7 +190,6 @@ async fn test_reasoning_stream_enabled_sync() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_reasoning_stream_enabled_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -234,7 +225,6 @@ async fn test_reasoning_stream_enabled_async() -> Result<(), Box<dyn std::error:
 #[tokio::test]
 
 async fn test_reasoning_invoke_no_reasoning_sync() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -267,7 +257,6 @@ async fn test_reasoning_invoke_no_reasoning_sync() -> Result<(), Box<dyn std::er
 #[tokio::test]
 
 async fn test_reasoning_invoke_no_reasoning_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -299,7 +288,6 @@ async fn test_reasoning_invoke_no_reasoning_async() -> Result<(), Box<dyn std::e
 #[tokio::test]
 
 async fn test_reasoning_invoke_none_sync() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -330,7 +318,6 @@ async fn test_reasoning_invoke_none_sync() -> Result<(), Box<dyn std::error::Err
 #[tokio::test]
 
 async fn test_reasoning_invoke_none_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -360,7 +347,6 @@ async fn test_reasoning_invoke_none_async() -> Result<(), Box<dyn std::error::Er
 #[tokio::test]
 
 async fn test_reasoning_invoke_enabled_sync() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -399,7 +385,6 @@ async fn test_reasoning_invoke_enabled_sync() -> Result<(), Box<dyn std::error::
 #[tokio::test]
 
 async fn test_reasoning_invoke_enabled_async() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let llm = ChatOllama::builder()
         .model(REASONING_MODEL)
         .num_ctx(4096u32)
@@ -437,7 +422,6 @@ async fn test_reasoning_invoke_enabled_async() -> Result<(), Box<dyn std::error:
 #[tokio::test]
 
 async fn test_reasoning_modes_behavior() -> Result<(), Box<dyn std::error::Error>> {
-    load_env();
     let message: AnyMessage = HumanMessage::builder()
         .content(SAMPLE_PROMPT)
         .build()

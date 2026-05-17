@@ -6,6 +6,7 @@ description = "Eurora Remote DB"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+auth-core = { workspace = true }
 bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 ipnet = { version = "2", features = ["serde"] }
@@ -24,3 +25,6 @@ sqlx = { version = "0.8.6", features = [
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v7"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

@@ -2,7 +2,6 @@
 	import { cn } from '$lib/utils.js';
 	import { tv } from 'tailwind-variants';
 	import { setAttachmentsContext, type AttachmentVariant } from './attachments-context.svelte.js';
-	import { watch } from 'runed';
 
 	interface Props {
 		class?: string;
@@ -26,14 +25,7 @@
 		},
 	});
 
-	let contextInstance = setAttachmentsContext(variant);
-
-	watch(
-		() => variant,
-		() => {
-			contextInstance.variant = variant;
-		},
-	);
+	setAttachmentsContext({ variant: () => variant });
 </script>
 
 <div data-slot="attachments" class={cn(attachmentsVariants({ variant }), className)} {...restProps}>

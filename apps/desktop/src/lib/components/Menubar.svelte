@@ -1,22 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { TAURPC_SERVICE } from '$lib/bindings/taurpcService.js';
-	import { inject } from '@eurora/shared/context';
+	import { unwrap } from '$lib/bindings/result.js';
+	import { commands } from '$lib/bindings/specta.bindings.js';
 	import { onMount } from 'svelte';
 
-	const taurpc = inject(TAURPC_SERVICE);
-
 	onMount(() => {
-		taurpc.auth
-			.is_authenticated()
-			.then((isAuthenticated) => {
-				if (!isAuthenticated) {
-					goto('/onboarding');
-				}
-			})
-			.catch((error) => {
-				goto('/onboarding');
+		(async () => {
+			try {
+				const isAuthenticated = unwrap(await commands.authIsAuthenticated());
+				if (!isAuthenticated) goto('/onboarding/login');
+			} catch (error) {
 				console.error('Failed to check authentication:', error);
-			});
+				goto('/onboarding/login');
+			}
+		})();
 	});
 </script>

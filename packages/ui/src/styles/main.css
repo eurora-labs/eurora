@@ -1,4 +1,20 @@
-@import 'tailwindcss';
+/*
+ * Source-only design tokens, theme overrides, and base styles. Consumers must
+ * own the `@import 'tailwindcss'` themselves and pair it with this file:
+ *
+ *     @import 'tailwindcss';
+ *     @import '@eurora/ui/main.css';
+ *
+ * That ordering matters — when this file is processed alongside a single
+ * Tailwind compile, the `@theme inline` block below overrides Tailwind's
+ * default `--text-*` tokens with the `var(--text-scale)` calc. Importing a
+ * pre-compiled Tailwind bundle here (or letting Tailwind run twice in the
+ * same cascade) re-emits the defaults later in source order and silently
+ * defeats the override. For standalone consumers that don't run their own
+ * Tailwind compile (Storybook, dev playgrounds), import `./preview.css`
+ * instead — it's the same content wrapped in `@import 'tailwindcss'`.
+ */
+
 @import 'tw-animate-css';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
@@ -30,6 +46,21 @@
 }
 
 :root {
+	/*
+	 * Accessibility scale variables. Defaults render the design system at its
+	 * native sizing so apps that never write to these variables behave exactly
+	 * as before. The desktop app's AppearanceService updates them at runtime.
+	 *
+	 *  --ui-scale   — multiplies the root font-size, scaling every rem-anchored
+	 *                 token (text + spacing + control sizes) together.
+	 *  --text-scale — additional multiplier layered onto the typography tokens
+	 *                 only, leaving spacing and control sizes alone.
+	 */
+	--ui-scale: 1;
+	--text-scale: 1;
+
+	font-size: calc(16px * var(--ui-scale));
+
 	--background: oklch(0.9821 0 0);
 	--foreground: oklch(0.3211 0 0);
 	--card: oklch(1 0 0);
@@ -63,6 +94,18 @@
 	--sidebar-ring: oklch(0.5676 0.2021 283.0838);
 	--selection: oklch(0.5676 0.2021 283.0838);
 	--selection-foreground: oklch(1 0 0);
+
+	/*
+	 * Theme-agnostic surface tones. Both modes keep these identical because
+	 * they exist to provide a reliable dark-on-X / light-on-X contrast match
+	 * regardless of the active theme (e.g. an icon backdrop that must stay
+	 * dark when the icon glyph is white, even while the app is in light
+	 * mode). Values mirror `--background` from each theme so the surfaces
+	 * read as miniature "light" / "dark" cards.
+	 */
+	--surface-light: oklch(0.9821 0 0);
+	--surface-dark: oklch(0.2303 0.0125 264.2926);
+
 	--font-sans:
 		ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
 		'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
@@ -162,6 +205,26 @@
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
 	--radius-xl: calc(var(--radius) + 4px);
+
+	/*
+	 * Override Tailwind's default typography tokens so every `text-*` utility
+	 * picks up the user's text-scale preference without altering rem-based
+	 * spacing utilities. Stays in rem (not em) to avoid the compounding-size
+	 * trap when text utilities are nested.
+	 */
+	--text-xs: calc(0.75rem * var(--text-scale));
+	--text-sm: calc(0.875rem * var(--text-scale));
+	--text-base: calc(1rem * var(--text-scale));
+	--text-lg: calc(1.125rem * var(--text-scale));
+	--text-xl: calc(1.25rem * var(--text-scale));
+	--text-2xl: calc(1.5rem * var(--text-scale));
+	--text-3xl: calc(1.875rem * var(--text-scale));
+	--text-4xl: calc(2.25rem * var(--text-scale));
+	--text-5xl: calc(3rem * var(--text-scale));
+	--text-6xl: calc(3.75rem * var(--text-scale));
+	--text-7xl: calc(4.5rem * var(--text-scale));
+	--text-8xl: calc(6rem * var(--text-scale));
+	--text-9xl: calc(8rem * var(--text-scale));
 }
 
 @layer base {
@@ -223,12 +286,12 @@
 
 @utility typo-title {
 	font-weight: 700;
-	font-size: clamp(2.25rem, 1.5rem + 3vw, 3rem);
+	font-size: calc(clamp(2.25rem, 1.5rem + 3vw, 3rem) * var(--text-scale));
 	line-height: 1.1;
 	letter-spacing: -0.02em;
 }
 
 @utility typo-body {
-	font-size: 1.125rem;
+	font-size: calc(1.125rem * var(--text-scale));
 	line-height: 1.6;
 }

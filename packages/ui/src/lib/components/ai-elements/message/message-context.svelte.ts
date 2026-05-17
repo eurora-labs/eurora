@@ -4,26 +4,31 @@ const MESSAGE_BRANCH_CONTEXT_KEY = Symbol.for('message-branch-context');
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'function' | 'data' | 'tool';
 
+export interface MessageBranchStateOptions {
+	defaultBranch?: number;
+	onBranchChange?: () => ((index: number) => void) | undefined;
+}
+
 export class MessageBranchState {
+	readonly #onBranchChange: () => ((index: number) => void) | undefined;
 	currentBranch = $state(0);
 	totalBranches = $state(0);
-	#onBranchChange?: (index: number) => void;
 
-	constructor(defaultBranch: number = 0, onBranchChange?: (index: number) => void) {
-		this.currentBranch = defaultBranch;
-		this.#onBranchChange = onBranchChange;
+	constructor(opts: MessageBranchStateOptions = {}) {
+		this.currentBranch = opts.defaultBranch ?? 0;
+		this.#onBranchChange = opts.onBranchChange ?? (() => undefined);
 	}
 
 	goToPrevious() {
 		const newBranch = this.currentBranch > 0 ? this.currentBranch - 1 : this.totalBranches - 1;
 		this.currentBranch = newBranch;
-		this.#onBranchChange?.(newBranch);
+		this.#onBranchChange()?.(newBranch);
 	}
 
 	goToNext() {
 		const newBranch = this.currentBranch < this.totalBranches - 1 ? this.currentBranch + 1 : 0;
 		this.currentBranch = newBranch;
-		this.#onBranchChange?.(newBranch);
+		this.#onBranchChange()?.(newBranch);
 	}
 }
 

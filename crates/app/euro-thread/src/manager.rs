@@ -10,18 +10,17 @@ use std::sync::Arc;
 
 use euro_auth::AuthManager;
 use euro_endpoint::EndpointManager;
-use euro_secret::ExposeSecret;
 use futures::{SinkExt, StreamExt};
 use reqwest::header;
+use secrecy::ExposeSecret;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use thread_core::{
     ChatClientMessage, ChatSendRequest, ChatServerMessage, CreateThreadRequest,
     CreateThreadResponse, DeleteThreadResponse, GenerateThreadTitleRequest,
     GenerateThreadTitleResponse, GetMessagesQuery, GetMessagesResponse, GetThreadResponse,
-    ListThreadsQuery, ListThreadsResponse, MessageNode, SavePreliminaryContentBlocksRequest,
-    SavePreliminaryContentBlocksResponse, SearchMessagesQuery, SearchMessagesResponse,
-    SearchThreadsQuery, SearchThreadsResponse, SwitchBranchRequest, Thread,
+    ListThreadsQuery, ListThreadsResponse, MessageNode, RegenerateRequest, SearchMessagesQuery,
+    SearchMessagesResponse, SearchThreadsQuery, SearchThreadsResponse, SwitchBranchRequest, Thread,
 };
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
@@ -169,12 +168,10 @@ impl ThreadManager {
         thread_id: Uuid,
         limit: u32,
         offset: u32,
-        all_variants: bool,
     ) -> Result<Vec<MessageNode>> {
         let query = GetMessagesQuery {
             limit: Some(limit),
             offset: Some(offset),
-            all_variants,
         };
         let response: GetMessagesResponse = self
             .get_json_query(&format!("/threads/{thread_id}/messages"), &query)
@@ -238,19 +235,7 @@ impl ThreadManager {
             .await
     }
 
-    pub async fn save_preliminary_content_blocks(
-        &self,
-        thread_id: Uuid,
-        content_blocks: Vec<serde_json::Value>,
-    ) -> Result<Vec<serde_json::Value>> {
-        let body = SavePreliminaryContentBlocksRequest { content_blocks };
-        let response: SavePreliminaryContentBlocksResponse = self
-            .post_json(&format!("/threads/{thread_id}/preliminary-blocks"), &body)
-            .await?;
-        Ok(response.content_blocks)
-    }
-
-    /// Open a chat WebSocket and stream the turn back to the caller.
+    /// Open a chat WebSocket and stream a fresh turn back to the caller.
     ///
     /// Sends a single [`ChatClientMessage::Send`] frame, then yields each
     /// inbound [`ChatServerMessage`] on the returned receiver. The receiver
@@ -260,6 +245,34 @@ impl ThreadManager {
         &self,
         thread_id: Uuid,
         request: ChatSendRequest,
+        cancel: CancellationToken,
+    ) -> Result<mpsc::UnboundedReceiver<Result<ChatServerMessage>>> {
+        self.open_chat_socket(thread_id, ChatClientMessage::Send(request), cancel)
+            .await
+    }
+
+    /// Open a chat WebSocket and stream a regenerated AI variant back to the
+    /// caller.
+    ///
+    /// Sends a single [`ChatClientMessage::Regenerate`] frame; the server
+    /// rewinds `active_leaf` to the AI message's human parent and runs the
+    /// agent loop on the existing context. The new AI message lands as a
+    /// sibling of the one identified by `ai_message_id`.
+    pub async fn chat_regenerate(
+        &self,
+        thread_id: Uuid,
+        ai_message_id: Uuid,
+        cancel: CancellationToken,
+    ) -> Result<mpsc::UnboundedReceiver<Result<ChatServerMessage>>> {
+        let request = RegenerateRequest { ai_message_id };
+        self.open_chat_socket(thread_id, ChatClientMessage::Regenerate(request), cancel)
+            .await
+    }
+
+    async fn open_chat_socket(
+        &self,
+        thread_id: Uuid,
+        opening: ChatClientMessage,
         cancel: CancellationToken,
     ) -> Result<mpsc::UnboundedReceiver<Result<ChatServerMessage>>> {
         let url = self.ws_url(&format!("/threads/{thread_id}/chat"))?;
@@ -283,10 +296,8 @@ impl ThreadManager {
         )
         .await?;
 
-        // Send the opening Send frame.
-        let send_frame =
-            serde_json::to_string(&ChatClientMessage::Send(request)).map_err(Error::Encode)?;
-        stream.send(Message::Text(send_frame.into())).await?;
+        let opening_frame = serde_json::to_string(&opening).map_err(Error::Encode)?;
+        stream.send(Message::Text(opening_frame.into())).await?;
 
         let (tx, rx) = mpsc::unbounded_channel::<Result<ChatServerMessage>>();
         tokio::spawn(drive_chat(stream, tx, cancel));

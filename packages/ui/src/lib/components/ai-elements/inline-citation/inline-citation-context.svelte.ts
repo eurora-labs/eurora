@@ -2,13 +2,16 @@ import { getContext, setContext } from 'svelte';
 
 const CAROUSEL_CONTEXT_KEY = Symbol.for('inline-citation-carousel');
 
-export class CarouselState {
-	#currentIndex = $state(0);
-	#total = $state(0);
+export interface CarouselStateOptions {
+	total: () => number;
+}
 
-	constructor(options: { currentIndex?: number; total?: number }) {
-		this.#currentIndex = options.currentIndex ?? 0;
-		this.#total = options.total ?? 0;
+export class CarouselState {
+	readonly #opts: CarouselStateOptions;
+	#currentIndex = $state(0);
+
+	constructor(opts: CarouselStateOptions) {
+		this.#opts = opts;
 	}
 
 	get currentIndex() {
@@ -19,16 +22,12 @@ export class CarouselState {
 		this.#currentIndex = value;
 	}
 
-	get total() {
-		return this.#total;
-	}
-
-	set total(value: number) {
-		this.#total = value;
+	get total(): number {
+		return this.#opts.total();
 	}
 
 	next() {
-		if (this.#currentIndex < this.#total - 1) {
+		if (this.#currentIndex < this.total - 1) {
 			this.#currentIndex++;
 		}
 	}

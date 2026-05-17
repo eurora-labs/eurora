@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils.js';
 	import { getWebPreviewContext } from './web-preview-context.svelte.js';
@@ -10,7 +11,7 @@
 	let { class: className, value: valueProp, ...restProps }: Props = $props();
 
 	let context = getWebPreviewContext();
-	let inputValue = $state(valueProp ?? context.url);
+	let inputValue = $state(untrack(() => valueProp ?? context.url));
 
 	$effect(() => {
 		if (valueProp !== undefined) {

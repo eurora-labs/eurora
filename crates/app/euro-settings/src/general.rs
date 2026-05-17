@@ -1,0 +1,14 @@
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneralSettings {
+    pub autostart: bool,
+}
+
+impl Default for GeneralSettings {
+    fn default() -> Self {
+        Self { autostart: true }
+    }
+}

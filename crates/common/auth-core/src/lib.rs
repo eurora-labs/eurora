@@ -19,20 +19,21 @@ pub mod responses;
 pub use claims::{Claims, Role};
 pub use provider::Provider;
 pub use requests::{
-    AssociateLoginTokenRequest, CheckEmailRequest, LoginByLoginTokenRequest, LoginRequest,
-    RegisterRequest, ThirdPartyAuthUrlRequest, VerifyEmailRequest,
+    AppleIdTokenLoginRequest, AppleNativeUser, AssociateLoginTokenRequest, CheckEmailRequest,
+    GoogleIdTokenLoginRequest, LoginByLoginTokenRequest, LoginRequest,
+    MobileThirdPartyAuthUrlRequest, RegisterRequest, ThirdPartyAuthUrlRequest, VerifyEmailRequest,
 };
 pub use responses::{
     AuthErrorResponse, AuthSuccessResponse, CheckEmailResponse, CheckEmailStatus,
     ThirdPartyAuthUrlResponse, TokenResponse, UserInfo, UserResponse,
 };
 
-/// Build a [`specta::TypeCollection`] containing every auth wire type
+/// Build a [`specta::Types`] containing every auth wire type
 /// the desktop / mobile app needs. Used by the codegen binary to emit
 /// `auth.ts`.
 #[cfg(feature = "specta")]
-pub fn type_collection() -> specta::TypeCollection {
-    specta::TypeCollection::default()
+pub fn type_collection() -> specta::Types {
+    specta::Types::default()
         .register::<Claims>()
         .register::<Role>()
         .register::<Provider>()
@@ -40,6 +41,10 @@ pub fn type_collection() -> specta::TypeCollection {
         .register::<RegisterRequest>()
         .register::<ThirdPartyAuthUrlRequest>()
         .register::<ThirdPartyAuthUrlResponse>()
+        .register::<MobileThirdPartyAuthUrlRequest>()
+        .register::<GoogleIdTokenLoginRequest>()
+        .register::<AppleIdTokenLoginRequest>()
+        .register::<AppleNativeUser>()
         .register::<LoginByLoginTokenRequest>()
         .register::<AssociateLoginTokenRequest>()
         .register::<CheckEmailRequest>()
@@ -61,7 +66,7 @@ mod tests {
         let types = super::type_collection();
         let names: Vec<String> = types
             .into_unsorted_iter()
-            .map(|ndt| ndt.name().to_string())
+            .map(|ndt| ndt.name.to_string())
             .collect();
         for expected in [
             "Claims",
@@ -71,6 +76,10 @@ mod tests {
             "RegisterRequest",
             "ThirdPartyAuthUrlRequest",
             "ThirdPartyAuthUrlResponse",
+            "MobileThirdPartyAuthUrlRequest",
+            "GoogleIdTokenLoginRequest",
+            "AppleIdTokenLoginRequest",
+            "AppleNativeUser",
             "LoginByLoginTokenRequest",
             "AssociateLoginTokenRequest",
             "CheckEmailRequest",

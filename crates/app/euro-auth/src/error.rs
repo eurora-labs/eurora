@@ -2,6 +2,8 @@ use auth_core::AuthErrorResponse;
 use reqwest::StatusCode;
 use thiserror::Error;
 
+use crate::secret_store::SecretStoreError;
+
 /// Errors produced by the authentication layer.
 ///
 /// The key distinction for callers is between [`AuthError::InvalidRefreshToken`]
@@ -22,6 +24,21 @@ pub enum AuthError {
     #[error("refresh token invalid or expired")]
     InvalidRefreshToken,
 
+    /// The PKCE login challenge is missing — either it expired, was already
+    /// consumed, or [`AuthManager::begin_login`] was never called. The
+    /// caller should restart the login flow.
+    ///
+    /// [`AuthManager::begin_login`]: crate::AuthManager::begin_login
+    #[error("PKCE login challenge missing or expired")]
+    LoginChallengeExpired,
+
+    /// The local secret store failed to read or write session state.
+    /// Treated as fatal-to-the-current-operation; the underlying
+    /// [`SecretStoreError`] is wrapped behind `anyhow::Error` so the
+    /// storage module stays `pub(crate)`.
+    #[error("secret store: {0}")]
+    Storage(#[source] anyhow::Error),
+
     /// The refresh attempt failed for a reason unrelated to token validity
     /// (server unreachable, timeout, internal server error, etc.). Stored
     /// credentials are untouched; the operation is safe to retry.
@@ -30,6 +47,12 @@ pub enum AuthError {
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+}
+
+impl From<SecretStoreError> for AuthError {
+    fn from(err: SecretStoreError) -> Self {
+        AuthError::Storage(anyhow::Error::new(err))
+    }
 }
 
 pub type AuthResult<T> = Result<T, AuthError>;
