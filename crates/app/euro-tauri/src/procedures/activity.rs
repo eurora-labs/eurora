@@ -1,6 +1,6 @@
 //! Persisted-activity surface exposed to the desktop frontend.
 //!
-//! Two responsibilities live here:
+//! Three responsibilities live here:
 //!
 //! - [`activity_list`] — the one-shot fetch the rail uses on mount to
 //!   hydrate from the most recent persisted activities. Bridges the
@@ -10,6 +10,12 @@
 //! - [`SavedActivityCreated`] — the tauri-specta event the persist path
 //!   emits *after* a successful `POST /activities`, so the rail can
 //!   prepend a freshly-tracked activity without re-polling the listing.
+//! - [`SavedActivityEnded`] — the tauri-specta event the persist path
+//!   emits *after* a successful closing PATCH of `ended_at`, so the rail
+//!   can patch the row's `endedAt` in place. Without this the rail keeps
+//!   `endedAt: null` for every row it received via
+//!   [`SavedActivityCreated`] and falls back to the minimum connector
+//!   height in its duration-based size calculation.
 //!
 //! The frontend wire shape ([`SavedActivity`]) is intentionally distinct
 //! from `activity_core::Activity`: that one is the JSON-HTTP contract
@@ -64,6 +70,22 @@ pub struct SavedActivity {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedActivityCreated(pub SavedActivity);
+
+/// Push event fired after the cloud closing PATCH of `ended_at` succeeds
+/// for a previously-tracked activity. Lets the desktop frontend update
+/// the matching row's `endedAt` in place — without it the row keeps the
+/// `null` it was created with and the timeline rail's duration-based
+/// connector height stays clamped to the minimum until the next reload.
+///
+/// Payload is intentionally minimal: the frontend already has the rest
+/// of the row in memory, so only the id and the now-known end timestamp
+/// are shipped over the wire.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedActivityEnded {
+    pub id: Uuid,
+    pub ended_at: DateTime<Utc>,
+}
 
 /// Errors surfaced to the frontend from [`activity_list`].
 ///

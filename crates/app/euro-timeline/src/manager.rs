@@ -12,7 +12,7 @@ use crate::{
     config::TimelineConfig,
     error::TimelineResult,
     storage::TimelineStorage,
-    types::{ActivityEvent, SavedActivityEvent},
+    types::{ActivityEvent, SavedActivityEndedEvent, SavedActivityEvent},
 };
 
 pub struct TimelineManager {
@@ -162,5 +162,11 @@ impl TimelineManager {
         &self,
     ) -> tokio::sync::broadcast::Receiver<SavedActivityEvent> {
         self.collector.subscribe_to_saved_activity_events()
+    }
+
+    pub fn subscribe_to_saved_activity_ended_events(
+        &self,
+    ) -> tokio::sync::broadcast::Receiver<SavedActivityEndedEvent> {
+        self.collector.subscribe_to_saved_activity_ended_events()
     }
 }

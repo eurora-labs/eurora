@@ -112,5 +112,24 @@
 		position: fixed;
 		inset: 0;
 		border-radius: var(--shell-radius);
+		/*
+		 * `overflow: hidden` (Tailwind utility on the element) plus
+		 * `border-radius` is the usual rounded-shell idiom, but in
+		 * Chromium that clip is not reliably re-applied to a child's
+		 * compositing layer. The timeline rail's first activity row uses
+		 * `filter: saturate(...)` for the highlight, which forces it
+		 * onto its own layer; without this backstop the rectangular
+		 * layer overrides the rounded clip at the top-left, and since
+		 * the LI is mostly transparent the corner reads as a square
+		 * cutout through the window's OS-level transparency.
+		 *
+		 * `clip-path` is applied after compositing, so it enforces the
+		 * rounded shape against escaping child layers regardless of
+		 * filter/transform/opacity etc. On platforms where
+		 * `--shell-radius: 0px` (macOS, Windows) this collapses to a
+		 * no-op `inset(0 round 0)` — same shape as the original
+		 * untouched rectangle.
+		 */
+		/*clip-path: inset(0 round var(--shell-radius));*/
 	}
 </style>
