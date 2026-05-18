@@ -4,25 +4,15 @@
 //! shared build crate) — the forwarding logic is short enough to
 //! inline.
 
-const REQUIRED: &[&str] = &["BACKEND_URL"];
+const VARS: &[(&str, &str)] = &[("BACKEND_URL", "http://localhost:3000")];
 
 fn main() {
-    for key in REQUIRED {
+    for (key, default) in VARS {
         println!("cargo:rerun-if-env-changed={key}");
         let value = std::env::var(key)
             .ok()
             .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| missing(key));
+            .unwrap_or_else(|| (*default).to_owned());
         println!("cargo:rustc-env={key}={value}");
     }
-}
-
-fn missing(key: &str) -> ! {
-    panic!(
-        "build.rs: required env var `{key}` is unset.\n\
-         Build via `just <recipe>` — the justfile loads `.env` and exports\n\
-         every variable to cargo. To run `cargo build` directly, export\n\
-         `{key}` first (`set -a; source .env; set +a; cargo build …`) or\n\
-         use `direnv` (the repo ships an `.envrc`)."
-    );
 }

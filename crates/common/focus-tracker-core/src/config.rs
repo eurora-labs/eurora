@@ -1,6 +1,6 @@
 use bon::bon;
 
-use crate::{FocusTrackerError, FocusTrackerResult, IgnoredProcesses};
+use crate::{FocusTrackerError, FocusTrackerResult, IgnoreRule, IgnoreRules};
 use std::time::Duration;
 
 fn validate_icon_size(size: u32) -> FocusTrackerResult<u32> {
@@ -99,27 +99,21 @@ pub struct FocusTrackerConfig {
     pub poll_interval: Duration,
     pub icon: IconConfig,
     pub icon_cache_capacity: usize,
-    /// Process names to ignore when running on Linux.
+    /// Ignore rules applied when running on Linux.
     ///
     /// Consulted only by the Linux tracker; ignored on other platforms.
-    /// Matched byte-exactly against [`FocusedWindow::process_name`].
-    ///
-    /// [`FocusedWindow::process_name`]: crate::FocusedWindow::process_name
-    pub linux_ignored_processes: IgnoredProcesses,
-    /// Process names to ignore when running on macOS.
+    /// See [`IgnoreRule`] for the matcher semantics.
+    pub linux_ignore_rules: IgnoreRules,
+    /// Ignore rules applied when running on macOS.
     ///
     /// Consulted only by the macOS tracker; ignored on other platforms.
-    /// Matched byte-exactly against [`FocusedWindow::process_name`].
-    ///
-    /// [`FocusedWindow::process_name`]: crate::FocusedWindow::process_name
-    pub macos_ignored_processes: IgnoredProcesses,
-    /// Process names to ignore when running on Windows.
+    /// See [`IgnoreRule`] for the matcher semantics.
+    pub macos_ignore_rules: IgnoreRules,
+    /// Ignore rules applied when running on Windows.
     ///
     /// Consulted only by the Windows tracker; ignored on other platforms.
-    /// Matched byte-exactly against [`FocusedWindow::process_name`].
-    ///
-    /// [`FocusedWindow::process_name`]: crate::FocusedWindow::process_name
-    pub windows_ignored_processes: IgnoredProcesses,
+    /// See [`IgnoreRule`] for the matcher semantics.
+    pub windows_ignore_rules: IgnoreRules,
 }
 
 impl Default for FocusTrackerConfig {
@@ -128,34 +122,34 @@ impl Default for FocusTrackerConfig {
             poll_interval: Duration::from_millis(100),
             icon: IconConfig::default(),
             icon_cache_capacity: 64,
-            linux_ignored_processes: IgnoredProcesses::default(),
-            macos_ignored_processes: IgnoredProcesses::default(),
-            windows_ignored_processes: IgnoredProcesses::default(),
+            linux_ignore_rules: IgnoreRules::default(),
+            macos_ignore_rules: IgnoreRules::default(),
+            windows_ignore_rules: IgnoreRules::default(),
         }
     }
 }
 
 impl FocusTrackerConfig {
-    /// Returns the ignore list that applies to the current build target.
+    /// Returns the ignore rules that apply to the current build target.
     #[must_use]
-    pub fn ignored_processes_for_current_platform(&self) -> &IgnoredProcesses {
+    pub fn ignore_rules_for_current_platform(&self) -> &IgnoreRules {
         #[cfg(target_os = "linux")]
         {
-            &self.linux_ignored_processes
+            &self.linux_ignore_rules
         }
         #[cfg(target_os = "macos")]
         {
-            &self.macos_ignored_processes
+            &self.macos_ignore_rules
         }
         #[cfg(target_os = "windows")]
         {
-            &self.windows_ignored_processes
+            &self.windows_ignore_rules
         }
         #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
         {
             // Fall back to a stable reference so other platforms compile.
-            static EMPTY: std::sync::OnceLock<IgnoredProcesses> = std::sync::OnceLock::new();
-            EMPTY.get_or_init(IgnoredProcesses::default)
+            static EMPTY: std::sync::OnceLock<IgnoreRules> = std::sync::OnceLock::new();
+            EMPTY.get_or_init(IgnoreRules::default)
         }
     }
 }
@@ -167,13 +161,19 @@ impl FocusTrackerConfig {
     /// # Example
     ///
     /// ```
-    /// use focus_tracker_core::{FocusTrackerConfig, IconConfig};
+    /// use focus_tracker_core::{FocusTrackerConfig, IconConfig, IgnoreRule, WindowTitleMatch};
     /// use std::time::Duration;
     ///
     /// let config = FocusTrackerConfig::builder()
     ///     .poll_interval(Duration::from_millis(50))
     ///     .unwrap()
     ///     .icon(IconConfig::builder().size(64).unwrap().build())
+    ///     .windows_ignore_rules([
+    ///         IgnoreRule::builder()
+    ///             .process_name("whatever")
+    ///             .window_title(WindowTitleMatch::Missing)
+    ///             .build(),
+    ///     ])
     ///     .build();
     /// ```
     #[builder]
@@ -195,27 +195,27 @@ impl FocusTrackerConfig {
         icon_cache_capacity: usize,
         #[builder(
             default,
-            with = |names: impl IntoIterator<Item: Into<String>>| IgnoredProcesses::new(names),
+            with = |rules: impl IntoIterator<Item = IgnoreRule>| IgnoreRules::new(rules),
         )]
-        linux_ignored_processes: IgnoredProcesses,
+        linux_ignore_rules: IgnoreRules,
         #[builder(
             default,
-            with = |names: impl IntoIterator<Item: Into<String>>| IgnoredProcesses::new(names),
+            with = |rules: impl IntoIterator<Item = IgnoreRule>| IgnoreRules::new(rules),
         )]
-        macos_ignored_processes: IgnoredProcesses,
+        macos_ignore_rules: IgnoreRules,
         #[builder(
             default,
-            with = |names: impl IntoIterator<Item: Into<String>>| IgnoredProcesses::new(names),
+            with = |rules: impl IntoIterator<Item = IgnoreRule>| IgnoreRules::new(rules),
         )]
-        windows_ignored_processes: IgnoredProcesses,
+        windows_ignore_rules: IgnoreRules,
     ) -> Self {
         Self {
             poll_interval,
             icon,
             icon_cache_capacity,
-            linux_ignored_processes,
-            macos_ignored_processes,
-            windows_ignored_processes,
+            linux_ignore_rules,
+            macos_ignore_rules,
+            windows_ignore_rules,
         }
     }
 }
@@ -370,59 +370,68 @@ mod tests {
     }
 
     #[test]
-    fn config_default_ignore_lists_are_empty() {
+    fn config_default_ignore_rules_are_empty() {
         let config = FocusTrackerConfig::default();
-        assert!(config.linux_ignored_processes.is_empty());
-        assert!(config.macos_ignored_processes.is_empty());
-        assert!(config.windows_ignored_processes.is_empty());
+        assert!(config.linux_ignore_rules.is_empty());
+        assert!(config.macos_ignore_rules.is_empty());
+        assert!(config.windows_ignore_rules.is_empty());
     }
 
     #[test]
-    fn config_builder_per_platform_ignore_lists() {
+    fn config_builder_per_platform_ignore_rules() {
         let config = FocusTrackerConfig::builder()
-            .linux_ignored_processes(["firefox"])
-            .macos_ignored_processes(["Firefox"])
-            .windows_ignored_processes(["firefox.exe", "chrome.exe"])
+            .linux_ignore_rules([IgnoreRule::builder().process_name("firefox").build()])
+            .macos_ignore_rules([IgnoreRule::builder().process_name("Firefox").build()])
+            .windows_ignore_rules([
+                IgnoreRule::builder().process_name("firefox.exe").build(),
+                IgnoreRule::builder().process_name("chrome.exe").build(),
+            ])
             .build();
 
-        assert!(config.linux_ignored_processes.contains("firefox"));
-        assert!(!config.linux_ignored_processes.contains("firefox.exe"));
+        assert!(config.linux_ignore_rules.matches("firefox", None));
+        assert!(!config.linux_ignore_rules.matches("firefox.exe", None));
 
-        assert!(config.macos_ignored_processes.contains("Firefox"));
-        assert!(!config.macos_ignored_processes.contains("firefox"));
+        assert!(config.macos_ignore_rules.matches("Firefox", None));
+        assert!(!config.macos_ignore_rules.matches("firefox", None));
 
-        assert_eq!(config.windows_ignored_processes.len(), 2);
-        assert!(config.windows_ignored_processes.contains("firefox.exe"));
-        assert!(config.windows_ignored_processes.contains("chrome.exe"));
+        assert_eq!(config.windows_ignore_rules.len(), 2);
+        assert!(config.windows_ignore_rules.matches("firefox.exe", None));
+        assert!(config.windows_ignore_rules.matches("chrome.exe", None));
     }
 
     #[test]
-    fn config_builder_accepts_string_and_str() {
-        let config = FocusTrackerConfig::builder()
-            .windows_ignored_processes([String::from("a"), String::from("b")])
-            .build();
-        assert_eq!(config.windows_ignored_processes.len(), 2);
+    fn config_builder_supports_title_aware_rules() {
+        use crate::WindowTitleMatch;
 
+        // The motivating case: suppress "whatever" only when it has no
+        // title; keep events for titled instances.
         let config = FocusTrackerConfig::builder()
-            .windows_ignored_processes(["a", "b"])
+            .windows_ignore_rules([IgnoreRule::builder()
+                .process_name("whatever")
+                .window_title(WindowTitleMatch::Missing)
+                .build()])
             .build();
-        assert_eq!(config.windows_ignored_processes.len(), 2);
+
+        assert!(config.windows_ignore_rules.matches("whatever", None));
+        assert!(config.windows_ignore_rules.matches("whatever", Some("")));
+        assert!(!config.windows_ignore_rules.matches("whatever", Some("Doc")));
+        assert!(!config.windows_ignore_rules.matches("other", None));
     }
 
     #[test]
     fn config_current_platform_selector_matches_target() {
         let config = FocusTrackerConfig::builder()
-            .linux_ignored_processes(["lin"])
-            .macos_ignored_processes(["mac"])
-            .windows_ignored_processes(["win"])
+            .linux_ignore_rules([IgnoreRule::builder().process_name("lin").build()])
+            .macos_ignore_rules([IgnoreRule::builder().process_name("mac").build()])
+            .windows_ignore_rules([IgnoreRule::builder().process_name("win").build()])
             .build();
 
-        let current = config.ignored_processes_for_current_platform();
+        let current = config.ignore_rules_for_current_platform();
         #[cfg(target_os = "linux")]
-        assert!(current.contains("lin"));
+        assert!(current.matches("lin", None));
         #[cfg(target_os = "macos")]
-        assert!(current.contains("mac"));
+        assert!(current.matches("mac", None));
         #[cfg(target_os = "windows")]
-        assert!(current.contains("win"));
+        assert!(current.matches("win", None));
     }
 }
