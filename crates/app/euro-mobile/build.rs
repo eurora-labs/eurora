@@ -5,13 +5,15 @@
 //! so anything the binary needs to know about its backend has to be
 //! baked at build time. Values come from the process environment
 //! only; the justfile (`set dotenv-load`) is the single point that
-//! reads `.env` and exports it to cargo.
+//! reads `.env` and exports it to cargo. Unset/empty values fall back
+//! to the dev-server default (matching the justfile's
+//! `env_var_or_default`) so plain `cargo check` works during local
+//! development; CI and release builds always set the var explicitly.
 
 use std::path::PathBuf;
 
-/// Required: build fails loudly if these aren't set. The binary
-/// cannot function without them.
-const REQUIRED: &[&str] = &["WEB_URL"];
+/// Required URL bake-ins with their dev-server fallbacks.
+const REQUIRED: &[(&str, &str)] = &[("WEB_URL", "http://localhost:5173")];
 
 /// Optional: empty if unset. Native Google sign-in is gated on these
 /// being present at runtime (see `procedures::auth_procedures::
@@ -50,12 +52,15 @@ fn main() {
 }
 
 fn forward_env() {
-    for key in REQUIRED {
+    for (key, fallback) in REQUIRED {
         println!("cargo:rerun-if-env-changed={key}");
         let value = std::env::var(key)
             .ok()
             .filter(|v| !v.is_empty())
-            .unwrap_or_else(|| missing(key));
+            .unwrap_or_else(|| {
+                println!("cargo:warning=build.rs: `{key}` unset; falling back to `{fallback}`");
+                (*fallback).to_string()
+            });
         println!("cargo:rustc-env={key}={value}");
     }
 
@@ -64,14 +69,4 @@ fn forward_env() {
         let value = std::env::var(key).unwrap_or_default();
         println!("cargo:rustc-env={key}={value}");
     }
-}
-
-fn missing(key: &str) -> ! {
-    panic!(
-        "build.rs: required env var `{key}` is unset.\n\
-         Build via `just <recipe>` — the justfile loads `.env` and exports\n\
-         every variable to cargo. To run `cargo build` directly, export\n\
-         `{key}` first (`set -a; source .env; set +a; cargo build …`) or\n\
-         use `direnv` (the repo ships an `.envrc`)."
-    );
 }
