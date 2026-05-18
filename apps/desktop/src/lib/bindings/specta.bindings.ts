@@ -349,7 +349,8 @@ export type ChatSendRequest = {
  * 
  *  Clients should accumulate `Chunk` payloads (using agent-chain's chunk-merge
  *  semantics) and replace placeholder state with the `Final.messages` payload
- *  when the turn ends.
+ *  when the turn ends. The tool-routing pair `ToolRequest` + `ToolCancel`
+ *  drives remote-tool RPC over the same socket.
  */
 export type ChatServerMessage = 
 /**  The user's message has been persisted; clients should display it. */
@@ -362,7 +363,19 @@ export type ChatServerMessage =
  */
 { type: "final"; messages: MessageNode[] } | 
 /**  The turn aborted with an error. The connection is closed after this. */
-{ type: "error"; kind: string; message: string };
+{ type: "error"; kind: string; message: string } | 
+/**
+ *  Request the client to execute a tool on its side and return the
+ *  result via [`ChatClientMessage::ToolResponse`] correlated by
+ *  `call_id`.
+ */
+{ type: "tool_request"; call_id: number; descriptor: WireToolDescriptor; arguments: unknown } | 
+/**
+ *  Abort an in-flight `ToolRequest`. Sent when the user cancels the
+ *  turn or the server's tool budget is exhausted before the client's
+ *  response arrives.
+ */
+{ type: "tool_cancel"; call_id: number };
 
 export type ChunkPosition = "last";
 
@@ -1051,6 +1064,29 @@ export type ToolMessage = {
 	response_metadata?: { [key in string]: unknown },
 };
 
+/**
+ *  Where a tool runs. The server uses this to dispatch each call:
+ *  `ServerLocal` tools execute in-process on the backend; everything else
+ *  is routed back to the client over the chat WebSocket as a `ToolRequest`,
+ *  and from there the client picks the right destination (bridge, native
+ *  app, ACP session).
+ * 
+ *  `#[non_exhaustive]` so adding new sources later is non-breaking for
+ *  downstream consumers that `match` on the enum.
+ */
+export type ToolSource = 
+/**
+ *  Routed via `euro-bridge` to a registered app of `app_kind` (in v1,
+ *  `"browser"`).
+ */
+{ kind: "bridge"; app_kind: string } | 
+/**  Runs in-process on the client (native Tauri tools). */
+{ kind: "client_local" } | 
+/**  Runs in-process on the backend (Firecrawl, describe-image). */
+{ kind: "server_local" } | 
+/**  Piped through an ACP session. */
+{ kind: "acp" };
+
 export type ToolStatus = "success" | "error";
 
 export type UpdateInfo = {
@@ -1074,6 +1110,54 @@ export type VideoContentBlock = {
 	url?: string | null,
 	base64?: string | null,
 	extras?: { [key in string]: unknown } | null,
+};
+
+/**
+ *  Wire-side descriptor for a tool. One per call, one per entry in the
+ *  per-turn `CapabilityUpdate.tools` list.
+ * 
+ *  The framework form (`eurora_tools::ToolDescriptor`) is the in-process
+ *  `&'static`-everywhere shape; this is its serializable counterpart, owned
+ *  and ready for transport. The server only ever sees this form.
+ */
+export type WireToolDescriptor = {
+	/**
+	 *  Fully-qualified tool name, namespaced with `::`
+	 *  (e.g. `browser::youtube::get_current_timestamp`).
+	 */
+	name: string,
+	/**
+	 *  Human-readable description shown to the LLM. Produced by the
+	 *  framework macro from the first paragraph of the trait method's
+	 *  rustdoc.
+	 */
+	description: string,
+	/**  JSON Schema for the tool's `arguments` payload. */
+	input_schema: unknown,
+	/**  JSON Schema for the tool's success payload. */
+	output_schema: unknown,
+	/**
+	 *  Per-call timeout in milliseconds. Used by the server's bus to bound
+	 *  in-flight remote calls; the framework's `ToolDescriptor.timeout`
+	 *  converts to/from this field. `u32` ms (~49 days) is bounded well
+	 *  above any sensible per-tool budget and keeps the wire shape inside
+	 *  JS's safe integer range.
+	 */
+	timeout_ms: number,
+	/**  Where the tool runs. The server uses this to pick a dispatch path. */
+	source: ToolSource,
+	/**
+	 *  Context keys whose presence is required for this tool to be
+	 *  surfaced to the LLM in a given turn (e.g.
+	 *  `["youtube::watch_page"]`).
+	 */
+	required_contexts: string[],
+	/**
+	 *  If true, the server must obtain explicit user approval before
+	 *  dispatching the call. Not enforced in v1 (all v1 tools are
+	 *  read-only) but declared so the protocol is stable.
+	 */
+	requires_user_approval: boolean,
 };
 
 /* Tauri Specta runtime */

@@ -53,7 +53,7 @@ specta = { workspace = true, optional = true, features = ["derive"] }
 # `specta-typescript` provides the `Unknown` marker used to escape from
 # `serde_json::Value`'s recursive built-in `Type` impl on every map/value
 # field that crosses the wire.
-specta-typescript = { version = "0.0.12", optional = true }
+specta-typescript = { workspace = true, optional = true }
 
 [dev-dependencies]
 serial_test = "3"

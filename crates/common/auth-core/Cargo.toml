@@ -12,7 +12,7 @@ specta = { workspace = true, optional = true, features = ["derive"] }
 # Provides the `BigInt` marker type used by `#[specta(type = BigInt)]` overrides
 # on `i64` JWT-NumericDate fields, mapping them to TypeScript `bigint` so the
 # wire shape is lossless.
-specta-typescript = { version = "0.0.12", optional = true }
+specta-typescript = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

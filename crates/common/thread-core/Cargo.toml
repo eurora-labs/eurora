@@ -10,14 +10,21 @@ agent-chain-core = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 
 specta = { workspace = true, optional = true, features = [
   "derive",
   "chrono",
   "uuid",
+  "serde_json",
 ] }
+# `specta-typescript` provides the `Unknown` marker used to escape from
+# `serde_json::Value`'s internal `i64`/`u64` representation when emitting
+# TypeScript bindings — specta forbids bigint-style types by default and
+# `Unknown` maps to TS `unknown` (the honest type for opaque JSON).
+specta-typescript = { workspace = true, optional = true }
 
 [features]
 default = []
-specta = ["dep:specta", "agent-chain-core/specta"]
+specta = ["dep:specta", "dep:specta-typescript", "agent-chain-core/specta"]
