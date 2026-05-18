@@ -135,6 +135,7 @@ settings-core = { path = "crates/common/settings-core" }
 sha1 = "0.10"
 sha2 = "0.10.9"
 specta = "=2.0.0-rc.25"
+specta-typescript = "0.0.12"
 tauri-specta = "=2.0.0-rc.25"
 strum = "0.28.0"
 strum_macros = "0.28.0"

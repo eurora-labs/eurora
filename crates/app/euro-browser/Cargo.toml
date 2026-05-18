@@ -18,7 +18,7 @@ tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
 
 specta-serde = { version = "0.0.12", optional = true }
-specta-typescript = { version = "0.0.12", optional = true }
+specta-typescript = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"

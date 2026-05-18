@@ -111,6 +111,17 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>, user_id: Uuid, t
                     Ok(ChatClientMessage::Send(_)) | Ok(ChatClientMessage::Regenerate(_)) => {
                         tracing::warn!("Ignoring extra command frame mid-turn");
                     }
+                    Ok(ChatClientMessage::CapabilityUpdate { .. })
+                    | Ok(ChatClientMessage::ToolResponse { .. }) => {
+                        // Tool-routing frames are declared in the wire types so
+                        // the protocol is stable, but the server-side dispatcher
+                        // isn't wired yet (lands in later phases). Drop them
+                        // with a log so we have observability when a client
+                        // upgrades ahead of the server.
+                        tracing::debug!(
+                            "Ignoring tool-routing frame; server-side dispatcher is not wired yet"
+                        );
+                    }
                     Err(e) => {
                         tracing::warn!(error = %e, "Failed to decode client frame");
                     }
@@ -181,6 +192,23 @@ async fn wait_for_initial_command(
                 }
                 Ok(ChatClientMessage::Cancel) => {
                     return Err("Cannot cancel before a turn has started".to_string());
+                }
+                Ok(ChatClientMessage::CapabilityUpdate { .. }) => {
+                    // The unified tool-execution architecture will require
+                    // `CapabilityUpdate` as the first frame, but that
+                    // enforcement (and the matching server-side consumer)
+                    // lands in a later phase. Until then, accepting it here
+                    // would silently advance to the next frame without
+                    // actually binding the catalog — clearer to reject.
+                    return Err(
+                        "CapabilityUpdate is declared but not yet handled by this server"
+                            .to_string(),
+                    );
+                }
+                Ok(ChatClientMessage::ToolResponse { .. }) => {
+                    return Err(
+                        "Received ToolResponse before any tool request was issued".to_string()
+                    );
                 }
                 Err(e) => return Err(format!("Failed to decode initial frame: {e}")),
             },
