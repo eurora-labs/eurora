@@ -27,9 +27,11 @@
 #
 #   - Linux and macOS recipes run under `bash`. Windows recipes run under
 #     Windows PowerShell (`powershell.exe`, ships with the OS) — no WSL,
-#     no Git Bash required. Recipe bodies that contain non-trivial shell
-#     logic are split via `[unix]` / `[windows]` attributes and delegate
-#     to scripts/*.{sh,ps1}.
+#     no Git Bash required. Recipe bodies that contain non-trivial logic
+#     delegate to Node scripts under `scripts/*.mjs`, which run identically
+#     on all three platforms via the `node` engine pinned in
+#     `package.json#engines`. A handful of platform-intrinsic helpers
+#     (release scripts, macOS-only setup) remain as `.sh`.
 #
 #   - Env handling: `set dotenv-load` reads `.env` at the workspace root and
 #     exports every variable to the child processes spawned below. That
@@ -213,29 +215,18 @@ _ios-xcode-script *args:
 # ─── First-run setup ───────────────────────────────────────────────────────
 # Copy .env.example to .env (if missing) and install JS deps. Idempotent.
 
-[unix]
 init:
-    @./scripts/init.sh
-    pnpm install
-
-[windows]
-init:
-    @powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/init.ps1
+    @node scripts/init.mjs
     pnpm install
 
 # ─── Pre-flight ────────────────────────────────────────────────────────────
 # Verifies tools are present, ports are free, and `.env` has a real
 # OPENAI_API_KEY before the stack tries to come up. Implementation lives in
-# scripts/doctor.{sh,ps1} to keep this recipe small and the checks
-# individually testable.
+# scripts/doctor.mjs to keep this recipe small and the checks individually
+# testable.
 
-[unix]
 doctor:
-    @./scripts/doctor.sh
-
-[windows]
-doctor:
-    @powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/doctor.ps1
+    @node scripts/doctor.mjs
 
 # ─── Backend ───────────────────────────────────────────────────────────────
 
@@ -275,14 +266,8 @@ dev-postgres-up:
     @echo "Postgres is ready."
 
 # Run the seed only if the users table is empty. Idempotent first-boot path.
-
-[unix]
 dev-seed-if-empty:
-    @./scripts/seed-if-empty.sh
-
-[windows]
-dev-seed-if-empty:
-    @powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/seed-if-empty.ps1
+    @node scripts/seed-if-empty.mjs
 
 # Force a re-seed: nuke the volume and start fresh.
 dev-reset:
@@ -330,17 +315,12 @@ stop:
 
 # ─── Internal helpers ──────────────────────────────────────────────────────
 
-# Start Docker Desktop if the daemon isn't already up. macOS-only side
-# effect; on Linux the script no-ops and lets `doctor` surface the
-# failure with a remediation hint (starting dockerd needs sudo). This
-# lives outside `doctor` so the doctor itself stays side-effect-free.
+# Start Docker Desktop if the daemon isn't already up. macOS and Windows
+# launch the GUI and poll; on Linux the script no-ops and lets `doctor`
+# surface the failure with a remediation hint (starting dockerd needs
+# sudo). This lives outside `doctor` so the doctor itself stays
+# side-effect-free.
 
 [private]
-[unix]
 _ensure-docker:
-    @./scripts/ensure-docker.sh
-
-[private]
-[windows]
-_ensure-docker:
-    @powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/ensure-docker.ps1
+    @node scripts/ensure-docker.mjs
