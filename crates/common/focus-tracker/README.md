@@ -22,7 +22,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-focus-tracker = "1.0.0"
+focus-tracker = "1.1.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -71,30 +71,70 @@ let config = FocusTrackerConfig::builder()
 let tracker = FocusTracker::builder().config(config).build();
 ```
 
-## Ignoring processes
+## Ignoring focus events
 
-Each platform exposes its own ignore list. When a focused window's process
-name appears in the list for the current platform, the tracker suppresses
-the event entirely: no `on_focus` callback, no dedup-state update, and no
-icon work. Lists for the other platforms are accepted by the builder (so
-cross-platform consumers don't need `cfg!` scaffolding) and silently
-unused.
+Each platform exposes its own ignore-rule set. When a rule matches a focused
+window, the tracker suppresses the event entirely: no `on_focus` callback,
+no dedup-state update, and no icon work. Rule sets for the other platforms
+are accepted by the builder (so cross-platform consumers don't need `cfg!`
+scaffolding) and silently unused.
+
+An `IgnoreRule` combines a process-name predicate **and** a window-title
+predicate. A rule matches when **both** predicates match; the set matches
+when **any** rule does.
 
 ```rust
-use focus_tracker::FocusTrackerConfig;
+use focus_tracker::{FocusTrackerConfig, IgnoreRule, WindowTitleMatch};
 
 let config = FocusTrackerConfig::builder()
-    .linux_ignored_processes(["firefox", "chrome"])
-    .macos_ignored_processes(["Firefox", "Google Chrome"])
-    .windows_ignored_processes(["firefox.exe", "chrome.exe"])
+    .linux_ignore_rules([
+        IgnoreRule::builder().process_name("firefox").build(),
+        IgnoreRule::builder().process_name("chrome").build(),
+        // Suppress "whatever" only when it has no title.
+        IgnoreRule::builder()
+            .process_name("whatever")
+            .window_title(WindowTitleMatch::Missing)
+            .build(),
+    ])
+    .macos_ignore_rules([
+        IgnoreRule::builder().process_name("Firefox").build(),
+        IgnoreRule::builder().process_name("Google Chrome").build(),
+    ])
+    .windows_ignore_rules([
+        IgnoreRule::builder().process_name("firefox.exe").build(),
+        IgnoreRule::builder().process_name("chrome.exe").build(),
+    ])
+    .build();
+```
+
+### Builder setters
+
+`IgnoreRule::builder()` exposes two setters, both optional:
+
+| Setter | Accepts | Default | Effect |
+| ------ | ------- | ------- | ------ |
+| `.process_name(s)` | any `Into<String>` | `ProcessNameMatch::Any` | matches the named process byte-exactly |
+| `.window_title(m)` | a [`WindowTitleMatch`] | `WindowTitleMatch::Any` | restricts to titles matching `m` |
+
+Pass `WindowTitleMatch::Missing` to match titleless windows (`None` **or**
+`Some("")`), `Present` for any non-empty title, or `Exact(t)` for a
+specific non-empty title. Omitting `.process_name(...)` matches every
+process — useful for title-only rules like "ignore every titleless focus
+event regardless of process":
+
+```rust
+use focus_tracker::{IgnoreRule, WindowTitleMatch};
+
+let rule = IgnoreRule::builder()
+    .window_title(WindowTitleMatch::Missing)
     .build();
 ```
 
 ### Matching is strict
 
-Names are matched **byte-exactly** against `FocusedWindow::process_name` as
-emitted by the platform. There is no case folding, no `.exe` stripping, no
-basename normalization. Provide every spelling you want to suppress.
+Names and titles are matched **byte-exactly** against the values emitted by
+the platform — no case folding, no `.exe` stripping, no basename
+normalization. Provide every spelling you want to suppress.
 
 | Platform | Source of `process_name` | Typical value |
 | -------- | ------------------------ | ------------- |
@@ -104,7 +144,13 @@ basename normalization. Provide every spelling you want to suppress.
 
 A consequence: on Linux the comm name is capped at 15 bytes by the kernel,
 and the exe-fallback path includes the full filesystem path. If you need
-to ignore a process by both spellings, list both.
+to ignore a process by both spellings, add a rule for each.
+
+`with_title_missing` deliberately collapses `None` and `Some("")` into the
+same "no title" category, because platforms disagree about which they emit
+for a titleless window.
+
+[`WindowTitleMatch`]: https://docs.rs/focus-tracker/latest/focus_tracker/enum.WindowTitleMatch.html
 
 ## Examples
 

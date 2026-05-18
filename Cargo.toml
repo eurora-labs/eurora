@@ -94,7 +94,7 @@ euro-vision = { path = "crates/app/euro-vision" }
 euro-office = { path = "crates/app/euro-office" }
 euro-pdf = { path = "crates/app/euro-pdf" }
 focus-tracker = { path = "crates/common/focus-tracker" }
-focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "1.0.0" }
+focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "1.1.0" }
 futures = "0.3.31"
 futures-util = "0.3"
 governor = "0.10"

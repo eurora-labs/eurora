@@ -52,8 +52,8 @@ where
         match utils::get_frontmost_window_basic_info() {
             Ok(mut window) => {
                 if config
-                    .macos_ignored_processes
-                    .contains(&window.process_name)
+                    .macos_ignore_rules
+                    .matches(&window.process_name, window.window_title.as_deref())
                 {
                     tokio::time::sleep(config.poll_interval).await;
                     continue;

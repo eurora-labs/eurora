@@ -7,7 +7,9 @@ use crate::{
 use chrono::{DateTime, Utc};
 use euro_activity::strategies::{ActivityReport, StrategySupport};
 use euro_activity::{Activity, ContextChip, NoStrategy, strategies::ActivityStrategyFunctionality};
-use focus_tracker::{FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig};
+use focus_tracker::{
+    FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig, IgnoreRule, WindowTitleMatch,
+};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -337,6 +339,21 @@ impl CollectorService {
                         .expect("valid icon size")
                         .build(),
                 )
+                // Suppress Explorer.EXE noise on Windows: the Alt-Tab
+                // "Task Switching" overlay and titleless Explorer
+                // pseudo-windows both surface as focus events but
+                // neither represents a real user-facing application
+                // context.
+                .windows_ignore_rules([
+                    IgnoreRule::builder()
+                        .process_name("Explorer.EXE")
+                        .window_title(WindowTitleMatch::Exact("Task Switching".into()))
+                        .build(),
+                    IgnoreRule::builder()
+                        .process_name("Explorer.EXE")
+                        .window_title(WindowTitleMatch::Missing)
+                        .build(),
+                ])
                 .build();
             let tracker = FocusTracker::builder().config(config).build();
             let prev_focus = Arc::new(Mutex::new(String::new()));

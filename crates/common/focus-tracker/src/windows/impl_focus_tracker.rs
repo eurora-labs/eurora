@@ -80,7 +80,10 @@ fn poll_focus_change(
         }
     };
 
-    if config.windows_ignored_processes.contains(&process_name) {
+    if config
+        .windows_ignore_rules
+        .matches(&process_name, title.as_deref())
+    {
         return None;
     }
 
