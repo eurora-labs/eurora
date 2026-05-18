@@ -1,0 +1,19 @@
+# Files that MUST be LF on checkout, even on Windows where
+# `core.autocrlf=true` (Git for Windows default) would otherwise rewrite
+# them. Each rule here corresponds to a tool we use that is documented
+# to break on CRLF.
+
+# Shell scripts — executed by bash inside Linux containers via
+# docker-compose (e.g. scripts/seed/seed.sh). A trailing CR breaks
+# `set -euo pipefail` with "invalid option name".
+*.sh text eol=lf
+
+# Justfile — `just`'s string literal `\`-line-continuation only handles
+# LF; on CRLF it parses the `\r` as an invalid escape and refuses to
+# load the file.
+Justfile text eol=lf
+justfile text eol=lf
+
+# Cross-platform Node scripts (used by `just dev`, etc).
+*.mjs text eol=lf
+*.cjs text eol=lf
