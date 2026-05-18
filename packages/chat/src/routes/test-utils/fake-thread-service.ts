@@ -102,6 +102,7 @@ export class FakeThreadService implements IThreadService {
 	threads: Thread[] = [];
 	messagesByThread = new Map<string, MessageNode[]>();
 	branchResults = new Map<string, MessageNode[]>();
+	threadsByActivity = new Map<string, Thread[]>();
 
 	deleteDelay = 0;
 	shouldFailDelete = false;
@@ -119,6 +120,10 @@ export class FakeThreadService implements IThreadService {
 
 	async listThreads(limit: number, offset: number): Promise<Thread[]> {
 		return this.threads.slice(offset, offset + limit);
+	}
+
+	async listThreadsForActivity(activityId: string): Promise<Thread[]> {
+		return this.threadsByActivity.get(activityId) ?? [];
 	}
 
 	async getMessages(threadId: string, _limit: number, _offset: number): Promise<MessageNode[]> {

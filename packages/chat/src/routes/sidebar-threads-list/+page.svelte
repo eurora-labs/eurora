@@ -65,10 +65,18 @@
 			<Sidebar.Content>
 				<Sidebar.Group>
 					<SidebarThreadsList
+						threads={chatService.threads}
+						loading={chatService.loadingThreads}
+						loadingMore={chatService.loadingMoreThreads}
+						hasMore={chatService.hasMoreThreads}
+						onLoadMore={() => chatService.loadMoreThreads()}
+						activeThreadId={chatService.activeThreadId}
 						onThreadSelect={(threadId) => {
 							selectedThreadId = threadId;
 							lastAction = `selected:${threadId}`;
+							chatService.activeThreadId = threadId;
 						}}
+						onThreadDelete={(id) => chatService.deleteThread(id)}
 					/>
 				</Sidebar.Group>
 			</Sidebar.Content>

@@ -86,7 +86,21 @@
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<SidebarThreadsList onThreadSelect={handleThreadSelect} />
+		<SidebarThreadsList
+			threads={chatService.threads}
+			loading={chatService.loadingThreads}
+			loadingMore={chatService.loadingMoreThreads}
+			hasMore={chatService.hasMoreThreads}
+			onLoadMore={() => chatService.loadMoreThreads()}
+			activeThreadId={chatService.activeThreadId}
+			onThreadSelect={handleThreadSelect}
+			onThreadDelete={async (id) => {
+				await chatService.deleteThread(id);
+				if (chatService.activeThreadId === undefined) {
+					handleThreadSelect('');
+				}
+			}}
+		/>
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<Sidebar.Menu>

@@ -89,11 +89,17 @@ export type ChatMessage = {
  * 
  *  When `parent_message_id` is present the turn is interpreted as an edit of
  *  an existing branch; the service rewinds `active_leaf` accordingly.
+ * 
+ *  `activity_id` captures the desktop client's currently-tracked activity
+ *  when the user sent the message, so the server can record the link in
+ *  `activity_threads`. Optional because non-desktop clients (web, mobile)
+ *  have no timeline; absent values skip the link step entirely.
  */
 export type ChatSendRequest = {
 	content_blocks: ContentBlock[],
 	parent_message_id?: string | null,
 	asset_chips_json?: string | null,
+	activity_id?: string | null,
 };
 
 /**

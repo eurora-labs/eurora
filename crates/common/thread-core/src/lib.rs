@@ -215,6 +215,11 @@ pub enum ChatClientMessage {
 ///
 /// When `parent_message_id` is present the turn is interpreted as an edit of
 /// an existing branch; the service rewinds `active_leaf` accordingly.
+///
+/// `activity_id` captures the desktop client's currently-tracked activity
+/// when the user sent the message, so the server can record the link in
+/// `activity_threads`. Optional because non-desktop clients (web, mobile)
+/// have no timeline; absent values skip the link step entirely.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct ChatSendRequest {
@@ -223,6 +228,8 @@ pub struct ChatSendRequest {
     pub parent_message_id: Option<Uuid>,
     #[serde(default)]
     pub asset_chips_json: Option<String>,
+    #[serde(default)]
+    pub activity_id: Option<Uuid>,
 }
 
 /// Payload of a [`ChatClientMessage::Regenerate`] frame.
@@ -387,6 +394,7 @@ mod tests {
             content_blocks: vec![sample_text_block()],
             parent_message_id: None,
             asset_chips_json: None,
+            activity_id: None,
         });
         let s = serde_json::to_string(&m).unwrap();
         assert!(s.contains("\"type\":\"send\""));

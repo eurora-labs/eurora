@@ -23,6 +23,12 @@ export interface ChatContext {
 
 export interface IThreadService {
 	listThreads(limit: number, offset: number): Promise<Thread[]>;
+	/**
+	 * List threads linked to a single timeline activity via the
+	 * `activity_threads` junction. Powers the desktop sidebar's per-app
+	 * filter; non-desktop hosts may implement as an empty result.
+	 */
+	listThreadsForActivity(activityId: string): Promise<Thread[]>;
 	getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]>;
 	switchBranch(
 		threadId: string,

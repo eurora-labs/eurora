@@ -13,14 +13,19 @@ export function initDependencies() {
 	const threadClient = new ThreadService();
 	const appearance = new AppearanceService();
 	const telemetry = new TelemetryService();
+	const activity = new ActivityService();
+	// Chat reads the live activity (always `recent[0]`) at send time so the
+	// thread→activity link records the app the user is actually in, not the
+	// one they happen to be scrolled to in the rail.
+	const chat = new ChatService(threadClient, () => activity.liveActivity?.id);
 	return provideAll([
 		[TELEMETRY_SERVICE, telemetry],
 		[THREAD_SERVICE, threadClient],
 		[USER_SERVICE, new UserService(telemetry)],
-		[CHAT_SERVICE, new ChatService(threadClient)],
+		[CHAT_SERVICE, chat],
 		[APPEARANCE_SERVICE, appearance],
 		[GENERAL_SERVICE, new GeneralService()],
 		[TIMELINE_SERVICE, new TimelineService(appearance)],
-		[ACTIVITY_SERVICE, new ActivityService()],
+		[ACTIVITY_SERVICE, activity],
 	]);
 }

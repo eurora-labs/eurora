@@ -54,6 +54,7 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             system_reinit_telemetry,
             system_rotate_telemetry_distinct_id,
             euro_thread::commands::thread::thread_list,
+            euro_thread::commands::thread::thread_list_by_activity,
             euro_thread::commands::thread::thread_create,
             euro_thread::commands::thread::thread_delete,
             euro_thread::commands::thread::thread_get_messages,
