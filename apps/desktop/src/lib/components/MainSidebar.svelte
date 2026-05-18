@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { commands } from '$lib/bindings/specta.bindings.js';
+	import { ACTIVITY_SERVICE } from '$lib/services/activity-service.svelte.js';
 	import { USER_SERVICE } from '$lib/services/user-service.svelte.js';
 	import SearchDialog from '@eurora/chat/components/SearchDialog.svelte';
 	import SidebarThreadsList from '@eurora/chat/components/SidebarThreadsList.svelte';
-	import { CHAT_SERVICE } from '@eurora/chat/services/chat/chat-service.svelte';
+	import { CHAT_SERVICE, ThreadMessages } from '@eurora/chat/services/chat/chat-service.svelte';
 	import { inject } from '@eurora/shared/context';
 	import { Button, buttonVariants } from '@eurora/ui/components/button/index';
 	import * as Dialog from '@eurora/ui/components/dialog/index';
@@ -21,6 +22,7 @@
 	import { toast } from 'svelte-sonner';
 
 	const chatService = inject(CHAT_SERVICE);
+	const activityService = inject(ACTIVITY_SERVICE);
 	const user = inject(USER_SERVICE);
 	const sidebarState = Sidebar.useSidebar();
 
@@ -51,6 +53,19 @@
 		}
 	});
 
+	// Lazy-fetch the per-activity thread bucket whenever the user's
+	// scrolled-to selection changes. The chat service short-circuits
+	// repeat calls for cached buckets, so cycling through the rail and
+	// back is free after the first visit. We skip index 0 — the
+	// most-recent slot is the "no selection" default and never filters.
+	$effect(() => {
+		if (activityService.activeIndex === 0) return;
+		const app = activityService.activeApp;
+		if (!app) return;
+		if (!user.authenticated) return;
+		chatService.loadThreadsForActivity(app.id);
+	});
+
 	onMount(() => {
 		if (!user.authenticated) {
 			chatService.loadingThreads = false;
@@ -60,6 +75,31 @@
 			chatService.destroy();
 			threadInitialized = false;
 		};
+	});
+
+	// Index 0 is the most-recent slot — treated as "no user selection"
+	// so the sidebar falls back to the full chronological list. Only an
+	// explicit scroll to a non-top rail position counts as filtering.
+	const selectedApp = $derived(
+		activityService.activeIndex === 0 ? undefined : activityService.activeApp,
+	);
+	const activityThreads = $derived(
+		selectedApp ? chatService.threadsByActivity.get(selectedApp.id) : undefined,
+	);
+
+	// `matched` feeds the pinned group at the top of the sidebar. The
+	// pinned group renders even when empty (showing a "No chats"
+	// placeholder under the group label) so the per-app filter context
+	// stays visible regardless of whether the activity has linked chats.
+	const matched = $derived(activityThreads ?? []);
+	const matchedIds = $derived(new Set(matched.map((t) => t.thread.id)));
+
+	// The main (paginated) list always shows the chronological flow.
+	// When a per-app group is present we filter out its threads so the
+	// same chat doesn't appear in both sections.
+	const chronologicalThreads = $derived.by<ThreadMessages[]>(() => {
+		if (!selectedApp || matched.length === 0) return chatService.threads;
+		return chatService.threads.filter((t) => !matchedIds.has(t.thread.id));
 	});
 
 	async function createChat() {
@@ -83,10 +123,18 @@
 	}
 
 	function handleThreadSelect(threadId: string) {
+		chatService.activeThreadId = threadId || undefined;
 		if (threadId) {
 			goto(`/${threadId}`);
 		} else {
 			goto('/');
+		}
+	}
+
+	async function handleThreadDelete(threadId: string): Promise<void> {
+		await chatService.deleteThread(threadId);
+		if (chatService.activeThreadId === undefined) {
+			handleThreadSelect('');
 		}
 	}
 </script>
@@ -110,7 +158,20 @@
 	</Sidebar.Header>
 	<Sidebar.Content>
 		{#if sidebarState.open}
-			<SidebarThreadsList onThreadSelect={handleThreadSelect} />
+			<SidebarThreadsList
+				threads={chronologicalThreads}
+				loading={chatService.loadingThreads}
+				loadingMore={chatService.loadingMoreThreads}
+				hasMore={chatService.hasMoreThreads}
+				onLoadMore={() => chatService.loadMoreThreads()}
+				activeThreadId={chatService.activeThreadId}
+				onThreadSelect={handleThreadSelect}
+				onThreadDelete={handleThreadDelete}
+				label={selectedApp ? 'Other chats' : 'Chats'}
+				pinnedLabel={selectedApp ? `Chats in ${selectedApp.name}` : undefined}
+				pinnedThreads={selectedApp ? matched : undefined}
+				pinnedAccentColor={selectedApp?.accent?.hex}
+			/>
 		{/if}
 	</Sidebar.Content>
 

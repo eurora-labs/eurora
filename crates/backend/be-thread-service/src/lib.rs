@@ -47,6 +47,10 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             post(handlers::threads::create_thread).get(handlers::threads::list_threads),
         )
         .route(
+            "/threads/by-activity/{activity_id}",
+            get(handlers::threads::list_threads_for_activity),
+        )
+        .route(
             "/threads/{thread_id}",
             get(handlers::threads::get_thread).delete(handlers::threads::delete_thread),
         )

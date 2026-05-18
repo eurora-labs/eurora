@@ -47,6 +47,14 @@ export class ThreadService implements IThreadService {
 		return resp.threads;
 	}
 
+	async listThreadsForActivity(activityId: string): Promise<Thread[]> {
+		const resp = await this.#api.fetch<ListThreadsResponse>(
+			`/threads/by-activity/${activityId}`,
+			{ query: { limit: 100, offset: 0 } },
+		);
+		return resp.threads;
+	}
+
 	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
 		const resp = await this.#api.fetch<GetMessagesResponse>(`/threads/${threadId}/messages`, {
 			query: { limit, offset },

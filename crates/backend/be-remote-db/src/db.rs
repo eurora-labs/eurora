@@ -11,7 +11,7 @@ use crate::{
     MessageType, PaginationParams,
     error::{DbError, DbResult},
     types::{
-        Activity, ActivityAsset, Asset, AssetStatus, ClaimedProvisioningJob,
+        Activity, ActivityAsset, ActivityThread, Asset, AssetStatus, ClaimedProvisioningJob,
         EmailVerificationToken, LoginToken, Message, OAuthCredentials, OAuthProvider, OAuthState,
         PasswordCredentials, RefreshToken, SearchResultMessage, SearchResultThread, Thread,
         TokenUsage, UpsertOutcome, User, UserSettingsRow,
@@ -1222,6 +1222,48 @@ impl DatabaseManager {
         Ok(activity_asset)
     }
 
+    /// Insert a link between `activity_id` and `thread_id` for the given user.
+    ///
+    /// Returns the newly inserted row on success, or `None` when the link
+    /// already exists (`ON CONFLICT DO NOTHING`) or either endpoint is not
+    /// owned by `user_id`. Callers that link opportunistically (e.g. the chat
+    /// send path, which fires once per message) can ignore the result — the
+    /// composite primary key on `(activity_id, thread_id)` keeps the table
+    /// from growing on repeat sends.
+    #[builder]
+    pub async fn link_activity_to_thread(
+        &self,
+        activity_id: Uuid,
+        thread_id: Uuid,
+        user_id: Uuid,
+    ) -> DbResult<Option<ActivityThread>> {
+        let now = Utc::now();
+
+        let link = sqlx::query_as::<_, ActivityThread>(
+            r#"
+            WITH verified_activity AS (
+                SELECT id FROM activities WHERE id = $1 AND user_id = $3
+            ),
+            verified_thread AS (
+                SELECT id FROM threads WHERE id = $2 AND user_id = $3
+            )
+            INSERT INTO activity_threads (activity_id, thread_id, created_at)
+            SELECT va.id, vt.id, $4
+            FROM verified_activity va, verified_thread vt
+            ON CONFLICT (activity_id, thread_id) DO NOTHING
+            RETURNING activity_id, thread_id, created_at
+            "#,
+        )
+        .bind(activity_id)
+        .bind(thread_id)
+        .bind(user_id)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(link)
+    }
+
     #[builder]
     pub async fn create_thread(
         &self,
@@ -1481,6 +1523,41 @@ impl DatabaseManager {
 
         let threads = sqlx::query_as::<_, Thread>(&query)
             .bind(user_id)
+            .bind(params.limit())
+            .bind(params.offset())
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(threads)
+    }
+
+    /// List threads that have been linked (via `activity_threads`) to the
+    /// supplied `activity_id`. User-scoped on both the thread and the activity
+    /// so a caller can't surface another user's threads by guessing an
+    /// activity uuid. Ordering and pagination follow [`list_threads`].
+    #[builder]
+    pub async fn list_threads_for_activity(
+        &self,
+        user_id: Uuid,
+        activity_id: Uuid,
+        params: PaginationParams,
+    ) -> DbResult<Vec<Thread>> {
+        let query = format!(
+            r#"
+            SELECT t.id, t.user_id, t.title, t.active_leaf_id, t.created_at, t.updated_at
+            FROM threads t
+            JOIN activity_threads at ON at.thread_id = t.id
+            JOIN activities a        ON a.id = at.activity_id
+            WHERE t.user_id = $1 AND a.user_id = $1 AND at.activity_id = $2
+            ORDER BY t.id {}
+            LIMIT $3 OFFSET $4
+            "#,
+            params.order()
+        );
+
+        let threads = sqlx::query_as::<_, Thread>(&query)
+            .bind(user_id)
+            .bind(activity_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
