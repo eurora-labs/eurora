@@ -1,5 +1,6 @@
 import { DEFAULT_MODELS } from '$lib/models/chat-model.js';
 import { InjectionToken } from '@eurora/shared/context';
+import { SvelteMap } from 'svelte/reactivity';
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
 import type { ChatServerMessage } from '$lib/models/streaming.js';
@@ -11,6 +12,18 @@ const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
 const RECONCILE_RETRIES = 3;
 const RECONCILE_DELAY_MS = 1000;
+
+/**
+ * Snapshot of the host's "currently focused activity" at the moment a
+ * thread mutation is about to happen — returns the activity uuid, or
+ * undefined when no host context is available (web, mobile, or a desktop
+ * client that hasn't recorded an activity yet).
+ *
+ * The provider is invoked at call time (not stored at construction time)
+ * so the service always sees the *live* activity, not the user's
+ * scrolled-to selection in the timeline rail.
+ */
+export type ActivityContextProvider = () => string | undefined;
 
 export class ThreadMessages {
 	// Explicit casting is fine because it's initialized in the constructor
@@ -40,6 +53,24 @@ export class ChatService {
 	loadingMoreThreads = $state(false);
 	hasMoreThreads = $state(true);
 
+	/**
+	 * Per-activity thread buckets, populated on demand by
+	 * [`loadThreadsForActivity`]. Keyed by `activity_id` (UUID string).
+	 *
+	 * Entries are reused across the lifetime of the service — the rail
+	 * only surfaces 20 activities at a time, so the cache is bounded.
+	 * The lazy population means typing a chat while the user is *not*
+	 * actively browsing the rail costs nothing extra; the rail's
+	 * filter pays only the activities it visits.
+	 *
+	 * Bucket entries are the same `ThreadMessages` instances as the
+	 * matching rows in [`threads`] (via the [`threadIndex`] dedupe),
+	 * so message-list state, loading flags, and streaming progress
+	 * stay in sync regardless of which view the user opened a thread
+	 * from.
+	 */
+	threadsByActivity: SvelteMap<string, ThreadMessages[]> = new SvelteMap();
+
 	// Per-conversation behaviour flags. They live on the service rather than
 	// inside the prompt-input component so they survive thread navigation and
 	// can be read by `sendMessage` (and any future regenerate/edit paths).
@@ -50,13 +81,16 @@ export class ChatService {
 	selectedModelId: string | undefined = $state(DEFAULT_MODELS[0]?.id);
 
 	private readonly threadClient: IThreadService;
+	private readonly activityContextProvider: ActivityContextProvider | undefined;
 
 	private threadIndex = new Map<string, ThreadMessages>();
 	private offset = 0;
+	private activityLoadInFlight = new Set<string>();
 	abortController: AbortController | null = null;
 
-	constructor(threadClient: IThreadService) {
+	constructor(threadClient: IThreadService, activityContextProvider?: ActivityContextProvider) {
 		this.threadClient = threadClient;
+		this.activityContextProvider = activityContextProvider;
 	}
 
 	async loadThreads(limit: number, offset: number) {
@@ -100,6 +134,50 @@ export class ChatService {
 		this.offset = Math.max(0, this.offset - 1);
 		if (this.activeThreadId === threadId) {
 			this.activeThreadId = undefined;
+		}
+		// CASCADE handles the DB side; sweep the in-memory mirror so the
+		// per-activity filter doesn't keep showing the deleted row.
+		for (const [activityId, bucket] of this.threadsByActivity) {
+			const filtered = bucket.filter((t) => t.thread.id !== threadId);
+			if (filtered.length !== bucket.length) {
+				this.threadsByActivity.set(activityId, filtered);
+			}
+		}
+	}
+
+	/**
+	 * Populate [`threadsByActivity`] with the threads linked to
+	 * `activityId`. Idempotent — repeat calls for the same id return
+	 * immediately whether the bucket is already loaded or another fetch
+	 * is in flight. Failures are logged and leave the bucket empty so
+	 * the next call retries.
+	 *
+	 * Reuses cached `ThreadMessages` instances from [`threadIndex`] so
+	 * the per-activity view and the full thread list share message
+	 * state, loading flags, and streaming progress for the same thread.
+	 */
+	async loadThreadsForActivity(activityId: string): Promise<void> {
+		if (this.threadsByActivity.has(activityId)) return;
+		if (this.activityLoadInFlight.has(activityId)) return;
+
+		this.activityLoadInFlight.add(activityId);
+		try {
+			const threads = await this.threadClient.listThreadsForActivity(activityId);
+			const bucket = threads.map((thread) => {
+				const existing = this.threadIndex.get(thread.id);
+				if (existing !== undefined) {
+					existing.thread = { ...existing.thread, ...thread };
+					return existing;
+				}
+				const entry = new ThreadMessages(thread);
+				this.threadIndex.set(thread.id, entry);
+				return entry;
+			});
+			this.threadsByActivity.set(activityId, bucket);
+		} catch (error) {
+			console.error(`Failed to load threads for activity ${activityId}:`, error);
+		} finally {
+			this.activityLoadInFlight.delete(activityId);
 		}
 	}
 
@@ -152,6 +230,12 @@ export class ChatService {
 	async sendMessage(text: string, assetChips: AssetChip[] = []): Promise<void> {
 		if (!text.trim()) return;
 
+		// Snapshot the live activity once at entry — the request carries
+		// the link target and the in-memory cache mirrors it. Reading
+		// inside `buildSendRequest` would be functionally equivalent today
+		// but invites drift if the placeholder/stream timeline grows.
+		const activityId = this.activityContextProvider?.();
+
 		const current = this.activeThreadId;
 		const existing = current ? this.threadIndex.get(current) : undefined;
 		const needsNewThread = !current || existing?.isTransient === true;
@@ -191,10 +275,15 @@ export class ChatService {
 		const receivedFinal = await this.consumeStream(entry, threadId, text, {
 			assetChips,
 			onFirstChunk,
+			activityId,
 		});
 
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
+		}
+
+		if (activityId !== undefined) {
+			this.linkActivityInCache(activityId, entry);
 		}
 	}
 
@@ -282,16 +371,42 @@ export class ChatService {
 		const preservedAssetChips =
 			original.message.type === 'human' ? extractAssetChips(original.message) : [];
 
+		// An edit is a fresh turn — link to whichever activity the user is
+		// actually in *now*, not the one tagged on the original message.
+		const activityId = this.activityContextProvider?.();
+
 		entry.messages = entry.messages.slice(0, nodeIndex);
 		this.appendPlaceholders(entry, text, preservedAssetChips);
 		const receivedFinal = await this.consumeStream(entry, threadId, text, {
 			parentMessageId: parentId,
 			preservedAssetChips,
+			activityId,
 		});
 
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
 		}
+
+		if (activityId !== undefined) {
+			this.linkActivityInCache(activityId, entry);
+		}
+	}
+
+	/**
+	 * Optimistically mirror a thread→activity link in the in-memory
+	 * [`threadsByActivity`] cache. The backend writes the row through
+	 * `link_activity_to_thread`; this keeps the sidebar's filter view
+	 * consistent without waiting for a refetch.
+	 *
+	 * No-op when the bucket has not been loaded yet (the next visit
+	 * to that activity will rehydrate from the server) or when the
+	 * thread is already in the bucket.
+	 */
+	private linkActivityInCache(activityId: string, entry: ThreadMessages): void {
+		const bucket = this.threadsByActivity.get(activityId);
+		if (bucket === undefined) return;
+		if (bucket.some((t) => t.thread.id === entry.thread.id)) return;
+		this.threadsByActivity.set(activityId, [entry, ...bucket]);
 	}
 
 	private async reconcileMessages(entry: ThreadMessages, threadId: string): Promise<void> {
@@ -376,6 +491,7 @@ export class ChatService {
 			assetChips?: AssetChip[];
 			preservedAssetChips?: AssetChip[];
 			onFirstChunk?: () => void;
+			activityId?: string | undefined;
 		} = {},
 	): Promise<boolean> {
 		this.abortController?.abort();
@@ -454,6 +570,7 @@ export class ChatService {
 			parentMessageId?: string | null;
 			assetChips?: AssetChip[];
 			preservedAssetChips?: AssetChip[];
+			activityId?: string | undefined;
 		},
 	): Promise<ChatSendRequest> {
 		const parent_message_id = options.parentMessageId ?? null;
@@ -484,6 +601,7 @@ export class ChatService {
 			content_blocks: [...context.contentBlocks, userBlock],
 			parent_message_id,
 			asset_chips_json: persistedChips.length > 0 ? JSON.stringify(persistedChips) : null,
+			activity_id: options.activityId ?? null,
 		};
 	}
 
@@ -508,6 +626,8 @@ export class ChatService {
 		this.abortController = null;
 		this.threads = [];
 		this.threadIndex.clear();
+		this.threadsByActivity.clear();
+		this.activityLoadInFlight.clear();
 		this.offset = 0;
 		this.hasMoreThreads = true;
 		this.loadingThreads = false;

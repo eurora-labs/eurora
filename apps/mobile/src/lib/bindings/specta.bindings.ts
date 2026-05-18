@@ -102,6 +102,7 @@ export const commands = {
 	systemReinitTelemetry: () => __TAURI_INVOKE<void>("system_reinit_telemetry"),
 	systemRotateTelemetryDistinctId: () => typedError<string, SystemError>(__TAURI_INVOKE("system_rotate_telemetry_distinct_id")),
 	threadList: (limit: number, offset: number) => typedError<Thread[], ThreadError>(__TAURI_INVOKE("thread_list", { limit, offset })),
+	threadListByActivity: (activityId: string, limit: number, offset: number) => typedError<Thread[], ThreadError>(__TAURI_INVOKE("thread_list_by_activity", { activityId, limit, offset })),
 	threadCreate: () => typedError<Thread, ThreadError>(__TAURI_INVOKE("thread_create")),
 	threadDelete: (threadId: string) => typedError<null, ThreadError>(__TAURI_INVOKE("thread_delete", { threadId })),
 	threadGetMessages: (threadId: string, limit: number, offset: number) => typedError<MessageNode[], ThreadError>(__TAURI_INVOKE("thread_get_messages", { threadId, limit, offset })),

@@ -153,6 +153,22 @@ impl ThreadManager {
         Ok(response.threads)
     }
 
+    pub async fn list_threads_for_activity(
+        &self,
+        activity_id: Uuid,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<Thread>> {
+        let query = ListThreadsQuery {
+            limit: Some(limit),
+            offset: Some(offset),
+        };
+        let response: ListThreadsResponse = self
+            .get_json_query(&format!("/threads/by-activity/{activity_id}"), &query)
+            .await?;
+        Ok(response.threads)
+    }
+
     pub async fn get_thread(&self, thread_id: Uuid) -> Result<Thread> {
         let response: GetThreadResponse = self.get_json(&format!("/threads/{thread_id}")).await?;
         Ok(response.thread)

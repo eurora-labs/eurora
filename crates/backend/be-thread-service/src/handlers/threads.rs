@@ -81,6 +81,36 @@ pub async fn list_threads(
     }))
 }
 
+/// List threads linked (via `activity_threads`) to a single activity.
+///
+/// Powers the desktop sidebar's per-app filter: as the user cycles through
+/// the timeline rail, the frontend fetches the threads associated with the
+/// currently-active activity and shows them as the filtered list.
+#[tracing::instrument(skip(state, user), fields(activity_id = %activity_id))]
+pub async fn list_threads_for_activity(
+    State(state): State<Arc<AppState>>,
+    user: AuthUser,
+    Path(activity_id): Path<Uuid>,
+    Query(query): Query<ListThreadsQuery>,
+) -> ThreadServiceResult<Json<ListThreadsResponse>> {
+    let user_id = user.user_id()?;
+    let limit = query.limit.unwrap_or(LIST_DEFAULT_LIMIT);
+    let offset = query.offset.unwrap_or(LIST_DEFAULT_OFFSET);
+
+    let threads = state
+        .db
+        .list_threads_for_activity()
+        .user_id(user_id)
+        .activity_id(activity_id)
+        .params(PaginationParams::new(offset, limit, "DESC"))
+        .call()
+        .await?;
+
+    Ok(Json(ListThreadsResponse {
+        threads: threads.into_iter().map(db_thread_to_wire).collect(),
+    }))
+}
+
 #[tracing::instrument(skip(state, user), fields(thread_id = %thread_id))]
 pub async fn get_thread(
     State(state): State<Arc<AppState>>,

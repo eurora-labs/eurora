@@ -22,7 +22,7 @@
 	{#snippet children()}
 		<div class="h-[600px] w-12 border-r p-2">
 			<Timeline.Root>
-				<Timeline.Item color="#22c55e" name="Blender" highlighted />
+				<Timeline.Item color="#22c55e" name="Blender" active />
 				<Timeline.Item color="#3b82f6" name="Slack" />
 				<Timeline.Item color="#ef4444" name="Reddit" />
 				<Timeline.Item color="#f59e0b" name="StackOverflow" />

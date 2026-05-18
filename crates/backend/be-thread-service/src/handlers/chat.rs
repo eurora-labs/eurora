@@ -315,6 +315,29 @@ async fn run_turn(
         .call()
         .await?;
 
+    // Link the thread to the activity the client was in when the message was
+    // sent. Idempotent — the composite PK (activity_id, thread_id) absorbs
+    // repeat sends from the same activity. Failure here must not poison the
+    // turn (chat works without the link), so we log and continue.
+    if let Some(activity_id) = request.activity_id {
+        if let Err(err) = state
+            .db
+            .link_activity_to_thread()
+            .activity_id(activity_id)
+            .thread_id(thread_id)
+            .user_id(user_id)
+            .call()
+            .await
+        {
+            tracing::warn!(
+                error = %err,
+                activity_id = %activity_id,
+                thread_id = %thread_id,
+                "Failed to link activity to thread"
+            );
+        }
+    }
+
     let human_message_id = human_db_message.id;
     let human_parent_id = human_db_message.parent_message_id;
     let human_node = MessageNode {

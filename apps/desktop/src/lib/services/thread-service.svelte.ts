@@ -18,6 +18,10 @@ export class ThreadService implements IThreadService {
 		return unwrap(await commands.threadList(limit, offset));
 	}
 
+	async listThreadsForActivity(activityId: string): Promise<Thread[]> {
+		return unwrap(await commands.threadListByActivity(activityId, 100, 0));
+	}
+
 	async getMessages(threadId: string, limit: number, offset: number): Promise<MessageNode[]> {
 		return unwrap(await commands.threadGetMessages(threadId, limit, offset));
 	}

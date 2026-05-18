@@ -63,3 +63,22 @@ export type ListActivitiesQuery = {
 export type ListActivitiesResponse = {
 	activities: Activity[],
 };
+
+/**
+ *  Request body for `PATCH /activities/{id}`.
+ * 
+ *  All fields are optional; missing fields are left untouched on the row.
+ *  Used by the desktop client to (a) ratchet `ended_at` forward on every
+ *  heartbeat tick and at activity transitions, and (b) correct
+ *  `window_title` when a browser strategy reports a title-only update.
+ */
+export type UpdateActivityRequest = {
+	name?: string | null,
+	window_title?: string | null,
+	ended_at?: string | null,
+};
+
+/**  Response body for `PATCH /activities/{id}`. */
+export type UpdateActivityResponse = {
+	activity: Activity,
+};
