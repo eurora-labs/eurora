@@ -1,4 +1,4 @@
-# Pre-flight check for `just dev`. Validates that the developer's machine
+﻿# Pre-flight check for `just dev`. Validates that the developer's machine
 # has the tools and configuration we need before we try to bring the stack
 # up. Exit code is the number of failed checks (capped at 1) so the script
 # fits cleanly into CI gates and `just dev: doctor` dependencies.
@@ -77,12 +77,17 @@ function Test-Command {
         return $false
     }
     try {
-        $version = (& $Cmd --version 2>&1 | Select-Object -First 1)
+        # Buffer the full output before slicing: piping a native command
+        # straight into `Select-Object -First 1` closes the pipeline early
+        # and leaves $LASTEXITCODE = -1 on tools like just/pnpm/watchexec,
+        # which would then be falsely flagged "not runnable".
+        $output = & $Cmd --version 2>$null
         # Native command exits don't auto-throw under $ErrorActionPreference
         # in PS 5.1 — turn a non-zero exit into a caught failure ourselves.
         if ($LASTEXITCODE -ne 0) {
             throw "exit $LASTEXITCODE"
         }
+        $version = if ($output -is [array]) { $output[0] } else { $output }
     } catch {
         Write-Fail $Label "not runnable"
         Write-Hint $InstallHint

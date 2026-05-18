@@ -1,4 +1,4 @@
-# Run the database seed only if the users table is empty. Idempotent
+﻿# Run the database seed only if the users table is empty. Idempotent
 # first-boot path for `just dev`.
 #
 # Distinguishes three cases:

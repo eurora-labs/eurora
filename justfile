@@ -57,50 +57,58 @@ set windows-shell := ["powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPoli
 export BACKEND_URL := env_var_or_default("BACKEND_URL", "http://localhost:3000")
 export WEB_URL := env_var_or_default("WEB_URL", "http://localhost:5173")
 
-default: dev
-
-# ─── Full stack ────────────────────────────────────────────────────────────
+# ─── Leaf commands for `just dev` / `just ios` / `just ios-device` ─────────
 #
-# Postgres + backend + web + desktop, all in one terminal. Pieces share
-# `just` itself as the supervisor; Ctrl-C stops them all.
+# These variables hold the actual shell commands that `concurrently`
+# spawns. Inlining them as leaves (rather than wrapping each one in a
+# `just` sub-recipe) keeps the process tree flat: every branch is one
+# child shell talking to one tool, with no nested `just → powershell →
+# pnpm.cmd` chain. That nesting was the source of a Windows-specific
+# bug where pnpm-wrapped commands detached from the parent console and
+# `concurrently --kill-others` then SIGTERMed the backend on spurious
+# success.
 #
-# `_dev-backend-watch` runs the backend under `watchexec`, which terminates
-# and re-runs `cargo run -p be-monolith` on every save under
+# `watchexec` re-runs `cargo run -p be-monolith` on every save under
 # `crates/backend/` or `crates/common/`, plus the workspace manifests.
-# `crates/app/` is intentionally excluded — those are clients of the
-# backend, not dependencies of it, so a desktop or mobile edit shouldn't
-# bounce the server. The watch is also extension-filtered to .rs / .toml
-# so log writes and editor scratch files don't trigger restarts.
+# `crates/app/` is intentionally excluded — those crates depend on the
+# backend, not vice versa, so a desktop or mobile edit shouldn't bounce
+# the server. The watch is also extension-filtered to .rs / .toml so log
+# writes and editor scratch files don't trigger restarts.
 #
 # Cost: a save in any backend or common crate restarts be-monolith even
 # if the edit didn't touch its actual dep graph; benefit: you don't have
 # to remember which crate triggers what. Use `dev-backend-once` for
 # stable runs (debugger, profiling, watching a steady tracing tail).
 #
-# Each child of `concurrently` is itself a `just` recipe call. That keeps
-# shell-quoting consistent across platforms (cmd.exe vs bash tokenize
-# embedded quotes differently) and lets the per-platform shell handle the
-# actual command.
+# The web / desktop / mobile branches gate themselves on the backend's
+# /health endpoint via `scripts/wait-for-backend.mjs` so Vite doesn't
+# call `/llm/info` (and clients don't surface connection errors) before
+# the backend has bound its port.
 
-# Postgres + backend + web + desktop, all in one terminal.
+backend_dev_cmd := "watchexec --restart --exts rs,toml \
+    --watch crates/backend --watch crates/common \
+    --watch Cargo.toml --watch Cargo.lock \
+    -- cargo run -p be-monolith"
+web_dev_cmd        := "node scripts/wait-for-backend.mjs && pnpm dev:web"
+desktop_dev_cmd    := "node scripts/wait-for-backend.mjs && pnpm dev:desktop"
+ios_dev_cmd        := "node scripts/wait-for-backend.mjs && pnpm dev:ios"
+ios_device_dev_cmd := "node scripts/wait-for-backend.mjs && pnpm tauri ios dev --host=$TAURI_DEV_HOST --config crates/app/euro-mobile/tauri.conf.json --features devtools"
+
+default: dev
+
+# ─── Full stack ────────────────────────────────────────────────────────────
+#
+# Postgres + backend + web + desktop, all in one terminal. `concurrently`
+# is the supervisor; Ctrl-C stops every child. `--kill-others-on-fail`
+# only tears down siblings if one *fails* — a clean exit (rare, since
+# every child is long-running) leaves the rest alone.
+
 dev: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
-    pnpm exec concurrently --kill-others \
+    pnpm exec concurrently --kill-others-on-fail \
         --names backend,web,desktop --prefix-colors cyan,green,yellow \
-        "just _dev-backend-watch" \
-        "just _dev-web-after-backend" \
-        "just _dev-desktop-after-backend"
-
-_dev-backend-watch:
-    watchexec --restart --exts rs,toml \
-        --watch crates/backend --watch crates/common \
-        --watch Cargo.toml --watch Cargo.lock \
-        -- cargo run -p be-monolith
-
-_dev-web-after-backend: _wait-for-backend
-    pnpm dev:web
-
-_dev-desktop-after-backend: _wait-for-backend
-    pnpm dev:desktop
+        "{{backend_dev_cmd}}" \
+        "{{web_dev_cmd}}" \
+        "{{desktop_dev_cmd}}"
 
 # ─── Full stack (iOS) ──────────────────────────────────────────────────────
 #
@@ -117,16 +125,11 @@ _dev-desktop-after-backend: _wait-for-backend
 
 [macos]
 ios: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
-    pnpm exec concurrently --kill-others --handle-input --default-input-target mobile \
+    pnpm exec concurrently --kill-others-on-fail --handle-input --default-input-target mobile \
         --names backend,web,mobile --prefix-colors cyan,green,magenta \
-        "just _dev-backend-watch" \
-        "just _dev-web-after-backend" \
-        "just _dev-ios-after-backend"
-
-[private]
-[macos]
-_dev-ios-after-backend: _wait-for-backend
-    pnpm dev:ios
+        "{{backend_dev_cmd}}" \
+        "{{web_dev_cmd}}" \
+        "{{ios_dev_cmd}}"
 
 # ─── Specta binding regeneration ───────────────────────────────────────────
 #
@@ -158,10 +161,10 @@ ios-specta: doctor
 # Mac. The recipe exports the resulting LAN host into the host-side
 # processes spawned below:
 #
-#   - apps/mobile/vite.config.ts    reads TAURI_DEV_HOST for its bind
-#   - apps/web/vite.config.ts       derives its bind from WEB_URL
-#   - be-monolith                   reads BACKEND_URL / WEB_URL at runtime
-#   - scripts/wait-for-backend.sh   polls the backend health URL
+#   - apps/mobile/vite.config.ts        reads TAURI_DEV_HOST for its bind
+#   - apps/web/vite.config.ts           derives its bind from WEB_URL
+#   - be-monolith                       reads BACKEND_URL / WEB_URL at runtime
+#   - scripts/wait-for-backend.mjs      polls $BACKEND_URL/health
 #
 # The iOS cargo build that bakes the URLs into the binary runs inside
 # xcodebuild's script phase, which doesn't reliably propagate parent-
@@ -183,19 +186,11 @@ ios-device: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
     export TAURI_DEV_HOST="$host"
     export WEB_URL="http://$host:5173"
     export BACKEND_URL="http://$host:3000"
-    export EURORA_HEALTH_URL="http://$host:3000/health"
-    pnpm exec concurrently --kill-others --handle-input --default-input-target mobile \
+    pnpm exec concurrently --kill-others-on-fail --handle-input --default-input-target mobile \
         --names backend,web,mobile --prefix-colors cyan,green,magenta \
-        "just _dev-backend-watch" \
-        "just _dev-web-after-backend" \
-        "just _dev-ios-device-after-backend"
-
-[private]
-[macos]
-_dev-ios-device-after-backend: _wait-for-backend
-    pnpm tauri ios dev --host="$TAURI_DEV_HOST" \
-        --config crates/app/euro-mobile/tauri.conf.json \
-        --features devtools
+        "{{backend_dev_cmd}}" \
+        "{{web_dev_cmd}}" \
+        "{{ios_device_dev_cmd}}"
 
 # Invoked by xcodebuild's preBuildScript in
 # `crates/app/euro-mobile/gen/apple/project.yml`. Self-contained: re-
@@ -244,11 +239,20 @@ doctor:
 
 # ─── Backend ───────────────────────────────────────────────────────────────
 
-dev-backend: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty && _dev-backend-watch
+# Backend with hot-reload (Postgres + watchexec).
+dev-backend: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
+    {{backend_dev_cmd}}
 
 # Backend only, single run, no auto-restart (debugger / profiling).
 dev-backend-once: _ensure-docker doctor dev-postgres-up dev-migrate dev-seed-if-empty
     cargo run -p be-monolith
+
+# Bare watch loop — no docker/seed gates. Called by `pnpm dev:monolith`
+# from package.json scripts that already expect Postgres to be up (e.g.
+# turborepo pipelines, or a `dev-backend` running in another terminal).
+[private]
+_dev-backend-watch:
+    {{backend_dev_cmd}}
 
 # Apply schema migrations against the running Postgres (idempotent).
 dev-migrate:
@@ -340,18 +344,3 @@ _ensure-docker:
 [windows]
 _ensure-docker:
     @powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/ensure-docker.ps1
-
-# Block until the backend's /health endpoint responds, with a 120s ceiling
-# to cover a slow first-time debug compile. Without this, the Vite dev
-# server tries to call /llm/info before the backend exists and the desktop
-# app surfaces a connection error on boot.
-
-[private]
-[unix]
-_wait-for-backend:
-    @./scripts/wait-for-backend.sh
-
-[private]
-[windows]
-_wait-for-backend:
-    @powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File ./scripts/wait-for-backend.ps1

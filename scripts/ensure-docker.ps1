@@ -1,4 +1,4 @@
-# Ensure the Docker daemon is reachable before `just dev` runs the
+﻿# Ensure the Docker daemon is reachable before `just dev` runs the
 # doctor. Doctor itself is side-effect-free by contract — this script
 # is the place where we're allowed to *act*.
 #
