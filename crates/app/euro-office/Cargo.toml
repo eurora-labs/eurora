@@ -35,7 +35,5 @@ name = "euro-office"
 path = "src/bin/codegen.rs"
 required-features = ["codegen"]
 
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

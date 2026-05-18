@@ -7,7 +7,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 [dependencies]
 axum = { workspace = true, features = ["ws"] }
 axum-server = { workspace = true }
-dashmap = "6.1.0"
+dashmap = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -24,7 +24,5 @@ tracing = { workspace = true }
 [dev-dependencies]
 tokio-tungstenite = { workspace = true }
 
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

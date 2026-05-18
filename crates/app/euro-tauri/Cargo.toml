@@ -114,7 +114,5 @@ error-context = ["dep:backtrace"]
 ## A forwarding to all crates that have windows-specific adjustments for testing on non-Windows.
 windows = []
 
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true
