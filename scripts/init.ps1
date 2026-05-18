@@ -1,4 +1,4 @@
-# First-run setup: copy .env.example to .env if .env doesn't exist yet.
+﻿# First-run setup: copy .env.example to .env if .env doesn't exist yet.
 # Idempotent — safe to re-run.
 #
 # Compatible with Windows PowerShell 5.1 and PowerShell 7+.
