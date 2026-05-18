@@ -22,7 +22,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-focus-tracker = "1.0.0"
+focus-tracker = "1.1.0"
 tokio = { version = "1", features = ["full"] }
 ```
 

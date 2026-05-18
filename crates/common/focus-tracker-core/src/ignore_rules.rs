@@ -347,7 +347,9 @@ mod tests {
     #[test]
     fn builder_accepts_string_and_str() {
         let rule_from_str = IgnoreRule::builder().process_name("p").build();
-        let rule_from_string = IgnoreRule::builder().process_name(String::from("p")).build();
+        let rule_from_string = IgnoreRule::builder()
+            .process_name(String::from("p"))
+            .build();
         assert_eq!(rule_from_str, rule_from_string);
     }
 
@@ -357,7 +359,10 @@ mod tests {
             .process_name("p")
             .window_title(WindowTitleMatch::Missing)
             .build();
-        assert_eq!(rule.process_name_match(), &ProcessNameMatch::Exact("p".into()));
+        assert_eq!(
+            rule.process_name_match(),
+            &ProcessNameMatch::Exact("p".into())
+        );
         assert_eq!(rule.window_title_match(), &WindowTitleMatch::Missing);
     }
 
