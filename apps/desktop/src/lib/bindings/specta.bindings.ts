@@ -1151,13 +1151,13 @@ export type WireToolDescriptor = {
 	 *  surfaced to the LLM in a given turn (e.g.
 	 *  `["youtube::watch_page"]`).
 	 */
-	required_contexts: string[],
+	required_contexts?: string[],
 	/**
 	 *  If true, the server must obtain explicit user approval before
 	 *  dispatching the call. Not enforced in v1 (all v1 tools are
 	 *  read-only) but declared so the protocol is stable.
 	 */
-	requires_user_approval: boolean,
+	requires_user_approval?: boolean,
 };
 
 /* Tauri Specta runtime */

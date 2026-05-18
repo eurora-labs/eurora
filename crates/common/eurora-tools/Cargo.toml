@@ -1,0 +1,23 @@
+[package]
+name = "eurora-tools"
+version = "0.0.0"
+edition.workspace = true
+description = "In-process tool framework for Eurora's unified tool-execution architecture. Defines descriptors, origins, errors, and the Dispatcher/Catalog/RemoteToolBus traits used by client- and server-side tool wiring."
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+dashmap = { workspace = true }
+futures = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+thread-core = { workspace = true }
+tokio-util = { workspace = true, features = ["rt"] }
+trait-variant = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+
+[lints]
+workspace = true
