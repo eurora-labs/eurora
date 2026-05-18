@@ -26,6 +26,7 @@ p, Free, /v1/assets/{asset_id}, GET
 # through `http_token_gate_middleware` which enforces monthly token caps.
 p, Free, /threads, GET
 p, Free, /threads, POST
+p, Free, /threads/by-activity/{activity_id}, GET
 p, Free, /threads/{thread_id}, GET
 p, Free, /threads/{thread_id}, DELETE
 p, Free, /threads/{thread_id}/title, POST

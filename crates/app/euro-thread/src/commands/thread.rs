@@ -27,6 +27,20 @@ pub async fn thread_list(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn thread_list_by_activity(
+    app_handle: AppHandle,
+    activity_id: Uuid,
+    limit: u32,
+    offset: u32,
+) -> Result<Vec<Thread>, ThreadError> {
+    let manager = thread_manager(&app_handle, ThreadError::StateUnavailable)?;
+    Ok(manager
+        .list_threads_for_activity(activity_id, limit, offset)
+        .await?)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn thread_create(app_handle: AppHandle) -> Result<Thread, ThreadError> {
     let manager = thread_manager(&app_handle, ThreadError::StateUnavailable)?;
     Ok(manager.create(None).await?)
