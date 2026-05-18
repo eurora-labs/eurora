@@ -319,8 +319,8 @@ async fn run_turn(
     // sent. Idempotent — the composite PK (activity_id, thread_id) absorbs
     // repeat sends from the same activity. Failure here must not poison the
     // turn (chat works without the link), so we log and continue.
-    if let Some(activity_id) = request.activity_id {
-        if let Err(err) = state
+    if let Some(activity_id) = request.activity_id
+        && let Err(err) = state
             .db
             .link_activity_to_thread()
             .activity_id(activity_id)
@@ -336,7 +336,6 @@ async fn run_turn(
                 "Failed to link activity to thread"
             );
         }
-    }
 
     let human_message_id = human_db_message.id;
     let human_parent_id = human_db_message.parent_message_id;
