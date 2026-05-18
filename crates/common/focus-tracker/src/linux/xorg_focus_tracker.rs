@@ -53,9 +53,10 @@ where
         if let Ok(Some(window)) = get_active_window(&conn, root, atoms.net_active_window) {
             match get_window_info(&conn, window, &atoms) {
                 Ok(mut focused_window) => {
-                    let ignored = config_clone
-                        .linux_ignored_processes
-                        .contains(&focused_window.process_name);
+                    let ignored = config_clone.linux_ignore_rules.matches(
+                        &focused_window.process_name,
+                        focused_window.window_title.as_deref(),
+                    );
 
                     current_focused_window = Some(window);
                     if let Err(e) = conn.change_window_attributes(
@@ -163,10 +164,10 @@ where
             if should_emit_focus_event && let Some(window) = new_window {
                 match get_window_info(&conn, window, &atoms) {
                     Ok(mut focused_window) => {
-                        if config_clone
-                            .linux_ignored_processes
-                            .contains(&focused_window.process_name)
-                        {
+                        if config_clone.linux_ignore_rules.matches(
+                            &focused_window.process_name,
+                            focused_window.window_title.as_deref(),
+                        ) {
                             continue;
                         }
 

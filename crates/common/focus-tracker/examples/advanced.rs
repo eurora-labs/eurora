@@ -10,7 +10,8 @@
 //! Usage: cargo run --example advanced
 
 use focus_tracker::{
-    FocusTracker, FocusTrackerConfig, FocusTrackerResult, FocusedWindow, IconConfig,
+    FocusTracker, FocusTrackerConfig, FocusTrackerResult, FocusedWindow, IconConfig, IgnoreRule,
+    WindowTitleMatch,
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -39,6 +40,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = FocusTrackerConfig::builder()
         .poll_interval(std::time::Duration::from_millis(50))?
         .icon(IconConfig::builder().size(64)?.build())
+        // Filter out Explorer.EXE noise on Windows: the Alt-Tab "Task
+        // Switching" overlay and titleless Explorer pseudo-windows are
+        // both reported as focus events, but neither is a real
+        // user-facing application context.
+        .windows_ignore_rules([
+            IgnoreRule::builder()
+                .process_name("Explorer.EXE")
+                .window_title(WindowTitleMatch::Exact("Task Switching".into()))
+                .build(),
+            IgnoreRule::builder()
+                .process_name("Explorer.EXE")
+                .window_title(WindowTitleMatch::Missing)
+                .build(),
+        ])
         .build();
 
     println!("⚙️  Configuration:");
