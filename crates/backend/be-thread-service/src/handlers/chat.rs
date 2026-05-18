@@ -328,14 +328,14 @@ async fn run_turn(
             .user_id(user_id)
             .call()
             .await
-        {
-            tracing::warn!(
-                error = %err,
-                activity_id = %activity_id,
-                thread_id = %thread_id,
-                "Failed to link activity to thread"
-            );
-        }
+    {
+        tracing::warn!(
+            error = %err,
+            activity_id = %activity_id,
+            thread_id = %thread_id,
+            "Failed to link activity to thread"
+        );
+    }
 
     let human_message_id = human_db_message.id;
     let human_parent_id = human_db_message.parent_message_id;
