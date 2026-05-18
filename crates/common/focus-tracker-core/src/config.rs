@@ -406,12 +406,10 @@ mod tests {
         // The motivating case: suppress "whatever" only when it has no
         // title; keep events for titled instances.
         let config = FocusTrackerConfig::builder()
-            .windows_ignore_rules([
-                IgnoreRule::builder()
-                    .process_name("whatever")
-                    .window_title(WindowTitleMatch::Missing)
-                    .build(),
-            ])
+            .windows_ignore_rules([IgnoreRule::builder()
+                .process_name("whatever")
+                .window_title(WindowTitleMatch::Missing)
+                .build()])
             .build();
 
         assert!(config.windows_ignore_rules.matches("whatever", None));
