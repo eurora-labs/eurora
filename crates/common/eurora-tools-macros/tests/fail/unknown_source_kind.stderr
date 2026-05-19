@@ -1,0 +1,11 @@
+error: unknown `source` kind `rocketship`; expected one of `bridge(<kind>)`, `client_local`, `server_local`, `acp`
+  --> tests/fail/unknown_source_kind.rs:16:39
+   |
+16 |     #[tool(timeout_ms = 100, source = "rocketship")]
+   |                                       ^^^^^^^^^^^^
+
+error: while parsing this `#[tool]`
+  --> tests/fail/unknown_source_kind.rs:16:5
+   |
+16 |     #[tool(timeout_ms = 100, source = "rocketship")]
+   |     ^
