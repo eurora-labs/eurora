@@ -116,6 +116,7 @@ mod tests {
                     "nonAnonymousMetrics": true,
                     "futureTelemetryKnob": true,
                 },
+                "askBar": { "enabled": true },
                 "futureDesktopKnob": [1, 2, 3],
             },
             "mobile": { "futureMobileKnob": "y" },

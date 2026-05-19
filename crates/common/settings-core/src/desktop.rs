@@ -3,6 +3,39 @@ use serde_json::{Map, Value};
 
 use crate::telemetry::TelemetryConsent;
 
+/// Settings for the floating "ask" overlay. The overlay is the
+/// Spotlight-style entry point that appears when the user presses the
+/// global hotkey or activates the system tray entry. Two windows
+/// participate: a compact bar that captures input, and a taller answer
+/// pane that streams the response. Both invocation paths funnel into
+/// the same answer window, so disabling the bar narrows the UX to
+/// "input directly in the answer window" without removing the
+/// invocation entry points.
+///
+/// `enabled` toggles the small bar; when `false`, the hotkey opens the
+/// answer window directly with an empty input. URL-scheme / App Intent
+/// invocation (`eurora://ask?q=…`) always lands in the answer window
+/// regardless of this setting — the bar is only relevant when the user
+/// invokes from the hotkey or tray with no prompt in hand.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, bon::Builder)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+#[serde(default, rename_all = "camelCase")]
+pub struct AskBarSettings {
+    /// When `true`, the hotkey (and tray entry) opens the compact ask
+    /// bar; on submit it spawns the answer window. When `false`, the
+    /// hotkey opens the answer window directly. Defaults to `true`
+    /// because the bar is the cheaper, lighter overlay and is what
+    /// most users will reach for first.
+    #[builder(default = true)]
+    pub enabled: bool,
+}
+
+impl Default for AskBarSettings {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
 /// Identity scale — the value the UI is designed against. Used as the
 /// `Default` for both [`InterfaceScale`] and [`TextScale`] so a missing
 /// field on the wire never resolves to a zero-size UI.
@@ -178,6 +211,10 @@ pub struct DesktopSettings {
     /// specific to the data actually collected.
     #[builder(default)]
     pub telemetry: TelemetryConsent,
+    /// Settings for the floating "ask" overlay (the Spotlight-style
+    /// entry point). See [`AskBarSettings`].
+    #[builder(default)]
+    pub ask_bar: AskBarSettings,
     // `flatten` of an empty Map already emits nothing — no
     // `skip_serializing_if` needed, and using it here would force
     // tauri-specta out of unified mode where the IPC surface lives.
@@ -311,10 +348,39 @@ mod tests {
                 "anonymousErrors": true,
                 "nonAnonymousMetrics": false,
             },
+            "askBar": { "enabled": true },
             "futureKnob": { "nested": true },
         });
         let parsed: DesktopSettings = serde_json::from_value(raw.clone()).unwrap();
         let round_tripped = serde_json::to_value(&parsed).unwrap();
         assert_eq!(round_tripped, raw);
+    }
+
+    #[test]
+    fn ask_bar_defaults_to_enabled() {
+        let s = DesktopSettings::default();
+        assert!(
+            s.ask_bar.enabled,
+            "fresh installs must surface the ask bar; users who don't want it opt out explicitly"
+        );
+    }
+
+    #[test]
+    fn ask_bar_missing_section_resolves_to_default() {
+        // Older clients won't write an `askBar` block; that must
+        // resolve to the enabled-by-default fresh-install value
+        // rather than the bool-zero "disabled" fallback.
+        let raw = serde_json::json!({ "interfaceScale": 1.0 });
+        let parsed: DesktopSettings = serde_json::from_value(raw).unwrap();
+        assert!(parsed.ask_bar.enabled);
+    }
+
+    #[test]
+    fn ask_bar_disabled_round_trips() {
+        let raw = serde_json::json!({ "askBar": { "enabled": false } });
+        let parsed: DesktopSettings = serde_json::from_value(raw).unwrap();
+        assert!(!parsed.ask_bar.enabled);
+        let back = serde_json::to_value(&parsed).unwrap();
+        assert_eq!(back["askBar"]["enabled"], serde_json::Value::Bool(false));
     }
 }

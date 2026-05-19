@@ -67,9 +67,17 @@ tauri = { workspace = true, features = [
   "x11",
   "dbus",
   "tray-icon",
+  # `macos-private-api` unlocks transparent NSWindow rendering on macOS
+  # via the NSVisualEffectView/NSWindow private surface tauri-runtime-wry
+  # exposes through this feature. Required for the Spotlight-style ask /
+  # answer overlays — without it, `.transparent(true)` is not even a
+  # method on the macOS `WebviewWindowBuilder`. The same feature on
+  # Linux/Windows is a no-op.
+  "macos-private-api",
 ] }
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2.3.2"
+tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-global-shortcut = "2"

@@ -25,6 +25,38 @@ export const commands = {
 	 *  one bad asset can't block the rest of the page from rendering.
 	 */
 	activityList: (limit: number, offset: number) => typedError<SavedActivity[], SavedActivityError>(__TAURI_INVOKE("activity_list", { limit, offset })),
+	askOpenWindow: () => typedError<null, AskError>(__TAURI_INVOKE("ask_open_window")),
+	askCloseWindow: () => typedError<null, AskError>(__TAURI_INVOKE("ask_close_window")),
+	askOpenAnswerWindow: (prompt: string | null) => typedError<null, AskError>(__TAURI_INVOKE("ask_open_answer_window", { prompt })),
+	/**
+	 *  Returns the currently-focused activity in the same shape the
+	 *  [`TimelineAppEvent`] broadcast uses. The broadcast channel does
+	 *  not replay history, so a webview that mounts mid-session (the
+	 *  ask / answer overlay windows are the load-bearing example) would
+	 *  otherwise see no icon until the next focus change. The overlay
+	 *  pages call this on mount to seed the icon synchronously instead
+	 *  of waiting on the user to switch apps.
+	 * 
+	 *  Returns `None` when the timeline collector hasn't observed any
+	 *  activity yet (cold startup, before the first focus event).
+	 */
+	timelineGetCurrentApp: () => __TAURI_INVOKE<{
+	name: string,
+	accent: AccentColor | null,
+	iconBase64: string | null,
+	/**
+	 *  Executable name of the focused process. Used by the frontend to
+	 *  resolve which browser (if any) the user is currently on so it can
+	 *  surface the matching extension install affordance.
+	 */
+	processName: string,
+	/**
+	 *  OS-level process id of the focused process. Required when the
+	 *  frontend wants to act on that specific browser instance (for
+	 *  example, opening a URL inside it rather than the OS default).
+	 */
+	processId: number,
+} | null>("timeline_get_current_app"),
 	chatCollectContext: (threadId: string) => typedError<ChatContext, StreamError>(__TAURI_INVOKE("chat_collect_context", { threadId })),
 	chatSendQuery: (threadId: string, channel: Channel<ChatServerMessage>, request: ChatSendRequest) => typedError<null, StreamError>(__TAURI_INVOKE("chat_send_query", { threadId, channel, request })),
 	chatRegenerate: (threadId: string, aiMessageId: string, channel: Channel<ChatServerMessage>) => typedError<null, StreamError>(__TAURI_INVOKE("chat_regenerate", { threadId, aiMessageId, channel })),
@@ -211,6 +243,39 @@ export type AnyMessage = {
 } & ChatMessage | {
 	type: "remove",
 } & RemoveMessage;
+
+/**
+ *  Settings for the floating "ask" overlay. The overlay is the
+ *  Spotlight-style entry point that appears when the user presses the
+ *  global hotkey or activates the system tray entry. Two windows
+ *  participate: a compact bar that captures input, and a taller answer
+ *  pane that streams the response. Both invocation paths funnel into
+ *  the same answer window, so disabling the bar narrows the UX to
+ *  "input directly in the answer window" without removing the
+ *  invocation entry points.
+ * 
+ *  `enabled` toggles the small bar; when `false`, the hotkey opens the
+ *  answer window directly with an empty input. URL-scheme / App Intent
+ *  invocation (`eurora://ask?q=…`) always lands in the answer window
+ *  regardless of this setting — the bar is only relevant when the user
+ *  invokes from the hotkey or tray with no prompt in hand.
+ */
+export type AskBarSettings = {
+	/**
+	 *  When `true`, the hotkey (and tray entry) opens the compact ask
+	 *  bar; on submit it spawns the answer window. When `false`, the
+	 *  hotkey opens the answer window directly. Defaults to `true`
+	 *  because the bar is the cheaper, lighter overlay and is what
+	 *  most users will reach for first.
+	 */
+	enabled?: boolean,
+};
+
+/**
+ *  Typed error surface for the `ask_*` IPC commands. Externally tagged
+ *  so the frontend can branch on `type` without parsing strings.
+ */
+export type AskError = { type: "Window"; data: string };
 
 export type AudioContentBlock = {
 	id?: string | null,
@@ -502,6 +567,11 @@ export type DesktopSettings = {
 	 *  specific to the data actually collected.
 	 */
 	telemetry?: TelemetryConsent,
+	/**
+	 *  Settings for the floating "ask" overlay (the Spotlight-style
+	 *  entry point). See [`AskBarSettings`].
+	 */
+	askBar?: AskBarSettings,
 } & { [key in string]: unknown };
 
 export type FileContentBlock = {

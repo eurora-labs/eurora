@@ -1,7 +1,13 @@
 use euro_activity::ContextChip;
+use euro_timeline::TimelineManager;
+use euro_vision::rgba_to_base64;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
+use tokio::sync::Mutex;
+
+use crate::procedures::accent::accent_from_image;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -67,3 +73,35 @@ pub struct TimelineAppEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct TimelineAssetsEvent(pub Vec<ContextChip>);
+
+/// Returns the currently-focused activity in the same shape the
+/// [`TimelineAppEvent`] broadcast uses. The broadcast channel does
+/// not replay history, so a webview that mounts mid-session (the
+/// ask / answer overlay windows are the load-bearing example) would
+/// otherwise see no icon until the next focus change. The overlay
+/// pages call this on mount to seed the icon synchronously instead
+/// of waiting on the user to switch apps.
+///
+/// Returns `None` when the timeline collector hasn't observed any
+/// activity yet (cold startup, before the first focus event).
+#[tauri::command]
+#[specta::specta]
+pub async fn timeline_get_current_app(app_handle: AppHandle) -> Option<TimelineAppEvent> {
+    let timeline_state = app_handle.try_state::<Mutex<TimelineManager>>()?;
+    let timeline = timeline_state.lock().await;
+    let storage = timeline.storage.lock().await;
+    let activity = storage.get_current_activity()?;
+
+    let (accent, icon_base64) = match activity.icon.as_ref() {
+        Some(icon) => (accent_from_image(icon), rgba_to_base64(icon).ok()),
+        None => (None, None),
+    };
+
+    Some(TimelineAppEvent {
+        name: activity.name.clone(),
+        accent,
+        icon_base64,
+        process_name: activity.process_name.clone(),
+        process_id: activity.process_id,
+    })
+}

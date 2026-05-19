@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Block until the backend's /health endpoint responds, with a 120s ceiling
+// Block until the backend's /health endpoint responds, with a 300s ceiling
 // to cover a slow first-time debug compile.
 //
 // Used by `just dev` (and friends) to delay web / desktop / mobile startup
@@ -19,7 +19,7 @@
 
 const baseUrl = process.env.BACKEND_URL ?? 'http://localhost:3000';
 const url = `${baseUrl.replace(/\/$/, '')}/health`;
-const deadlineSecs = 120;
+const deadlineSecs = 300;
 const deadline = Date.now() + deadlineSecs * 1000;
 const pollIntervalMs = 500;
 
