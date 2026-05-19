@@ -4343,6 +4343,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "eurora-tools-youtube"
+version = "0.0.0"
+dependencies = [
+ "eurora-tools",
+ "insta",
+ "schemars 1.2.1",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
 name = "event-listener"
 version = "5.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

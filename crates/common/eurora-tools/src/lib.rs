@@ -34,6 +34,7 @@
 //!
 //! See `plan.md` for the end-to-end design.
 
+mod args;
 mod bus;
 mod descriptor;
 mod dispatcher;
@@ -44,6 +45,7 @@ mod schema;
 #[doc(hidden)]
 pub mod __private;
 
+pub use args::Empty;
 pub use bus::{IncomingCall, RemoteToolBus, RemoteToolBusLocal};
 pub use descriptor::ToolDescriptor;
 pub use dispatcher::{Catalog, Dispatcher};
