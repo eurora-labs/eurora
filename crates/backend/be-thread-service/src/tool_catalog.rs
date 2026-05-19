@@ -386,6 +386,22 @@ mod tests {
     }
 
     #[test]
+    fn build_detects_collision_between_two_server_locals() {
+        let err = TurnCatalog::build(
+            [
+                NamedTool::arc("firecrawl_search"),
+                NamedTool::arc("firecrawl_search"),
+            ],
+            [],
+            &[],
+        )
+        .unwrap_err();
+        match err {
+            CatalogBuildError::NameCollision(name) => assert_eq!(name, "firecrawl_search"),
+        }
+    }
+
+    #[test]
     fn tool_likes_emits_definition_for_remote_entries() {
         let catalog = TurnCatalog::build(
             [],

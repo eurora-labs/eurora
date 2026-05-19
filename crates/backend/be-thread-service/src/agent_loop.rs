@@ -775,6 +775,48 @@ mod tests {
         );
     }
 
+    /// Guards the `if token.is_cancelled()` arm in `execute_tool_calls`: a
+    /// bus that returns `ToolError::Cancelled` *without* the chat token
+    /// having fired is a misbehaving bus, not a cancellation. The round
+    /// must continue and surface a normal error tool message rather than
+    /// aborting the turn.
+    #[tokio::test]
+    async fn dispatch_treats_bus_cancelled_without_token_cancel_as_error() {
+        let catalog = Arc::new(
+            TurnCatalog::build([], [remote_descriptor("browser::test::cancel")], &[]).unwrap(),
+        );
+        let bus = StubBus::err(ToolError::Cancelled);
+        let cancel = CancellationToken::new();
+
+        let outcome = execute_tool_calls(
+            &catalog,
+            &*bus,
+            vec![tool_call("browser::test::cancel", json!({}), "c1")],
+            &cancel,
+        )
+        .await;
+
+        let msgs = match outcome {
+            ToolExecOutcome::Completed(m) => m,
+            ToolExecOutcome::Cancelled(_) => {
+                panic!("bus.Cancelled without token-cancel should not abort the round")
+            }
+        };
+        assert_eq!(msgs.len(), 1);
+        let msg = extract_tool_message(&msgs[0]);
+        assert_eq!(msg.status, ToolStatus::Error);
+        let content_text = msg.content.iter().fold(String::new(), |mut acc, b| {
+            if let agent_chain::messages::ContentBlock::Text(t) = b {
+                acc.push_str(&t.text);
+            }
+            acc
+        });
+        assert!(
+            content_text.contains("tool call cancelled"),
+            "expected ToolError::Cancelled rendering, got {content_text:?}"
+        );
+    }
+
     #[tokio::test]
     async fn dispatch_reports_unknown_tool_as_error_message() {
         let catalog = Arc::new(TurnCatalog::build([], [], &[]).unwrap());
