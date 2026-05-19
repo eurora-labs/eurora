@@ -9,6 +9,7 @@
 //! `ToolError`) live in `eurora-tools` and convert to/from the wire shapes
 //! defined here. See `plan.md` for the full architecture.
 
+use agent_chain_core::tools::ToolDefinition;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -86,22 +87,25 @@ pub enum ToolErrorWire {
 /// Wire-side descriptor for a tool. One per call, one per entry in the
 /// per-turn `CapabilityUpdate.tools` list.
 ///
-/// The framework form (`eurora_tools::ToolDescriptor`) is the in-process
+/// `WireToolDescriptor` is a [`ToolDefinition`] (name, description,
+/// parameters schema) plus dispatch metadata (timeout, source, required
+/// contexts, approval flag) and the tool's output schema. The framework
+/// form (`eurora_tools::ToolDescriptor`) is the in-process
 /// `&'static`-everywhere shape; this is its serializable counterpart, owned
 /// and ready for transport. The server only ever sees this form.
+///
+/// The `definition` field is flattened on the wire so the JSON shape stays
+/// flat (`{"name": ..., "description": ..., "parameters": ..., ...}`),
+/// while in Rust the typed relationship `WireToolDescriptor IS-A
+/// ToolDefinition + dispatch metadata` is explicit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct WireToolDescriptor {
-    /// Fully-qualified tool name, namespaced with `::`
-    /// (e.g. `browser::youtube::get_current_timestamp`).
-    pub name: String,
-    /// Human-readable description shown to the LLM. Produced by the
-    /// framework macro from the first paragraph of the trait method's
-    /// rustdoc.
-    pub description: String,
-    /// JSON Schema for the tool's `arguments` payload.
-    #[cfg_attr(feature = "specta", specta(type = Unknown))]
-    pub input_schema: serde_json::Value,
+    /// The LLM-facing identity of the tool: name, description, parameters
+    /// schema. Reused by `agent-chain-core` providers when binding the
+    /// tool to a chat model.
+    #[serde(flatten)]
+    pub definition: ToolDefinition,
     /// JSON Schema for the tool's success payload.
     #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub output_schema: serde_json::Value,
@@ -123,6 +127,14 @@ pub struct WireToolDescriptor {
     /// read-only) but declared so the protocol is stable.
     #[serde(default)]
     pub requires_user_approval: bool,
+}
+
+impl WireToolDescriptor {
+    /// Shortcut for the most common field access — the tool's name lives
+    /// inside the flattened [`ToolDefinition`].
+    pub fn name(&self) -> &str {
+        &self.definition.name
+    }
 }
 
 /// Wire-side projection of an active context, sent in `CapabilityUpdate`.
@@ -264,9 +276,11 @@ mod tests {
 
     fn sample_descriptor() -> WireToolDescriptor {
         WireToolDescriptor {
-            name: "browser::youtube::get_current_timestamp".into(),
-            description: "Return the user's current playback position.".into(),
-            input_schema: json!({"type": "object"}),
+            definition: ToolDefinition {
+                name: "browser::youtube::get_current_timestamp".into(),
+                description: "Return the user's current playback position.".into(),
+                parameters: json!({"type": "object"}),
+            },
             output_schema: json!({"type": "object", "properties": {"timestamp_seconds": {"type": "number"}}}),
             timeout_ms: 2_000,
             source: ToolSource::Bridge {
@@ -286,13 +300,28 @@ mod tests {
     }
 
     #[test]
+    fn wire_tool_descriptor_flattens_definition_on_the_wire() {
+        // The flattened ToolDefinition fields sit at the top level of the
+        // JSON object — no nested `definition` envelope. Pin this so a
+        // future #[serde(flatten)] mistake breaks the test, not the wire.
+        let s = serde_json::to_string(&sample_descriptor()).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&s).unwrap();
+        let obj = parsed.as_object().expect("wire shape is an object");
+        assert!(obj.contains_key("name"));
+        assert!(obj.contains_key("description"));
+        assert!(obj.contains_key("parameters"));
+        assert!(!obj.contains_key("definition"));
+        assert!(!obj.contains_key("input_schema"));
+    }
+
+    #[test]
     fn wire_tool_descriptor_decodes_with_missing_optional_fields() {
         // Forward-compat: clients that predate the addition of
         // `required_contexts` / `requires_user_approval` should still parse.
         let json = r#"{
             "name": "browser::youtube::get_current_timestamp",
             "description": "x",
-            "input_schema": {},
+            "parameters": {},
             "output_schema": {},
             "timeout_ms": 2000,
             "source": {"kind": "bridge", "app_kind": "browser"}
@@ -300,6 +329,12 @@ mod tests {
         let back: WireToolDescriptor = serde_json::from_str(json).unwrap();
         assert!(back.required_contexts.is_empty());
         assert!(!back.requires_user_approval);
+    }
+
+    #[test]
+    fn wire_tool_descriptor_name_helper_returns_definition_name() {
+        let d = sample_descriptor();
+        assert_eq!(d.name(), "browser::youtube::get_current_timestamp");
     }
 
     #[test]

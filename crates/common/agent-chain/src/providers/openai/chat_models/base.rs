@@ -65,7 +65,9 @@ use crate::chat_models::{
 use crate::error::{Error, Result};
 use crate::language_models::ChatGenerationStream;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
-use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
+use crate::language_models::{
+    ChatModelRunnable, ToolLike, extract_tool_name_from_schema, partition_tool_likes,
+};
 use crate::messages::{
     AIMessage, AnyMessage, ContentBlock, ContentBlocks, InvalidToolCall, PlainTextContentBlock,
     ToolCall,
@@ -3042,23 +3044,12 @@ impl BaseChatModel for ChatOpenAI {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
-            .iter()
-            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        let (function_tools, builtin_tools) = partition_tool_likes(tools);
         bound.bound_tools = function_tools
             .iter()
             .map(|t| t.to_definition())
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        bound.bound_builtin_tools = builtin_tools
-            .iter()
-            .filter_map(|t| {
-                if let ToolLike::Builtin(v) = t {
-                    Some(v.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
+        bound.bound_builtin_tools = builtin_tools;
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -3103,23 +3094,12 @@ impl ChatOpenAI {
         response_format: Option<serde_json::Value>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
-            .iter()
-            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        let (function_tools, builtin_tools) = partition_tool_likes(tools);
         bound.bound_tools = function_tools
             .iter()
             .map(|t| t.to_definition())
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        bound.bound_builtin_tools = builtin_tools
-            .iter()
-            .filter_map(|t| {
-                if let ToolLike::Builtin(v) = t {
-                    Some(v.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
+        bound.bound_builtin_tools = builtin_tools;
         bound.bound_tool_choice = tool_choice;
         bound.bound_strict = strict;
         bound.bound_parallel_tool_calls = parallel_tool_calls;

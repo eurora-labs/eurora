@@ -1,17 +1,18 @@
 ---
 source: crates/common/tools/eurora-tools-youtube/tests/descriptors_snapshot.rs
-assertion_line: 20
 expression: wire
 ---
 [
     WireToolDescriptor {
-        name: "browser::youtube::get_current_timestamp",
-        description: "Return the user's current playback position in the active YouTube video, along with the video duration and play/pause state.",
-        input_schema: Object {
-            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-            "description": String("No arguments."),
-            "title": String("Empty"),
-            "type": String("object"),
+        definition: ToolDefinition {
+            name: "browser::youtube::get_current_timestamp",
+            description: "Return the user's current playback position in the active YouTube video, along with the video duration and play/pause state.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("No arguments."),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
         },
         output_schema: Object {
             "$schema": String("https://json-schema.org/draft/2020-12/schema"),
@@ -55,13 +56,15 @@ expression: wire
         requires_user_approval: false,
     },
     WireToolDescriptor {
-        name: "browser::youtube::get_transcript",
-        description: "Return the full transcript of the video the user is watching. Comes from YouTube's caption API; videos without captions fail with a structured error.",
-        input_schema: Object {
-            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-            "description": String("No arguments."),
-            "title": String("Empty"),
-            "type": String("object"),
+        definition: ToolDefinition {
+            name: "browser::youtube::get_transcript",
+            description: "Return the full transcript of the video the user is watching. Comes from YouTube's caption API; videos without captions fail with a structured error.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("No arguments."),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
         },
         output_schema: Object {
             "$defs": Object {
@@ -128,13 +131,15 @@ expression: wire
         requires_user_approval: false,
     },
     WireToolDescriptor {
-        name: "browser::youtube::get_current_frame",
-        description: "Capture the current visible video frame as a PNG, base64-encoded.",
-        input_schema: Object {
-            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-            "description": String("No arguments."),
-            "title": String("Empty"),
-            "type": String("object"),
+        definition: ToolDefinition {
+            name: "browser::youtube::get_current_frame",
+            description: "Capture the current visible video frame as a PNG, base64-encoded.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("No arguments."),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
         },
         output_schema: Object {
             "$schema": String("https://json-schema.org/draft/2020-12/schema"),

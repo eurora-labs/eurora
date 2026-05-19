@@ -6,6 +6,7 @@ description = "In-process tool framework for Eurora's unified tool-execution arc
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+agent-chain-core = { workspace = true }
 dashmap = { workspace = true }
 eurora-tools-macros = { workspace = true }
 futures = { workspace = true }

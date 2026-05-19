@@ -2,15 +2,15 @@
 //! dispatch tool calls it emits, and force a final text answer if it
 //! exhausts the tool-call budget.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use agent_chain::{
-    AIMessage, AnyMessage, BaseChatModel, BaseTool, SystemMessage,
+    AIMessage, AnyMessage, BaseChatModel, SystemMessage,
     language_models::{ToolChoice, ToolLike},
     messages::{AIMessageChunk, ToolCall, ToolMessage, ToolStatus},
 };
 use be_remote_db::{DatabaseManager, MessageType};
+use eurora_tools::{RemoteToolBus, ToolError};
 use serde_json::Value;
 use thread_core::{ChatServerMessage, MessageNode};
 use tokio::sync::mpsc;
@@ -19,6 +19,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::conversion::convert_db_message_to_base_message;
+use crate::tool_catalog::{TurnCatalog, TurnEntry};
 
 /// Appended as a system message on the forced-synthesis turn so the model
 /// understands why its tools have been taken away.
@@ -181,44 +182,94 @@ enum ToolExecOutcome {
     Cancelled(Vec<AnyMessage>),
 }
 
-async fn execute_tool_calls(
-    tools: &HashMap<String, Arc<dyn BaseTool>>,
+async fn execute_tool_calls<B>(
+    catalog: &TurnCatalog,
+    bus: &B,
     calls: Vec<ToolCall>,
     token: &CancellationToken,
-) -> ToolExecOutcome {
+) -> ToolExecOutcome
+where
+    B: RemoteToolBus,
+{
     let mut results = Vec::with_capacity(calls.len());
 
     for call in calls {
         let tool_name = call.name.clone();
-        let Some(tool) = tools.get(&tool_name) else {
-            tracing::error!("Unknown tool: {tool_name}");
-            let tool_call_id = call.id.clone().unwrap_or_default();
-            results.push(
-                ToolMessage::builder()
-                    .content(format!("Error: unknown tool '{tool_name}'"))
-                    .tool_call_id(tool_call_id)
-                    .status(ToolStatus::Error)
-                    .build()
-                    .into(),
-            );
-            continue;
-        };
-
         if call.id.is_none() {
             tracing::warn!("Tool call '{tool_name}' has no id");
         }
+        let tool_call_id = call.id.clone().unwrap_or_default();
 
-        let result_msg = tokio::select! {
-            msg = tool.invoke_tool_call(call) => msg,
-            () = token.cancelled() => {
-                tracing::info!("Chat stream cancelled during tool invocation");
-                return ToolExecOutcome::Cancelled(results);
+        let Some(entry) = catalog.get(&tool_name) else {
+            tracing::error!("Unknown tool: {tool_name}");
+            results.push(unknown_tool_message(&tool_name, &tool_call_id));
+            continue;
+        };
+
+        let result_msg = match entry {
+            TurnEntry::ServerLocal { tool } => {
+                tokio::select! {
+                    msg = tool.invoke_tool_call(call) => msg,
+                    () = token.cancelled() => {
+                        tracing::info!("Chat stream cancelled during tool invocation");
+                        return ToolExecOutcome::Cancelled(results);
+                    }
+                }
+            }
+            TurnEntry::Remote { descriptor } => {
+                let arguments = call.args.clone();
+                let outcome = tokio::select! {
+                    res = bus.call(descriptor, arguments) => res,
+                    () = token.cancelled() => {
+                        tracing::info!("Chat stream cancelled while awaiting remote tool result");
+                        return ToolExecOutcome::Cancelled(results);
+                    }
+                };
+                match outcome {
+                    Ok(value) => remote_success_message(&tool_call_id, value),
+                    Err(ToolError::Cancelled) if token.is_cancelled() => {
+                        return ToolExecOutcome::Cancelled(results);
+                    }
+                    Err(err) => remote_error_message(&tool_name, &tool_call_id, err),
+                }
             }
         };
         results.push(result_msg);
     }
 
     ToolExecOutcome::Completed(results)
+}
+
+fn unknown_tool_message(tool_name: &str, tool_call_id: &str) -> AnyMessage {
+    ToolMessage::builder()
+        .content(format!("Error: unknown tool '{tool_name}'"))
+        .tool_call_id(tool_call_id.to_string())
+        .status(ToolStatus::Error)
+        .build()
+        .into()
+}
+
+fn remote_success_message(tool_call_id: &str, value: Value) -> AnyMessage {
+    let content = match &value {
+        Value::String(s) => s.clone(),
+        other => serde_json::to_string(other).unwrap_or_else(|_| other.to_string()),
+    };
+    ToolMessage::builder()
+        .content(content)
+        .tool_call_id(tool_call_id.to_string())
+        .status(ToolStatus::Success)
+        .build()
+        .into()
+}
+
+fn remote_error_message(tool_name: &str, tool_call_id: &str, err: ToolError) -> AnyMessage {
+    tracing::warn!(tool = %tool_name, error = %err, "Remote tool call failed");
+    ToolMessage::builder()
+        .content(format!("Error: {err}"))
+        .tool_call_id(tool_call_id.to_string())
+        .status(ToolStatus::Error)
+        .build()
+        .into()
 }
 
 async fn run_forced_synthesis(
@@ -347,19 +398,29 @@ async fn finalize(
 /// followed by a forced-synthesis round if the budget is exhausted with
 /// pending tool calls. Streamed chunks and the terminal `Final` envelope are
 /// forwarded to `tx`. The aggregated AI message is persisted on completion.
+///
+/// `catalog` is the per-turn tool catalog produced by
+/// [`crate::tool_catalog::TurnCatalog::build`]; `remote_bus` is the
+/// [`eurora_tools::RemoteToolBus`] used to dispatch tools whose
+/// [`TurnEntry`] is `Remote`. The bus is taken as a concrete `Arc<B>` so
+/// the agent loop can be exercised with stub buses in tests; production
+/// callers pass [`crate::remote_tool_bus::ChatRemoteBus`].
 #[bon::builder]
-pub async fn run_agent_loop(
+pub async fn run_agent_loop<B>(
     tx: mpsc::Sender<ChatServerMessage>,
     token: CancellationToken,
     db: Arc<DatabaseManager>,
     chat_model: Arc<dyn BaseChatModel + Send + Sync>,
-    tools: HashMap<String, Arc<dyn BaseTool>>,
+    catalog: Arc<TurnCatalog>,
+    remote_bus: Arc<B>,
     mut messages: Vec<AnyMessage>,
     thread_id: Uuid,
     user_id: Uuid,
     human_message_id: Uuid,
     max_tool_rounds: usize,
-) {
+) where
+    B: RemoteToolBus + Send + Sync + 'static,
+{
     let mut acc = ChatAccumulator::default();
     let mut cancelled = false;
     let mut budget_exhausted = false;
@@ -394,7 +455,7 @@ pub async fn run_agent_loop(
                 .into(),
         );
 
-        match execute_tool_calls(&tools, result.tool_calls, &token).await {
+        match execute_tool_calls(&catalog, remote_bus.as_ref(), result.tool_calls, &token).await {
             ToolExecOutcome::Completed(tool_msgs) => messages.extend(tool_msgs),
             ToolExecOutcome::Cancelled(tool_msgs) => {
                 messages.extend(tool_msgs);
@@ -414,7 +475,7 @@ pub async fn run_agent_loop(
             rounds = max_tool_rounds,
             "Tool-call budget exhausted; running forced synthesis with tool_choice=none"
         );
-        let tool_likes: Vec<ToolLike> = tools.values().cloned().map(ToolLike::Tool).collect();
+        let tool_likes: Vec<ToolLike> = catalog.tool_likes();
         match run_forced_synthesis(&*chat_model, &tool_likes, &messages, &tx, &token, &mut acc)
             .await
         {
@@ -435,4 +496,311 @@ pub async fn run_agent_loop(
         cancelled,
     )
     .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::Mutex;
+
+    use agent_chain::async_trait;
+    use agent_chain::callbacks::manager::CallbackManagerForToolRun;
+    use agent_chain::error::Result as ChainResult;
+    use agent_chain::runnables::RunnableConfig;
+    use agent_chain::tools::{ArgsSchema, BaseTool, ToolInput, ToolOutput};
+    use eurora_tools::ToolError;
+    use serde_json::json;
+    use thread_core::{ToolSource, WireToolDescriptor};
+
+    #[derive(Debug)]
+    struct RecordingTool {
+        name: String,
+        args_schema: ArgsSchema,
+        last_call: Mutex<Option<ToolInput>>,
+        result: String,
+    }
+
+    impl RecordingTool {
+        fn new(name: &str, result: &str) -> Arc<Self> {
+            Arc::new(Self {
+                name: name.to_string(),
+                args_schema: ArgsSchema::JsonSchema(json!({"type": "object"})),
+                last_call: Mutex::new(None),
+                result: result.to_string(),
+            })
+        }
+    }
+
+    #[async_trait]
+    impl BaseTool for RecordingTool {
+        fn name(&self) -> &str {
+            &self.name
+        }
+
+        fn description(&self) -> &str {
+            "recording test tool"
+        }
+
+        fn args_schema(&self) -> Option<&ArgsSchema> {
+            Some(&self.args_schema)
+        }
+
+        async fn tool_run(
+            &self,
+            input: ToolInput,
+            _run_manager: Option<&CallbackManagerForToolRun>,
+            _config: &RunnableConfig,
+        ) -> ChainResult<ToolOutput> {
+            *self.last_call.lock().unwrap() = Some(input);
+            Ok(ToolOutput::String(self.result.clone()))
+        }
+    }
+
+    /// Stub bus that records descriptor + args and returns a canned value
+    /// or error. Used to verify that the agent loop's remote-dispatch arm
+    /// reaches the bus with the right inputs and surfaces the result back
+    /// to the `ToolMessage`.
+    struct StubBus {
+        recorded: Mutex<Vec<(String, Value)>>,
+        outcome: Mutex<Box<dyn FnMut() -> Result<Value, ToolError> + Send>>,
+    }
+
+    impl StubBus {
+        fn ok(value: Value) -> Arc<Self> {
+            Arc::new(Self {
+                recorded: Mutex::new(Vec::new()),
+                outcome: Mutex::new(Box::new(move || Ok(value.clone()))),
+            })
+        }
+
+        fn err(err: ToolError) -> Arc<Self> {
+            let err = Mutex::new(Some(err));
+            Arc::new(Self {
+                recorded: Mutex::new(Vec::new()),
+                outcome: Mutex::new(Box::new(move || {
+                    Err(err.lock().unwrap().take().expect("err used twice"))
+                })),
+            })
+        }
+
+        fn recorded(&self) -> Vec<(String, Value)> {
+            self.recorded.lock().unwrap().clone()
+        }
+    }
+
+    impl RemoteToolBus for StubBus {
+        async fn call(
+            &self,
+            descriptor: &WireToolDescriptor,
+            arguments: Value,
+        ) -> Result<Value, ToolError> {
+            self.recorded
+                .lock()
+                .unwrap()
+                .push((descriptor.name().to_string(), arguments));
+            (self.outcome.lock().unwrap())()
+        }
+    }
+
+    fn remote_descriptor(name: &str) -> WireToolDescriptor {
+        WireToolDescriptor {
+            definition: agent_chain_core::tools::ToolDefinition {
+                name: name.to_string(),
+                description: "x".to_string(),
+                parameters: json!({"type": "object"}),
+            },
+            output_schema: json!({"type": "object"}),
+            timeout_ms: 5_000,
+            source: ToolSource::Bridge {
+                app_kind: "browser".to_string(),
+            },
+            required_contexts: vec![],
+            requires_user_approval: false,
+        }
+    }
+
+    fn tool_call(name: &str, args: Value, id: &str) -> ToolCall {
+        ToolCall::builder()
+            .name(name.to_string())
+            .args(args)
+            .id(id.to_string())
+            .build()
+    }
+
+    fn extract_tool_message(msg: &AnyMessage) -> &ToolMessage {
+        match msg {
+            AnyMessage::ToolMessage(t) => t,
+            other => panic!("expected ToolMessage, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn dispatch_routes_server_local_calls_to_basetool() {
+        let tool = RecordingTool::new("firecrawl_search", "search-result-body");
+        let catalog =
+            Arc::new(TurnCatalog::build([tool.clone() as Arc<dyn BaseTool>], [], &[]).unwrap());
+        let bus = StubBus::ok(json!({}));
+        let cancel = CancellationToken::new();
+
+        let outcome = execute_tool_calls(
+            &catalog,
+            &*bus,
+            vec![tool_call(
+                "firecrawl_search",
+                json!({"query": "rust"}),
+                "c1",
+            )],
+            &cancel,
+        )
+        .await;
+
+        let msgs = match outcome {
+            ToolExecOutcome::Completed(m) => m,
+            ToolExecOutcome::Cancelled(_) => panic!("unexpected cancel"),
+        };
+        assert_eq!(msgs.len(), 1);
+        let msg = extract_tool_message(&msgs[0]);
+        assert_eq!(msg.tool_call_id, "c1");
+        assert_eq!(msg.status, ToolStatus::Success);
+
+        assert!(tool.last_call.lock().unwrap().is_some());
+        assert!(
+            bus.recorded().is_empty(),
+            "server-local should not touch the bus"
+        );
+    }
+
+    #[tokio::test]
+    async fn dispatch_routes_remote_calls_to_bus_and_propagates_success() {
+        let catalog = Arc::new(
+            TurnCatalog::build(
+                [],
+                [remote_descriptor("browser::youtube::get_current_timestamp")],
+                &[],
+            )
+            .unwrap(),
+        );
+        let bus = StubBus::ok(json!({"timestamp_seconds": 12.5}));
+        let cancel = CancellationToken::new();
+
+        let outcome = execute_tool_calls(
+            &catalog,
+            &*bus,
+            vec![tool_call(
+                "browser::youtube::get_current_timestamp",
+                json!({}),
+                "c1",
+            )],
+            &cancel,
+        )
+        .await;
+
+        let msgs = match outcome {
+            ToolExecOutcome::Completed(m) => m,
+            ToolExecOutcome::Cancelled(_) => panic!("unexpected cancel"),
+        };
+        assert_eq!(msgs.len(), 1);
+        let msg = extract_tool_message(&msgs[0]);
+        assert_eq!(msg.tool_call_id, "c1");
+        assert_eq!(msg.status, ToolStatus::Success);
+        let content_text = msg.content.iter().fold(String::new(), |mut acc, b| {
+            if let agent_chain::messages::ContentBlock::Text(t) = b {
+                acc.push_str(&t.text);
+            }
+            acc
+        });
+        assert!(content_text.contains("12.5"));
+
+        let recorded = bus.recorded();
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(recorded[0].0, "browser::youtube::get_current_timestamp");
+    }
+
+    #[tokio::test]
+    async fn dispatch_propagates_remote_error_as_error_tool_message() {
+        let catalog = Arc::new(
+            TurnCatalog::build([], [remote_descriptor("browser::test::fail")], &[]).unwrap(),
+        );
+        let bus = StubBus::err(ToolError::Remote {
+            code: 500,
+            message: "upstream boom".to_string(),
+            details: None,
+        });
+        let cancel = CancellationToken::new();
+
+        let outcome = execute_tool_calls(
+            &catalog,
+            &*bus,
+            vec![tool_call("browser::test::fail", json!({}), "c1")],
+            &cancel,
+        )
+        .await;
+
+        let msgs = match outcome {
+            ToolExecOutcome::Completed(m) => m,
+            ToolExecOutcome::Cancelled(_) => panic!("unexpected cancel"),
+        };
+        let msg = extract_tool_message(&msgs[0]);
+        assert_eq!(msg.status, ToolStatus::Error);
+        let content_text = msg.content.iter().fold(String::new(), |mut acc, b| {
+            if let agent_chain::messages::ContentBlock::Text(t) = b {
+                acc.push_str(&t.text);
+            }
+            acc
+        });
+        assert!(content_text.contains("upstream boom"));
+    }
+
+    #[tokio::test]
+    async fn dispatch_returns_cancelled_when_remote_call_observes_cancellation() {
+        let catalog = Arc::new(
+            TurnCatalog::build([], [remote_descriptor("browser::test::slow")], &[]).unwrap(),
+        );
+        let bus = StubBus::err(ToolError::Cancelled);
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+
+        let outcome = execute_tool_calls(
+            &catalog,
+            &*bus,
+            vec![tool_call("browser::test::slow", json!({}), "c1")],
+            &cancel,
+        )
+        .await;
+
+        assert!(
+            matches!(outcome, ToolExecOutcome::Cancelled(_)),
+            "expected ToolExecOutcome::Cancelled"
+        );
+    }
+
+    #[tokio::test]
+    async fn dispatch_reports_unknown_tool_as_error_message() {
+        let catalog = Arc::new(TurnCatalog::build([], [], &[]).unwrap());
+        let bus = StubBus::ok(json!({}));
+        let cancel = CancellationToken::new();
+
+        let outcome = execute_tool_calls(
+            &catalog,
+            &*bus,
+            vec![tool_call("ghost::tool", json!({}), "c1")],
+            &cancel,
+        )
+        .await;
+
+        let msgs = match outcome {
+            ToolExecOutcome::Completed(m) => m,
+            ToolExecOutcome::Cancelled(_) => panic!("unexpected cancel"),
+        };
+        let msg = extract_tool_message(&msgs[0]);
+        assert_eq!(msg.status, ToolStatus::Error);
+        let content_text = msg.content.iter().fold(String::new(), |mut acc, b| {
+            if let agent_chain::messages::ContentBlock::Text(t) = b {
+                acc.push_str(&t.text);
+            }
+            acc
+        });
+        assert!(content_text.contains("unknown tool 'ghost::tool'"));
+    }
 }

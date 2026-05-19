@@ -14,7 +14,7 @@ pub use chat_models::{
     StructuredOutputWithRaw, ToolChoice, ToolLike, agenerate_from_stream,
     cleanup_llm_representation, collect_and_merge_stream, extract_tool_name_from_schema,
     format_for_tracing, format_ls_structured_output, generate_from_stream,
-    generate_response_from_error,
+    generate_response_from_error, partition_tool_likes,
 };
 
 pub use crate::messages::UsageMetadata;
