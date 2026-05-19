@@ -4193,6 +4193,7 @@ dependencies = [
  "euro-thread",
  "euro-timeline",
  "euro-vision",
+ "eurora-tools",
  "futures",
  "image",
  "keyring",
@@ -4315,6 +4316,7 @@ name = "eurora-tools"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
+ "chrono",
  "dashmap",
  "eurora-tools-macros",
  "futures",

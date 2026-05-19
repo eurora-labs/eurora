@@ -82,10 +82,12 @@ pub enum ChatClientMessage {
 /// (e.g. the currently-focused YouTube watch page). Both are filtered into
 /// the server's per-turn catalog and rendered into the LLM context.
 ///
-/// Flattened on the wire so the JSON shape stays
-/// `{"type":"capability_update","tools":[...],"contexts":[...]}` — the
-/// `#[serde(flatten)]` on the enum variant lifts the fields up to the same
-/// level as the discriminator, matching the pre-struct payload shape.
+/// On the wire the payload's fields sit alongside the `type` discriminator,
+/// producing `{"type":"capability_update","tools":[...],"contexts":[...]}`.
+/// This is automatic for newtype variants of an internally-tagged enum
+/// (`#[serde(tag = "type")]`) whose inner type serializes as a map — no
+/// `#[serde(flatten)]` is required, and adding one would be redundant. The
+/// `capability_update_golden_json` test below pins the exact shape.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[cfg_attr(feature = "specta", derive(Type))]
 pub struct CapabilityUpdatePayload {

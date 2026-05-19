@@ -7,6 +7,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 agent-chain-core = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
 dashmap = { workspace = true }
 eurora-tools-macros = { workspace = true }
 futures = { workspace = true }

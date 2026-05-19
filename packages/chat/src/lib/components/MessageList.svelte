@@ -11,8 +11,8 @@
 
 <script lang="ts">
 	import MessageItem from '$lib/components/MessageItem.svelte';
+	import { readReasoningContent } from '$lib/models/messages/index.js';
 	import { CHAT_SERVICE } from '$lib/services/chat/chat-service.svelte.js';
-	import { getReasoningFromMessage } from '$lib/utils/asset-chips.js';
 	import { getTextContent, messageId } from '$lib/utils/message-content.js';
 	import { useIdleRef } from '$lib/utils/throttled.svelte.js';
 	import { inject } from '@eurora/shared/context';
@@ -58,7 +58,7 @@
 		isLive: () => streamingId !== null,
 	});
 	const idleStreamingReasoning = useIdleRef({
-		source: () => (streamingNode ? getReasoningFromMessage(streamingNode.message) : ''),
+		source: () => (streamingNode ? readReasoningContent(streamingNode.message) : ''),
 		isLive: () => streamingId !== null,
 	});
 

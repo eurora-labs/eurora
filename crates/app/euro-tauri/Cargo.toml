@@ -44,6 +44,7 @@ euro-process = { workspace = true }
 euro-settings = { workspace = true, features = ["tls-native-roots"] }
 euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
+eurora-tools = { workspace = true }
 thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
 euro-vision = { workspace = true }

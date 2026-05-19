@@ -11,9 +11,17 @@
 //! — the server only sees [`thread_core::WireActiveContext`], which omits
 //! the routing fields. Origins exist purely client-side.
 //!
+//! The Serde derives are present because origins **do** cross the
+//! bridge WebSocket (extension → desktop) inside the `EventFrame` payload
+//! that activates / deactivates a context. The externally-tagged enum
+//! form Serde produces by default (`{"Browser": { ... }}`) matches the
+//! JSON shape the extension emits.
+//!
 //! v1 wires `Origin::Browser` end-to-end. The other variants are declared
 //! so the enum is stable and adapter methods can target them at compile
 //! time; their plumbing arrives in later phases.
+
+use serde::{Deserialize, Serialize};
 
 /// Routing target for a tool call.
 ///
@@ -26,7 +34,7 @@
 ///
 /// `#[non_exhaustive]` so new origin kinds can be added without breaking
 /// downstream `match` expressions inside this crate's consumers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Origin {
     /// A specific tab inside a bridge-registered browser process.
@@ -60,7 +68,7 @@ impl Origin {
 /// is the browser's per-process tab identifier (passed verbatim to
 /// `chrome.tabs.sendMessage`). The window id and page URL are carried
 /// for diagnostics and for the LLM-facing context payload.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserOrigin {
     pub process_id: u32,
     pub tab_id: i64,
@@ -69,7 +77,7 @@ pub struct BrowserOrigin {
 }
 
 /// Routing target for tools backed by the OS focus tracker.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FocusedOrigin {
     pub process_id: u32,
     pub window_id: Option<u64>,
@@ -77,7 +85,7 @@ pub struct FocusedOrigin {
 }
 
 /// Routing target for tools piped through an ACP session.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AcpOrigin {
     pub process_id: u32,
     pub session_id: String,
@@ -131,6 +139,43 @@ mod tests {
                 assert_eq!(b.page_url, "https://www.youtube.com/watch?v=abc123");
             }
             other => panic!("expected Browser variant, got {other:?}"),
+        }
+    }
+
+    /// Pin the externally-tagged JSON form. The browser extension emits
+    /// `{"Browser": { ... }}` literally; if Serde's default representation
+    /// changed under us, the bridge listener would silently stop decoding
+    /// activation events.
+    #[test]
+    fn browser_origin_round_trips_as_externally_tagged_json() {
+        let origin = sample_browser();
+        let json = serde_json::to_value(&origin).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "Browser": {
+                    "process_id": 4242,
+                    "tab_id": 19,
+                    "window_id": "win-0",
+                    "page_url": "https://www.youtube.com/watch?v=abc123",
+                }
+            }),
+        );
+
+        let round_tripped: Origin = serde_json::from_value(json).expect("deserialize");
+        assert!(matches!(round_tripped, Origin::Browser(_)));
+    }
+
+    #[test]
+    fn focused_and_acp_round_trip_as_externally_tagged_json() {
+        for origin in [sample_focused(), sample_acp()] {
+            let variant = origin.variant_name();
+            let json = serde_json::to_value(&origin).expect("serialize");
+            assert!(
+                json.get(variant).is_some(),
+                "expected externally-tagged key {variant:?}, got {json}"
+            );
+            let _: Origin = serde_json::from_value(json).expect("deserialize");
         }
     }
 }

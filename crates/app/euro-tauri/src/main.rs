@@ -857,6 +857,16 @@ fn main() {
                     spawn_timeline_listeners(tauri_app.handle().clone());
                     spawn_browser_status_bridge(tauri_app.handle().clone());
 
+                    // Track active client-side contexts (browser tabs,
+                    // focused apps, ACP sessions) so `ChatBridge` can
+                    // snapshot them at turn start. Fed by bridge
+                    // `EventFrame`s; readable from any Tauri command
+                    // via managed state.
+                    let context_registry =
+                        std::sync::Arc::new(eurora_tools::ContextRegistry::new());
+                    euro_tauri::context_registry::spawn_context_listener(context_registry.clone());
+                    tauri_app.manage(context_registry);
+
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())

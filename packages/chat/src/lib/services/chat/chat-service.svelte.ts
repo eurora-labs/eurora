@@ -1,12 +1,22 @@
 import { DEFAULT_MODELS } from '$lib/models/chat-model.js';
+import {
+	AiStreamSink,
+	createAiPlaceholderNode,
+	createHumanPlaceholderNode,
+	createLocalAiNode,
+	createLocalHumanNode,
+	createStubThread,
+	isHumanNode,
+	readAssetChips,
+} from '$lib/models/messages/index.js';
 import { InjectionToken } from '@eurora/shared/context';
 import { SvelteMap } from 'svelte/reactivity';
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
-import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
+import type { AssetChip, HumanPlaceholderNode, MessageNode } from '$lib/models/messages/index.js';
 import type { ChatServerMessage } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
-import type { AIMessageChunk, ChatSendRequest } from '@eurora/shared/bindings/thread';
+import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
@@ -196,7 +206,7 @@ export class ChatService {
 	async loadMessages(threadId: string): Promise<void> {
 		let entry = this.threadIndex.get(threadId);
 		if (!entry) {
-			entry = new ThreadMessages(makeStubThread(threadId));
+			entry = new ThreadMessages(createStubThread(threadId));
 			this.threadIndex.set(threadId, entry);
 		}
 		if (entry.loading || entry.loaded || entry.streamingMessageId) return;
@@ -262,7 +272,7 @@ export class ChatService {
 		const entry = this.getThreadData(threadId);
 		if (!entry) return;
 
-		this.appendPlaceholders(entry, text, assetChips);
+		const { humanNode, sink } = this.appendPlaceholders(entry, text, assetChips);
 
 		const onFirstChunk = isNewThread
 			? () => {
@@ -272,7 +282,7 @@ export class ChatService {
 				}
 			: undefined;
 
-		const receivedFinal = await this.consumeStream(entry, threadId, text, {
+		const receivedFinal = await this.consumeStream(entry, threadId, text, humanNode, sink, {
 			assetChips,
 			onFirstChunk,
 			activityId,
@@ -288,21 +298,18 @@ export class ChatService {
 	}
 
 	addLocalExchange(userText: string, aiText: string): void {
-		const threadId = `transient-${crypto.randomUUID()}`;
-		const entry = new ThreadMessages(makeStubThread(threadId));
+		const thread = createStubThread();
+		const entry = new ThreadMessages(thread);
 		entry.isTransient = true;
 		entry.loaded = true;
 
-		const humanId = `local-${crypto.randomUUID()}`;
-		const aiId = `local-${crypto.randomUUID()}`;
+		const humanNode = createLocalHumanNode(null, userText);
+		const aiNode = createLocalAiNode(humanNode.message.id, aiText);
 
-		entry.messages = [
-			makeHumanNode(humanId, null, userText, []),
-			makeAiNode(aiId, humanId, aiText),
-		];
+		entry.messages = [humanNode, aiNode];
 
-		this.threadIndex.set(threadId, entry);
-		this.activeThreadId = threadId;
+		this.threadIndex.set(thread.id, entry);
+		this.activeThreadId = thread.id;
 	}
 
 	async regenerateAi(aiMessageId: string): Promise<void> {
@@ -316,17 +323,15 @@ export class ChatService {
 		if (targetIndex < 0) return;
 
 		const target = entry.messages[targetIndex];
-		if (target.message.type !== 'ai') return;
-
 		const parentId = target.parent_id ?? null;
-		if (!parentId) return;
+		if (target.message.type !== 'ai' || !parentId) return;
 
 		this.abortController?.abort();
 
-		const placeholderId = `temp-${crypto.randomUUID()}`;
-		const placeholder = makeAiNode(placeholderId, parentId, '');
+		const placeholder = createAiPlaceholderNode(parentId, '');
+		const sink = new AiStreamSink(placeholder);
 		entry.messages = entry.messages.map((node, i) => (i === targetIndex ? placeholder : node));
-		entry.streamingMessageId = placeholderId;
+		entry.streamingMessageId = sink.id;
 
 		const abortController = new AbortController();
 		this.abortController = abortController;
@@ -337,7 +342,7 @@ export class ChatService {
 			abortController.signal,
 		);
 		const receivedFinal = await this.consumeChatStream(entry, stream, {
-			placeholder,
+			sink,
 			onConfirmedHumanMessage: null,
 		});
 
@@ -371,16 +376,15 @@ export class ChatService {
 
 		const original = entry.messages[nodeIndex];
 		const parentId = original.parent_id ?? null;
-		const preservedAssetChips =
-			original.message.type === 'human' ? extractAssetChips(original.message) : [];
+		const preservedAssetChips = isHumanNode(original) ? readAssetChips(original.message) : [];
 
 		// An edit is a fresh turn — link to whichever activity the user is
 		// actually in *now*, not the one tagged on the original message.
 		const activityId = this.activityContextProvider?.();
 
 		entry.messages = entry.messages.slice(0, nodeIndex);
-		this.appendPlaceholders(entry, text, preservedAssetChips);
-		const receivedFinal = await this.consumeStream(entry, threadId, text, {
+		const { humanNode, sink } = this.appendPlaceholders(entry, text, preservedAssetChips);
+		const receivedFinal = await this.consumeStream(entry, threadId, text, humanNode, sink, {
 			parentMessageId: parentId,
 			preservedAssetChips,
 			activityId,
@@ -433,10 +437,10 @@ export class ChatService {
 
 	/**
 	 * Shared chat-stream consumer. Drains the wire envelopes from `stream`
-	 * into `entry`: mutates the AI placeholder with streaming chunks and
-	 * swaps it for the persisted message on `final`. Returns `true` iff a
-	 * `final` frame was observed; callers reconcile against the server when
-	 * the stream ends without one.
+	 * into `entry`: routes streaming chunks through the sink and swaps the
+	 * placeholder for the persisted message on `final`. Returns `true` iff
+	 * a `final` frame was observed; callers reconcile against the server
+	 * when the stream ends without one.
 	 *
 	 * The discriminator is matched exhaustively — any future
 	 * [`ChatServerMessage`] variant will fail the build at the `default`
@@ -457,13 +461,9 @@ export class ChatService {
 		stream: AsyncIterable<ChatServerMessage>,
 		policy: ChatStreamPolicy,
 	): Promise<boolean> {
-		const aiMessage = policy.placeholder.message;
-		if (aiMessage.type !== 'ai') return false;
-
-		const placeholderId = aiMessage.id;
+		const { sink } = policy;
 		let onFirstChunk = policy.onFirstChunk;
 		let receivedFinal = false;
-		const ctx: ChunkAppendState = { hasContent: false, pendingWhitespace: '' };
 
 		try {
 			consume: for await (const event of stream) {
@@ -476,13 +476,13 @@ export class ChatService {
 							onFirstChunk();
 							onFirstChunk = undefined;
 						}
-						appendChunkToAiMessage(aiMessage, event.chunk, ctx);
+						sink.appendChunk(event.chunk);
 						break;
 					case 'final': {
 						const aiMsg = event.messages[0];
 						if (aiMsg) {
 							entry.messages = entry.messages.map((node) =>
-								node.message.id === placeholderId ? aiMsg : node,
+								node.message.id === sink.id ? aiMsg : node,
 							);
 						}
 						entry.loaded = true;
@@ -493,25 +493,23 @@ export class ChatService {
 						throw new Error(`${event.kind}: ${event.message}`);
 					case 'tool_request':
 					case 'tool_cancel': {
-						// The client-side tool dispatcher is not wired in yet
-						// (the backend handler at
-						// `be-thread-service/src/handlers/chat.rs` takes the
-						// symmetric stance on tool-routing frames). Log and
-						// ignore so chat keeps working when a server upgrades
-						// ahead of the client.
+						// Client-side tool dispatch isn't wired up yet. The
+						// backend's `ChatRemoteBus` already emits these frames;
+						// until the client grows a dispatcher we drop them so
+						// the chat stream still finishes cleanly when a server
+						// runs ahead of the client.
 						break;
 					}
 					default: {
 						const _exhaustive: never = event;
-						console.warn('chat: unknown server frame', event);
 						void _exhaustive;
 					}
 				}
 			}
 		} catch (e) {
 			console.error(`Chat stream error for thread ${entry.thread.id}:`, e);
-			if (aiMessage.content.length === 0) {
-				entry.messages = entry.messages.filter((n) => n.message.id !== placeholderId);
+			if (sink.isEmpty) {
+				entry.messages = entry.messages.filter((n) => n.message.id !== sink.id);
 			}
 		} finally {
 			entry.streamingMessageId = null;
@@ -525,6 +523,8 @@ export class ChatService {
 		entry: ThreadMessages,
 		threadId: string,
 		text: string,
+		humanPlaceholder: HumanPlaceholderNode,
+		sink: AiStreamSink,
 		options: {
 			parentMessageId?: string | null;
 			assetChips?: AssetChip[];
@@ -535,22 +535,19 @@ export class ChatService {
 	): Promise<boolean> {
 		this.abortController?.abort();
 
-		const placeholder = entry.messages.at(-1)!;
-		if (placeholder.message.type !== 'ai') return false;
-
-		const tempHumanId = entry.messages.at(-2)?.message.id;
-
+		const humanPlaceholderId = humanPlaceholder.message.id;
 		const abortController = new AbortController();
 		const request = await this.buildSendRequest(threadId, text, options);
 		const stream = this.threadClient.sendMessage(threadId, request, abortController.signal);
 
 		return this.consumeChatStream(entry, stream, {
-			placeholder,
+			sink,
 			onConfirmedHumanMessage: (confirmed) => {
 				entry.messages = entry.messages.map((node) => {
-					if (node.message.id === tempHumanId) return confirmed;
-					if (node.parent_id === tempHumanId)
+					if (node.message.id === humanPlaceholderId) return confirmed;
+					if (node.parent_id === humanPlaceholderId) {
 						return { ...node, parent_id: confirmed.message.id };
+					}
 					return node;
 				});
 				this.abortController = abortController;
@@ -605,16 +602,13 @@ export class ChatService {
 		entry: ThreadMessages,
 		text: string,
 		assetChips: AssetChip[] = [],
-	): void {
-		const humanId = `temp-${crypto.randomUUID()}`;
-		const aiId = `temp-${crypto.randomUUID()}`;
-
-		entry.messages = [
-			...entry.messages,
-			makeHumanNode(humanId, null, text, assetChips),
-			makeAiNode(aiId, humanId, ''),
-		];
-		entry.streamingMessageId = aiId;
+	): { humanNode: HumanPlaceholderNode; sink: AiStreamSink } {
+		const humanNode = createHumanPlaceholderNode(null, text, assetChips);
+		const aiNode = createAiPlaceholderNode(humanNode.message.id, '');
+		entry.messages = [...entry.messages, humanNode, aiNode];
+		const sink = new AiStreamSink(aiNode);
+		entry.streamingMessageId = sink.id;
+		return { humanNode, sink };
 	}
 
 	destroy() {
@@ -635,26 +629,12 @@ export class ChatService {
 	}
 }
 
-/**
- * The `ai`-discriminated variant of [`MessageNode['message']`]. Helper
- * functions that operate on a streaming AI placeholder take this narrower
- * type so the [`MessageNode['message']`] type guard lives at the call site,
- * not on every helper entry.
- */
-type AiMessageNode = Extract<MessageNode['message'], { type: 'ai' }>;
-
-interface ChunkAppendState {
-	hasContent: boolean;
-	pendingWhitespace: string;
-}
-
 interface ChatStreamPolicy {
 	/**
-	 * AI placeholder node already present in the entry. Its `id` is the
-	 * swap target when `final` arrives, and its `message` (an
-	 * [`AiMessageNode`]) receives streaming chunks in place.
+	 * Owns the AI placeholder that streaming chunks mutate. The sink's
+	 * `id` is the swap target when `final` arrives.
 	 */
-	placeholder: MessageNode;
+	sink: AiStreamSink;
 	/**
 	 * Invoked when the server confirms the user message has been persisted.
 	 * `send` swaps the temp human node and binds the abort controller from
@@ -664,159 +644,6 @@ interface ChatStreamPolicy {
 	onConfirmedHumanMessage: ((confirmed: MessageNode) => void) | null;
 	/** Fires exactly once, immediately before the first content chunk lands. */
 	onFirstChunk?: () => void;
-}
-
-function appendChunkToAiMessage(
-	aiMessage: AiMessageNode,
-	chunk: AIMessageChunk,
-	ctx: ChunkAppendState,
-): void {
-	// Mirror agent-chain's `extract_reasoning_from_additional_kwargs`:
-	// providers like DeepSeek, Ollama, XAI emit reasoning in
-	// additional_kwargs. Accumulate it on the AI message's kwargs (the wire
-	// shape) so the UI can render it without inventing a fake `reasoning`
-	// content block.
-	appendReasoningKwargs(aiMessage, chunk);
-
-	for (const block of chunk.content) {
-		if (block.type === 'text') {
-			let textContent = block.text;
-			if (!ctx.hasContent) {
-				if (textContent.trim().length === 0) {
-					ctx.pendingWhitespace += textContent;
-					continue;
-				}
-				ctx.hasContent = true;
-				textContent = ctx.pendingWhitespace + textContent;
-				ctx.pendingWhitespace = '';
-			}
-			const existing = aiMessage.content.find((b) => b.type === 'text');
-			if (existing && existing.type === 'text') {
-				existing.text += textContent;
-			} else {
-				aiMessage.content.push({ ...block, text: textContent });
-			}
-		} else if (block.type === 'reasoning') {
-			const existing = aiMessage.content.find((b) => b.type === 'reasoning');
-			if (existing && existing.type === 'reasoning') {
-				existing.reasoning = (existing.reasoning ?? '') + (block.reasoning ?? '');
-			} else {
-				aiMessage.content.push({ ...block });
-			}
-		} else {
-			aiMessage.content.push(block);
-		}
-	}
-}
-
-function makeHumanNode(
-	id: string,
-	parentId: string | null,
-	text: string,
-	assetChips: AssetChip[],
-): MessageNode {
-	return {
-		parent_id: parentId,
-		message: {
-			type: 'human',
-			content:
-				text.length > 0
-					? [
-							{
-								type: 'text',
-								text,
-								id: null,
-								annotations: null,
-								index: null,
-								extras: null,
-							},
-						]
-					: [],
-			id,
-			name: null,
-			additional_kwargs: assetChips.length > 0 ? { asset_chips: assetChips } : {},
-			response_metadata: {},
-		},
-		children: [],
-		sibling_index: 0,
-		depth: 0,
-	};
-}
-
-function makeAiNode(id: string, parentId: string | null, text: string): MessageNode {
-	return {
-		parent_id: parentId,
-		message: {
-			type: 'ai',
-			content: text
-				? [{ type: 'text', text, id: null, annotations: null, index: null, extras: null }]
-				: [],
-			id,
-			name: null,
-			tool_calls: [],
-			invalid_tool_calls: [],
-			usage_metadata: null,
-			additional_kwargs: {},
-			response_metadata: {},
-		},
-		children: [],
-		sibling_index: 0,
-		depth: 0,
-	};
-}
-
-function makeStubThread(id: string): Thread {
-	const now = new Date().toISOString();
-	return {
-		id,
-		user_id: '',
-		title: '',
-		created_at: now,
-		updated_at: now,
-	} as Thread;
-}
-
-function appendReasoningKwargs(
-	aiMessage: AiMessageNode,
-	chunk: { additional_kwargs?: unknown },
-): void {
-	const incoming = chunk.additional_kwargs;
-	if (!isObject(incoming)) return;
-	const reasoning =
-		typeof incoming.reasoning_content === 'string' ? incoming.reasoning_content : null;
-	if (reasoning === null || reasoning.length === 0) return;
-	const kwargs = isObject(aiMessage.additional_kwargs)
-		? (aiMessage.additional_kwargs as Record<string, unknown>)
-		: {};
-	const previous = typeof kwargs.reasoning_content === 'string' ? kwargs.reasoning_content : '';
-	kwargs.reasoning_content = previous + reasoning;
-	aiMessage.additional_kwargs = kwargs;
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-	return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-function extractAssetChips(message: MessageNode['message']): AssetChip[] {
-	if (message.type !== 'human') return [];
-	const kwargs = message.additional_kwargs;
-	if (!isObject(kwargs)) return [];
-	const raw = kwargs.asset_chips;
-	if (!Array.isArray(raw)) return [];
-	const chips: AssetChip[] = [];
-	for (const entry of raw) {
-		if (!isObject(entry)) continue;
-		const id = typeof entry.id === 'string' ? entry.id : null;
-		const name = typeof entry.name === 'string' ? entry.name : null;
-		if (id === null || name === null) continue;
-		chips.push({
-			id,
-			name,
-			icon: typeof entry.icon === 'string' ? entry.icon : null,
-			domain: typeof entry.domain === 'string' ? entry.domain : null,
-		});
-	}
-	return chips;
 }
 
 export const CHAT_SERVICE = new InjectionToken<ChatService>('ChatService');

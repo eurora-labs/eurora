@@ -29,6 +29,9 @@
 //!   `ChatBridge` looks tools up against on the client.
 //! - **[`RemoteToolBus`]** — server-side bus the agent loop calls into
 //!   when a tool's `ToolSource` is anything other than `ServerLocal`.
+//! - **[`ContextRegistry`]** — client-side store of [`ActiveContext`]
+//!   entries. Fed by the bridge listener in `euro-tauri`; snapshotted
+//!   by `ChatBridge` at turn start.
 //! - **[`schema_of`]** — shared JSON-Schema cache backing the
 //!   `input_schema` / `output_schema` accessors on `ToolDescriptor`.
 //!
@@ -36,6 +39,7 @@
 
 mod args;
 mod bus;
+mod context;
 mod descriptor;
 mod dispatcher;
 mod error;
@@ -47,6 +51,7 @@ pub mod __private;
 
 pub use args::Empty;
 pub use bus::{IncomingCall, RemoteToolBus, RemoteToolBusLocal};
+pub use context::{ActiveContext, ContextRegistry};
 pub use descriptor::ToolDescriptor;
 pub use dispatcher::{Catalog, Dispatcher};
 pub use error::ToolError;
