@@ -61,8 +61,21 @@ use crate::preliminary::rewrite_preliminary_blocks;
 use crate::remote_tool_bus::ChatRemoteBus;
 use crate::service::AppState;
 
+/// Trailing messages from the active branch fed back to the LLM as
+/// context for the next turn. Small on purpose — long histories blow
+/// the token budget, and recall of older messages is a job for the
+/// summarisation pipeline (when it lands), not the chat prelude.
 const CONTEXT_MESSAGE_LIMIT: u32 = 5;
+
+/// Hard cap on tool-call rounds per turn. Guards against an agent
+/// looping over its own tool calls without converging on an answer.
+/// On exhaustion the loop runs one forced synthesis with
+/// `tool_choice=none` and finalises whatever it has accumulated.
 const MAX_TOOL_ROUNDS: usize = 15;
+
+/// Buffer depth for the agent-loop → WebSocket-writer channel. Sized
+/// to absorb a small burst of `Chunk` frames before the writer
+/// flushes; beyond this, backpressure parks the agent loop cleanly.
 const SERVER_CHANNEL_DEPTH: usize = 32;
 
 /// Budget for each of the two prelude frames (`CapabilityUpdate` then
