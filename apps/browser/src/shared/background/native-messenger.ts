@@ -1,7 +1,9 @@
+import { startContextObserver, stopContextObserver } from './context-observer';
 import { resolveFaviconBase64 } from './favicon';
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
 import { sendMessageWithRetry } from './messaging';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
+import { errorFrame, forwardTabRpc } from './tab-rpc';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
 import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings';
@@ -20,6 +22,7 @@ function connect() {
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort.onMessage.addListener(onNativePortMessage);
 	initFocusTracker(nativePort);
+	startContextObserver(nativePort);
 	startSafariPoller();
 }
 
@@ -28,6 +31,7 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 	console.error('Native port disconnected:', error || 'Unknown error');
 
 	destroyFocusTracker();
+	stopContextObserver();
 	stopSafariPoller();
 	nativePort = null;
 
@@ -100,17 +104,17 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 		case 'GET_SNAPSHOT':
 			return await onActionContentData(frame, 'GENERATE_SNAPSHOT');
 
+		case 'YOUTUBE_GET_CURRENT_TIMESTAMP':
+			return await forwardTabRpc(frame, 'GET_CURRENT_TIMESTAMP');
+
+		case 'YOUTUBE_GET_TRANSCRIPT':
+			return await forwardTabRpc(frame, 'GET_TRANSCRIPT');
+
+		case 'YOUTUBE_GET_CURRENT_FRAME':
+			return await forwardTabRpc(frame, 'GET_CURRENT_FRAME');
+
 		default:
-			return {
-				kind: {
-					Error: {
-						id: frame.id,
-						code: 0,
-						message: `Unknown action: ${frame.action}`,
-						details: null,
-					},
-				},
-			} as Frame;
+			return errorFrame(frame, 400, `Unknown action: ${frame.action}`);
 	}
 }
 

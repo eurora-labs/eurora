@@ -64,14 +64,23 @@ impl Origin {
 /// Routing target for tools backed by the browser bridge.
 ///
 /// `process_id` is the bridge-registered app PID (the OS process id for
-/// real browsers, a stable assigned id for sandboxed clients). `tab_id`
-/// is the browser's per-process tab identifier (passed verbatim to
-/// `chrome.tabs.sendMessage`). The window id and page URL are carried
-/// for diagnostics and for the LLM-facing context payload.
+/// real browsers, a stable assigned id for sandboxed clients). It is
+/// populated server-side from the bridge envelope when the extension
+/// emits `CONTEXT_ACTIVATED` — the extension itself cannot read its
+/// host's OS PID and omits the field entirely. `#[serde(default)]`
+/// keeps the wire shape ergonomic for the extension; the desktop
+/// listener replaces the default with the authoritative envelope value
+/// before the origin reaches the registry.
+///
+/// `tab_id` is the browser's per-process tab identifier (passed
+/// verbatim to `chrome.tabs.sendMessage`). The window id and page URL
+/// are carried for diagnostics and for the LLM-facing context payload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserOrigin {
+    #[serde(default)]
     pub process_id: u32,
     pub tab_id: i64,
+    #[serde(default)]
     pub window_id: Option<String>,
     pub page_url: String,
 }
