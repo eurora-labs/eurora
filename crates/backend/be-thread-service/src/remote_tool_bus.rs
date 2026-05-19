@@ -7,10 +7,10 @@
 //! token.
 //!
 //! Inbound [`ChatClientMessage::ToolResponse`] frames land via
-//! [`ChatRemoteBus::resolve`] (Phase 6 wires the chat handler's reader task
-//! to call it). Late responses for already-removed call ids are dropped
-//! silently — the bus has already woken the caller with `Timeout` or
-//! `Cancelled` and updated its state accordingly.
+//! [`ChatRemoteBus::resolve`] — the chat handler's reader task forwards
+//! them. Late responses for already-removed call ids are dropped silently:
+//! the bus has already woken the caller with `Timeout` or `Cancelled` and
+//! updated its state accordingly.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -56,10 +56,6 @@ impl ChatRemoteBus {
     /// Called by the chat handler's inbound reader task when it receives a
     /// `ChatClientMessage::ToolResponse`. A no-op when no call is pending
     /// under `call_id` (e.g. the call already timed out or was cancelled).
-    //
-    // Wired by the inbound reader task in Phase 6; exercised by unit tests
-    // in this module today.
-    #[allow(dead_code)]
     pub fn resolve(&self, call_id: u32, result: Result<Value, ToolErrorWire>) {
         if let Some((_, sender)) = self.pending.remove(&call_id) {
             let _ = sender.send(result.map_err(ToolError::from));
@@ -69,10 +65,6 @@ impl ChatRemoteBus {
     /// Drop every pending call, waking each waiter with
     /// [`ToolError::Transport`]. Call when the turn ends so no agent-loop
     /// task is left awaiting a oneshot that will never resolve.
-    //
-    // Wired by the chat handler's cleanup path in Phase 6; exercised by
-    // unit tests in this module today.
-    #[allow(dead_code)]
     pub fn shutdown(&self) {
         let pending_ids: Vec<u32> = self.pending.iter().map(|e| *e.key()).collect();
         for id in pending_ids {

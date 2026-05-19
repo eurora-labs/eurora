@@ -336,7 +336,10 @@ export class ChatService {
 			aiMessageId,
 			abortController.signal,
 		);
-		const receivedFinal = await this.consumeAiStream(entry, placeholder, stream);
+		const receivedFinal = await this.consumeChatStream(entry, stream, {
+			placeholder,
+			onConfirmedHumanMessage: null,
+		});
 
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
@@ -428,49 +431,85 @@ export class ChatService {
 		}
 	}
 
-	/// Drive an AI-only chat stream into an existing placeholder node. Used by
-	/// `regenerateAi`, where there is no human-message confirmation envelope —
-	/// the server immediately starts streaming chunks and ends with `final`.
-	private async consumeAiStream(
+	/**
+	 * Shared chat-stream consumer. Drains the wire envelopes from `stream`
+	 * into `entry`: mutates the AI placeholder with streaming chunks and
+	 * swaps it for the persisted message on `final`. Returns `true` iff a
+	 * `final` frame was observed; callers reconcile against the server when
+	 * the stream ends without one.
+	 *
+	 * The discriminator is matched exhaustively — any future
+	 * [`ChatServerMessage`] variant will fail the build at the `default`
+	 * arm rather than silently dropping into a fallthrough.
+	 *
+	 * Per-turn divergence between `send` and `regenerate` is funnelled
+	 * through `policy`:
+	 * - `onConfirmedHumanMessage` runs when the server reports the user
+	 *   message has been persisted. `send` uses the hook to swap the
+	 *   temp human node and bind the abort controller; `regenerate`
+	 *   passes `null` because no new human message exists.
+	 * - `onFirstChunk` fires exactly once, immediately before the first
+	 *   content chunk is appended. Used by `send` to lazily generate a
+	 *   thread title.
+	 */
+	private async consumeChatStream(
 		entry: ThreadMessages,
-		placeholder: MessageNode,
 		stream: AsyncIterable<ChatServerMessage>,
+		policy: ChatStreamPolicy,
 	): Promise<boolean> {
-		const aiMessage = placeholder.message;
+		const aiMessage = policy.placeholder.message;
 		if (aiMessage.type !== 'ai') return false;
 
 		const placeholderId = aiMessage.id;
+		let onFirstChunk = policy.onFirstChunk;
 		let receivedFinal = false;
 		const ctx: ChunkAppendState = { hasContent: false, pendingWhitespace: '' };
 
 		try {
-			for await (const event of stream) {
-				if (event.type === 'final') {
-					const aiMsg = event.messages[0];
-					if (aiMsg) {
-						entry.messages = entry.messages.map((node) =>
-							node.message.id === placeholderId ? aiMsg : node,
-						);
+			consume: for await (const event of stream) {
+				switch (event.type) {
+					case 'confirmed_human_message':
+						policy.onConfirmedHumanMessage?.(event.message);
+						break;
+					case 'chunk':
+						if (onFirstChunk) {
+							onFirstChunk();
+							onFirstChunk = undefined;
+						}
+						appendChunkToAiMessage(aiMessage, event.chunk, ctx);
+						break;
+					case 'final': {
+						const aiMsg = event.messages[0];
+						if (aiMsg) {
+							entry.messages = entry.messages.map((node) =>
+								node.message.id === placeholderId ? aiMsg : node,
+							);
+						}
+						entry.loaded = true;
+						receivedFinal = true;
+						break consume;
 					}
-					entry.loaded = true;
-					receivedFinal = true;
-					break;
+					case 'error':
+						throw new Error(`${event.kind}: ${event.message}`);
+					case 'tool_request':
+					case 'tool_cancel': {
+						// The client-side tool dispatcher is not wired in yet
+						// (the backend handler at
+						// `be-thread-service/src/handlers/chat.rs` takes the
+						// symmetric stance on tool-routing frames). Log and
+						// ignore so chat keeps working when a server upgrades
+						// ahead of the client.
+						break;
+					}
+					default: {
+						const _exhaustive: never = event;
+						console.warn('chat: unknown server frame', event);
+						void _exhaustive;
+					}
 				}
-
-				if (event.type === 'error') {
-					throw new Error(`${event.kind}: ${event.message}`);
-				}
-
-				if (event.type === 'confirmed_human_message') {
-					// Regenerate never persists a new human message; ignore
-					// stray envelopes rather than asserting on them.
-					continue;
-				}
-
-				appendChunkToAiMessage(aiMessage, event.chunk, ctx);
 			}
 		} catch (e) {
-			console.error('AI stream error:', e);
+			console.error(`Chat stream error for thread ${entry.thread.id}:`, e);
 			if (aiMessage.content.length === 0) {
 				entry.messages = entry.messages.filter((n) => n.message.id !== placeholderId);
 			}
@@ -496,71 +535,28 @@ export class ChatService {
 	): Promise<boolean> {
 		this.abortController?.abort();
 
-		const aiNode = entry.messages.at(-1)!;
-		const aiMessage = aiNode.message;
-		if (aiMessage.type === 'remove') return false;
+		const placeholder = entry.messages.at(-1)!;
+		if (placeholder.message.type !== 'ai') return false;
 
 		const tempHumanId = entry.messages.at(-2)?.message.id;
-		const tempAiId = aiMessage.id;
-
-		const ctx: ChunkAppendState = { hasContent: false, pendingWhitespace: '' };
-		let receivedFinal = false;
 
 		const abortController = new AbortController();
 		const request = await this.buildSendRequest(threadId, text, options);
 		const stream = this.threadClient.sendMessage(threadId, request, abortController.signal);
-		let onFirstChunk = options.onFirstChunk;
 
-		try {
-			for await (const event of stream) {
-				if (event.type === 'confirmed_human_message') {
-					const confirmed = event.message;
-					entry.messages = entry.messages.map((node) => {
-						if (node.message.id === tempHumanId) return confirmed;
-						if (node.parent_id === tempHumanId)
-							return { ...node, parent_id: confirmed.message.id };
-						return node;
-					});
-					this.abortController = abortController;
-					continue;
-				}
-
-				if (event.type === 'final') {
-					const aiMsg = event.messages[0];
-					if (aiMsg) {
-						entry.messages = entry.messages.map((node) =>
-							node.message.id === tempAiId ? aiMsg : node,
-						);
-					}
-					entry.loaded = true;
-					receivedFinal = true;
-					break;
-				}
-
-				if (event.type === 'error') {
-					throw new Error(`${event.kind}: ${event.message}`);
-				}
-
-				if (onFirstChunk) {
-					onFirstChunk();
-					onFirstChunk = undefined;
-				}
-
-				appendChunkToAiMessage(aiMessage, event.chunk, ctx);
-			}
-		} catch (e) {
-			console.error(`Stream error for thread ${threadId}:`, e);
-			if ('content' in aiMessage && aiMessage.content.length === 0) {
-				entry.messages = entry.messages.filter((n) => n.message.id !== aiMessage.id);
-			}
-		} finally {
-			entry.streamingMessageId = null;
-			if (!entry.loaded) {
-				entry.loaded = true;
-			}
-		}
-
-		return receivedFinal;
+		return this.consumeChatStream(entry, stream, {
+			placeholder,
+			onConfirmedHumanMessage: (confirmed) => {
+				entry.messages = entry.messages.map((node) => {
+					if (node.message.id === tempHumanId) return confirmed;
+					if (node.parent_id === tempHumanId)
+						return { ...node, parent_id: confirmed.message.id };
+					return node;
+				});
+				this.abortController = abortController;
+			},
+			onFirstChunk: options.onFirstChunk,
+		});
 	}
 
 	private async buildSendRequest(
@@ -639,18 +635,42 @@ export class ChatService {
 	}
 }
 
+/**
+ * The `ai`-discriminated variant of [`MessageNode['message']`]. Helper
+ * functions that operate on a streaming AI placeholder take this narrower
+ * type so the [`MessageNode['message']`] type guard lives at the call site,
+ * not on every helper entry.
+ */
+type AiMessageNode = Extract<MessageNode['message'], { type: 'ai' }>;
+
 interface ChunkAppendState {
 	hasContent: boolean;
 	pendingWhitespace: string;
 }
 
+interface ChatStreamPolicy {
+	/**
+	 * AI placeholder node already present in the entry. Its `id` is the
+	 * swap target when `final` arrives, and its `message` (an
+	 * [`AiMessageNode`]) receives streaming chunks in place.
+	 */
+	placeholder: MessageNode;
+	/**
+	 * Invoked when the server confirms the user message has been persisted.
+	 * `send` swaps the temp human node and binds the abort controller from
+	 * inside the callback. `regenerate` has no fresh human message to
+	 * confirm and passes `null` — stray envelopes are then ignored.
+	 */
+	onConfirmedHumanMessage: ((confirmed: MessageNode) => void) | null;
+	/** Fires exactly once, immediately before the first content chunk lands. */
+	onFirstChunk?: () => void;
+}
+
 function appendChunkToAiMessage(
-	aiMessage: MessageNode['message'],
+	aiMessage: AiMessageNode,
 	chunk: AIMessageChunk,
 	ctx: ChunkAppendState,
 ): void {
-	if (aiMessage.type !== 'ai') return;
-
 	// Mirror agent-chain's `extract_reasoning_from_additional_kwargs`:
 	// providers like DeepSeek, Ollama, XAI emit reasoning in
 	// additional_kwargs. Accumulate it on the AI message's kwargs (the wire
@@ -757,10 +777,9 @@ function makeStubThread(id: string): Thread {
 }
 
 function appendReasoningKwargs(
-	aiMessage: MessageNode['message'],
+	aiMessage: AiMessageNode,
 	chunk: { additional_kwargs?: unknown },
 ): void {
-	if (aiMessage.type !== 'ai') return;
 	const incoming = chunk.additional_kwargs;
 	if (!isObject(incoming)) return;
 	const reasoning =
@@ -771,7 +790,7 @@ function appendReasoningKwargs(
 		: {};
 	const previous = typeof kwargs.reasoning_content === 'string' ? kwargs.reasoning_content : '';
 	kwargs.reasoning_content = previous + reasoning;
-	(aiMessage as { additional_kwargs: unknown }).additional_kwargs = kwargs;
+	aiMessage.additional_kwargs = kwargs;
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {

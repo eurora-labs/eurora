@@ -113,9 +113,13 @@ fn build_catalog(
     remote: Vec<WireToolDescriptor>,
     active_contexts: &[WireActiveContext],
 ) -> Result<Arc<TurnCatalog>, ThreadServiceError> {
+    // `CatalogBuildError` only fires for tool-name collisions, which mean
+    // the client advertised a malformed `CapabilityUpdate` — a protocol
+    // fault, not a generic invalid-argument. The chat handler surfaces it
+    // to the client as `Error { kind: "protocol", ... }`.
     TurnCatalog::build(server_local, remote, active_contexts)
         .map(Arc::new)
-        .map_err(|err| ThreadServiceError::InvalidArgument(err.to_string()))
+        .map_err(|err| ThreadServiceError::ProtocolViolation(err.to_string()))
 }
 
 fn bind_chat_model(

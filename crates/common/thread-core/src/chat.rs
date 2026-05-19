@@ -63,10 +63,7 @@ pub enum ChatClientMessage {
     /// Declaration of the client's available tools and active contexts for
     /// the upcoming turn. Sent before every `Send`/`Regenerate` so the
     /// catalog reflects the freshest state of the user's session.
-    CapabilityUpdate {
-        tools: Vec<WireToolDescriptor>,
-        contexts: Vec<WireActiveContext>,
-    },
+    CapabilityUpdate(CapabilityUpdatePayload),
     /// Resolution of a previously-issued `ToolRequest`. The result uses
     /// serde's default `Result` repr (`{"Ok": ...}` / `{"Err": ...}`); the
     /// shape is pinned by tests in this module. See [`WireToolResult`] for
@@ -76,6 +73,26 @@ pub enum ChatClientMessage {
         #[cfg_attr(feature = "specta", specta(type = WireToolResult))]
         result: Result<serde_json::Value, ToolErrorWire>,
     },
+}
+
+/// Payload of a [`ChatClientMessage::CapabilityUpdate`] frame.
+///
+/// The `tools` list is the client's catalog of remote-dispatch descriptors
+/// for the upcoming turn; the `contexts` list is the set of live contexts
+/// (e.g. the currently-focused YouTube watch page). Both are filtered into
+/// the server's per-turn catalog and rendered into the LLM context.
+///
+/// Flattened on the wire so the JSON shape stays
+/// `{"type":"capability_update","tools":[...],"contexts":[...]}` — the
+/// `#[serde(flatten)]` on the enum variant lifts the fields up to the same
+/// level as the discriminator, matching the pre-struct payload shape.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub struct CapabilityUpdatePayload {
+    #[serde(default)]
+    pub tools: Vec<WireToolDescriptor>,
+    #[serde(default)]
+    pub contexts: Vec<WireActiveContext>,
 }
 
 /// Payload of a [`ChatClientMessage::Send`] frame.
@@ -248,7 +265,7 @@ mod tests {
 
     #[test]
     fn capability_update_round_trips() {
-        let m = ChatClientMessage::CapabilityUpdate {
+        let m = ChatClientMessage::CapabilityUpdate(CapabilityUpdatePayload {
             tools: vec![sample_descriptor()],
             contexts: vec![WireActiveContext {
                 key: "youtube::watch_page".into(),
@@ -257,7 +274,7 @@ mod tests {
                     .with_timezone(&Utc),
                 data: json!({"video_id": "abc123"}),
             }],
-        };
+        });
         let s = serde_json::to_string(&m).unwrap();
         let back: ChatClientMessage = serde_json::from_str(&s).unwrap();
         assert_eq!(m, back);
@@ -267,10 +284,11 @@ mod tests {
     fn capability_update_golden_json() {
         // Lock the exact wire shape — any future shift (field reorder,
         // tag rename, default-on-encode change) must update this golden
-        // and is reviewable in the diff. The flattened ToolDefinition
-        // surfaces `name`, `description`, and `parameters` at the top
-        // level of the descriptor object.
-        let m = ChatClientMessage::CapabilityUpdate {
+        // and is reviewable in the diff. The newtype `CapabilityUpdatePayload`
+        // is inlined into the externally-tagged enum so the JSON object's
+        // top-level fields are `type`, `tools`, and `contexts` — same as the
+        // pre-struct shape.
+        let m = ChatClientMessage::CapabilityUpdate(CapabilityUpdatePayload {
             tools: vec![WireToolDescriptor {
                 definition: agent_chain_core::tools::ToolDefinition {
                     name: "browser::youtube::get_current_timestamp".into(),
@@ -292,7 +310,7 @@ mod tests {
                     .with_timezone(&Utc),
                 data: json!({"video_id": "abc123"}),
             }],
-        };
+        });
         let s = serde_json::to_string(&m).unwrap();
         assert_eq!(
             s,
@@ -403,9 +421,24 @@ mod tests {
             serde_json::from_str(r#"{"type":"capability_update","tools":[],"contexts":[]}"#)
                 .unwrap();
         match m {
-            ChatClientMessage::CapabilityUpdate { tools, contexts } => {
-                assert!(tools.is_empty());
-                assert!(contexts.is_empty());
+            ChatClientMessage::CapabilityUpdate(payload) => {
+                assert!(payload.tools.is_empty());
+                assert!(payload.contexts.is_empty());
+            }
+            other => panic!("expected CapabilityUpdate, got {other:?}"),
+        }
+    }
+
+    /// Both fields carry `#[serde(default)]`, so a client that predates the
+    /// addition of either list still parses cleanly with the missing field
+    /// initialised to an empty `Vec`.
+    #[test]
+    fn capability_update_decodes_with_missing_fields() {
+        let m: ChatClientMessage = serde_json::from_str(r#"{"type":"capability_update"}"#).unwrap();
+        match m {
+            ChatClientMessage::CapabilityUpdate(payload) => {
+                assert!(payload.tools.is_empty());
+                assert!(payload.contexts.is_empty());
             }
             other => panic!("expected CapabilityUpdate, got {other:?}"),
         }
