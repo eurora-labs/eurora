@@ -835,6 +835,7 @@ impl BridgeService {
         match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
             Ok(Ok(Ok(resp))) => Ok(resp),
             Ok(Ok(Err(err))) => Err(BridgeError::Client {
+                code: err.code,
                 message: err.message,
                 details: err.details,
             }),
@@ -1334,7 +1335,12 @@ mod tests {
             .expect("request future")
             .expect("join");
         match result {
-            Err(BridgeError::Client { message, details }) => {
+            Err(BridgeError::Client {
+                code,
+                message,
+                details,
+            }) => {
+                assert_eq!(code, 42);
                 assert_eq!(message, "boom");
                 assert_eq!(details.as_deref(), Some("trace"));
             }

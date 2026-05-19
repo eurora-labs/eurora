@@ -1,6 +1,6 @@
 import type { MessageType, BrowserObj } from '../../../shared/content/extensions/watchers/watcher';
 
-type CustomMessageType = 'PLAY';
+type CustomMessageType = 'PLAY' | 'GET_CURRENT_TIMESTAMP' | 'GET_TRANSCRIPT' | 'GET_CURRENT_FRAME';
 export type YoutubeMessageType = MessageType | CustomMessageType;
 
 export interface WatcherParams {

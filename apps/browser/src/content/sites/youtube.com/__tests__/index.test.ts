@@ -1,4 +1,4 @@
-import { main } from '../index.js';
+import { YoutubeWatcher, main } from '../index.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('webextension-polyfill', () => ({
@@ -19,17 +19,36 @@ vi.mock('../../../../shared/content/extensions/article/util', () => ({
 	}),
 }));
 
+const transcriptFetchMock = vi.fn();
 vi.mock('../transcript/index.js', () => ({
 	YouTubeTranscriptApi: vi.fn().mockImplementation(() => ({
-		fetch: vi.fn().mockResolvedValue({
-			snippets: [{ text: 'Test transcript', start: 0, duration: 5 }],
-		}),
+		fetch: transcriptFetchMock,
 	})),
 }));
+
+function makeWatcher() {
+	const canvas = document.createElement('canvas');
+	const context = canvas.getContext('2d') as CanvasRenderingContext2D;
+	const player = document.querySelector('video.html5-main-video') as HTMLVideoElement;
+	// jsdom doesn't run the video pipeline; stub the bits the handlers
+	// read directly so we can drive them without a real media element.
+	Object.defineProperty(player, 'currentTime', { value: 12.5, configurable: true });
+	Object.defineProperty(player, 'duration', { value: 240.0, configurable: true });
+	Object.defineProperty(player, 'paused', { value: false, configurable: true });
+	Object.defineProperty(player, 'readyState', { value: 4, configurable: true });
+	Object.defineProperty(player, 'videoWidth', { value: 640, configurable: true });
+	Object.defineProperty(player, 'videoHeight', { value: 360, configurable: true });
+	return new YoutubeWatcher({ canvas, context, youtubePlayer: player });
+}
+
+function makeSender(): import('webextension-polyfill').Runtime.MessageSender {
+	return {} as import('webextension-polyfill').Runtime.MessageSender;
+}
 
 describe('youtube.com site handler', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
+		transcriptFetchMock.mockReset();
 
 		document.body.innerHTML = `
 			<video class="html5-main-video"></video>
@@ -37,86 +56,107 @@ describe('youtube.com site handler', () => {
 
 		Object.defineProperty(window, 'location', {
 			value: {
-				href: 'https://www.youtube.com/watch?v=test123',
-				search: '?v=test123',
+				href: 'https://www.youtube.com/watch?v=abc123',
+				search: '?v=abc123',
 			},
 			writable: true,
 		});
 	});
 
-	it('should export main function', () => {
-		expect(main).toBeDefined();
-		expect(typeof main).toBe('function');
-	});
-
-	it('should register message listener when main is called', async () => {
+	it('registers a message listener when main is called', async () => {
 		const browser = await import('webextension-polyfill');
-
 		main();
-
 		expect(browser.default.runtime.onMessage.addListener).toHaveBeenCalled();
 	});
 
-	it('should handle NEW message type', () => {
-		const message = {
-			type: 'NEW',
-		};
+	describe('GET_CURRENT_TIMESTAMP', () => {
+		it('returns the typed CurrentTimestamp payload', async () => {
+			const watcher = makeWatcher();
+			const result = await watcher.listen({ type: 'GET_CURRENT_TIMESTAMP' }, makeSender());
 
-		expect(message.type).toBe('NEW');
+			expect(result).toEqual({
+				video_id: 'abc123',
+				timestamp_seconds: 12.5,
+				duration_seconds: 240.0,
+				playing: true,
+			});
+		});
+
+		it('surfaces a missing player as a guarded {kind: Error} envelope', async () => {
+			document.body.innerHTML = '';
+			const watcher = new YoutubeWatcher({
+				canvas: document.createElement('canvas'),
+				context: document.createElement('canvas').getContext('2d'),
+				youtubePlayer: null,
+			});
+			const result = await watcher.listen({ type: 'GET_CURRENT_TIMESTAMP' }, makeSender());
+			expect(result).toMatchObject({ kind: 'Error' });
+		});
 	});
 
-	it('should handle PLAY message type', () => {
-		const message = {
-			type: 'PLAY',
-			value: 10.5,
-		};
+	describe('GET_TRANSCRIPT', () => {
+		it('returns the typed Transcript payload with snippets mapped to entries', async () => {
+			transcriptFetchMock.mockResolvedValueOnce({
+				videoId: 'abc123',
+				languageCode: 'en',
+				snippets: [
+					{ text: 'Hello', start: 0, duration: 1.5 },
+					{ text: 'World', start: 1.5, duration: 1.0 },
+				],
+			});
 
-		expect(message.type).toBe('PLAY');
-		expect(message.value).toBe(10.5);
+			const watcher = makeWatcher();
+			const result = await watcher.listen({ type: 'GET_TRANSCRIPT' }, makeSender());
+
+			expect(result).toEqual({
+				video_id: 'abc123',
+				language: 'en',
+				entries: [
+					{ start_seconds: 0, duration_seconds: 1.5, text: 'Hello' },
+					{ start_seconds: 1.5, duration_seconds: 1.0, text: 'World' },
+				],
+			});
+		});
+
+		it('surfaces transcript fetch failures as a guarded error envelope', async () => {
+			transcriptFetchMock.mockRejectedValueOnce(new Error('no captions'));
+			const watcher = makeWatcher();
+			const result = await watcher.listen({ type: 'GET_TRANSCRIPT' }, makeSender());
+			expect(result).toMatchObject({ kind: 'Error', data: 'no captions' });
+		});
 	});
 
-	it('should handle GENERATE_ASSETS message type', () => {
-		const message = {
-			type: 'GENERATE_ASSETS',
-		};
+	describe('GET_CURRENT_FRAME', () => {
+		it('returns the typed CapturedFrame payload', async () => {
+			const watcher = makeWatcher();
+			const result = await watcher.listen({ type: 'GET_CURRENT_FRAME' }, makeSender());
 
-		expect(message.type).toBe('GENERATE_ASSETS');
+			expect(result).toEqual({
+				video_id: 'abc123',
+				timestamp_seconds: 12.5,
+				width: 640,
+				height: 360,
+				image_base64: 'mockdata',
+			});
+		});
 	});
 
-	it('should handle GENERATE_SNAPSHOT message type', () => {
-		const message = {
-			type: 'GENERATE_SNAPSHOT',
-		};
+	describe('unrelated messages', () => {
+		it('delegates GENERATE_ASSETS to the existing watcher path on watch URLs', async () => {
+			transcriptFetchMock.mockResolvedValueOnce({
+				videoId: 'abc123',
+				languageCode: 'en',
+				snippets: [],
+			});
+			const watcher = makeWatcher();
+			const result = await watcher.listen({ type: 'GENERATE_ASSETS' }, makeSender());
+			expect(result).toMatchObject({ kind: 'NativeYoutubeAsset' });
+		});
 
-		expect(message.type).toBe('GENERATE_SNAPSHOT');
-	});
-
-	it('should extract video ID from URL', () => {
-		const url = 'https://www.youtube.com/watch?v=test123';
-		const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : null;
-
-		expect(videoId).toBe('test123');
-	});
-
-	it('should return null for non-video URLs', () => {
-		const url = 'https://www.youtube.com/';
-		const videoId = url.includes('v=') ? url.split('v=')[1].split('&')[0] : null;
-
-		expect(videoId).toBeNull();
-	});
-
-	it('should find YouTube video element', () => {
-		const videoElement = document.querySelector('video.html5-main-video');
-
-		expect(videoElement).toBeTruthy();
-		expect(videoElement?.tagName).toBe('VIDEO');
-	});
-
-	it('should create canvas for video frame capture', () => {
-		const canvas = document.createElement('canvas');
-
-		expect(canvas).toBeTruthy();
-		expect(canvas.tagName).toBe('CANVAS');
-		expect(typeof canvas.getContext).toBe('function');
+		it('returns false for unknown message types', async () => {
+			const watcher = makeWatcher();
+			const result = watcher.listen({ type: 'UNKNOWN' as never }, makeSender());
+			expect(result).toBe(false);
+		});
 	});
 });

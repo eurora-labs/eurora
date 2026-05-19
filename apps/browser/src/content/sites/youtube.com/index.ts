@@ -1,4 +1,4 @@
-import { YouTubeTranscriptApi } from './transcript/index.js';
+import { YouTubeTranscriptApi, type FetchedTranscript } from './transcript/index.js';
 import { createArticleAsset } from '../../../shared/content/extensions/article/util';
 import {
 	Watcher,
@@ -15,6 +15,39 @@ interface EurImage {
 	height: number;
 }
 
+/// Mirrors `eurora_tools_youtube::types::CurrentTimestamp`. The bridge
+/// dispatcher decodes this shape verbatim — keep the field names and
+/// types in sync with the Rust struct.
+interface CurrentTimestampPayload {
+	video_id: string;
+	timestamp_seconds: number;
+	duration_seconds: number;
+	playing: boolean;
+}
+
+/// Mirrors `eurora_tools_youtube::types::TranscriptEntry`.
+interface TranscriptEntryPayload {
+	start_seconds: number;
+	duration_seconds: number;
+	text: string;
+}
+
+/// Mirrors `eurora_tools_youtube::types::Transcript`.
+interface TranscriptPayload {
+	video_id: string;
+	language: string;
+	entries: TranscriptEntryPayload[];
+}
+
+/// Mirrors `eurora_tools_youtube::types::CapturedFrame`.
+interface CapturedFramePayload {
+	video_id: string;
+	timestamp_seconds: number;
+	width: number;
+	height: number;
+	image_base64: string;
+}
+
 export class YoutubeWatcher extends Watcher<WatcherParams> {
 	private youtubeTranscriptApi: YouTubeTranscriptApi;
 	constructor(params: WatcherParams) {
@@ -22,17 +55,29 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
 	}
 
-	private async fetchTranscript(): Promise<any> {
+	private async fetchTranscript(): Promise<FetchedTranscript> {
 		const videoId = getCurrentVideoId();
-		return (await this.youtubeTranscriptApi.fetch(videoId)).snippets;
+		if (videoId === undefined) {
+			throw new Error('YouTube watch page has no video id');
+		}
+		return await this.youtubeTranscriptApi.fetch(videoId);
 	}
 
 	public listen(
 		obj: BrowserObj,
 		sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> | false {
-		if ((obj as YoutubeBrowserMessage).type === 'PLAY') {
-			return this.handlePlay(obj as YoutubeBrowserMessage, sender).catch(() => undefined);
+	): Promise<unknown> | false {
+		const msg = obj as YoutubeBrowserMessage;
+		if (msg.type === 'PLAY') {
+			return this.handlePlay(msg, sender).catch(() => undefined);
+		}
+		switch (msg.type) {
+			case 'GET_CURRENT_TIMESTAMP':
+				return this.guard(this.handleGetCurrentTimestamp());
+			case 'GET_TRANSCRIPT':
+				return this.guard(this.handleGetTranscript());
+			case 'GET_CURRENT_FRAME':
+				return this.guard(this.handleGetCurrentFrame());
 		}
 		return super.listen(obj, sender);
 	}
@@ -112,6 +157,62 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		return { kind: 'NativeYoutubeSnapshot', data: reportData };
 	}
 
+	/// Return the current playback state. Mirrors
+	/// `eurora_tools_youtube::YoutubeAdapter::get_current_timestamp`.
+	/// Throws if the page has no `<video>` element ready yet — the bridge
+	/// catches that and returns it as a content-script error (HTTP 500
+	/// in the bridge contract), not a tab-gone signal.
+	public async handleGetCurrentTimestamp(): Promise<CurrentTimestampPayload> {
+		const videoId = requireCurrentVideoId();
+		const player = this.requirePlayer();
+		return {
+			video_id: videoId,
+			timestamp_seconds: player.currentTime,
+			duration_seconds: player.duration,
+			playing: !player.paused,
+		};
+	}
+
+	/// Return the active video's transcript. Mirrors
+	/// `eurora_tools_youtube::YoutubeAdapter::get_transcript`. The
+	/// language tag comes from YouTube's caption metadata — for
+	/// auto-generated tracks this is the ASR language, for manual tracks
+	/// the author-specified locale.
+	public async handleGetTranscript(): Promise<TranscriptPayload> {
+		const fetched = await this.fetchTranscript();
+		return {
+			video_id: fetched.videoId,
+			language: fetched.languageCode,
+			entries: fetched.snippets.map((s) => ({
+				start_seconds: s.start,
+				duration_seconds: s.duration,
+				text: s.text,
+			})),
+		};
+	}
+
+	/// Capture the visible video frame as PNG. Mirrors
+	/// `eurora_tools_youtube::YoutubeAdapter::get_current_frame`.
+	public async handleGetCurrentFrame(): Promise<CapturedFramePayload> {
+		const videoId = requireCurrentVideoId();
+		const player = this.requirePlayer();
+		const frame = this.getCurrentVideoFrame();
+		return {
+			video_id: videoId,
+			timestamp_seconds: player.currentTime,
+			width: frame.width,
+			height: frame.height,
+			image_base64: frame.dataBase64,
+		};
+	}
+
+	private requirePlayer(): HTMLVideoElement {
+		const player = this.getYouTubePlayer();
+		if (!player) throw new Error('no YouTube player element on the page');
+		if (player.readyState === 0) throw new Error('YouTube player not ready');
+		return player;
+	}
+
 	getCurrentVideoFrame(): EurImage {
 		const { youtubePlayer, canvas } = this.params;
 		if (!youtubePlayer) return null;
@@ -148,11 +249,19 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	}
 }
 
-function getCurrentVideoId() {
+function getCurrentVideoId(): string | undefined {
 	if (window.location.search?.includes('v=')) {
 		return window.location.search.split('v=')[1].split('&')[0];
 	}
 	return undefined;
+}
+
+function requireCurrentVideoId(): string {
+	const videoId = getCurrentVideoId();
+	if (videoId === undefined) {
+		throw new Error('YouTube watch page has no video id');
+	}
+	return videoId;
 }
 
 let initialized = false;

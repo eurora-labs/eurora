@@ -28,6 +28,12 @@ pub const YOUTUBE_GET_TRANSCRIPT: &str = "YOUTUBE_GET_TRANSCRIPT";
 /// Bridge action emitted for `browser::youtube::get_current_frame`.
 pub const YOUTUBE_GET_CURRENT_FRAME: &str = "YOUTUBE_GET_CURRENT_FRAME";
 
+/// `ErrorFrame.code` returned by the browser extension when the target
+/// tab is unreachable (closed, content script missing). Modelled on HTTP
+/// `410 Gone` — the resource the call was pinned to is no longer there
+/// and the desktop must not retry.
+const CLIENT_CODE_TAB_GONE: u32 = 410;
+
 const TIMESTAMP_TOOL: &str = "browser::youtube::get_current_timestamp";
 const TRANSCRIPT_TOOL: &str = "browser::youtube::get_transcript";
 const FRAME_TOOL: &str = "browser::youtube::get_current_frame";
@@ -112,10 +118,14 @@ fn decode_payload<T: DeserializeOwned>(
 ///
 /// `NotFound` is treated as a lost context — the browser bridge client
 /// has disconnected and there's no point in retrying this turn.
-/// `Timeout` maps directly. `Client` errors are remote tool errors
-/// with no HTTP-style code; the optional `details` blob is parsed back
-/// to JSON when possible. Anything else surfaces as a transport
-/// failure with the rendered display message.
+/// `Timeout` maps directly. A [`CLIENT_CODE_TAB_GONE`] reply from the
+/// extension (tab closed, content script missing) maps to
+/// [`ToolError::ContextUnavailable`] — the call was pinned to a tab
+/// that no longer exists, retrying within the turn cannot succeed.
+/// Other `Client` errors surface as [`ToolError::Remote`] with the
+/// extension-supplied code preserved; the optional `details` blob is
+/// parsed back to JSON when possible. Anything else surfaces as a
+/// transport failure with the rendered display message.
 fn map_bridge_err(tool: &'static str, err: BridgeError) -> ToolError {
     match err {
         BridgeError::NotFound { .. } => ToolError::ContextUnavailable {
@@ -124,8 +134,19 @@ fn map_bridge_err(tool: &'static str, err: BridgeError) -> ToolError {
         },
         BridgeError::Timeout => ToolError::Timeout,
         BridgeError::ChannelClosed => ToolError::Transport(Cow::Borrowed("bridge channel closed")),
-        BridgeError::Client { message, details } => ToolError::Remote {
-            code: 0,
+        BridgeError::Client {
+            code: CLIENT_CODE_TAB_GONE,
+            ..
+        } => ToolError::ContextUnavailable {
+            tool: Cow::Borrowed(tool),
+            reason: Cow::Borrowed("browser tab is gone"),
+        },
+        BridgeError::Client {
+            code,
+            message,
+            details,
+        } => ToolError::Remote {
+            code,
             message,
             details: details.and_then(|s| serde_json::from_str(&s).ok()),
         },
@@ -171,6 +192,7 @@ mod tests {
         match map_bridge_err(
             TIMESTAMP_TOOL,
             BridgeError::Client {
+                code: 500,
                 message: "no captions".into(),
                 details: Some(details),
             },
@@ -180,7 +202,7 @@ mod tests {
                 message,
                 details,
             } => {
-                assert_eq!(code, 0);
+                assert_eq!(code, 500);
                 assert_eq!(message, "no captions");
                 assert_eq!(details, Some(json!({"hint": "video offline"})));
             }
@@ -193,11 +215,48 @@ mod tests {
         match map_bridge_err(
             TIMESTAMP_TOOL,
             BridgeError::Client {
+                code: 0,
                 message: "weird".into(),
                 details: Some("not valid json".into()),
             },
         ) {
             ToolError::Remote { details, .. } => assert!(details.is_none()),
+            other => panic!("expected Remote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_bridge_err_client_code_410_is_context_unavailable() {
+        match map_bridge_err(
+            TRANSCRIPT_TOOL,
+            BridgeError::Client {
+                code: 410,
+                message: "tab unreachable".into(),
+                details: None,
+            },
+        ) {
+            ToolError::ContextUnavailable { tool, reason } => {
+                assert_eq!(tool, TRANSCRIPT_TOOL);
+                assert!(reason.contains("gone"));
+            }
+            other => panic!("expected ContextUnavailable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_bridge_err_client_preserves_non_410_code() {
+        match map_bridge_err(
+            FRAME_TOOL,
+            BridgeError::Client {
+                code: 400,
+                message: "bad tab_id".into(),
+                details: None,
+            },
+        ) {
+            ToolError::Remote { code, message, .. } => {
+                assert_eq!(code, 400);
+                assert_eq!(message, "bad tab_id");
+            }
             other => panic!("expected Remote, got {other:?}"),
         }
     }

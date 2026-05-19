@@ -18,10 +18,15 @@ export abstract class Watcher<T> {
 	// message port before async sendResponse callbacks fire, dropping the
 	// reply; returning a Promise is the cross-browser pattern that
 	// webextension-polyfill marshals correctly on all engines.
+	//
+	// The Promise resolves to `unknown` so subclasses can return typed
+	// payloads (e.g. adapter-driven tool replies) that don't conform to
+	// `NativeResponse` — the cross-process message bus only requires the
+	// value to be JSON-serializable.
 	public listen(
 		obj: BrowserObj,
 		sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> | false {
+	): Promise<unknown> | false {
 		switch (obj.type) {
 			case 'NEW':
 				return this.guard(this.handleNew(obj, sender));
@@ -34,10 +39,20 @@ export abstract class Watcher<T> {
 		}
 	}
 
-	private async guard(promise: Promise<WatcherResponse>): Promise<WatcherResponse> {
+	/// Convert a rejected handler promise into the `{kind: 'Error'}`
+	/// envelope the bridge expects. Subclasses that override `listen` to
+	/// add new message types should route their handler promises through
+	/// this so a thrown error doesn't bubble out as a raw `sendMessage`
+	/// rejection (which the bridge interprets as a tab-gone signal).
+	///
+	/// The success type is preserved verbatim — the message bus
+	/// serializes whatever shape the handler returns, including flat
+	/// typed payloads that aren't `NativeResponse`-shaped (e.g. the
+	/// adapter-driven YouTube tool replies).
+	protected async guard<T>(promise: Promise<T>): Promise<T | NativeResponse> {
 		return await promise.catch((error) => {
 			const message = error instanceof Error ? error.message : String(error);
-			return { kind: 'Error', data: message };
+			return { kind: 'Error', data: message } as NativeResponse;
 		});
 	}
 
