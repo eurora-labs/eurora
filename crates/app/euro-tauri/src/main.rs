@@ -867,6 +867,23 @@ fn main() {
                     euro_tauri::context_registry::spawn_context_listener(context_registry.clone());
                     tauri_app.manage(context_registry);
 
+                    // Build the per-process catalog of client-side
+                    // dispatchers and register every available adapter.
+                    // `ChatBridge` looks tools up against this catalog
+                    // at turn start; missing entries surface as
+                    // `ContextUnavailable` / `Remote 404` to the LLM.
+                    // The bridge service was bound by
+                    // `bind_and_serve_bridge()` above, so
+                    // `get_or_init()` resolves to the live singleton.
+                    let bridge_service = euro_bridge::BridgeService::get_or_init();
+                    let catalog = std::sync::Arc::new(eurora_tools::Catalog::new());
+                    catalog.register(std::sync::Arc::new(
+                        eurora_tools_youtube::YoutubeDispatcher::new(
+                            euro_tauri::tools::youtube::YoutubeBridgeImpl::new(bridge_service),
+                        ),
+                    ));
+                    tauri_app.manage(catalog);
+
                     Ok(())
                 })
                 .plugin(tauri_plugin_http::init())
