@@ -108,7 +108,18 @@ impl ChatChunk {
 
 #[derive(Debug, Clone)]
 pub enum ToolLike {
+    /// In-process executor. The provider derives the LLM-facing definition
+    /// by calling `tool.definition()` and invokes the tool at runtime when
+    /// the model picks it.
     Tool(Arc<dyn BaseTool>),
+    /// Definition-only handle for tools whose execution lives elsewhere
+    /// (e.g. on another process behind an RPC bus). Providers bind the
+    /// definition for the LLM but never invoke it locally.
+    Definition(ToolDefinition),
+    /// Raw JSON Schema input. Provider impls normalise this through
+    /// [`convert_to_openai_tool`] to recover name/description/parameters.
+    /// Use [`ToolLike::Definition`] in preference when the caller already
+    /// holds a typed [`ToolDefinition`].
     Schema(Value),
     /// Raw tool JSON passed through unchanged (e.g. `{"type": "web_search_preview"}`).
     /// Used for Responses API builtin tools that don't follow the function tool format.
@@ -119,6 +130,7 @@ impl ToolLike {
     pub fn to_definition(&self) -> Result<ToolDefinition> {
         match self {
             ToolLike::Tool(tool) => Ok(tool.definition()),
+            ToolLike::Definition(def) => Ok(def.clone()),
             ToolLike::Schema(schema) => {
                 let openai_tool = convert_to_openai_tool(schema, None)?;
                 let function = openai_tool.get("function").cloned().unwrap_or_default();
@@ -160,10 +172,36 @@ impl From<Arc<dyn BaseTool>> for ToolLike {
     }
 }
 
+impl From<ToolDefinition> for ToolLike {
+    fn from(definition: ToolDefinition) -> Self {
+        ToolLike::Definition(definition)
+    }
+}
+
 impl From<Value> for ToolLike {
     fn from(schema: Value) -> Self {
         ToolLike::Schema(schema)
     }
+}
+
+/// Split a `[ToolLike]` into the LLM function-tool side and the
+/// provider-builtin side. The match is exhaustive so adding a new
+/// [`ToolLike`] variant fails the build until the partition is
+/// updated — better than a silent route to the wrong bucket.
+pub fn partition_tool_likes(tools: &[ToolLike]) -> (Vec<ToolLike>, Vec<Value>) {
+    let mut function_tools = Vec::with_capacity(tools.len());
+    let mut builtin_tools = Vec::new();
+    for tool in tools {
+        match tool {
+            ToolLike::Tool(_) | ToolLike::Definition(_) | ToolLike::Schema(_) => {
+                function_tools.push(tool.clone());
+            }
+            ToolLike::Builtin(value) => {
+                builtin_tools.push(value.clone());
+            }
+        }
+    }
+    (function_tools, builtin_tools)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1317,6 +1355,20 @@ mod tests {
         assert_eq!(config.base.cache, Some(true));
         assert_eq!(config.disable_streaming, DisableStreaming::Bool(true));
         assert_eq!(config.output_version, Some("v1".to_string()));
+    }
+
+    #[test]
+    fn tool_like_definition_round_trips_via_to_definition() {
+        let def = ToolDefinition {
+            name: "browser::youtube::get_current_timestamp".to_string(),
+            description: "Return the user's current playback position.".to_string(),
+            parameters: serde_json::json!({"type": "object"}),
+        };
+        let tool_like: ToolLike = def.clone().into();
+        let recovered = tool_like
+            .to_definition()
+            .expect("definition arm is infallible");
+        assert_eq!(recovered, def);
     }
 
     #[test]

@@ -1053,6 +1053,12 @@ export type ToolCallChunkBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
+export type ToolDefinition = {
+	name: string,
+	description: string,
+	parameters: unknown,
+};
+
 export type ToolMessage = {
 	content: ContentBlocks,
 	tool_call_id: string,
@@ -1116,24 +1122,19 @@ export type VideoContentBlock = {
  *  Wire-side descriptor for a tool. One per call, one per entry in the
  *  per-turn `CapabilityUpdate.tools` list.
  * 
- *  The framework form (`eurora_tools::ToolDescriptor`) is the in-process
+ *  `WireToolDescriptor` is a [`ToolDefinition`] (name, description,
+ *  parameters schema) plus dispatch metadata (timeout, source, required
+ *  contexts, approval flag) and the tool's output schema. The framework
+ *  form (`eurora_tools::ToolDescriptor`) is the in-process
  *  `&'static`-everywhere shape; this is its serializable counterpart, owned
  *  and ready for transport. The server only ever sees this form.
+ * 
+ *  The `definition` field is flattened on the wire so the JSON shape stays
+ *  flat (`{"name": ..., "description": ..., "parameters": ..., ...}`),
+ *  while in Rust the typed relationship `WireToolDescriptor IS-A
+ *  ToolDefinition + dispatch metadata` is explicit.
  */
 export type WireToolDescriptor = {
-	/**
-	 *  Fully-qualified tool name, namespaced with `::`
-	 *  (e.g. `browser::youtube::get_current_timestamp`).
-	 */
-	name: string,
-	/**
-	 *  Human-readable description shown to the LLM. Produced by the
-	 *  framework macro from the first paragraph of the trait method's
-	 *  rustdoc.
-	 */
-	description: string,
-	/**  JSON Schema for the tool's `arguments` payload. */
-	input_schema: unknown,
 	/**  JSON Schema for the tool's success payload. */
 	output_schema: unknown,
 	/**
@@ -1158,7 +1159,7 @@ export type WireToolDescriptor = {
 	 *  read-only) but declared so the protocol is stable.
 	 */
 	requires_user_approval?: boolean,
-};
+} & ToolDefinition;
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

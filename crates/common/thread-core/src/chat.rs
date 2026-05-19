@@ -174,9 +174,11 @@ mod tests {
 
     fn sample_descriptor() -> WireToolDescriptor {
         WireToolDescriptor {
-            name: "browser::youtube::get_current_timestamp".into(),
-            description: "Return the user's current playback position.".into(),
-            input_schema: json!({"type": "object"}),
+            definition: agent_chain_core::tools::ToolDefinition {
+                name: "browser::youtube::get_current_timestamp".into(),
+                description: "Return the user's current playback position.".into(),
+                parameters: json!({"type": "object"}),
+            },
             output_schema: json!({"type": "object"}),
             timeout_ms: 2_000,
             source: ToolSource::Bridge {
@@ -265,12 +267,16 @@ mod tests {
     fn capability_update_golden_json() {
         // Lock the exact wire shape — any future shift (field reorder,
         // tag rename, default-on-encode change) must update this golden
-        // and is reviewable in the diff.
+        // and is reviewable in the diff. The flattened ToolDefinition
+        // surfaces `name`, `description`, and `parameters` at the top
+        // level of the descriptor object.
         let m = ChatClientMessage::CapabilityUpdate {
             tools: vec![WireToolDescriptor {
-                name: "browser::youtube::get_current_timestamp".into(),
-                description: "x".into(),
-                input_schema: json!({}),
+                definition: agent_chain_core::tools::ToolDefinition {
+                    name: "browser::youtube::get_current_timestamp".into(),
+                    description: "x".into(),
+                    parameters: json!({}),
+                },
                 output_schema: json!({}),
                 timeout_ms: 2_000,
                 source: ToolSource::Bridge {
@@ -290,7 +296,7 @@ mod tests {
         let s = serde_json::to_string(&m).unwrap();
         assert_eq!(
             s,
-            r#"{"type":"capability_update","tools":[{"name":"browser::youtube::get_current_timestamp","description":"x","input_schema":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false}],"contexts":[{"key":"youtube::watch_page","activated_at":"2026-01-15T12:00:00Z","data":{"video_id":"abc123"}}]}"#
+            r#"{"type":"capability_update","tools":[{"name":"browser::youtube::get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false}],"contexts":[{"key":"youtube::watch_page","activated_at":"2026-01-15T12:00:00Z","data":{"video_id":"abc123"}}]}"#
         );
     }
 
@@ -360,9 +366,11 @@ mod tests {
         let m = ChatServerMessage::ToolRequest {
             call_id: 99,
             descriptor: WireToolDescriptor {
-                name: "browser::youtube::get_current_timestamp".into(),
-                description: "x".into(),
-                input_schema: json!({}),
+                definition: agent_chain_core::tools::ToolDefinition {
+                    name: "browser::youtube::get_current_timestamp".into(),
+                    description: "x".into(),
+                    parameters: json!({}),
+                },
                 output_schema: json!({}),
                 timeout_ms: 2_000,
                 source: ToolSource::Bridge {
@@ -376,7 +384,7 @@ mod tests {
         let s = serde_json::to_string(&m).unwrap();
         assert_eq!(
             s,
-            r#"{"type":"tool_request","call_id":99,"descriptor":{"name":"browser::youtube::get_current_timestamp","description":"x","input_schema":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false},"arguments":{}}"#
+            r#"{"type":"tool_request","call_id":99,"descriptor":{"name":"browser::youtube::get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false},"arguments":{}}"#
         );
     }
 

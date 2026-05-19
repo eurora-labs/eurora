@@ -2,23 +2,26 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use agent_chain::messages::ContentBlock;
-use agent_chain::{AnyMessage, BaseChatModel, BaseTool, SystemMessage, language_models::ToolLike};
+use agent_chain::{AnyMessage, BaseChatModel, BaseTool, SystemMessage};
 use base64::{Engine as _, engine::general_purpose};
 use be_asset::AssetService;
 use be_storage::StorageService;
 use futures::stream::{self, StreamExt};
+use thread_core::{WireActiveContext, WireToolDescriptor};
 
 use crate::describe_image_tool::{self, DescribeImageTool};
 use crate::error::ThreadServiceError;
 use crate::llm::Providers;
 use crate::message_projection::{collect_thread_images, project_for_text_llm};
+use crate::tool_catalog::{TurnCatalog, build_context_system_message};
 
 /// Per-turn LLM context: the messages to invoke the model with, the bound
-/// model itself, and the tool registry the agent loop will dispatch from.
+/// model itself, and the unified tool catalog the agent loop will dispatch
+/// from.
 pub struct LlmContext {
     pub messages: Vec<AnyMessage>,
     pub chat_model: Arc<dyn BaseChatModel + Send + Sync>,
-    pub tools: HashMap<String, Arc<dyn BaseTool>>,
+    pub catalog: Arc<TurnCatalog>,
 }
 
 /// Build the per-turn LLM context.
@@ -28,29 +31,39 @@ pub struct LlmContext {
 /// vanilla message history. In vision mode we instead leave images referenced
 /// by id, register a `describe_image` tool that the model can call to inspect
 /// them lazily, and prepend a system prompt teaching the model how to use it.
+///
+/// `remote_descriptors` are the tool descriptors the client advertised in
+/// its `CapabilityUpdate` frame, and `active_contexts` are the contexts the
+/// client said are live. Both are filtered into the merged
+/// [`TurnCatalog`] alongside the server-local tools; the LLM is bound with
+/// the union so it sees one flat catalog.
 pub async fn prepare_llm_context(
     providers: &Providers,
     asset_service: &Arc<AssetService>,
     mut messages: Vec<AnyMessage>,
+    remote_descriptors: Vec<WireToolDescriptor>,
+    active_contexts: &[WireActiveContext],
 ) -> Result<LlmContext, ThreadServiceError> {
+    if let Some(system_message) = build_context_system_message(active_contexts) {
+        messages.insert(0, system_message.into());
+    }
+
     resolve_plain_text_blocks(asset_service, &mut messages).await;
 
     let Some(vision) = providers.vision.as_ref() else {
         resolve_image_blocks(asset_service, &mut messages).await;
+        let catalog = build_catalog(Vec::new(), remote_descriptors, active_contexts)?;
+        let chat_model = bind_chat_model(&providers.chat, &catalog)?;
         return Ok(LlmContext {
             messages,
-            chat_model: providers.chat.clone(),
-            tools: HashMap::new(),
+            chat_model,
+            catalog,
         });
     };
 
     let allowed_images = collect_thread_images(&messages);
 
-    let mut tools: HashMap<String, Arc<dyn BaseTool>> = vision
-        .default_tools
-        .iter()
-        .map(|tool| (tool.name().to_string(), tool.clone()))
-        .collect();
+    let mut server_local: Vec<Arc<dyn BaseTool>> = vision.default_tools.to_vec();
 
     if !allowed_images.is_empty() {
         let describe = Arc::new(DescribeImageTool::new(
@@ -58,15 +71,11 @@ pub async fn prepare_llm_context(
             asset_service.clone(),
             allowed_images.clone(),
         )) as Arc<dyn BaseTool>;
-        tools.insert(describe_image_tool::TOOL_NAME.to_string(), describe);
+        server_local.push(describe);
     }
 
-    let tool_likes: Vec<ToolLike> = tools.values().cloned().map(ToolLike::Tool).collect();
-    let bound = providers.chat.bind_tools(&tool_likes, None).map_err(|e| {
-        ThreadServiceError::Internal(format!("Failed to bind tools to chat model: {e}"))
-    })?;
-    let chat_model: Arc<dyn BaseChatModel + Send + Sync> =
-        Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
+    let catalog = build_catalog(server_local, remote_descriptors, active_contexts)?;
+    let chat_model = bind_chat_model(&providers.chat, &catalog)?;
 
     project_for_text_llm(&mut messages);
 
@@ -78,9 +87,10 @@ pub async fn prepare_llm_context(
             .join(", ");
         let system_prompt = format!(
             "You cannot see attached images directly. To learn anything about an image \
-             you MUST call the `describe_image` tool with that image's `image_id` and a \
+             you MUST call the `{tool}` tool with that image's `image_id` and a \
              concrete `question`. Do not claim to have seen an image without calling the \
-             tool first. Available image_ids: {id_list}."
+             tool first. Available image_ids: {id_list}.",
+            tool = describe_image_tool::TOOL_NAME,
         );
         messages.insert(
             0,
@@ -94,8 +104,32 @@ pub async fn prepare_llm_context(
     Ok(LlmContext {
         messages,
         chat_model,
-        tools,
+        catalog,
     })
+}
+
+fn build_catalog(
+    server_local: Vec<Arc<dyn BaseTool>>,
+    remote: Vec<WireToolDescriptor>,
+    active_contexts: &[WireActiveContext],
+) -> Result<Arc<TurnCatalog>, ThreadServiceError> {
+    TurnCatalog::build(server_local, remote, active_contexts)
+        .map(Arc::new)
+        .map_err(|err| ThreadServiceError::InvalidArgument(err.to_string()))
+}
+
+fn bind_chat_model(
+    chat: &Arc<dyn BaseChatModel + Send + Sync>,
+    catalog: &TurnCatalog,
+) -> Result<Arc<dyn BaseChatModel + Send + Sync>, ThreadServiceError> {
+    if catalog.is_empty() {
+        return Ok(chat.clone());
+    }
+    let tool_likes = catalog.tool_likes();
+    let bound = chat.bind_tools(&tool_likes, None).map_err(|e| {
+        ThreadServiceError::Internal(format!("Failed to bind tools to chat model: {e}"))
+    })?;
+    Ok(Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>))
 }
 
 /// Concurrent download fan-out. Storage backends are typically remote (S3),

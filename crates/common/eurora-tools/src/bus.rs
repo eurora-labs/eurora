@@ -96,7 +96,7 @@ mod tests {
             // Trivial echo for the test: the result mirrors the call so we
             // can verify both arguments survive the trait dispatch.
             Ok(json!({
-                "echoed_for": descriptor.name,
+                "echoed_for": descriptor.name(),
                 "arguments": arguments,
             }))
         }
@@ -104,9 +104,11 @@ mod tests {
 
     fn sample_descriptor() -> WireToolDescriptor {
         WireToolDescriptor {
-            name: "browser::test::echo".into(),
-            description: "x".into(),
-            input_schema: json!({}),
+            definition: agent_chain_core::tools::ToolDefinition {
+                name: "browser::test::echo".into(),
+                description: "x".into(),
+                parameters: json!({}),
+            },
             output_schema: json!({}),
             timeout_ms: 1_000,
             source: thread_core::ToolSource::Bridge {

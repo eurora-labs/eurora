@@ -19,7 +19,9 @@ mod handlers;
 mod llm;
 mod message_projection;
 mod preliminary;
+mod remote_tool_bus;
 mod service;
+mod tool_catalog;
 mod tools;
 
 use std::sync::Arc;

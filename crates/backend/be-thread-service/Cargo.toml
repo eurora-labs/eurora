@@ -17,6 +17,8 @@ be-remote-db = { workspace = true }
 be-storage = { workspace = true }
 bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
+dashmap = { workspace = true }
+eurora-tools = { workspace = true }
 futures = { workspace = true }
 llm-core = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
@@ -25,9 +27,12 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 thread-core = { workspace = true }
-tokio = { workspace = true, features = ["sync", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "sync", "time"] }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 tower-http = { workspace = true, features = ["trace"] }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["serde", "v7"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "test-util", "time"] }

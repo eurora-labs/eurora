@@ -8,6 +8,7 @@
 
 use std::time::Duration;
 
+use agent_chain_core::tools::ToolDefinition;
 use thread_core::{ToolSource, WireToolDescriptor};
 
 use crate::schema::SchemaFn;
@@ -66,10 +67,12 @@ impl ToolDescriptor {
     pub fn to_wire(&self) -> WireToolDescriptor {
         let timeout_ms = u32::try_from(self.timeout.as_millis()).unwrap_or(u32::MAX);
         WireToolDescriptor {
-            name: self.name.to_owned(),
-            description: self.description.to_owned(),
-            input_schema: serde_json::to_value((self.input_schema)())
-                .expect("schemars::Schema must serialize to JSON"),
+            definition: ToolDefinition {
+                name: self.name.to_owned(),
+                description: self.description.to_owned(),
+                parameters: serde_json::to_value((self.input_schema)())
+                    .expect("schemars::Schema must serialize to JSON"),
+            },
             output_schema: serde_json::to_value((self.output_schema)())
                 .expect("schemars::Schema must serialize to JSON"),
             timeout_ms,
@@ -120,9 +123,12 @@ mod tests {
     #[test]
     fn to_wire_preserves_name_and_description() {
         let wire = sample_descriptor().to_wire();
-        assert_eq!(wire.name, "browser::youtube::get_current_timestamp");
         assert_eq!(
-            wire.description,
+            wire.definition.name,
+            "browser::youtube::get_current_timestamp"
+        );
+        assert_eq!(
+            wire.definition.description,
             "Return the user's current playback position."
         );
     }
@@ -130,13 +136,13 @@ mod tests {
     #[test]
     fn to_wire_invokes_schema_accessors() {
         let wire = sample_descriptor().to_wire();
-        assert!(wire.input_schema.is_object());
+        assert!(wire.definition.parameters.is_object());
         assert!(wire.output_schema.is_object());
-        let input_str = serde_json::to_string(&wire.input_schema).unwrap();
+        let input_str = serde_json::to_string(&wire.definition.parameters).unwrap();
         let output_str = serde_json::to_string(&wire.output_schema).unwrap();
         assert!(
             input_str.contains("\"query\""),
-            "input schema should describe the `query` field: {input_str}"
+            "parameters schema should describe the `query` field: {input_str}"
         );
         assert!(
             output_str.contains("\"result\""),

@@ -47,6 +47,7 @@ use crate::conversion::convert_db_message_to_base_message;
 use crate::error::{ThreadServiceError, ThreadServiceResult};
 use crate::llm::{LlmContext, prepare_llm_context};
 use crate::preliminary::rewrite_preliminary_blocks;
+use crate::remote_tool_bus::ChatRemoteBus;
 use crate::service::AppState;
 
 const CONTEXT_MESSAGE_LIMIT: u32 = 5;
@@ -326,11 +327,24 @@ async fn run_turn(
     // Prepare the LLM context *before* persisting the human message so that
     // a context-prep failure doesn't leave a half-completed turn (a human
     // row with no AI response) in the thread history.
+    //
+    // Phase 5 wires the per-turn catalog through to the agent loop but
+    // doesn't yet read `CapabilityUpdate` from the client (that's Phase
+    // 6). Until then every turn runs with an empty remote-descriptor list
+    // and no active contexts, so the catalog contains only server-local
+    // tools — Firecrawl and (in vision mode) `describe_image`.
     let LlmContext {
         messages: llm_messages,
         chat_model,
-        tools,
-    } = prepare_llm_context(&state.providers, &state.asset_service, messages).await?;
+        catalog,
+    } = prepare_llm_context(
+        &state.providers,
+        &state.asset_service,
+        messages,
+        Vec::new(),
+        &[],
+    )
+    .await?;
 
     let human_db_message = state
         .db
@@ -389,13 +403,15 @@ async fn run_turn(
     }
 
     let db = state.db.clone();
+    let remote_bus = ChatRemoteBus::new(tx.clone(), cancel.clone());
     tokio::spawn(
         run_agent_loop()
             .tx(tx)
             .token(cancel)
             .db(db)
             .chat_model(chat_model)
-            .tools(tools)
+            .catalog(catalog)
+            .remote_bus(remote_bus)
             .messages(llm_messages)
             .thread_id(thread_id)
             .user_id(user_id)
@@ -449,17 +465,26 @@ async fn regenerate_ai_response(
     let LlmContext {
         messages: llm_messages,
         chat_model,
-        tools,
-    } = prepare_llm_context(&state.providers, &state.asset_service, messages).await?;
+        catalog,
+    } = prepare_llm_context(
+        &state.providers,
+        &state.asset_service,
+        messages,
+        Vec::new(),
+        &[],
+    )
+    .await?;
 
     let db = state.db.clone();
+    let remote_bus = ChatRemoteBus::new(tx.clone(), cancel.clone());
     tokio::spawn(
         run_agent_loop()
             .tx(tx)
             .token(cancel)
             .db(db)
             .chat_model(chat_model)
-            .tools(tools)
+            .catalog(catalog)
+            .remote_bus(remote_bus)
             .messages(llm_messages)
             .thread_id(thread_id)
             .user_id(user_id)

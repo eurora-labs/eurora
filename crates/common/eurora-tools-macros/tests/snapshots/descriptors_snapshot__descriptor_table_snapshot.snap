@@ -1,16 +1,18 @@
 ---
 source: crates/common/eurora-tools-macros/tests/descriptors_snapshot.rs
-assertion_line: 61
+assertion_line: 60
 expression: wire
 ---
 [
     WireToolDescriptor {
-        name: "browser::youtube::get_current_timestamp",
-        description: "Return the user's current playback position.",
-        input_schema: Object {
-            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-            "title": String("Empty"),
-            "type": String("object"),
+        definition: ToolDefinition {
+            name: "browser::youtube::get_current_timestamp",
+            description: "Return the user's current playback position.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
         },
         output_schema: Object {
             "$schema": String("https://json-schema.org/draft/2020-12/schema"),
@@ -40,12 +42,14 @@ expression: wire
         requires_user_approval: false,
     },
     WireToolDescriptor {
-        name: "browser::youtube::get_transcript",
-        description: "Return the full transcript of the video the user is watching.",
-        input_schema: Object {
-            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-            "title": String("Empty"),
-            "type": String("object"),
+        definition: ToolDefinition {
+            name: "browser::youtube::get_transcript",
+            description: "Return the full transcript of the video the user is watching.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
         },
         output_schema: Object {
             "$schema": String("https://json-schema.org/draft/2020-12/schema"),

@@ -41,9 +41,7 @@ public enum FrameKind {
     case register(RegisterFrame)
     case shutdown(ShutdownFrame)
 }
-
 // MARK: - FrameKind Codable Implementation
-
 extension FrameKind: Codable {
     private enum CodingKeys: String, CodingKey {
         case request = "Request"
@@ -57,13 +55,10 @@ extension FrameKind: Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-
+        
         if container.allKeys.count != 1 {
             throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: decoder.codingPath,
-                    debugDescription: "Invalid number of keys found, expected one."
-                )
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid number of keys found, expected one.")
             )
         }
 
@@ -95,29 +90,30 @@ extension FrameKind: Codable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-
+        
         switch self {
-        case let .request(data):
+        case .request(let data):
             try container.encode(data, forKey: .request)
-        case let .response(data):
+        case .response(let data):
             try container.encode(data, forKey: .response)
-        case let .event(data):
+        case .event(let data):
             try container.encode(data, forKey: .event)
-        case let .error(data):
+        case .error(let data):
             try container.encode(data, forKey: .error)
-        case let .cancel(data):
+        case .cancel(let data):
             try container.encode(data, forKey: .cancel)
-        case let .register(data):
+        case .register(let data):
             try container.encode(data, forKey: .register)
-        case let .shutdown(data):
+        case .shutdown(let data):
             try container.encode(data, forKey: .shutdown)
         }
     }
 }
 
+
 /// Mandatory first frame on every connection. Identifies the host
 /// process (the bridge) and the application process being represented.
-///
+/// 
 /// `app_pid` is the OS PID for clients that have one (browsers via the
 /// native-messaging host, the macOS launcher representing Safari).
 /// Sandboxed clients without access to a real PID — Office.js add-ins
@@ -158,3 +154,4 @@ public struct ResponseFrame: Codable {
 public struct ShutdownFrame: Codable {
     public let reason: String?
 }
+
