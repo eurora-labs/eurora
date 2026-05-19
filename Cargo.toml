@@ -13,6 +13,7 @@ members = [
   "crates/common/asset-core",
   "crates/common/auth-core",
   "crates/common/eurora-tools",
+  "crates/common/eurora-tools-macros",
   "crates/common/thread-core",
   "crates/common/focus-tracker",
   "crates/common/focus-tracker-core",
@@ -99,6 +100,7 @@ euro-vision = { path = "crates/app/euro-vision" }
 euro-office = { path = "crates/app/euro-office" }
 euro-pdf = { path = "crates/app/euro-pdf" }
 eurora-tools = { path = "crates/common/eurora-tools" }
+eurora-tools-macros = { path = "crates/common/eurora-tools-macros" }
 focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "1.1.0" }
 futures = "0.3.31"
@@ -164,6 +166,7 @@ tower-http = "0.6.8"
 tracing = "0.1.44"
 tracing-subscriber = "0.3.22"
 trait-variant = "0.1"
+trybuild = "1.0"
 url = { version = "2.5.8", features = ["serde"] }
 uuid = "1.20.0"
 wiremock = "0.6"

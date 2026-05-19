@@ -484,7 +484,10 @@ mod tests {
             }
             ref other => panic!("expected Decode (kind preserved), got {other:?}"),
         }
-        assert_eq!(back.to_string(), "failed to decode tool payload: expected number");
+        assert_eq!(
+            back.to_string(),
+            "failed to decode tool payload: expected number"
+        );
     }
 
     #[test]

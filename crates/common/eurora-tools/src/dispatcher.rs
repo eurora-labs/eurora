@@ -346,7 +346,11 @@ mod tests {
         catalog.register(Arc::new(StubDispatcher));
         catalog.register(Arc::new(OtherDispatcher));
         let names: Vec<&str> = catalog.all_descriptors().iter().map(|d| d.name).collect();
-        assert_eq!(names.len(), 3, "expected 3 unique descriptors, got {names:?}");
+        assert_eq!(
+            names.len(),
+            3,
+            "expected 3 unique descriptors, got {names:?}"
+        );
     }
 
     #[test]

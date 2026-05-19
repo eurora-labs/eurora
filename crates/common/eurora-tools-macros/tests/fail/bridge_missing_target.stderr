@@ -1,0 +1,5 @@
+error: tool method missing target parameter; expected `target: &::eurora_tools::BrowserOrigin` here before the args parameter
+  --> tests/fail/bridge_missing_target.rs:17:32
+   |
+17 |     async fn boom(&self, args: Empty) -> Result<Output, ToolError>;
+   |                                ^^^^^
