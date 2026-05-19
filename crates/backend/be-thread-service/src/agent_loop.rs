@@ -488,7 +488,7 @@ pub async fn run_agent_loop<B>(
 
     finalize(
         &tx,
-        &db,
+        db.as_ref(),
         thread_id,
         user_id,
         human_message_id,

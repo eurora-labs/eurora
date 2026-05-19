@@ -13,6 +13,13 @@ pub enum ThreadServiceError {
     #[error("Invalid argument: {0}")]
     InvalidArgument(String),
 
+    /// The client violated the chat-WebSocket frame protocol — e.g. sent
+    /// `Send` before `CapabilityUpdate`, or declared two tools with the
+    /// same name. Surfaced to the client as
+    /// `ChatServerMessage::Error { kind: "protocol", ... }`.
+    #[error("Protocol violation: {0}")]
+    ProtocolViolation(String),
+
     #[error("Not found: {0}")]
     NotFound(String),
 
@@ -48,6 +55,10 @@ impl ThreadServiceError {
         Self::InvalidArgument(msg.into())
     }
 
+    pub fn protocol_violation(msg: impl Into<String>) -> Self {
+        Self::ProtocolViolation(msg.into())
+    }
+
     pub fn not_found(msg: impl Into<String>) -> Self {
         Self::NotFound(msg.into())
     }
@@ -62,6 +73,7 @@ impl ThreadServiceError {
         match self {
             Self::Unauthenticated(_) => "unauthenticated",
             Self::InvalidArgument(_) => "invalid_argument",
+            Self::ProtocolViolation(_) => "protocol",
             Self::NotFound(_) => "not_found",
             Self::Conflict(_) => "conflict",
             Self::Database(_) => "database_error",
@@ -75,7 +87,9 @@ impl ThreadServiceError {
     fn status(&self) -> StatusCode {
         match self {
             Self::Unauthenticated(_) => StatusCode::UNAUTHORIZED,
-            Self::InvalidArgument(_) | Self::InvalidBase64 { .. } => StatusCode::BAD_REQUEST,
+            Self::InvalidArgument(_) | Self::ProtocolViolation(_) | Self::InvalidBase64 { .. } => {
+                StatusCode::BAD_REQUEST
+            }
             Self::NotFound(_) => StatusCode::NOT_FOUND,
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Database(_) | Self::Storage(_) | Self::Asset(_) | Self::Internal(_) => {
@@ -149,6 +163,9 @@ impl IntoResponse for ThreadServiceError {
             Self::InvalidArgument(_) | Self::InvalidBase64 { .. } => {
                 tracing::debug!(error = %detail, "Thread service client error");
             }
+            Self::ProtocolViolation(_) => {
+                tracing::info!(error = %detail, "Thread service protocol violation");
+            }
             Self::NotFound(_) => {
                 tracing::debug!(error = %detail, "Thread service resource not found");
             }
@@ -203,6 +220,13 @@ mod tests {
     fn invalid_argument_maps_to_400() {
         let err = ThreadServiceError::invalid_argument("title is required");
         assert_eq!(err.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn protocol_violation_maps_to_400_with_protocol_kind() {
+        let err = ThreadServiceError::protocol_violation("capability_update must precede send");
+        assert_eq!(err.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(err.error_kind(), "protocol");
     }
 
     #[test]

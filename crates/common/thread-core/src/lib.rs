@@ -36,7 +36,10 @@ pub mod messages;
 pub mod thread;
 pub mod tool_wire;
 
-pub use chat::{ChatClientMessage, ChatSendRequest, ChatServerMessage, RegenerateRequest};
+pub use chat::{
+    CapabilityUpdatePayload, ChatClientMessage, ChatSendRequest, ChatServerMessage,
+    RegenerateRequest,
+};
 pub use context_chip::ContextChip;
 pub use error::ThreadErrorResponse;
 pub use messages::{
@@ -75,6 +78,7 @@ pub fn type_collection() -> specta::Types {
         .register::<SearchMessagesResponse>()
         .register::<SearchMessageResult>()
         .register::<ChatClientMessage>()
+        .register::<CapabilityUpdatePayload>()
         .register::<ChatSendRequest>()
         .register::<RegenerateRequest>()
         .register::<ChatServerMessage>()

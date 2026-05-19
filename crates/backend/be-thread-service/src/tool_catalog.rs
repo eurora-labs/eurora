@@ -12,8 +12,8 @@
 //! change the visible tool set without needing a long-lived reconcile loop.
 //!
 //! [`build_context_system_message`] renders the active contexts into a
-//! single LLM-visible `SystemMessage`. The chat handler will prepend it to
-//! the message list when wiring in Phase 6.
+//! single LLM-visible `SystemMessage`. The chat handler prepends it to the
+//! message list when assembling the per-turn LLM context.
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
@@ -40,8 +40,7 @@ pub enum TurnEntry {
 /// The single variant covers descriptor-name collisions, which are a
 /// protocol-level fault: two tools claim the same fully-qualified name and
 /// the dispatcher would be ambiguous. The chat handler renders this as
-/// `ChatServerMessage::Error { kind: "invalid_argument", ... }` today;
-/// Phase 6 reclassifies it as a `ProtocolViolation`.
+/// `ChatServerMessage::Error { kind: "protocol", ... }`.
 #[derive(Debug, Error)]
 pub enum CatalogBuildError {
     #[error("tool name collision: {0}")]
