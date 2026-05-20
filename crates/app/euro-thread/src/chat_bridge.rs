@@ -280,32 +280,26 @@ impl ChatBridge {
             .iter()
             .find_map(|ctx| turn.targets.get(ctx).cloned());
 
-        let dispatcher = self.catalog.dispatcher_for(&wire_name);
+        // Single catalog read: `lookup` returns the dispatcher plus the
+        // `&'static str` descriptor name in one shot, so the spawned task
+        // doesn't pay for a second linear scan inside the dispatcher.
+        let entry = self.catalog.lookup(&wire_name);
         let cancel = turn.turn_cancel.child_token();
         turn.inflight.insert(call_id, cancel.clone());
         let inflight = turn.inflight.clone();
 
         set.spawn(async move {
-            let result: std::result::Result<Value, ToolError> = match (origin, dispatcher) {
-                (Some(origin), Some(dispatcher)) => {
-                    match dispatcher.descriptor_name_for(&wire_name) {
-                        Some(static_name) => {
-                            dispatcher
-                                .dispatch(IncomingCall {
-                                    call_id,
-                                    descriptor_name: static_name,
-                                    arguments,
-                                    origin,
-                                    cancel: cancel.clone(),
-                                })
-                                .await
-                        }
-                        None => Err(ToolError::Remote {
-                            code: 404,
-                            message: format!("dispatcher does not recognise `{wire_name}`"),
-                            details: None,
-                        }),
-                    }
+            let result: std::result::Result<Value, ToolError> = match (origin, entry) {
+                (Some(origin), Some((dispatcher, static_name))) => {
+                    dispatcher
+                        .dispatch(IncomingCall {
+                            call_id,
+                            descriptor_name: static_name,
+                            arguments,
+                            origin,
+                            cancel: cancel.clone(),
+                        })
+                        .await
                 }
                 (None, _) => Err(ToolError::ContextUnavailable {
                     tool: Cow::Owned(wire_name),

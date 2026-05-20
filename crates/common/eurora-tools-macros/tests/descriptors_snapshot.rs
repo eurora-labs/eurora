@@ -17,7 +17,7 @@ pub struct Empty {}
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct CurrentTimestamp {
     pub video_id: String,
-    pub timestamp_seconds: f64,
+    pub current_time: f64,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]

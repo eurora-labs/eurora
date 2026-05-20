@@ -79,11 +79,13 @@ function postedFrames(port: FakePort): Frame[] {
 }
 
 function frameEvent(frame: Frame): { action: string; payload: unknown } {
-	const kind = frame.kind as { Event?: { action: string; payload?: string | null } };
+	const kind = frame.kind as { Event?: { action: string; payload?: unknown } };
 	if (!kind.Event) throw new Error('expected Event frame');
 	return {
 		action: kind.Event.action,
-		payload: kind.Event.payload ? JSON.parse(kind.Event.payload) : null,
+		// The bridge payload is inline JSON — already a JS value, no
+		// `JSON.parse` step.
+		payload: kind.Event.payload ?? null,
 	};
 }
 

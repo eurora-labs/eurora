@@ -19,8 +19,8 @@ where
 fn current_timestamp_round_trips() {
     let value = CurrentTimestamp {
         video_id: "dQw4w9WgXcQ".into(),
-        timestamp_seconds: 42.5,
-        duration_seconds: 213.0,
+        current_time: 42.5,
+        duration: 213.0,
         playing: true,
     };
     assert_eq!(round_trip(&value), value);
@@ -33,13 +33,13 @@ fn transcript_round_trips_with_entries() {
         language: "en-US".into(),
         entries: vec![
             TranscriptEntry {
-                start_seconds: 0.0,
-                duration_seconds: 1.5,
+                start: 0.0,
+                duration: 1.5,
                 text: "Never gonna give you up".into(),
             },
             TranscriptEntry {
-                start_seconds: 1.5,
-                duration_seconds: 1.5,
+                start: 1.5,
+                duration: 1.5,
                 text: "Never gonna let you down".into(),
             },
         ],
@@ -61,7 +61,7 @@ fn transcript_round_trips_with_no_entries() {
 fn captured_frame_round_trips() {
     let value = CapturedFrame {
         video_id: "dQw4w9WgXcQ".into(),
-        timestamp_seconds: 90.25,
+        current_time: 90.25,
         width: 1280,
         height: 720,
         image_base64: "iVBORw0KGgoAAAANSUhEUg==".into(),

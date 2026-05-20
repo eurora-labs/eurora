@@ -9,12 +9,19 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 eurora-tools = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+specta = { workspace = true, optional = true, features = ["derive"] }
 
 [dev-dependencies]
 insta = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 tokio-util = { workspace = true, features = ["rt"] }
+
+[features]
+# Emit `specta::Type` derives on the YouTube argument/return types so they
+# can be exported into the browser-extension TypeScript bindings via
+# `euro-browser`'s `type_collection`.
+specta = ["dep:specta"]
 
 [lints]
 workspace = true

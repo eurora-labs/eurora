@@ -16,7 +16,9 @@ mod common;
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use euro_bridge::{BridgeService, Frame, FrameKind, RegisterFrame, ResponseFrame, bridge_url_for};
+use euro_bridge::{
+    BridgeService, Frame, FrameKind, Payload, RegisterFrame, ResponseFrame, bridge_url_for,
+};
 use euro_office::{ACTION_GET_ASSETS, MICROSOFT_WORD_KIND, WordDocumentAsset, fetch_word_asset};
 use futures_util::{SinkExt, StreamExt};
 use tokio::time::timeout;
@@ -97,7 +99,7 @@ async fn fetch_word_asset_round_trips_through_a_real_websocket() {
             req.payload
         );
 
-        let payload = serde_json::to_string(&mock_asset).unwrap();
+        let payload = Payload::from_value(&mock_asset).unwrap();
         let reply = serde_json::to_string(&Frame::from(ResponseFrame {
             id: req.id,
             action: req.action,
@@ -148,10 +150,12 @@ async fn fetch_word_asset_returns_none_when_payload_is_malformed() {
         let FrameKind::Request(req) = frame.kind else {
             panic!("expected Request, got {:?}", frame.kind);
         };
+        // Structurally valid JSON, but not a `WordDocumentAsset` — the
+        // strategy must swallow the decode error and yield `None`.
         let reply = serde_json::to_string(&Frame::from(ResponseFrame {
             id: req.id,
             action: req.action,
-            payload: Some("not json at all".into()),
+            payload: Some(Payload::from_value(&"not the right shape").unwrap()),
         }))
         .unwrap();
         ws.send(TMessage::text(reply)).await.unwrap();
@@ -244,7 +248,7 @@ async fn try_answer_one_request(ws: &mut ClientWs, asset: WordDocumentAsset) -> 
     let FrameKind::Request(req) = frame.kind else {
         return false;
     };
-    let payload = serde_json::to_string(&asset).unwrap();
+    let payload = Payload::from_value(&asset).unwrap();
     let reply = serde_json::to_string(&Frame::from(ResponseFrame {
         id: req.id,
         action: req.action,

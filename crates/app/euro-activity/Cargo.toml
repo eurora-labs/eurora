@@ -25,6 +25,7 @@ euro-office = { workspace = true }
 euro-pdf = { workspace = true }
 euro-process = { workspace = true }
 euro-vision = { workspace = true }
+eurora-tools-youtube = { workspace = true }
 focus-tracker = { workspace = true }
 humantime-serde = { workspace = true }
 image = { workspace = true }

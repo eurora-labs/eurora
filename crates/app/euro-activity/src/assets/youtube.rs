@@ -1,6 +1,7 @@
 use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use async_trait::async_trait;
-use euro_browser::{NativeTranscriptLine, NativeYoutubeAsset};
+use euro_browser::NativeYoutubeAsset;
+use eurora_tools_youtube::TranscriptEntry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -8,29 +9,12 @@ use crate::{ActivityResult, storage::SaveableAsset, types::AssetFunctionality};
 
 const YOUTUBE_EXTENSION_ID: &str = "7c7b59bb-d44d-431a-9f4d-64240172e092";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TranscriptLine {
-    pub text: String,
-    pub start: f64,
-    pub duration: f64,
-}
-
-impl From<NativeTranscriptLine> for TranscriptLine {
-    fn from(line: NativeTranscriptLine) -> Self {
-        Self {
-            text: line.text,
-            start: line.start,
-            duration: line.duration,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct YoutubeAsset {
     pub id: String,
     pub url: String,
     pub title: String,
-    pub transcript: Vec<TranscriptLine>,
+    pub transcript: Vec<TranscriptEntry>,
     pub current_time: f64,
 }
 
@@ -39,7 +23,7 @@ impl YoutubeAsset {
         id: String,
         url: String,
         title: String,
-        transcript: Vec<TranscriptLine>,
+        transcript: Vec<TranscriptEntry>,
         current_time: f64,
     ) -> Self {
         Self {
@@ -144,7 +128,7 @@ impl From<NativeYoutubeAsset> for YoutubeAsset {
             id: uuid::Uuid::new_v4().to_string(),
             url: asset.url,
             title: asset.title,
-            transcript: asset.transcript.into_iter().map(TranscriptLine::from).collect(),
+            transcript: asset.transcript,
             current_time: asset.current_time,
         }
     }
@@ -158,12 +142,12 @@ mod tests {
     #[test]
     fn test_youtube_asset_creation() {
         let transcript = vec![
-            TranscriptLine {
+            TranscriptEntry {
                 text: "Hello world".to_string(),
                 start: 0.0,
                 duration: 2.0,
             },
-            TranscriptLine {
+            TranscriptEntry {
                 text: "This is a test".to_string(),
                 start: 2.0,
                 duration: 3.0,

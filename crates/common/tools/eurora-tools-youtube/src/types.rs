@@ -13,30 +13,33 @@ use serde::{Deserialize, Serialize};
 
 /// Current playback state of the active YouTube video.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct CurrentTimestamp {
     /// The YouTube video ID — the `v=` parameter from the watch URL.
     pub video_id: String,
     /// Playback position in seconds, possibly fractional.
-    pub timestamp_seconds: f64,
+    pub current_time: f64,
     /// Total video length in seconds, possibly fractional.
-    pub duration_seconds: f64,
+    pub duration: f64,
     /// `true` when the video is playing, `false` when paused.
     pub playing: bool,
 }
 
 /// One cue from a YouTube transcript.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct TranscriptEntry {
     /// Start time of the cue in seconds, relative to the video start.
-    pub start_seconds: f64,
+    pub start: f64,
     /// How long the cue is on screen, in seconds.
-    pub duration_seconds: f64,
+    pub duration: f64,
     /// Cue text as YouTube serves it (HTML-escaped, single-language).
     pub text: String,
 }
 
 /// Full transcript of a YouTube video.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct Transcript {
     /// The YouTube video ID the transcript belongs to.
     pub video_id: String,
@@ -48,11 +51,12 @@ pub struct Transcript {
 
 /// A single captured frame from the active YouTube video.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct CapturedFrame {
     /// The YouTube video ID the frame was captured from.
     pub video_id: String,
     /// Playback position at which the frame was captured, in seconds.
-    pub timestamp_seconds: f64,
+    pub current_time: f64,
     /// Decoded frame width in pixels.
     pub width: u32,
     /// Decoded frame height in pixels.

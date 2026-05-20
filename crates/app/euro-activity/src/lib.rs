@@ -7,13 +7,13 @@ pub mod strategies;
 pub mod types;
 mod utils;
 
-pub use assets::youtube::TranscriptLine;
 pub use assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset};
 pub use config::{
     ActivityConfig, ActivityConfigBuilder, ApplicationConfig, GlobalConfig, PrivacyConfig,
     SnapshotFrequency, StrategyConfig,
 };
 pub use error::{ActivityError, ActivityResult};
+pub use eurora_tools_youtube::TranscriptEntry;
 pub use snapshots::{ArticleSnapshot, DefaultSnapshot, YoutubeSnapshot};
 pub use storage::{ActivityStorage, SaveableAsset, SavedAssetInfo};
 pub use strategies::ActivityStrategy;

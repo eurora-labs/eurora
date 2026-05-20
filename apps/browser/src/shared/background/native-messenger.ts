@@ -6,7 +6,7 @@ import { startSafariPoller, stopSafariPoller } from './safari-poller';
 import { errorFrame, forwardTabRpc } from './tab-rpc';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
-import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings';
+import type { Frame, Payload, RequestFrame, ResponseFrame } from '../content/bindings';
 
 declare const __DEV__: boolean;
 const host = __DEV__ ? 'com.eurora.dev' : 'com.eurora.app';
@@ -128,7 +128,7 @@ async function onActionContentData(frame: RequestFrame, messageType: string): Pr
 					Response: {
 						id: frame.id,
 						action: frame.action,
-						payload: JSON.stringify({ kind: 'Error', data: 'No active tab found' }),
+						payload: { kind: 'Error', data: 'No active tab found' } as Payload,
 					},
 				},
 			} as Frame;
@@ -141,7 +141,7 @@ async function onActionContentData(frame: RequestFrame, messageType: string): Pr
 				Response: {
 					id: frame.id,
 					action: frame.action,
-					payload: JSON.stringify(contentResponse),
+					payload: contentResponse as Payload,
 				},
 			},
 		} as Frame;
@@ -152,7 +152,7 @@ async function onActionContentData(frame: RequestFrame, messageType: string): Pr
 				Response: {
 					id: frame.id,
 					action: frame.action,
-					payload: JSON.stringify({ kind: 'Error', data: errorMessage }),
+					payload: { kind: 'Error', data: errorMessage } as Payload,
 				},
 			},
 		} as Frame;
@@ -166,14 +166,14 @@ async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 	const response: ResponseFrame = {
 		id: frame.id,
 		action: frame.action,
-		payload: JSON.stringify({
+		payload: {
 			kind: 'NativeMetadata',
 			data: {
 				url: activeTab?.url,
 				icon_base64: iconBase64,
 				title: activeTab?.title ?? null,
 			},
-		}),
+		} as Payload,
 	};
 
 	return { kind: { Response: response } } as Frame;
@@ -186,10 +186,10 @@ async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<F
 		const response: ResponseFrame = {
 			id: frame.id,
 			action: frame.action,
-			payload: JSON.stringify({
+			payload: {
 				kind: 'Error',
 				data: 'No active tab found',
-			}),
+			} as Payload,
 		};
 		return { kind: { Response: response } } as Frame;
 	}
@@ -202,7 +202,7 @@ async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<F
 		const response: ResponseFrame = {
 			id: frame.id,
 			action: frame.action,
-			payload: JSON.stringify(contentResponse),
+			payload: contentResponse as Payload,
 		};
 
 		return { kind: { Response: response } } as Frame;
@@ -211,10 +211,10 @@ async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<F
 		const response: ResponseFrame = {
 			id: frame.id,
 			action: frame.action,
-			payload: JSON.stringify({
+			payload: {
 				kind: 'Error',
 				data: `Failed to get metadata from content script: ${errorMessage}`,
-			}),
+			} as Payload,
 		};
 		return { kind: { Response: response } } as Frame;
 	}

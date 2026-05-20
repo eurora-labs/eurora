@@ -59,7 +59,7 @@ final class BridgeRequestRouter: @unchecked Sendable {
                 Frame(ResponseFrame(
                     id: response.id,
                     action: response.action,
-                    payload: "{\"status\":\"forwarded\"}"
+                    payload: .object(["status": .string("forwarded")])
                 ))
             )
 
@@ -174,15 +174,18 @@ final class BridgeRequestRouter: @unchecked Sendable {
         serverRequests.removeAll()
         serverRequestsLock.unlock()
 
-        let payload: String
+        // Inline the polled requests directly into the bridge payload —
+        // the wire shape is now an inline JSON value (a Frame array), not
+        // an escaped JSON string. On encoding failure we fall back to an
+        // empty array so the poll RPC still completes cleanly.
+        let payload: Payload
         do {
-            let data = try JSONEncoder().encode(frames)
-            payload = String(data: data, encoding: .utf8) ?? "[]"
+            payload = try Payload.encoding(frames)
         } catch {
             logger.error(
                 "Failed to encode polled requests: \(error.localizedDescription, privacy: .public)"
             )
-            payload = "[]"
+            payload = .array([])
         }
 
         completion(Frame(ResponseFrame(id: requestId, action: "POLL_REQUESTS", payload: payload)))

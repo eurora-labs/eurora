@@ -7,7 +7,9 @@ description = "Wire protocol shared between the Eurora desktop app and connected
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["raw_value"] }
 specta = { workspace = true, features = ["derive"] }
+specta-typescript = { workspace = true }
 thiserror = { workspace = true }
 
 anyhow = { workspace = true, optional = true }
@@ -15,7 +17,7 @@ specta-serde = { version = "0.0.12", optional = true }
 specta-swift = { version = "0.0.3", optional = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 
 [features]
 default = []

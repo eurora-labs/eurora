@@ -540,24 +540,8 @@ async fn run_turn(
 
     // Prepare the LLM context *before* persisting the human message so that
     // a context-prep failure doesn't leave a half-completed turn (a human
-    // row with no AI response) in the thread history. The catalog is built
-    // from the per-turn `CapabilityUpdate` plus the server-local tool set.
-    let CapabilityUpdatePayload {
-        tools: remote_tools,
-        contexts: active_contexts,
-    } = capability;
-    let LlmContext {
-        messages: llm_messages,
-        chat_model,
-        catalog,
-    } = prepare_llm_context(
-        &state.providers,
-        &state.asset_service,
-        messages,
-        remote_tools,
-        &active_contexts,
-    )
-    .await?;
+    // row with no AI response) in the thread history.
+    let prepared = prepare_turn(&state, messages, capability).await?;
 
     let human_db_message = state
         .db
@@ -615,21 +599,17 @@ async fn run_turn(
         return Ok(());
     }
 
-    let db = state.db.clone();
-    tokio::spawn(
-        run_agent_loop()
-            .tx(tx)
-            .token(cancel)
-            .db(db)
-            .chat_model(chat_model)
-            .catalog(catalog)
-            .remote_bus(bus)
-            .messages(llm_messages)
-            .thread_id(thread_id)
-            .user_id(user_id)
-            .human_message_id(human_message_id)
-            .max_tool_rounds(MAX_TOOL_ROUNDS)
-            .call(),
+    spawn_agent_loop(
+        state,
+        prepared,
+        SpawnContext {
+            thread_id,
+            user_id,
+            human_message_id,
+            tx,
+            cancel,
+            bus,
+        },
     );
 
     Ok(())
@@ -676,24 +656,75 @@ async fn regenerate_ai_response(
         .await?;
 
     let messages = load_active_branch_context(&state, user_id, thread_id).await?;
+    let prepared = prepare_turn(&state, messages, capability).await?;
 
+    spawn_agent_loop(
+        state,
+        prepared,
+        SpawnContext {
+            thread_id,
+            user_id,
+            human_message_id: human_parent_id,
+            tx,
+            cancel,
+            bus,
+        },
+    );
+
+    Ok(())
+}
+
+/// Inputs to the agent loop that are independent of the LLM context — caller
+/// identity, channels, and cancellation. Grouped to avoid the
+/// many-arguments lint on [`spawn_agent_loop`].
+struct SpawnContext {
+    thread_id: Uuid,
+    user_id: Uuid,
+    human_message_id: Uuid,
+    tx: mpsc::Sender<ChatServerMessage>,
+    cancel: CancellationToken,
+    bus: Arc<ChatRemoteBus>,
+}
+
+/// Build the per-turn LLM context from the active branch and the client's
+/// `CapabilityUpdate`. Centralised so both `run_turn` and
+/// `regenerate_ai_response` route through the same prep path.
+async fn prepare_turn(
+    state: &AppState,
+    messages: Vec<AnyMessage>,
+    capability: CapabilityUpdatePayload,
+) -> ThreadServiceResult<LlmContext> {
     let CapabilityUpdatePayload {
         tools: remote_tools,
         contexts: active_contexts,
     } = capability;
-    let LlmContext {
-        messages: llm_messages,
-        chat_model,
-        catalog,
-    } = prepare_llm_context(
+    prepare_llm_context(
         &state.providers,
         &state.asset_service,
         messages,
         remote_tools,
         &active_contexts,
     )
-    .await?;
+    .await
+}
 
+/// Spawn the agent loop with the prepared context. Mirror image of
+/// [`prepare_turn`] — both call sites in this module use it to keep the
+/// `run_agent_loop` builder wiring in exactly one place.
+fn spawn_agent_loop(state: Arc<AppState>, prepared: LlmContext, ctx: SpawnContext) {
+    let LlmContext {
+        messages,
+        chat_model,
+        catalog,
+    } = prepared;
+    let SpawnContext {
+        thread_id,
+        user_id,
+        human_message_id,
+        tx,
+        cancel,
+        bus,
+    } = ctx;
     let db = state.db.clone();
     tokio::spawn(
         run_agent_loop()
@@ -703,15 +734,13 @@ async fn regenerate_ai_response(
             .chat_model(chat_model)
             .catalog(catalog)
             .remote_bus(bus)
-            .messages(llm_messages)
+            .messages(messages)
             .thread_id(thread_id)
             .user_id(user_id)
-            .human_message_id(human_parent_id)
+            .human_message_id(human_message_id)
             .max_tool_rounds(MAX_TOOL_ROUNDS)
             .call(),
     );
-
-    Ok(())
 }
 
 #[cfg(test)]
@@ -721,7 +750,7 @@ mod tests {
     use eurora_tools::{RemoteToolBus, ToolError};
     use serde_json::json;
     use thread_core::{
-        CapabilityUpdatePayload, ChatSendRequest, RegenerateRequest, ToolErrorWire, ToolSource,
+        CapabilityUpdatePayload, ChatSendRequest, RegenerateRequest, ToolErrorWire,
         WireToolDescriptor,
     };
     use tokio::sync::mpsc;
@@ -749,20 +778,7 @@ mod tests {
     }
 
     fn sample_descriptor() -> WireToolDescriptor {
-        WireToolDescriptor {
-            definition: agent_chain_core::tools::ToolDefinition {
-                name: "browser::test::echo".to_string(),
-                description: "x".to_string(),
-                parameters: json!({"type": "object"}),
-            },
-            output_schema: json!({"type": "object"}),
-            timeout_ms: 60_000,
-            source: ToolSource::Bridge {
-                app_kind: "browser".to_string(),
-            },
-            required_contexts: vec![],
-            requires_user_approval: false,
-        }
+        crate::test_support::bridge_descriptor("browser::test::echo", 60_000)
     }
 
     fn make_bus() -> (

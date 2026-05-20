@@ -18,7 +18,12 @@ expression: wire
             "$schema": String("https://json-schema.org/draft/2020-12/schema"),
             "description": String("Current playback state of the active YouTube video."),
             "properties": Object {
-                "duration_seconds": Object {
+                "current_time": Object {
+                    "description": String("Playback position in seconds, possibly fractional."),
+                    "format": String("double"),
+                    "type": String("number"),
+                },
+                "duration": Object {
                     "description": String("Total video length in seconds, possibly fractional."),
                     "format": String("double"),
                     "type": String("number"),
@@ -27,11 +32,6 @@ expression: wire
                     "description": String("`true` when the video is playing, `false` when paused."),
                     "type": String("boolean"),
                 },
-                "timestamp_seconds": Object {
-                    "description": String("Playback position in seconds, possibly fractional."),
-                    "format": String("double"),
-                    "type": String("number"),
-                },
                 "video_id": Object {
                     "description": String("The YouTube video ID — the `v=` parameter from the watch URL."),
                     "type": String("string"),
@@ -39,8 +39,8 @@ expression: wire
             },
             "required": Array [
                 String("video_id"),
-                String("timestamp_seconds"),
-                String("duration_seconds"),
+                String("current_time"),
+                String("duration"),
                 String("playing"),
             ],
             "title": String("CurrentTimestamp"),
@@ -71,12 +71,12 @@ expression: wire
                 "TranscriptEntry": Object {
                     "description": String("One cue from a YouTube transcript."),
                     "properties": Object {
-                        "duration_seconds": Object {
+                        "duration": Object {
                             "description": String("How long the cue is on screen, in seconds."),
                             "format": String("double"),
                             "type": String("number"),
                         },
-                        "start_seconds": Object {
+                        "start": Object {
                             "description": String("Start time of the cue in seconds, relative to the video start."),
                             "format": String("double"),
                             "type": String("number"),
@@ -87,8 +87,8 @@ expression: wire
                         },
                     },
                     "required": Array [
-                        String("start_seconds"),
-                        String("duration_seconds"),
+                        String("start"),
+                        String("duration"),
                         String("text"),
                     ],
                     "type": String("object"),
@@ -145,6 +145,11 @@ expression: wire
             "$schema": String("https://json-schema.org/draft/2020-12/schema"),
             "description": String("A single captured frame from the active YouTube video."),
             "properties": Object {
+                "current_time": Object {
+                    "description": String("Playback position at which the frame was captured, in seconds."),
+                    "format": String("double"),
+                    "type": String("number"),
+                },
                 "height": Object {
                     "description": String("Decoded frame height in pixels."),
                     "format": String("uint32"),
@@ -154,11 +159,6 @@ expression: wire
                 "image_base64": Object {
                     "description": String("PNG bytes, base64-encoded (standard alphabet, padded)."),
                     "type": String("string"),
-                },
-                "timestamp_seconds": Object {
-                    "description": String("Playback position at which the frame was captured, in seconds."),
-                    "format": String("double"),
-                    "type": String("number"),
                 },
                 "video_id": Object {
                     "description": String("The YouTube video ID the frame was captured from."),
@@ -173,7 +173,7 @@ expression: wire
             },
             "required": Array [
                 String("video_id"),
-                String("timestamp_seconds"),
+                String("current_time"),
                 String("width"),
                 String("height"),
                 String("image_base64"),

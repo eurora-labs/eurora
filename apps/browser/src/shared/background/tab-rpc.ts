@@ -1,12 +1,13 @@
 import browser from 'webextension-polyfill';
-import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings';
+import type { Frame, Payload, RequestFrame, ResponseFrame } from '../content/bindings';
 
 /// Error-frame `code` values used by the YouTube tab RPCs. Kept in
 /// sync with the desktop-side mapping in
 /// `crates/app/euro-tauri/src/tools/youtube.rs` so the bridge contract
 /// stays symmetric:
 ///
-/// - `400 BAD_REQUEST`: payload is malformed (missing `tab_id`, bad JSON).
+/// - `400 BAD_REQUEST`: payload is malformed (missing `tab_id`, wrong
+///   shape).
 /// - `410 GONE`: `chrome.tabs.sendMessage` rejected — the tab no longer
 ///   exists or has no content-script listener. Desktop maps this to
 ///   `ToolError::ContextUnavailable` so the chat layer drops the call
@@ -19,8 +20,12 @@ export const CODE_CONTENT_ERROR = 500;
 
 /// Forward a tab-targeted RPC frame to the content script identified
 /// by the `tab_id` in its payload, returning the typed reply verbatim
-/// as a `ResponseFrame`. See [`forwardTabRpc`]'s `code` table for
-/// failure modes.
+/// as a `ResponseFrame`. See the `code` constants above for failure
+/// modes.
+///
+/// `frame.payload` is the bridge protocol's inline JSON value
+/// (`Payload`, generated as `unknown`): no `JSON.parse` step — the
+/// outer-frame parse already decoded the inline JSON.
 export async function forwardTabRpc(frame: RequestFrame, messageType: string): Promise<Frame> {
 	let tabId: number;
 	try {
@@ -52,23 +57,22 @@ export async function forwardTabRpc(frame: RequestFrame, messageType: string): P
 	const response: ResponseFrame = {
 		id: frame.id,
 		action: frame.action,
-		payload: JSON.stringify(reply),
+		payload: reply as Payload,
 	};
 	return { kind: { Response: response } } as Frame;
 }
 
-export function parseTabId(payload: string | null | undefined): number {
-	if (!payload) throw new Error('missing payload');
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(payload);
-	} catch (err) {
-		throw new Error(`malformed payload: ${errorMessage(err)}`);
+/// Pull `tab_id` out of an inline payload value. The payload arrives
+/// already decoded as a JS value (the outer Frame parse handles the
+/// JSON layer), so this is a pure shape check.
+export function parseTabId(payload: Payload | null | undefined): number {
+	if (payload === null || payload === undefined) {
+		throw new Error('missing payload');
 	}
-	if (typeof parsed !== 'object' || parsed === null || !('tab_id' in parsed)) {
+	if (typeof payload !== 'object' || !('tab_id' in (payload as Record<string, unknown>))) {
 		throw new Error('payload missing tab_id');
 	}
-	const raw = (parsed as { tab_id: unknown }).tab_id;
+	const raw = (payload as { tab_id: unknown }).tab_id;
 	if (typeof raw !== 'number' || !Number.isInteger(raw)) {
 		throw new Error('tab_id must be an integer');
 	}

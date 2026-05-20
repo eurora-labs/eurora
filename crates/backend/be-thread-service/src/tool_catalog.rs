@@ -149,7 +149,7 @@ impl TurnCatalog {
 
     /// Number of entries — useful for the "skip LLM tool binding when
     /// there's nothing to bind" guard.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
@@ -251,7 +251,7 @@ mod tests {
     use agent_chain::tools::{ArgsSchema, BaseTool, ToolInput, ToolOutput};
     use chrono::{DateTime, Utc};
     use serde_json::json;
-    use thread_core::{ToolSource, WireActiveContext, WireToolDescriptor};
+    use thread_core::{WireActiveContext, WireToolDescriptor};
 
     /// Minimal `BaseTool` with a configurable name — used to construct
     /// collision and dispatch fixtures without dragging the full Firecrawl
@@ -296,20 +296,9 @@ mod tests {
     }
 
     fn remote_descriptor(name: &str, required: &[&str]) -> WireToolDescriptor {
-        WireToolDescriptor {
-            definition: agent_chain_core::tools::ToolDefinition {
-                name: name.to_string(),
-                description: "x".to_string(),
-                parameters: json!({"type": "object"}),
-            },
-            output_schema: json!({"type": "object"}),
-            timeout_ms: 2_000,
-            source: ToolSource::Bridge {
-                app_kind: "browser".to_string(),
-            },
-            required_contexts: required.iter().map(|s| (*s).to_string()).collect(),
-            requires_user_approval: false,
-        }
+        let mut d = crate::test_support::bridge_descriptor(name, 2_000);
+        d.required_contexts = required.iter().map(|s| (*s).to_string()).collect();
+        d
     }
 
     fn active(key: &str) -> WireActiveContext {

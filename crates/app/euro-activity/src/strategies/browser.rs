@@ -90,11 +90,11 @@ impl BrowserStrategy {
                     continue;
                 }
 
-                let Some(payload_str) = event_frame.payload else {
+                let Some(payload_value) = event_frame.payload else {
                     continue;
                 };
 
-                let native_message = match serde_json::from_str::<NativeMessage>(&payload_str) {
+                let native_message = match payload_value.deserialize::<NativeMessage>() {
                     Ok(msg) => msg,
                     Err(e) => {
                         tracing::warn!("Failed to parse native message: {}", e);
@@ -165,8 +165,7 @@ impl BrowserStrategy {
             .send_request(browser_pid, "GET_ASSETS", None)
             .await
             .ok()?;
-        let payload = response.payload?;
-        let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
+        let native_message = response.payload?.deserialize::<NativeMessage>().ok()?;
         ActivityAsset::try_from(native_message).ok()
     }
 
@@ -175,8 +174,7 @@ impl BrowserStrategy {
             .send_request(browser_pid, "GET_SNAPSHOT", None)
             .await
             .ok()?;
-        let payload = response.payload?;
-        let native_message = serde_json::from_str::<NativeMessage>(&payload).ok()?;
+        let native_message = response.payload?.deserialize::<NativeMessage>().ok()?;
         ActivitySnapshot::try_from(native_message).ok()
     }
 
@@ -399,7 +397,9 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             .payload
             .ok_or_else(|| ActivityError::invalid_data("Metadata response contained no payload"))?;
 
-        let native_metadata = serde_json::from_str::<NativeMessage>(&payload)?;
+        let native_metadata: NativeMessage = payload.deserialize().map_err(|e| {
+            ActivityError::invalid_data(format!("Failed to decode metadata: {}", e))
+        })?;
 
         let NativeMessage::NativeMetadata(metadata) = native_metadata else {
             return Err(ActivityError::invalid_data(

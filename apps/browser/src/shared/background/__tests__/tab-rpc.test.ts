@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Frame, RequestFrame } from '../../content/bindings';
+import type { Frame, Payload, RequestFrame } from '../../content/bindings';
 
 const sendMessageMock = vi.fn();
 
@@ -17,7 +17,7 @@ beforeEach(async () => {
 	rpc = await import('../tab-rpc');
 });
 
-function requestFrame(payload: string | null = JSON.stringify({ tab_id: 19 })): RequestFrame {
+function requestFrame(payload: Payload | null = { tab_id: 19 } as Payload): RequestFrame {
 	return { id: 42, action: 'YOUTUBE_GET_CURRENT_TIMESTAMP', payload };
 }
 
@@ -27,9 +27,9 @@ function asError(frame: Frame): { id: number; code: number; message: string } {
 	return kind.Error;
 }
 
-function asResponse(frame: Frame): { id: number; action: string; payload: string | null } {
+function asResponse(frame: Frame): { id: number; action: string; payload: Payload | null } {
 	const kind = frame.kind as {
-		Response?: { id: number; action: string; payload: string | null };
+		Response?: { id: number; action: string; payload: Payload | null };
 	};
 	if (!kind.Response) throw new Error(`expected Response frame, got ${JSON.stringify(frame)}`);
 	return kind.Response;
@@ -37,24 +37,20 @@ function asResponse(frame: Frame): { id: number; action: string; payload: string
 
 describe('parseTabId', () => {
 	it('parses integer tab_id', () => {
-		expect(rpc.parseTabId(JSON.stringify({ tab_id: 19 }))).toBe(19);
+		expect(rpc.parseTabId({ tab_id: 19 } as Payload)).toBe(19);
 	});
 
 	it('rejects missing payload', () => {
 		expect(() => rpc.parseTabId(null)).toThrow(/missing payload/);
 	});
 
-	it('rejects malformed JSON', () => {
-		expect(() => rpc.parseTabId('{not json')).toThrow(/malformed payload/);
-	});
-
 	it('rejects payload without tab_id', () => {
-		expect(() => rpc.parseTabId('{}')).toThrow(/missing tab_id/);
+		expect(() => rpc.parseTabId({} as Payload)).toThrow(/missing tab_id/);
 	});
 
 	it('rejects non-integer tab_id', () => {
-		expect(() => rpc.parseTabId(JSON.stringify({ tab_id: '19' }))).toThrow(/integer/);
-		expect(() => rpc.parseTabId(JSON.stringify({ tab_id: 19.5 }))).toThrow(/integer/);
+		expect(() => rpc.parseTabId({ tab_id: '19' } as Payload)).toThrow(/integer/);
+		expect(() => rpc.parseTabId({ tab_id: 19.5 } as Payload)).toThrow(/integer/);
 	});
 });
 
@@ -62,8 +58,8 @@ describe('forwardTabRpc', () => {
 	it('returns Response carrying the content-script reply verbatim', async () => {
 		const reply = {
 			video_id: 'abc123',
-			timestamp_seconds: 12.5,
-			duration_seconds: 240.0,
+			current_time: 12.5,
+			duration: 240.0,
 			playing: true,
 		};
 		sendMessageMock.mockResolvedValueOnce(reply);
@@ -73,11 +69,13 @@ describe('forwardTabRpc', () => {
 
 		expect(response.id).toBe(42);
 		expect(response.action).toBe('YOUTUBE_GET_CURRENT_TIMESTAMP');
-		expect(JSON.parse(response.payload!)).toEqual(reply);
+		// Payload is the inline JS value — no `JSON.parse` step on the
+		// consumer side, since the outer-frame parse already decoded it.
+		expect(response.payload).toEqual(reply);
 		expect(sendMessageMock).toHaveBeenCalledWith(19, { type: 'GET_CURRENT_TIMESTAMP' });
 	});
 
-	it('returns 400 for malformed payload', async () => {
+	it('returns 400 for missing payload', async () => {
 		const result = await rpc.forwardTabRpc(requestFrame(null), 'GET_CURRENT_TIMESTAMP');
 		expect(asError(result).code).toBe(400);
 		expect(sendMessageMock).not.toHaveBeenCalled();
