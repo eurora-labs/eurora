@@ -26,16 +26,16 @@ use serde::de::DeserializeOwned;
 use crate::adapter::YoutubeAdapter;
 use crate::types::{CapturedFrame, CurrentTimestamp, Transcript};
 
-/// Bridge action emitted for `browser::youtube::get_current_timestamp`.
+/// Bridge action emitted for `browser_youtube_get_current_timestamp`.
 pub const YOUTUBE_GET_CURRENT_TIMESTAMP: &str = "YOUTUBE_GET_CURRENT_TIMESTAMP";
-/// Bridge action emitted for `browser::youtube::get_transcript`.
+/// Bridge action emitted for `browser_youtube_get_transcript`.
 pub const YOUTUBE_GET_TRANSCRIPT: &str = "YOUTUBE_GET_TRANSCRIPT";
-/// Bridge action emitted for `browser::youtube::get_current_frame`.
+/// Bridge action emitted for `browser_youtube_get_current_frame`.
 pub const YOUTUBE_GET_CURRENT_FRAME: &str = "YOUTUBE_GET_CURRENT_FRAME";
 
-const TIMESTAMP_TOOL: &str = "browser::youtube::get_current_timestamp";
-const TRANSCRIPT_TOOL: &str = "browser::youtube::get_transcript";
-const FRAME_TOOL: &str = "browser::youtube::get_current_frame";
+const TIMESTAMP_TOOL: &str = "browser_youtube_get_current_timestamp";
+const TRANSCRIPT_TOOL: &str = "browser_youtube_get_transcript";
+const FRAME_TOOL: &str = "browser_youtube_get_current_frame";
 
 /// Wrapper that fulfils every [`YoutubeAdapter`] method by hitting the
 /// browser process registered with [`BridgeService`].

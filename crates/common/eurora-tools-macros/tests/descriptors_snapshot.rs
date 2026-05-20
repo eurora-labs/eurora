@@ -27,7 +27,7 @@ pub struct Transcript {
 }
 
 /// Tools for the YouTube video the user is currently watching.
-#[adapter(namespace = "browser::youtube", version = 1)]
+#[adapter(namespace = "browser_youtube", version = 1)]
 pub trait YoutubeAdapter: Send + Sync {
     /// Return the user's current playback position.
     #[tool(

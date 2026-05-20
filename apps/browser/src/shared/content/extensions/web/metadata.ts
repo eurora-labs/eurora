@@ -1,5 +1,4 @@
 import type { PageMetadata, ViewportMetrics } from '../../bindings';
-import type { NativeResponse } from '../../models';
 
 /**
  * Resolve [`PageMetadata`] for the active document.
@@ -14,8 +13,12 @@ import type { NativeResponse } from '../../models';
  * OpenGraph tags are scraped from `<meta property="og:*">` into a flat
  * map keyed by the suffix after `og:`. Duplicate properties keep the
  * first value encountered (document order).
+ *
+ * Returns the metadata structure directly; see the note on
+ * `handleGetReadabilityArticle` for why the response is not wrapped in
+ * a `{kind, data}` envelope.
  */
-export async function handleGetPageMetadata(): Promise<NativeResponse> {
+export async function handleGetPageMetadata(): Promise<PageMetadata> {
 	const url = window.location.href;
 	const parsed = safeParseUrl(url);
 	const title = document.title;
@@ -26,7 +29,7 @@ export async function handleGetPageMetadata(): Promise<NativeResponse> {
 	const og = readOpenGraph();
 	const viewport = readViewport();
 
-	const metadata: PageMetadata = {
+	return {
 		url,
 		title,
 		host,
@@ -36,8 +39,6 @@ export async function handleGetPageMetadata(): Promise<NativeResponse> {
 		og,
 		viewport,
 	};
-
-	return { kind: 'PageMetadata', data: metadata };
 }
 
 function safeParseUrl(href: string): URL | null {

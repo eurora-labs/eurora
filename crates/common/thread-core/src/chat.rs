@@ -194,7 +194,7 @@ mod tests {
     fn sample_descriptor() -> WireToolDescriptor {
         WireToolDescriptor {
             definition: agent_chain_core::tools::ToolDefinition {
-                name: "browser::youtube::get_current_timestamp".into(),
+                name: "browser_youtube_get_current_timestamp".into(),
                 description: "Return the user's current playback position.".into(),
                 parameters: json!({"type": "object"}),
             },
@@ -293,7 +293,7 @@ mod tests {
         let m = ChatClientMessage::CapabilityUpdate(CapabilityUpdatePayload {
             tools: vec![WireToolDescriptor {
                 definition: agent_chain_core::tools::ToolDefinition {
-                    name: "browser::youtube::get_current_timestamp".into(),
+                    name: "browser_youtube_get_current_timestamp".into(),
                     description: "x".into(),
                     parameters: json!({}),
                 },
@@ -316,7 +316,7 @@ mod tests {
         let s = serde_json::to_string(&m).unwrap();
         assert_eq!(
             s,
-            r#"{"type":"capability_update","tools":[{"name":"browser::youtube::get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false}],"contexts":[{"key":"youtube::watch_page","activated_at":"2026-01-15T12:00:00Z","data":{"video_id":"abc123"}}]}"#
+            r#"{"type":"capability_update","tools":[{"name":"browser_youtube_get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false}],"contexts":[{"key":"youtube::watch_page","activated_at":"2026-01-15T12:00:00Z","data":{"video_id":"abc123"}}]}"#
         );
     }
 
@@ -387,7 +387,7 @@ mod tests {
             call_id: 99,
             descriptor: WireToolDescriptor {
                 definition: agent_chain_core::tools::ToolDefinition {
-                    name: "browser::youtube::get_current_timestamp".into(),
+                    name: "browser_youtube_get_current_timestamp".into(),
                     description: "x".into(),
                     parameters: json!({}),
                 },
@@ -404,7 +404,7 @@ mod tests {
         let s = serde_json::to_string(&m).unwrap();
         assert_eq!(
             s,
-            r#"{"type":"tool_request","call_id":99,"descriptor":{"name":"browser::youtube::get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false},"arguments":{}}"#
+            r#"{"type":"tool_request","call_id":99,"descriptor":{"name":"browser_youtube_get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false},"arguments":{}}"#
         );
     }
 

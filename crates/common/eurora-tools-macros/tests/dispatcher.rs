@@ -36,7 +36,7 @@ pub struct Sum {
 }
 
 /// Tools for the YouTube tab in the user's browser.
-#[adapter(namespace = "browser::youtube", version = 1)]
+#[adapter(namespace = "browser_youtube", version = 1)]
 pub trait YoutubeAdapter: Send + Sync {
     /// Mirror the routing target back to the caller as proof we
     /// destructured the right `Origin` variant.
@@ -49,7 +49,7 @@ pub trait YoutubeAdapter: Send + Sync {
 }
 
 /// Local arithmetic tools — no target parameter.
-#[adapter(namespace = "client::math")]
+#[adapter(namespace = "client_math")]
 pub trait MathAdapter: Send + Sync {
     /// Add two integers.
     #[tool(timeout_ms = 100, source = "client_local")]
@@ -115,7 +115,7 @@ fn call(name: &'static str, args: serde_json::Value, origin: Origin) -> Incoming
 async fn descriptors_table_matches_declared_methods() {
     assert_eq!(YOUTUBE_DESCRIPTORS.len(), 1);
     let d = &YOUTUBE_DESCRIPTORS[0];
-    assert_eq!(d.name, "browser::youtube::echo_target");
+    assert_eq!(d.name, "browser_youtube_echo_target");
     assert_eq!(d.timeout.as_millis(), 1_000);
     assert_eq!(d.required_contexts, &["youtube::watch_page"]);
     assert!(!d.requires_user_approval);
@@ -126,7 +126,7 @@ async fn dispatcher_descriptors_returns_static_table() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let descs = eurora_tools::Dispatcher::descriptors(&dispatcher);
     assert_eq!(descs.len(), 1);
-    assert_eq!(descs[0].name, "browser::youtube::echo_target");
+    assert_eq!(descs[0].name, "browser_youtube_echo_target");
 }
 
 #[tokio::test]
@@ -134,7 +134,7 @@ async fn dispatch_decodes_args_and_encodes_result() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let result = eurora_tools::Dispatcher::dispatch(
         &dispatcher,
-        call("browser::youtube::echo_target", json!({}), browser_origin()),
+        call("browser_youtube_echo_target", json!({}), browser_origin()),
     )
     .await
     .expect("call succeeds");
@@ -147,7 +147,7 @@ async fn dispatch_returns_origin_mismatch_for_wrong_variant() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let err = eurora_tools::Dispatcher::dispatch(
         &dispatcher,
-        call("browser::youtube::echo_target", json!({}), focused_origin()),
+        call("browser_youtube_echo_target", json!({}), focused_origin()),
     )
     .await
     .expect_err("wrong origin must fail");
@@ -157,7 +157,7 @@ async fn dispatch_returns_origin_mismatch_for_wrong_variant() {
             expected,
             got,
         } => {
-            assert_eq!(tool, "browser::youtube::echo_target");
+            assert_eq!(tool, "browser_youtube_echo_target");
             assert_eq!(expected, "Browser");
             assert_eq!(got, "Focused");
         }
@@ -171,7 +171,7 @@ async fn dispatch_unknown_name_returns_404() {
     let err = eurora_tools::Dispatcher::dispatch(
         &dispatcher,
         call(
-            "browser::youtube::does_not_exist",
+            "browser_youtube_does_not_exist",
             json!({}),
             browser_origin(),
         ),
@@ -194,7 +194,7 @@ async fn client_local_dispatcher_runs_without_target() {
         &dispatcher,
         // Any origin works — `client_local` skips the variant check.
         call(
-            "client::math::add",
+            "client_math_add",
             json!({"a": 2, "b": 3}),
             focused_origin(),
         ),
@@ -210,7 +210,7 @@ async fn dispatch_decode_failure_returns_decode_error() {
     let err = eurora_tools::Dispatcher::dispatch(
         &dispatcher,
         call(
-            "client::math::add",
+            "client_math_add",
             json!({"a": "not a number"}),
             focused_origin(),
         ),
@@ -231,11 +231,11 @@ async fn catalog_round_trip_routes_to_emitted_dispatcher() {
 
     assert_eq!(catalog.len(), 2);
     let dispatcher = catalog
-        .dispatcher_for("browser::youtube::echo_target")
+        .dispatcher_for("browser_youtube_echo_target")
         .expect("registered");
     let result = dispatcher
         .dispatch(call(
-            "browser::youtube::echo_target",
+            "browser_youtube_echo_target",
             json!({}),
             browser_origin(),
         ))

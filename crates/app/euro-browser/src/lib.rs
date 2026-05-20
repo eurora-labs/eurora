@@ -48,7 +48,7 @@ pub fn type_collection() -> specta::Types {
         .register_mut::<NativeMessage>()
         .register_mut::<NativeMetadata>()
         // YouTube adapter types — `CapturedFrame` is the canonical
-        // YouTube-frame shape returned by `browser::youtube::get_current_frame`.
+        // YouTube-frame shape returned by `browser_youtube_get_current_frame`.
         .register_mut::<eurora_tools_youtube::TranscriptEntry>()
         .register_mut::<eurora_tools_youtube::CurrentTimestamp>()
         .register_mut::<eurora_tools_youtube::Transcript>()

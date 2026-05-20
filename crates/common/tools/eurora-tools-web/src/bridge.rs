@@ -32,31 +32,31 @@ use crate::types::{
     QuerySelectorResult, ReadabilityArticle, SelectedText,
 };
 
-/// Bridge action emitted for `browser::web::get_page_metadata`.
+/// Bridge action emitted for `browser_web_get_page_metadata`.
 pub const WEB_GET_PAGE_METADATA: &str = "WEB_GET_PAGE_METADATA";
-/// Bridge action emitted for `browser::web::get_accessibility_tree`.
+/// Bridge action emitted for `browser_web_get_accessibility_tree`.
 pub const WEB_GET_ACCESSIBILITY_TREE: &str = "WEB_GET_ACCESSIBILITY_TREE";
-/// Bridge action emitted for `browser::web::get_readability_article`.
+/// Bridge action emitted for `browser_web_read_article`.
 pub const WEB_GET_READABILITY_ARTICLE: &str = "WEB_GET_READABILITY_ARTICLE";
-/// Bridge action emitted for `browser::web::get_selected_text`.
+/// Bridge action emitted for `browser_web_get_selected_text`.
 pub const WEB_GET_SELECTED_TEXT: &str = "WEB_GET_SELECTED_TEXT";
-/// Bridge action emitted for `browser::web::query_selector`.
+/// Bridge action emitted for `browser_web_query_selector`.
 pub const WEB_QUERY_SELECTOR: &str = "WEB_QUERY_SELECTOR";
-/// Bridge action emitted for `browser::web::list_links`.
+/// Bridge action emitted for `browser_web_list_links`.
 pub const WEB_LIST_LINKS: &str = "WEB_LIST_LINKS";
-/// Bridge action emitted for `browser::web::list_form_inputs`.
+/// Bridge action emitted for `browser_web_list_form_inputs`.
 pub const WEB_LIST_FORM_INPUTS: &str = "WEB_LIST_FORM_INPUTS";
-/// Bridge action emitted for `browser::web::insert_text`.
+/// Bridge action emitted for `browser_web_insert_text`.
 pub const WEB_INSERT_TEXT: &str = "WEB_INSERT_TEXT";
 
-const METADATA_TOOL: &str = "browser::web::get_page_metadata";
-const AX_TREE_TOOL: &str = "browser::web::get_accessibility_tree";
-const READABILITY_TOOL: &str = "browser::web::get_readability_article";
-const SELECTION_TOOL: &str = "browser::web::get_selected_text";
-const QUERY_TOOL: &str = "browser::web::query_selector";
-const LINKS_TOOL: &str = "browser::web::list_links";
-const FORM_INPUTS_TOOL: &str = "browser::web::list_form_inputs";
-const INSERT_TEXT_TOOL: &str = "browser::web::insert_text";
+const METADATA_TOOL: &str = "browser_web_get_page_metadata";
+const AX_TREE_TOOL: &str = "browser_web_get_accessibility_tree";
+const READABILITY_TOOL: &str = "browser_web_read_article";
+const SELECTION_TOOL: &str = "browser_web_get_selected_text";
+const QUERY_TOOL: &str = "browser_web_query_selector";
+const LINKS_TOOL: &str = "browser_web_list_links";
+const FORM_INPUTS_TOOL: &str = "browser_web_list_form_inputs";
+const INSERT_TEXT_TOOL: &str = "browser_web_insert_text";
 
 /// Wrapper that fulfils every [`WebAdapter`] method by hitting the
 /// browser process registered with [`BridgeService`].
@@ -114,7 +114,7 @@ impl WebAdapter for WebBridgeImpl {
             .await
     }
 
-    async fn get_readability_article(
+    async fn read_article(
         &self,
         target: &BrowserOrigin,
         args: Empty,

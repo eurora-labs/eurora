@@ -5,7 +5,7 @@ expression: wire
 [
     WireToolDescriptor {
         definition: ToolDefinition {
-            name: "browser::youtube::get_current_timestamp",
+            name: "browser_youtube_get_current_timestamp",
             description: "Return the user's current playback position.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
@@ -42,7 +42,7 @@ expression: wire
     },
     WireToolDescriptor {
         definition: ToolDefinition {
-            name: "browser::youtube::get_transcript",
+            name: "browser_youtube_get_transcript",
             description: "Return the full transcript of the video the user is watching.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),

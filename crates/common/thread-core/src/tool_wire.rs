@@ -191,11 +191,11 @@ mod tests {
     fn tool_error_wire_all_variants_round_trip() {
         let cases = vec![
             ToolErrorWire::ContextUnavailable {
-                tool: "browser::youtube::get_transcript".into(),
+                tool: "browser_youtube_get_transcript".into(),
                 reason: "no active youtube tab".into(),
             },
             ToolErrorWire::OriginMismatch {
-                tool: "browser::youtube::get_transcript".into(),
+                tool: "browser_youtube_get_transcript".into(),
                 expected: "Browser".into(),
                 got: "Focused".into(),
             },
@@ -277,7 +277,7 @@ mod tests {
     fn sample_descriptor() -> WireToolDescriptor {
         WireToolDescriptor {
             definition: ToolDefinition {
-                name: "browser::youtube::get_current_timestamp".into(),
+                name: "browser_youtube_get_current_timestamp".into(),
                 description: "Return the user's current playback position.".into(),
                 parameters: json!({"type": "object"}),
             },
@@ -319,7 +319,7 @@ mod tests {
         // Forward-compat: clients that predate the addition of
         // `required_contexts` / `requires_user_approval` should still parse.
         let json = r#"{
-            "name": "browser::youtube::get_current_timestamp",
+            "name": "browser_youtube_get_current_timestamp",
             "description": "x",
             "parameters": {},
             "output_schema": {},
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn wire_tool_descriptor_name_helper_returns_definition_name() {
         let d = sample_descriptor();
-        assert_eq!(d.name(), "browser::youtube::get_current_timestamp");
+        assert_eq!(d.name(), "browser_youtube_get_current_timestamp");
     }
 
     #[test]

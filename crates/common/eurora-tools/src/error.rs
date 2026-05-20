@@ -153,13 +153,13 @@ mod tests {
     #[test]
     fn forward_context_unavailable() {
         let err = ToolError::ContextUnavailable {
-            tool: Cow::Borrowed("browser::youtube::get_transcript"),
+            tool: Cow::Borrowed("browser_youtube_get_transcript"),
             reason: Cow::Borrowed("no active youtube tab"),
         };
         let wire: ToolErrorWire = err.into();
         match wire {
             ToolErrorWire::ContextUnavailable { tool, reason } => {
-                assert_eq!(tool, "browser::youtube::get_transcript");
+                assert_eq!(tool, "browser_youtube_get_transcript");
                 assert_eq!(reason, "no active youtube tab");
             }
             other => panic!("expected ContextUnavailable, got {other:?}"),
@@ -169,7 +169,7 @@ mod tests {
     #[test]
     fn forward_origin_mismatch() {
         let err = ToolError::OriginMismatch {
-            tool: Cow::Borrowed("browser::youtube::get_transcript"),
+            tool: Cow::Borrowed("browser_youtube_get_transcript"),
             expected: Cow::Borrowed("Browser"),
             got: Cow::Borrowed("Focused"),
         };
@@ -180,7 +180,7 @@ mod tests {
                 expected,
                 got,
             } => {
-                assert_eq!(tool, "browser::youtube::get_transcript");
+                assert_eq!(tool, "browser_youtube_get_transcript");
                 assert_eq!(expected, "Browser");
                 assert_eq!(got, "Focused");
             }
@@ -308,14 +308,14 @@ mod tests {
     #[test]
     fn reverse_context_unavailable_round_trips() {
         let original = ToolError::ContextUnavailable {
-            tool: Cow::Borrowed("browser::youtube::get_transcript"),
+            tool: Cow::Borrowed("browser_youtube_get_transcript"),
             reason: Cow::Borrowed("no active youtube tab"),
         };
         let wire: ToolErrorWire = original.into();
         let back: ToolError = wire.into();
         match back {
             ToolError::ContextUnavailable { tool, reason } => {
-                assert_eq!(tool, "browser::youtube::get_transcript");
+                assert_eq!(tool, "browser_youtube_get_transcript");
                 assert_eq!(reason, "no active youtube tab");
             }
             other => panic!("expected ContextUnavailable, got {other:?}"),
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn reverse_origin_mismatch_round_trips() {
         let original = ToolError::OriginMismatch {
-            tool: Cow::Borrowed("browser::youtube::get_transcript"),
+            tool: Cow::Borrowed("browser_youtube_get_transcript"),
             expected: Cow::Borrowed("Browser"),
             got: Cow::Borrowed("Focused"),
         };
@@ -337,7 +337,7 @@ mod tests {
                 expected,
                 got,
             } => {
-                assert_eq!(tool, "browser::youtube::get_transcript");
+                assert_eq!(tool, "browser_youtube_get_transcript");
                 assert_eq!(expected, "Browser");
                 assert_eq!(got, "Focused");
             }

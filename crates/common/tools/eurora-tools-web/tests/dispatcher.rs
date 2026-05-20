@@ -23,14 +23,14 @@ use eurora_tools_web::{
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
-const GET_PAGE_METADATA_TOOL: &str = "browser::web::get_page_metadata";
-const GET_ACCESSIBILITY_TREE_TOOL: &str = "browser::web::get_accessibility_tree";
-const GET_READABILITY_ARTICLE_TOOL: &str = "browser::web::get_readability_article";
-const GET_SELECTED_TEXT_TOOL: &str = "browser::web::get_selected_text";
-const QUERY_SELECTOR_TOOL: &str = "browser::web::query_selector";
-const LIST_LINKS_TOOL: &str = "browser::web::list_links";
-const LIST_FORM_INPUTS_TOOL: &str = "browser::web::list_form_inputs";
-const INSERT_TEXT_TOOL: &str = "browser::web::insert_text";
+const GET_PAGE_METADATA_TOOL: &str = "browser_web_get_page_metadata";
+const GET_ACCESSIBILITY_TREE_TOOL: &str = "browser_web_get_accessibility_tree";
+const GET_READABILITY_ARTICLE_TOOL: &str = "browser_web_read_article";
+const GET_SELECTED_TEXT_TOOL: &str = "browser_web_get_selected_text";
+const QUERY_SELECTOR_TOOL: &str = "browser_web_query_selector";
+const LIST_LINKS_TOOL: &str = "browser_web_list_links";
+const LIST_FORM_INPUTS_TOOL: &str = "browser_web_list_form_inputs";
+const INSERT_TEXT_TOOL: &str = "browser_web_insert_text";
 
 const ALL_TOOLS: [&str; 8] = [
     GET_PAGE_METADATA_TOOL,
@@ -93,7 +93,7 @@ impl WebAdapter for WebStub {
         })
     }
 
-    async fn get_readability_article(
+    async fn read_article(
         &self,
         target: &BrowserOrigin,
         _args: Empty,
@@ -497,7 +497,7 @@ async fn dispatch_unknown_name_returns_404() {
     let dispatcher = WebDispatcher::new(WebStub);
     let err = dispatcher
         .dispatch(call(
-            "browser::web::does_not_exist",
+            "browser_web_does_not_exist",
             json!({}),
             browser_origin(),
         ))

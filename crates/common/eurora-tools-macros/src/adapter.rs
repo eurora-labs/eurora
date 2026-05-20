@@ -183,7 +183,7 @@ fn prepare_method(
     let target_kind = tool_attrs.source.target_kind();
     let signature = analyze(method, target_kind)?;
 
-    let tool_name = format!("{}::{}", adapter_attrs.namespace.value(), method.sig.ident);
+    let tool_name = format!("{}_{}", adapter_attrs.namespace.value(), method.sig.ident);
     let tool_name_lit = LitStr::new(&tool_name, method.sig.ident.span());
 
     let descriptor = build_descriptor(&tool_name_lit, &description, &tool_attrs, &signature);

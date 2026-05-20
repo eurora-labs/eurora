@@ -22,7 +22,7 @@ use eurora_tools::{BrowserOrigin, Empty, ToolError, adapter};
 use crate::types::{CapturedFrame, CurrentTimestamp, Transcript};
 
 /// Tools for the YouTube video the user is currently watching.
-#[adapter(namespace = "browser::youtube", version = 1)]
+#[adapter(namespace = "browser_youtube", version = 1)]
 pub trait YoutubeAdapter: Send + Sync {
     /// Return the user's current playback position in the active YouTube
     /// video, along with the video duration and play/pause state.

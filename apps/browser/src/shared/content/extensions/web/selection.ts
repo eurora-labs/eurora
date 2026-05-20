@@ -1,5 +1,4 @@
 import type { SelectedText } from '../../bindings';
-import type { NativeResponse } from '../../models';
 
 /**
  * Resolve whatever the user has highlighted right now, plus XPaths to
@@ -9,18 +8,17 @@ import type { NativeResponse } from '../../models';
  * Empty selections (the common case) return an empty `text` and
  * `null` XPath fields — the tool never fails for "nothing selected".
  */
-export async function handleGetSelectedText(): Promise<NativeResponse> {
+export async function handleGetSelectedText(): Promise<SelectedText> {
 	const selection = window.getSelection();
 	const text = selection?.toString() ?? '';
 	const anchor = selection?.anchorNode ? xpathOf(selection.anchorNode) : null;
 	const focus = selection?.focusNode ? xpathOf(selection.focusNode) : null;
 
-	const payload: SelectedText = {
+	return {
 		text,
 		anchor_xpath: anchor,
 		focus_xpath: focus,
 	};
-	return { kind: 'SelectedText', data: payload };
 }
 
 /**

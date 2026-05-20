@@ -8,7 +8,6 @@ import type {
 	QuerySelectorInclude,
 	QuerySelectorResult,
 } from '../../bindings';
-import type { NativeResponse } from '../../models';
 import type { BrowserObj } from '../watchers/watcher';
 
 const DEFAULT_LIMIT = 50;
@@ -26,7 +25,7 @@ const VALID_INCLUDES = new Set<QuerySelectorInclude>(['text', 'html', 'attribute
  * `truncated`, because the elements will never appear no matter how
  * the caller widens the call.
  */
-export async function handleQuerySelector(obj: BrowserObj): Promise<NativeResponse> {
+export async function handleQuerySelector(obj: BrowserObj): Promise<QuerySelectorResult> {
 	const args = parseArgs(obj);
 	if (!args.selector || args.selector.trim().length === 0) {
 		throw new Error('query_selector requires a non-empty selector');
@@ -65,12 +64,11 @@ export async function handleQuerySelector(obj: BrowserObj): Promise<NativeRespon
 		matches.push(node.node);
 	}
 
-	const result: QuerySelectorResult = {
+	return {
 		matches,
 		total_match_count: raw.length,
 		truncated,
 	};
-	return { kind: 'QuerySelectorResult', data: result };
 }
 
 function parseArgs(obj: BrowserObj): QuerySelectorArgs {
