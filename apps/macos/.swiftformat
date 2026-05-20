@@ -1,2 +1,2 @@
---exclude Shared/Generated,.build,Packages,Pods,Carthage
+--exclude Shared/Generated,Shared/BridgeProtocol.swift,.build,Packages,Pods,Carthage
 --swiftversion 5.9

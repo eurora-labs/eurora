@@ -97,7 +97,7 @@ public extension Payload {
     /// `case` is filled from the encoded shape — i.e. `[String: Any]`
     /// for an object, `[Any]` for an array, scalars for primitives.
     /// Mirrors the Rust [`Payload::from_value`] helper.
-    static func encoding<T: Encodable>(_ value: T) throws -> Payload {
+    static func encoding(_ value: some Encodable) throws -> Payload {
         let data = try BridgeProtocol.encoder.encode(value)
         return try BridgeProtocol.decoder.decode(Payload.self, from: data)
     }
