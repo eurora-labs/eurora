@@ -75,6 +75,20 @@ export type NativeMetadata = {
 	title: string | null,
 };
 
+/**
+ *  One cue from a YouTube transcript as the browser extension emits it.
+ * 
+ *  Field names mirror YouTube's caption format (`start` and `duration`
+ *  in seconds) — the extension's transcript parser already exposes them
+ *  in this shape, so we type the wire payload to match rather than
+ *  inventing a separate vocabulary at the host boundary.
+ */
+export type NativeTranscriptLine = {
+	text: string,
+	start: number | null,
+	duration: number | null,
+};
+
 export type NativeTwitterAsset = {
 	url: string,
 	title: string,
@@ -92,7 +106,7 @@ export type NativeTwitterTweet = {
 export type NativeYoutubeAsset = {
 	url: string,
 	title: string,
-	transcript: string,
+	transcript: NativeTranscriptLine[],
 	current_time: number | null,
 };
 

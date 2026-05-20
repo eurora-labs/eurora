@@ -1,20 +1,28 @@
 use agent_chain_core::messages::{ContentBlocks, PlainTextContentBlock};
 use async_trait::async_trait;
-use euro_browser::NativeYoutubeAsset;
+use euro_browser::{NativeTranscriptLine, NativeYoutubeAsset};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{
-    ActivityResult, error::ActivityError, storage::SaveableAsset, types::AssetFunctionality,
-};
+use crate::{ActivityResult, storage::SaveableAsset, types::AssetFunctionality};
 
 const YOUTUBE_EXTENSION_ID: &str = "7c7b59bb-d44d-431a-9f4d-64240172e092";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptLine {
     pub text: String,
-    pub start: f32,
-    pub duration: f32,
+    pub start: f64,
+    pub duration: f64,
+}
+
+impl From<NativeTranscriptLine> for TranscriptLine {
+    fn from(line: NativeTranscriptLine) -> Self {
+        Self {
+            text: line.text,
+            start: line.start,
+            duration: line.duration,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -23,7 +31,7 @@ pub struct YoutubeAsset {
     pub url: String,
     pub title: String,
     pub transcript: Vec<TranscriptLine>,
-    pub current_time: f32,
+    pub current_time: f64,
 }
 
 impl YoutubeAsset {
@@ -32,7 +40,7 @@ impl YoutubeAsset {
         url: String,
         title: String,
         transcript: Vec<TranscriptLine>,
-        current_time: f32,
+        current_time: f64,
     ) -> Self {
         Self {
             id,
@@ -41,19 +49,6 @@ impl YoutubeAsset {
             transcript,
             current_time,
         }
-    }
-
-    pub fn try_from(asset: NativeYoutubeAsset) -> Result<Self, ActivityError> {
-        let transcript = serde_json::from_str::<Vec<TranscriptLine>>(&asset.transcript)
-            .map_err(ActivityError::from)?;
-
-        Ok(YoutubeAsset {
-            id: uuid::Uuid::new_v4().to_string(),
-            url: asset.url,
-            title: asset.title,
-            transcript,
-            current_time: asset.current_time,
-        })
     }
 }
 
@@ -145,7 +140,13 @@ impl SaveableAsset for YoutubeAsset {
 
 impl From<NativeYoutubeAsset> for YoutubeAsset {
     fn from(asset: NativeYoutubeAsset) -> Self {
-        Self::try_from(asset).expect("Failed to convert NativeYoutubeAsset to YoutubeAsset")
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            url: asset.url,
+            title: asset.title,
+            transcript: asset.transcript.into_iter().map(TranscriptLine::from).collect(),
+            current_time: asset.current_time,
+        }
     }
 }
 
