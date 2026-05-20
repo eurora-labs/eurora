@@ -9,6 +9,8 @@
 //! receives once a `ToolRequest` has been correlated with a frozen
 //! [`crate::Origin`] from the turn snapshot.
 
+use std::sync::Arc;
+
 use serde_json::Value;
 use thread_core::WireToolDescriptor;
 use tokio_util::sync::CancellationToken;
@@ -72,7 +74,12 @@ pub struct IncomingCall {
     /// The frozen routing target captured at turn start. Dispatchers must
     /// verify the variant matches the adapter method's declared target
     /// type and return [`ToolError::OriginMismatch`] otherwise.
-    pub origin: Origin,
+    ///
+    /// Shared as `Arc<Origin>` so the per-turn `TurnState.targets` map
+    /// hands out cheap clones to every `IncomingCall` for that turn —
+    /// avoids deep-cloning the inner `BrowserOrigin::page_url` (and
+    /// similar string-heavy variants) on every tool call.
+    pub origin: Arc<Origin>,
     /// Child cancellation token rooted at the turn's cancel token.
     pub cancel: CancellationToken,
 }
@@ -151,12 +158,12 @@ mod tests {
             call_id: 42,
             descriptor_name: "browser::test::echo",
             arguments: json!({"x": 1}),
-            origin: Origin::Browser(BrowserOrigin {
+            origin: Arc::new(Origin::Browser(BrowserOrigin {
                 process_id: 1,
                 tab_id: 2,
                 window_id: None,
                 page_url: "https://example.test".into(),
-            }),
+            })),
             cancel: CancellationToken::new(),
         };
         assert_eq!(call.call_id, 42);

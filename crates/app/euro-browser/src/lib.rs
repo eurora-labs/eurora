@@ -52,7 +52,12 @@ pub fn type_collection() -> specta::Types {
         .register_mut::<NativeMetadata>()
         .register_mut::<NativeYoutubeAsset>()
         .register_mut::<eurora_tools_youtube::TranscriptEntry>()
-        .register_mut::<NativeYoutubeSnapshot>()
+        .register_mut::<eurora_tools_youtube::CurrentTimestamp>()
+        .register_mut::<eurora_tools_youtube::Transcript>()
+        // `CapturedFrame` doubles as the activity-capture snapshot payload
+        // (carried inside `NativeMessage::NativeYoutubeSnapshot`) — same
+        // shape used by the `browser::youtube::get_current_frame` tool.
+        .register_mut::<eurora_tools_youtube::CapturedFrame>()
         .register_mut::<NativeTwitterAsset>()
         .register_mut::<NativeTwitterTweet>()
         .register_mut::<TweetPageData>()
@@ -102,7 +107,9 @@ mod tests {
             "NativeArticleSnapshot",
             "NativeYoutubeAsset",
             "TranscriptEntry",
-            "NativeYoutubeSnapshot",
+            "CurrentTimestamp",
+            "Transcript",
+            "CapturedFrame",
             "NativeTwitterAsset",
             "NativeTwitterTweet",
             "ParseResult",

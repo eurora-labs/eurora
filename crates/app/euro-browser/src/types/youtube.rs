@@ -9,18 +9,16 @@ use specta::Type;
 /// `eurora-tools-youtube`: extension, native-messaging host, activity
 /// pipeline, and tool dispatchers all encode YouTube transcripts in
 /// exactly one shape (`{start, duration, text}`).
+///
+/// Snapshots (the per-frame variant) now go through
+/// [`eurora_tools_youtube::CapturedFrame`] directly — the legacy
+/// `NativeYoutubeSnapshot` wrapper was dropped to eliminate the
+/// duplicate field-name + precision drift (`video_frame_base64`/f32 vs
+/// `image_base64`/f64) between the activity-capture and tool-call paths.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
 pub struct NativeYoutubeAsset {
     pub url: String,
     pub title: String,
     pub transcript: Vec<TranscriptEntry>,
     pub current_time: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
-pub struct NativeYoutubeSnapshot {
-    pub current_time: f32,
-    pub video_frame_base64: String,
-    pub video_frame_width: i32,
-    pub video_frame_height: i32,
 }

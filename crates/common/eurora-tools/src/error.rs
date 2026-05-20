@@ -17,7 +17,7 @@
 
 use std::borrow::Cow;
 
-use thread_core::ToolErrorWire;
+use eurora_tools_macros::WireMirror;
 
 /// Error type for an in-flight tool call.
 ///
@@ -42,7 +42,19 @@ use thread_core::ToolErrorWire;
 ///
 /// `#[non_exhaustive]` so we can extend without breaking downstream
 /// matchers.
-#[derive(Debug, thiserror::Error)]
+///
+/// The `From<ToolError> for ToolErrorWire` and `From<ToolErrorWire> for
+/// ToolError` impls are produced by the [`WireMirror`] derive — every
+/// variant on this enum must have a matching variant on
+/// [`ToolErrorWire`] (with `Cow<'static, str>` fields swapped for
+/// `String` and `#[source]` causes dropped), or the derive's generated
+/// match arms fail to compile.
+#[derive(Debug, thiserror::Error, WireMirror)]
+#[wire_mirror(
+    target = "::thread_core::ToolErrorWire",
+    catch_all = "Adapter",
+    catch_all_message = "unsupported tool error variant: {variant:?}; eurora-tools needs an update"
+)]
 #[non_exhaustive]
 pub enum ToolError {
     #[error("context unavailable for tool `{tool}`: {reason}")]
@@ -60,8 +72,8 @@ pub enum ToolError {
     Timeout,
     #[error("tool call cancelled")]
     Cancelled,
-    #[error("transport error: {0}")]
-    Transport(Cow<'static, str>),
+    #[error("transport error: {message}")]
+    Transport { message: Cow<'static, str> },
     #[error("remote error {code}: {message}")]
     Remote {
         code: u32,
@@ -72,18 +84,21 @@ pub enum ToolError {
     Decode {
         message: Cow<'static, str>,
         #[source]
+        #[wire_mirror(skip)]
         source: Option<serde_json::Error>,
     },
     #[error("failed to encode tool payload: {message}")]
     Encode {
         message: Cow<'static, str>,
         #[source]
+        #[wire_mirror(skip)]
         source: Option<serde_json::Error>,
     },
     #[error("adapter error: {message}")]
     Adapter {
         message: Cow<'static, str>,
         #[source]
+        #[wire_mirror(skip)]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 }
@@ -120,106 +135,16 @@ impl ToolError {
     }
 }
 
-impl From<ToolError> for ToolErrorWire {
-    fn from(err: ToolError) -> Self {
-        match err {
-            ToolError::ContextUnavailable { tool, reason } => Self::ContextUnavailable {
-                tool: tool.into_owned(),
-                reason: reason.into_owned(),
-            },
-            ToolError::OriginMismatch {
-                tool,
-                expected,
-                got,
-            } => Self::OriginMismatch {
-                tool: tool.into_owned(),
-                expected: expected.into_owned(),
-                got: got.into_owned(),
-            },
-            ToolError::Timeout => Self::Timeout,
-            ToolError::Cancelled => Self::Cancelled,
-            ToolError::Transport(msg) => Self::Transport {
-                message: msg.into_owned(),
-            },
-            ToolError::Remote {
-                code,
-                message,
-                details,
-            } => Self::Remote {
-                code,
-                message,
-                details,
-            },
-            ToolError::Decode { message, .. } => Self::Decode {
-                message: message.into_owned(),
-            },
-            ToolError::Encode { message, .. } => Self::Encode {
-                message: message.into_owned(),
-            },
-            ToolError::Adapter { message, .. } => Self::Adapter {
-                message: message.into_owned(),
-            },
-        }
-    }
-}
-
-impl From<ToolErrorWire> for ToolError {
-    fn from(err: ToolErrorWire) -> Self {
-        match err {
-            ToolErrorWire::ContextUnavailable { tool, reason } => Self::ContextUnavailable {
-                tool: Cow::Owned(tool),
-                reason: Cow::Owned(reason),
-            },
-            ToolErrorWire::OriginMismatch {
-                tool,
-                expected,
-                got,
-            } => Self::OriginMismatch {
-                tool: Cow::Owned(tool),
-                expected: Cow::Owned(expected),
-                got: Cow::Owned(got),
-            },
-            ToolErrorWire::Timeout => Self::Timeout,
-            ToolErrorWire::Cancelled => Self::Cancelled,
-            ToolErrorWire::Transport { message } => Self::Transport(Cow::Owned(message)),
-            ToolErrorWire::Remote {
-                code,
-                message,
-                details,
-            } => Self::Remote {
-                code,
-                message,
-                details,
-            },
-            ToolErrorWire::Decode { message } => Self::Decode {
-                message: Cow::Owned(message),
-                source: None,
-            },
-            ToolErrorWire::Encode { message } => Self::Encode {
-                message: Cow::Owned(message),
-                source: None,
-            },
-            ToolErrorWire::Adapter { message } => Self::Adapter {
-                message: Cow::Owned(message),
-                source: None,
-            },
-            // ToolErrorWire is #[non_exhaustive]; folding unknown variants
-            // into Adapter keeps the message intact for diagnostics and
-            // signals (clearly) that eurora-tools needs an update.
-            other => Self::Adapter {
-                message: Cow::Owned(format!(
-                    "unsupported tool error variant: {other:?}; eurora-tools needs an update"
-                )),
-                source: None,
-            },
-        }
-    }
-}
+// `From<ToolError> for ToolErrorWire` and `From<ToolErrorWire> for ToolError`
+// are generated by the `#[derive(WireMirror)]` above. Variants without a
+// 1:1 wire counterpart will surface a non-exhaustive-match compile error in
+// the generated arms, which is exactly the drift signal we want.
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    use thread_core::ToolErrorWire;
 
     fn decode_err() -> serde_json::Error {
         serde_json::from_str::<u32>("not a number").unwrap_err()
@@ -277,7 +202,10 @@ mod tests {
 
     #[test]
     fn forward_transport_preserves_message() {
-        let wire: ToolErrorWire = ToolError::Transport(Cow::Borrowed("ws closed")).into();
+        let wire: ToolErrorWire = ToolError::Transport {
+            message: Cow::Borrowed("ws closed"),
+        }
+        .into();
         match wire {
             ToolErrorWire::Transport { message } => assert_eq!(message, "ws closed"),
             other => panic!("expected Transport, got {other:?}"),
@@ -436,7 +364,7 @@ mod tests {
         };
         let back: ToolError = wire.into();
         match back {
-            ToolError::Transport(msg) => assert_eq!(msg.as_ref(), "ws closed"),
+            ToolError::Transport { message } => assert_eq!(message.as_ref(), "ws closed"),
             other => panic!("expected Transport, got {other:?}"),
         }
     }

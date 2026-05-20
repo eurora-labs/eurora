@@ -475,7 +475,7 @@ pub async fn run_agent_loop<B>(
             rounds = max_tool_rounds,
             "Tool-call budget exhausted; running forced synthesis with tool_choice=none"
         );
-        let tool_likes: Vec<ToolLike> = catalog.tool_likes();
+        let tool_likes = catalog.tool_likes();
         match run_forced_synthesis(&*chat_model, &tool_likes, &messages, &tx, &token, &mut acc)
             .await
         {

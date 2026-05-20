@@ -1938,6 +1938,7 @@ dependencies = [
  "eurora-tools",
  "futures",
  "llm-core",
+ "request-correlator",
  "reqwest 0.12.28",
  "secrecy",
  "serde",
@@ -3989,10 +3990,12 @@ dependencies = [
  "dashmap",
  "euro-bridge-protocol",
  "futures-util",
+ "request-correlator",
  "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
  "tracing",
 ]
 
@@ -4357,6 +4360,8 @@ dependencies = [
 name = "eurora-tools-youtube"
 version = "0.0.0"
 dependencies = [
+ "euro-bridge",
+ "euro-bridge-protocol",
  "eurora-tools",
  "insta",
  "schemars 1.2.1",
@@ -9142,6 +9147,15 @@ dependencies = [
  "sha1 0.10.6",
  "sha2 0.10.9",
  "tokio",
+]
+
+[[package]]
+name = "request-correlator"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]

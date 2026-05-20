@@ -1,54 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Frame } from '../../content/bindings';
+import type { TabChange, TabStateBus } from '../tab-state-bus';
 import type browser from 'webextension-polyfill';
 
-// Listener registry the mocked `browser` exposes. Tests invoke these
-// directly to simulate user actions without depending on the
-// webextension event loop.
-const listeners = {
-	tabsOnActivated: [] as Array<(info: { tabId: number; windowId: number }) => unknown>,
-	tabsOnUpdated: [] as Array<
-		(tabId: number, changeInfo: Record<string, unknown>, tab: unknown) => unknown
-	>,
-	tabsOnRemoved: [] as Array<(tabId: number) => unknown>,
-	windowsOnFocusChanged: [] as Array<(windowId: number) => unknown>,
-};
-
-function makeListener<T extends keyof typeof listeners>(name: T) {
-	return {
-		addListener: vi.fn((fn: (typeof listeners)[T][number]) => {
-			listeners[name].push(fn as never);
-		}),
-		removeListener: vi.fn((fn: (typeof listeners)[T][number]) => {
-			const idx = listeners[name].indexOf(fn as never);
-			if (idx >= 0) listeners[name].splice(idx, 1);
-		}),
-	};
-}
-
-const tabsQueryMock = vi.fn();
-const browserMock = {
-	tabs: {
-		onActivated: makeListener('tabsOnActivated'),
-		onUpdated: makeListener('tabsOnUpdated'),
-		onRemoved: makeListener('tabsOnRemoved'),
-		query: tabsQueryMock,
+vi.mock('webextension-polyfill', () => ({
+	default: {
+		// The observer only touches `webextension-polyfill` for type
+		// imports now; the bus owns the runtime side. A stub is enough
+		// to keep `await import` happy.
+		tabs: {},
+		windows: { WINDOW_ID_NONE: -1 },
+		runtime: {},
 	},
-	windows: {
-		onFocusChanged: makeListener('windowsOnFocusChanged'),
-		WINDOW_ID_NONE: -1,
-	},
-};
-
-vi.mock('webextension-polyfill', () => ({ default: browserMock }));
+}));
 
 let observer: typeof import('../context-observer');
 
 beforeEach(async () => {
-	for (const key of Object.keys(listeners) as (keyof typeof listeners)[]) {
-		listeners[key].length = 0;
-	}
-	tabsQueryMock.mockReset();
 	vi.resetModules();
 	observer = await import('../context-observer');
 });
@@ -61,6 +29,44 @@ type FakePort = browser.Runtime.Port & { postMessage: ReturnType<typeof vi.fn> }
 
 function fakePort(): FakePort {
 	return { postMessage: vi.fn() } as unknown as FakePort;
+}
+
+/// Test bus that lets the test driver push synthetic [`TabChange`]
+/// events at the subscriber. Mirrors the production [`TabStateBus`] API
+/// — `subscribe` registers the handler and immediately emits an
+/// `initial-sync` change carrying the supplied tab snapshot.
+function makeBus(initial: browser.Tabs.Tab | undefined): {
+	bus: TabStateBus;
+	emit: (change: TabChange) => Promise<void>;
+} {
+	const handlers: ((change: TabChange) => void | Promise<void>)[] = [];
+	let currentTab = initial;
+	return {
+		bus: {
+			subscribe(handler) {
+				handlers.push(handler);
+				// Synchronous-ish microtask: matches the bus's
+				// `dispatchOne` which awaits its `queryActiveTab` promise
+				// before invoking the handler.
+				void Promise.resolve().then(
+					async () => await handler({ cause: 'initial-sync', activeTab: currentTab }),
+				);
+				return () => {
+					const idx = handlers.indexOf(handler);
+					if (idx >= 0) handlers.splice(idx, 1);
+				};
+			},
+			stop() {
+				handlers.length = 0;
+			},
+		},
+		async emit(change) {
+			currentTab = change.activeTab ?? currentTab;
+			for (const h of handlers.slice()) {
+				await h(change);
+			}
+		},
+	};
 }
 
 function watchTab(overrides: Partial<browser.Tabs.Tab> = {}): browser.Tabs.Tab {
@@ -87,6 +93,11 @@ function frameEvent(frame: Frame): { action: string; payload: unknown } {
 		// `JSON.parse` step.
 		payload: kind.Event.payload ?? null,
 	};
+}
+
+async function flushMicrotasks(): Promise<void> {
+	await Promise.resolve();
+	await Promise.resolve();
 }
 
 describe('classifyYoutubeUrl', () => {
@@ -122,11 +133,10 @@ describe('classifyYoutubeUrl', () => {
 
 describe('context-observer transitions', () => {
 	it('activates with envelope-stamped payload when the active tab is a watch page', async () => {
-		tabsQueryMock.mockResolvedValueOnce([watchTab()]);
 		const port = fakePort();
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
+		const { bus } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 
 		const frames = postedFrames(port);
 		expect(frames).toHaveLength(1);
@@ -150,36 +160,32 @@ describe('context-observer transitions', () => {
 	});
 
 	it('does not republish on a no-op resync of the same tab and video', async () => {
-		tabsQueryMock.mockResolvedValue([watchTab()]);
 		const port = fakePort();
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
-
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 		expect(postedFrames(port)).toHaveLength(1);
 
-		// Fire a tab-activated event for the same tab; the resync should
-		// see no change and not emit a second frame.
-		await listeners.tabsOnActivated[0]({ tabId: 19, windowId: 7 });
+		// Same tab activated again; transition() should observe no change.
+		await emit({ cause: 'activated', activeTab: watchTab() });
 		expect(postedFrames(port)).toHaveLength(1);
 	});
 
 	it('emits deactivate then activate when the same tab navigates to a new video', async () => {
 		const port = fakePort();
-		tabsQueryMock.mockResolvedValueOnce([watchTab()]);
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 		expect(postedFrames(port)).toHaveLength(1);
 
-		tabsQueryMock.mockResolvedValueOnce([
-			watchTab({ url: 'https://www.youtube.com/watch?v=def456', title: 'Another video' }),
-		]);
-		await listeners.tabsOnUpdated[0](
-			19,
-			{ url: 'https://www.youtube.com/watch?v=def456' },
-			watchTab({ url: 'https://www.youtube.com/watch?v=def456' }),
-		);
+		await emit({
+			cause: 'updated',
+			activeTab: watchTab({
+				url: 'https://www.youtube.com/watch?v=def456',
+				title: 'Another video',
+			}),
+			changeInfo: { url: 'https://www.youtube.com/watch?v=def456' },
+		});
 
 		const events = postedFrames(port).map(frameEvent);
 		expect(events.map((e) => e.action)).toEqual([
@@ -187,35 +193,32 @@ describe('context-observer transitions', () => {
 			'CONTEXT_DEACTIVATED',
 			'CONTEXT_ACTIVATED',
 		]);
-		// The deactivate carries the *previous* key — not video-scoped.
 		expect((events[1].payload as { key: string }).key).toBe('youtube::watch_page');
 		expect((events[2].payload as { data: { video_id: string } }).data.video_id).toBe('def456');
 	});
 
 	it('deactivates on switch to a non-watch page', async () => {
 		const port = fakePort();
-		tabsQueryMock.mockResolvedValueOnce([watchTab()]);
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 
-		tabsQueryMock.mockResolvedValueOnce([
-			watchTab({ id: 20, url: 'https://www.example.com/' }),
-		]);
-		await listeners.tabsOnActivated[0]({ tabId: 20, windowId: 7 });
+		await emit({
+			cause: 'activated',
+			activeTab: watchTab({ id: 20, url: 'https://www.example.com/' }),
+		});
 
 		const events = postedFrames(port).map(frameEvent);
 		expect(events.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
 	});
 
-	it('ignores window-focus-lost transitions (WINDOW_ID_NONE) by deactivating', async () => {
+	it('deactivates on window-focus-lost (WINDOW_ID_NONE)', async () => {
 		const port = fakePort();
-		tabsQueryMock.mockResolvedValueOnce([watchTab()]);
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 
-		await listeners.windowsOnFocusChanged[0](browserMock.windows.WINDOW_ID_NONE);
+		await emit({ cause: 'window-focus', windowId: -1, activeTab: watchTab() });
 
 		const events = postedFrames(port).map(frameEvent);
 		expect(events.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
@@ -223,13 +226,12 @@ describe('context-observer transitions', () => {
 
 	it('deactivates when the active tab is removed', async () => {
 		const port = fakePort();
-		tabsQueryMock.mockResolvedValueOnce([watchTab()]);
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 		expect(postedFrames(port)).toHaveLength(1);
 
-		listeners.tabsOnRemoved[0](19);
+		await emit({ cause: 'removed', removedTabId: 19, activeTab: undefined });
 
 		const events = postedFrames(port).map(frameEvent);
 		expect(events).toHaveLength(2);
@@ -237,28 +239,26 @@ describe('context-observer transitions', () => {
 	});
 
 	it('does not emit anything when starting on a non-watch tab', async () => {
-		tabsQueryMock.mockResolvedValueOnce([watchTab({ url: 'https://www.example.com/' })]);
 		const port = fakePort();
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
+		const { bus } = makeBus(watchTab({ url: 'https://www.example.com/' }));
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 
 		expect(postedFrames(port)).toHaveLength(0);
 	});
 
 	it('ignores tab-updated events that did not change url or status', async () => {
 		const port = fakePort();
-		tabsQueryMock.mockResolvedValueOnce([watchTab()]);
-		observer.startContextObserver(port);
-		await Promise.resolve();
-		await Promise.resolve();
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
 		const baseline = postedFrames(port).length;
 
-		await listeners.tabsOnUpdated[0](
-			19,
-			{ favIconUrl: 'https://www.youtube.com/favicon.ico' },
-			watchTab(),
-		);
+		await emit({
+			cause: 'updated',
+			activeTab: watchTab(),
+			changeInfo: { favIconUrl: 'https://www.youtube.com/favicon.ico' },
+		});
 
 		expect(postedFrames(port).length).toBe(baseline);
 	});

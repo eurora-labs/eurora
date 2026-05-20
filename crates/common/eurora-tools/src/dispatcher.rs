@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use futures::future::BoxFuture;
 use serde_json::Value;
+use thread_core::WireToolDescriptor;
 
 use crate::bus::IncomingCall;
 use crate::descriptor::ToolDescriptor;
@@ -78,9 +79,16 @@ pub struct Catalog {
 /// Joint storage of a dispatcher and the descriptor it serves under one
 /// name. Keeping the descriptor pre-resolved makes `all_descriptors`
 /// O(N) instead of scanning the dispatcher's slice on every iteration.
+///
+/// The wire form is also pre-computed at registration so per-turn
+/// [`CapabilityUpdate`] frames are an `Arc::clone` per descriptor instead
+/// of a full schema re-serialization.
+///
+/// [`CapabilityUpdate`]: thread_core::CapabilityUpdatePayload
 struct Entry {
     dispatcher: Arc<dyn Dispatcher>,
     descriptor: ToolDescriptor,
+    wire: Arc<WireToolDescriptor>,
 }
 
 impl Catalog {
@@ -105,11 +113,13 @@ impl Catalog {
             }
         }
         for desc in descriptors {
+            let wire = Arc::new(desc.to_wire());
             self.by_name.insert(
                 desc.name,
                 Entry {
                     dispatcher: dispatcher.clone(),
                     descriptor: desc.clone(),
+                    wire,
                 },
             );
         }
@@ -147,6 +157,21 @@ impl Catalog {
             .iter()
             .map(|e| e.value().descriptor.clone())
             .collect()
+    }
+
+    /// All wire-form descriptors, returned as `Arc`s so the
+    /// `CapabilityUpdate` build path avoids re-serializing schemas on
+    /// every turn. Each `Arc` was constructed once at register time.
+    pub fn all_wire_descriptors(&self) -> Vec<Arc<WireToolDescriptor>> {
+        self.by_name
+            .iter()
+            .map(|e| Arc::clone(&e.value().wire))
+            .collect()
+    }
+
+    /// Look up the cached wire descriptor for a registered tool.
+    pub fn wire_descriptor_for(&self, name: &str) -> Option<Arc<WireToolDescriptor>> {
+        self.by_name.get(name).map(|e| Arc::clone(&e.value().wire))
     }
 
     /// Number of distinct descriptor names registered.
@@ -271,12 +296,12 @@ mod tests {
             call_id: 1,
             descriptor_name,
             arguments: json!({}),
-            origin: Origin::Browser(BrowserOrigin {
+            origin: Arc::new(Origin::Browser(BrowserOrigin {
                 process_id: 1,
                 tab_id: 1,
                 window_id: None,
                 page_url: "https://example.test".into(),
-            }),
+            })),
             cancel: CancellationToken::new(),
         }
     }
@@ -375,6 +400,35 @@ mod tests {
         assert!(catalog.is_empty());
         assert_eq!(catalog.len(), 0);
         assert!(catalog.all_descriptors().is_empty());
+    }
+
+    #[test]
+    fn wire_descriptors_are_cached_and_return_same_arc_per_call() {
+        let catalog = Catalog::new();
+        catalog.register(Arc::new(StubDispatcher));
+
+        let a1 = catalog.wire_descriptor_for("stub::tool::a").unwrap();
+        let a2 = catalog.wire_descriptor_for("stub::tool::a").unwrap();
+        assert!(
+            Arc::ptr_eq(&a1, &a2),
+            "wire_descriptor_for must return the same Arc on repeat calls",
+        );
+
+        // all_wire_descriptors yields the cached Arcs too — verify by
+        // pointer-equality against a fresh lookup.
+        let all = catalog.all_wire_descriptors();
+        let matching = all
+            .iter()
+            .find(|w| w.definition.name == "stub::tool::a")
+            .expect("all_wire_descriptors must include registered tools");
+        assert!(Arc::ptr_eq(&a1, matching));
+    }
+
+    #[test]
+    fn wire_descriptor_for_returns_none_for_unknown_names() {
+        let catalog = Catalog::new();
+        catalog.register(Arc::new(StubDispatcher));
+        assert!(catalog.wire_descriptor_for("does::not::exist").is_none());
     }
 
     #[tokio::test(flavor = "current_thread")]

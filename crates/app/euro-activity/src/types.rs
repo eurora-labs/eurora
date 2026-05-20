@@ -76,9 +76,13 @@ impl TryFrom<NativeMessage> for ActivitySnapshot {
 
     fn try_from(value: NativeMessage) -> Result<Self, Self::Error> {
         match value {
-            NativeMessage::NativeYoutubeSnapshot(snapshot) => Ok(
-                ActivitySnapshot::YoutubeSnapshot(YoutubeSnapshot::from(snapshot)),
-            ),
+            // `NativeYoutubeSnapshot` now carries `CapturedFrame` directly
+            // — same shape used by the `browser::youtube::get_current_frame`
+            // tool, so the activity pipeline and the tool path agree on
+            // field names and precision.
+            NativeMessage::NativeYoutubeSnapshot(frame) => Ok(ActivitySnapshot::YoutubeSnapshot(
+                YoutubeSnapshot::from(frame),
+            )),
             NativeMessage::NativeArticleSnapshot(snapshot) => Ok(
                 ActivitySnapshot::ArticleSnapshot(ArticleSnapshot::from(snapshot)),
             ),

@@ -1,11 +1,11 @@
 export type {
+	CapturedFrame,
 	NativeArticleAsset,
 	NativeArticleSnapshot,
 	NativeMetadata,
 	NativeTwitterAsset,
 	NativeTwitterTweet,
 	NativeYoutubeAsset,
-	NativeYoutubeSnapshot,
 } from './bindings';
 
 export type { NativeResponse } from './models';

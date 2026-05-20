@@ -879,7 +879,7 @@ fn main() {
                     let catalog = std::sync::Arc::new(eurora_tools::Catalog::new());
                     catalog.register(std::sync::Arc::new(
                         eurora_tools_youtube::YoutubeDispatcher::new(
-                            euro_tauri::tools::youtube::YoutubeBridgeImpl::new(bridge_service),
+                            euro_tauri::tools::YoutubeBridgeImpl::new(bridge_service),
                         ),
                     ));
                     tauri_app.manage(catalog);

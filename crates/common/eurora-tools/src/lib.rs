@@ -58,7 +58,7 @@ pub use error::ToolError;
 pub use origin::{AcpOrigin, BrowserOrigin, FocusedOrigin, Origin};
 pub use schema::{SchemaFn, schema_of};
 
-pub use eurora_tools_macros::{adapter, tool};
+pub use eurora_tools_macros::{WireMirror, adapter, tool};
 
 // Wire types are re-exported so adapter crates depend on `eurora-tools`
 // alone and don't need a direct `thread-core` import.

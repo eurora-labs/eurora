@@ -20,6 +20,7 @@ members = [
   "crates/common/focus-tracker-core",
   "crates/common/llm-core",
   "crates/common/pdf-core",
+  "crates/common/request-correlator",
   "crates/common/settings-core",
 ]
 
@@ -130,6 +131,7 @@ rand = "0.10.1"
 rand_distr = "0.6.0"
 regex = "1.12.2"
 regex-syntax = "0.8"  # collapse 0.8, 0.6
+request-correlator = { path = "crates/common/request-correlator" }
 reqwest = { version = "0.12", default-features = false, features = [
   "rustls-tls"
 ] }

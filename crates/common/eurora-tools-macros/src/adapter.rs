@@ -293,9 +293,13 @@ fn build_match_arm(
     {
         let variant_ident = format_ident!("{}", variant_name);
         let variant_lit = LitStr::new(variant_name, Span::call_site());
+        // `call.origin` is `Arc<Origin>`; the framework keeps it shared
+        // across every dispatch in a turn so the per-turn snapshot avoids
+        // deep-cloning string-heavy variants. `.as_ref()` borrows the
+        // inner `Origin` for the pattern match.
         quote! {
             #tool_name_lit => {
-                let ::eurora_tools::Origin::#variant_ident(#target_name) = &call.origin else {
+                let ::eurora_tools::Origin::#variant_ident(#target_name) = call.origin.as_ref() else {
                     return ::core::result::Result::Err(
                         ::eurora_tools::ToolError::OriginMismatch {
                             tool: ::std::borrow::Cow::Borrowed(#tool_name_lit),

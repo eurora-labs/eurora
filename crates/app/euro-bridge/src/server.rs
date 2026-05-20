@@ -17,6 +17,7 @@ use euro_bridge_protocol::{
     bridge_url_for,
 };
 use futures_util::{SinkExt, StreamExt};
+use request_correlator::{RequestCorrelator, WaitError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -358,7 +359,7 @@ pub struct BridgeService {
     registrations_tx: broadcast::Sender<RegistrationEvent>,
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
     extension_states_tx: broadcast::Sender<ExtensionStateUpdate>,
-    pending_requests: Arc<DashMap<u32, oneshot::Sender<Result<ResponseFrame, ErrorFrame>>>>,
+    pending_requests: RequestCorrelator<u32, ResponseFrame, ErrorFrame>,
     request_id_counter: Arc<AtomicU32>,
     server: Arc<StdMutex<Option<ServerHandle>>>,
     /// Browser-purge deadline. While `Instant::now() < purge_until`,
@@ -399,7 +400,7 @@ impl BridgeService {
             registrations_tx,
             disconnects_tx,
             extension_states_tx,
-            pending_requests: Arc::new(DashMap::new()),
+            pending_requests: RequestCorrelator::new(),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             server: Arc::new(StdMutex::new(None)),
             purge_until_nanos: Arc::new(AtomicU64::new(0)),
@@ -425,7 +426,7 @@ impl BridgeService {
     }
 
     fn spawn_frame_handler(&self) {
-        let pending_requests = Arc::clone(&self.pending_requests);
+        let pending_requests = self.pending_requests.clone();
         let events_tx = self.events_tx.clone();
         let extension_states = Arc::clone(&self.extension_states);
         let extension_states_tx = self.extension_states_tx.clone();
@@ -453,20 +454,13 @@ impl BridgeService {
                     }
                     FrameKind::Response(resp) => {
                         let id = resp.id;
-                        if let Some((_, sender)) = pending_requests.remove(&id) {
-                            if sender.send(Ok(resp)).is_err() {
-                                tracing::debug!(
-                                    request_id = id,
-                                    "Pending request was dropped before response arrived",
-                                );
-                            }
-                        } else {
-                            tracing::debug!(
-                                request_id = id,
-                                action = %resp.action,
-                                "Received response for unknown request id",
-                            );
-                        }
+                        let action = resp.action.clone();
+                        pending_requests.resolve(id, Ok(resp));
+                        tracing::trace!(
+                            request_id = id,
+                            action = %action,
+                            "Resolved pending request with response",
+                        );
                     }
                     FrameKind::Event(evt) => {
                         if evt.action == EXTENSION_STATE_EVENT {
@@ -492,19 +486,16 @@ impl BridgeService {
                             message = %err.message,
                             "Received error frame from client",
                         );
-                        if let Some((_, sender)) = pending_requests.remove(&id)
-                            && sender.send(Err(err)).is_err()
-                        {
-                            tracing::debug!(
-                                request_id = id,
-                                "Pending request was dropped before error arrived",
-                            );
-                        }
+                        pending_requests.resolve(id, Err(err));
                     }
                     FrameKind::Cancel(cancel) => {
-                        if pending_requests.remove(&cancel.id).is_some() {
-                            tracing::debug!(request_id = cancel.id, "Cancelled pending request");
-                        }
+                        // Drop the pending entry without synthesizing a
+                        // structured error: the waiter wakes with
+                        // `WaitError::SenderDropped`, which `send_request`
+                        // maps to `BridgeError::ChannelClosed` — preserving
+                        // the pre-correlator behaviour.
+                        pending_requests.drop_silently(cancel.id);
+                        tracing::debug!(request_id = cancel.id, "Cancelled pending request");
                     }
                     FrameKind::Register(_) => {
                         tracing::warn!(app_pid, "Received Register frame outside the handshake",);
@@ -817,8 +808,9 @@ impl BridgeService {
         payload: Option<Payload>,
     ) -> Result<ResponseFrame, BridgeError> {
         let request_id = self.request_id_counter.fetch_add(1, Ordering::Relaxed);
-        let (tx, rx) = oneshot::channel();
-        self.pending_requests.insert(request_id, tx);
+        // Drop-guard removes the pending entry on every exit path,
+        // including the early return on send failure and panics.
+        let guard = self.pending_requests.register(request_id);
 
         let request = Frame::from(RequestFrame {
             id: request_id,
@@ -828,24 +820,18 @@ impl BridgeService {
 
         tracing::debug!(app_pid, request_id, action, "Sending bridge request");
 
-        if let Err(err) = self.send_to_client(app_pid, request).await {
-            self.pending_requests.remove(&request_id);
-            return Err(err);
-        }
+        self.send_to_client(app_pid, request).await?;
 
-        match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
-            Ok(Ok(Ok(resp))) => Ok(resp),
-            Ok(Ok(Err(err))) => Err(BridgeError::Client {
+        match guard.wait(DEFAULT_REQUEST_TIMEOUT).await {
+            Ok(Ok(resp)) => Ok(resp),
+            Ok(Err(err)) => Err(BridgeError::Client {
                 code: err.code,
                 message: err.message,
                 details: err.details,
             }),
-            Ok(Err(_)) => {
-                self.pending_requests.remove(&request_id);
-                Err(BridgeError::ChannelClosed)
-            }
-            Err(_) => {
-                self.pending_requests.remove(&request_id);
+            Err(WaitError::SenderDropped) => Err(BridgeError::ChannelClosed),
+            Err(WaitError::Cancelled) => Err(BridgeError::ChannelClosed),
+            Err(WaitError::Timeout) => {
                 let cancel = Frame::from(CancelFrame { id: request_id });
                 if let Err(err) = self.send_to_client(app_pid, cancel).await {
                     tracing::debug!(

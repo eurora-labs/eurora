@@ -13,6 +13,7 @@ mod docs;
 mod signature;
 mod source;
 mod tool;
+mod wire_mirror;
 
 use proc_macro::TokenStream;
 
@@ -114,4 +115,52 @@ pub fn adapter(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn tool(attr: TokenStream, item: TokenStream) -> TokenStream {
     tool::expand(attr.into(), item.into()).into()
+}
+
+/// Derive bidirectional `From` impls between a framework error enum (uses
+/// `Cow<'static, str>`, may carry `#[source]` causes) and its wire-side
+/// counterpart (`String` everywhere, source dropped).
+///
+/// The wire enum is **user-maintained**. The derive only generates the
+/// conversions, so adding a variant to either side without adding it to the
+/// other surfaces as a compile-time match-incompleteness error in the
+/// generated arms — drift is caught at the next `cargo check`.
+///
+/// Container attribute syntax:
+///
+/// ```ignore
+/// #[derive(WireMirror)]
+/// #[wire_mirror(
+///     target = "::thread_core::ToolErrorWire",
+///     catch_all = "Adapter",
+///     catch_all_message = "unsupported tool error variant: {variant:?}",
+/// )]
+/// pub enum ToolError { ... }
+/// ```
+///
+/// - `target` — required path to the wire enum.
+/// - `catch_all` — optional; the source variant absorbing unknown wire
+///   variants when the target is `#[non_exhaustive]`. Must be a named-field
+///   variant with `message: Cow<'static, str>` and `source: Option<_>`.
+/// - `catch_all_message` — required if `catch_all` is set. Format string
+///   passed to `format!`; `{variant:?}` interpolates the unknown wire
+///   variant's `Debug`.
+///
+/// Field attribute:
+/// - `#[wire_mirror(skip)]` — field present on the framework side only.
+///   Dropped in the forward conversion; rebuilt with `Default::default()`
+///   in the reverse conversion. Use on `#[source]` boxed causes that can't
+///   round-trip through serde.
+///
+/// Field rewrites: every `Cow<'static, str>` field is converted via
+/// `into_owned()` (forward) and `Cow::Owned(...)` (reverse). All other
+/// types are passed through unchanged.
+///
+/// Tuple variants are intentionally unsupported — convert to named-field
+/// variants first, so the conversion arms stay readable.
+#[proc_macro_derive(WireMirror, attributes(wire_mirror))]
+pub fn wire_mirror(input: TokenStream) -> TokenStream {
+    wire_mirror::expand(input.into())
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
 }

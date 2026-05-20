@@ -106,7 +106,7 @@ fn call(name: &'static str, args: serde_json::Value, origin: Origin) -> Incoming
         call_id: 1,
         descriptor_name: name,
         arguments: args,
-        origin,
+        origin: std::sync::Arc::new(origin),
         cancel: CancellationToken::new(),
     }
 }

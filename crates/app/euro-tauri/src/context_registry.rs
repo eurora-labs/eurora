@@ -137,7 +137,7 @@ pub fn apply_event(
                 });
             }
             let payload: ActivatePayload = decode_payload(&frame.action, frame.payload.as_ref())?;
-            let origin = stamp_routing_pid(payload.origin, app_pid);
+            let origin = std::sync::Arc::new(stamp_routing_pid(payload.origin, app_pid));
             registry.activate(ActiveContext {
                 key: payload.key,
                 activated_at: Utc::now(),
@@ -286,7 +286,7 @@ mod tests {
         assert_eq!(snapshot.len(), 1);
         let entry = &snapshot[0];
         assert_eq!(entry.key, "youtube::watch_page");
-        match &entry.origin {
+        match entry.origin.as_ref() {
             Origin::Browser(b) => {
                 assert_eq!(b.process_id, TEST_APP_PID);
                 assert_eq!(b.tab_id, 19);
@@ -326,7 +326,7 @@ mod tests {
         )
         .expect("apply");
 
-        match &registry.snapshot()[0].origin {
+        match registry.snapshot()[0].origin.as_ref() {
             Origin::Browser(b) => assert_eq!(b.process_id, TEST_APP_PID),
             other => panic!("expected Browser origin, got {other:?}"),
         }
@@ -490,7 +490,7 @@ mod tests {
         assert_eq!(snapshot.len(), 1);
         let entry = &snapshot[0];
         assert_eq!(entry.data["video_id"], json!("def456"));
-        match &entry.origin {
+        match entry.origin.as_ref() {
             Origin::Browser(b) => {
                 assert_eq!(b.process_id, new_pid);
                 assert_eq!(b.tab_id, 22);

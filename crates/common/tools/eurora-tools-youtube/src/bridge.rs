@@ -1,25 +1,31 @@
-//! Client-side YouTube adapter bound to `euro-bridge`.
+//! Bridge-backed [`YoutubeAdapter`] implementation.
 //!
 //! Each method on [`YoutubeBridgeImpl`] translates one
-//! [`YoutubeAdapter`] call into a [`BridgeService::send_request`] round
-//! trip, targeting the browser process identified by the frozen
-//! [`BrowserOrigin`] from the per-turn snapshot. The browser extension
-//! satisfies the request via the matching action constant
-//! ([`YOUTUBE_GET_CURRENT_TIMESTAMP`], …) and the response payload is
-//! decoded into the typed return.
+//! [`YoutubeAdapter`] call into a
+//! [`euro_bridge::BridgeService::send_request`] round trip, targeting the
+//! browser process identified by the frozen [`BrowserOrigin`] from the
+//! per-turn snapshot. The browser extension satisfies the request via the
+//! matching action constant ([`YOUTUBE_GET_CURRENT_TIMESTAMP`], …) and
+//! the response payload is decoded into the typed return.
 //!
-//! Errors are funnelled through [`map_bridge_err`] so transport
-//! failures, timeouts, and remote errors land in the right
-//! [`ToolError`] variant without leaking bridge-protocol types into the
-//! framework.
+//! Errors are funnelled through [`map_bridge_err`] so transport failures,
+//! timeouts, and remote errors land in the right [`ToolError`] variant
+//! without leaking bridge-protocol types into the framework.
+//!
+//! This module is gated behind the crate's `bridge` feature so non-desktop
+//! consumers (the agent loop, codegen utilities) don't pull
+//! [`euro_bridge`] and its transitive dependencies.
+
+use std::borrow::Cow;
 
 use euro_bridge::BridgeService;
 use euro_bridge_protocol::{BridgeError, Payload};
 use eurora_tools::{BrowserOrigin, Empty, ToolError};
-use eurora_tools_youtube::{CapturedFrame, CurrentTimestamp, Transcript, YoutubeAdapter};
 use serde::de::DeserializeOwned;
 use serde_json::json;
-use std::borrow::Cow;
+
+use crate::adapter::YoutubeAdapter;
+use crate::types::{CapturedFrame, CurrentTimestamp, Transcript};
 
 /// Bridge action emitted for `browser::youtube::get_current_timestamp`.
 pub const YOUTUBE_GET_CURRENT_TIMESTAMP: &str = "YOUTUBE_GET_CURRENT_TIMESTAMP";
@@ -40,6 +46,11 @@ const FRAME_TOOL: &str = "browser::youtube::get_current_frame";
 
 /// Wrapper that fulfils every [`YoutubeAdapter`] method by hitting the
 /// browser process registered with [`BridgeService`].
+///
+/// Constructed once per process from
+/// [`BridgeService::get_or_init`](euro_bridge::BridgeService::get_or_init).
+/// The `'static` reference matches that initializer's return type so the
+/// struct is cheaply `Clone`-able and trivially sharable across threads.
 pub struct YoutubeBridgeImpl {
     bridge: &'static BridgeService,
 }
@@ -135,7 +146,9 @@ fn map_bridge_err(tool: &'static str, err: BridgeError) -> ToolError {
             reason: Cow::Borrowed("browser bridge client disconnected"),
         },
         BridgeError::Timeout => ToolError::Timeout,
-        BridgeError::ChannelClosed => ToolError::Transport(Cow::Borrowed("bridge channel closed")),
+        BridgeError::ChannelClosed => ToolError::Transport {
+            message: Cow::Borrowed("bridge channel closed"),
+        },
         BridgeError::Client {
             code: CLIENT_CODE_TAB_GONE,
             ..
@@ -152,7 +165,9 @@ fn map_bridge_err(tool: &'static str, err: BridgeError) -> ToolError {
             message,
             details: details.and_then(|p| p.deserialize().ok()),
         },
-        other => ToolError::Transport(other.to_string().into()),
+        other => ToolError::Transport {
+            message: other.to_string().into(),
+        },
     }
 }
 
@@ -183,7 +198,7 @@ mod tests {
     #[test]
     fn map_bridge_err_channel_closed_is_transport() {
         match map_bridge_err(FRAME_TOOL, BridgeError::ChannelClosed) {
-            ToolError::Transport(msg) => assert!(msg.contains("channel closed")),
+            ToolError::Transport { message } => assert!(message.contains("channel closed")),
             other => panic!("expected Transport, got {other:?}"),
         }
     }
@@ -211,12 +226,6 @@ mod tests {
             other => panic!("expected Remote, got {other:?}"),
         }
     }
-
-    /// `Payload::from_value(&"...")` always produces a structurally valid
-    /// JSON fragment, so we cannot exercise the "garbled details" case at
-    /// this layer any more — `BridgeError::Client.details` is now typed.
-    /// `decode_payload`'s malformed-input coverage already pins the
-    /// behaviour on the consumer side; nothing else needs to change here.
 
     #[test]
     fn map_bridge_err_client_code_410_is_context_unavailable() {
@@ -268,9 +277,6 @@ mod tests {
 
     #[test]
     fn decode_payload_malformed_json_preserves_serde_source() {
-        // Build a syntactically valid JSON payload that doesn't match
-        // the target type; the serde error must propagate as the
-        // `Decode.source`.
         let payload = Payload::from_value(&json!({"unexpected": "shape"})).unwrap();
         let err: ToolError =
             decode_payload::<CurrentTimestamp>(TIMESTAMP_TOOL, Some(payload)).unwrap_err();

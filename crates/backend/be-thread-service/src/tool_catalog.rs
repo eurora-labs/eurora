@@ -17,7 +17,7 @@
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use agent_chain::{BaseTool, SystemMessage, language_models::ToolLike};
 use serde_json::Value;
@@ -54,9 +54,15 @@ pub enum CatalogBuildError {
 /// The catalog is then held in an `Arc` and shared between
 /// [`crate::agent_loop::run_agent_loop`] and the LLM-binding code that
 /// constructs the `ToolLike` list.
-#[derive(Clone, Default)]
+///
+/// [`Self::tool_likes`] is memoized via [`OnceLock`]: the first caller
+/// builds the `Arc<[ToolLike]>`; subsequent callers (initial bind in
+/// `llm::context`, forced-synthesis rebind in `agent_loop`) cheaply
+/// clone the `Arc`.
+#[derive(Default)]
 pub struct TurnCatalog {
     entries: HashMap<String, TurnEntry>,
+    tool_likes_cache: OnceLock<Arc<[ToolLike]>>,
 }
 
 impl std::fmt::Debug for TurnCatalog {
@@ -122,7 +128,10 @@ impl TurnCatalog {
             entries.insert(name, TurnEntry::Remote { descriptor });
         }
 
-        Ok(Self { entries })
+        Ok(Self {
+            entries,
+            tool_likes_cache: OnceLock::new(),
+        })
     }
 
     /// Look up an entry by fully-qualified tool name. Returns `None` for
@@ -135,16 +144,24 @@ impl TurnCatalog {
     /// chat model can invoke them through `BaseTool`; remote entries become
     /// [`ToolLike::Definition`] so the LLM sees them in the function-tool
     /// list without being able to invoke them locally.
-    pub fn tool_likes(&self) -> Vec<ToolLike> {
-        self.entries
-            .values()
-            .map(|entry| match entry {
-                TurnEntry::ServerLocal { tool } => ToolLike::Tool(tool.clone()),
-                TurnEntry::Remote { descriptor } => {
-                    ToolLike::Definition(descriptor.definition.clone())
-                }
-            })
-            .collect()
+    ///
+    /// The first call materializes the `Vec` and stores it as an
+    /// `Arc<[ToolLike]>` in [`Self::tool_likes_cache`]; subsequent calls
+    /// (initial LLM bind in `llm::context` + forced-synthesis rebind in
+    /// `agent_loop`) cheaply clone the `Arc`.
+    pub fn tool_likes(&self) -> Arc<[ToolLike]> {
+        Arc::clone(self.tool_likes_cache.get_or_init(|| {
+            self.entries
+                .values()
+                .map(|entry| match entry {
+                    TurnEntry::ServerLocal { tool } => ToolLike::Tool(tool.clone()),
+                    TurnEntry::Remote { descriptor } => {
+                        ToolLike::Definition(descriptor.definition.clone())
+                    }
+                })
+                .collect::<Vec<_>>()
+                .into()
+        }))
     }
 
     /// Number of entries — useful for the "skip LLM tool binding when
@@ -418,6 +435,26 @@ mod tests {
         let likes = catalog.tool_likes();
         assert_eq!(likes.len(), 1);
         assert!(matches!(&likes[0], ToolLike::Tool(_)));
+    }
+
+    /// The first call builds the vector and caches it; the second call
+    /// returns the same `Arc`, so the agent-loop forced-synthesis rebind
+    /// pays no rebuild cost. Pin pointer-equality to lock the cache.
+    #[test]
+    fn tool_likes_is_memoized_across_calls() {
+        let catalog = TurnCatalog::build(
+            [NamedTool::arc("firecrawl_search")],
+            [remote_descriptor("browser::dup", &[])],
+            &[],
+        )
+        .unwrap();
+        let a = catalog.tool_likes();
+        let b = catalog.tool_likes();
+        assert!(
+            Arc::ptr_eq(&a, &b),
+            "tool_likes() must return the same Arc on repeat calls",
+        );
+        assert_eq!(a.len(), 2);
     }
 
     #[test]
