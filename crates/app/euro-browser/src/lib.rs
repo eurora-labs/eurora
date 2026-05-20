@@ -51,6 +51,7 @@ pub fn type_collection() -> specta::Types {
         .register_mut::<NativeArticleSnapshot>()
         .register_mut::<NativeMetadata>()
         .register_mut::<NativeYoutubeAsset>()
+        .register_mut::<NativeTranscriptLine>()
         .register_mut::<NativeYoutubeSnapshot>()
         .register_mut::<NativeTwitterAsset>()
         .register_mut::<NativeTwitterTweet>()

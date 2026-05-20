@@ -102,13 +102,17 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	private async generateVideoAsset(): Promise<any> {
 		try {
 			const currentTime = this.getCurrentVideoTime();
-			const transcript = await this.fetchTranscript();
+			const fetched = await this.fetchTranscript();
 
 			const reportData: NativeYoutubeAsset = {
 				url: window.location.href,
 				title: document.title,
-				transcript: JSON.stringify(transcript),
-				current_time: Math.round(currentTime),
+				transcript: fetched.snippets.map((s) => ({
+					text: s.text,
+					start: s.start,
+					duration: s.duration,
+				})),
+				current_time: currentTime,
 			};
 
 			return { kind: 'NativeYoutubeAsset', data: reportData };
