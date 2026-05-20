@@ -1,3 +1,4 @@
+use eurora_tools_youtube::CapturedFrame;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -21,6 +22,12 @@ pub struct NativeImage {
 /// exchanges with the desktop bridge. Externally tagged on `kind` with
 /// the inner payload under `data` so the JSON shape matches what the
 /// browser extension already constructs.
+///
+/// The YouTube snapshot variant carries an [`eurora_tools_youtube::CapturedFrame`]
+/// — the single canonical YouTube-frame shape, also returned by the
+/// `browser::youtube::get_current_frame` tool. The legacy
+/// `NativeYoutubeSnapshot` wrapper was dropped in favour of this unified
+/// type; consumers compose around `CapturedFrame` directly.
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", content = "data")]
@@ -29,7 +36,7 @@ pub enum NativeMessage {
     NativeArticleAsset(NativeArticleAsset),
     NativeTwitterAsset(NativeTwitterAsset),
 
-    NativeYoutubeSnapshot(NativeYoutubeSnapshot),
+    NativeYoutubeSnapshot(CapturedFrame),
     NativeArticleSnapshot(NativeArticleSnapshot),
 
     NativeMetadata(NativeMetadata),

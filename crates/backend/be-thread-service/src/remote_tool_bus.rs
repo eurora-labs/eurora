@@ -2,11 +2,11 @@
 //!
 //! Each chat turn owns one [`ChatRemoteBus`]: it allocates correlation ids,
 //! emits [`ChatServerMessage::ToolRequest`] frames on the per-turn outbound
-//! channel, parks the calling task on a oneshot, and races the response
-//! against the descriptor-supplied timeout and the chat-level cancellation
-//! token.
+//! channel, parks the calling task on a oneshot via
+//! [`request_correlator::RequestCorrelator`], and races the response against
+//! the descriptor-supplied timeout and the chat-level cancellation token.
 //!
-//! Inbound [`ChatClientMessage::ToolResponse`] frames land via
+//! Inbound [`thread_core::ChatClientMessage::ToolResponse`] frames land via
 //! [`ChatRemoteBus::resolve`] — the chat handler's reader task forwards
 //! them. Late responses for already-removed call ids are dropped silently:
 //! the bus has already woken the caller with `Timeout` or `Cancelled` and
@@ -16,11 +16,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use dashmap::DashMap;
 use eurora_tools::{RemoteToolBus, ToolError, ToolErrorWire};
+use request_correlator::{RequestCorrelator, WaitError};
 use serde_json::Value;
 use thread_core::{ChatServerMessage, WireToolDescriptor};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 /// Per-turn remote-tool dispatcher backed by the chat WebSocket.
@@ -31,7 +31,7 @@ use tokio_util::sync::CancellationToken;
 /// `ToolResponse` frame arrives.
 pub struct ChatRemoteBus {
     outbound: mpsc::Sender<ChatServerMessage>,
-    pending: DashMap<u32, oneshot::Sender<Result<Value, ToolError>>>,
+    correlator: RequestCorrelator<u32, Value, ToolError>,
     next_call_id: AtomicU32,
     chat_cancel: CancellationToken,
 }
@@ -45,7 +45,7 @@ impl ChatRemoteBus {
     ) -> Arc<Self> {
         Arc::new(Self {
             outbound,
-            pending: DashMap::new(),
+            correlator: RequestCorrelator::new(),
             next_call_id: AtomicU32::new(0),
             chat_cancel,
         })
@@ -57,23 +57,17 @@ impl ChatRemoteBus {
     /// `ChatClientMessage::ToolResponse`. A no-op when no call is pending
     /// under `call_id` (e.g. the call already timed out or was cancelled).
     pub fn resolve(&self, call_id: u32, result: Result<Value, ToolErrorWire>) {
-        if let Some((_, sender)) = self.pending.remove(&call_id) {
-            let _ = sender.send(result.map_err(ToolError::from));
-        }
+        self.correlator
+            .resolve(call_id, result.map_err(ToolError::from));
     }
 
     /// Drop every pending call, waking each waiter with
     /// [`ToolError::Transport`]. Call when the turn ends so no agent-loop
     /// task is left awaiting a oneshot that will never resolve.
     pub fn shutdown(&self) {
-        let pending_ids: Vec<u32> = self.pending.iter().map(|e| *e.key()).collect();
-        for id in pending_ids {
-            if let Some((_, sender)) = self.pending.remove(&id) {
-                let _ = sender.send(Err(ToolError::Transport(
-                    "turn ended before tool response arrived".into(),
-                )));
-            }
-        }
+        self.correlator.shutdown_with(|_| ToolError::Transport {
+            message: "turn ended before tool response arrived".into(),
+        });
     }
 }
 
@@ -84,13 +78,7 @@ impl RemoteToolBus for ChatRemoteBus {
         arguments: Value,
     ) -> Result<Value, ToolError> {
         let call_id = self.next_call_id.fetch_add(1, Ordering::Relaxed);
-        let (tx, rx) = oneshot::channel();
-        self.pending.insert(call_id, tx);
-        // SAFETY: this guard removes the pending entry on every exit path
-        // (success, error, panic). Every place that previously called
-        // `self.pending.remove(&call_id)` is now redundant — the guard fires
-        // when it goes out of scope below.
-        let _guard = PendingGuard::new(&self.pending, call_id);
+        let guard = self.correlator.register(call_id);
 
         let request = ChatServerMessage::ToolRequest {
             call_id,
@@ -98,30 +86,25 @@ impl RemoteToolBus for ChatRemoteBus {
             arguments,
         };
         if self.outbound.send(request).await.is_err() {
-            return Err(ToolError::Transport(
-                "chat outbound channel closed before ToolRequest sent".into(),
-            ));
+            return Err(ToolError::Transport {
+                message: "chat outbound channel closed before ToolRequest sent".into(),
+            });
         }
 
         let timeout = Duration::from_millis(descriptor.timeout_ms.into());
-        let outcome = tokio::select! {
-            biased;
-            () = self.chat_cancel.cancelled() => {
-                self.send_cancel(call_id).await;
-                return Err(ToolError::Cancelled);
-            }
-            () = tokio::time::sleep(timeout) => {
-                self.send_cancel(call_id).await;
-                return Err(ToolError::Timeout);
-            }
-            res = rx => res,
-        };
-
-        match outcome {
+        match guard.wait_cancellable(timeout, &self.chat_cancel).await {
             Ok(result) => result,
-            Err(_) => Err(ToolError::Transport(
-                "tool response channel dropped before result arrived".into(),
-            )),
+            Err(WaitError::Cancelled) => {
+                self.send_cancel(call_id).await;
+                Err(ToolError::Cancelled)
+            }
+            Err(WaitError::Timeout) => {
+                self.send_cancel(call_id).await;
+                Err(ToolError::Timeout)
+            }
+            Err(WaitError::SenderDropped) => Err(ToolError::Transport {
+                message: "tool response channel dropped before result arrived".into(),
+            }),
         }
     }
 }
@@ -139,30 +122,6 @@ impl ChatRemoteBus {
                 "chat outbound channel closed before ToolCancel could be emitted"
             );
         }
-    }
-}
-
-/// Drop guard that removes a pending call's oneshot sender on every exit
-/// path of [`ChatRemoteBus::call`] — including panics. Centralising the
-/// removal here means each error arm only handles its own side-effect
-/// (e.g. emitting `ToolCancel`) and never has to remember the map cleanup.
-struct PendingGuard<'a> {
-    pending: &'a DashMap<u32, oneshot::Sender<Result<Value, ToolError>>>,
-    call_id: u32,
-}
-
-impl<'a> PendingGuard<'a> {
-    fn new(
-        pending: &'a DashMap<u32, oneshot::Sender<Result<Value, ToolError>>>,
-        call_id: u32,
-    ) -> Self {
-        Self { pending, call_id }
-    }
-}
-
-impl Drop for PendingGuard<'_> {
-    fn drop(&mut self) {
-        self.pending.remove(&self.call_id);
     }
 }
 
@@ -284,7 +243,7 @@ mod tests {
         let descriptor = sample_descriptor(5_000);
         let err = bus.call(&descriptor, json!({})).await.unwrap_err();
         match err {
-            ToolError::Transport(msg) => {
+            ToolError::Transport { message: msg } => {
                 assert!(msg.contains("chat outbound channel closed"), "{msg}");
             }
             other => panic!("expected Transport, got {other:?}"),
@@ -305,7 +264,7 @@ mod tests {
         bus.shutdown();
         let err = handle.await.expect("task didn't panic").unwrap_err();
         match err {
-            ToolError::Transport(msg) => assert!(msg.contains("turn ended"), "{msg}"),
+            ToolError::Transport { message: msg } => assert!(msg.contains("turn ended"), "{msg}"),
             other => panic!("expected Transport, got {other:?}"),
         }
     }

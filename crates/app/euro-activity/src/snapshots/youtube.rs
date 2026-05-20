@@ -1,18 +1,24 @@
 use agent_chain_core::messages::{
     ContentBlock, ContentBlocks, ImageContentBlock, PlainTextContentBlock,
 };
-use euro_browser::types::NativeYoutubeSnapshot;
+use eurora_tools_youtube::CapturedFrame;
 use serde::{Deserialize, Serialize};
 
 use crate::{error::ActivityError, types::SnapshotFunctionality};
 
+/// Activity-pipeline view of one captured YouTube frame.
+///
+/// Wraps [`CapturedFrame`] (the same shape returned by the
+/// `browser::youtube::get_current_frame` tool) with the per-snapshot
+/// activity metadata (timestamps, optional video metadata) the
+/// timeline needs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YoutubeSnapshot {
     pub id: String,
-    pub current_time: f32,
+    pub current_time: f64,
     #[serde(skip_serializing)]
     pub video_frame: Option<String>,
-    pub video_duration: Option<f32>,
+    pub video_duration: Option<f64>,
     pub video_title: Option<String>,
     pub video_url: Option<String>,
     pub created_at: u64,
@@ -23,8 +29,8 @@ impl YoutubeSnapshot {
     pub fn new(
         id: Option<String>,
         video_frame: Option<String>,
-        current_time: f32,
-        video_duration: Option<f32>,
+        current_time: f64,
+        video_duration: Option<f64>,
         video_title: Option<String>,
         video_url: Option<String>,
     ) -> Self {
@@ -43,13 +49,13 @@ impl YoutubeSnapshot {
         }
     }
 
-    pub fn try_from(snapshot: NativeYoutubeSnapshot) -> Result<Self, ActivityError> {
+    pub fn try_from(frame: CapturedFrame) -> Result<Self, ActivityError> {
         let now = chrono::Utc::now().timestamp() as u64;
 
         Ok(YoutubeSnapshot {
             id: uuid::Uuid::new_v4().to_string(),
-            video_frame: Some(snapshot.video_frame_base64),
-            current_time: snapshot.current_time,
+            video_frame: Some(frame.image_base64),
+            current_time: frame.current_time,
             video_duration: None,
             video_title: None,
             video_url: None,
@@ -58,7 +64,7 @@ impl YoutubeSnapshot {
         })
     }
 
-    pub fn get_progress_percentage(&self) -> Option<f32> {
+    pub fn get_progress_percentage(&self) -> Option<f64> {
         self.video_duration.map(|duration| {
             if duration > 0.0 {
                 (self.current_time / duration).clamp(0.0, 1.0)
@@ -143,9 +149,8 @@ impl SnapshotFunctionality for YoutubeSnapshot {
     }
 }
 
-impl From<NativeYoutubeSnapshot> for YoutubeSnapshot {
-    fn from(snapshot: NativeYoutubeSnapshot) -> Self {
-        Self::try_from(snapshot)
-            .expect("Failed to convert NativeYoutubeSnapshot to YoutubeSnapshot")
+impl From<CapturedFrame> for YoutubeSnapshot {
+    fn from(frame: CapturedFrame) -> Self {
+        Self::try_from(frame).expect("Failed to convert CapturedFrame to YoutubeSnapshot")
     }
 }

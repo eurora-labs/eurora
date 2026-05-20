@@ -16,7 +16,14 @@
 //! `YoutubeBridgeImpl` (Phase 8 of the plan).
 
 mod adapter;
+#[cfg(feature = "bridge")]
+mod bridge;
 mod types;
 
 pub use adapter::{YOUTUBE_DESCRIPTORS, YoutubeAdapter, YoutubeAdapterLocal, YoutubeDispatcher};
+#[cfg(feature = "bridge")]
+pub use bridge::{
+    YOUTUBE_GET_CURRENT_FRAME, YOUTUBE_GET_CURRENT_TIMESTAMP, YOUTUBE_GET_TRANSCRIPT,
+    YoutubeBridgeImpl,
+};
 pub use types::{CapturedFrame, CurrentTimestamp, Transcript, TranscriptEntry};

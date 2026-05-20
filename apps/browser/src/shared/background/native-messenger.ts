@@ -4,6 +4,7 @@ import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
 import { sendMessageWithRetry } from './messaging';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
 import { errorFrame, forwardTabRpc } from './tab-rpc';
+import { type TabStateBus, startTabStateBus } from './tab-state-bus';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
 import type { Frame, Payload, RequestFrame, ResponseFrame } from '../content/bindings';
@@ -12,6 +13,7 @@ declare const __DEV__: boolean;
 const host = __DEV__ ? 'com.eurora.dev' : 'com.eurora.app';
 const connectTimeout = 5000;
 let nativePort: browser.Runtime.Port | null = null;
+let tabBus: TabStateBus | null = null;
 
 export function startNativeMessenger() {
 	connect();
@@ -21,8 +23,11 @@ function connect() {
 	nativePort = browser.runtime.connectNative(host);
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort.onMessage.addListener(onNativePortMessage);
-	initFocusTracker(nativePort);
-	startContextObserver(nativePort);
+	// One bus per connection lifecycle. Both observers subscribe; the
+	// bus owns the underlying `chrome.tabs` / `chrome.windows` listeners.
+	tabBus = startTabStateBus();
+	initFocusTracker(nativePort, tabBus);
+	startContextObserver(nativePort, tabBus);
 	startSafariPoller();
 }
 
@@ -32,6 +37,8 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 
 	destroyFocusTracker();
 	stopContextObserver();
+	tabBus?.stop();
+	tabBus = null;
 	stopSafariPoller();
 	nativePort = null;
 

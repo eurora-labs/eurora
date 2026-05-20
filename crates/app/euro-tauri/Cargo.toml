@@ -45,7 +45,7 @@ euro-settings = { workspace = true, features = ["tls-native-roots"] }
 euro-telemetry = { workspace = true }
 euro-thread = { workspace = true, features = ["tauri"] }
 eurora-tools = { workspace = true }
-eurora-tools-youtube = { workspace = true }
+eurora-tools-youtube = { workspace = true, features = ["bridge"] }
 thread-core = { workspace = true, features = ["specta"] }
 euro-timeline = { workspace = true }
 euro-vision = { workspace = true }

@@ -27,6 +27,8 @@
 //!   tiny in v1 (≤ one entry in practice) so the clone cost is
 //!   irrelevant.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde_json::Value;
@@ -52,7 +54,12 @@ pub struct ActiveContext {
     pub data: Value,
     /// Routing target the dispatcher will use when this context is
     /// captured in a [`TurnState`](crate). Never serialized.
-    pub origin: Origin,
+    ///
+    /// Stored in an `Arc` so the per-turn snapshot can hand the same
+    /// origin to every `IncomingCall` without deep-cloning the inner
+    /// `BrowserOrigin::page_url` (and similar string-heavy fields) per
+    /// tool call.
+    pub origin: Arc<Origin>,
 }
 
 /// Thread-safe registry of currently-active contexts on the client.
@@ -115,13 +122,13 @@ mod tests {
     use crate::origin::BrowserOrigin;
     use serde_json::json;
 
-    fn sample_origin() -> Origin {
-        Origin::Browser(BrowserOrigin {
+    fn sample_origin() -> Arc<Origin> {
+        Arc::new(Origin::Browser(BrowserOrigin {
             process_id: 4242,
             tab_id: 19,
             window_id: Some("win-0".into()),
             page_url: "https://www.youtube.com/watch?v=abc123".into(),
-        })
+        }))
     }
 
     fn sample_context(at: DateTime<Utc>) -> ActiveContext {

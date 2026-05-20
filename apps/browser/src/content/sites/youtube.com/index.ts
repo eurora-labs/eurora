@@ -8,36 +8,11 @@ import {
 import browser from 'webextension-polyfill';
 import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
 import type {
+	CapturedFrame,
+	CurrentTimestamp,
 	NativeYoutubeAsset,
-	NativeYoutubeSnapshot,
-	TranscriptEntry,
+	Transcript,
 } from '../../../shared/content/bindings';
-
-/// Mirrors `eurora_tools_youtube::types::CurrentTimestamp`. The bridge
-/// dispatcher decodes this shape verbatim — keep the field names and
-/// types in sync with the Rust struct.
-interface CurrentTimestampPayload {
-	video_id: string;
-	current_time: number;
-	duration: number;
-	playing: boolean;
-}
-
-/// Mirrors `eurora_tools_youtube::types::Transcript`.
-interface TranscriptPayload {
-	video_id: string;
-	language: string;
-	entries: TranscriptEntry[];
-}
-
-/// Mirrors `eurora_tools_youtube::types::CapturedFrame`.
-interface CapturedFramePayload {
-	video_id: string;
-	current_time: number;
-	width: number;
-	height: number;
-	image_base64: string;
-}
 
 /// Raw frame capture without the per-call envelope. Used internally by
 /// both `handleGetCurrentFrame` (tool path) and `handleGenerateSnapshot`
@@ -119,23 +94,20 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		_obj: YoutubeBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		const player = this.requirePlayer();
-		const frame = this.captureFrame(player);
-		const reportData: NativeYoutubeSnapshot = {
-			current_time: Math.round(player.currentTime),
-			video_frame_base64: frame.image_base64,
-			video_frame_width: frame.width,
-			video_frame_height: frame.height,
-		};
+		// The activity-pipeline snapshot now ships the canonical
+		// `CapturedFrame` shape — same as the
+		// `browser::youtube::get_current_frame` tool — so there's a single
+		// representation of "a YouTube frame at a moment in time" across
+		// the bridge.
+		const reportData: CapturedFrame = await this.handleGetCurrentFrame();
 		return { kind: 'NativeYoutubeSnapshot', data: reportData };
 	}
 
-	/// Return the current playback state. Mirrors
-	/// `eurora_tools_youtube::YoutubeAdapter::get_current_timestamp`.
-	/// Throws if the page has no `<video>` element ready yet — the bridge
-	/// catches that and returns it as a content-script error (HTTP 500
-	/// in the bridge contract), not a tab-gone signal.
-	public async handleGetCurrentTimestamp(): Promise<CurrentTimestampPayload> {
+	/// Return the current playback state. Throws if the page has no
+	/// `<video>` element ready yet — the bridge catches that and returns
+	/// it as a content-script error (HTTP 500 in the bridge contract),
+	/// not a tab-gone signal.
+	public async handleGetCurrentTimestamp(): Promise<CurrentTimestamp> {
 		const videoId = requireCurrentVideoId();
 		const player = this.requirePlayer();
 		return {
@@ -146,12 +118,10 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		};
 	}
 
-	/// Return the active video's transcript. Mirrors
-	/// `eurora_tools_youtube::YoutubeAdapter::get_transcript`. The
-	/// language tag comes from YouTube's caption metadata — for
-	/// auto-generated tracks this is the ASR language, for manual tracks
-	/// the author-specified locale.
-	public async handleGetTranscript(): Promise<TranscriptPayload> {
+	/// Return the active video's transcript. The language tag comes from
+	/// YouTube's caption metadata — for auto-generated tracks this is the
+	/// ASR language, for manual tracks the author-specified locale.
+	public async handleGetTranscript(): Promise<Transcript> {
 		const fetched = await this.fetchTranscript();
 		return {
 			video_id: fetched.videoId,
@@ -164,9 +134,8 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		};
 	}
 
-	/// Capture the visible video frame as PNG. Mirrors
-	/// `eurora_tools_youtube::YoutubeAdapter::get_current_frame`.
-	public async handleGetCurrentFrame(): Promise<CapturedFramePayload> {
+	/// Capture the visible video frame as PNG.
+	public async handleGetCurrentFrame(): Promise<CapturedFrame> {
 		const videoId = requireCurrentVideoId();
 		const player = this.requirePlayer();
 		const frame = this.captureFrame(player);

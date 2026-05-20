@@ -28,9 +28,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use eurora_tools::{
-    ActiveContext, Catalog, ContextRegistry, IncomingCall, Origin, ToolDescriptor, ToolError,
-};
+use eurora_tools::{ActiveContext, Catalog, ContextRegistry, IncomingCall, Origin, ToolError};
 use serde_json::Value;
 use thread_core::{
     CapabilityUpdatePayload, ChatClientMessage, ChatSendRequest, ChatServerMessage,
@@ -130,16 +128,26 @@ impl ChatBridge {
         sink: &S,
     ) -> Result<()> {
         let snapshot = self.contexts.snapshot();
-        let descriptors = descriptors_for(&self.catalog, &snapshot);
+        let wire_descriptors = wire_descriptors_for(&self.catalog, &snapshot);
 
-        let targets: HashMap<String, Origin> = snapshot
+        // `ActiveContext.origin` is already `Arc<Origin>`; we hand each
+        // target out to every `IncomingCall` for this turn via cheap
+        // `Arc::clone`.
+        let targets: HashMap<String, Arc<Origin>> = snapshot
             .iter()
-            .map(|c| (c.key.clone(), c.origin.clone()))
+            .map(|c| (c.key.clone(), Arc::clone(&c.origin)))
             .collect();
-        let capabilities: HashSet<String> = descriptors.iter().map(|d| d.name.to_owned()).collect();
+        let capabilities: HashSet<String> = wire_descriptors
+            .iter()
+            .map(|d| d.definition.name.clone())
+            .collect();
 
+        // The catalog hands us `Arc<WireToolDescriptor>`s built once at
+        // register time; cloning the inner value is now just a few
+        // string/Value clones — the per-turn JSON schema serialization
+        // already happened.
         let wire_tools: Vec<WireToolDescriptor> =
-            descriptors.iter().map(ToolDescriptor::to_wire).collect();
+            wire_descriptors.iter().map(|arc| (**arc).clone()).collect();
         let wire_contexts: Vec<WireActiveContext> = snapshot
             .into_iter()
             .map(|c| WireActiveContext {
@@ -322,8 +330,10 @@ impl ChatBridge {
 }
 
 struct TurnState {
-    /// Frozen per-context routing targets — `context_key → Origin`.
-    targets: HashMap<String, Origin>,
+    /// Frozen per-context routing targets — `context_key → Arc<Origin>`.
+    /// The `Arc` lets every `IncomingCall` for this turn share the same
+    /// origin without deep-cloning the inner variant.
+    targets: HashMap<String, Arc<Origin>>,
     /// Wire names advertised in `CapabilityUpdate` this turn. Used to
     /// reject `ToolRequest` frames the server invents or sends past
     /// the capability surface.
@@ -336,14 +346,23 @@ struct TurnState {
     inflight: Arc<DashMap<u32, CancellationToken>>,
 }
 
-/// Filter the catalog down to the descriptors whose every required
-/// context is currently active.
-fn descriptors_for(catalog: &Catalog, snapshot: &[ActiveContext]) -> Vec<ToolDescriptor> {
+/// Filter the catalog's cached wire descriptors down to those whose
+/// every required context is currently active. The descriptors are
+/// pre-built `Arc<WireToolDescriptor>`s — no per-turn schema
+/// serialization, only an `Arc::clone` per advertised tool.
+fn wire_descriptors_for(
+    catalog: &Catalog,
+    snapshot: &[ActiveContext],
+) -> Vec<Arc<WireToolDescriptor>> {
     let active: HashSet<&str> = snapshot.iter().map(|c| c.key.as_str()).collect();
     catalog
-        .all_descriptors()
+        .all_wire_descriptors()
         .into_iter()
-        .filter(|d| d.required_contexts.iter().all(|c| active.contains(*c)))
+        .filter(|w| {
+            w.required_contexts
+                .iter()
+                .all(|c| active.contains(c.as_str()))
+        })
         .collect()
 }
 
@@ -352,7 +371,7 @@ mod tests {
     use super::*;
     use crate::chat_socket::ChatSocketHarness;
     use chrono::Utc;
-    use eurora_tools::{BrowserOrigin, Dispatcher, Empty, schema_of};
+    use eurora_tools::{BrowserOrigin, Dispatcher, Empty, ToolDescriptor, schema_of};
     use futures::future::BoxFuture;
     use serde_json::json;
     use std::sync::Mutex as StdMutex;
@@ -391,11 +410,25 @@ mod tests {
         seen: Arc<StdMutex<Vec<DispatchObservation>>>,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Clone)]
     struct DispatchObservation {
         descriptor_name: &'static str,
         call_id: u32,
         origin_variant: &'static str,
+        /// `Arc<Origin>` retained so test assertions can verify pointer
+        /// identity across multiple dispatches — the per-turn snapshot
+        /// hands the *same* `Arc<Origin>` to every call.
+        origin_arc: Arc<Origin>,
+    }
+
+    impl std::fmt::Debug for DispatchObservation {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("DispatchObservation")
+                .field("descriptor_name", &self.descriptor_name)
+                .field("call_id", &self.call_id)
+                .field("origin_variant", &self.origin_variant)
+                .finish()
+        }
     }
 
     impl StubDispatcher {
@@ -439,6 +472,7 @@ mod tests {
                     descriptor_name: call.descriptor_name,
                     call_id: call.call_id,
                     origin_variant: call.origin.variant_name(),
+                    origin_arc: Arc::clone(&call.origin),
                 });
                 let _ = call.arguments;
                 if await_cancel {
@@ -456,12 +490,12 @@ mod tests {
             key: "youtube::watch_page".into(),
             activated_at: Utc::now(),
             data: json!({"video_id": "abc123"}),
-            origin: Origin::Browser(BrowserOrigin {
+            origin: Arc::new(Origin::Browser(BrowserOrigin {
                 process_id: 4242,
                 tab_id: 19,
                 window_id: Some("win-0".into()),
                 page_url: "https://www.youtube.com/watch?v=abc123".into(),
-            }),
+            })),
         });
         Arc::new(registry)
     }
@@ -677,6 +711,71 @@ mod tests {
         assert_eq!(observations[0].descriptor_name, TIMESTAMP_TOOL);
         assert_eq!(observations[0].call_id, 7);
         assert_eq!(observations[0].origin_variant, "Browser");
+
+        harness
+            .server_to_client
+            .send(Ok(ChatServerMessage::Final {
+                messages: Vec::new(),
+            }))
+            .unwrap();
+        run.await.unwrap().expect("turn completes");
+    }
+
+    /// The per-turn `TurnState.targets` is built once and hands the
+    /// same `Arc<Origin>` to every `IncomingCall` for that turn — no
+    /// deep clones per tool call. Pin pointer-identity across two
+    /// sequential dispatches.
+    #[tokio::test(flavor = "current_thread")]
+    async fn dispatches_in_a_turn_share_the_same_origin_arc() {
+        let stub = StubDispatcher::new(json!({"ok": true}));
+        let bridge = ChatBridge::new(registry_with_youtube_context(), catalog_with(stub.clone()));
+
+        let (socket, mut harness) = ChatSocket::test_pair();
+        let (sink, _captured) = collecting_sink();
+        let cancel = CancellationToken::new();
+
+        let run = tokio::spawn(async move {
+            bridge
+                .run_turn(
+                    socket,
+                    TurnOpening::Send(ChatSendRequest {
+                        content_blocks: Vec::new(),
+                        parent_message_id: None,
+                        asset_chips_json: None,
+                        activity_id: None,
+                    }),
+                    cancel,
+                    &sink,
+                )
+                .await
+        });
+
+        // CapabilityUpdate + Send.
+        let _ = next_outbound(&mut harness).await;
+        let _ = next_outbound(&mut harness).await;
+
+        for call_id in [10u32, 11] {
+            harness
+                .server_to_client
+                .send(Ok(ChatServerMessage::ToolRequest {
+                    call_id,
+                    descriptor: timestamp_wire_descriptor(),
+                    arguments: json!({}),
+                }))
+                .unwrap();
+            // Drain until the matching ToolResponse arrives.
+            let _ = drain_until(&mut harness, |f| {
+                matches!(f, ChatClientMessage::ToolResponse { .. })
+            })
+            .await;
+        }
+
+        let observations = stub.seen();
+        assert_eq!(observations.len(), 2);
+        assert!(
+            Arc::ptr_eq(&observations[0].origin_arc, &observations[1].origin_arc),
+            "every dispatch in a turn must share the same Arc<Origin>",
+        );
 
         harness
             .server_to_client

@@ -1,8 +1,14 @@
-//! Client-side tool adapter implementations.
+//! Client-side tool adapter wiring.
 //!
-//! Each submodule binds one adapter trait from `eurora-tools-*` to the
-//! transport it actually uses on this client. The [`youtube`] module
-//! routes the YouTube adapter through `euro-bridge`'s native-messaging
-//! channel so the browser extension can satisfy each call.
+//! The actual adapter implementations live in their respective
+//! `eurora-tools-*` crates so non-Tauri consumers (e.g. `euro-activity`)
+//! can use them too. This module is the desktop's entry point for
+//! constructing each adapter against the shared [`BridgeService`] and
+//! handing the resulting dispatcher to the framework's
+//! [`Catalog`](eurora_tools::Catalog).
+//!
+//! Today the only adapter is the YouTube one. Future adapters add a
+//! module here, depend on the corresponding adapter crate with its
+//! `"bridge"` feature, and register a dispatcher in `main.rs`.
 
-pub mod youtube;
+pub use eurora_tools_youtube::YoutubeBridgeImpl;

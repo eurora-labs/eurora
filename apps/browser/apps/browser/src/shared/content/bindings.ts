@@ -4,41 +4,41 @@
  *  by `id`.
  */
 export type CancelFrame = {
-	id: number,
+	id: number;
 };
 
 /**  A single captured frame from the active YouTube video. */
 export type CapturedFrame = {
 	/**  The YouTube video ID the frame was captured from. */
-	video_id: string,
+	video_id: string;
 	/**  Playback position at which the frame was captured, in seconds. */
-	current_time: number | null,
+	current_time: number | null;
 	/**  Decoded frame width in pixels. */
-	width: number,
+	width: number;
 	/**  Decoded frame height in pixels. */
-	height: number,
+	height: number;
 	/**  PNG bytes, base64-encoded (standard alphabet, padded). */
-	image_base64: string,
+	image_base64: string;
 };
 
 /**  Current playback state of the active YouTube video. */
 export type CurrentTimestamp = {
 	/**  The YouTube video ID — the `v=` parameter from the watch URL. */
-	video_id: string,
+	video_id: string;
 	/**  Playback position in seconds, possibly fractional. */
-	current_time: number | null,
+	current_time: number | null;
 	/**  Total video length in seconds, possibly fractional. */
-	duration: number | null,
+	duration: number | null;
 	/**  `true` when the video is playing, `false` when paused. */
-	playing: boolean,
+	playing: boolean;
 };
 
 /**  Failure response correlated with a [`RequestFrame`] by `id`. */
 export type ErrorFrame = {
-	id: number,
-	code: number,
-	message: string,
-	details?: Payload | null,
+	id: number;
+	code: number;
+	message: string;
+	details?: Payload | null;
 };
 
 /**
@@ -46,8 +46,8 @@ export type ErrorFrame = {
  *  activation, Word selection change).
  */
 export type EventFrame = {
-	action: string,
-	payload?: Payload | null,
+	action: string;
+	payload?: Payload | null;
 };
 
 /**
@@ -56,7 +56,7 @@ export type EventFrame = {
  *  payload variant.
  */
 export type Frame = {
-	kind: FrameKind,
+	kind: FrameKind;
 };
 
 /**
@@ -64,27 +64,83 @@ export type Frame = {
  *  `{ "Request": { ... } }` — to match the shape the browser extension
  *  already consumes.
  */
-export type FrameKind = ({ Request: RequestFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Response?: never; Shutdown?: never } | ({ Response: ResponseFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Shutdown?: never } | ({ Event: EventFrame }) & { Cancel?: never; Error?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Error: ErrorFrame }) & { Cancel?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Cancel: CancelFrame }) & { Error?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Register: RegisterFrame }) & { Cancel?: never; Error?: never; Event?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Shutdown: ShutdownFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Response?: never };
+export type FrameKind =
+	| ({ Request: RequestFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Response: ResponseFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Shutdown?: never;
+	  })
+	| ({ Event: EventFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Error: ErrorFrame } & {
+			Cancel?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Cancel: CancelFrame } & {
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Register: RegisterFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Request?: never;
+			Response?: never;
+			Shutdown?: never;
+	  })
+	| ({ Shutdown: ShutdownFrame } & {
+			Cancel?: never;
+			Error?: never;
+			Event?: never;
+			Register?: never;
+			Request?: never;
+			Response?: never;
+	  });
 
 export type NativeArticleAsset = {
-	title: string,
-	url: string,
-	content: string,
-	text_content: string,
-	site_name: string,
-	selected_text: string | null,
-	language: string,
-	excerpt: string,
-	length: number,
+	title: string;
+	url: string;
+	content: string;
+	text_content: string;
+	site_name: string;
+	selected_text: string | null;
+	language: string;
+	excerpt: string;
+	length: number;
 };
 
 export type NativeArticleSnapshot = {
-	highlighted_text: string | null,
+	highlighted_text: string | null;
 };
 
 export type NativeImage = {
-	base64: string,
-	mime_type: string,
+	base64: string;
+	mime_type: string;
 };
 
 /**
@@ -92,44 +148,50 @@ export type NativeImage = {
  *  exchanges with the desktop bridge. Externally tagged on `kind` with
  *  the inner payload under `data` so the JSON shape matches what the
  *  browser extension already constructs.
- * 
+ *
  *  The YouTube snapshot variant carries an [`eurora_tools_youtube::CapturedFrame`]
  *  — the single canonical YouTube-frame shape, also returned by the
  *  `browser::youtube::get_current_frame` tool. The legacy
  *  `NativeYoutubeSnapshot` wrapper was dropped in favour of this unified
  *  type; consumers compose around `CapturedFrame` directly.
  */
-export type NativeMessage = { kind: "NativeYoutubeAsset"; data: NativeYoutubeAsset } | { kind: "NativeArticleAsset"; data: NativeArticleAsset } | { kind: "NativeTwitterAsset"; data: NativeTwitterAsset } | { kind: "NativeYoutubeSnapshot"; data: CapturedFrame } | { kind: "NativeArticleSnapshot"; data: NativeArticleSnapshot } | { kind: "NativeMetadata"; data: NativeMetadata };
+export type NativeMessage =
+	| { kind: 'NativeYoutubeAsset'; data: NativeYoutubeAsset }
+	| { kind: 'NativeArticleAsset'; data: NativeArticleAsset }
+	| { kind: 'NativeTwitterAsset'; data: NativeTwitterAsset }
+	| { kind: 'NativeYoutubeSnapshot'; data: CapturedFrame }
+	| { kind: 'NativeArticleSnapshot'; data: NativeArticleSnapshot }
+	| { kind: 'NativeMetadata'; data: NativeMetadata };
 
 export type NativeMetadata = {
-	url: string | null,
-	icon_base64: string | null,
-	title: string | null,
+	url: string | null;
+	icon_base64: string | null;
+	title: string | null;
 };
 
 export type NativeTwitterAsset = {
-	url: string,
-	title: string,
-	result: ParseResult,
-	timestamp: string,
+	url: string;
+	title: string;
+	result: ParseResult;
+	timestamp: string;
 };
 
 export type NativeTwitterTweet = {
-	text: string,
-	timestamp: string | null,
-	author: string | null,
-	images?: NativeImage[],
+	text: string;
+	timestamp: string | null;
+	author: string | null;
+	images?: NativeImage[];
 };
 
 /**
  *  Activity-capture asset emitted by the browser extension's
  *  `GENERATE_ASSETS` flow on YouTube watch pages.
- * 
+ *
  *  The transcript reuses the canonical [`TranscriptEntry`] from
  *  `eurora-tools-youtube`: extension, native-messaging host, activity
  *  pipeline, and tool dispatchers all encode YouTube transcripts in
  *  exactly one shape (`{start, duration, text}`).
- * 
+ *
  *  Snapshots (the per-frame variant) now go through
  *  [`eurora_tools_youtube::CapturedFrame`] directly — the legacy
  *  `NativeYoutubeSnapshot` wrapper was dropped to eliminate the
@@ -137,25 +199,31 @@ export type NativeTwitterTweet = {
  *  `image_base64`/f64) between the activity-capture and tool-call paths.
  */
 export type NativeYoutubeAsset = {
-	url: string,
-	title: string,
-	transcript: TranscriptEntry[],
-	current_time: number | null,
+	url: string;
+	title: string;
+	transcript: TranscriptEntry[];
+	current_time: number | null;
 };
 
 export type NotificationsData = {
-	tweets: NativeTwitterTweet[],
+	tweets: NativeTwitterTweet[];
 };
 
-export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "profile"; data: ProfilePageData } | { page: "home"; data: TimelineData } | { page: "search"; data: SearchData } | { page: "notifications"; data: NotificationsData } | { page: "unsupported"; data: UnsupportedPageData };
+export type ParseResult =
+	| { page: 'tweet'; data: TweetPageData }
+	| { page: 'profile'; data: ProfilePageData }
+	| { page: 'home'; data: TimelineData }
+	| { page: 'search'; data: SearchData }
+	| { page: 'notifications'; data: NotificationsData }
+	| { page: 'unsupported'; data: UnsupportedPageData };
 
 /**
  *  Inline JSON payload carried by Request/Response/Event frames.
- * 
+ *
  *  Stored as a [`Box<RawValue>`] so the payload's JSON serializes
  *  **inline** into the frame envelope rather than as a JSON-encoded
  *  string. Compared to the historical `Option<String>` shape, this:
- * 
+ *
  *  - halves the wire size for large payloads (e.g. base64-encoded
  *    PNGs) because the outer envelope no longer double-escapes the
  *    inner JSON;
@@ -165,7 +233,7 @@ export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "prof
  *  - typed in Rust as JSON rather than "string of unknown structure",
  *    which means the encode/decode helpers can be centralised here
  *    and call sites stop manually `serde_json::to_string`-ing.
- * 
+ *
  *  Construct via [`Payload::from_value`] for typed Rust data, or
  *  [`Payload::from_raw_json`] when handing through a literal JSON
  *  fragment.
@@ -173,14 +241,14 @@ export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "prof
 export type Payload = unknown;
 
 export type ProfilePageData = {
-	username: string,
-	tweets: NativeTwitterTweet[],
+	username: string;
+	tweets: NativeTwitterTweet[];
 };
 
 /**
  *  Mandatory first frame on every connection. Identifies the host
  *  process (the bridge) and the application process being represented.
- * 
+ *
  *  `app_pid` is the OS PID for clients that have one (browsers via the
  *  native-messaging host, the macOS launcher representing Safari).
  *  Sandboxed clients without access to a real PID — Office.js add-ins
@@ -189,33 +257,33 @@ export type ProfilePageData = {
  *  desktop can locate the client without relying on OS process lookup.
  */
 export type RegisterFrame = {
-	host_pid: number,
-	app_pid: number,
+	host_pid: number;
+	app_pid: number;
 	/**
 	 *  Logical client identifier for non-PID-based integrations.
 	 *  `None` for clients whose `app_pid` corresponds to a real OS
 	 *  process discoverable via process-name lookup.
 	 */
-	app_kind?: string | null,
+	app_kind?: string | null;
 };
 
 /**  Desktop-initiated request to a connected client. */
 export type RequestFrame = {
-	id: number,
-	action: string,
-	payload?: Payload | null,
+	id: number;
+	action: string;
+	payload?: Payload | null;
 };
 
 /**  Client reply to a [`RequestFrame`], correlated by `id`. */
 export type ResponseFrame = {
-	id: number,
-	action: string,
-	payload?: Payload | null,
+	id: number;
+	action: string;
+	payload?: Payload | null;
 };
 
 export type SearchData = {
-	query: string,
-	tweets: NativeTwitterTweet[],
+	query: string;
+	tweets: NativeTwitterTweet[];
 };
 
 /**
@@ -226,38 +294,38 @@ export type SearchData = {
  *  binary. The `reason` is informational only (logged by the recipient).
  */
 export type ShutdownFrame = {
-	reason?: string | null,
+	reason?: string | null;
 };
 
 export type TimelineData = {
-	tweets: NativeTwitterTweet[],
+	tweets: NativeTwitterTweet[];
 };
 
 /**  Full transcript of a YouTube video. */
 export type Transcript = {
 	/**  The YouTube video ID the transcript belongs to. */
-	video_id: string,
+	video_id: string;
 	/**  Caption language as a BCP-47 tag (`"en"`, `"en-US"`, `"de"`, …). */
-	language: string,
+	language: string;
 	/**  Ordered cues; empty for videos with auto-captions disabled. */
-	entries: TranscriptEntry[],
+	entries: TranscriptEntry[];
 };
 
 /**  One cue from a YouTube transcript. */
 export type TranscriptEntry = {
 	/**  Start time of the cue in seconds, relative to the video start. */
-	start: number | null,
+	start: number | null;
 	/**  How long the cue is on screen, in seconds. */
-	duration: number | null,
+	duration: number | null;
 	/**  Cue text as YouTube serves it (HTML-escaped, single-language). */
-	text: string,
+	text: string;
 };
 
 export type TweetPageData = {
-	tweet: NativeTwitterTweet | null,
-	replies: NativeTwitterTweet[],
+	tweet: NativeTwitterTweet | null;
+	replies: NativeTwitterTweet[];
 };
 
 export type UnsupportedPageData = {
-	url: string,
+	url: string;
 };

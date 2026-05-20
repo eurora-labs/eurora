@@ -21,6 +21,7 @@ dashmap = { workspace = true }
 eurora-tools = { workspace = true }
 futures = { workspace = true }
 llm-core = { workspace = true }
+request-correlator = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

@@ -1,4 +1,5 @@
 import browser from 'webextension-polyfill';
+import type { TabChange, TabStateBus } from './tab-state-bus';
 import type { Frame, Payload } from '../content/bindings';
 
 /// The single `ActiveContext.key` this observer manages. Keep in sync
@@ -21,89 +22,63 @@ type WatchPage = {
 
 let active: WatchPage | null = null;
 let nativePort: browser.Runtime.Port | null = null;
+let unsubscribe: (() => void) | null = null;
 
 /// Begin observing focus / URL changes and publishing
 /// `CONTEXT_ACTIVATED` / `CONTEXT_DEACTIVATED` events through `port`.
 ///
-/// Replaces any previous port — the native messenger calls this on
-/// every reconnect, so attach handlers idempotently.
-export function startContextObserver(port: browser.Runtime.Port): void {
+/// The bus owns the underlying `chrome.tabs` / `chrome.windows`
+/// subscriptions — every consumer in the background page shares one
+/// listener set. Replaces any previous registration so the native
+/// messenger can call this on every reconnect idempotently.
+export function startContextObserver(port: browser.Runtime.Port, bus: TabStateBus): void {
+	stopContextObserver();
 	nativePort = port;
-
-	browser.tabs.onActivated.addListener(onTabActivated);
-	browser.tabs.onUpdated.addListener(onTabUpdated);
-	browser.tabs.onRemoved.addListener(onTabRemoved);
-	browser.windows.onFocusChanged.addListener(onWindowFocusChanged);
-
-	resyncFromActiveTab().catch((err) =>
-		console.error('context-observer initial sync failed:', err),
-	);
+	unsubscribe = bus.subscribe(onTabChange);
 }
 
 /// Stop observing and clear local state. Does not emit a deactivation
 /// — caller should do that explicitly before tearing down if it wants
 /// the desktop to drop the entry.
 export function stopContextObserver(): void {
+	if (unsubscribe) {
+		unsubscribe();
+		unsubscribe = null;
+	}
 	nativePort = null;
 	active = null;
-
-	browser.tabs.onActivated.removeListener(onTabActivated);
-	browser.tabs.onUpdated.removeListener(onTabUpdated);
-	browser.tabs.onRemoved.removeListener(onTabRemoved);
-	browser.windows.onFocusChanged.removeListener(onWindowFocusChanged);
 }
 
-async function onTabActivated(_info: browser.Tabs.OnActivatedActiveInfoType): Promise<void> {
-	await resyncFromActiveTab();
-}
-
-async function onTabUpdated(
-	_tabId: number,
-	changeInfo: browser.Tabs.OnUpdatedChangeInfoType,
-	tab: browser.Tabs.Tab,
-): Promise<void> {
-	// Only react when something we actually care about changed. The
-	// `status: 'complete'` arm covers the title settling after a hard
-	// navigation; the `url` arm covers YouTube's SPA navigation between
-	// `/watch?v=…` URLs without a full page load.
-	if (changeInfo.url === undefined && changeInfo.status !== 'complete') return;
-	if (!tab.active) return;
-	await resyncFromActiveTab();
-}
-
-function onTabRemoved(tabId: number): void {
-	if (active && active.tabId === tabId) {
-		emitDeactivated(active);
-		active = null;
+async function onTabChange(change: TabChange): Promise<void> {
+	if (!nativePort) return;
+	if (change.cause === 'removed') {
+		if (active && active.tabId === change.removedTabId) {
+			emitDeactivated(active);
+			active = null;
+		}
+		return;
 	}
-}
-
-async function onWindowFocusChanged(windowId: number): Promise<void> {
-	if (windowId === browser.windows.WINDOW_ID_NONE) {
-		// The browser lost focus entirely. The user's attention is
-		// elsewhere; deactivate so the desktop knows the context is no
-		// longer live.
+	if (change.cause === 'window-focus' && change.windowId === -1) {
+		// `WINDOW_ID_NONE`: the browser lost focus entirely. The user's
+		// attention is elsewhere; deactivate so the desktop knows the
+		// context is no longer live.
 		if (active) {
 			emitDeactivated(active);
 			active = null;
 		}
 		return;
 	}
-	await resyncFromActiveTab();
-}
-
-async function resyncFromActiveTab(): Promise<void> {
-	if (!nativePort) return;
-
-	let tab: browser.Tabs.Tab | undefined;
-	try {
-		[tab] = await browser.tabs.query({ active: true, currentWindow: true });
-	} catch (err) {
-		console.error('context-observer: failed to query active tab:', err);
-		return;
+	if (change.cause === 'updated') {
+		// Only react when something meaningful changed. `status:
+		// 'complete'` covers the title settling after a hard navigation;
+		// `url` covers YouTube's SPA navigation between `/watch?v=…` URLs
+		// without a full page load.
+		const changeInfo = change.changeInfo ?? {};
+		if (changeInfo.url === undefined && changeInfo.status !== 'complete') return;
+		if (change.activeTab && !change.activeTab.active) return;
 	}
 
-	const candidate = classifyTab(tab);
+	const candidate = classifyTab(change.activeTab);
 	transition(candidate);
 }
 
