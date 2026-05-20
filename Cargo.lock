@@ -4021,6 +4021,7 @@ dependencies = [
  "backon",
  "euro-bridge-protocol",
  "euro-process",
+ "eurora-tools-web",
  "eurora-tools-youtube",
  "futures-util",
  "serde",
@@ -4354,6 +4355,22 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trybuild",
+]
+
+[[package]]
+name = "eurora-tools-web"
+version = "0.0.0"
+dependencies = [
+ "euro-bridge",
+ "euro-bridge-protocol",
+ "eurora-tools",
+ "insta",
+ "schemars 1.2.1",
+ "serde",
+ "serde_json",
+ "specta",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
