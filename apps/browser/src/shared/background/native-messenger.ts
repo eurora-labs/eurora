@@ -1,7 +1,6 @@
 import { startContextObserver, stopContextObserver } from './context-observer';
 import { resolveFaviconBase64 } from './favicon';
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
-import { sendMessageWithRetry } from './messaging';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
 import { errorFrame, forwardTabRpc } from './tab-rpc';
 import { type TabStateBus, startTabStateBus } from './tab-state-bus';
@@ -82,7 +81,7 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 		}
 	} else if ('Response' in kind) {
 		const resp = kind.Response as { action?: string };
-		const pollerActions = ['POLL_REQUESTS', 'GET_METADATA', 'GET_ASSETS', 'GET_SNAPSHOT'];
+		const pollerActions = ['POLL_REQUESTS', 'GET_METADATA'];
 		if (!pollerActions.includes(resp.action ?? '')) {
 			console.warn('Unexpected response frame:', kind.Response);
 		}
@@ -105,12 +104,6 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 			}
 			return await onActionMetadata(frame);
 
-		case 'GET_ASSETS':
-			return await onActionContentData(frame, 'GENERATE_ASSETS');
-
-		case 'GET_SNAPSHOT':
-			return await onActionContentData(frame, 'GENERATE_SNAPSHOT');
-
 		case 'YOUTUBE_GET_CURRENT_TIMESTAMP':
 			return await forwardTabRpc(frame, 'GET_CURRENT_TIMESTAMP');
 
@@ -120,49 +113,32 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 		case 'YOUTUBE_GET_CURRENT_FRAME':
 			return await forwardTabRpc(frame, 'GET_CURRENT_FRAME');
 
+		case 'WEB_GET_PAGE_METADATA':
+			return await forwardTabRpc(frame, 'GET_PAGE_METADATA');
+
+		case 'WEB_GET_ACCESSIBILITY_TREE':
+			return await forwardTabRpc(frame, 'GET_ACCESSIBILITY_TREE');
+
+		case 'WEB_GET_READABILITY_ARTICLE':
+			return await forwardTabRpc(frame, 'GET_READABILITY_ARTICLE');
+
+		case 'WEB_GET_SELECTED_TEXT':
+			return await forwardTabRpc(frame, 'GET_SELECTED_TEXT');
+
+		case 'WEB_QUERY_SELECTOR':
+			return await forwardTabRpc(frame, 'QUERY_SELECTOR');
+
+		case 'WEB_LIST_LINKS':
+			return await forwardTabRpc(frame, 'LIST_LINKS');
+
+		case 'WEB_LIST_FORM_INPUTS':
+			return await forwardTabRpc(frame, 'LIST_FORM_INPUTS');
+
+		case 'WEB_INSERT_TEXT':
+			return await forwardTabRpc(frame, 'INSERT_TEXT');
+
 		default:
 			return errorFrame(frame, 400, `Unknown action: ${frame.action}`);
-	}
-}
-
-async function onActionContentData(frame: RequestFrame, messageType: string): Promise<Frame> {
-	try {
-		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-
-		if (!activeTab || !activeTab.id) {
-			return {
-				kind: {
-					Response: {
-						id: frame.id,
-						action: frame.action,
-						payload: { kind: 'Error', data: 'No active tab found' } as Payload,
-					},
-				},
-			} as Frame;
-		}
-
-		const contentResponse = await sendMessageWithRetry(activeTab.id, { type: messageType });
-
-		return {
-			kind: {
-				Response: {
-					id: frame.id,
-					action: frame.action,
-					payload: contentResponse as Payload,
-				},
-			},
-		} as Frame;
-	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		return {
-			kind: {
-				Response: {
-					id: frame.id,
-					action: frame.action,
-					payload: { kind: 'Error', data: errorMessage } as Payload,
-				},
-			},
-		} as Frame;
 	}
 }
 

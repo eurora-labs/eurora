@@ -315,85 +315,23 @@ export type ListLinksArgs = {
 	limit?: number,
 };
 
-export type NativeArticleAsset = {
-	title: string,
-	url: string,
-	content: string,
-	text_content: string,
-	site_name: string,
-	selected_text: string | null,
-	language: string,
-	excerpt: string,
-	length: number,
-};
-
-export type NativeArticleSnapshot = {
-	highlighted_text: string | null,
-};
-
-export type NativeImage = {
-	base64: string,
-	mime_type: string,
-};
-
 /**
  *  Envelope for every payload the browser native-messaging host
  *  exchanges with the desktop bridge. Externally tagged on `kind` with
- *  the inner payload under `data` so the JSON shape matches what the
- *  browser extension already constructs.
+ *  the inner payload under `data` so the JSON shape stays stable as
+ *  new wire-payload variants are added.
  * 
- *  The YouTube snapshot variant carries an [`eurora_tools_youtube::CapturedFrame`]
- *  — the single canonical YouTube-frame shape, also returned by the
- *  `browser::youtube::get_current_frame` tool. The legacy
- *  `NativeYoutubeSnapshot` wrapper was dropped in favour of this unified
- *  type; consumers compose around `CapturedFrame` directly.
+ *  At present only [`NativeMetadata`] crosses the bridge — page content
+ *  is delivered through granular adapter tools (`browser::web::*`,
+ *  `browser::youtube::*`, …) rather than through pre-bundled assets or
+ *  snapshots.
  */
-export type NativeMessage = { kind: "NativeYoutubeAsset"; data: NativeYoutubeAsset } | { kind: "NativeArticleAsset"; data: NativeArticleAsset } | { kind: "NativeTwitterAsset"; data: NativeTwitterAsset } | { kind: "NativeYoutubeSnapshot"; data: CapturedFrame } | { kind: "NativeArticleSnapshot"; data: NativeArticleSnapshot } | { kind: "NativeMetadata"; data: NativeMetadata };
+export type NativeMessage = { kind: "NativeMetadata"; data: NativeMetadata };
 
 export type NativeMetadata = {
 	url: string | null,
 	icon_base64: string | null,
 	title: string | null,
-};
-
-export type NativeTwitterAsset = {
-	url: string,
-	title: string,
-	result: ParseResult,
-	timestamp: string,
-};
-
-export type NativeTwitterTweet = {
-	text: string,
-	timestamp: string | null,
-	author: string | null,
-	images?: NativeImage[],
-};
-
-/**
- *  Activity-capture asset emitted by the browser extension's
- *  `GENERATE_ASSETS` flow on YouTube watch pages.
- * 
- *  The transcript reuses the canonical [`TranscriptEntry`] from
- *  `eurora-tools-youtube`: extension, native-messaging host, activity
- *  pipeline, and tool dispatchers all encode YouTube transcripts in
- *  exactly one shape (`{start, duration, text}`).
- * 
- *  Snapshots (the per-frame variant) now go through
- *  [`eurora_tools_youtube::CapturedFrame`] directly — the legacy
- *  `NativeYoutubeSnapshot` wrapper was dropped to eliminate the
- *  duplicate field-name + precision drift (`video_frame_base64`/f32 vs
- *  `image_base64`/f64) between the activity-capture and tool-call paths.
- */
-export type NativeYoutubeAsset = {
-	url: string,
-	title: string,
-	transcript: TranscriptEntry[],
-	current_time: number | null,
-};
-
-export type NotificationsData = {
-	tweets: NativeTwitterTweet[],
 };
 
 /**  Page-level metadata exposed to the LLM for the active tab. */
@@ -422,8 +360,6 @@ export type PageMetadata = {
 	viewport: ViewportMetrics,
 };
 
-export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "profile"; data: ProfilePageData } | { page: "home"; data: TimelineData } | { page: "search"; data: SearchData } | { page: "notifications"; data: NotificationsData } | { page: "unsupported"; data: UnsupportedPageData };
-
 /**
  *  Inline JSON payload carried by Request/Response/Event frames.
  * 
@@ -446,11 +382,6 @@ export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "prof
  *  fragment.
  */
 export type Payload = unknown;
-
-export type ProfilePageData = {
-	username: string,
-	tweets: NativeTwitterTweet[],
-};
 
 /**  Arguments to `query_selector`. */
 export type QuerySelectorArgs = {
@@ -555,11 +486,6 @@ export type ResponseFrame = {
 	payload?: Payload | null,
 };
 
-export type SearchData = {
-	query: string,
-	tweets: NativeTwitterTweet[],
-};
-
 /**  Whatever the user has highlighted in the active document right now. */
 export type SelectedText = {
 	/**
@@ -584,10 +510,6 @@ export type ShutdownFrame = {
 	reason?: string | null,
 };
 
-export type TimelineData = {
-	tweets: NativeTwitterTweet[],
-};
-
 /**  Full transcript of a YouTube video. */
 export type Transcript = {
 	/**  The YouTube video ID the transcript belongs to. */
@@ -606,15 +528,6 @@ export type TranscriptEntry = {
 	duration: number | null,
 	/**  Cue text as YouTube serves it (HTML-escaped, single-language). */
 	text: string,
-};
-
-export type TweetPageData = {
-	tweet: NativeTwitterTweet | null,
-	replies: NativeTwitterTweet[],
-};
-
-export type UnsupportedPageData = {
-	url: string,
 };
 
 /**  Scroll and viewport metrics for the active document. */

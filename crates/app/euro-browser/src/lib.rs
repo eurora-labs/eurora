@@ -31,9 +31,9 @@ pub use euro_bridge_protocol::{
 pub use types::*;
 
 /// Cap on the size of any single JSON frame exchanged with Chrome over
-/// stdin/stdout. Chrome's native messaging max is 1 MiB; we allow more
-/// here for SNAPSHOT/ASSETS payloads that include base64-encoded
-/// images.
+/// stdin/stdout. Chrome's native messaging max is 1 MiB; we keep headroom
+/// for granular tool returns that include accessibility trees or readability
+/// articles.
 pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024;
 
 /// Build the [`specta::Types`] collection containing every type the
@@ -46,18 +46,14 @@ pub fn type_collection() -> specta::Types {
     let mut types = euro_bridge_protocol::type_collection();
     types
         .register_mut::<NativeMessage>()
-        .register_mut::<NativeImage>()
-        .register_mut::<NativeArticleAsset>()
-        .register_mut::<NativeArticleSnapshot>()
         .register_mut::<NativeMetadata>()
-        .register_mut::<NativeYoutubeAsset>()
+        // YouTube adapter types — `CapturedFrame` is the canonical
+        // YouTube-frame shape returned by `browser::youtube::get_current_frame`.
         .register_mut::<eurora_tools_youtube::TranscriptEntry>()
         .register_mut::<eurora_tools_youtube::CurrentTimestamp>()
         .register_mut::<eurora_tools_youtube::Transcript>()
-        // `CapturedFrame` doubles as the activity-capture snapshot payload
-        // (carried inside `NativeMessage::NativeYoutubeSnapshot`) — same
-        // shape used by the `browser::youtube::get_current_frame` tool.
         .register_mut::<eurora_tools_youtube::CapturedFrame>()
+        // Web adapter types — one entry per type that crosses the bridge.
         .register_mut::<eurora_tools_web::PageMetadata>()
         .register_mut::<eurora_tools_web::ViewportMetrics>()
         .register_mut::<eurora_tools_web::GetAccessibilityTreeArgs>()
@@ -78,16 +74,7 @@ pub fn type_collection() -> specta::Types {
         .register_mut::<eurora_tools_web::FormInput>()
         .register_mut::<eurora_tools_web::FormInputKind>()
         .register_mut::<eurora_tools_web::InsertTextArgs>()
-        .register_mut::<eurora_tools_web::InsertTextResult>()
-        .register_mut::<NativeTwitterAsset>()
-        .register_mut::<NativeTwitterTweet>()
-        .register_mut::<TweetPageData>()
-        .register_mut::<ProfilePageData>()
-        .register_mut::<TimelineData>()
-        .register_mut::<SearchData>()
-        .register_mut::<NotificationsData>()
-        .register_mut::<UnsupportedPageData>()
-        .register_mut::<ParseResult>();
+        .register_mut::<eurora_tools_web::InsertTextResult>();
     types
 }
 
@@ -122,11 +109,8 @@ mod tests {
             "ShutdownFrame",
             // native-messaging payloads
             "NativeMessage",
-            "NativeImage",
             "NativeMetadata",
-            "NativeArticleAsset",
-            "NativeArticleSnapshot",
-            "NativeYoutubeAsset",
+            // youtube adapter
             "TranscriptEntry",
             "CurrentTimestamp",
             "Transcript",
@@ -150,9 +134,6 @@ mod tests {
             "FormInputKind",
             "InsertTextArgs",
             "InsertTextResult",
-            "NativeTwitterAsset",
-            "NativeTwitterTweet",
-            "ParseResult",
         ] {
             assert!(
                 names.iter().any(|n| n == required),

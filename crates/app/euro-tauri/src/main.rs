@@ -882,6 +882,9 @@ fn main() {
                             euro_tauri::tools::YoutubeBridgeImpl::new(bridge_service),
                         ),
                     ));
+                    catalog.register(std::sync::Arc::new(eurora_tools_web::WebDispatcher::new(
+                        euro_tauri::tools::WebBridgeImpl::new(bridge_service),
+                    )));
                     tauri_app.manage(catalog);
 
                     Ok(())

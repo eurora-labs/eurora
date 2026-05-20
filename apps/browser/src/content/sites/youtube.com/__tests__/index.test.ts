@@ -12,13 +12,6 @@ vi.mock('webextension-polyfill', () => ({
 	},
 }));
 
-vi.mock('../../../../shared/content/extensions/article/util', () => ({
-	createArticleAsset: vi.fn().mockResolvedValue({
-		kind: 'NativeArticleAsset',
-		data: { url: 'test-url', title: 'test-title' },
-	}),
-}));
-
 const transcriptFetchMock = vi.fn();
 vi.mock('../transcript/index.js', () => ({
 	YouTubeTranscriptApi: vi.fn().mockImplementation(() => ({
@@ -140,17 +133,6 @@ describe('youtube.com site handler', () => {
 	});
 
 	describe('unrelated messages', () => {
-		it('delegates GENERATE_ASSETS to the existing watcher path on watch URLs', async () => {
-			transcriptFetchMock.mockResolvedValueOnce({
-				videoId: 'abc123',
-				languageCode: 'en',
-				snippets: [],
-			});
-			const watcher = makeWatcher();
-			const result = await watcher.listen({ type: 'GENERATE_ASSETS' }, makeSender());
-			expect(result).toMatchObject({ kind: 'NativeYoutubeAsset' });
-		});
-
 		it('returns false for unknown message types', async () => {
 			const watcher = makeWatcher();
 			const result = watcher.listen({ type: 'UNKNOWN' as never }, makeSender());

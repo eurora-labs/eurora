@@ -1,9 +1,10 @@
 //! Desktop implementation of [`euro_thread::commands::ChatContextProvider`].
 //!
-//! Pulls per-turn chat context from the timeline: refreshes the active
-//! activity (best-effort) so the strategy can attach fresh assets and
-//! snapshots, then surfaces the most recent asset/snapshot content
-//! blocks plus a single context chip for the current activity.
+//! Surfaces a single [`ContextChip`] describing the current activity so the
+//! UI can render it; the LLM receives the active-context summary through
+//! the system message built by `be-thread-service::tool_catalog::build_context_system_message`
+//! and pulls page contents through granular tool calls. The desktop no
+//! longer speculatively bundles asset/snapshot blocks into every turn.
 //!
 //! Activity rows themselves are pushed to the remote service by the
 //! collector at creation time — there is no duplicate upload here.
@@ -38,20 +39,6 @@ impl ChatContextProvider for TimelineChatContextProvider {
 
         let timeline = timeline_state.lock().await;
 
-        // Refreshing the activity is best-effort: a missing tab or stale
-        // browser bridge shouldn't abort the chat turn — we just contribute
-        // no fresh context for it.
-        if let Err(e) = timeline.refresh_current_activity().await {
-            tracing::debug!("collect_context: refresh failed: {e}");
-        }
-
-        let asset_blocks = timeline.construct_messages_from_last_asset().await;
-        let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
-
-        let mut content_blocks = Vec::with_capacity(asset_blocks.len() + snapshot_blocks.len());
-        content_blocks.extend(asset_blocks.into_inner());
-        content_blocks.extend(snapshot_blocks.into_inner());
-
         let asset_chips = timeline
             .get_context_chip()
             .await
@@ -59,7 +46,7 @@ impl ChatContextProvider for TimelineChatContextProvider {
             .unwrap_or_default();
 
         Ok(ChatContext {
-            content_blocks,
+            content_blocks: Vec::new(),
             asset_chips,
         })
     }

@@ -1,5 +1,4 @@
 import { YouTubeTranscriptApi, type FetchedTranscript } from './transcript/index.js';
-import { createArticleAsset } from '../../../shared/content/extensions/article/util';
 import {
 	Watcher,
 	type BrowserObj,
@@ -7,22 +6,7 @@ import {
 } from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
-import type {
-	CapturedFrame,
-	CurrentTimestamp,
-	NativeYoutubeAsset,
-	Transcript,
-} from '../../../shared/content/bindings';
-
-/// Raw frame capture without the per-call envelope. Used internally by
-/// both `handleGetCurrentFrame` (tool path) and `handleGenerateSnapshot`
-/// (legacy activity-capture path), so the canvas-draw logic exists in
-/// exactly one place.
-interface RawFrame {
-	width: number;
-	height: number;
-	image_base64: string;
-}
+import type { CapturedFrame, CurrentTimestamp, Transcript } from '../../../shared/content/bindings';
 
 export class YoutubeWatcher extends Watcher<WatcherParams> {
 	private youtubeTranscriptApi: YouTubeTranscriptApi;
@@ -52,55 +36,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		return { kind: 'Ok', data: null };
-	}
-
-	public async handleGenerateAssets(
-		_obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		if (!window.location.href.includes('/watch?v=')) {
-			return createArticleAsset(document);
-		}
-
-		try {
-			const [{ current_time }, transcript] = await Promise.all([
-				this.handleGetCurrentTimestamp(),
-				this.handleGetTranscript(),
-			]);
-
-			const reportData: NativeYoutubeAsset = {
-				url: window.location.href,
-				title: document.title,
-				transcript: transcript.entries,
-				current_time,
-			};
-			return { kind: 'NativeYoutubeAsset', data: reportData };
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error('Error generating YouTube report:', {
-				url: window.location.href,
-				videoId: getCurrentVideoId(),
-				error: errorMessage,
-				stack: error instanceof Error ? error.stack : undefined,
-			});
-			return {
-				kind: 'Error',
-				data: `Failed to generate YouTube assets for ${window.location.href}: ${errorMessage}`,
-			};
-		}
-	}
-
-	public async handleGenerateSnapshot(
-		_obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		// The activity-pipeline snapshot now ships the canonical
-		// `CapturedFrame` shape — same as the
-		// `browser::youtube::get_current_frame` tool — so there's a single
-		// representation of "a YouTube frame at a moment in time" across
-		// the bridge.
-		const reportData: CapturedFrame = await this.handleGetCurrentFrame();
-		return { kind: 'NativeYoutubeSnapshot', data: reportData };
 	}
 
 	/// Return the current playback state. Throws if the page has no
@@ -138,13 +73,18 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	public async handleGetCurrentFrame(): Promise<CapturedFrame> {
 		const videoId = requireCurrentVideoId();
 		const player = this.requirePlayer();
-		const frame = this.captureFrame(player);
+		const { canvas } = this.params;
+		canvas.width = player.videoWidth;
+		canvas.height = player.videoHeight;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) throw new Error('2D canvas context unavailable');
+		ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
 		return {
 			video_id: videoId,
 			current_time: player.currentTime,
-			width: frame.width,
-			height: frame.height,
-			image_base64: frame.image_base64,
+			width: canvas.width,
+			height: canvas.height,
+			image_base64: canvas.toDataURL('image/png').split(',')[1],
 		};
 	}
 
@@ -164,23 +104,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		if (player.readyState === 0) throw new Error('YouTube player not ready');
 		this.params.youtubePlayer = player;
 		return player;
-	}
-
-	/// Encode the current video frame as base64 PNG. Returns the dimensions
-	/// of the source video stream rather than the canvas (which can differ
-	/// if the player has been letterboxed).
-	private captureFrame(player: HTMLVideoElement): RawFrame {
-		const { canvas } = this.params;
-		canvas.width = player.videoWidth;
-		canvas.height = player.videoHeight;
-		const ctx = canvas.getContext('2d');
-		if (!ctx) throw new Error('2D canvas context unavailable');
-		ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
-		return {
-			image_base64: canvas.toDataURL('image/png').split(',')[1],
-			width: canvas.width,
-			height: canvas.height,
-		};
 	}
 }
 

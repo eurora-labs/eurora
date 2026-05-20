@@ -10,10 +10,8 @@ ignored = ["humantime-serde"]
 
 [dependencies]
 activity-core = { workspace = true }
-agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-asset-core = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 enum_dispatch = { workspace = true }
@@ -24,8 +22,6 @@ euro-endpoint = { workspace = true, features = ["tls-native-roots"] }
 euro-office = { workspace = true }
 euro-pdf = { workspace = true }
 euro-process = { workspace = true }
-euro-vision = { workspace = true }
-eurora-tools-youtube = { workspace = true }
 focus-tracker = { workspace = true }
 humantime-serde = { workspace = true }
 image = { workspace = true }
@@ -35,8 +31,6 @@ resvg = { version = "0.47" }
 secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-specta = { workspace = true, features = ["derive", "function"] }
-tauri-specta = { workspace = true }
 thiserror = { workspace = true }
 thread-core = { workspace = true, features = ["specta"] }
 tiny-skia = "0.12"

@@ -218,11 +218,17 @@ export type ChatMessage = {
  * 
  *  When `parent_message_id` is present the turn is interpreted as an edit of
  *  an existing branch; the service rewinds `active_leaf` accordingly.
+ * 
+ *  `activity_id` captures the desktop client's currently-tracked activity
+ *  when the user sent the message, so the server can record the link in
+ *  `activity_threads`. Optional because non-desktop clients (web, mobile)
+ *  have no timeline; absent values skip the link step entirely.
  */
 export type ChatSendRequest = {
 	content_blocks: ContentBlock[],
 	parent_message_id?: string | null,
 	asset_chips_json?: string | null,
+	activity_id?: string | null,
 };
 
 /**
@@ -230,7 +236,8 @@ export type ChatSendRequest = {
  * 
  *  Clients should accumulate `Chunk` payloads (using agent-chain's chunk-merge
  *  semantics) and replace placeholder state with the `Final.messages` payload
- *  when the turn ends.
+ *  when the turn ends. The tool-routing pair `ToolRequest` + `ToolCancel`
+ *  drives remote-tool RPC over the same socket.
  */
 export type ChatServerMessage = 
 /**  The user's message has been persisted; clients should display it. */
@@ -243,7 +250,19 @@ export type ChatServerMessage =
  */
 { type: "final"; messages: MessageNode[] } | 
 /**  The turn aborted with an error. The connection is closed after this. */
-{ type: "error"; kind: string; message: string };
+{ type: "error"; kind: string; message: string } | 
+/**
+ *  Request the client to execute a tool on its side and return the
+ *  result via [`ChatClientMessage::ToolResponse`] correlated by
+ *  `call_id`.
+ */
+{ type: "tool_request"; call_id: number; descriptor: WireToolDescriptor; arguments: unknown } | 
+/**
+ *  Abort an in-flight `ToolRequest`. Sent when the user cancels the
+ *  turn or the server's tool budget is exhausted before the client's
+ *  response arrives.
+ */
+{ type: "tool_cancel"; call_id: number };
 
 export type ChunkPosition = "last";
 
@@ -269,7 +288,7 @@ export type Claims = {
  *  Pushed from Rust to the frontend whenever the mobile telemetry
  *  consent gate flips. Fired once during startup (in response to
  *  [`frontend_ready`]) and again whenever the gate changes (e.g. after
- *  [`crate::procedures::settings_procedures::settings_record_telemetry_consent`]).
+ *  [`crate::procedures::settings::settings_record_telemetry_consent`]).
  * 
  *  Today mobile shares the `desktop.telemetry` cloud record with the
  *  desktop client; Phase 10 partitions mobile into its own section
@@ -670,6 +689,12 @@ export type ToolCallChunkBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
+export type ToolDefinition = {
+	name: string,
+	description: string,
+	parameters: unknown,
+};
+
 export type ToolMessage = {
 	content: ContentBlocks,
 	tool_call_id: string,
@@ -680,6 +705,29 @@ export type ToolMessage = {
 	additional_kwargs?: { [key in string]: unknown },
 	response_metadata?: { [key in string]: unknown },
 };
+
+/**
+ *  Where a tool runs. The server uses this to dispatch each call:
+ *  `ServerLocal` tools execute in-process on the backend; everything else
+ *  is routed back to the client over the chat WebSocket as a `ToolRequest`,
+ *  and from there the client picks the right destination (bridge, native
+ *  app, ACP session).
+ * 
+ *  `#[non_exhaustive]` so adding new sources later is non-breaking for
+ *  downstream consumers that `match` on the enum.
+ */
+export type ToolSource = 
+/**
+ *  Routed via `euro-bridge` to a registered app of `app_kind` (in v1,
+ *  `"browser"`).
+ */
+{ kind: "bridge"; app_kind: string } | 
+/**  Runs in-process on the client (native Tauri tools). */
+{ kind: "client_local" } | 
+/**  Runs in-process on the backend (Firecrawl, describe-image). */
+{ kind: "server_local" } | 
+/**  Piped through an ACP session. */
+{ kind: "acp" };
 
 export type ToolStatus = "success" | "error";
 
@@ -700,6 +748,49 @@ export type VideoContentBlock = {
 	base64?: string | null,
 	extras?: { [key in string]: unknown } | null,
 };
+
+/**
+ *  Wire-side descriptor for a tool. One per call, one per entry in the
+ *  per-turn `CapabilityUpdate.tools` list.
+ * 
+ *  `WireToolDescriptor` is a [`ToolDefinition`] (name, description,
+ *  parameters schema) plus dispatch metadata (timeout, source, required
+ *  contexts, approval flag) and the tool's output schema. The framework
+ *  form (`eurora_tools::ToolDescriptor`) is the in-process
+ *  `&'static`-everywhere shape; this is its serializable counterpart, owned
+ *  and ready for transport. The server only ever sees this form.
+ * 
+ *  The `definition` field is flattened on the wire so the JSON shape stays
+ *  flat (`{"name": ..., "description": ..., "parameters": ..., ...}`),
+ *  while in Rust the typed relationship `WireToolDescriptor IS-A
+ *  ToolDefinition + dispatch metadata` is explicit.
+ */
+export type WireToolDescriptor = {
+	/**  JSON Schema for the tool's success payload. */
+	output_schema: unknown,
+	/**
+	 *  Per-call timeout in milliseconds. Used by the server's bus to bound
+	 *  in-flight remote calls; the framework's `ToolDescriptor.timeout`
+	 *  converts to/from this field. `u32` ms (~49 days) is bounded well
+	 *  above any sensible per-tool budget and keeps the wire shape inside
+	 *  JS's safe integer range.
+	 */
+	timeout_ms: number,
+	/**  Where the tool runs. The server uses this to pick a dispatch path. */
+	source: ToolSource,
+	/**
+	 *  Context keys whose presence is required for this tool to be
+	 *  surfaced to the LLM in a given turn (e.g.
+	 *  `["youtube::watch_page"]`).
+	 */
+	required_contexts?: string[],
+	/**
+	 *  If true, the server must obtain explicit user approval before
+	 *  dispatching the call. Not enforced in v1 (all v1 tools are
+	 *  read-only) but declared so the protocol is stable.
+	 */
+	requires_user_approval?: boolean,
+} & ToolDefinition;
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

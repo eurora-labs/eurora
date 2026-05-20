@@ -18,7 +18,8 @@ const FIREFOX_PROD_ID = '{271903fe-1905-4636-b47f-6f0873dc97f8}';
 function targetPatch(browser) {
 	if (browser === 'firefox') {
 		const isProd = (process.env['BUILD_MODE'] ?? 'production') === 'production';
-		const firefoxId = process.env['FIREFOX_EXTENSION_ID'] || (isProd ? FIREFOX_PROD_ID : FIREFOX_DEV_ID);
+		const firefoxId =
+			process.env['FIREFOX_EXTENSION_ID'] || (isProd ? FIREFOX_PROD_ID : FIREFOX_DEV_ID);
 		return {
 			browser_specific_settings: {
 				gecko: { id: firefoxId },

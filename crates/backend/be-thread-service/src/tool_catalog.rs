@@ -191,6 +191,7 @@ pub fn build_context_system_message(contexts: &[WireActiveContext]) -> Option<Sy
     for ctx in contexts {
         match ctx.key.as_str() {
             "youtube::watch_page" => format_youtube_watch_page(&mut buf, &ctx.data),
+            "web::page" => format_web_page(&mut buf, &ctx.data),
             _ => format_generic(&mut buf, ctx),
         }
     }
@@ -232,6 +233,36 @@ fn format_youtube_watch_page(buf: &mut String, data: &Value) {
         )
         .expect("write to String");
     }
+}
+
+fn format_web_page(buf: &mut String, data: &Value) {
+    let url = data.get("url").and_then(Value::as_str).unwrap_or("unknown");
+    let title = data
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let host = data
+        .get("host")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let language = data
+        .get("language")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+
+    writeln!(buf, "## Current web page").expect("write to String");
+    writeln!(buf, "- URL: {url}").expect("write to String");
+    writeln!(buf, "- Title: {title}").expect("write to String");
+    writeln!(buf, "- Host: {host}").expect("write to String");
+    writeln!(buf, "- Language: {language}").expect("write to String");
+    writeln!(buf).expect("write to String");
+    writeln!(
+        buf,
+        "Generic web tools (`browser::web::*`) are available — use them to read DOM, \
+         extract structured content, or insert text into specific form fields the user \
+         can see. The model cannot click buttons, submit forms, or navigate."
+    )
+    .expect("write to String");
 }
 
 fn format_generic(buf: &mut String, ctx: &WireActiveContext) {
@@ -517,6 +548,109 @@ mod tests {
             .collect::<String>();
         assert!(text.contains("## Context `focus::app::vscode`"));
         assert!(text.contains("\"window_title\": \"main.rs\""));
+    }
+
+    #[test]
+    fn build_context_system_message_web_page_golden() {
+        let ctx = WireActiveContext {
+            key: "web::page".into(),
+            activated_at: DateTime::parse_from_rfc3339("2026-01-15T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            data: json!({
+                "url": "https://example.com/path",
+                "title": "Example domain",
+                "host": "example.com",
+                "language": "en",
+            }),
+        };
+        let msg = build_context_system_message(&[ctx]).expect("rendered");
+        let text = msg
+            .content
+            .iter()
+            .filter_map(|block| match block {
+                agent_chain::messages::ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<String>();
+        let expected = "Live context from the user's machine:\n\n\
+            ## Current web page\n\
+            - URL: https://example.com/path\n\
+            - Title: Example domain\n\
+            - Host: example.com\n\
+            - Language: en\n\
+            \n\
+            Generic web tools (`browser::web::*`) are available — use them to read DOM, \
+            extract structured content, or insert text into specific form fields the user \
+            can see. The model cannot click buttons, submit forms, or navigate.\n\
+            \nTool calls for these contexts are pinned to the specific source the user was on at \
+            turn start. If the user closes the tab or navigates away, calls return \
+            `context_unavailable` — acknowledge the change to the user rather than retrying.";
+        assert_eq!(text, expected);
+    }
+
+    #[test]
+    fn build_context_system_message_web_page_renders_unknown_for_missing_fields() {
+        let ctx = WireActiveContext {
+            key: "web::page".into(),
+            activated_at: DateTime::parse_from_rfc3339("2026-01-15T12:00:00Z")
+                .unwrap()
+                .with_timezone(&Utc),
+            data: json!({}),
+        };
+        let msg = build_context_system_message(&[ctx]).expect("rendered");
+        let text = msg
+            .content
+            .iter()
+            .filter_map(|block| match block {
+                agent_chain::messages::ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<String>();
+        assert!(text.contains("- URL: unknown"));
+        assert!(text.contains("- Title: unknown"));
+        assert!(text.contains("- Host: unknown"));
+        assert!(text.contains("- Language: unknown"));
+        assert!(text.contains("Generic web tools (`browser::web::*`)"));
+    }
+
+    #[test]
+    fn build_context_system_message_renders_web_page_and_youtube_together() {
+        let activated_at = DateTime::parse_from_rfc3339("2026-01-15T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let contexts = vec![
+            WireActiveContext {
+                key: "web::page".into(),
+                activated_at,
+                data: json!({
+                    "url": "https://youtube.com/watch?v=abc",
+                    "title": "Tokio async patterns",
+                    "host": "youtube.com",
+                    "language": "en",
+                }),
+            },
+            WireActiveContext {
+                key: "youtube::watch_page".into(),
+                activated_at,
+                data: json!({
+                    "title": "Tokio async patterns",
+                    "channel": "ThePrimeagen",
+                    "duration_seconds": 1122,
+                }),
+            },
+        ];
+        let msg = build_context_system_message(&contexts).expect("rendered");
+        let text = msg
+            .content
+            .iter()
+            .filter_map(|block| match block {
+                agent_chain::messages::ContentBlock::Text(t) => Some(t.text.as_str()),
+                _ => None,
+            })
+            .collect::<String>();
+        assert!(text.contains("## Current web page"));
+        assert!(text.contains("## YouTube video (currently playing)"));
     }
 
     #[test]

@@ -80,19 +80,37 @@ function watchTab(overrides: Partial<browser.Tabs.Tab> = {}): browser.Tabs.Tab {
 	} as browser.Tabs.Tab;
 }
 
+function plainTab(overrides: Partial<browser.Tabs.Tab> = {}): browser.Tabs.Tab {
+	return {
+		id: 30,
+		windowId: 7,
+		url: 'https://example.com/article',
+		title: 'Example article',
+		active: true,
+		...overrides,
+	} as browser.Tabs.Tab;
+}
+
 function postedFrames(port: FakePort): Frame[] {
 	return port.postMessage.mock.calls.map((c) => c[0] as Frame);
 }
 
-function frameEvent(frame: Frame): { action: string; payload: unknown } {
+function frameEvent(frame: Frame): {
+	action: string;
+	payload: { key: string; data?: unknown; tab_id?: number };
+} {
 	const kind = frame.kind as { Event?: { action: string; payload?: unknown } };
 	if (!kind.Event) throw new Error('expected Event frame');
 	return {
 		action: kind.Event.action,
-		// The bridge payload is inline JSON — already a JS value, no
-		// `JSON.parse` step.
-		payload: kind.Event.payload ?? null,
+		payload: kind.Event.payload as { key: string; data?: unknown; tab_id?: number },
 	};
+}
+
+function eventsFor(port: FakePort, key: string): { action: string; payload: unknown }[] {
+	return postedFrames(port)
+		.map(frameEvent)
+		.filter((e) => e.payload.key === key);
 }
 
 async function flushMicrotasks(): Promise<void> {
@@ -131,29 +149,54 @@ describe('classifyYoutubeUrl', () => {
 	});
 });
 
-describe('context-observer transitions', () => {
+describe('classifyWebUrl', () => {
+	it('matches http and https URLs', () => {
+		expect(observer.classifyWebUrl('https://example.com/path')).toEqual({
+			pageUrl: 'https://example.com/path',
+			host: 'example.com',
+		});
+		expect(observer.classifyWebUrl('http://example.com/')).not.toBeNull();
+	});
+
+	it('rejects non-http(s) schemes', () => {
+		expect(observer.classifyWebUrl('about:blank')).toBeNull();
+		expect(observer.classifyWebUrl('chrome://settings/')).toBeNull();
+		expect(observer.classifyWebUrl('chrome-extension://abc/popup.html')).toBeNull();
+		expect(observer.classifyWebUrl('file:///etc/hosts')).toBeNull();
+		expect(observer.classifyWebUrl('data:text/html,<h1>x</h1>')).toBeNull();
+		expect(observer.classifyWebUrl('javascript:void(0)')).toBeNull();
+		expect(observer.classifyWebUrl('view-source:https://example.com')).toBeNull();
+	});
+
+	it('returns null for invalid URL strings', () => {
+		expect(observer.classifyWebUrl('not a url')).toBeNull();
+	});
+});
+
+describe('youtube::watch_page transitions', () => {
 	it('activates with envelope-stamped payload when the active tab is a watch page', async () => {
 		const port = fakePort();
 		const { bus } = makeBus(watchTab());
 		observer.startContextObserver(port, bus);
 		await flushMicrotasks();
 
-		const frames = postedFrames(port);
-		expect(frames).toHaveLength(1);
-		const evt = frameEvent(frames[0]);
-		expect(evt.action).toBe('CONTEXT_ACTIVATED');
-		expect(evt.payload).toEqual({
-			key: 'youtube::watch_page',
-			data: {
-				video_id: 'abc123',
-				title: 'Tokio async patterns',
-				page_url: 'https://www.youtube.com/watch?v=abc123',
-			},
-			origin: {
-				Browser: {
-					tab_id: 19,
-					window_id: 'win-7',
+		const events = eventsFor(port, 'youtube::watch_page');
+		expect(events).toHaveLength(1);
+		expect(events[0]).toEqual({
+			action: 'CONTEXT_ACTIVATED',
+			payload: {
+				key: 'youtube::watch_page',
+				data: {
+					video_id: 'abc123',
+					title: 'Tokio async patterns',
 					page_url: 'https://www.youtube.com/watch?v=abc123',
+				},
+				origin: {
+					Browser: {
+						tab_id: 19,
+						window_id: 'win-7',
+						page_url: 'https://www.youtube.com/watch?v=abc123',
+					},
 				},
 			},
 		});
@@ -164,11 +207,10 @@ describe('context-observer transitions', () => {
 		const { bus, emit } = makeBus(watchTab());
 		observer.startContextObserver(port, bus);
 		await flushMicrotasks();
-		expect(postedFrames(port)).toHaveLength(1);
+		const baseline = eventsFor(port, 'youtube::watch_page').length;
 
-		// Same tab activated again; transition() should observe no change.
 		await emit({ cause: 'activated', activeTab: watchTab() });
-		expect(postedFrames(port)).toHaveLength(1);
+		expect(eventsFor(port, 'youtube::watch_page')).toHaveLength(baseline);
 	});
 
 	it('emits deactivate then activate when the same tab navigates to a new video', async () => {
@@ -176,7 +218,6 @@ describe('context-observer transitions', () => {
 		const { bus, emit } = makeBus(watchTab());
 		observer.startContextObserver(port, bus);
 		await flushMicrotasks();
-		expect(postedFrames(port)).toHaveLength(1);
 
 		await emit({
 			cause: 'updated',
@@ -187,14 +228,12 @@ describe('context-observer transitions', () => {
 			changeInfo: { url: 'https://www.youtube.com/watch?v=def456' },
 		});
 
-		const events = postedFrames(port).map(frameEvent);
+		const events = eventsFor(port, 'youtube::watch_page');
 		expect(events.map((e) => e.action)).toEqual([
 			'CONTEXT_ACTIVATED',
 			'CONTEXT_DEACTIVATED',
 			'CONTEXT_ACTIVATED',
 		]);
-		expect((events[1].payload as { key: string }).key).toBe('youtube::watch_page');
-		expect((events[2].payload as { data: { video_id: string } }).data.video_id).toBe('def456');
 	});
 
 	it('deactivates on switch to a non-watch page', async () => {
@@ -208,20 +247,8 @@ describe('context-observer transitions', () => {
 			activeTab: watchTab({ id: 20, url: 'https://www.example.com/' }),
 		});
 
-		const events = postedFrames(port).map(frameEvent);
-		expect(events.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
-	});
-
-	it('deactivates on window-focus-lost (WINDOW_ID_NONE)', async () => {
-		const port = fakePort();
-		const { bus, emit } = makeBus(watchTab());
-		observer.startContextObserver(port, bus);
-		await flushMicrotasks();
-
-		await emit({ cause: 'window-focus', windowId: -1, activeTab: watchTab() });
-
-		const events = postedFrames(port).map(frameEvent);
-		expect(events.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
+		const ytEvents = eventsFor(port, 'youtube::watch_page');
+		expect(ytEvents.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
 	});
 
 	it('deactivates when the active tab is removed', async () => {
@@ -229,22 +256,11 @@ describe('context-observer transitions', () => {
 		const { bus, emit } = makeBus(watchTab());
 		observer.startContextObserver(port, bus);
 		await flushMicrotasks();
-		expect(postedFrames(port)).toHaveLength(1);
 
 		await emit({ cause: 'removed', removedTabId: 19, activeTab: undefined });
 
-		const events = postedFrames(port).map(frameEvent);
-		expect(events).toHaveLength(2);
-		expect(events[1].action).toBe('CONTEXT_DEACTIVATED');
-	});
-
-	it('does not emit anything when starting on a non-watch tab', async () => {
-		const port = fakePort();
-		const { bus } = makeBus(watchTab({ url: 'https://www.example.com/' }));
-		observer.startContextObserver(port, bus);
-		await flushMicrotasks();
-
-		expect(postedFrames(port)).toHaveLength(0);
+		const ytEvents = eventsFor(port, 'youtube::watch_page');
+		expect(ytEvents.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
 	});
 
 	it('ignores tab-updated events that did not change url or status', async () => {
@@ -261,5 +277,157 @@ describe('context-observer transitions', () => {
 		});
 
 		expect(postedFrames(port).length).toBe(baseline);
+	});
+});
+
+describe('web::page transitions', () => {
+	it('activates on a plain http(s) tab', async () => {
+		const port = fakePort();
+		const { bus } = makeBus(plainTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		const events = eventsFor(port, 'web::page');
+		expect(events).toHaveLength(1);
+		expect(events[0].action).toBe('CONTEXT_ACTIVATED');
+		const payload = events[0].payload as {
+			data: { url: string; host: string; title: string | null; language: string | null };
+			origin: { Browser: { tab_id: number; window_id: string; page_url: string } };
+		};
+		expect(payload.data.url).toBe('https://example.com/article');
+		expect(payload.data.host).toBe('example.com');
+		expect(payload.data.title).toBe('Example article');
+		expect(payload.data.language).toBeNull();
+		expect(payload.origin.Browser.tab_id).toBe(30);
+	});
+
+	it('deactivates on switch to about:blank', async () => {
+		const port = fakePort();
+		const { bus, emit } = makeBus(plainTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		await emit({
+			cause: 'activated',
+			activeTab: plainTab({ url: 'about:blank' }),
+		});
+
+		const events = eventsFor(port, 'web::page');
+		expect(events.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
+	});
+
+	it('does not activate on chrome:// or extension URLs', async () => {
+		const port = fakePort();
+		const { bus } = makeBus(plainTab({ url: 'chrome://settings/' }));
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		expect(eventsFor(port, 'web::page')).toHaveLength(0);
+	});
+
+	it('deactivates on window-focus-lost (WINDOW_ID_NONE)', async () => {
+		const port = fakePort();
+		const { bus, emit } = makeBus(plainTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		await emit({ cause: 'window-focus', windowId: -1, activeTab: plainTab() });
+
+		const events = eventsFor(port, 'web::page');
+		expect(events.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
+	});
+
+	it('deactivates when the active tab is removed', async () => {
+		const port = fakePort();
+		const { bus, emit } = makeBus(plainTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		await emit({ cause: 'removed', removedTabId: 30, activeTab: undefined });
+
+		const events = eventsFor(port, 'web::page');
+		expect(events.at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
+	});
+
+	it('re-activates on URL change within the same tab', async () => {
+		const port = fakePort();
+		const { bus, emit } = makeBus(plainTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		await emit({
+			cause: 'updated',
+			activeTab: plainTab({ url: 'https://example.com/other' }),
+			changeInfo: { url: 'https://example.com/other' },
+		});
+
+		const events = eventsFor(port, 'web::page');
+		expect(events.map((e) => e.action)).toEqual([
+			'CONTEXT_ACTIVATED',
+			'CONTEXT_DEACTIVATED',
+			'CONTEXT_ACTIVATED',
+		]);
+	});
+});
+
+describe('coexistence: web::page and youtube::watch_page', () => {
+	it('emits both activations when the active tab is a YouTube watch page', async () => {
+		const port = fakePort();
+		const { bus } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		const youtubeEvents = eventsFor(port, 'youtube::watch_page');
+		const webEvents = eventsFor(port, 'web::page');
+		expect(youtubeEvents.map((e) => e.action)).toEqual(['CONTEXT_ACTIVATED']);
+		expect(webEvents.map((e) => e.action)).toEqual(['CONTEXT_ACTIVATED']);
+	});
+
+	it('deactivates only youtube::watch_page when navigating from watch to homepage', async () => {
+		const port = fakePort();
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		await emit({
+			cause: 'updated',
+			activeTab: watchTab({ url: 'https://www.youtube.com/' }),
+			changeInfo: { url: 'https://www.youtube.com/' },
+		});
+
+		const youtubeEvents = eventsFor(port, 'youtube::watch_page');
+		const webEvents = eventsFor(port, 'web::page');
+		expect(youtubeEvents.map((e) => e.action)).toEqual([
+			'CONTEXT_ACTIVATED',
+			'CONTEXT_DEACTIVATED',
+		]);
+		// `web::page` swaps because the URL changed, but it stays active
+		// throughout — the model still has access to generic web tools.
+		expect(webEvents.map((e) => e.action)).toEqual([
+			'CONTEXT_ACTIVATED',
+			'CONTEXT_DEACTIVATED',
+			'CONTEXT_ACTIVATED',
+		]);
+	});
+
+	it('deactivates every key on window-focus-lost', async () => {
+		const port = fakePort();
+		const { bus, emit } = makeBus(watchTab());
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		await emit({ cause: 'window-focus', windowId: -1, activeTab: watchTab() });
+
+		expect(eventsFor(port, 'youtube::watch_page').at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
+		expect(eventsFor(port, 'web::page').at(-1)?.action).toBe('CONTEXT_DEACTIVATED');
+	});
+
+	it('does not emit either when starting on chrome:// or about:blank', async () => {
+		const port = fakePort();
+		const { bus } = makeBus(plainTab({ url: 'about:blank' }));
+		observer.startContextObserver(port, bus);
+		await flushMicrotasks();
+
+		expect(postedFrames(port)).toHaveLength(0);
 	});
 });

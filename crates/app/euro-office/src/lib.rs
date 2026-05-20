@@ -5,17 +5,14 @@
 //!
 //! - [`WordDocumentAsset`] — the on-the-wire shape exchanged with the
 //!   Office add-in over the bridge WebSocket.
-//! - [`WordAsset`] — the desktop-side wrapper with a stable UUID, used
-//!   by `euro-activity` as a variant of `ActivityAsset`.
+//! - [`WordAsset`] — desktop-side wrapper with a stable UUID. Reserved
+//!   for the forthcoming `office::word::*` adapter; the activity
+//!   pipeline only consumes the wire shape's `document_name` for the
+//!   focused-document title today.
 //! - [`OfficeApp`] — focus-tracker process-name catalog mirroring
 //!   `euro_process::Browser`.
 //! - [`fetch_word_asset`] / [`MICROSOFT_WORD_KIND`] — bridge helpers
 //!   used by `euro-activity::strategies::word::WordStrategy`.
-//!
-//! Trait implementations that bind [`WordAsset`] into the activity
-//! pipeline (`AssetFunctionality`, `SaveableAsset`) live in
-//! `euro-activity` to avoid pulling that crate's dependencies — and the
-//! agent-message machinery — into the Office bindings build.
 //!
 //! Unlike the browser's native-messaging path, the Office add-in is not
 //! constrained by Chrome's stdio framing, so no `NativeMessage`
