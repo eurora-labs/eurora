@@ -12,7 +12,7 @@ export type ErrorFrame = {
 	id: number,
 	code: number,
 	message: string,
-	details?: string | null,
+	details?: Payload | null,
 };
 
 /**
@@ -21,7 +21,7 @@ export type ErrorFrame = {
  */
 export type EventFrame = {
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 /**
@@ -75,20 +75,6 @@ export type NativeMetadata = {
 	title: string | null,
 };
 
-/**
- *  One cue from a YouTube transcript as the browser extension emits it.
- * 
- *  Field names mirror YouTube's caption format (`start` and `duration`
- *  in seconds) — the extension's transcript parser already exposes them
- *  in this shape, so we type the wire payload to match rather than
- *  inventing a separate vocabulary at the host boundary.
- */
-export type NativeTranscriptLine = {
-	text: string,
-	start: number | null,
-	duration: number | null,
-};
-
 export type NativeTwitterAsset = {
 	url: string,
 	title: string,
@@ -103,10 +89,19 @@ export type NativeTwitterTweet = {
 	images?: NativeImage[],
 };
 
+/**
+ *  Activity-capture asset emitted by the browser extension's
+ *  `GENERATE_ASSETS` flow on YouTube watch pages.
+ * 
+ *  The transcript reuses the canonical [`TranscriptEntry`] from
+ *  `eurora-tools-youtube`: extension, native-messaging host, activity
+ *  pipeline, and tool dispatchers all encode YouTube transcripts in
+ *  exactly one shape (`{start, duration, text}`).
+ */
 export type NativeYoutubeAsset = {
 	url: string,
 	title: string,
-	transcript: NativeTranscriptLine[],
+	transcript: TranscriptEntry[],
 	current_time: number | null,
 };
 
@@ -122,6 +117,29 @@ export type NotificationsData = {
 };
 
 export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "profile"; data: ProfilePageData } | { page: "home"; data: TimelineData } | { page: "search"; data: SearchData } | { page: "notifications"; data: NotificationsData } | { page: "unsupported"; data: UnsupportedPageData };
+
+/**
+ *  Inline JSON payload carried by Request/Response/Event frames.
+ * 
+ *  Stored as a [`Box<RawValue>`] so the payload's JSON serializes
+ *  **inline** into the frame envelope rather than as a JSON-encoded
+ *  string. Compared to the historical `Option<String>` shape, this:
+ * 
+ *  - halves the wire size for large payloads (e.g. base64-encoded
+ *    PNGs) because the outer envelope no longer double-escapes the
+ *    inner JSON;
+ *  - drops one parse + one escape per direction (Rust producers hand
+ *    raw JSON straight to serde; consumers read it without first
+ *    decoding a string layer);
+ *  - typed in Rust as JSON rather than "string of unknown structure",
+ *    which means the encode/decode helpers can be centralised here
+ *    and call sites stop manually `serde_json::to_string`-ing.
+ * 
+ *  Construct via [`Payload::from_value`] for typed Rust data, or
+ *  [`Payload::from_raw_json`] when handing through a literal JSON
+ *  fragment.
+ */
+export type Payload = unknown;
 
 export type ProfilePageData = {
 	username: string,
@@ -154,14 +172,14 @@ export type RegisterFrame = {
 export type RequestFrame = {
 	id: number,
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 /**  Client reply to a [`RequestFrame`], correlated by `id`. */
 export type ResponseFrame = {
 	id: number,
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 export type SearchData = {
@@ -182,6 +200,16 @@ export type ShutdownFrame = {
 
 export type TimelineData = {
 	tweets: NativeTwitterTweet[],
+};
+
+/**  One cue from a YouTube transcript. */
+export type TranscriptEntry = {
+	/**  Start time of the cue in seconds, relative to the video start. */
+	start: number | null,
+	/**  How long the cue is on screen, in seconds. */
+	duration: number | null,
+	/**  Cue text as YouTube serves it (HTML-escaped, single-language). */
+	text: string,
 };
 
 export type TweetPageData = {

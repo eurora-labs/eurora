@@ -14,7 +14,7 @@
 //! framework.
 
 use euro_bridge::BridgeService;
-use euro_bridge_protocol::BridgeError;
+use euro_bridge_protocol::{BridgeError, Payload};
 use eurora_tools::{BrowserOrigin, Empty, ToolError};
 use eurora_tools_youtube::{CapturedFrame, CurrentTimestamp, Transcript, YoutubeAdapter};
 use serde::de::DeserializeOwned;
@@ -58,8 +58,8 @@ impl YoutubeBridgeImpl {
     where
         T: DeserializeOwned,
     {
-        let payload = serde_json::to_string(&json!({ "tab_id": target.tab_id }))
-            .map_err(ToolError::encode)?;
+        let payload =
+            Payload::from_value(&json!({ "tab_id": target.tab_id })).map_err(ToolError::encode)?;
         let response = self
             .bridge
             .send_request(target.process_id, action, Some(payload))
@@ -105,13 +105,15 @@ impl YoutubeAdapter for YoutubeBridgeImpl {
 /// failure to the wire layer, not the bridge implementation.
 fn decode_payload<T: DeserializeOwned>(
     tool: &'static str,
-    payload: Option<String>,
+    payload: Option<Payload>,
 ) -> Result<T, ToolError> {
-    let raw = payload.ok_or_else(|| ToolError::Decode {
-        message: format!("tool `{tool}` returned an empty payload").into(),
-        source: None,
-    })?;
-    serde_json::from_str(&raw).map_err(ToolError::decode)
+    payload
+        .ok_or_else(|| ToolError::Decode {
+            message: format!("tool `{tool}` returned an empty payload").into(),
+            source: None,
+        })?
+        .deserialize()
+        .map_err(ToolError::decode)
 }
 
 /// Translate a [`BridgeError`] into a tool-facing [`ToolError`].
@@ -148,7 +150,7 @@ fn map_bridge_err(tool: &'static str, err: BridgeError) -> ToolError {
         } => ToolError::Remote {
             code,
             message,
-            details: details.and_then(|s| serde_json::from_str(&s).ok()),
+            details: details.and_then(|p| p.deserialize().ok()),
         },
         other => ToolError::Transport(other.to_string().into()),
     }
@@ -188,7 +190,7 @@ mod tests {
 
     #[test]
     fn map_bridge_err_client_to_remote_with_decoded_details() {
-        let details = serde_json::to_string(&json!({"hint": "video offline"})).unwrap();
+        let details = Payload::from_value(&json!({"hint": "video offline"})).unwrap();
         match map_bridge_err(
             TIMESTAMP_TOOL,
             BridgeError::Client {
@@ -210,20 +212,11 @@ mod tests {
         }
     }
 
-    #[test]
-    fn map_bridge_err_client_with_garbled_details_drops_details() {
-        match map_bridge_err(
-            TIMESTAMP_TOOL,
-            BridgeError::Client {
-                code: 0,
-                message: "weird".into(),
-                details: Some("not valid json".into()),
-            },
-        ) {
-            ToolError::Remote { details, .. } => assert!(details.is_none()),
-            other => panic!("expected Remote, got {other:?}"),
-        }
-    }
+    /// `Payload::from_value(&"...")` always produces a structurally valid
+    /// JSON fragment, so we cannot exercise the "garbled details" case at
+    /// this layer any more — `BridgeError::Client.details` is now typed.
+    /// `decode_payload`'s malformed-input coverage already pins the
+    /// behaviour on the consumer side; nothing else needs to change here.
 
     #[test]
     fn map_bridge_err_client_code_410_is_context_unavailable() {
@@ -275,9 +268,12 @@ mod tests {
 
     #[test]
     fn decode_payload_malformed_json_preserves_serde_source() {
+        // Build a syntactically valid JSON payload that doesn't match
+        // the target type; the serde error must propagate as the
+        // `Decode.source`.
+        let payload = Payload::from_value(&json!({"unexpected": "shape"})).unwrap();
         let err: ToolError =
-            decode_payload::<CurrentTimestamp>(TIMESTAMP_TOOL, Some("{not json".into()))
-                .unwrap_err();
+            decode_payload::<CurrentTimestamp>(TIMESTAMP_TOOL, Some(payload)).unwrap_err();
         match err {
             ToolError::Decode { source, .. } => assert!(source.is_some()),
             other => panic!("expected Decode, got {other:?}"),
@@ -286,14 +282,15 @@ mod tests {
 
     #[test]
     fn decode_payload_happy_path_round_trips_current_timestamp() {
-        let raw = serde_json::to_string(&CurrentTimestamp {
+        let payload = Payload::from_value(&CurrentTimestamp {
             video_id: "abc123".into(),
-            timestamp_seconds: 12.5,
-            duration_seconds: 240.0,
+            current_time: 12.5,
+            duration: 240.0,
             playing: true,
         })
         .unwrap();
-        let decoded: CurrentTimestamp = decode_payload(TIMESTAMP_TOOL, Some(raw)).expect("decode");
+        let decoded: CurrentTimestamp =
+            decode_payload(TIMESTAMP_TOOL, Some(payload)).expect("decode");
         assert_eq!(decoded.video_id, "abc123");
         assert!(decoded.playing);
     }

@@ -2,6 +2,8 @@ use std::net::SocketAddr;
 
 use thiserror::Error;
 
+use crate::Payload;
+
 /// Errors surfaced by the bridge service to its callers.
 #[derive(Debug, Error)]
 pub enum BridgeError {
@@ -30,7 +32,7 @@ pub enum BridgeError {
     Client {
         code: u32,
         message: String,
-        details: Option<String>,
+        details: Option<Payload>,
     },
 
     /// The frame could not be delivered to the client's outbound

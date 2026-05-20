@@ -121,6 +121,22 @@ impl Catalog {
         self.by_name.get(name).map(|e| e.value().dispatcher.clone())
     }
 
+    /// Look up the dispatcher serving `name` together with the matching
+    /// `&'static str` descriptor name held by [`Entry`]. Callers that need
+    /// the static name (e.g. to populate [`IncomingCall::descriptor_name`])
+    /// should prefer this over the two-step
+    /// `dispatcher_for` + `Dispatcher::descriptor_name_for` because the
+    /// catalog already knows both — no second linear scan over the
+    /// dispatcher's slice.
+    ///
+    /// [`Entry`]: self
+    /// [`IncomingCall::descriptor_name`]: crate::IncomingCall::descriptor_name
+    pub fn lookup(&self, name: &str) -> Option<(Arc<dyn Dispatcher>, &'static str)> {
+        self.by_name
+            .get(name)
+            .map(|e| (e.value().dispatcher.clone(), e.value().descriptor.name))
+    }
+
     /// All descriptors known to the catalog, in unspecified order.
     ///
     /// Used by the per-turn `descriptors_for` filter that builds the

@@ -86,6 +86,11 @@ impl RemoteToolBus for ChatRemoteBus {
         let call_id = self.next_call_id.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
         self.pending.insert(call_id, tx);
+        // SAFETY: this guard removes the pending entry on every exit path
+        // (success, error, panic). Every place that previously called
+        // `self.pending.remove(&call_id)` is now redundant — the guard fires
+        // when it goes out of scope below.
+        let _guard = PendingGuard::new(&self.pending, call_id);
 
         let request = ChatServerMessage::ToolRequest {
             call_id,
@@ -93,7 +98,6 @@ impl RemoteToolBus for ChatRemoteBus {
             arguments,
         };
         if self.outbound.send(request).await.is_err() {
-            self.pending.remove(&call_id);
             return Err(ToolError::Transport(
                 "chat outbound channel closed before ToolRequest sent".into(),
             ));
@@ -103,19 +107,16 @@ impl RemoteToolBus for ChatRemoteBus {
         let outcome = tokio::select! {
             biased;
             () = self.chat_cancel.cancelled() => {
-                self.pending.remove(&call_id);
                 self.send_cancel(call_id).await;
                 return Err(ToolError::Cancelled);
             }
             () = tokio::time::sleep(timeout) => {
-                self.pending.remove(&call_id);
                 self.send_cancel(call_id).await;
                 return Err(ToolError::Timeout);
             }
             res = rx => res,
         };
 
-        self.pending.remove(&call_id);
         match outcome {
             Ok(result) => result,
             Err(_) => Err(ToolError::Transport(
@@ -141,29 +142,39 @@ impl ChatRemoteBus {
     }
 }
 
+/// Drop guard that removes a pending call's oneshot sender on every exit
+/// path of [`ChatRemoteBus::call`] — including panics. Centralising the
+/// removal here means each error arm only handles its own side-effect
+/// (e.g. emitting `ToolCancel`) and never has to remember the map cleanup.
+struct PendingGuard<'a> {
+    pending: &'a DashMap<u32, oneshot::Sender<Result<Value, ToolError>>>,
+    call_id: u32,
+}
+
+impl<'a> PendingGuard<'a> {
+    fn new(
+        pending: &'a DashMap<u32, oneshot::Sender<Result<Value, ToolError>>>,
+        call_id: u32,
+    ) -> Self {
+        Self { pending, call_id }
+    }
+}
+
+impl Drop for PendingGuard<'_> {
+    fn drop(&mut self) {
+        self.pending.remove(&self.call_id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use serde_json::json;
-    use thread_core::ToolSource;
     use tokio::time::Duration as TokioDuration;
 
     fn sample_descriptor(timeout_ms: u32) -> WireToolDescriptor {
-        WireToolDescriptor {
-            definition: agent_chain_core::tools::ToolDefinition {
-                name: "browser::test::echo".to_string(),
-                description: "x".to_string(),
-                parameters: json!({"type": "object"}),
-            },
-            output_schema: json!({"type": "object"}),
-            timeout_ms,
-            source: ToolSource::Bridge {
-                app_kind: "browser".to_string(),
-            },
-            required_contexts: vec![],
-            requires_user_approval: false,
-        }
+        crate::test_support::bridge_descriptor("browser::test::echo", timeout_ms)
     }
 
     /// Await a `ToolRequest` frame on the outbound channel and extract its

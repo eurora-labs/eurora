@@ -1,6 +1,5 @@
 ---
 source: crates/common/eurora-tools-macros/tests/descriptors_snapshot.rs
-assertion_line: 60
 expression: wire
 ---
 [
@@ -17,7 +16,7 @@ expression: wire
         output_schema: Object {
             "$schema": String("https://json-schema.org/draft/2020-12/schema"),
             "properties": Object {
-                "timestamp_seconds": Object {
+                "current_time": Object {
                     "format": String("double"),
                     "type": String("number"),
                 },
@@ -27,7 +26,7 @@ expression: wire
             },
             "required": Array [
                 String("video_id"),
-                String("timestamp_seconds"),
+                String("current_time"),
             ],
             "title": String("CurrentTimestamp"),
             "type": String("object"),

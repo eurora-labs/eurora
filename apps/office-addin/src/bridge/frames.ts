@@ -4,6 +4,7 @@ import type {
 	EventFrame,
 	Frame,
 	FrameKind,
+	Payload,
 	RegisterFrame,
 	RequestFrame,
 	ResponseFrame,
@@ -14,7 +15,7 @@ export function registerFrame(host_pid: number, app_pid: number, app_kind: strin
 	return { kind: { Register: { host_pid, app_pid, app_kind } } };
 }
 
-export function responseFrame(id: number, action: string, payload: string | null): Frame {
+export function responseFrame(id: number, action: string, payload: Payload | null): Frame {
 	return { kind: { Response: { id, action, payload } } };
 }
 
@@ -22,7 +23,7 @@ export function errorFrame(
 	id: number,
 	code: number,
 	message: string,
-	details: string | null = null,
+	details: Payload | null = null,
 ): Frame {
 	return { kind: { Error: { id, code, message, details } } };
 }

@@ -511,7 +511,7 @@ mod tests {
     use agent_chain::tools::{ArgsSchema, BaseTool, ToolInput, ToolOutput};
     use eurora_tools::ToolError;
     use serde_json::json;
-    use thread_core::{ToolSource, WireToolDescriptor};
+    use thread_core::WireToolDescriptor;
 
     #[derive(Debug)]
     struct RecordingTool {
@@ -604,20 +604,7 @@ mod tests {
     }
 
     fn remote_descriptor(name: &str) -> WireToolDescriptor {
-        WireToolDescriptor {
-            definition: agent_chain_core::tools::ToolDefinition {
-                name: name.to_string(),
-                description: "x".to_string(),
-                parameters: json!({"type": "object"}),
-            },
-            output_schema: json!({"type": "object"}),
-            timeout_ms: 5_000,
-            source: ToolSource::Bridge {
-                app_kind: "browser".to_string(),
-            },
-            required_contexts: vec![],
-            requires_user_approval: false,
-        }
+        crate::test_support::bridge_descriptor(name, 5_000)
     }
 
     fn tool_call(name: &str, args: Value, id: &str) -> ToolCall {

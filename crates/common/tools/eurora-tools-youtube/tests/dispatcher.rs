@@ -32,8 +32,8 @@ impl YoutubeAdapter for YoutubeStub {
     ) -> Result<CurrentTimestamp, ToolError> {
         Ok(CurrentTimestamp {
             video_id: format!("tab-{}", target.tab_id),
-            timestamp_seconds: 12.5,
-            duration_seconds: 240.0,
+            current_time: 12.5,
+            duration: 240.0,
             playing: true,
         })
     }
@@ -47,8 +47,8 @@ impl YoutubeAdapter for YoutubeStub {
             video_id: format!("tab-{}", target.tab_id),
             language: "en-US".into(),
             entries: vec![TranscriptEntry {
-                start_seconds: 0.0,
-                duration_seconds: 1.0,
+                start: 0.0,
+                duration: 1.0,
                 text: "hello world".into(),
             }],
         })
@@ -61,7 +61,7 @@ impl YoutubeAdapter for YoutubeStub {
     ) -> Result<CapturedFrame, ToolError> {
         Ok(CapturedFrame {
             video_id: format!("tab-{}", target.tab_id),
-            timestamp_seconds: 12.5,
+            current_time: 12.5,
             width: 1280,
             height: 720,
             image_base64: "iVBORw0KGgo=".into(),
@@ -143,8 +143,8 @@ async fn dispatch_get_current_timestamp_round_trips() {
         decoded,
         CurrentTimestamp {
             video_id: "tab-42".into(),
-            timestamp_seconds: 12.5,
-            duration_seconds: 240.0,
+            current_time: 12.5,
+            duration: 240.0,
             playing: true,
         }
     );

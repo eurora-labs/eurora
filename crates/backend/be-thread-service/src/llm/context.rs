@@ -48,10 +48,10 @@ pub async fn prepare_llm_context(
         messages.insert(0, system_message.into());
     }
 
-    resolve_plain_text_blocks(asset_service, &mut messages).await;
+    resolve_blocks::<PlainTextBlock>(asset_service, &mut messages).await;
 
     let Some(vision) = providers.vision.as_ref() else {
-        resolve_image_blocks(asset_service, &mut messages).await;
+        resolve_blocks::<ImageBlock>(asset_service, &mut messages).await;
         let catalog = build_catalog(Vec::new(), remote_descriptors, active_contexts)?;
         let chat_model = bind_chat_model(&providers.chat, &catalog)?;
         return Ok(LlmContext {
@@ -141,89 +141,109 @@ fn bind_chat_model(
 /// throughput against connection pressure.
 const ASSET_DOWNLOAD_CONCURRENCY: usize = 8;
 
-async fn resolve_plain_text_blocks(asset_service: &AssetService, messages: &mut [AnyMessage]) {
-    let mut urls: HashSet<String> = HashSet::new();
-    for_each_resolve_block(messages, |block| {
-        if let ContentBlock::PlainText(pt) = block
-            && pt.text.is_none()
-            && let Some(url) = pt.url.as_deref()
-        {
-            urls.insert(url.to_string());
-        }
-    });
+/// Defines how a [`ContentBlock`] variant participates in the
+/// download-and-rewrite pass driven by [`resolve_blocks`].
+trait ResolvableBlock {
+    /// Human-readable tag included in download-failure log lines.
+    const LABEL: &'static str;
 
-    let downloaded = download_many(asset_service.storage(), urls, "plain-text").await;
+    /// The URL still pending resolution, if any. `None` means the block
+    /// either has no URL or has already been resolved inline.
+    fn pending_url(block: &ContentBlock) -> Option<&str>;
 
-    for_each_resolve_block_mut(messages, |block| {
-        let ContentBlock::PlainText(pt) = block else {
-            return;
-        };
-        if pt.text.is_some() {
-            return;
-        }
-        let Some(url) = pt.url.as_deref() else {
-            return;
-        };
-        if let Some(bytes) = downloaded.get(url) {
-            pt.text = Some(String::from_utf8_lossy(bytes).into_owned());
-        }
-    });
+    /// Replace the block's URL reference with the downloaded bytes.
+    /// Called only when [`Self::pending_url`] returned `Some(url)` and
+    /// the URL was successfully fetched.
+    fn apply(block: &mut ContentBlock, bytes: &[u8]);
 }
 
-async fn resolve_image_blocks(asset_service: &AssetService, messages: &mut [AnyMessage]) {
-    let mut urls: HashSet<String> = HashSet::new();
-    for_each_resolve_block(messages, |block| {
-        if let ContentBlock::Image(img) = block
-            && img.base64.is_none()
-            && let Some(url) = img.url.as_deref()
-        {
-            urls.insert(url.to_string());
+struct PlainTextBlock;
+impl ResolvableBlock for PlainTextBlock {
+    const LABEL: &'static str = "plain-text";
+
+    fn pending_url(block: &ContentBlock) -> Option<&str> {
+        let ContentBlock::PlainText(pt) = block else {
+            return None;
+        };
+        if pt.text.is_some() {
+            return None;
         }
-    });
+        pt.url.as_deref()
+    }
 
-    let downloaded = download_many(asset_service.storage(), urls, "image").await;
+    fn apply(block: &mut ContentBlock, bytes: &[u8]) {
+        if let ContentBlock::PlainText(pt) = block {
+            pt.text = Some(String::from_utf8_lossy(bytes).into_owned());
+        }
+    }
+}
 
-    for_each_resolve_block_mut(messages, |block| {
+struct ImageBlock;
+impl ResolvableBlock for ImageBlock {
+    const LABEL: &'static str = "image";
+
+    fn pending_url(block: &ContentBlock) -> Option<&str> {
         let ContentBlock::Image(img) = block else {
-            return;
+            return None;
         };
         if img.base64.is_some() {
-            return;
+            return None;
         }
-        let Some(url) = img.url.as_deref() else {
-            return;
-        };
-        if let Some(bytes) = downloaded.get(url) {
+        img.url.as_deref()
+    }
+
+    fn apply(block: &mut ContentBlock, bytes: &[u8]) {
+        if let ContentBlock::Image(img) = block {
             img.base64 = Some(general_purpose::STANDARD.encode(bytes));
             img.url = None;
         }
-    });
+    }
 }
 
-fn for_each_resolve_block(messages: &[AnyMessage], mut f: impl FnMut(&ContentBlock)) {
-    for message in messages {
+async fn resolve_blocks<B: ResolvableBlock>(
+    asset_service: &AssetService,
+    messages: &mut [AnyMessage],
+) {
+    let urls: HashSet<String> = iter_blocks(messages)
+        .filter_map(|block| B::pending_url(block).map(str::to_owned))
+        .collect();
+
+    if urls.is_empty() {
+        return;
+    }
+
+    let downloaded = download_many(asset_service.storage(), urls, B::LABEL).await;
+
+    for block in iter_blocks_mut(messages) {
+        let Some(url) = B::pending_url(block) else {
+            continue;
+        };
+        if let Some(bytes) = downloaded.get(url) {
+            B::apply(block, bytes);
+        }
+    }
+}
+
+fn iter_blocks(messages: &[AnyMessage]) -> impl Iterator<Item = &ContentBlock> {
+    messages.iter().flat_map(|message| {
         let blocks: &[ContentBlock] = match message {
             AnyMessage::HumanMessage(m) => &m.content,
             AnyMessage::SystemMessage(m) => &m.content,
-            _ => continue,
+            _ => &[],
         };
-        for block in blocks {
-            f(block);
-        }
-    }
+        blocks.iter()
+    })
 }
 
-fn for_each_resolve_block_mut(messages: &mut [AnyMessage], mut f: impl FnMut(&mut ContentBlock)) {
-    for message in messages {
+fn iter_blocks_mut(messages: &mut [AnyMessage]) -> impl Iterator<Item = &mut ContentBlock> {
+    messages.iter_mut().flat_map(|message| {
         let blocks: &mut [ContentBlock] = match message {
             AnyMessage::HumanMessage(m) => &mut m.content,
             AnyMessage::SystemMessage(m) => &mut m.content,
-            _ => continue,
+            _ => &mut [],
         };
-        for block in blocks {
-            f(block);
-        }
-    }
+        blocks.iter_mut()
+    })
 }
 
 async fn download_many(

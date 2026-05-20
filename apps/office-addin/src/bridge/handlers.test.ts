@@ -16,7 +16,7 @@ function req(action: string): RequestFrame {
 }
 
 describe('dispatchRequest', () => {
-	it('returns a Response with the JSON-encoded WordDocumentAsset for GET_ASSETS', async () => {
+	it('returns a Response with the WordDocumentAsset inline for GET_ASSETS', async () => {
 		const deps = {
 			getAsset: vi.fn().mockResolvedValue(ASSET),
 			getMetadata: vi.fn(),
@@ -24,11 +24,11 @@ describe('dispatchRequest', () => {
 		const frame = await dispatchRequest(req('GET_ASSETS'), deps);
 		expect(deps.getAsset).toHaveBeenCalledOnce();
 		expect(frame).toEqual({
-			kind: { Response: { id: 1, action: 'GET_ASSETS', payload: JSON.stringify(ASSET) } },
+			kind: { Response: { id: 1, action: 'GET_ASSETS', payload: ASSET } },
 		});
 	});
 
-	it('returns a Response with the JSON-encoded metadata for GET_METADATA', async () => {
+	it('returns a Response with the metadata inline for GET_METADATA', async () => {
 		const deps = {
 			getAsset: vi.fn(),
 			getMetadata: vi.fn().mockResolvedValue(METADATA),
@@ -37,7 +37,7 @@ describe('dispatchRequest', () => {
 		expect(deps.getMetadata).toHaveBeenCalledOnce();
 		expect(frame).toEqual({
 			kind: {
-				Response: { id: 1, action: 'GET_METADATA', payload: JSON.stringify(METADATA) },
+				Response: { id: 1, action: 'GET_METADATA', payload: METADATA },
 			},
 		});
 	});

@@ -1,10 +1,13 @@
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use specta::Type;
 
 /// Top-level envelope sent in both directions on the bridge. Every
 /// message is a `Frame`; the [`FrameKind`] discriminator identifies the
 /// payload variant.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct Frame {
     pub kind: FrameKind,
 }
@@ -12,7 +15,7 @@ pub struct Frame {
 /// Frame payload. Serialized as an externally-tagged JSON object —
 /// `{ "Request": { ... } }` — to match the shape the browser extension
 /// already consumes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub enum FrameKind {
     Request(RequestFrame),
     Response(ResponseFrame),
@@ -41,41 +44,152 @@ impl FrameKind {
     }
 }
 
+/// Inline JSON payload carried by Request/Response/Event frames.
+///
+/// Stored as a [`Box<RawValue>`] so the payload's JSON serializes
+/// **inline** into the frame envelope rather than as a JSON-encoded
+/// string. Compared to the historical `Option<String>` shape, this:
+///
+/// - halves the wire size for large payloads (e.g. base64-encoded
+///   PNGs) because the outer envelope no longer double-escapes the
+///   inner JSON;
+/// - drops one parse + one escape per direction (Rust producers hand
+///   raw JSON straight to serde; consumers read it without first
+///   decoding a string layer);
+/// - typed in Rust as JSON rather than "string of unknown structure",
+///   which means the encode/decode helpers can be centralised here
+///   and call sites stop manually `serde_json::to_string`-ing.
+///
+/// Construct via [`Payload::from_value`] for typed Rust data, or
+/// [`Payload::from_raw_json`] when handing through a literal JSON
+/// fragment.
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(transparent)]
+// Binding-target-specific specta wiring:
+//
+// - **TypeScript** path (`codegen` feature off): the wrapper inherits
+//   the serde `transparent` attribute, so specta inlines it as its
+//   inner field type and the inner-field override to
+//   `specta_typescript::Unknown` makes every reference emit `unknown`.
+// - **Swift** path (`codegen` feature on): specta's auto-`transparent`
+//   detection is suppressed via `specta(transparent = false)`, so the
+//   wrapper renders as a named struct. The inner field is then
+//   `specta(skip)`'d to keep the emitted struct body empty (specta-swift
+//   refuses to render `Box<RawValue>` directly anyway), and the
+//   codegen post-processor in
+//   `crates/app/euro-bridge-protocol/src/bin/codegen.rs` rewrites that
+//   empty body into the JSON-value `Codable` enum downstream Swift
+//   consumers actually need.
+#[cfg_attr(feature = "codegen", specta(transparent = false))]
+pub struct Payload(
+    #[cfg_attr(not(feature = "codegen"), specta(type = specta_typescript::Unknown))]
+    #[cfg_attr(feature = "codegen", specta(skip))]
+    Box<RawValue>,
+);
+
+impl Payload {
+    /// Wrap a Rust value that implements [`Serialize`].
+    ///
+    /// Returns an error if `value` cannot be serialized — typically
+    /// because of a `serde` custom-serializer error, since `RawValue`
+    /// itself imposes no shape constraints.
+    pub fn from_value<T: Serialize + ?Sized>(value: &T) -> Result<Self, serde_json::Error> {
+        Ok(Self(serde_json::value::to_raw_value(value)?))
+    }
+
+    /// Wrap a pre-rendered JSON fragment.
+    pub fn from_raw_json(raw: Box<RawValue>) -> Self {
+        Self(raw)
+    }
+
+    /// Decode the payload into a typed Rust value.
+    pub fn deserialize<T: serde::de::DeserializeOwned>(&self) -> Result<T, serde_json::Error> {
+        serde_json::from_str(self.0.get())
+    }
+
+    /// Borrow the underlying JSON fragment as a `&str`. The slice
+    /// outlives the borrow but not the [`Payload`] — callers that need
+    /// ownership should clone or call [`Payload::into_raw`].
+    pub fn as_str(&self) -> &str {
+        self.0.get()
+    }
+
+    /// Consume `self` and return the boxed `RawValue` for callers that
+    /// need to hand the fragment through to another serde structure
+    /// without re-encoding.
+    pub fn into_raw(self) -> Box<RawValue> {
+        self.0
+    }
+}
+
+impl PartialEq for Payload {
+    /// JSON-value equality, not byte equality: two payloads compare
+    /// equal iff their decoded `serde_json::Value` trees match. This
+    /// matches the intent of the wire — `{"a":1}` and `{ "a": 1 }`
+    /// represent the same data — and means [`Frame`]'s derived
+    /// `PartialEq` continues to behave as a structural comparator.
+    fn eq(&self, other: &Self) -> bool {
+        match (
+            serde_json::from_str::<serde_json::Value>(self.0.get()),
+            serde_json::from_str::<serde_json::Value>(other.0.get()),
+        ) {
+            (Ok(a), Ok(b)) => a == b,
+            _ => self.0.get() == other.0.get(),
+        }
+    }
+}
+
+impl fmt::Display for Payload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.get())
+    }
+}
+
+impl<T: Serialize> From<&T> for Payload {
+    /// Convenience for the common "serialize a typed value into a
+    /// payload" path. Panics on serialization failure — only safe for
+    /// types that can never fail to serialize (the usual case for
+    /// `Serialize`-derived plain data).
+    fn from(value: &T) -> Self {
+        Payload::from_value(value).expect("Payload::from value serializes")
+    }
+}
+
 /// Desktop-initiated request to a connected client.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct RequestFrame {
     pub id: u32,
     pub action: String,
     #[serde(default)]
-    pub payload: Option<String>,
+    pub payload: Option<Payload>,
 }
 
 /// Client reply to a [`RequestFrame`], correlated by `id`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ResponseFrame {
     pub id: u32,
     pub action: String,
     #[serde(default)]
-    pub payload: Option<String>,
+    pub payload: Option<Payload>,
 }
 
 /// Unsolicited notification pushed by a client (e.g. browser tab
 /// activation, Word selection change).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct EventFrame {
     pub action: String,
     #[serde(default)]
-    pub payload: Option<String>,
+    pub payload: Option<Payload>,
 }
 
 /// Failure response correlated with a [`RequestFrame`] by `id`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ErrorFrame {
     pub id: u32,
     pub code: u32,
     pub message: String,
     #[serde(default)]
-    pub details: Option<String>,
+    pub details: Option<Payload>,
 }
 
 /// Either side may send this to abort an in-flight request identified
@@ -176,10 +290,11 @@ impl From<ShutdownFrame> for Frame {
 mod tests {
     use super::*;
 
-    /// Pin the JSON wire format. The browser extension's
-    /// `native-messenger.ts` keys on `'Request' in kind`,
-    /// `'Response' in kind`, etc. — so the externally-tagged form must
-    /// not regress.
+    /// Pin the JSON wire format. Payload-bearing frames now embed
+    /// the inner JSON inline rather than as an escaped string, so the
+    /// browser extension and other clients see the payload as a
+    /// regular JSON value instead of having to call `JSON.parse(...)`
+    /// on it first.
     #[test]
     fn request_frame_round_trips_through_externally_tagged_json() {
         let frame = Frame::from(RequestFrame {
@@ -204,6 +319,64 @@ mod tests {
 
         let round_tripped: Frame = serde_json::from_value(json).expect("deserialize");
         assert_eq!(round_tripped, frame);
+    }
+
+    /// A payload-bearing frame must serialize the payload **inline**
+    /// (not as an escaped JSON string). This pins the wire shape the
+    /// browser extension and Office add-in expect after the
+    /// `Option<String>` → `Option<Payload>` change.
+    #[test]
+    fn request_frame_inlines_payload_on_the_wire() {
+        let frame = Frame::from(RequestFrame {
+            id: 7,
+            action: "YOUTUBE_GET_CURRENT_TIMESTAMP".into(),
+            payload: Some(Payload::from_value(&serde_json::json!({"tab_id": 19})).unwrap()),
+        });
+
+        let json = serde_json::to_value(&frame).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "kind": {
+                    "Request": {
+                        "id": 7,
+                        "action": "YOUTUBE_GET_CURRENT_TIMESTAMP",
+                        "payload": {"tab_id": 19},
+                    }
+                }
+            })
+        );
+    }
+
+    /// Round-trip through a typed payload struct: encode → outer JSON →
+    /// decode → the same typed struct, exercising the `Payload::from_value`
+    /// + `Payload::deserialize` ergonomics.
+    #[test]
+    fn payload_round_trips_a_typed_struct() {
+        #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+        struct Args {
+            tab_id: i64,
+            label: String,
+        }
+
+        let args = Args {
+            tab_id: 19,
+            label: "primary".into(),
+        };
+        let frame = Frame::from(RequestFrame {
+            id: 1,
+            action: "X".into(),
+            payload: Some(Payload::from_value(&args).unwrap()),
+        });
+
+        let json = serde_json::to_string(&frame).expect("serialize");
+        let parsed: Frame = serde_json::from_str(&json).expect("deserialize");
+
+        let FrameKind::Request(req) = parsed.kind else {
+            panic!("expected Request");
+        };
+        let decoded: Args = req.payload.expect("payload present").deserialize().unwrap();
+        assert_eq!(decoded, args);
     }
 
     #[test]
@@ -385,5 +558,17 @@ mod tests {
         };
         assert_eq!(event.action, "TAB_ACTIVATED");
         assert!(event.payload.is_none());
+    }
+
+    /// Equality on `Payload` is JSON-structural, not byte-wise. Two
+    /// payloads that decode to the same `serde_json::Value` compare
+    /// equal even if their byte representations differ (whitespace,
+    /// key order on objects, …).
+    #[test]
+    fn payload_equality_is_structural() {
+        let a = Payload::from_raw_json(RawValue::from_string(r#"{"a":1,"b":2}"#.into()).unwrap());
+        let b =
+            Payload::from_raw_json(RawValue::from_string(r#"{ "b": 2, "a": 1 }"#.into()).unwrap());
+        assert_eq!(a, b);
     }
 }

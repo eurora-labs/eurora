@@ -27,7 +27,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use euro_bridge::{BridgeService, EventFrame};
+use euro_bridge::{BridgeService, EventFrame, Payload};
 use eurora_tools::{ActiveContext, ContextRegistry, Origin};
 use serde::Deserialize;
 use serde_json::Value;
@@ -136,7 +136,7 @@ pub fn apply_event(
                     action: frame.action.clone(),
                 });
             }
-            let payload: ActivatePayload = decode_payload(&frame.action, frame.payload.as_deref())?;
+            let payload: ActivatePayload = decode_payload(&frame.action, frame.payload.as_ref())?;
             let origin = stamp_routing_pid(payload.origin, app_pid);
             registry.activate(ActiveContext {
                 key: payload.key,
@@ -147,8 +147,7 @@ pub fn apply_event(
             Ok(EventOutcome::Activated)
         }
         CONTEXT_DEACTIVATED => {
-            let payload: DeactivatePayload =
-                decode_payload(&frame.action, frame.payload.as_deref())?;
+            let payload: DeactivatePayload = decode_payload(&frame.action, frame.payload.as_ref())?;
             registry.deactivate(&payload.key);
             Ok(EventOutcome::Deactivated)
         }
@@ -158,15 +157,17 @@ pub fn apply_event(
 
 fn decode_payload<T: for<'de> Deserialize<'de>>(
     action: &str,
-    payload: Option<&str>,
+    payload: Option<&Payload>,
 ) -> Result<T, ApplyError> {
-    let raw = payload.ok_or_else(|| ApplyError::MissingPayload {
-        action: action.to_owned(),
-    })?;
-    serde_json::from_str(raw).map_err(|source| ApplyError::InvalidJson {
-        action: action.to_owned(),
-        source,
-    })
+    payload
+        .ok_or_else(|| ApplyError::MissingPayload {
+            action: action.to_owned(),
+        })?
+        .deserialize()
+        .map_err(|source| ApplyError::InvalidJson {
+            action: action.to_owned(),
+            source,
+        })
 }
 
 /// Replace the origin's routing PID with the envelope-derived
@@ -247,8 +248,8 @@ mod tests {
 
     /// The shape the extension actually emits: no `process_id` on the
     /// origin (it's stamped on the desktop from the envelope `app_pid`).
-    fn browser_payload(key: &str) -> String {
-        json!({
+    fn browser_payload(key: &str) -> Payload {
+        Payload::from_value(&json!({
             "key": key,
             "data": {
                 "video_id": "abc123",
@@ -262,12 +263,12 @@ mod tests {
                     "page_url": "https://www.youtube.com/watch?v=abc123",
                 }
             }
-        })
-        .to_string()
+        }))
+        .expect("encode browser payload")
     }
 
-    fn deactivate_payload(key: &str) -> String {
-        json!({ "key": key }).to_string()
+    fn deactivate_payload(key: &str) -> Payload {
+        Payload::from_value(&json!({ "key": key })).expect("encode deactivate payload")
     }
 
     #[test]
@@ -302,7 +303,7 @@ mod tests {
         // Even if the extension misbehaves and supplies its own
         // `process_id`, the envelope is authoritative.
         let registry = ContextRegistry::new();
-        let payload = json!({
+        let payload = Payload::from_value(&json!({
             "key": "youtube::watch_page",
             "data": {},
             "origin": {
@@ -313,8 +314,8 @@ mod tests {
                     "page_url": "https://www.youtube.com/watch?v=xyz",
                 }
             }
-        })
-        .to_string();
+        }))
+        .expect("encode payload");
         apply_event(
             &registry,
             TEST_APP_PID,
@@ -372,9 +373,12 @@ mod tests {
     #[test]
     fn malformed_json_is_rejected() {
         let registry = ContextRegistry::new();
+        // Structurally valid JSON, but missing the `key` / `data` /
+        // `origin` fields the activate path requires — exercises the
+        // `InvalidJson` arm without bypassing the `Payload` newtype.
         let frame = EventFrame {
             action: CONTEXT_ACTIVATED.into(),
-            payload: Some("{not json".into()),
+            payload: Some(Payload::from_value(&json!({"unexpected": true})).unwrap()),
         };
         let err = apply_event(&registry, TEST_APP_PID, &frame).expect_err("malformed json");
         assert!(matches!(err, ApplyError::InvalidJson { .. }));
@@ -419,7 +423,7 @@ mod tests {
             TEST_APP_PID,
             &EventFrame {
                 action: "TAB_ACTIVATED".into(),
-                payload: Some("{}".into()),
+                payload: Some(Payload::from_value(&json!({})).unwrap()),
             },
         )
         .expect("ignored");
@@ -456,7 +460,7 @@ mod tests {
         )
         .expect("activate first");
 
-        let updated = json!({
+        let updated = Payload::from_value(&json!({
             "key": "youtube::watch_page",
             "data": { "video_id": "def456" },
             "origin": {
@@ -466,8 +470,8 @@ mod tests {
                     "page_url": "https://www.youtube.com/watch?v=def456",
                 }
             }
-        })
-        .to_string();
+        }))
+        .expect("encode payload");
         // Re-activation from a different host registration (new browser
         // session) carries a different envelope PID — verifies the
         // overwrite path stamps the latest value.

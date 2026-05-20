@@ -28,7 +28,6 @@ vi.mock('../transcript/index.js', () => ({
 
 function makeWatcher() {
 	const canvas = document.createElement('canvas');
-	const context = canvas.getContext('2d') as CanvasRenderingContext2D;
 	const player = document.querySelector('video.html5-main-video') as HTMLVideoElement;
 	// jsdom doesn't run the video pipeline; stub the bits the handlers
 	// read directly so we can drive them without a real media element.
@@ -38,7 +37,7 @@ function makeWatcher() {
 	Object.defineProperty(player, 'readyState', { value: 4, configurable: true });
 	Object.defineProperty(player, 'videoWidth', { value: 640, configurable: true });
 	Object.defineProperty(player, 'videoHeight', { value: 360, configurable: true });
-	return new YoutubeWatcher({ canvas, context, youtubePlayer: player });
+	return new YoutubeWatcher({ canvas, youtubePlayer: player });
 }
 
 function makeSender(): import('webextension-polyfill').Runtime.MessageSender {
@@ -76,8 +75,8 @@ describe('youtube.com site handler', () => {
 
 			expect(result).toEqual({
 				video_id: 'abc123',
-				timestamp_seconds: 12.5,
-				duration_seconds: 240.0,
+				current_time: 12.5,
+				duration: 240.0,
 				playing: true,
 			});
 		});
@@ -86,7 +85,6 @@ describe('youtube.com site handler', () => {
 			document.body.innerHTML = '';
 			const watcher = new YoutubeWatcher({
 				canvas: document.createElement('canvas'),
-				context: document.createElement('canvas').getContext('2d'),
 				youtubePlayer: null,
 			});
 			const result = await watcher.listen({ type: 'GET_CURRENT_TIMESTAMP' }, makeSender());
@@ -112,8 +110,8 @@ describe('youtube.com site handler', () => {
 				video_id: 'abc123',
 				language: 'en',
 				entries: [
-					{ start_seconds: 0, duration_seconds: 1.5, text: 'Hello' },
-					{ start_seconds: 1.5, duration_seconds: 1.0, text: 'World' },
+					{ start: 0, duration: 1.5, text: 'Hello' },
+					{ start: 1.5, duration: 1.0, text: 'World' },
 				],
 			});
 		});
@@ -133,7 +131,7 @@ describe('youtube.com site handler', () => {
 
 			expect(result).toEqual({
 				video_id: 'abc123',
-				timestamp_seconds: 12.5,
+				current_time: 12.5,
 				width: 640,
 				height: 360,
 				image_base64: 'mockdata',

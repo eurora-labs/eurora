@@ -1,5 +1,5 @@
 import browser from 'webextension-polyfill';
-import type { Frame } from '../content/bindings';
+import type { Frame, Payload } from '../content/bindings';
 
 /// The single `ActiveContext.key` this observer manages. Keep in sync
 /// with the server-side per-key formatter
@@ -197,7 +197,11 @@ function postEvent(action: string, payload: unknown): void {
 		kind: {
 			Event: {
 				action,
-				payload: JSON.stringify(payload),
+				// `payload` is the bridge protocol's inline JSON value
+				// — no `JSON.stringify` step. The Rust-side Frame parser
+				// captures the raw JSON region verbatim and a typed
+				// consumer narrows it (`Payload::deserialize`).
+				payload: payload as Payload,
 			},
 		},
 	};

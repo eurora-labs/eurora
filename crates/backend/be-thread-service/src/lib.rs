@@ -24,6 +24,9 @@ mod service;
 mod tool_catalog;
 mod tools;
 
+#[cfg(test)]
+mod test_support;
+
 use std::sync::Arc;
 
 use axum::Router;

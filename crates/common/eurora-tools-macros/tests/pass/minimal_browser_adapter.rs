@@ -10,7 +10,7 @@ pub struct Empty {}
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct CurrentTimestamp {
     pub video_id: String,
-    pub timestamp_seconds: f64,
+    pub current_time: f64,
 }
 
 /// Tools for the YouTube video the user is currently watching.
@@ -46,7 +46,7 @@ fn main() {
         ) -> Result<CurrentTimestamp, ToolError> {
             Ok(CurrentTimestamp {
                 video_id: String::new(),
-                timestamp_seconds: 0.0,
+                current_time: 0.0,
             })
         }
     }

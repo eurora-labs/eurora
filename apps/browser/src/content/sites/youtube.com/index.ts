@@ -7,42 +7,43 @@ import {
 } from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
-import type { NativeYoutubeAsset, NativeYoutubeSnapshot } from '../../../shared/content/bindings';
-
-interface EurImage {
-	dataBase64: string;
-	width: number;
-	height: number;
-}
+import type {
+	NativeYoutubeAsset,
+	NativeYoutubeSnapshot,
+	TranscriptEntry,
+} from '../../../shared/content/bindings';
 
 /// Mirrors `eurora_tools_youtube::types::CurrentTimestamp`. The bridge
 /// dispatcher decodes this shape verbatim — keep the field names and
 /// types in sync with the Rust struct.
 interface CurrentTimestampPayload {
 	video_id: string;
-	timestamp_seconds: number;
-	duration_seconds: number;
+	current_time: number;
+	duration: number;
 	playing: boolean;
-}
-
-/// Mirrors `eurora_tools_youtube::types::TranscriptEntry`.
-interface TranscriptEntryPayload {
-	start_seconds: number;
-	duration_seconds: number;
-	text: string;
 }
 
 /// Mirrors `eurora_tools_youtube::types::Transcript`.
 interface TranscriptPayload {
 	video_id: string;
 	language: string;
-	entries: TranscriptEntryPayload[];
+	entries: TranscriptEntry[];
 }
 
 /// Mirrors `eurora_tools_youtube::types::CapturedFrame`.
 interface CapturedFramePayload {
 	video_id: string;
-	timestamp_seconds: number;
+	current_time: number;
+	width: number;
+	height: number;
+	image_base64: string;
+}
+
+/// Raw frame capture without the per-call envelope. Used internally by
+/// both `handleGetCurrentFrame` (tool path) and `handleGenerateSnapshot`
+/// (legacy activity-capture path), so the canvas-draw logic exists in
+/// exactly one place.
+interface RawFrame {
 	width: number;
 	height: number;
 	image_base64: string;
@@ -55,22 +56,11 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
 	}
 
-	private async fetchTranscript(): Promise<FetchedTranscript> {
-		const videoId = getCurrentVideoId();
-		if (videoId === undefined) {
-			throw new Error('YouTube watch page has no video id');
-		}
-		return await this.youtubeTranscriptApi.fetch(videoId);
-	}
-
 	public listen(
 		obj: BrowserObj,
 		sender: browser.Runtime.MessageSender,
 	): Promise<unknown> | false {
 		const msg = obj as YoutubeBrowserMessage;
-		if (msg.type === 'PLAY') {
-			return this.handlePlay(msg, sender).catch(() => undefined);
-		}
 		switch (msg.type) {
 			case 'GET_CURRENT_TIMESTAMP':
 				return this.guard(this.handleGetCurrentTimestamp());
@@ -82,16 +72,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		return super.listen(obj, sender);
 	}
 
-	public async handlePlay(
-		obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<any> {
-		const { value } = obj;
-		if (this.params.youtubePlayer) {
-			this.params.youtubePlayer.currentTime = value as number;
-		}
-	}
-
 	public async handleNew(
 		_obj: YoutubeBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
@@ -99,22 +79,26 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		return { kind: 'Ok', data: null };
 	}
 
-	private async generateVideoAsset(): Promise<any> {
+	public async handleGenerateAssets(
+		_obj: YoutubeBrowserMessage,
+		_sender: browser.Runtime.MessageSender,
+	): Promise<WatcherResponse> {
+		if (!window.location.href.includes('/watch?v=')) {
+			return createArticleAsset(document);
+		}
+
 		try {
-			const currentTime = this.getCurrentVideoTime();
-			const fetched = await this.fetchTranscript();
+			const [{ current_time }, transcript] = await Promise.all([
+				this.handleGetCurrentTimestamp(),
+				this.handleGetTranscript(),
+			]);
 
 			const reportData: NativeYoutubeAsset = {
 				url: window.location.href,
 				title: document.title,
-				transcript: fetched.snippets.map((s) => ({
-					text: s.text,
-					start: s.start,
-					duration: s.duration,
-				})),
-				current_time: currentTime,
+				transcript: transcript.entries,
+				current_time,
 			};
-
 			return { kind: 'NativeYoutubeAsset', data: reportData };
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
@@ -124,7 +108,6 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 				error: errorMessage,
 				stack: error instanceof Error ? error.stack : undefined,
 			});
-
 			return {
 				kind: 'Error',
 				data: `Failed to generate YouTube assets for ${window.location.href}: ${errorMessage}`,
@@ -132,32 +115,18 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		}
 	}
 
-	public async handleGenerateAssets(
-		_obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		if (window.location.href.includes('/watch?v=')) {
-			return await this.generateVideoAsset();
-		} else {
-			const articleAsset = createArticleAsset(document);
-			return articleAsset;
-		}
-	}
-
 	public async handleGenerateSnapshot(
 		_obj: YoutubeBrowserMessage,
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
-		const currentTime = this.getCurrentVideoTime();
-		const videoFrame = this.getCurrentVideoFrame();
-
+		const player = this.requirePlayer();
+		const frame = this.captureFrame(player);
 		const reportData: NativeYoutubeSnapshot = {
-			current_time: Math.round(currentTime),
-			video_frame_base64: videoFrame.dataBase64,
-			video_frame_width: videoFrame.width,
-			video_frame_height: videoFrame.height,
+			current_time: Math.round(player.currentTime),
+			video_frame_base64: frame.image_base64,
+			video_frame_width: frame.width,
+			video_frame_height: frame.height,
 		};
-
 		return { kind: 'NativeYoutubeSnapshot', data: reportData };
 	}
 
@@ -171,8 +140,8 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 		const player = this.requirePlayer();
 		return {
 			video_id: videoId,
-			timestamp_seconds: player.currentTime,
-			duration_seconds: player.duration,
+			current_time: player.currentTime,
+			duration: player.duration,
 			playing: !player.paused,
 		};
 	}
@@ -188,8 +157,8 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 			video_id: fetched.videoId,
 			language: fetched.languageCode,
 			entries: fetched.snippets.map((s) => ({
-				start_seconds: s.start,
-				duration_seconds: s.duration,
+				start: s.start,
+				duration: s.duration,
 				text: s.text,
 			})),
 		};
@@ -200,56 +169,49 @@ export class YoutubeWatcher extends Watcher<WatcherParams> {
 	public async handleGetCurrentFrame(): Promise<CapturedFramePayload> {
 		const videoId = requireCurrentVideoId();
 		const player = this.requirePlayer();
-		const frame = this.getCurrentVideoFrame();
+		const frame = this.captureFrame(player);
 		return {
 			video_id: videoId,
-			timestamp_seconds: player.currentTime,
+			current_time: player.currentTime,
 			width: frame.width,
 			height: frame.height,
-			image_base64: frame.dataBase64,
+			image_base64: frame.image_base64,
 		};
 	}
 
+	private async fetchTranscript(): Promise<FetchedTranscript> {
+		return await this.youtubeTranscriptApi.fetch(requireCurrentVideoId());
+	}
+
+	/// Resolve the `<video>` element. Throws when the page has no player
+	/// or the player hasn't loaded enough data to read `currentTime` /
+	/// `duration` (`readyState === 0`). Every primitive that reads from
+	/// the player goes through here so the not-ready and not-on-page
+	/// failures show up as the same structured content-script error.
 	private requirePlayer(): HTMLVideoElement {
-		const player = this.getYouTubePlayer();
+		const cached = this.params.youtubePlayer;
+		const player = cached ?? document.querySelector<HTMLVideoElement>('video.html5-main-video');
 		if (!player) throw new Error('no YouTube player element on the page');
 		if (player.readyState === 0) throw new Error('YouTube player not ready');
+		this.params.youtubePlayer = player;
 		return player;
 	}
 
-	getCurrentVideoFrame(): EurImage {
-		const { youtubePlayer, canvas } = this.params;
-		if (!youtubePlayer) return null;
-
-		canvas.width = youtubePlayer.videoWidth;
-		canvas.height = youtubePlayer.videoHeight;
-
-		canvas.getContext('2d')?.drawImage(youtubePlayer, 0, 0, canvas.width, canvas.height);
-
+	/// Encode the current video frame as base64 PNG. Returns the dimensions
+	/// of the source video stream rather than the canvas (which can differ
+	/// if the player has been letterboxed).
+	private captureFrame(player: HTMLVideoElement): RawFrame {
+		const { canvas } = this.params;
+		canvas.width = player.videoWidth;
+		canvas.height = player.videoHeight;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) throw new Error('2D canvas context unavailable');
+		ctx.drawImage(player, 0, 0, canvas.width, canvas.height);
 		return {
-			dataBase64: canvas.toDataURL('image/png').split(',')[1],
+			image_base64: canvas.toDataURL('image/png').split(',')[1],
 			width: canvas.width,
 			height: canvas.height,
 		};
-	}
-
-	getCurrentVideoTime(): number {
-		const player = this.getYouTubePlayer();
-		if (!player) return -1.0;
-
-		if (player.readyState === 0 || player.duration === 0) return -1.0;
-
-		return player.currentTime;
-	}
-
-	getYouTubePlayer(): HTMLVideoElement | null {
-		const { youtubePlayer } = this.params;
-		if (!youtubePlayer) {
-			this.params.youtubePlayer = document.querySelector(
-				'video.html5-main-video',
-			) as HTMLVideoElement;
-		}
-		return this.params.youtubePlayer;
 	}
 }
 
@@ -276,7 +238,6 @@ export function main() {
 
 	const watcher = new YoutubeWatcher({
 		canvas: document.createElement('canvas'),
-		context: document.createElement('canvas').getContext('2d'),
 		youtubePlayer: null,
 	});
 

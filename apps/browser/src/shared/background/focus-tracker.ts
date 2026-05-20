@@ -1,6 +1,6 @@
 import { resolveFaviconBase64 } from './favicon';
 import browser from 'webextension-polyfill';
-import type { NativeMetadata, Frame } from '../content/bindings';
+import type { NativeMetadata, Frame, Payload } from '../content/bindings';
 
 let activeNativePort: browser.Runtime.Port | null = null;
 
@@ -85,7 +85,10 @@ async function sendMetadataEvent(tab: browser.Tabs.Tab, port: browser.Runtime.Po
 			kind: {
 				Event: {
 					action: 'TAB_ACTIVATED',
-					payload: JSON.stringify(metadata),
+					// Inline JSON payload — the bridge protocol decodes it
+					// as a typed value at the Rust boundary, no double
+					// `JSON.parse` required.
+					payload: metadata as Payload,
 				},
 			},
 		};
