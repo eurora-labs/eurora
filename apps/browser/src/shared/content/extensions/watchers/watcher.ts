@@ -1,7 +1,26 @@
+import {
+	handleGetAccessibilityTree,
+	handleGetPageMetadata,
+	handleGetReadabilityArticle,
+	handleGetSelectedText,
+	handleInsertText,
+	handleListFormInputs,
+	handleListLinks,
+	handleQuerySelector,
+} from '../web';
 import browser from 'webextension-polyfill';
 import type { NativeResponse } from '../../models';
 
-export type MessageType = 'NEW' | 'GENERATE_ASSETS' | 'GENERATE_SNAPSHOT';
+export type MessageType =
+	| 'NEW'
+	| 'GET_PAGE_METADATA'
+	| 'GET_ACCESSIBILITY_TREE'
+	| 'GET_READABILITY_ARTICLE'
+	| 'GET_SELECTED_TEXT'
+	| 'QUERY_SELECTOR'
+	| 'LIST_LINKS'
+	| 'LIST_FORM_INPUTS'
+	| 'INSERT_TEXT';
 
 export type BrowserObj = { type: string; [key: string]: unknown };
 
@@ -30,10 +49,26 @@ export abstract class Watcher<T> {
 		switch (obj.type) {
 			case 'NEW':
 				return this.guard(this.handleNew(obj, sender));
-			case 'GENERATE_ASSETS':
-				return this.guard(this.handleGenerateAssets(obj, sender));
-			case 'GENERATE_SNAPSHOT':
-				return this.guard(this.handleGenerateSnapshot(obj, sender));
+			// Generic web tools — available on every page through the base
+			// watcher, regardless of which site-specific subclass is mounted.
+			// Site-specific overrides should fall through to `super.listen`
+			// on no-match so these stay reachable.
+			case 'GET_PAGE_METADATA':
+				return this.guard(handleGetPageMetadata());
+			case 'GET_ACCESSIBILITY_TREE':
+				return this.guard(handleGetAccessibilityTree(obj));
+			case 'GET_READABILITY_ARTICLE':
+				return this.guard(handleGetReadabilityArticle());
+			case 'GET_SELECTED_TEXT':
+				return this.guard(handleGetSelectedText());
+			case 'QUERY_SELECTOR':
+				return this.guard(handleQuerySelector(obj));
+			case 'LIST_LINKS':
+				return this.guard(handleListLinks(obj));
+			case 'LIST_FORM_INPUTS':
+				return this.guard(handleListFormInputs(obj));
+			case 'INSERT_TEXT':
+				return this.guard(handleInsertText(obj));
 			default:
 				return false;
 		}
@@ -48,7 +83,9 @@ export abstract class Watcher<T> {
 	/// The success type is preserved verbatim — the message bus
 	/// serializes whatever shape the handler returns, including flat
 	/// typed payloads that aren't `NativeResponse`-shaped (e.g. the
-	/// adapter-driven YouTube tool replies).
+	/// adapter-driven YouTube tool replies, and the structured
+	/// `{kind: 'Error', code: 'SAFETY_VIOLATION', …}` envelope that
+	/// `insert_text` emits for safety-contract violations).
 	protected async guard<T>(promise: Promise<T>): Promise<T | NativeResponse> {
 		return await promise.catch((error) => {
 			const message = error instanceof Error ? error.message : String(error);
@@ -57,16 +94,6 @@ export abstract class Watcher<T> {
 	}
 
 	abstract handleNew(
-		obj: BrowserObj,
-		sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse>;
-
-	abstract handleGenerateAssets(
-		obj: BrowserObj,
-		sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse>;
-
-	abstract handleGenerateSnapshot(
 		obj: BrowserObj,
 		sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse>;

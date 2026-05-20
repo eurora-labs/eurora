@@ -12,8 +12,8 @@
 //! instantiates the trait; it consumes `WEB_DESCRIPTORS` (via
 //! [`ToolDescriptor::to_wire`](eurora_tools::ToolDescriptor::to_wire))
 //! and routes calls through [`eurora_tools::RemoteToolBus`]. The
-//! bridge-backed `WebBridgeImpl` lands in Phase 12 behind the `bridge`
-//! cargo feature.
+//! bridge-backed `WebBridgeImpl` is available behind the `bridge` cargo
+//! feature.
 
 mod adapter;
 #[cfg(feature = "bridge")]
@@ -21,4 +21,10 @@ mod bridge;
 mod types;
 
 pub use adapter::{WEB_DESCRIPTORS, WebAdapter, WebAdapterLocal, WebDispatcher};
+#[cfg(feature = "bridge")]
+pub use bridge::{
+    WEB_GET_ACCESSIBILITY_TREE, WEB_GET_PAGE_METADATA, WEB_GET_READABILITY_ARTICLE,
+    WEB_GET_SELECTED_TEXT, WEB_INSERT_TEXT, WEB_LIST_FORM_INPUTS, WEB_LIST_LINKS,
+    WEB_QUERY_SELECTOR, WebBridgeImpl,
+};
 pub use types::*;

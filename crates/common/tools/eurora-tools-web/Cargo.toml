@@ -7,11 +7,9 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 euro-bridge = { workspace = true, optional = true }
-euro-bridge-protocol = { workspace = true, optional = true }
 eurora-tools = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_json = { workspace = true, optional = true }
 specta = { workspace = true, optional = true, features = ["derive"] }
 
 [dev-dependencies]
@@ -27,10 +25,10 @@ tokio-util = { workspace = true, features = ["rt"] }
 specta = ["dep:specta"]
 # Build the bridge-backed adapter implementation (`WebBridgeImpl`).
 # Off by default so non-desktop consumers (the agent loop, codegen) don't
-# pull `euro-bridge` and its transitive dependencies. The runtime impl
-# lands in Phase 12; Phase 11 ships the feature gate with an empty
-# `bridge` module so feature-matrix builds are exercised from day one.
-bridge = ["dep:euro-bridge", "dep:euro-bridge-protocol", "dep:serde_json"]
+# pull `euro-bridge` and its transitive dependencies. Payload framing,
+# response decoding, and transport-error mapping route through the
+# shared `eurora-tools::bridge` helpers.
+bridge = ["dep:euro-bridge", "eurora-tools/bridge"]
 
 [lints]
 workspace = true

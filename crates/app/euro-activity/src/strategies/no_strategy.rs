@@ -10,7 +10,6 @@ use crate::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
         StrategySupport,
     },
-    types::{ActivityAsset, ActivitySnapshot},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -61,33 +60,7 @@ impl ActivityStrategyFunctionality for NoStrategy {
         Ok(())
     }
 
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        tracing::debug!("NoStrategy: skipping asset retrieval");
-        Ok(vec![])
-    }
-
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        tracing::debug!("NoStrategy: skipping snapshot retrieval");
-        Ok(vec![])
-    }
-
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_no_strategy_returns_empty() {
-        let mut strategy = NoStrategy;
-
-        let assets = strategy.retrieve_assets().await.unwrap();
-        assert!(assets.is_empty());
-
-        let snapshots = strategy.retrieve_snapshots().await.unwrap();
-        assert!(snapshots.is_empty());
     }
 }

@@ -14,11 +14,7 @@ use url::Url;
 pub use crate::strategies::ActivityStrategyFunctionality;
 use crate::strategies::{ActivityReport, StrategyMetadata};
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
-use crate::{
-    Activity, ActivityError,
-    error::ActivityResult,
-    types::{ActivityAsset, ActivitySnapshot},
-};
+use crate::{Activity, ActivityError, error::ActivityResult};
 
 #[derive(Clone, Serialize, Deserialize, Default)]
 pub struct BrowserStrategy {
@@ -105,9 +101,7 @@ impl BrowserStrategy {
                 if event_frame.action.as_str() == "TAB_ACTIVATED"
                     || event_frame.action.as_str() == "TAB_UPDATED"
                 {
-                    let NativeMessage::NativeMetadata(data) = native_message else {
-                        continue;
-                    };
+                    let NativeMessage::NativeMetadata(data) = native_message;
                     let metadata = StrategyMetadata::from(data);
 
                     let Some(url) = metadata.url else {
@@ -138,7 +132,6 @@ impl BrowserStrategy {
                         metadata.icon,
                         process_name,
                         browser_pid,
-                        vec![],
                     );
 
                     tracing::info!(
@@ -158,24 +151,6 @@ impl BrowserStrategy {
 
         self.event_subscription_handle = Some(Arc::new(handle));
         Ok(())
-    }
-
-    async fn fetch_asset(service: &BridgeService, browser_pid: u32) -> Option<ActivityAsset> {
-        let response = service
-            .send_request(browser_pid, "GET_ASSETS", None)
-            .await
-            .ok()?;
-        let native_message = response.payload?.deserialize::<NativeMessage>().ok()?;
-        ActivityAsset::try_from(native_message).ok()
-    }
-
-    async fn fetch_snapshot(service: &BridgeService, browser_pid: u32) -> Option<ActivitySnapshot> {
-        let response = service
-            .send_request(browser_pid, "GET_SNAPSHOT", None)
-            .await
-            .ok()?;
-        let native_message = response.payload?.deserialize::<NativeMessage>().ok()?;
-        ActivitySnapshot::try_from(native_message).ok()
     }
 
     async fn resolve_messenger_pid(&self, process_name: &str, fallback_pid: u32) -> u32 {
@@ -221,7 +196,6 @@ impl BrowserStrategy {
                         metadata.icon,
                         process_name.clone(),
                         focus_pid,
-                        vec![],
                     )
                 }
                 None => {
@@ -236,7 +210,6 @@ impl BrowserStrategy {
                         focus_window.icon.clone(),
                         process_name.clone(),
                         focus_pid,
-                        vec![],
                     )
                 }
             },
@@ -249,7 +222,6 @@ impl BrowserStrategy {
                     focus_window.icon.clone(),
                     process_name.clone(),
                     focus_pid,
-                    vec![],
                 )
             }
         };
@@ -347,34 +319,6 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
         Ok(())
     }
 
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        let Some(service) = self.bridge_service else {
-            return Ok(vec![]);
-        };
-        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
-        if browser_pid == 0 {
-            return Ok(vec![]);
-        }
-        Ok(Self::fetch_asset(service, browser_pid)
-            .await
-            .into_iter()
-            .collect())
-    }
-
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        let Some(service) = self.bridge_service else {
-            return Ok(vec![]);
-        };
-        let browser_pid = self.active_browser_pid.load(Ordering::Relaxed);
-        if browser_pid == 0 {
-            return Ok(vec![]);
-        }
-        Ok(Self::fetch_snapshot(service, browser_pid)
-            .await
-            .into_iter()
-            .collect())
-    }
-
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
         tracing::debug!("Retrieving metadata for browser strategy");
 
@@ -401,11 +345,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             ActivityError::invalid_data(format!("Failed to decode metadata: {}", e))
         })?;
 
-        let NativeMessage::NativeMetadata(metadata) = native_metadata else {
-            return Err(ActivityError::invalid_data(
-                "Browser response did not contain metadata",
-            ));
-        };
+        let NativeMessage::NativeMetadata(metadata) = native_metadata;
 
         let strategy_metadata = StrategyMetadata::from(metadata);
 

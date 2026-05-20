@@ -1,5 +1,4 @@
 import { resolveFaviconBase64 } from './favicon';
-import { sendMessageWithRetry } from './messaging';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
 import type { Frame, NativeMetadata, Payload, RequestFrame } from '../content/bindings';
@@ -76,12 +75,6 @@ async function handlePendingRequest(request: unknown): Promise<void> {
 		case 'GET_METADATA':
 			await handleGetMetadata(reqFrame);
 			break;
-		case 'GET_ASSETS':
-			await handleGetContentData(reqFrame, 'GENERATE_ASSETS');
-			break;
-		case 'GET_SNAPSHOT':
-			await handleGetContentData(reqFrame, 'GENERATE_SNAPSHOT');
-			break;
 		default: {
 			const resp: Frame = {
 				kind: {
@@ -101,36 +94,6 @@ async function handlePendingRequest(request: unknown): Promise<void> {
 				/* ignore */
 			}
 			break;
-		}
-	}
-}
-
-async function handleGetContentData(reqFrame: RequestFrame, messageType: string): Promise<void> {
-	try {
-		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-
-		if (!activeTab || !activeTab.id) {
-			await sendErrorResponse(reqFrame, 'No active tab found');
-			return;
-		}
-
-		const contentResponse = await sendMessageWithRetry(activeTab.id, { type: messageType });
-
-		const resp: Frame = {
-			kind: {
-				Response: {
-					id: reqFrame.id,
-					action: reqFrame.action,
-					payload: contentResponse as Payload,
-				},
-			},
-		};
-		await browser.runtime.sendNativeMessage(host, resp);
-	} catch (error) {
-		try {
-			await sendErrorResponse(reqFrame, `Failed to get ${messageType}: ${error}`);
-		} catch {
-			/* ignore */
 		}
 	}
 }

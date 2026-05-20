@@ -20,10 +20,7 @@ pub use no_strategy::NoStrategy;
 pub use preview::PreviewStrategy;
 pub use word::WordStrategy;
 
-use crate::{
-    error::ActivityResult,
-    types::{Activity, ActivityAsset, ActivitySnapshot},
-};
+use crate::{error::ActivityResult, types::Activity};
 
 /// Metadata returned by a strategy about the currently focused target.
 ///
@@ -133,8 +130,6 @@ pub trait ActivityStrategyFunctionality {
 
     async fn stop_tracking(&mut self) -> ActivityResult<()>;
 
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
 }
 

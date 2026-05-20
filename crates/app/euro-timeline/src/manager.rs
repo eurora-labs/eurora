@@ -1,13 +1,11 @@
-use agent_chain_core::messages::ContentBlocks;
 use bon::bon;
-use euro_activity::{SavedAssetInfo, types::SnapshotFunctionality};
 use euro_auth::AuthManager;
 use euro_endpoint::EndpointManager;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::{
-    ActivityStorage, AssetFunctionality, ContextChip, TimelineError,
+    ActivityStorage, ContextChip,
     collector::CollectorService,
     config::TimelineConfig,
     error::TimelineResult,
@@ -70,84 +68,6 @@ impl TimelineManager {
         storage
             .get_current_activity()
             .map(|activity| activity.get_context_chip())
-    }
-
-    pub async fn save_assets_to_service_by_ids(
-        &self,
-        ids: &[String],
-    ) -> TimelineResult<Vec<SavedAssetInfo>> {
-        let activity = {
-            let storage = self.storage.lock().await;
-            storage.get_current_activity().cloned()
-        };
-
-        match activity {
-            Some(activity) => Ok(self
-                .activity_storage
-                .save_assets_to_service_by_ids(&activity, ids)
-                .await?),
-            None => Err(TimelineError::Storage(
-                "No current activity found".to_string(),
-            )),
-        }
-    }
-
-    pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
-        self.collector.refresh_current_activity().await
-    }
-
-    pub async fn construct_messages_from_last_snapshot(&self) -> ContentBlocks {
-        let storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_current_activity() {
-            if let Some(snapshot) = activity.snapshots.last() {
-                snapshot.construct_messages()
-            } else {
-                ContentBlocks::new()
-            }
-        } else {
-            ContentBlocks::new()
-        }
-    }
-
-    pub async fn construct_messages_from_last_asset(&self) -> ContentBlocks {
-        let storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_current_activity() {
-            if let Some(asset) = activity.assets.last() {
-                asset.construct_messages()
-            } else {
-                ContentBlocks::new()
-            }
-        } else {
-            ContentBlocks::new()
-        }
-    }
-
-    pub async fn construct_asset_messages_by_ids(&self, ids: &[String]) -> ContentBlocks {
-        let storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_current_activity() {
-            activity
-                .assets
-                .iter()
-                .filter(|asset| ids.contains(&asset.get_id().to_string()))
-                .flat_map(|asset| asset.construct_messages().into_inner())
-                .collect::<Vec<_>>()
-                .into()
-        } else {
-            ContentBlocks::new()
-        }
-    }
-
-    pub async fn construct_snapshot_messages_by_ids(&self, _ids: &[String]) -> ContentBlocks {
-        let storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_current_activity() {
-            if let Some(snapshot) = activity.snapshots.last() {
-                snapshot.construct_messages()
-            } else {
-                ContentBlocks::new()
-            }
-        } else {
-            ContentBlocks::new()
-        }
     }
 
     pub fn subscribe_to_activity_events(&self) -> tokio::sync::broadcast::Receiver<ActivityEvent> {

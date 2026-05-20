@@ -4,7 +4,6 @@
 //! copy per browser instance.
 
 use std::process;
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -13,7 +12,7 @@ use euro_browser::utils::{read_framed, write_framed};
 use euro_browser::{Frame, FrameKind, RegisterFrame, bridge_url, parent_pid};
 use futures_util::{SinkExt, StreamExt};
 use tokio::io;
-use tokio::sync::{Mutex, broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
@@ -74,9 +73,6 @@ async fn main() -> Result<()> {
     let (from_server_tx, mut from_server_rx) = mpsc::channel::<Frame>(FROM_SERVER_QUEUE);
     let (to_server_tx, _) = broadcast::channel::<Frame>(TO_SERVER_QUEUE);
 
-    let cached_assets: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
-    let cached_snapshot: Arc<Mutex<Option<Frame>>> = Arc::new(Mutex::new(None));
-
     let chrome_writer_handle = tokio::spawn(async move {
         let mut stdout = io::stdout();
         tracing::info!("Chrome writer task started");
@@ -92,8 +88,6 @@ async fn main() -> Result<()> {
 
     let chrome_reader_handle = {
         let to_server_tx = to_server_tx.clone();
-        let cached_assets = Arc::clone(&cached_assets);
-        let cached_snapshot = Arc::clone(&cached_snapshot);
         tokio::spawn(async move {
             let mut stdin = io::stdin();
             tracing::info!("Chrome reader task started");
@@ -101,17 +95,6 @@ async fn main() -> Result<()> {
                 match read_framed(&mut stdin).await {
                     Ok(Some(frame)) => {
                         tracing::debug!("Read frame from Chrome: {}", frame_summary(&frame));
-                        if let FrameKind::Event(ref e) = frame.kind {
-                            match e.action.as_str() {
-                                "ASSETS" => {
-                                    *cached_assets.lock().await = Some(frame.clone());
-                                }
-                                "SNAPSHOT" => {
-                                    *cached_snapshot.lock().await = Some(frame.clone());
-                                }
-                                _ => {}
-                            }
-                        }
                         let _ = to_server_tx.send(frame);
                     }
                     Ok(None) => {
@@ -130,21 +113,11 @@ async fn main() -> Result<()> {
 
     let bridge_handle = {
         let to_server_tx = to_server_tx.clone();
-        let cached_assets = Arc::clone(&cached_assets);
-        let cached_snapshot = Arc::clone(&cached_snapshot);
         tokio::spawn(async move {
             let url = bridge_url();
             loop {
-                match run_bridge_session(
-                    &url,
-                    host_pid,
-                    app_pid,
-                    &from_server_tx,
-                    &to_server_tx,
-                    &cached_assets,
-                    &cached_snapshot,
-                )
-                .await
+                match run_bridge_session(&url, host_pid, app_pid, &from_server_tx, &to_server_tx)
+                    .await
                 {
                     SessionOutcome::Reconnect => {
                         tracing::info!(
@@ -171,19 +144,16 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// One round-trip of: connect -> register -> replay cached events ->
-/// pump frames in both directions until either side closes. The returned
-/// [`SessionOutcome`] tells the outer loop whether to reconnect or to
-/// stop the loop entirely (the latter when the desktop sends a
-/// [`FrameKind::Shutdown`]).
+/// One round-trip of: connect -> register -> pump frames in both
+/// directions until either side closes. The returned [`SessionOutcome`]
+/// tells the outer loop whether to reconnect or to stop the loop
+/// entirely (the latter when the desktop sends a [`FrameKind::Shutdown`]).
 async fn run_bridge_session(
     url: &str,
     host_pid: u32,
     app_pid: u32,
     from_server_tx: &mpsc::Sender<Frame>,
     to_server_tx: &broadcast::Sender<Frame>,
-    cached_assets: &Arc<Mutex<Option<Frame>>>,
-    cached_snapshot: &Arc<Mutex<Option<Frame>>>,
 ) -> SessionOutcome {
     let socket =
         (|| async {
@@ -219,21 +189,6 @@ async fn run_bridge_session(
     if let Err(err) = send_frame(&mut sink, &register).await {
         tracing::error!("Failed to send Register frame: {err}");
         return SessionOutcome::Reconnect;
-    }
-
-    if let Some(assets) = cached_assets.lock().await.clone() {
-        tracing::info!("Replaying cached ASSETS frame");
-        if let Err(err) = send_frame(&mut sink, &assets).await {
-            tracing::error!("Failed to replay cached ASSETS frame: {err}");
-            return SessionOutcome::Reconnect;
-        }
-    }
-    if let Some(snapshot) = cached_snapshot.lock().await.clone() {
-        tracing::info!("Replaying cached SNAPSHOT frame");
-        if let Err(err) = send_frame(&mut sink, &snapshot).await {
-            tracing::error!("Failed to replay cached SNAPSHOT frame: {err}");
-            return SessionOutcome::Reconnect;
-        }
     }
 
     let mut to_server_rx = to_server_tx.subscribe();

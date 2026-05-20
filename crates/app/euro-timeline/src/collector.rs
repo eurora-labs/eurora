@@ -131,32 +131,6 @@ impl CollectorService {
         self.saved_activity_ended_event_tx.subscribe()
     }
 
-    pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
-        let mut strategy = self.strategy.write().await;
-        let assets = strategy
-            .retrieve_assets()
-            .await
-            .map_err(|e| TimelineError::Storage(e.to_string()))?;
-        let snapshots = strategy
-            .retrieve_snapshots()
-            .await
-            .map_err(|e| TimelineError::Storage(e.to_string()))?;
-
-        let mut storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_all_activities_mut().back_mut() {
-            if !assets.is_empty() {
-                activity.assets.clear();
-                activity.assets.extend(assets);
-            }
-            if !snapshots.is_empty() {
-                activity.snapshots.clear();
-                activity.snapshots.extend(snapshots);
-            }
-        }
-
-        Ok(())
-    }
-
     /// Stop the heartbeat and PATCH the current activity's real
     /// `ended_at` (best-effort, bounded by [`SHUTDOWN_FLUSH_TIMEOUT`]).
     /// Called by [`crate::TimelineManager::stop`] so a clean shutdown

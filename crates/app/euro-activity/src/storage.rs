@@ -2,48 +2,26 @@ use activity_core::{
     Activity as WireActivity, ActivityErrorResponse, InsertActivityRequest, InsertActivityResponse,
     ListActivitiesResponse, UpdateActivityRequest, UpdateActivityResponse,
 };
-use asset_core::{Asset, CreateAssetRequest};
-use async_trait::async_trait;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use chrono::{DateTime, Utc};
-use enum_dispatch::enum_dispatch;
 use euro_auth::AuthManager;
 use euro_endpoint::EndpointManager;
 use reqwest::StatusCode;
 use secrecy::ExposeSecret;
-use serde::{Deserialize, Serialize};
-use std::{io::Cursor, path::PathBuf, sync::Arc};
+use std::{io::Cursor, sync::Arc};
 use uuid::Uuid;
 
-use crate::{Activity, ActivityAsset, ActivityError, error::ActivityResult};
+use crate::{Activity, ActivityError, error::ActivityResult};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SavedAssetInfo {
-    pub file_path: PathBuf,
-    pub absolute_path: PathBuf,
-    pub content_hash: Option<String>,
-    pub file_size: u64,
-    pub saved_at: chrono::DateTime<chrono::Utc>,
-}
-
-#[async_trait]
-#[enum_dispatch]
-pub trait SaveableAsset {
-    fn get_asset_type(&self) -> &'static str;
-
-    async fn serialize_content(&self) -> ActivityResult<Vec<u8>>;
-
-    fn get_unique_id(&self) -> String;
-
-    fn get_display_name(&self) -> String;
-}
-
-/// HTTP client wrapper used to persist activities and their assets.
+/// HTTP client wrapper used to persist activities.
 ///
-/// Both the activity write path (`POST /activities`) and the asset write
-/// path (`POST /v1/assets`) talk JSON over HTTPS. A single `AuthManager`
-/// drives token refresh for both, and a single `EndpointManager` provides
-/// the shared base URL so config changes flip both endpoints in lock-step.
+/// The activity write path (`POST /activities`) speaks JSON over HTTPS.
+/// A single [`AuthManager`] drives token refresh and an [`EndpointManager`]
+/// provides the base URL so config changes flip endpoints in lock-step.
+///
+/// Asset persistence was removed alongside the bundled-context channel —
+/// the LLM pulls page contents through granular tools per turn, so there
+/// is no longer a server-side asset store fed by this client.
 pub struct ActivityStorage {
     endpoint_manager: Arc<EndpointManager>,
     auth_manager: AuthManager,
@@ -164,6 +142,10 @@ impl ActivityStorage {
     /// the two so foreign ids can't be probed). Any other non-success
     /// status surfaces as [`ActivityError::Network`]. The returned MIME
     /// type mirrors the value recorded at upload time.
+    ///
+    /// Kept around for historical assets that were uploaded prior to the
+    /// bundled-context channel's removal; the desktop no longer writes new
+    /// assets through this client.
     pub async fn fetch_asset_bytes(
         &self,
         asset_id: Uuid,
@@ -259,73 +241,6 @@ impl ActivityStorage {
             ActivityError::network(format!("Failed to decode activity patch response: {e}"))
         })?;
         Ok(body)
-    }
-
-    pub async fn save_assets_to_service_by_ids(
-        &self,
-        activity: &Activity,
-        _ids: &[String],
-    ) -> ActivityResult<Vec<SavedAssetInfo>> {
-        let mut saved_assets = Vec::new();
-
-        for asset in &activity.assets {
-            let saved_info = self.save_asset_to_service(asset).await?;
-            saved_assets.push(saved_info);
-        }
-
-        Ok(saved_assets)
-    }
-
-    pub async fn save_asset_to_service(
-        &self,
-        asset: &ActivityAsset,
-    ) -> ActivityResult<SavedAssetInfo> {
-        let bytes = serde_json::to_vec(asset)?;
-        let file_size = bytes.len() as u64;
-
-        let metadata = serde_json::json!({
-            "asset_type": asset.get_asset_type(),
-            "unique_id": asset.get_unique_id(),
-            "display_name": asset.get_display_name(),
-        });
-
-        let request = CreateAssetRequest {
-            name: asset.get_display_name(),
-            content: BASE64_STANDARD.encode(&bytes),
-            mime_type: "application/json".to_string(),
-            metadata: Some(metadata),
-            activity_id: None,
-        };
-
-        let bearer = self.bearer().await?;
-        let response = self
-            .http
-            .post(self.url("/v1/assets"))
-            .header("Authorization", bearer)
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| ActivityError::network(format!("asset request failed: {e}")))?;
-
-        let status = response.status();
-        if !status.is_success() {
-            return Err(map_http_error_response(status, response).await);
-        }
-
-        let created: Asset = response
-            .json()
-            .await
-            .map_err(|e| ActivityError::network(format!("Failed to decode asset response: {e}")))?;
-
-        tracing::debug!("Asset saved with ID: {}", created.id);
-
-        Ok(SavedAssetInfo {
-            file_path: PathBuf::from(&created.storage_uri),
-            absolute_path: PathBuf::from(&created.storage_uri),
-            content_hash: created.checksum_sha256,
-            file_size,
-            saved_at: chrono::Utc::now(),
-        })
     }
 }
 

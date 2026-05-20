@@ -1,95 +1,9 @@
-use agent_chain_core::messages::ContentBlocks;
 use chrono::{DateTime, Utc};
-use enum_dispatch::enum_dispatch;
-use euro_browser::NativeMessage;
-use euro_office::WordAsset;
-use euro_pdf::PdfAsset;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 pub use thread_core::ContextChip;
 use url::Url;
 use uuid::Uuid;
-
-use crate::{
-    assets::{ArticleAsset, DefaultAsset, TwitterAsset, YoutubeAsset},
-    error::ActivityResult,
-    snapshots::{ArticleSnapshot, DefaultSnapshot, YoutubeSnapshot},
-    storage::SaveableAsset,
-};
-
-#[enum_dispatch(SaveableAsset, AssetFunctionality)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ActivityAsset {
-    YoutubeAsset,
-    ArticleAsset,
-    TwitterAsset,
-    WordAsset,
-    PdfAsset,
-    DefaultAsset,
-}
-
-impl TryFrom<NativeMessage> for ActivityAsset {
-    type Error = anyhow::Error;
-
-    fn try_from(value: NativeMessage) -> Result<Self, Self::Error> {
-        match value {
-            NativeMessage::NativeYoutubeAsset(asset) => {
-                Ok(ActivityAsset::YoutubeAsset(YoutubeAsset::from(asset)))
-            }
-            NativeMessage::NativeArticleAsset(asset) => {
-                Ok(ActivityAsset::ArticleAsset(ArticleAsset::from(asset)))
-            }
-            NativeMessage::NativeTwitterAsset(asset) => {
-                Ok(ActivityAsset::TwitterAsset(TwitterAsset::from(asset)))
-            }
-            _ => Err(anyhow::anyhow!("Invalid asset type")),
-        }
-    }
-}
-
-#[enum_dispatch]
-pub trait AssetFunctionality {
-    fn get_id(&self) -> &str;
-    fn get_name(&self) -> &str;
-    fn get_icon(&self) -> Option<&str>;
-    fn construct_messages(&self) -> ContentBlocks;
-}
-
-#[enum_dispatch]
-pub trait SnapshotFunctionality {
-    fn get_id(&self) -> &str;
-    fn construct_messages(&self) -> ContentBlocks;
-    fn get_updated_at(&self) -> u64;
-    fn get_created_at(&self) -> u64;
-}
-
-#[enum_dispatch(SnapshotFunctionality)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ActivitySnapshot {
-    YoutubeSnapshot,
-    ArticleSnapshot,
-    DefaultSnapshot,
-}
-
-impl TryFrom<NativeMessage> for ActivitySnapshot {
-    type Error = anyhow::Error;
-
-    fn try_from(value: NativeMessage) -> Result<Self, Self::Error> {
-        match value {
-            // `NativeYoutubeSnapshot` now carries `CapturedFrame` directly
-            // — same shape used by the `browser::youtube::get_current_frame`
-            // tool, so the activity pipeline and the tool path agree on
-            // field names and precision.
-            NativeMessage::NativeYoutubeSnapshot(frame) => Ok(ActivitySnapshot::YoutubeSnapshot(
-                YoutubeSnapshot::from(frame),
-            )),
-            NativeMessage::NativeArticleSnapshot(snapshot) => Ok(
-                ActivitySnapshot::ArticleSnapshot(ArticleSnapshot::from(snapshot)),
-            ),
-            _ => Err(anyhow::anyhow!("Invalid snapshot type")),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Activity {
@@ -103,8 +17,6 @@ pub struct Activity {
     pub process_id: u32,
     pub start: DateTime<Utc>,
     pub end: Option<DateTime<Utc>>,
-    pub assets: Vec<ActivityAsset>,
-    pub snapshots: Vec<ActivitySnapshot>,
 }
 
 impl Activity {
@@ -114,7 +26,6 @@ impl Activity {
         icon: Option<Arc<image::RgbaImage>>,
         process_name: String,
         process_id: u32,
-        assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
             id: Uuid::now_v7(),
@@ -126,8 +37,6 @@ impl Activity {
             process_id,
             start: Utc::now(),
             end: None,
-            assets,
-            snapshots: Vec::new(),
         }
     }
 
@@ -143,7 +52,6 @@ impl Activity {
         icon: Option<Arc<image::RgbaImage>>,
         process_name: String,
         process_id: u32,
-        assets: Vec<ActivityAsset>,
     ) -> Self {
         Self {
             id: Uuid::now_v7(),
@@ -155,8 +63,6 @@ impl Activity {
             process_id,
             start: Utc::now(),
             end: None,
-            assets,
-            snapshots: Vec::new(),
         }
     }
 
@@ -184,14 +90,6 @@ impl Activity {
     pub fn set_url(&mut self, url: Url) {
         self.name = url.to_string();
         self.url = Some(url);
-    }
-
-    pub fn add_asset(&mut self, asset: ActivityAsset) {
-        self.assets.push(asset);
-    }
-
-    pub fn add_snapshot(&mut self, snapshot: ActivitySnapshot) {
-        self.snapshots.push(snapshot);
     }
 
     pub fn end_activity(&mut self) {
@@ -244,7 +142,6 @@ mod tests {
             None,
             "chrome".into(),
             42,
-            vec![],
         );
         let chip = activity.get_context_chip();
         assert_eq!(chip.domain.as_deref(), Some("youtube.com"));
@@ -254,14 +151,7 @@ mod tests {
 
     #[test]
     fn non_browser_activity_has_no_domain() {
-        let activity = Activity::new(
-            "Some Window Title".into(),
-            None,
-            None,
-            "someapp".into(),
-            7,
-            vec![],
-        );
+        let activity = Activity::new("Some Window Title".into(), None, None, "someapp".into(), 7);
         let chip = activity.get_context_chip();
         assert_eq!(chip.domain, None);
         assert_eq!(activity.process_id, 7);
@@ -275,7 +165,6 @@ mod tests {
             None,
             "chrome".into(),
             0,
-            vec![],
         );
         let new_url = parse("https://example.com/b");
         activity.set_url(new_url.clone());

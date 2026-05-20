@@ -1,43 +1,21 @@
-use eurora_tools_youtube::CapturedFrame;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-mod article;
 mod metadata;
-mod twitter;
-mod youtube;
 
-pub use article::*;
 pub use metadata::*;
-pub use twitter::*;
-pub use youtube::*;
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Type)]
-pub struct NativeImage {
-    pub base64: String,
-    pub mime_type: String,
-}
 
 /// Envelope for every payload the browser native-messaging host
 /// exchanges with the desktop bridge. Externally tagged on `kind` with
-/// the inner payload under `data` so the JSON shape matches what the
-/// browser extension already constructs.
+/// the inner payload under `data` so the JSON shape stays stable as
+/// new wire-payload variants are added.
 ///
-/// The YouTube snapshot variant carries an [`eurora_tools_youtube::CapturedFrame`]
-/// — the single canonical YouTube-frame shape, also returned by the
-/// `browser::youtube::get_current_frame` tool. The legacy
-/// `NativeYoutubeSnapshot` wrapper was dropped in favour of this unified
-/// type; consumers compose around `CapturedFrame` directly.
-#[allow(clippy::enum_variant_names)]
+/// At present only [`NativeMetadata`] crosses the bridge — page content
+/// is delivered through granular adapter tools (`browser::web::*`,
+/// `browser::youtube::*`, …) rather than through pre-bundled assets or
+/// snapshots.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", content = "data")]
 pub enum NativeMessage {
-    NativeYoutubeAsset(NativeYoutubeAsset),
-    NativeArticleAsset(NativeArticleAsset),
-    NativeTwitterAsset(NativeTwitterAsset),
-
-    NativeYoutubeSnapshot(CapturedFrame),
-    NativeArticleSnapshot(NativeArticleSnapshot),
-
     NativeMetadata(NativeMetadata),
 }

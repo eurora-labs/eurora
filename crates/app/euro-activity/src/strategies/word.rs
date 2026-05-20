@@ -7,10 +7,12 @@
 //! window and the add-in's session pid are unrelated, which is exactly
 //! what the `app_kind` registration field exists for.
 //!
-//! The add-in's `GET_ASSETS` response carries a [`WordDocumentAsset`]
-//! directly (no `NativeMessage` envelope, see `euro-office`'s crate
-//! docs). The strategy wraps it into a [`WordAsset`] (assigning a
-//! UUID) before handing it to the rest of the activity pipeline.
+//! The strategy emits a `NewActivity` report whenever Word becomes
+//! focused, populating the activity name from the live document name
+//! (best-effort, refreshed via the add-in's `GET_ASSETS` action). The
+//! document body is no longer pre-bundled into the activity record —
+//! callers that want the body should reach for a future
+//! `office::word::*` adapter built around `fetch_word_asset` directly.
 
 use std::sync::{
     Arc, RwLock,
@@ -19,7 +21,7 @@ use std::sync::{
 
 use async_trait::async_trait;
 use euro_bridge::BridgeService;
-use euro_office::{OfficeApp, WordAsset, WordDocumentAsset, fetch_word_asset};
+use euro_office::{OfficeApp, WordDocumentAsset, fetch_word_asset};
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -31,7 +33,6 @@ use crate::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
         StrategySupport,
     },
-    types::{ActivityAsset, ActivitySnapshot},
 };
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -118,7 +119,6 @@ impl WordStrategy {
             focus_window.icon.clone(),
             focus_window.process_name.clone(),
             focus_window.process_id,
-            vec![],
         )
     }
 
@@ -218,26 +218,6 @@ impl ActivityStrategyFunctionality for WordStrategy {
             *guard = None;
         }
         Ok(())
-    }
-
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        let Some(service) = self.bridge_service else {
-            return Ok(vec![]);
-        };
-        let Some(wire) = fetch_word_asset(service).await else {
-            return Ok(vec![]);
-        };
-
-        if let Ok(mut guard) = self.last_document_name.write() {
-            *guard = Some(wire.document_name.clone());
-        }
-
-        let asset = WordAsset::from(wire);
-        Ok(vec![ActivityAsset::WordAsset(asset)])
-    }
-
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        Ok(vec![])
     }
 
     async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {

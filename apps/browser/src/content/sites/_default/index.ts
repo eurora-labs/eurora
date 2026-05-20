@@ -1,7 +1,3 @@
-import {
-	createArticleAsset,
-	createArticleSnapshot,
-} from '../../../shared/content/extensions/article/util';
 import { Watcher, type WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
 import browser from 'webextension-polyfill';
 import type { ArticleBrowserMessage, WatcherParams } from './types.js';
@@ -16,20 +12,6 @@ export class ArticleWatcher extends Watcher<WatcherParams> {
 		_sender: browser.Runtime.MessageSender,
 	): Promise<WatcherResponse> {
 		return { kind: 'Ok', data: null };
-	}
-
-	public async handleGenerateAssets(
-		_obj: ArticleBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		return createArticleAsset(document);
-	}
-
-	public async handleGenerateSnapshot(
-		_obj: ArticleBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		return createArticleSnapshot(window);
 	}
 }
 
