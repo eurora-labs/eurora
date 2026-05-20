@@ -8,7 +8,6 @@ import {
 } from './truncation';
 import { roles as ariaRoles } from 'aria-query';
 import type { AccessibilityTree, AxNode, GetAccessibilityTreeArgs } from '../../bindings';
-import type { NativeResponse } from '../../models';
 import type { BrowserObj } from '../watchers/watcher';
 
 /**
@@ -26,7 +25,7 @@ import type { BrowserObj } from '../watchers/watcher';
  * corresponding subtree is elided and the top-level `truncated` flag is
  * raised.
  */
-export async function handleGetAccessibilityTree(obj: BrowserObj): Promise<NativeResponse> {
+export async function handleGetAccessibilityTree(obj: BrowserObj): Promise<AccessibilityTree> {
 	const args = parseArgs(obj);
 	const root = resolveRoot(args.root_selector);
 	if (!root) {
@@ -39,12 +38,11 @@ export async function handleGetAccessibilityTree(obj: BrowserObj): Promise<Nativ
 	const counter = { count: 0, truncated: false };
 	const tree = buildAxNode(root, 0, maxDepth, maxNodes, counter);
 
-	const result: AccessibilityTree = {
+	return {
 		root: tree,
 		node_count: counter.count,
 		truncated: counter.truncated,
 	};
-	return { kind: 'AccessibilityTree', data: result };
 }
 
 function parseArgs(obj: BrowserObj): GetAccessibilityTreeArgs {

@@ -21,9 +21,11 @@ use crate::schema::SchemaFn;
 /// itself is trivially `Clone` and can be embedded in `LazyLock`s.
 #[derive(Debug, Clone)]
 pub struct ToolDescriptor {
-    /// Fully-qualified tool name, namespaced with `::`
-    /// (e.g. `browser::youtube::get_current_timestamp`). Must be unique
-    /// across the whole catalog.
+    /// Fully-qualified tool name in the form `<namespace>_<method>`
+    /// (e.g. `browser_youtube_get_current_timestamp`). Must be unique
+    /// across the whole catalog and match the function-name regex
+    /// `^[a-zA-Z0-9_-]{1,64}$` accepted by OpenAI-compatible LLM
+    /// tool-calling APIs.
     pub name: &'static str,
     /// Human-readable description shown to the LLM. The macro takes this
     /// from the first paragraph of the trait method's rustdoc.
@@ -107,7 +109,7 @@ mod tests {
     fn sample_descriptor() -> ToolDescriptor {
         const REQUIRED: &[&str] = &["youtube::watch_page"];
         ToolDescriptor {
-            name: "browser::youtube::get_current_timestamp",
+            name: "browser_youtube_get_current_timestamp",
             description: "Return the user's current playback position.",
             input_schema: schema_of::<SampleInput>,
             output_schema: schema_of::<SampleOutput>,
@@ -125,7 +127,7 @@ mod tests {
         let wire = sample_descriptor().to_wire();
         assert_eq!(
             wire.definition.name,
-            "browser::youtube::get_current_timestamp"
+            "browser_youtube_get_current_timestamp"
         );
         assert_eq!(
             wire.definition.description,

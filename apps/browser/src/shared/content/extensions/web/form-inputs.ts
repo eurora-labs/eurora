@@ -1,7 +1,6 @@
 import { isVisible, writableFieldKind } from './element-filter';
 import { buildSelectorPath } from './selector-path';
 import type { FormInput, FormInputsList, ListFormInputsArgs } from '../../bindings';
-import type { NativeResponse } from '../../models';
 import type { BrowserObj } from '../watchers/watcher';
 
 const DEFAULT_LIMIT = 100;
@@ -18,7 +17,7 @@ const FIELD_SELECTORS = 'input, textarea, [contenteditable]';
  * `total` is the pre-`limit` count of allowlisted fields, so the LLM
  * can opt into a higher cap when working with long forms.
  */
-export async function handleListFormInputs(obj: BrowserObj): Promise<NativeResponse> {
+export async function handleListFormInputs(obj: BrowserObj): Promise<FormInputsList> {
 	const args = parseArgs(obj);
 	const root = resolveRoot(args.root_selector);
 	if (!root) {
@@ -52,8 +51,7 @@ export async function handleListFormInputs(obj: BrowserObj): Promise<NativeRespo
 		});
 	}
 
-	const result: FormInputsList = { inputs, total };
-	return { kind: 'FormInputsList', data: result };
+	return { inputs, total };
 }
 
 function parseArgs(obj: BrowserObj): ListFormInputsArgs {

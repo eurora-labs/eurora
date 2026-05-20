@@ -1360,7 +1360,7 @@ mod tests {
     #[test]
     fn tool_like_definition_round_trips_via_to_definition() {
         let def = ToolDefinition {
-            name: "browser::youtube::get_current_timestamp".to_string(),
+            name: "browser_youtube_get_current_timestamp".to_string(),
             description: "Return the user's current playback position.".to_string(),
             parameters: serde_json::json!({"type": "object"}),
         };

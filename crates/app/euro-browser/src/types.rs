@@ -11,8 +11,8 @@ pub use metadata::*;
 /// new wire-payload variants are added.
 ///
 /// At present only [`NativeMetadata`] crosses the bridge — page content
-/// is delivered through granular adapter tools (`browser::web::*`,
-/// `browser::youtube::*`, …) rather than through pre-bundled assets or
+/// is delivered through granular adapter tools (`browser_web_*`,
+/// `browser_youtube_*`, …) rather than through pre-bundled assets or
 /// snapshots.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(tag = "kind", content = "data")]

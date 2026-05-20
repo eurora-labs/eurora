@@ -380,7 +380,7 @@ mod tests {
     use tokio::sync::mpsc;
     use tokio::time::timeout;
 
-    const TIMESTAMP_TOOL: &str = "browser::youtube::get_current_timestamp";
+    const TIMESTAMP_TOOL: &str = "browser_youtube_get_current_timestamp";
 
     /// `ToolSource::Bridge { app_kind: String }` can't be constructed in a
     /// `const`, but the bridge logic ignores `source` (it's a server-side

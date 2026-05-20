@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn build_payload_empty_args_flattens_to_tab_id_only() {
-        let payload = build_payload(&origin(), &Empty {}).expect("build");
+        let payload = build_payload(&origin(), &Empty::default()).expect("build");
         let value: serde_json::Value = serde_json::from_str(payload.as_str()).unwrap();
         assert_eq!(value, json!({ "tab_id": 42 }));
     }

@@ -1,5 +1,6 @@
 ---
 source: crates/common/tools/eurora-tools-web/tests/descriptors_snapshot.rs
+assertion_line: 20
 expression: wire
 ---
 [

@@ -228,7 +228,7 @@ fn format_youtube_watch_page(buf: &mut String, data: &Value) {
     if let Some(t) = approx {
         writeln!(
             buf,
-            "- Approximate current playback time: {} (call `browser::youtube::get_current_timestamp` for precise)",
+            "- Approximate current playback time: {} (call `browser_youtube_get_current_timestamp` for precise)",
             fmt_hms(t)
         )
         .expect("write to String");
@@ -258,7 +258,7 @@ fn format_web_page(buf: &mut String, data: &Value) {
     writeln!(buf).expect("write to String");
     writeln!(
         buf,
-        "Generic web tools (`browser::web::*`) are available — use them to read DOM, \
+        "Generic web tools (`browser_web_*`) are available — use them to read DOM, \
          extract structured content, or insert text into specific form fields the user \
          can see. The model cannot click buttons, submit forms, or navigate."
     )
@@ -364,7 +364,7 @@ mod tests {
         let catalog = TurnCatalog::build(
             [],
             [remote_descriptor(
-                "browser::youtube::get_current_timestamp",
+                "browser_youtube_get_current_timestamp",
                 &["youtube::watch_page"],
             )],
             &[active("youtube::watch_page")],
@@ -372,7 +372,7 @@ mod tests {
         .expect("contexts are active");
         assert!(
             catalog
-                .get("browser::youtube::get_current_timestamp")
+                .get("browser_youtube_get_current_timestamp")
                 .is_some()
         );
         assert_eq!(catalog.len(), 1);
@@ -383,7 +383,7 @@ mod tests {
         let catalog = TurnCatalog::build(
             [],
             [remote_descriptor(
-                "browser::youtube::get_transcript",
+                "browser_youtube_get_transcript",
                 &["youtube::watch_page", "browser::active_tab"],
             )],
             &[active("youtube::watch_page")],
@@ -442,7 +442,7 @@ mod tests {
         let catalog = TurnCatalog::build(
             [],
             [remote_descriptor(
-                "browser::youtube::get_current_timestamp",
+                "browser_youtube_get_current_timestamp",
                 &[],
             )],
             &[],
@@ -452,7 +452,7 @@ mod tests {
         assert_eq!(likes.len(), 1);
         match &likes[0] {
             ToolLike::Definition(def) => {
-                assert_eq!(def.name, "browser::youtube::get_current_timestamp");
+                assert_eq!(def.name, "browser_youtube_get_current_timestamp");
                 assert_eq!(def.description, "x");
                 assert_eq!(def.parameters, json!({"type": "object"}));
             }
@@ -521,7 +521,7 @@ mod tests {
             - Title: Tokio async patterns\n\
             - Channel: ThePrimeagen\n\
             - Duration: 18:42\n\
-            - Approximate current playback time: 2:33 (call `browser::youtube::get_current_timestamp` for precise)\n\
+            - Approximate current playback time: 2:33 (call `browser_youtube_get_current_timestamp` for precise)\n\
             \nTool calls for these contexts are pinned to the specific source the user was on at \
             turn start. If the user closes the tab or navigates away, calls return \
             `context_unavailable` — acknowledge the change to the user rather than retrying.";
@@ -580,7 +580,7 @@ mod tests {
             - Host: example.com\n\
             - Language: en\n\
             \n\
-            Generic web tools (`browser::web::*`) are available — use them to read DOM, \
+            Generic web tools (`browser_web_*`) are available — use them to read DOM, \
             extract structured content, or insert text into specific form fields the user \
             can see. The model cannot click buttons, submit forms, or navigate.\n\
             \nTool calls for these contexts are pinned to the specific source the user was on at \
@@ -611,7 +611,7 @@ mod tests {
         assert!(text.contains("- Title: unknown"));
         assert!(text.contains("- Host: unknown"));
         assert!(text.contains("- Language: unknown"));
-        assert!(text.contains("Generic web tools (`browser::web::*`)"));
+        assert!(text.contains("Generic web tools (`browser_web_*`)"));
     }
 
     #[test]

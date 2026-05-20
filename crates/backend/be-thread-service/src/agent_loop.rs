@@ -663,7 +663,7 @@ mod tests {
         let catalog = Arc::new(
             TurnCatalog::build(
                 [],
-                [remote_descriptor("browser::youtube::get_current_timestamp")],
+                [remote_descriptor("browser_youtube_get_current_timestamp")],
                 &[],
             )
             .unwrap(),
@@ -675,7 +675,7 @@ mod tests {
             &catalog,
             &*bus,
             vec![tool_call(
-                "browser::youtube::get_current_timestamp",
+                "browser_youtube_get_current_timestamp",
                 json!({}),
                 "c1",
             )],
@@ -701,7 +701,7 @@ mod tests {
 
         let recorded = bus.recorded();
         assert_eq!(recorded.len(), 1);
-        assert_eq!(recorded[0].0, "browser::youtube::get_current_timestamp");
+        assert_eq!(recorded[0].0, "browser_youtube_get_current_timestamp");
     }
 
     #[tokio::test]

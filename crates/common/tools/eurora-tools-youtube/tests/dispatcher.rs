@@ -18,9 +18,9 @@ use eurora_tools_youtube::{
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
-const TIMESTAMP_TOOL: &str = "browser::youtube::get_current_timestamp";
-const TRANSCRIPT_TOOL: &str = "browser::youtube::get_transcript";
-const FRAME_TOOL: &str = "browser::youtube::get_current_frame";
+const TIMESTAMP_TOOL: &str = "browser_youtube_get_current_timestamp";
+const TRANSCRIPT_TOOL: &str = "browser_youtube_get_transcript";
+const FRAME_TOOL: &str = "browser_youtube_get_current_frame";
 
 struct YoutubeStub;
 
@@ -223,7 +223,7 @@ async fn dispatch_unknown_name_returns_404() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let err = dispatcher
         .dispatch(call(
-            "browser::youtube::does_not_exist",
+            "browser_youtube_does_not_exist",
             json!({}),
             browser_origin(),
         ))

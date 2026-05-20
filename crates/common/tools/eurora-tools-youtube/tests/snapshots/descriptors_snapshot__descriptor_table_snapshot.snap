@@ -10,6 +10,15 @@ expression: wire
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
                 "description": String("No arguments."),
+                "properties": Object {
+                    "note": Object {
+                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
+                        "type": Array [
+                            String("string"),
+                            String("null"),
+                        ],
+                    },
+                },
                 "title": String("Empty"),
                 "type": String("object"),
             },
@@ -62,6 +71,15 @@ expression: wire
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
                 "description": String("No arguments."),
+                "properties": Object {
+                    "note": Object {
+                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
+                        "type": Array [
+                            String("string"),
+                            String("null"),
+                        ],
+                    },
+                },
                 "title": String("Empty"),
                 "type": String("object"),
             },
@@ -137,6 +155,15 @@ expression: wire
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
                 "description": String("No arguments."),
+                "properties": Object {
+                    "note": Object {
+                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
+                        "type": Array [
+                            String("string"),
+                            String("null"),
+                        ],
+                    },
+                },
                 "title": String("Empty"),
                 "type": String("object"),
             },

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use agent_chain::language_models::ToolLike;
 use agent_chain::messages::ContentBlock;
 use agent_chain::{AnyMessage, BaseChatModel, BaseTool, SystemMessage};
 use base64::{Engine as _, engine::general_purpose};
@@ -12,6 +13,7 @@ use thread_core::{WireActiveContext, WireToolDescriptor};
 use crate::describe_image_tool::{self, DescribeImageTool};
 use crate::error::ThreadServiceError;
 use crate::llm::Providers;
+use crate::llm::openai_schema;
 use crate::message_projection::{collect_thread_images, project_for_text_llm};
 use crate::tool_catalog::{TurnCatalog, build_context_system_message};
 
@@ -129,7 +131,18 @@ fn bind_chat_model(
     if catalog.is_empty() {
         return Ok(chat.clone());
     }
-    let tool_likes = catalog.tool_likes();
+    let tool_likes: Vec<ToolLike> = catalog
+        .tool_likes()
+        .iter()
+        .map(|like| match like {
+            ToolLike::Definition(def) => {
+                let mut def = def.clone();
+                openai_schema::normalize(&mut def.parameters);
+                ToolLike::Definition(def)
+            }
+            other => other.clone(),
+        })
+        .collect();
     let bound = chat.bind_tools(&tool_likes, None).map_err(|e| {
         ThreadServiceError::Internal(format!("Failed to bind tools to chat model: {e}"))
     })?;
