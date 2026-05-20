@@ -65,3 +65,4 @@ export {
 export type { AiPlaceholderNode, HumanPlaceholderNode } from './factory.js';
 
 export { AiStreamSink } from './stream-sink.js';
+export type { AiPlaceholderResolver } from './stream-sink.js';

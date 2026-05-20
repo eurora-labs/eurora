@@ -12,7 +12,12 @@ import {
 import { InjectionToken } from '@eurora/shared/context';
 import { SvelteMap } from 'svelte/reactivity';
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
-import type { AssetChip, HumanPlaceholderNode, MessageNode } from '$lib/models/messages/index.js';
+import type {
+	AiPlaceholderNode,
+	AssetChip,
+	HumanPlaceholderNode,
+	MessageNode,
+} from '$lib/models/messages/index.js';
 import type { ChatServerMessage } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
@@ -329,8 +334,14 @@ export class ChatService {
 		this.abortController?.abort();
 
 		const placeholder = createAiPlaceholderNode(parentId, '');
-		const sink = new AiStreamSink(placeholder);
 		entry.messages = entry.messages.map((node, i) => (i === targetIndex ? placeholder : node));
+		// Construct the sink *after* the array assignment so the
+		// resolver hits the reactive (proxied) view of the node, not the
+		// raw reference. See `findStreamingPlaceholder`'s doc comment.
+		const placeholderId = placeholder.message.id;
+		const sink = new AiStreamSink(placeholderId, () =>
+			findStreamingPlaceholder(entry, placeholderId),
+		);
 		entry.streamingMessageId = sink.id;
 
 		const abortController = new AbortController();
@@ -606,7 +617,11 @@ export class ChatService {
 		const humanNode = createHumanPlaceholderNode(null, text, assetChips);
 		const aiNode = createAiPlaceholderNode(humanNode.message.id, '');
 		entry.messages = [...entry.messages, humanNode, aiNode];
-		const sink = new AiStreamSink(aiNode);
+		// Resolver looks up the node back through `entry.messages` so
+		// every sink mutation passes through Svelte's `$state` proxy.
+		// See `findStreamingPlaceholder`'s doc comment.
+		const aiId = aiNode.message.id;
+		const sink = new AiStreamSink(aiId, () => findStreamingPlaceholder(entry, aiId));
 		entry.streamingMessageId = sink.id;
 		return { humanNode, sink };
 	}
@@ -629,9 +644,26 @@ export class ChatService {
 	}
 }
 
+/**
+ * Locate the live `AiPlaceholderNode` for `id` inside `entry.messages`.
+ * Returns `null` if no such node exists (cancellation, error rollback)
+ * or if the matching node is no longer an AI placeholder (it was
+ * swapped for the persisted message when `final` arrived).
+ *
+ * Routed through `entry.messages.find(...)`, the lookup goes through
+ * Svelte's `$state` proxy — handing the result to `AiStreamSink`
+ * ensures every mutation flows through the reactive view, so chunks
+ * render incrementally instead of buffering until the final swap.
+ */
+function findStreamingPlaceholder(entry: ThreadMessages, id: string): AiPlaceholderNode | null {
+	const node = entry.messages.find((n) => n.message.id === id);
+	if (!node || node.message.type !== 'ai') return null;
+	return node as AiPlaceholderNode;
+}
+
 interface ChatStreamPolicy {
 	/**
-	 * Owns the AI placeholder that streaming chunks mutate. The sink's
+	 * Drives streaming mutations on the AI placeholder. The sink's
 	 * `id` is the swap target when `final` arrives.
 	 */
 	sink: AiStreamSink;
