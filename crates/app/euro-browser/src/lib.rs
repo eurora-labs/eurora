@@ -58,6 +58,27 @@ pub fn type_collection() -> specta::Types {
         // (carried inside `NativeMessage::NativeYoutubeSnapshot`) — same
         // shape used by the `browser::youtube::get_current_frame` tool.
         .register_mut::<eurora_tools_youtube::CapturedFrame>()
+        .register_mut::<eurora_tools_web::PageMetadata>()
+        .register_mut::<eurora_tools_web::ViewportMetrics>()
+        .register_mut::<eurora_tools_web::GetAccessibilityTreeArgs>()
+        .register_mut::<eurora_tools_web::AccessibilityTree>()
+        .register_mut::<eurora_tools_web::AxNode>()
+        .register_mut::<eurora_tools_web::ReadabilityArticle>()
+        .register_mut::<eurora_tools_web::SelectedText>()
+        .register_mut::<eurora_tools_web::QuerySelectorArgs>()
+        .register_mut::<eurora_tools_web::QuerySelectorInclude>()
+        .register_mut::<eurora_tools_web::QuerySelectorResult>()
+        .register_mut::<eurora_tools_web::DomNode>()
+        .register_mut::<eurora_tools_web::BoundingBox>()
+        .register_mut::<eurora_tools_web::ListLinksArgs>()
+        .register_mut::<eurora_tools_web::LinksList>()
+        .register_mut::<eurora_tools_web::Link>()
+        .register_mut::<eurora_tools_web::ListFormInputsArgs>()
+        .register_mut::<eurora_tools_web::FormInputsList>()
+        .register_mut::<eurora_tools_web::FormInput>()
+        .register_mut::<eurora_tools_web::FormInputKind>()
+        .register_mut::<eurora_tools_web::InsertTextArgs>()
+        .register_mut::<eurora_tools_web::InsertTextResult>()
         .register_mut::<NativeTwitterAsset>()
         .register_mut::<NativeTwitterTweet>()
         .register_mut::<TweetPageData>()
@@ -110,6 +131,25 @@ mod tests {
             "CurrentTimestamp",
             "Transcript",
             "CapturedFrame",
+            // web adapter — at least one representative type per tool
+            "PageMetadata",
+            "ViewportMetrics",
+            "AccessibilityTree",
+            "AxNode",
+            "ReadabilityArticle",
+            "SelectedText",
+            "QuerySelectorArgs",
+            "QuerySelectorInclude",
+            "QuerySelectorResult",
+            "DomNode",
+            "BoundingBox",
+            "LinksList",
+            "Link",
+            "FormInputsList",
+            "FormInput",
+            "FormInputKind",
+            "InsertTextArgs",
+            "InsertTextResult",
             "NativeTwitterAsset",
             "NativeTwitterTweet",
             "ParseResult",

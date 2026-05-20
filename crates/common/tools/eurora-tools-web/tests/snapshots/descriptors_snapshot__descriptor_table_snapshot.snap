@@ -1,0 +1,871 @@
+---
+source: crates/common/tools/eurora-tools-web/tests/descriptors_snapshot.rs
+expression: wire
+---
+[
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::get_page_metadata",
+            description: "Page-level metadata for the active tab: URL, title, host, language, charset, description, OpenGraph tags, and viewport / scroll metrics.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("No arguments."),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$defs": Object {
+                "ViewportMetrics": Object {
+                    "description": String("Scroll and viewport metrics for the active document."),
+                    "properties": Object {
+                        "document_height": Object {
+                            "description": String("`document.documentElement.scrollHeight` in CSS pixels."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                        "inner_height": Object {
+                            "description": String("`window.innerHeight` in CSS pixels."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                        "inner_width": Object {
+                            "description": String("`window.innerWidth` in CSS pixels."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                        "scroll_x": Object {
+                            "description": String("`window.scrollX` in CSS pixels."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                        "scroll_y": Object {
+                            "description": String("`window.scrollY` in CSS pixels."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                    },
+                    "required": Array [
+                        String("scroll_x"),
+                        String("scroll_y"),
+                        String("inner_width"),
+                        String("inner_height"),
+                        String("document_height"),
+                    ],
+                    "type": String("object"),
+                },
+            },
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Page-level metadata exposed to the LLM for the active tab."),
+            "properties": Object {
+                "charset": Object {
+                    "description": String("Document character set as reported by the browser, when known."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "description": Object {
+                    "description": String("`<meta name=\"description\">` content, when present."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "host": Object {
+                    "description": String("Host component of `url` (no scheme, no port)."),
+                    "type": String("string"),
+                },
+                "language": Object {
+                    "description": String("BCP-47 language tag derived from `<html lang>` then\n`<meta http-equiv=\"content-language\">`. `None` when neither is set."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "og": Object {
+                    "additionalProperties": Object {
+                        "type": String("string"),
+                    },
+                    "description": String("OpenGraph tags scraped from `<meta property=\"og:*\">`, keyed by the\nsuffix after `og:` (e.g. `\"title\"`, `\"image\"`, `\"site_name\"`)."),
+                    "type": String("object"),
+                },
+                "title": Object {
+                    "description": String("`document.title` at observation time."),
+                    "type": String("string"),
+                },
+                "url": Object {
+                    "description": String("Fully-qualified URL of the active document, including query and fragment."),
+                    "type": String("string"),
+                },
+                "viewport": Object {
+                    "$ref": String("#/$defs/ViewportMetrics"),
+                    "description": String("Scroll and viewport metrics at observation time."),
+                },
+            },
+            "required": Array [
+                String("url"),
+                String("title"),
+                String("host"),
+                String("og"),
+                String("viewport"),
+            ],
+            "title": String("PageMetadata"),
+            "type": String("object"),
+        },
+        timeout_ms: 2000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: false,
+    },
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::get_accessibility_tree",
+            description: "Approximate accessibility tree of the active page, derived from ARIA roles, implicit element roles, and an accname-spec accessible- name walk. Defaults: depth 12, 500 nodes; hard cap 2 000 nodes.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("Arguments to `get_accessibility_tree`. All fields are optional; the\ncontent-script applies the documented defaults when omitted."),
+                "properties": Object {
+                    "max_depth": Object {
+                        "description": String("Maximum traversal depth. Defaults to 12; deeper nodes are pruned and\n[`AccessibilityTree::truncated`] is set."),
+                        "format": String("uint32"),
+                        "minimum": Number(0),
+                        "type": Array [
+                            String("integer"),
+                            String("null"),
+                        ],
+                    },
+                    "max_nodes": Object {
+                        "description": String("Soft cap on emitted nodes. Defaults to 500; hard cap is 2 000.\nReaching the cap sets [`AccessibilityTree::truncated`]."),
+                        "format": String("uint32"),
+                        "minimum": Number(0),
+                        "type": Array [
+                            String("integer"),
+                            String("null"),
+                        ],
+                    },
+                    "root_selector": Object {
+                        "description": String("CSS selector for the subtree root. Defaults to `<body>` when omitted."),
+                        "type": Array [
+                            String("string"),
+                            String("null"),
+                        ],
+                    },
+                },
+                "title": String("GetAccessibilityTreeArgs"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$defs": Object {
+                "AxNode": Object {
+                    "description": String("One node in the approximate accessibility tree. The structure mirrors\nthe platform-computed AX tree CDP exposes, but the role and name are\nresolved client-side from ARIA attributes and implicit element roles."),
+                    "properties": Object {
+                        "children": Object {
+                            "description": String("Children in document order. Empty for leaf nodes."),
+                            "items": Object {
+                                "$ref": String("#/$defs/AxNode"),
+                            },
+                            "type": String("array"),
+                        },
+                        "description": Object {
+                            "description": String("Accessible description from `aria-describedby` or the `title` attr."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                        "name": Object {
+                            "description": String("Accessible name computed per the\n[accname](https://w3c.github.io/accname/) spec — `aria-labelledby`,\nthen `aria-label`, then associated `<label>`, then `placeholder`,\nthen text content."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                        "role": Object {
+                            "description": String("Resolved ARIA role (`\"button\"`, `\"link\"`, `\"textbox\"`, …).\nFalls back to `\"generic\"` when no implicit or explicit role applies."),
+                            "type": String("string"),
+                        },
+                        "selector_path": Object {
+                            "description": String("CSS selector that re-targets this node for DOM-tool follow-ups\n(`query_selector`, `insert_text`). Stable for the lifetime of the\nobservation; may break after page mutations."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                        "value": Object {
+                            "description": String("Current value for form controls (`<input>`, `<textarea>`,\n`[role=textbox]`, `[role=slider]`, etc.)."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                    },
+                    "required": Array [
+                        String("role"),
+                        String("children"),
+                    ],
+                    "type": String("object"),
+                },
+            },
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Approximate accessibility tree returned by `get_accessibility_tree`."),
+            "properties": Object {
+                "node_count": Object {
+                    "description": String("Total number of nodes in the emitted tree, including `root`."),
+                    "format": String("uint32"),
+                    "minimum": Number(0),
+                    "type": String("integer"),
+                },
+                "root": Object {
+                    "$ref": String("#/$defs/AxNode"),
+                    "description": String("Root of the emitted subtree (the element resolved from\n`root_selector`, or `<body>` when none was given)."),
+                },
+                "truncated": Object {
+                    "description": String("`true` when traversal hit `max_depth` or `max_nodes` and one or\nmore subtrees were elided. The model can refine via `root_selector`\nor raise `max_nodes` (within the 2 000 hard cap) to see more."),
+                    "type": String("boolean"),
+                },
+            },
+            "required": Array [
+                String("root"),
+                String("node_count"),
+                String("truncated"),
+            ],
+            "title": String("AccessibilityTree"),
+            "type": String("object"),
+        },
+        timeout_ms: 5000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: false,
+    },
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::get_readability_article",
+            description: "Reader-mode extraction of the page's primary article via Mozilla Readability, including title, byline, language, and HTML / text bodies. Per-call truncation caps both bodies at 32 KB.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("No arguments."),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Mozilla Readability extraction of the page's primary article."),
+            "properties": Object {
+                "byline": Object {
+                    "description": String("Author byline, when Readability can identify one."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "content_html": Object {
+                    "description": String("Sanitised HTML body. Subject to a per-call 32 KB truncation cap."),
+                    "type": String("string"),
+                },
+                "excerpt": Object {
+                    "description": String("Short excerpt suitable for surface previews."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "language": Object {
+                    "description": String("BCP-47 language tag for the article body, when known."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "length": Object {
+                    "description": String("Character length of `text_content` before truncation."),
+                    "format": String("uint32"),
+                    "minimum": Number(0),
+                    "type": String("integer"),
+                },
+                "site_name": Object {
+                    "description": String("Publishing site name, typically from `<meta property=\"og:site_name\">`."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "text_content": Object {
+                    "description": String("Plain-text body. Subject to a per-call 32 KB truncation cap."),
+                    "type": String("string"),
+                },
+                "title": Object {
+                    "description": String("Article title as Readability resolves it."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+            },
+            "required": Array [
+                String("content_html"),
+                String("text_content"),
+                String("length"),
+            ],
+            "title": String("ReadabilityArticle"),
+            "type": String("object"),
+        },
+        timeout_ms: 5000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: false,
+    },
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::get_selected_text",
+            description: "Whatever the user has highlighted in the active document right now, plus XPaths to the selection's anchor and focus endpoints. Empty selection returns an empty `text` field.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("No arguments."),
+                "title": String("Empty"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Whatever the user has highlighted in the active document right now."),
+            "properties": Object {
+                "anchor_xpath": Object {
+                    "description": String("XPath to the selection anchor node, when one is present."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "focus_xpath": Object {
+                    "description": String("XPath to the selection focus node, when one is present."),
+                    "type": Array [
+                        String("string"),
+                        String("null"),
+                    ],
+                },
+                "text": Object {
+                    "description": String("Highlighted text as `window.getSelection().toString()` returns it.\nEmpty string when no selection is active."),
+                    "type": String("string"),
+                },
+            },
+            "required": Array [
+                String("text"),
+            ],
+            "title": String("SelectedText"),
+            "type": String("object"),
+        },
+        timeout_ms: 1000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: false,
+    },
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::query_selector",
+            description: "Generalised DOM reader — returns text content, outer HTML, attributes, or bounding rect per match. Hidden, password, file, and submit-style inputs and CSRF-shaped `<meta>` tags are elided from results regardless of selector; the pre-filter match count is reported separately so the model can tell when elision happened.",
+            parameters: Object {
+                "$defs": Object {
+                    "QuerySelectorInclude": Object {
+                        "description": String("Per-match facet the caller wants populated. Stringly-encoded as a\n`snake_case` discriminator on the wire so the LLM's input schema is\na closed enum, not free-form text."),
+                        "oneOf": Array [
+                            Object {
+                                "const": String("text"),
+                                "description": String("Populate [`DomNode::text`] with `Element.textContent`."),
+                                "type": String("string"),
+                            },
+                            Object {
+                                "const": String("html"),
+                                "description": String("Populate [`DomNode::html`] with `Element.outerHTML`."),
+                                "type": String("string"),
+                            },
+                            Object {
+                                "const": String("attributes"),
+                                "description": String("Populate [`DomNode::attributes`] with the element's attribute map."),
+                                "type": String("string"),
+                            },
+                            Object {
+                                "const": String("bounds"),
+                                "description": String("Populate [`DomNode::bounds`] with the element's bounding client rect."),
+                                "type": String("string"),
+                            },
+                        ],
+                    },
+                },
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("Arguments to `query_selector`."),
+                "properties": Object {
+                    "include": Object {
+                        "default": Array [],
+                        "description": String("Per-match facets to populate. Empty `include` returns nodes that\ncarry only [`DomNode::selector_path`]."),
+                        "items": Object {
+                            "$ref": String("#/$defs/QuerySelectorInclude"),
+                        },
+                        "type": String("array"),
+                    },
+                    "limit": Object {
+                        "default": Number(50),
+                        "description": String("Maximum matches to return. Defaults to 50."),
+                        "format": String("uint32"),
+                        "minimum": Number(0),
+                        "type": String("integer"),
+                    },
+                    "selector": Object {
+                        "description": String("CSS selector evaluated against `document`."),
+                        "type": String("string"),
+                    },
+                },
+                "required": Array [
+                    String("selector"),
+                ],
+                "title": String("QuerySelectorArgs"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$defs": Object {
+                "BoundingBox": Object {
+                    "description": String("Bounding rectangle in CSS pixels — mirrors `DOMRect` semantics."),
+                    "properties": Object {
+                        "height": Object {
+                            "description": String("Height in CSS pixels."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                        "width": Object {
+                            "description": String("Width in CSS pixels."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                        "x": Object {
+                            "description": String("X coordinate of the left edge, relative to the viewport."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                        "y": Object {
+                            "description": String("Y coordinate of the top edge, relative to the viewport."),
+                            "format": String("double"),
+                            "type": String("number"),
+                        },
+                    },
+                    "required": Array [
+                        String("x"),
+                        String("y"),
+                        String("width"),
+                        String("height"),
+                    ],
+                    "type": String("object"),
+                },
+                "DomNode": Object {
+                    "description": String("One DOM match returned from `query_selector`. Fields beyond\n`selector_path` are populated only when the corresponding\n[`QuerySelectorInclude`] was passed."),
+                    "properties": Object {
+                        "attributes": Object {
+                            "additionalProperties": Object {
+                                "type": String("string"),
+                            },
+                            "description": String("Attribute map (`name` → `value`) of the element. Present iff the\ncaller passed [`QuerySelectorInclude::Attributes`]."),
+                            "type": Array [
+                                String("object"),
+                                String("null"),
+                            ],
+                        },
+                        "bounds": Object {
+                            "anyOf": Array [
+                                Object {
+                                    "$ref": String("#/$defs/BoundingBox"),
+                                },
+                                Object {
+                                    "type": String("null"),
+                                },
+                            ],
+                            "description": String("Bounding client rect in CSS pixels. Present iff the caller passed\n[`QuerySelectorInclude::Bounds`] and the element is laid out."),
+                        },
+                        "html": Object {
+                            "description": String("`Element.outerHTML`, truncated to 32 KB. Present iff the caller\npassed [`QuerySelectorInclude::Html`]."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                        "selector_path": Object {
+                            "description": String("CSS selector that re-targets this node for DOM-tool follow-ups."),
+                            "type": String("string"),
+                        },
+                        "text": Object {
+                            "description": String("`Element.textContent`, truncated to 8 KB. Present iff the caller\npassed [`QuerySelectorInclude::Text`]."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                    },
+                    "required": Array [
+                        String("selector_path"),
+                    ],
+                    "type": String("object"),
+                },
+            },
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Result of a `query_selector` invocation."),
+            "properties": Object {
+                "matches": Object {
+                    "description": String("Emitted matches (post-filter, capped by `limit`)."),
+                    "items": Object {
+                        "$ref": String("#/$defs/DomNode"),
+                    },
+                    "type": String("array"),
+                },
+                "total_match_count": Object {
+                    "description": String("Total number of pre-filter matches, before the safety denylist\nand `limit` were applied. When this exceeds `matches.len()`, some\nelements were elided (hidden / password / file / submit / CSRF-\nshaped metas) or truncated."),
+                    "format": String("uint32"),
+                    "minimum": Number(0),
+                    "type": String("integer"),
+                },
+                "truncated": Object {
+                    "description": String("`true` when `total_match_count > matches.len()` for any reason\nother than the safety denylist (i.e. the model can ask for more\nwith a higher `limit`)."),
+                    "type": String("boolean"),
+                },
+            },
+            "required": Array [
+                String("matches"),
+                String("total_match_count"),
+                String("truncated"),
+            ],
+            "title": String("QuerySelectorResult"),
+            "type": String("object"),
+        },
+        timeout_ms: 5000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: false,
+    },
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::list_links",
+            description: "Inventory of clickable navigations on the active page (URL, accessible label, role). The model can suggest navigations from this list; the user is the one who navigates.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("Arguments to `list_links`."),
+                "properties": Object {
+                    "limit": Object {
+                        "default": Number(100),
+                        "description": String("Maximum links to return. Defaults to 100."),
+                        "format": String("uint32"),
+                        "minimum": Number(0),
+                        "type": String("integer"),
+                    },
+                    "root_selector": Object {
+                        "description": String("CSS selector scoping the search. Defaults to the whole document."),
+                        "type": Array [
+                            String("string"),
+                            String("null"),
+                        ],
+                    },
+                },
+                "title": String("ListLinksArgs"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$defs": Object {
+                "Link": Object {
+                    "description": String("One link, suitable for the model to suggest as a navigation target."),
+                    "properties": Object {
+                        "label": Object {
+                            "description": String("Accessible label of the link, when one can be resolved."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                        "role": Object {
+                            "description": String("ARIA role (`\"link\"` for `<a href>`, possibly `\"button\"` for\nlink-styled `<button>`s the content-script chose to include)."),
+                            "type": String("string"),
+                        },
+                        "selector_path": Object {
+                            "description": String("CSS selector that re-targets this element for DOM-tool follow-ups."),
+                            "type": String("string"),
+                        },
+                        "url": Object {
+                            "description": String("Resolved absolute URL of the link target."),
+                            "type": String("string"),
+                        },
+                    },
+                    "required": Array [
+                        String("url"),
+                        String("role"),
+                        String("selector_path"),
+                    ],
+                    "type": String("object"),
+                },
+            },
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Result of a `list_links` invocation."),
+            "properties": Object {
+                "links": Object {
+                    "description": String("Emitted links (capped by `limit`)."),
+                    "items": Object {
+                        "$ref": String("#/$defs/Link"),
+                    },
+                    "type": String("array"),
+                },
+                "total": Object {
+                    "description": String("Total number of in-scope links, before `limit` was applied."),
+                    "format": String("uint32"),
+                    "minimum": Number(0),
+                    "type": String("integer"),
+                },
+            },
+            "required": Array [
+                String("links"),
+                String("total"),
+            ],
+            "title": String("LinksList"),
+            "type": String("object"),
+        },
+        timeout_ms: 3000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: false,
+    },
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::list_form_inputs",
+            description: "Inventory of text-typed editable fields on the active page, with accessible labels and current values. Password, file, hidden, submit, disabled, and readonly fields are excluded; each entry's `field_id` is the only legal target for `insert_text`.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("Arguments to `list_form_inputs`."),
+                "properties": Object {
+                    "limit": Object {
+                        "default": Number(100),
+                        "description": String("Maximum inputs to return. Defaults to 100."),
+                        "format": String("uint32"),
+                        "minimum": Number(0),
+                        "type": String("integer"),
+                    },
+                    "root_selector": Object {
+                        "description": String("CSS selector scoping the search. Defaults to the whole document."),
+                        "type": Array [
+                            String("string"),
+                            String("null"),
+                        ],
+                    },
+                },
+                "title": String("ListFormInputsArgs"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$defs": Object {
+                "FormInput": Object {
+                    "description": String("One editable field discovered by `list_form_inputs`. Restricted by\n[`FormInputKind`] to the allowlist of safely-writable input types."),
+                    "properties": Object {
+                        "field_id": Object {
+                            "description": String("Selector-shaped identifier the model must pass back to\n`insert_text`. Stable for the lifetime of the observation."),
+                            "type": String("string"),
+                        },
+                        "kind": Object {
+                            "$ref": String("#/$defs/FormInputKind"),
+                            "description": String("One of the allowlisted editable kinds. The content-script never\nemits a [`FormInput`] outside this set."),
+                        },
+                        "label": Object {
+                            "description": String("Accessible label resolved via `<label for>`, `aria-labelledby`,\n`aria-label`, or `placeholder` (in that order)."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                        "placeholder": Object {
+                            "description": String("Placeholder text, when set on the underlying element."),
+                            "type": Array [
+                                String("string"),
+                                String("null"),
+                            ],
+                        },
+                        "required": Object {
+                            "description": String("`true` when the field is marked `required` (HTML constraint or\n`aria-required=\"true\"`)."),
+                            "type": String("boolean"),
+                        },
+                        "value": Object {
+                            "description": String("Current value at observation time. Empty string for empty fields."),
+                            "type": String("string"),
+                        },
+                    },
+                    "required": Array [
+                        String("field_id"),
+                        String("kind"),
+                        String("value"),
+                        String("required"),
+                    ],
+                    "type": String("object"),
+                },
+                "FormInputKind": Object {
+                    "description": String("Allowlist of editable input kinds the `insert_text` writer accepts.\nThe content-script never returns any other kind, and `insert_text`\nrejects writes whose target falls outside this set."),
+                    "oneOf": Array [
+                        Object {
+                            "const": String("text"),
+                            "description": String("`<input type=\"text\">`."),
+                            "type": String("string"),
+                        },
+                        Object {
+                            "const": String("search"),
+                            "description": String("`<input type=\"search\">`."),
+                            "type": String("string"),
+                        },
+                        Object {
+                            "const": String("email"),
+                            "description": String("`<input type=\"email\">`."),
+                            "type": String("string"),
+                        },
+                        Object {
+                            "const": String("url"),
+                            "description": String("`<input type=\"url\">`."),
+                            "type": String("string"),
+                        },
+                        Object {
+                            "const": String("tel"),
+                            "description": String("`<input type=\"tel\">`."),
+                            "type": String("string"),
+                        },
+                        Object {
+                            "const": String("number"),
+                            "description": String("`<input type=\"number\">`."),
+                            "type": String("string"),
+                        },
+                        Object {
+                            "const": String("textarea"),
+                            "description": String("`<textarea>`."),
+                            "type": String("string"),
+                        },
+                        Object {
+                            "const": String("content_editable"),
+                            "description": String("`[contenteditable=\"true\"]` on any element."),
+                            "type": String("string"),
+                        },
+                    ],
+                },
+            },
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Result of a `list_form_inputs` invocation."),
+            "properties": Object {
+                "inputs": Object {
+                    "description": String("Emitted text-typed editable fields (capped by `limit`)."),
+                    "items": Object {
+                        "$ref": String("#/$defs/FormInput"),
+                    },
+                    "type": String("array"),
+                },
+                "total": Object {
+                    "description": String("Total number of allowlisted, enabled, in-scope fields before\n`limit` was applied. Password, file, hidden, submit, disabled,\nand readonly fields are never counted."),
+                    "format": String("uint32"),
+                    "minimum": Number(0),
+                    "type": String("integer"),
+                },
+            },
+            "required": Array [
+                String("inputs"),
+                String("total"),
+            ],
+            "title": String("FormInputsList"),
+            "type": String("object"),
+        },
+        timeout_ms: 3000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: false,
+    },
+    WireToolDescriptor {
+        definition: ToolDefinition {
+            name: "browser::web::insert_text",
+            description: "Insert text into a known editable field. The `field_id` must come from a prior `list_form_inputs` call; arbitrary selectors are rejected. Restricted to text-typed `<input>`, `<textarea>`, and `[contenteditable]`. Never fires `change`, `keydown`, `keyup`, `keypress`, `focus`, `blur`, or `submit` — sites that submit on `Enter` or on `blur` are unaffected.",
+            parameters: Object {
+                "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+                "description": String("Arguments to `insert_text`, the single mutating web tool."),
+                "properties": Object {
+                    "field_id": Object {
+                        "description": String("Selector-shaped identifier previously returned by `list_form_inputs`.\n`insert_text` rejects any `field_id` that doesn't resolve to exactly\none allowlisted, enabled, writable element."),
+                        "type": String("string"),
+                    },
+                    "replace": Object {
+                        "default": Bool(false),
+                        "description": String("When `true`, overwrite the entire field value. When `false`\n(default), append `text` to the existing value. Caret position\nis not preserved either way."),
+                        "type": String("boolean"),
+                    },
+                    "text": Object {
+                        "description": String("Text to insert. Inserted as-is — no Unicode normalisation, no key\ndispatch, no `Enter`-on-newline."),
+                        "type": String("string"),
+                    },
+                },
+                "required": Array [
+                    String("field_id"),
+                    String("text"),
+                ],
+                "title": String("InsertTextArgs"),
+                "type": String("object"),
+            },
+        },
+        output_schema: Object {
+            "$schema": String("https://json-schema.org/draft/2020-12/schema"),
+            "description": String("Result of a successful `insert_text` call."),
+            "properties": Object {
+                "field_id": Object {
+                    "description": String("Echo of the [`InsertTextArgs::field_id`] that was written."),
+                    "type": String("string"),
+                },
+                "new_value": Object {
+                    "description": String("Value of the field immediately after the write."),
+                    "type": String("string"),
+                },
+                "previous_value": Object {
+                    "description": String("Value of the field immediately before the write."),
+                    "type": String("string"),
+                },
+            },
+            "required": Array [
+                String("field_id"),
+                String("previous_value"),
+                String("new_value"),
+            ],
+            "title": String("InsertTextResult"),
+            "type": String("object"),
+        },
+        timeout_ms: 2000,
+        source: Bridge {
+            app_kind: "browser",
+        },
+        required_contexts: [
+            "web::page",
+        ],
+        requires_user_approval: true,
+    },
+]

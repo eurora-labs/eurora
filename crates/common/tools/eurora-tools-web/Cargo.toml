@@ -1,0 +1,36 @@
+[package]
+name = "eurora-tools-web"
+version = "0.0.0"
+edition.workspace = true
+description = "Generic web-page adapter for Eurora's unified tool-execution architecture. Declares the WebAdapter trait, its argument/return types, and the macro-generated descriptor table and dispatcher for the read-only DOM surface plus the single constrained text-insertion writer."
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+euro-bridge = { workspace = true, optional = true }
+euro-bridge-protocol = { workspace = true, optional = true }
+eurora-tools = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
+specta = { workspace = true, optional = true, features = ["derive"] }
+
+[dev-dependencies]
+insta = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+tokio-util = { workspace = true, features = ["rt"] }
+
+[features]
+# Emit `specta::Type` derives on the web argument/return types so they can
+# be exported into the browser-extension TypeScript bindings via
+# `euro-browser`'s `type_collection`.
+specta = ["dep:specta"]
+# Build the bridge-backed adapter implementation (`WebBridgeImpl`).
+# Off by default so non-desktop consumers (the agent loop, codegen) don't
+# pull `euro-bridge` and its transitive dependencies. The runtime impl
+# lands in Phase 12; Phase 11 ships the feature gate with an empty
+# `bridge` module so feature-matrix builds are exercised from day one.
+bridge = ["dep:euro-bridge", "dep:euro-bridge-protocol", "dep:serde_json"]
+
+[lints]
+workspace = true
