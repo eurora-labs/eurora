@@ -45,7 +45,9 @@ export const SAFETY_VIOLATION = 'SAFETY_VIOLATION';
  * envelope (`{kind: 'Error', code: 'SAFETY_VIOLATION', …}`) so the
  * background script can distinguish them from internal handler bugs.
  */
-export async function handleInsertText(obj: BrowserObj): Promise<InsertTextResult | NativeResponse> {
+export async function handleInsertText(
+	obj: BrowserObj,
+): Promise<InsertTextResult | NativeResponse> {
 	const args = parseArgs(obj);
 	if (!args) {
 		return violation('insert_text requires { field_id: string, text: string }');
