@@ -26,7 +26,7 @@
 		"@gitbutler/svelte-comment-injector": "^1.0.1",
 		"@icons-pack/svelte-simple-icons": "^5.0.0",
 		"@lucide/svelte": "catalog:",
-		"@playwright/test": "^1.59.1",
+		"@playwright/test": "^1.60.0",
 		"@sentry/vite-plugin": "^4.4.1",
 		"@sveltejs/adapter-node": "^5.5.4",
 		"@sveltejs/adapter-static": "catalog:svelte",
@@ -58,7 +58,7 @@
 		"postcss-nesting": "^13.0.2",
 		"postcss-pxtorem": "^6.1.0",
 		"prettier": "^3.8.3",
-		"prettier-plugin-svelte": "^3.5.1",
+		"prettier-plugin-svelte": "^3.5.2",
 		"prettier-plugin-tailwindcss": "^0.8.0",
 		"runed": "catalog:svelte",
 		"svelte": "catalog:svelte",
@@ -74,8 +74,8 @@
 		"vitest": "catalog:"
 	},
 	"dependencies": {
-		"@sentry/svelte": "^10.51.0",
+		"@sentry/svelte": "^10.53.1",
 		"@tauri-apps/plugin-opener": "^2.5.4",
-		"posthog-js": "^1.372.9"
+		"posthog-js": "^1.373.4"
 	}
 }
