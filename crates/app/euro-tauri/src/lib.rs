@@ -22,7 +22,9 @@ pub mod ipc;
 
 pub use ipc::build_specta;
 pub use window::{
-    MAIN_WINDOW_LABEL, create as create_window, show_and_focus_main, state::WindowState,
+    ANSWER_WINDOW_LABEL, ASK_WINDOW_LABEL, MAIN_WINDOW_LABEL, anchor_answer_window,
+    anchor_ask_window, create as create_window, create_answer_window, create_ask_window,
+    show_and_focus_main, state::WindowState,
 };
 
 /// Inject build-time URL bake-ins into the process environment so the

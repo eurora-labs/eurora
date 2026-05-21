@@ -63,7 +63,7 @@ pub mod telemetry;
 pub mod web;
 
 pub use cloud::{CURRENT_SCHEMA_VERSION, CloudSettings};
-pub use desktop::{DEFAULT_SCALE, DesktopSettings, InterfaceScale, TextScale};
+pub use desktop::{AskBarSettings, DEFAULT_SCALE, DesktopSettings, InterfaceScale, TextScale};
 pub use dto::{
     GetSettingsResponse, PutSettingsAcceptedResponse, PutSettingsConflictResponse,
     PutSettingsRequest,
@@ -82,6 +82,7 @@ pub fn type_collection() -> specta::Types {
         .register::<CloudSettings>()
         .register::<SharedSettings>()
         .register::<DesktopSettings>()
+        .register::<AskBarSettings>()
         .register::<MobileSettings>()
         .register::<WebSettings>()
         .register::<TelemetryConsent>()
@@ -106,6 +107,7 @@ mod tests {
             "CloudSettings",
             "SharedSettings",
             "DesktopSettings",
+            "AskBarSettings",
             "MobileSettings",
             "WebSettings",
             "TelemetryConsent",

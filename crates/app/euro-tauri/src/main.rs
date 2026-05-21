@@ -11,6 +11,7 @@ use euro_tauri::{
     procedures::{
         accent::accent_from_image,
         activity::{SavedActivity, SavedActivityCreated, SavedActivityEnded},
+        ask::{open_answer_pane, summon_overlay},
         system::{
             BrowserExtensionStatusChanged, SAFARI_BRIDGE_APP_KIND, resolve_browser_extension_state,
         },
@@ -298,9 +299,10 @@ fn register_autostart(tauri_app: &mut tauri::App, settings: &SettingsState) {
 
 fn setup_tray(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = tauri_app.handle().clone();
-    let open_i = MenuItem::with_id(tauri_app, "open", "Open", true, None::<&str>)?;
+    let ask_i = MenuItem::with_id(tauri_app, "ask", "Ask Eurora", true, None::<&str>)?;
+    let open_i = MenuItem::with_id(tauri_app, "open", "Open Eurora", true, None::<&str>)?;
     let quit_i = MenuItem::with_id(tauri_app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(tauri_app, &[&open_i, &quit_i])?;
+    let menu = Menu::with_items(tauri_app, &[&ask_i, &open_i, &quit_i])?;
 
     let icon = tauri_app
         .default_window_icon()
@@ -318,10 +320,133 @@ fn setup_tray(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Erro
                     tracing::error!("Failed to show main window from tray: {e}");
                 }
             }
+            "ask" => {
+                // The tray entry mirrors the hotkey: surface the bar
+                // when enabled, otherwise drop the user straight into
+                // the answer pane. Run on the async runtime so the
+                // tray callback returns promptly even if the settings
+                // mutex is briefly contended.
+                let handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    summon_overlay(handle).await;
+                });
+            }
             other => tracing::warn!("Unhandled tray menu event: {other}"),
         })
         .build(tauri_app)?;
 
+    Ok(())
+}
+
+/// Wire the `eurora://` URL scheme to the ask overlay. Any URL of the
+/// form `eurora://ask?q=<text>` opens the answer pane pre-filled with
+/// `<text>`; bare `eurora://ask` opens an empty answer pane. Other
+/// paths under the scheme are ignored — invented routes log at warn
+/// rather than firing the overlay accidentally.
+///
+/// Both invocation paths land here: a cold-launch where the OS hands
+/// us the URL via the deep-link plugin's `on_open_url`, and a
+/// warm-launch where the single-instance plugin forwards the second
+/// process's args. Cold-launch reaches us through `get_current` after
+/// the plugin has buffered the launch URL; we drain it once at setup.
+fn setup_deep_link(app_handle: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri_plugin_deep_link::DeepLinkExt;
+
+    let on_url_handle = app_handle.clone();
+    app_handle.deep_link().on_open_url(move |event| {
+        for url in event.urls() {
+            dispatch_deep_link(&on_url_handle, &url);
+        }
+    });
+
+    // Drain any URL the OS handed the binary at cold launch — the
+    // plugin buffers it until a handler is attached.
+    if let Ok(Some(initial_urls)) = app_handle.deep_link().get_current() {
+        for url in initial_urls {
+            dispatch_deep_link(&app_handle, &url);
+        }
+    }
+
+    Ok(())
+}
+
+/// Route a single `eurora://...` URL to the appropriate overlay.
+fn dispatch_deep_link(app_handle: &tauri::AppHandle, url: &url::Url) {
+    if url.scheme() != "eurora" {
+        return;
+    }
+    // `host_str()` is what `URL` parses out of `eurora://ask?q=…` — the
+    // "ask" sits in the host position because there is no `//` host
+    // boundary syntactically distinct from the path. Treat both the
+    // host and the first path segment as candidates so users hand-typing
+    // `eurora:ask` (no `//`) still land on the right route.
+    let action = url
+        .host_str()
+        .filter(|h| !h.is_empty())
+        .or_else(|| url.path_segments().and_then(|mut s| s.next()))
+        .unwrap_or("");
+    if action != "ask" {
+        tracing::warn!(action, %url, "Unknown deep-link action; ignoring");
+        return;
+    }
+    let prompt = url
+        .query_pairs()
+        .find_map(|(k, v)| (k == "q").then(|| v.into_owned()))
+        .filter(|s| !s.is_empty());
+
+    let handle = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(err) = open_answer_pane(&handle, prompt.as_deref()) {
+            tracing::error!("Failed to open answer pane from deep link: {err}");
+        }
+    });
+}
+
+/// Register the system-wide hotkey that summons the ask overlay.
+///
+/// Default binding: `CmdOrCtrl+Shift+Space`. Picked to mirror the
+/// "spotlight-adjacent" idiom Raycast / Alfred use; reachable from
+/// every kind of focused app without intercepting common edit
+/// shortcuts. Conflicts (e.g. with another launcher already grabbing
+/// the same chord) are logged rather than treated as fatal so a
+/// preference collision can't block app startup.
+fn setup_global_shortcut(app_handle: tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri_plugin_global_shortcut::{
+        Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
+    };
+
+    #[cfg(target_os = "macos")]
+    let modifiers = Modifiers::SUPER | Modifiers::SHIFT;
+    #[cfg(not(target_os = "macos"))]
+    let modifiers = Modifiers::CONTROL | Modifiers::SHIFT;
+    let overlay_shortcut = Shortcut::new(Some(modifiers), Code::Space);
+
+    app_handle.plugin(
+        tauri_plugin_global_shortcut::Builder::new()
+            .with_handler(move |app, shortcut, event| {
+                // Pressed-only: ShortcutState fires both on press and
+                // release; we only want one summon per key chord, on
+                // the down edge. Without this filter the bar would
+                // toggle in and out on a single tap.
+                if event.state != ShortcutState::Pressed {
+                    return;
+                }
+                if *shortcut != overlay_shortcut {
+                    return;
+                }
+                let handle = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    summon_overlay(handle).await;
+                });
+            })
+            .build(),
+    )?;
+
+    if let Err(err) = app_handle.global_shortcut().register(overlay_shortcut) {
+        tracing::warn!(
+            "Failed to register global ask-overlay shortcut (likely already bound by another app): {err}"
+        );
+    }
     Ok(())
 }
 
@@ -693,6 +818,7 @@ fn main() {
             let builder = tauri::Builder::default()
                 .plugin(tauri_plugin_os::init())
                 .plugin(tauri_plugin_clipboard_manager::init())
+                .plugin(tauri_plugin_deep_link::init())
                 .plugin(tauri_plugin_updater::Builder::new().build())
                 .invoke_handler(specta.invoke_handler())
                 .setup(move |tauri_app| {
@@ -853,6 +979,8 @@ fn main() {
 
                     setup_main_window(tauri_app, started_by_autostart)?;
                     setup_tray(tauri_app)?;
+                    setup_global_shortcut(tauri_app.handle().clone())?;
+                    setup_deep_link(tauri_app.handle().clone())?;
 
                     spawn_timeline_listeners(tauri_app.handle().clone());
                     spawn_browser_status_bridge(tauri_app.handle().clone());
@@ -900,8 +1028,23 @@ fn main() {
                         .build(),
                 )
                 .plugin(tauri_plugin_shell::init())
-                .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-                    if let Err(e) = show_and_focus_main(app) {
+                .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+                    // A second instance launched with a `eurora://...`
+                    // argv lands here (Linux's launcher hands the URL
+                    // through argv when single-instance reroutes the
+                    // second process). Forward every argv-shaped URL
+                    // to the deep-link dispatcher before falling back
+                    // to the default "raise the main window" behavior.
+                    let mut handled_deep_link = false;
+                    for arg in args.iter().skip(1) {
+                        if let Ok(parsed) = url::Url::parse(arg)
+                            && parsed.scheme() == "eurora"
+                        {
+                            dispatch_deep_link(app, &parsed);
+                            handled_deep_link = true;
+                        }
+                    }
+                    if !handled_deep_link && let Err(e) = show_and_focus_main(app) {
                         tracing::error!("Failed to show main window for second instance: {e}");
                     }
                 }))

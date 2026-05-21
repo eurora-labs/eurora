@@ -6,7 +6,9 @@
     "linux"
   ],
   "windows": [
-    "main"
+    "main",
+    "ask-overlay",
+    "ask-answer"
   ],
   "permissions": [
     "global-shortcut:allow-is-registered",
@@ -19,6 +21,7 @@
     "autostart:allow-is-enabled",
     "updater:default",
     "opener:allow-open-url",
-    "opener:allow-default-urls"
+    "opener:allow-default-urls",
+    "deep-link:default"
   ]
 }

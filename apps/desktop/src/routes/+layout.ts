@@ -8,6 +8,15 @@ export async function load({ url }) {
 	if (url.pathname.startsWith('/onboarding')) {
 		return {};
 	}
+	// The ask / answer overlay windows are spawned by the Tauri host
+	// directly via `tauri::WebviewUrl::App("ask"|"answer"…)`. They run
+	// in their own webviews with their own minimal layout shell and
+	// must not be gated on the main window's telemetry-consent prompt
+	// — the gate event is delivered only to a webview that issued
+	// `frontendReady`, and these overlays deliberately don't.
+	if (url.pathname.startsWith('/ask') || url.pathname.startsWith('/answer')) {
+		return {};
+	}
 	try {
 		// Rust pushes the gate state via the `ConsentGate` event. We attach
 		// a one-shot listener, hit `frontendReady` to make the backend emit,

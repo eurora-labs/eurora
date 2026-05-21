@@ -54,7 +54,7 @@ pub use telemetry::TelemetryLocal;
 // `record_for_desktop`) lives as inherent methods on `TelemetryConsent`
 // in `settings-core`, so call sites use it through this re-export.
 pub use settings_core::{
-    CURRENT_SCHEMA_VERSION, CloudSettings, DEFAULT_SCALE, DESKTOP_CONSENT_VERSION, DesktopSettings,
-    InterfaceScale, MobileSettings, SharedSettings, TelemetryConsent, TextScale, ThemePreference,
-    WebSettings,
+    AskBarSettings, CURRENT_SCHEMA_VERSION, CloudSettings, DEFAULT_SCALE, DESKTOP_CONSENT_VERSION,
+    DesktopSettings, InterfaceScale, MobileSettings, SharedSettings, TelemetryConsent, TextScale,
+    ThemePreference, WebSettings,
 };

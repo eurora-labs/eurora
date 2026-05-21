@@ -20,6 +20,19 @@
 	import { ModeWatcher } from 'mode-watcher';
 	import { useEventListener } from 'runed';
 
+	// SvelteKit always wraps every route in the root layout — there is
+	// no file-system way to opt out. The ask / answer overlay windows
+	// run in their own Tauri webviews and need a fundamentally different
+	// shell (no sidebar, no titlebar, transparent background, their own
+	// dependency-injection root). Decide once at script time which
+	// branch to render: a literal pathname check, evaluated before
+	// service init so the overlay webviews don't pay for services they
+	// own themselves and don't double-provide DI tokens.
+	const isOverlayRoute =
+		typeof window !== 'undefined' &&
+		(window.location.pathname.startsWith('/ask') ||
+			window.location.pathname.startsWith('/answer'));
+
 	// Set platform class synchronously (before first render) so CSS
 	// variables like --titlebar-height are correct from the start.
 	const currentPlatform = platform();
@@ -27,38 +40,40 @@
 
 	let { children } = $props();
 
-	initDependencies();
+	if (!isOverlayRoute) {
+		initDependencies();
 
-	// Kick off telemetry first. `init()` is async — it round-trips an IPC
-	// to fetch the consent state and embedded keys before `Sentry.init`
-	// runs — so errors that happen synchronously above this line, or
-	// between here and the IPC resolving, won't be captured. The Rust
-	// side has its own panic hook installed earlier in `main()`, which
-	// covers anything serious during the same window.
-	const telemetryService = inject(TELEMETRY_SERVICE);
-	telemetryService.init();
+		// Kick off telemetry first. `init()` is async — it round-trips an IPC
+		// to fetch the consent state and embedded keys before `Sentry.init`
+		// runs — so errors that happen synchronously above this line, or
+		// between here and the IPC resolving, won't be captured. The Rust
+		// side has its own panic hook installed earlier in `main()`, which
+		// covers anything serious during the same window.
+		const telemetryService = inject(TELEMETRY_SERVICE);
+		telemetryService.init();
 
-	const userService = inject(USER_SERVICE);
-	userService.init();
+		const userService = inject(USER_SERVICE);
+		userService.init();
 
-	const appearanceService = inject(APPEARANCE_SERVICE);
-	appearanceService.init();
+		const appearanceService = inject(APPEARANCE_SERVICE);
+		appearanceService.init();
 
-	const generalService = inject(GENERAL_SERVICE);
-	generalService.init();
+		const generalService = inject(GENERAL_SERVICE);
+		generalService.init();
 
-	const timelineService = inject(TIMELINE_SERVICE);
-	timelineService.init();
+		const timelineService = inject(TIMELINE_SERVICE);
+		timelineService.init();
 
-	const activityService = inject(ACTIVITY_SERVICE);
-	activityService.init();
+		const activityService = inject(ACTIVITY_SERVICE);
+		activityService.init();
 
-	// Boot the syntax-highlighter worker and pre-load common languages so
-	// the first streamed code block doesn't pay grammar-load latency.
-	warmupShikiHighlighter();
+		// Boot the syntax-highlighter worker and pre-load common languages so
+		// the first streamed code block doesn't pay grammar-load latency.
+		warmupShikiHighlighter();
 
-	// All urls open in a separate browser window
-	useEventListener(() => document, 'click', handleUrls);
+		// All urls open in a separate browser window
+		useEventListener(() => document, 'click', handleUrls);
+	}
 
 	async function handleUrls(event: MouseEvent) {
 		const target = event.target as HTMLElement | null;
@@ -83,28 +98,32 @@
 	}
 </script>
 
-<ModeWatcher defaultMode="system" />
+{#if isOverlayRoute}
+	{@render children?.()}
+{:else}
+	<ModeWatcher defaultMode="system" />
 
-<Sidebar.Provider open={true}>
-	<div class="app-shell flex flex-col overflow-hidden bg-background">
-		<Titlebar />
-		<main class="flex flex-1 min-h-0 bg-background">
-			{@render children?.()}
-		</main>
-	</div>
-</Sidebar.Provider>
+	<Sidebar.Provider open={true}>
+		<div class="app-shell flex flex-col overflow-hidden bg-background">
+			<Titlebar />
+			<main class="flex flex-1 min-h-0 bg-background">
+				{@render children?.()}
+			</main>
+		</div>
+	</Sidebar.Provider>
 
-<AccessibilityPermission />
-<UpdateChecker />
-<Toaster />
+	<AccessibilityPermission />
+	<UpdateChecker />
+	<Toaster />
 
-<!--
-	Resize handles cover the OS window rect (the full viewport, including
-	the Linux shadow gutter), so they are siblings of the visually-rounded
-	shell rather than children clipped by it. macOS uses native edge resize.
--->
-{#if currentPlatform !== 'macos'}
-	<ResizeHandles />
+	<!--
+		Resize handles cover the OS window rect (the full viewport, including
+		the Linux shadow gutter), so they are siblings of the visually-rounded
+		shell rather than children clipped by it. macOS uses native edge resize.
+	-->
+	{#if currentPlatform !== 'macos'}
+		<ResizeHandles />
+	{/if}
 {/if}
 
 <style>
