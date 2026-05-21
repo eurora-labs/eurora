@@ -20,12 +20,12 @@
 		"test:unit": "vitest"
 	},
 	"devDependencies": {
-		"@types/node": "^22.9.0",
-		"@types/office-js": "^1.0.498",
+		"@types/node": "^22.19.19",
+		"@types/office-js": "^1.0.591",
 		"eslint": "^9.39.4",
-		"office-addin-debugging": "^6.0.5",
-		"office-addin-dev-certs": "^2.0.4",
-		"office-addin-manifest": "^2.0.4",
+		"office-addin-debugging": "^6.1.0",
+		"office-addin-dev-certs": "^2.0.8",
+		"office-addin-manifest": "^2.1.4",
 		"prettier": "^3.8.3",
 		"typescript": "5.9.3",
 		"vite": "catalog:",
