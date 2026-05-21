@@ -193,11 +193,7 @@ async fn client_local_dispatcher_runs_without_target() {
     let result = eurora_tools::Dispatcher::dispatch(
         &dispatcher,
         // Any origin works — `client_local` skips the variant check.
-        call(
-            "client_math_add",
-            json!({"a": 2, "b": 3}),
-            focused_origin(),
-        ),
+        call("client_math_add", json!({"a": 2, "b": 3}), focused_origin()),
     )
     .await
     .expect("local call succeeds");
