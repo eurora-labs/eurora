@@ -1,9 +1,22 @@
-pub fn get_process_name(pid: u32) -> Option<String> {
-    get_process_name_impl(pid)
+//! Resolve a PID to its executable name on the current OS.
+//!
+//! Per-OS implementations:
+//!
+//! - **Linux** reads `/proc/{pid}/comm`.
+//! - **macOS** calls `proc_pidpath(2)` and returns the file-name component.
+//! - **Windows** walks the ToolHelp32 process snapshot until it finds a
+//!   matching PID and returns the UTF-16 executable name.
+//!
+//! Returns [`None`] for any failure mode (process gone, permission denied,
+//! empty name) so callers can fall back without distinguishing causes.
+
+/// Look up the executable name of the process identified by `pid`.
+pub fn lookup_process_name(pid: u32) -> Option<String> {
+    lookup_process_name_impl(pid)
 }
 
 #[cfg(target_os = "windows")]
-fn get_process_name_impl(pid: u32) -> Option<String> {
+fn lookup_process_name_impl(pid: u32) -> Option<String> {
     #[repr(C)]
     #[allow(non_snake_case)]
     struct PROCESSENTRY32W {
@@ -72,7 +85,7 @@ fn get_process_name_impl(pid: u32) -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
-fn get_process_name_impl(pid: u32) -> Option<String> {
+fn lookup_process_name_impl(pid: u32) -> Option<String> {
     std::fs::read_to_string(format!("/proc/{pid}/comm"))
         .ok()
         .map(|s| s.trim().to_string())
@@ -80,7 +93,7 @@ fn get_process_name_impl(pid: u32) -> Option<String> {
 }
 
 #[cfg(target_os = "macos")]
-fn get_process_name_impl(pid: u32) -> Option<String> {
+fn lookup_process_name_impl(pid: u32) -> Option<String> {
     unsafe extern "C" {
         fn proc_pidpath(pid: i32, buffer: *mut u8, buffersize: u32) -> i32;
     }
@@ -100,6 +113,25 @@ fn get_process_name_impl(pid: u32) -> Option<String> {
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-fn get_process_name_impl(_pid: u32) -> Option<String> {
+fn lookup_process_name_impl(_pid: u32) -> Option<String> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_current_process() {
+        let pid = std::process::id();
+        let name = lookup_process_name(pid).expect("self pid resolves");
+        assert!(!name.is_empty(), "process name should not be empty");
+    }
+
+    #[test]
+    fn unknown_pid_returns_none() {
+        // `u32::MAX` is reserved on every supported OS and will not match
+        // any live process; the lookup must return `None`.
+        assert_eq!(lookup_process_name(u32::MAX), None);
+    }
 }

@@ -20,14 +20,14 @@
 //! `run_turn`'s stack — a grace period after the terminal frame lets
 //! straggler responses ride out the socket, then the set is aborted so
 //! a stuck adapter cannot pin the turn beyond
-//! [`DISPATCH_DRAIN`].
+//! [`CHAT_DISPATCH_DRAIN`].
 
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::Duration;
 
 use dashmap::DashMap;
+use euro_transport_policy::CHAT_DISPATCH_DRAIN;
 use eurora_tools::{ActiveContext, Catalog, ContextRegistry, IncomingCall, Origin, ToolError};
 use serde_json::Value;
 use thread_core::{
@@ -39,15 +39,6 @@ use tokio_util::sync::CancellationToken;
 
 use crate::chat_socket::{ChatOutbound, ChatSocket};
 use crate::error::{Error, Result};
-
-/// Bridge-level shutdown grace period.
-///
-/// After `Final` / `Error` arrives, in-flight dispatch tasks have this
-/// long to deliver their final `ToolResponse` before being aborted. The
-/// window is conservative — well below the longest per-tool timeout but
-/// long enough to absorb a single ms-scale serialise + send through the
-/// outbound channel.
-const DISPATCH_DRAIN: Duration = Duration::from_secs(1);
 
 /// Opening frame for a chat turn — `Send` for a fresh human turn,
 /// `Regenerate` to re-roll an existing AI message under the same parent.
@@ -244,10 +235,13 @@ impl ChatBridge {
 
         // Cancel everything still in flight and drain with a grace
         // period. Stragglers are aborted via `JoinSet::shutdown` so a
-        // stuck adapter cannot pin the turn beyond `DISPATCH_DRAIN`.
+        // stuck adapter cannot pin the turn beyond `CHAT_DISPATCH_DRAIN`.
         turn.turn_cancel.cancel();
         let drain = async { while dispatches.join_next().await.is_some() {} };
-        if tokio::time::timeout(DISPATCH_DRAIN, drain).await.is_err() {
+        if tokio::time::timeout(CHAT_DISPATCH_DRAIN, drain)
+            .await
+            .is_err()
+        {
             dispatches.shutdown().await;
         }
 

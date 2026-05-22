@@ -1,11 +1,10 @@
 import path from 'node:path';
 
+// Background entry is the same module for every target. Browser-specific
+// manifest differences (Firefox `scripts: [...]` vs. Chrome `service_worker`)
+// are applied by `manifest/targets.js`; the bundled JS is identical.
 export function backgroundConfig({ browser, outDir, emptyOutDir, mode }) {
 	const rootDir = path.resolve(import.meta.dirname, '../..');
-	const input =
-		browser === 'firefox' || browser === 'safari'
-			? 'src/background/entry.firefox.ts'
-			: 'src/background/entry.chrome.ts';
 	return {
 		// Don't load vite.config.ts (which has SvelteKit) for this build
 		configFile: false,
@@ -20,7 +19,7 @@ export function backgroundConfig({ browser, outDir, emptyOutDir, mode }) {
 			emptyOutDir,
 			rollupOptions: {
 				input: {
-					background: path.resolve(rootDir, input),
+					background: path.resolve(rootDir, 'src/background/index.ts'),
 				},
 				output: {
 					format: 'es',

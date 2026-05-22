@@ -7,7 +7,8 @@ use euro_endpoint::EndpointManager;
 use euro_settings::{CloudSettingsCache, SettingsState};
 use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::{
-    MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
+    DESKTOP_BINDINGS_PATH, MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
+    export_desktop_bindings,
     procedures::{
         accent::accent_from_image,
         activity::{SavedActivity, SavedActivityCreated, SavedActivityEnded},
@@ -675,18 +676,19 @@ fn main() {
             let telemetry_controller = telemetry_controller.clone();
             let specta = build_specta();
 
-            // Regenerate the TypeScript bindings on every dev launch.
-            // `specta-typescript` 0.0.12 fails the export by default if any
-            // `i64`/`u64` field crosses the wire without an explicit
-            // `#[specta(type = ...)]` override, which is the strictness we
-            // want — silently bridging through `bigint` masks lossy round
-            // trips on the JS side.
+            // Regenerate the TypeScript bindings on every dev launch so
+            // editing a wire type and re-running the desktop binary is a
+            // single round-trip. The canonical generator is the
+            // workspace-level `euro-codegen` orchestrator (see
+            // `export_desktop_bindings`); this hook just runs the same
+            // function with a path resolved relative to the crate
+            // manifest because Tauri dev sets cwd to the manifest dir.
             #[cfg(debug_assertions)]
             {
                 let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../../apps/desktop/src/lib/bindings/specta.bindings.ts");
-                specta
-                    .export(specta_typescript::Typescript::default(), &bindings_path)
+                    .join("../../../")
+                    .join(DESKTOP_BINDINGS_PATH);
+                export_desktop_bindings(&bindings_path)
                     .expect("Failed to export tauri-specta bindings");
             }
 
