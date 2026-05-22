@@ -1,43 +1,21 @@
-//! Generate Swift bindings for the bridge wire types.
+//! Swift bindings for the bridge wire types, emitted into
+//! `apps/macos/Shared/BridgeProtocol.swift`.
 //!
-//! Invoked from the workspace root:
-//!
-//! ```text
-//! cargo run -p euro-bridge-protocol --features codegen -- --generate_specta
-//! ```
+//! This module is gated behind the `codegen` feature and called from
+//! the workspace-level `euro-codegen` orchestrator. There is no
+//! standalone binary — the orchestrator is the only entry point so
+//! every binding regenerates together.
 
 use anyhow::{Context, Result};
-use euro_bridge_protocol::type_collection;
 use specta_swift::{NamingConvention, Swift};
-use std::env;
 use std::fs;
-use std::process::ExitCode;
+
+use crate::type_collection;
 
 const SWIFT_OUT: &str = "apps/macos/Shared/BridgeProtocol.swift";
 
-fn main() -> ExitCode {
-    let mut args = env::args();
-    let program = args.next().unwrap_or_else(|| "euro-bridge-protocol".into());
-
-    match args.next().as_deref() {
-        Some("--generate_specta") => match generate_bindings() {
-            Ok(()) => {
-                println!("wrote {SWIFT_OUT}");
-                ExitCode::SUCCESS
-            }
-            Err(err) => {
-                eprintln!("failed to generate bindings: {err:?}");
-                ExitCode::FAILURE
-            }
-        },
-        _ => {
-            eprintln!("usage: {program} --generate_specta");
-            ExitCode::FAILURE
-        }
-    }
-}
-
-fn generate_bindings() -> Result<()> {
+/// Generate the Swift bindings and write them to [`SWIFT_OUT`].
+pub fn run() -> Result<()> {
     let types = type_collection();
 
     let swift = Swift::default()
@@ -47,6 +25,7 @@ fn generate_bindings() -> Result<()> {
 
     let processed = substitute_payload(&collapse_double_optional(&swift));
     fs::write(SWIFT_OUT, processed).context("writing Swift bindings")?;
+    println!("wrote {SWIFT_OUT}");
 
     Ok(())
 }
@@ -72,7 +51,7 @@ fn collapse_double_optional(input: &str) -> String {
 /// Hand-rolled JSON-value `Codable` enum that replaces the empty
 /// `Payload` struct specta emits.
 ///
-/// The Rust [`euro_bridge_protocol::frame::Payload`] is a
+/// The Rust [`crate::frame::Payload`] is a
 /// `Box<serde_json::value::RawValue>` — "any JSON value". Specta-swift
 /// can't render that polymorphic shape (no `Any`-style native and no
 /// `serde_json::Value` because of Chrome native-messaging's no-BigInt
@@ -171,7 +150,7 @@ public enum Payload: Codable {
 /// (or a comparable empty form). We rewind from the struct declaration
 /// through any `///` doc lines so the substitution can drop the
 /// upstream comments — [`PAYLOAD_REPLACEMENT`] carries its own
-/// `///`-formatted documentation tailored to the enum.
+/// `///`-formatted documentation.
 ///
 /// Panics if the placeholder isn't present so a future specta upgrade
 /// that changes the empty-struct shape fails the codegen loudly instead

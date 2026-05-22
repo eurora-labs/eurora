@@ -365,7 +365,7 @@ jobs:
 
             - name: Generate office add-in bindings
               shell: bash
-              run: pnpm specta:office
+              run: pnpm specta
 
             - name: Build office add-in
               shell: bash
@@ -918,7 +918,7 @@ jobs:
                   path: ./apps/mobile/build/
 
             - name: Set up Ruby for fastlane
-              uses: ruby/setup-ruby@97ecb7b512899eb71ab1bf2310a624c6f1589ac6 # v1
+              uses: ruby/setup-ruby@afeafc3d1ab54a631816aba4c914a0081c12ff2f # v1
               with:
                   ruby-version: '3.3'
                   bundler-cache: false

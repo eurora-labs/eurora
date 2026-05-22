@@ -176,6 +176,37 @@ jobs:
                   save-if: ${{ github.ref == 'refs/heads/main' }}
             - run: cargo test --workspace --exclude euro-tauri --exclude be-monolith
 
+    codegen-drift:
+        needs: changes
+        if: ${{ needs.changes.outputs.rust == 'true' || needs.changes.outputs.node == 'true' }}
+        runs-on: ubuntu-latest
+        container:
+            image: ghcr.io/eurora-labs/ci-base-image:latest
+        env:
+            CARGO_TERM_COLOR: always
+            CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
+            CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--ld-path=wild
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
+                  lfs: true
+            - name: Rust Cache
+              uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+              with:
+                  shared-key: rust-codegen
+                  save-if: ${{ github.ref == 'refs/heads/main' }}
+            - name: Regenerate bindings
+              run: cargo run -p euro-codegen
+            - name: Verify no bindings drift
+              run: |
+                  git diff --exit-code \
+                      apps/desktop/src/lib/bindings \
+                      apps/browser/src/shared/content/bindings.ts \
+                      apps/office-addin/src/shared/bindings.ts \
+                      apps/macos/Shared/BridgeProtocol.swift \
+                      packages/shared/src/lib/bindings
+
     check-rust:
         if: always()
         needs:
@@ -184,6 +215,7 @@ jobs:
             - check-rust-macos
             - rust-test
             - rust-lint
+            - codegen-drift
         runs-on: ubuntu-latest
         env:
             CARGO_TERM_COLOR: always
