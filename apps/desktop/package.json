@@ -75,7 +75,6 @@
 	},
 	"dependencies": {
 		"@sentry/svelte": "^10.53.1",
-		"@tauri-apps/plugin-opener": "^2.5.4",
 		"posthog-js": "^1.373.4"
 	}
 }

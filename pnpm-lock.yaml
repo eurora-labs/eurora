@@ -306,9 +306,6 @@ importers:
       '@sentry/svelte':
         specifier: ^10.53.1
         version: 10.53.1(svelte@5.55.7)
-      '@tauri-apps/plugin-opener':
-        specifier: ^2.5.4
-        version: 2.5.4
       posthog-js:
         specifier: ^1.373.4
         version: 1.373.4
