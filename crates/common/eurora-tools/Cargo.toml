@@ -9,7 +9,6 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 agent-chain-core = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dashmap = { workspace = true }
-euro-bridge-protocol = { workspace = true, optional = true }
 eurora-tools-macros = { workspace = true }
 futures = { workspace = true }
 schemars = { workspace = true }
@@ -22,14 +21,6 @@ trait-variant = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
-
-[features]
-# Helpers for bridge-backed adapter implementations (`build_payload`,
-# `decode_payload`, `map_bridge_err`). Pulls in `euro-bridge-protocol`
-# so the helpers can speak the on-the-wire `Payload` / `BridgeError`
-# vocabulary. Off by default so non-desktop consumers (the agent loop,
-# codegen utilities) don't pull the bridge protocol crate.
-bridge = ["dep:euro-bridge-protocol"]
 
 [lints]
 workspace = true

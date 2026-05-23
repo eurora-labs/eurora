@@ -11,7 +11,7 @@ use eurora_tools::{
     AcpOrigin, BrowserOrigin, Catalog, Dispatcher, Empty, FocusedOrigin, IncomingCall, Origin,
     ToolError,
 };
-use eurora_tools_youtube::{
+use eurora_tools_browser::youtube::{
     CapturedFrame, CurrentTimestamp, Transcript, TranscriptEntry, YOUTUBE_DESCRIPTORS,
     YoutubeAdapter, YoutubeDispatcher,
 };
@@ -133,7 +133,11 @@ async fn dispatcher_descriptors_returns_static_table() {
 async fn dispatch_get_current_timestamp_round_trips() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let result = dispatcher
-        .dispatch(call(TIMESTAMP_TOOL, json!({}), browser_origin()))
+        .dispatch(call(
+            TIMESTAMP_TOOL,
+            json!({ "task": "" }),
+            browser_origin(),
+        ))
         .await
         .expect("call succeeds");
 
@@ -154,7 +158,11 @@ async fn dispatch_get_current_timestamp_round_trips() {
 async fn dispatch_get_transcript_round_trips() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let result = dispatcher
-        .dispatch(call(TRANSCRIPT_TOOL, json!({}), browser_origin()))
+        .dispatch(call(
+            TRANSCRIPT_TOOL,
+            json!({ "task": "" }),
+            browser_origin(),
+        ))
         .await
         .expect("call succeeds");
 
@@ -169,7 +177,7 @@ async fn dispatch_get_transcript_round_trips() {
 async fn dispatch_get_current_frame_round_trips() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let result = dispatcher
-        .dispatch(call(FRAME_TOOL, json!({}), browser_origin()))
+        .dispatch(call(FRAME_TOOL, json!({ "task": "" }), browser_origin()))
         .await
         .expect("call succeeds");
 
@@ -183,7 +191,11 @@ async fn dispatch_get_current_frame_round_trips() {
 async fn dispatch_returns_origin_mismatch_for_focused_origin() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let err = dispatcher
-        .dispatch(call(TIMESTAMP_TOOL, json!({}), focused_origin()))
+        .dispatch(call(
+            TIMESTAMP_TOOL,
+            json!({ "task": "" }),
+            focused_origin(),
+        ))
         .await
         .expect_err("wrong origin must fail");
 
@@ -205,7 +217,7 @@ async fn dispatch_returns_origin_mismatch_for_focused_origin() {
 async fn dispatch_returns_origin_mismatch_for_acp_origin() {
     let dispatcher = YoutubeDispatcher::new(YoutubeStub);
     let err = dispatcher
-        .dispatch(call(TRANSCRIPT_TOOL, json!({}), acp_origin()))
+        .dispatch(call(TRANSCRIPT_TOOL, json!({ "task": "" }), acp_origin()))
         .await
         .expect_err("wrong origin must fail");
 
@@ -224,7 +236,7 @@ async fn dispatch_unknown_name_returns_404() {
     let err = dispatcher
         .dispatch(call(
             "browser_youtube_does_not_exist",
-            json!({}),
+            json!({ "task": "" }),
             browser_origin(),
         ))
         .await
@@ -270,7 +282,7 @@ async fn catalog_routes_each_descriptor_to_the_dispatcher() {
             .dispatcher_for(name)
             .unwrap_or_else(|| panic!("descriptor `{name}` should be registered"));
         let result = dispatcher
-            .dispatch(call(name, json!({}), browser_origin()))
+            .dispatch(call(name, json!({ "task": "" }), browser_origin()))
             .await
             .unwrap_or_else(|err| panic!("call to `{name}` should succeed, got {err:?}"));
         assert!(result.is_object(), "tool `{name}` returns a JSON object");

@@ -1,5 +1,5 @@
 ---
-source: crates/common/tools/eurora-tools-web/tests/descriptors_snapshot.rs
+source: crates/common/tools/eurora-tools-browser/tests/web_descriptors_snapshot.rs
 expression: wire
 ---
 [
@@ -9,16 +9,15 @@ expression: wire
             description: "Get the active tab's URL, title, host, language, charset, description, OpenGraph tags, and viewport/scroll metrics.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-                "description": String("No arguments."),
+                "description": String("No-input args carrier. Carries a required `task` field that every\ndispatcher ignores; see the module-level docs for why."),
                 "properties": Object {
-                    "note": Object {
-                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
-                        "type": Array [
-                            String("string"),
-                            String("null"),
-                        ],
+                    "task": Object {
+                        "type": String("string"),
                     },
                 },
+                "required": Array [
+                    String("task"),
+                ],
                 "title": String("Empty"),
                 "type": String("object"),
             },
@@ -258,20 +257,19 @@ expression: wire
     },
     WireToolDescriptor {
         definition: ToolDefinition {
-            name: "browser_web_get_readability_article",
+            name: "browser_web_read_article",
             description: "Get the readable text and HTML of the active page's main article via Mozilla Readability. Use this to transcribe, summarise, or quote the page's primary content. Bodies are truncated at 32 KB.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-                "description": String("No arguments."),
+                "description": String("No-input args carrier. Carries a required `task` field that every\ndispatcher ignores; see the module-level docs for why."),
                 "properties": Object {
-                    "note": Object {
-                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
-                        "type": Array [
-                            String("string"),
-                            String("null"),
-                        ],
+                    "task": Object {
+                        "type": String("string"),
                     },
                 },
+                "required": Array [
+                    String("task"),
+                ],
                 "title": String("Empty"),
                 "type": String("object"),
             },
@@ -353,16 +351,15 @@ expression: wire
             description: "Get whatever text the user has highlighted in the active document right now, plus XPaths to the selection's anchor and focus endpoints. Returns empty `text` when nothing is selected.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-                "description": String("No arguments."),
+                "description": String("No-input args carrier. Carries a required `task` field that every\ndispatcher ignores; see the module-level docs for why."),
                 "properties": Object {
-                    "note": Object {
-                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
-                        "type": Array [
-                            String("string"),
-                            String("null"),
-                        ],
+                    "task": Object {
+                        "type": String("string"),
                     },
                 },
+                "required": Array [
+                    String("task"),
+                ],
                 "title": String("Empty"),
                 "type": String("object"),
             },

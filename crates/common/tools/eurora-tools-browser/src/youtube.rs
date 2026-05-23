@@ -1,4 +1,5 @@
-//! The YouTube adapter trait.
+//! The YouTube adapter — tools for the YouTube tab the user is
+//! currently watching.
 //!
 //! The `#[adapter]` macro expands this module into:
 //!
@@ -16,10 +17,16 @@
 //! The first paragraph of each method's rustdoc is extracted by the
 //! macro as the tool description sent to the LLM, so the wording here
 //! is part of the runtime surface — keep it user-facing.
+//!
+//! Bridge-backed implementations of [`YoutubeAdapter`] live in
+//! `euro-bridge-adapters` on the app side; this crate stays free of
+//! any transport dependency.
+
+mod types;
+
+pub use types::{CapturedFrame, CurrentTimestamp, Transcript, TranscriptEntry};
 
 use eurora_tools::{BrowserOrigin, Empty, ToolError, adapter};
-
-use crate::types::{CapturedFrame, CurrentTimestamp, Transcript};
 
 /// Tools for the YouTube video the user is currently watching.
 #[adapter(namespace = "browser_youtube", version = 1)]

@@ -13,7 +13,7 @@ use eurora_tools::{
     AcpOrigin, BrowserOrigin, Catalog, Dispatcher, Empty, FocusedOrigin, IncomingCall, Origin,
     ToolError,
 };
-use eurora_tools_web::{
+use eurora_tools_browser::web::{
     AccessibilityTree, AxNode, BoundingBox, DomNode, FormInput, FormInputKind, FormInputsList,
     GetAccessibilityTreeArgs, InsertTextArgs, InsertTextResult, Link, LinksList,
     ListFormInputsArgs, ListLinksArgs, PageMetadata, QuerySelectorArgs, QuerySelectorInclude,
@@ -287,7 +287,11 @@ async fn dispatcher_descriptors_returns_static_table() {
 async fn dispatch_get_page_metadata_round_trips() {
     let dispatcher = WebDispatcher::new(WebStub);
     let result = dispatcher
-        .dispatch(call(GET_PAGE_METADATA_TOOL, json!({}), browser_origin()))
+        .dispatch(call(
+            GET_PAGE_METADATA_TOOL,
+            json!({ "task": "" }),
+            browser_origin(),
+        ))
         .await
         .expect("call succeeds");
 
@@ -321,7 +325,7 @@ async fn dispatch_get_readability_article_round_trips() {
     let result = dispatcher
         .dispatch(call(
             GET_READABILITY_ARTICLE_TOOL,
-            json!({}),
+            json!({ "task": "" }),
             browser_origin(),
         ))
         .await
@@ -337,7 +341,11 @@ async fn dispatch_get_readability_article_round_trips() {
 async fn dispatch_get_selected_text_round_trips() {
     let dispatcher = WebDispatcher::new(WebStub);
     let result = dispatcher
-        .dispatch(call(GET_SELECTED_TEXT_TOOL, json!({}), browser_origin()))
+        .dispatch(call(
+            GET_SELECTED_TEXT_TOOL,
+            json!({ "task": "" }),
+            browser_origin(),
+        ))
         .await
         .expect("call succeeds");
 
@@ -391,7 +399,11 @@ async fn dispatch_query_selector_applies_default_limit_when_omitted() {
 async fn dispatch_list_links_round_trips() {
     let dispatcher = WebDispatcher::new(WebStub);
     let result = dispatcher
-        .dispatch(call(LIST_LINKS_TOOL, json!({}), browser_origin()))
+        .dispatch(call(
+            LIST_LINKS_TOOL,
+            json!({ "task": "" }),
+            browser_origin(),
+        ))
         .await
         .expect("call succeeds");
 
@@ -404,7 +416,11 @@ async fn dispatch_list_links_round_trips() {
 async fn dispatch_list_form_inputs_round_trips() {
     let dispatcher = WebDispatcher::new(WebStub);
     let result = dispatcher
-        .dispatch(call(LIST_FORM_INPUTS_TOOL, json!({}), browser_origin()))
+        .dispatch(call(
+            LIST_FORM_INPUTS_TOOL,
+            json!({ "task": "" }),
+            browser_origin(),
+        ))
         .await
         .expect("call succeeds");
 
@@ -453,7 +469,11 @@ async fn dispatch_insert_text_replaces_value_when_replace_true() {
 async fn dispatch_returns_origin_mismatch_for_focused_origin() {
     let dispatcher = WebDispatcher::new(WebStub);
     let err = dispatcher
-        .dispatch(call(GET_PAGE_METADATA_TOOL, json!({}), focused_origin()))
+        .dispatch(call(
+            GET_PAGE_METADATA_TOOL,
+            json!({ "task": "" }),
+            focused_origin(),
+        ))
         .await
         .expect_err("wrong origin must fail");
 
@@ -498,7 +518,7 @@ async fn dispatch_unknown_name_returns_404() {
     let err = dispatcher
         .dispatch(call(
             "browser_web_does_not_exist",
-            json!({}),
+            json!({ "task": "" }),
             browser_origin(),
         ))
         .await
@@ -546,7 +566,7 @@ async fn catalog_routes_each_descriptor_to_the_dispatcher() {
         let args = match name {
             QUERY_SELECTOR_TOOL => json!({ "selector": "h1" }),
             INSERT_TEXT_TOOL => json!({ "field_id": "#q", "text": "x" }),
-            _ => json!({}),
+            _ => json!({ "task": "" }),
         };
         let result = dispatcher
             .dispatch(call(name, args, browser_origin()))

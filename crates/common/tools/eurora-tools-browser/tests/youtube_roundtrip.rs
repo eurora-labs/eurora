@@ -5,7 +5,7 @@
 //! from. These tests catch accidental `#[serde(rename)]`, field-type,
 //! or field-removal drift before it ships.
 
-use eurora_tools_youtube::{CapturedFrame, CurrentTimestamp, Transcript, TranscriptEntry};
+use eurora_tools_browser::youtube::{CapturedFrame, CurrentTimestamp, Transcript, TranscriptEntry};
 
 fn round_trip<T>(value: &T) -> T
 where

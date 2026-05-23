@@ -1,20 +1,20 @@
-//! Shared helpers for bridge-backed adapter implementations.
+//! [`BridgeClient`] — the one call helper every bridge-backed adapter
+//! routes through.
 //!
-//! Every adapter crate that targets the browser bridge
-//! (`eurora-tools-youtube`, `eurora-tools-web`, future site adapters)
-//! translates a typed call into a [`euro_bridge::BridgeService::send_request`]
-//! round trip with the same three concerns:
+//! Each call traverses the same three concerns; centralising them here
+//! keeps every adapter impl uniform and surfaces consistent
+//! [`ToolError`] semantics to the agent loop:
 //!
-//! 1. **Payload shape.** The browser extension expects a flat JSON object
-//!    `{ tab_id, …args }` keyed on `tab_id`; the args' fields ride along
-//!    at the top level so [`tab-rpc.ts::parseTabId`] can split the
-//!    routing key from the content-script message in one read.
+//! 1. **Payload shape.** The browser extension expects a flat JSON
+//!    object `{ tab_id, …args }` keyed on `tab_id`; the args' fields
+//!    ride along at the top level so `tab-rpc.ts::parseTabId` can split
+//!    the routing key from the content-script message in one read.
 //!    [`build_payload`] enforces this shape from any adapter arg type.
-//! 2. **Response decode.** A successful response carries a typed payload
-//!    that needs to deserialize back into the adapter's return type; a
-//!    missing payload is treated as a structured decode failure rather
-//!    than an opaque transport error so the LLM-side surface attributes
-//!    blame correctly. [`decode_payload`] handles both paths.
+//! 2. **Response decode.** A successful response carries a typed
+//!    payload that needs to deserialize back into the adapter's return
+//!    type; a missing payload is treated as a structured decode failure
+//!    rather than an opaque transport error so the LLM-side surface
+//!    attributes blame correctly. [`decode_payload`] handles both paths.
 //! 3. **Error mapping.** A [`BridgeError`] from the transport layer has
 //!    to be mapped onto the framework's [`ToolError`] without leaking
 //!    bridge-protocol types into adapters. [`map_bridge_err`] is the
@@ -22,24 +22,17 @@
 //!    consistent policy applies — `NotFound` and the
 //!    [`CLIENT_CODE_TAB_GONE`] reply both surface as
 //!    [`ToolError::ContextUnavailable`]; `Timeout` maps directly; other
-//!    client errors surface as [`ToolError::Remote`] with the extension-
-//!    supplied numeric code preserved.
-//!
-//! All three helpers are bridge-protocol-aware and therefore live behind
-//! this crate's `bridge` cargo feature; non-desktop consumers (the
-//! agent loop, codegen utilities) don't pull
-//! [`euro_bridge_protocol`].
-//!
-//! [`tab-rpc.ts::parseTabId`]: https://github.com/eurora-labs/eurora/blob/main/apps/browser/src/shared/background/tab-rpc.ts
+//!    client errors surface as [`ToolError::Remote`] with the
+//!    extension-supplied numeric code preserved.
 
 use std::borrow::Cow;
 
+use euro_bridge::BridgeService;
 use euro_bridge_protocol::{BridgeError, Payload};
+use eurora_tools::{BrowserOrigin, ToolError};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::json;
-
-use crate::{BrowserOrigin, ToolError};
 
 /// `ErrorFrame.code` returned by the browser extension when the target
 /// tab is unreachable (closed, content script missing). Modelled on HTTP
@@ -47,12 +40,59 @@ use crate::{BrowserOrigin, ToolError};
 /// and the desktop must not retry.
 pub const CLIENT_CODE_TAB_GONE: u32 = 410;
 
+/// Wrapper around [`BridgeService`] that exposes one ergonomic
+/// `call_action` method per adapter call.
+///
+/// Constructed once per process from
+/// [`BridgeService::get_or_init`](euro_bridge::BridgeService::get_or_init).
+/// The `'static` reference matches that initializer's return type so the
+/// struct is cheap to `Copy` and trivially sharable across threads.
+#[derive(Clone, Copy)]
+pub struct BridgeClient {
+    bridge: &'static BridgeService,
+}
+
+impl BridgeClient {
+    /// Bind to the process-wide [`BridgeService`] singleton.
+    pub const fn new(bridge: &'static BridgeService) -> Self {
+        Self { bridge }
+    }
+
+    /// Fire a typed adapter call across the bridge.
+    ///
+    /// `args` is serialized through [`build_payload`] (which inlines
+    /// `tab_id` as the routing key), the resulting `RequestFrame` is
+    /// sent over the bridge to the registered browser process, and the
+    /// response payload is decoded into `T`. Any transport-layer
+    /// [`BridgeError`] is mapped onto [`ToolError`] via
+    /// [`map_bridge_err`] so adapters never leak bridge-protocol types.
+    pub async fn call_action<A, T>(
+        &self,
+        target: &BrowserOrigin,
+        action: &'static str,
+        tool: &'static str,
+        args: &A,
+    ) -> Result<T, ToolError>
+    where
+        A: Serialize + ?Sized,
+        T: DeserializeOwned,
+    {
+        let payload = build_payload(target, args)?;
+        let response = self
+            .bridge
+            .send_request(target.process_id, action, Some(payload))
+            .await
+            .map_err(|err| map_bridge_err(tool, err))?;
+        decode_payload(tool, response.payload)
+    }
+}
+
 /// Build the `{ tab_id, …args }` payload the browser extension expects.
 ///
 /// `args` must serialize to a JSON object. Every current adapter arg
-/// type is a named-field struct (or [`crate::Empty`], which serializes
-/// to `{}`) so the object cast holds by construction; if someone adds a
-/// tuple-struct or enum arg later they get a structured
+/// type is a named-field struct (or [`eurora_tools::Empty`], which
+/// serializes to `{}`) so the object cast holds by construction; if
+/// someone adds a tuple-struct or enum arg later they get a structured
 /// [`ToolError::Encode`] with a pointed message instead of a silently
 /// mis-shaped payload landing in the extension.
 ///
@@ -77,8 +117,9 @@ where
 /// Decode a bridge response payload into the adapter's return type.
 ///
 /// A missing payload is treated as a structured decode error rather
-/// than [`ToolError::Adapter`] so the LLM-side surface clearly attributes
-/// the failure to the wire layer, not the bridge implementation.
+/// than [`ToolError::Adapter`] so the LLM-side surface clearly
+/// attributes the failure to the wire layer, not the bridge
+/// implementation.
 pub fn decode_payload<T>(tool: &'static str, payload: Option<Payload>) -> Result<T, ToolError>
 where
     T: DeserializeOwned,
@@ -139,7 +180,7 @@ pub fn map_bridge_err(tool: &'static str, err: BridgeError) -> ToolError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{BrowserOrigin, Empty, ToolError};
+    use eurora_tools::{BrowserOrigin, Empty, ToolError};
     use serde::{Deserialize, Serialize};
     use serde_json::json;
 
@@ -169,10 +210,12 @@ mod tests {
     // --- build_payload ----------------------------------------------------
 
     #[test]
-    fn build_payload_empty_args_flattens_to_tab_id_only() {
+    fn build_payload_empty_args_flattens_to_tab_id_alongside_task() {
+        // `Empty` carries a required `task` field (see `eurora_tools::args`
+        // for why); the routing key still rides at the top level.
         let payload = build_payload(&origin(), &Empty::default()).expect("build");
         let value: serde_json::Value = serde_json::from_str(payload.as_str()).unwrap();
-        assert_eq!(value, json!({ "tab_id": 42 }));
+        assert_eq!(value, json!({ "tab_id": 42, "task": "" }));
     }
 
     #[test]

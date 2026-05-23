@@ -3982,6 +3982,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "euro-bridge-adapters"
+version = "0.0.0"
+dependencies = [
+ "euro-bridge",
+ "euro-bridge-protocol",
+ "eurora-tools",
+ "eurora-tools-browser",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "euro-bridge-protocol"
 version = "0.0.0"
 dependencies = [
@@ -4003,8 +4015,7 @@ dependencies = [
  "euro-bridge-protocol",
  "euro-process",
  "euro-transport-policy",
- "eurora-tools-web",
- "eurora-tools-youtube",
+ "eurora-tools-browser",
  "futures-util",
  "serde",
  "serde_json",
@@ -4193,6 +4204,7 @@ dependencies = [
  "euro-activity",
  "euro-auth",
  "euro-bridge",
+ "euro-bridge-adapters",
  "euro-bridge-protocol",
  "euro-endpoint",
  "euro-process",
@@ -4202,8 +4214,7 @@ dependencies = [
  "euro-timeline",
  "euro-vision",
  "eurora-tools",
- "eurora-tools-web",
- "eurora-tools-youtube",
+ "eurora-tools-browser",
  "futures",
  "image",
  "keyring",
@@ -4335,7 +4346,6 @@ dependencies = [
  "agent-chain-core",
  "chrono",
  "dashmap",
- "euro-bridge-protocol",
  "eurora-tools-macros",
  "futures",
  "schemars 1.2.1",
@@ -4346,6 +4356,20 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trait-variant",
+]
+
+[[package]]
+name = "eurora-tools-browser"
+version = "0.0.0"
+dependencies = [
+ "eurora-tools",
+ "insta",
+ "schemars 1.2.1",
+ "serde",
+ "serde_json",
+ "specta",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -4363,36 +4387,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "trybuild",
-]
-
-[[package]]
-name = "eurora-tools-web"
-version = "0.0.0"
-dependencies = [
- "euro-bridge",
- "eurora-tools",
- "insta",
- "schemars 1.2.1",
- "serde",
- "serde_json",
- "specta",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
-name = "eurora-tools-youtube"
-version = "0.0.0"
-dependencies = [
- "euro-bridge",
- "eurora-tools",
- "insta",
- "schemars 1.2.1",
- "serde",
- "serde_json",
- "specta",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]

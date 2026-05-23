@@ -38,8 +38,6 @@
 //! See `plan.md` for the end-to-end design.
 
 mod args;
-#[cfg(feature = "bridge")]
-pub mod bridge;
 mod bus;
 mod context;
 mod descriptor;

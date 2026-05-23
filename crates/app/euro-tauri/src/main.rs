@@ -7,8 +7,7 @@ use euro_endpoint::EndpointManager;
 use euro_settings::{CloudSettingsCache, SettingsState};
 use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::{
-    DESKTOP_BINDINGS_PATH, MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
-    export_desktop_bindings,
+    MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
         accent::accent_from_image,
         activity::{SavedActivity, SavedActivityCreated, SavedActivityEnded},
@@ -878,15 +877,18 @@ fn main() {
                     // `bind_and_serve_bridge()` above, so
                     // `get_or_init()` resolves to the live singleton.
                     let bridge_service = euro_bridge::BridgeService::get_or_init();
+                    let bridge_client = euro_bridge_adapters::BridgeClient::new(bridge_service);
                     let catalog = std::sync::Arc::new(eurora_tools::Catalog::new());
                     catalog.register(std::sync::Arc::new(
-                        eurora_tools_youtube::YoutubeDispatcher::new(
-                            euro_tauri::tools::YoutubeBridgeImpl::new(bridge_service),
+                        eurora_tools_browser::youtube::YoutubeDispatcher::new(
+                            euro_tauri::tools::YoutubeBridgeImpl::with_client(bridge_client),
                         ),
                     ));
-                    catalog.register(std::sync::Arc::new(eurora_tools_web::WebDispatcher::new(
-                        euro_tauri::tools::WebBridgeImpl::new(bridge_service),
-                    )));
+                    catalog.register(std::sync::Arc::new(
+                        eurora_tools_browser::web::WebDispatcher::new(
+                            euro_tauri::tools::WebBridgeImpl::with_client(bridge_client),
+                        ),
+                    ));
                     tauri_app.manage(catalog);
 
                     Ok(())

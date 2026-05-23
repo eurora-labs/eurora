@@ -1,0 +1,27 @@
+[package]
+name = "eurora-tools-browser"
+version = "0.0.0"
+edition.workspace = true
+description = "Browser-transport adapters for Eurora's unified tool-execution architecture. Declares the per-site adapter traits (YouTube, generic web), their argument/return types, and the macro-generated descriptor tables and dispatchers."
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+eurora-tools = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+specta = { workspace = true, optional = true, features = ["derive"] }
+
+[dev-dependencies]
+insta = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+tokio-util = { workspace = true, features = ["rt"] }
+
+[features]
+# Emit `specta::Type` derives on every adapter argument/return type so the
+# shared shapes flow into the browser-extension TypeScript bindings via
+# `euro-browser`'s `type_collection`.
+specta = ["dep:specta"]
+
+[lints]
+workspace = true

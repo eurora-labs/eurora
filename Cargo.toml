@@ -14,8 +14,7 @@ members = [
   "crates/common/auth-core",
   "crates/common/eurora-tools",
   "crates/common/eurora-tools-macros",
-  "crates/common/tools/eurora-tools-web",
-  "crates/common/tools/eurora-tools-youtube",
+  "crates/common/tools/eurora-tools-browser",
   "crates/common/thread-core",
   "crates/common/focus-tracker",
   "crates/common/focus-tracker-core",
@@ -87,6 +86,7 @@ enum_dispatch = "0.3.13"
 euro-activity = { path = "crates/app/euro-activity" }
 euro-auth = { path = "crates/app/euro-auth" }
 euro-bridge = { path = "crates/app/euro-bridge" }
+euro-bridge-adapters = { path = "crates/app/euro-bridge-adapters" }
 euro-bridge-protocol = { path = "crates/app/euro-bridge-protocol" }
 euro-browser = { path = "crates/app/euro-browser" }
 euro-codegen = { path = "crates/app/euro-codegen" }
@@ -106,8 +106,7 @@ euro-office = { path = "crates/app/euro-office" }
 euro-pdf = { path = "crates/app/euro-pdf" }
 eurora-tools = { path = "crates/common/eurora-tools" }
 eurora-tools-macros = { path = "crates/common/eurora-tools-macros" }
-eurora-tools-web = { path = "crates/common/tools/eurora-tools-web" }
-eurora-tools-youtube = { path = "crates/common/tools/eurora-tools-youtube" }
+eurora-tools-browser = { path = "crates/common/tools/eurora-tools-browser" }
 focus-tracker = { path = "crates/common/focus-tracker" }
 focus-tracker-core = { path = "crates/common/focus-tracker-core", version = "1.1.0" }
 futures = "0.3.31"

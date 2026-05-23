@@ -1,0 +1,17 @@
+[package]
+name = "euro-bridge-adapters"
+version = "0.0.0"
+edition.workspace = true
+description = "App-side bridge-backed implementations of Eurora's tool adapters. Houses BridgeClient (the generic call helper that funnels every browser-bridge tool through one payload/decode/error pipeline) and per-namespace implementations of the adapter traits declared in eurora-tools-browser."
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+
+[dependencies]
+euro-bridge = { workspace = true }
+euro-bridge-protocol = { workspace = true }
+eurora-tools = { workspace = true }
+eurora-tools-browser = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

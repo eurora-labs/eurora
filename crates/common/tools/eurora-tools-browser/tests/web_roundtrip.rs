@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use eurora_tools_web::{
+use eurora_tools_browser::web::{
     AccessibilityTree, AxNode, BoundingBox, DomNode, FormInput, FormInputKind, FormInputsList,
     GetAccessibilityTreeArgs, InsertTextArgs, InsertTextResult, Link, LinksList,
     ListFormInputsArgs, ListLinksArgs, PageMetadata, QuerySelectorArgs, QuerySelectorInclude,

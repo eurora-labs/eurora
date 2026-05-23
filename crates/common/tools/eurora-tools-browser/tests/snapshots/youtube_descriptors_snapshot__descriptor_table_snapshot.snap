@@ -1,24 +1,23 @@
 ---
-source: crates/common/tools/eurora-tools-youtube/tests/descriptors_snapshot.rs
+source: crates/common/tools/eurora-tools-browser/tests/youtube_descriptors_snapshot.rs
 expression: wire
 ---
 [
     WireToolDescriptor {
         definition: ToolDefinition {
-            name: "browser::youtube::get_current_timestamp",
+            name: "browser_youtube_get_current_timestamp",
             description: "Return the user's current playback position in the active YouTube video, along with the video duration and play/pause state.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-                "description": String("No arguments."),
+                "description": String("No-input args carrier. Carries a required `task` field that every\ndispatcher ignores; see the module-level docs for why."),
                 "properties": Object {
-                    "note": Object {
-                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
-                        "type": Array [
-                            String("string"),
-                            String("null"),
-                        ],
+                    "task": Object {
+                        "type": String("string"),
                     },
                 },
+                "required": Array [
+                    String("task"),
+                ],
                 "title": String("Empty"),
                 "type": String("object"),
             },
@@ -66,20 +65,19 @@ expression: wire
     },
     WireToolDescriptor {
         definition: ToolDefinition {
-            name: "browser::youtube::get_transcript",
+            name: "browser_youtube_get_transcript",
             description: "Return the full transcript of the video the user is watching. Comes from YouTube's caption API; videos without captions fail with a structured error.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-                "description": String("No arguments."),
+                "description": String("No-input args carrier. Carries a required `task` field that every\ndispatcher ignores; see the module-level docs for why."),
                 "properties": Object {
-                    "note": Object {
-                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
-                        "type": Array [
-                            String("string"),
-                            String("null"),
-                        ],
+                    "task": Object {
+                        "type": String("string"),
                     },
                 },
+                "required": Array [
+                    String("task"),
+                ],
                 "title": String("Empty"),
                 "type": String("object"),
             },
@@ -150,20 +148,19 @@ expression: wire
     },
     WireToolDescriptor {
         definition: ToolDefinition {
-            name: "browser::youtube::get_current_frame",
+            name: "browser_youtube_get_current_frame",
             description: "Capture the current visible video frame as a PNG, base64-encoded.",
             parameters: Object {
                 "$schema": String("https://json-schema.org/draft/2020-12/schema"),
-                "description": String("No arguments."),
+                "description": String("No-input args carrier. Carries a required `task` field that every\ndispatcher ignores; see the module-level docs for why."),
                 "properties": Object {
-                    "note": Object {
-                        "description": String("Optional free-form note from the model. Ignored by every dispatcher."),
-                        "type": Array [
-                            String("string"),
-                            String("null"),
-                        ],
+                    "task": Object {
+                        "type": String("string"),
                     },
                 },
+                "required": Array [
+                    String("task"),
+                ],
                 "title": String("Empty"),
                 "type": String("object"),
             },

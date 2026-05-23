@@ -42,38 +42,40 @@ pub const MAX_FRAME_SIZE: usize = 16 * 1024 * 1024;
 /// in this crate. Emitted as a single TypeScript `bindings.ts` consumed
 /// by `apps/browser`.
 pub fn type_collection() -> specta::Types {
+    use eurora_tools_browser::{web, youtube};
+
     let mut types = euro_bridge_protocol::type_collection();
     types
         .register_mut::<NativeMessage>()
         .register_mut::<NativeMetadata>()
         // YouTube adapter types — `CapturedFrame` is the canonical
         // YouTube-frame shape returned by `browser_youtube_get_current_frame`.
-        .register_mut::<eurora_tools_youtube::TranscriptEntry>()
-        .register_mut::<eurora_tools_youtube::CurrentTimestamp>()
-        .register_mut::<eurora_tools_youtube::Transcript>()
-        .register_mut::<eurora_tools_youtube::CapturedFrame>()
+        .register_mut::<youtube::TranscriptEntry>()
+        .register_mut::<youtube::CurrentTimestamp>()
+        .register_mut::<youtube::Transcript>()
+        .register_mut::<youtube::CapturedFrame>()
         // Web adapter types — one entry per type that crosses the bridge.
-        .register_mut::<eurora_tools_web::PageMetadata>()
-        .register_mut::<eurora_tools_web::ViewportMetrics>()
-        .register_mut::<eurora_tools_web::GetAccessibilityTreeArgs>()
-        .register_mut::<eurora_tools_web::AccessibilityTree>()
-        .register_mut::<eurora_tools_web::AxNode>()
-        .register_mut::<eurora_tools_web::ReadabilityArticle>()
-        .register_mut::<eurora_tools_web::SelectedText>()
-        .register_mut::<eurora_tools_web::QuerySelectorArgs>()
-        .register_mut::<eurora_tools_web::QuerySelectorInclude>()
-        .register_mut::<eurora_tools_web::QuerySelectorResult>()
-        .register_mut::<eurora_tools_web::DomNode>()
-        .register_mut::<eurora_tools_web::BoundingBox>()
-        .register_mut::<eurora_tools_web::ListLinksArgs>()
-        .register_mut::<eurora_tools_web::LinksList>()
-        .register_mut::<eurora_tools_web::Link>()
-        .register_mut::<eurora_tools_web::ListFormInputsArgs>()
-        .register_mut::<eurora_tools_web::FormInputsList>()
-        .register_mut::<eurora_tools_web::FormInput>()
-        .register_mut::<eurora_tools_web::FormInputKind>()
-        .register_mut::<eurora_tools_web::InsertTextArgs>()
-        .register_mut::<eurora_tools_web::InsertTextResult>();
+        .register_mut::<web::PageMetadata>()
+        .register_mut::<web::ViewportMetrics>()
+        .register_mut::<web::GetAccessibilityTreeArgs>()
+        .register_mut::<web::AccessibilityTree>()
+        .register_mut::<web::AxNode>()
+        .register_mut::<web::ReadabilityArticle>()
+        .register_mut::<web::SelectedText>()
+        .register_mut::<web::QuerySelectorArgs>()
+        .register_mut::<web::QuerySelectorInclude>()
+        .register_mut::<web::QuerySelectorResult>()
+        .register_mut::<web::DomNode>()
+        .register_mut::<web::BoundingBox>()
+        .register_mut::<web::ListLinksArgs>()
+        .register_mut::<web::LinksList>()
+        .register_mut::<web::Link>()
+        .register_mut::<web::ListFormInputsArgs>()
+        .register_mut::<web::FormInputsList>()
+        .register_mut::<web::FormInput>()
+        .register_mut::<web::FormInputKind>()
+        .register_mut::<web::InsertTextArgs>()
+        .register_mut::<web::InsertTextResult>();
     types
 }
 

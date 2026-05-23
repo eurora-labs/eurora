@@ -9,10 +9,10 @@
 //! Regenerate with:
 //!
 //! ```sh
-//! INSTA_UPDATE=auto cargo test -p eurora-tools-youtube --test descriptors_snapshot
+//! INSTA_UPDATE=auto cargo test -p eurora-tools-browser --test youtube_descriptors_snapshot
 //! ```
 
-use eurora_tools_youtube::YOUTUBE_DESCRIPTORS;
+use eurora_tools_browser::youtube::YOUTUBE_DESCRIPTORS;
 
 #[test]
 fn descriptor_table_snapshot() {

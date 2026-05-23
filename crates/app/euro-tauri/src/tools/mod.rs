@@ -1,15 +1,15 @@
 //! Client-side tool adapter wiring.
 //!
-//! The actual adapter implementations live in their respective
-//! `eurora-tools-*` crates so non-Tauri consumers (e.g. `euro-activity`)
-//! can use them too. This module is the desktop's entry point for
-//! constructing each adapter against the shared [`BridgeService`] and
-//! handing the resulting dispatcher to the framework's
-//! [`Catalog`](eurora_tools::Catalog).
+//! Adapter traits (the `*Adapter` declarations consumed by the macro)
+//! live in `eurora-tools-browser`; their bridge-backed implementations
+//! live in `euro-bridge-adapters`. This module is the desktop's entry
+//! point for handing each implementation off to the framework's
+//! [`Catalog`](eurora_tools::Catalog) — see `main.rs` for the
+//! registration call site.
 //!
-//! New adapters add a re-export here, depend on the corresponding
-//! adapter crate with its `"bridge"` feature, and register a dispatcher
-//! in `main.rs`.
+//! New transports follow the same shape: declare the trait in a
+//! `crates/common/tools/eurora-tools-*` crate, ship the bridge-backed
+//! impl in `euro-bridge-adapters` (or its successor for non-bridge
+//! transports), and add a re-export here.
 
-pub use eurora_tools_web::WebBridgeImpl;
-pub use eurora_tools_youtube::YoutubeBridgeImpl;
+pub use euro_bridge_adapters::browser::{WebBridgeImpl, YoutubeBridgeImpl};

@@ -1,4 +1,4 @@
-//! The web-page adapter trait — eight tools, one namespace.
+//! The generic web-page adapter — eight tools, one namespace.
 //!
 //! Read-only tools observe the active `http(s)` tab; [`insert_text`] is
 //! the only mutator. The `#[adapter]` macro expands this module into:
@@ -18,15 +18,22 @@
 //! macro as the tool description sent to the LLM, so the wording here
 //! is part of the runtime surface — keep it user-facing.
 //!
+//! Bridge-backed implementations of [`WebAdapter`] live in
+//! `euro-bridge-adapters` on the app side; this crate stays free of
+//! any transport dependency.
+//!
 //! [`insert_text`]: WebAdapter::insert_text
 
-use eurora_tools::{BrowserOrigin, Empty, ToolError, adapter};
+mod types;
 
-use crate::types::{
-    AccessibilityTree, FormInputsList, GetAccessibilityTreeArgs, InsertTextArgs, InsertTextResult,
-    LinksList, ListFormInputsArgs, ListLinksArgs, PageMetadata, QuerySelectorArgs,
-    QuerySelectorResult, ReadabilityArticle, SelectedText,
+pub use types::{
+    AccessibilityTree, AxNode, BoundingBox, DomNode, FormInput, FormInputKind, FormInputsList,
+    GetAccessibilityTreeArgs, InsertTextArgs, InsertTextResult, Link, LinksList,
+    ListFormInputsArgs, ListLinksArgs, PageMetadata, QuerySelectorArgs, QuerySelectorInclude,
+    QuerySelectorResult, ReadabilityArticle, SelectedText, ViewportMetrics,
 };
+
+use eurora_tools::{BrowserOrigin, Empty, ToolError, adapter};
 
 /// Generic web-page tools — available on every `http(s)` tab the user
 /// has focused in a registered browser.

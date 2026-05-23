@@ -9,10 +9,10 @@
 //! Regenerate with:
 //!
 //! ```sh
-//! INSTA_UPDATE=auto cargo test -p eurora-tools-web --test descriptors_snapshot
+//! INSTA_UPDATE=auto cargo test -p eurora-tools-browser --test web_descriptors_snapshot
 //! ```
 
-use eurora_tools_web::WEB_DESCRIPTORS;
+use eurora_tools_browser::web::WEB_DESCRIPTORS;
 
 #[test]
 fn descriptor_table_snapshot() {
