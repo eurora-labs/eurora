@@ -65,27 +65,19 @@ impl FrameKind {
 /// fragment.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(transparent)]
-// Binding-target-specific specta wiring:
+// `Payload` is "any JSON value" — specta-swift can't render
+// `Box<RawValue>` and specta-typescript would over-eagerly inline it,
+// so the type is emitted as a named struct with no fields and
+// language-specific post-processors swap that placeholder in for the
+// real definition:
 //
-// - **TypeScript** path (`codegen` feature off): the wrapper inherits
-//   the serde `transparent` attribute, so specta inlines it as its
-//   inner field type and the inner-field override to
-//   `specta_typescript::Unknown` makes every reference emit `unknown`.
-// - **Swift** path (`codegen` feature on): specta's auto-`transparent`
-//   detection is suppressed via `specta(transparent = false)`, so the
-//   wrapper renders as a named struct. The inner field is then
-//   `specta(skip)`'d to keep the emitted struct body empty (specta-swift
-//   refuses to render `Box<RawValue>` directly anyway), and the
-//   codegen post-processor in
-//   `crates/app/euro-bridge-protocol/src/bin/codegen.rs` rewrites that
-//   empty body into the JSON-value `Codable` enum downstream Swift
-//   consumers actually need.
-#[cfg_attr(feature = "codegen", specta(transparent = false))]
-pub struct Payload(
-    #[cfg_attr(not(feature = "codegen"), specta(type = specta_typescript::Unknown))]
-    #[cfg_attr(feature = "codegen", specta(skip))]
-    Box<RawValue>,
-);
+// - The TypeScript post-processor in [`codegen::rewrite_typescript_payload`]
+//   rewrites the empty `Payload` alias to `type Payload = unknown`.
+// - The Swift post-processor in [`codegen::run`] replaces the empty
+//   `struct Payload: Codable` with the hand-rolled JSON-value
+//   `Codable` enum downstream Swift consumers actually need.
+#[specta(transparent = false)]
+pub struct Payload(#[specta(skip)] Box<RawValue>);
 
 impl Payload {
     /// Wrap a Rust value that implements [`Serialize`].

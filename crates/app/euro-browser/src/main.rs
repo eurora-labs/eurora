@@ -4,12 +4,12 @@
 //! copy per browser instance.
 
 use std::process;
-use std::time::Duration;
 
 use anyhow::Result;
 use backon::{ConstantBuilder, Retryable};
 use euro_browser::utils::{read_framed, write_framed};
 use euro_browser::{Frame, FrameKind, RegisterFrame, bridge_url, parent_pid};
+use euro_transport_policy::NATIVE_HOST_RECONNECT_BACKOFF;
 use futures_util::{SinkExt, StreamExt};
 use tokio::io;
 use tokio::sync::{broadcast, mpsc};
@@ -18,8 +18,6 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 
-/// Backoff between WebSocket reconnect attempts.
-const RECONNECT_INTERVAL: Duration = Duration::from_secs(2);
 /// Bound on the queue feeding stdout from the WebSocket.
 const FROM_SERVER_QUEUE: usize = 1024;
 /// Bound on the broadcast channel feeding the WebSocket from stdin.
@@ -122,9 +120,9 @@ async fn main() -> Result<()> {
                     SessionOutcome::Reconnect => {
                         tracing::info!(
                             "Bridge connection lost; reconnecting in {}s",
-                            RECONNECT_INTERVAL.as_secs()
+                            NATIVE_HOST_RECONNECT_BACKOFF.as_secs()
                         );
-                        tokio::time::sleep(RECONNECT_INTERVAL).await;
+                        tokio::time::sleep(NATIVE_HOST_RECONNECT_BACKOFF).await;
                     }
                     SessionOutcome::Shutdown => {
                         tracing::info!("Bridge requested shutdown; stopping reconnect loop");
@@ -167,7 +165,7 @@ async fn run_bridge_session(
         })
         .retry(
             ConstantBuilder::default()
-                .with_delay(RECONNECT_INTERVAL)
+                .with_delay(NATIVE_HOST_RECONNECT_BACKOFF)
                 .without_max_times(),
         )
         .sleep(tokio::time::sleep)

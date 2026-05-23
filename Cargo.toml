@@ -89,6 +89,7 @@ euro-auth = { path = "crates/app/euro-auth" }
 euro-bridge = { path = "crates/app/euro-bridge" }
 euro-bridge-protocol = { path = "crates/app/euro-bridge-protocol" }
 euro-browser = { path = "crates/app/euro-browser" }
+euro-codegen = { path = "crates/app/euro-codegen" }
 euro-debug = { path = "crates/app/euro-debug" }
 euro-endpoint = { path = "crates/app/euro-endpoint", default-features = false }
 euro-fs = { path = "crates/app/euro-fs" }
@@ -98,6 +99,7 @@ euro-storage = { path = "crates/app/euro-storage" }
 euro-tauri = { path = "crates/app/euro-tauri" }
 euro-telemetry = { path = "crates/app/euro-telemetry" }
 euro-thread = { path = "crates/app/euro-thread" }
+euro-transport-policy = { path = "crates/app/euro-transport-policy" }
 euro-timeline = { path = "crates/app/euro-timeline" }
 euro-vision = { path = "crates/app/euro-vision" }
 euro-office = { path = "crates/app/euro-office" }

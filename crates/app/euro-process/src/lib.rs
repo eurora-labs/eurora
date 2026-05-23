@@ -1,8 +1,12 @@
+mod ancestry;
 mod app_process;
 mod browser;
+mod process_name;
 
+pub use ancestry::{browser_ancestor_pid, parent_pid};
 pub use app_process::AppProcess;
 pub use browser::{Browser, BrowserStore};
+pub use process_name::lookup_process_name;
 
 #[inline(always)]
 pub fn os_pick<'a>(_windows: &'a str, _linux: &'a str, _macos: &'a str) -> &'a str {

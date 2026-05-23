@@ -9,6 +9,8 @@ axum = { workspace = true, features = ["ws"] }
 axum-server = { workspace = true }
 dashmap = { workspace = true }
 euro-bridge-protocol = { workspace = true }
+euro-process = { workspace = true }
+euro-transport-policy = { workspace = true }
 futures-util = { workspace = true }
 request-correlator = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
