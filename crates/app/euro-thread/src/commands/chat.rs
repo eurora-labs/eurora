@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use euro_transport_policy::CHAT_STREAM_TIMEOUT;
 use eurora_tools::{Catalog, ContextRegistry};
 use tauri::{AppHandle, Manager, ipc::Channel};
 use thread_core::{ChatSendRequest, ChatServerMessage, RegenerateRequest};
@@ -12,8 +13,6 @@ use super::context::{ChatContext, SharedChatContextProvider};
 use super::error::StreamError;
 use super::state::ActiveStreamTokens;
 use super::thread::thread_manager;
-
-const STREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 fn active_stream_tokens(
     app_handle: &AppHandle,
@@ -160,7 +159,7 @@ async fn open_and_drive(
 
     let drive_future = bridge.run_turn(socket, opening, cancel.clone(), &sink);
 
-    match tokio::time::timeout(STREAM_TIMEOUT, drive_future).await {
+    match tokio::time::timeout(CHAT_STREAM_TIMEOUT, drive_future).await {
         Ok(Ok(())) => Ok(()),
         Ok(Err(err)) => {
             cancel.cancel();
@@ -168,7 +167,7 @@ async fn open_and_drive(
         }
         Err(_) => {
             cancel.cancel();
-            Err(StreamError::Timeout(STREAM_TIMEOUT.as_secs() as u32))
+            Err(StreamError::Timeout(CHAT_STREAM_TIMEOUT.as_secs() as u32))
         }
     }
 }

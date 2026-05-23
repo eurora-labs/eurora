@@ -16,25 +16,22 @@ use euro_bridge_protocol::{
     Frame, FrameKind, Payload, RegisterFrame, RequestFrame, ResponseFrame, ShutdownFrame,
     bridge_url_for,
 };
+use euro_process::lookup_process_name;
+use euro_transport_policy::{
+    BRIDGE_HEARTBEAT_INTERVAL, BRIDGE_REGISTER_TIMEOUT, BRIDGE_REQUEST_TIMEOUT,
+    BRIDGE_SHUTDOWN_GRACE,
+};
 use futures_util::{SinkExt, StreamExt};
 use request_correlator::{RequestCorrelator, WaitError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
-
-use crate::process_name::get_process_name;
 
 /// `EventFrame.action` clients send to publish a fresh
 /// [`BundledExtensionState`] to the desktop. Payload is JSON-encoded
 /// [`ExtensionStatePayload`].
 pub const EXTENSION_STATE_EVENT: &str = "EXTENSION_STATE_CHANGED";
 
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
-const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 const OUTBOUND_QUEUE_SIZE: usize = 32;
-/// Time we let in-flight connections drain on shutdown before forcing
-/// the listener closed.
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 static GLOBAL_SERVICE: OnceLock<BridgeService> = OnceLock::new();
 
@@ -673,7 +670,7 @@ impl BridgeService {
         };
 
         tracing::info!("Sending shutdown signal to bridge WebSocket server");
-        axum_handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
+        axum_handle.graceful_shutdown(Some(BRIDGE_SHUTDOWN_GRACE));
 
         if let Some(done) = done {
             // Fired by `serve` when its accept loop ends, or by
@@ -798,7 +795,7 @@ impl BridgeService {
     }
 
     /// Send a request to `app_pid` and await a correlated response.
-    /// Times out after [`DEFAULT_REQUEST_TIMEOUT`]; on timeout a
+    /// Times out after [`BRIDGE_REQUEST_TIMEOUT`]; on timeout a
     /// `Cancel` frame is sent so the client can drop any work it
     /// started.
     pub async fn send_request(
@@ -822,7 +819,7 @@ impl BridgeService {
 
         self.send_to_client(app_pid, request).await?;
 
-        match guard.wait(DEFAULT_REQUEST_TIMEOUT).await {
+        match guard.wait(BRIDGE_REQUEST_TIMEOUT).await {
             Ok(Ok(resp)) => Ok(resp),
             Ok(Err(err)) => Err(BridgeError::Client {
                 code: err.code,
@@ -899,7 +896,7 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
     let app_kind = register.app_kind;
     let app_name = match &app_kind {
         Some(kind) => kind.clone(),
-        None => get_process_name(app_pid).unwrap_or_else(|| format!("unknown_{app_pid}")),
+        None => lookup_process_name(app_pid).unwrap_or_else(|| format!("unknown_{app_pid}")),
     };
 
     let (outbound_tx, outbound_rx) = mpsc::channel::<Frame>(OUTBOUND_QUEUE_SIZE);
@@ -1010,7 +1007,7 @@ async fn read_register_frame<S>(stream: &mut S) -> Result<RegisterFrame, String>
 where
     S: futures_util::Stream<Item = Result<Message, axum::Error>> + Unpin,
 {
-    let next = tokio::time::timeout(FIRST_FRAME_TIMEOUT, stream.next())
+    let next = tokio::time::timeout(BRIDGE_REGISTER_TIMEOUT, stream.next())
         .await
         .map_err(|_| "timed out waiting for Register frame".to_string())?;
 
@@ -1045,7 +1042,7 @@ async fn writer_task(
     mut sink: futures_util::stream::SplitSink<WebSocket, Message>,
     mut outbound_rx: mpsc::Receiver<Frame>,
 ) {
-    let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
+    let mut heartbeat = tokio::time::interval(BRIDGE_HEARTBEAT_INTERVAL);
     heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // Skip the immediate first tick.
     heartbeat.tick().await;

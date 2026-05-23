@@ -11,7 +11,8 @@
 //! `apps/browser/src/shared/background/native-messenger.ts`.
 //!
 //! TypeScript and Swift bindings are generated from these types via
-//! `cargo run -p euro-bridge-protocol --features codegen -- --generate_specta`.
+//! the workspace-level `cargo run -p euro-codegen` orchestrator, which
+//! calls into [`codegen::run`] (gated behind the `codegen` feature).
 //!
 //! ## Transport
 //!
@@ -30,6 +31,11 @@
 //! our frames). The
 //! [register-frame token check](`crate::frame::RegisterFrame`) is the
 //! authentication boundary, not TLS.
+
+#[cfg(feature = "codegen")]
+pub mod codegen;
+
+pub mod ts_fixup;
 
 mod error;
 mod frame;
