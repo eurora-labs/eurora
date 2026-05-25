@@ -46,7 +46,10 @@ async function onTabChange(change: TabChange): Promise<void> {
 
 	const tab = change.activeTab;
 	if (!tab || tab.id === undefined || !tab.url || !isRealWebUrl(tab.url)) return;
-	await sendMetadataEvent(tab as browser.Tabs.Tab & { id: number; url: string }, activeNativePort);
+	await sendMetadataEvent(
+		tab as browser.Tabs.Tab & { id: number; url: string },
+		activeNativePort,
+	);
 }
 
 async function sendMetadataEvent(

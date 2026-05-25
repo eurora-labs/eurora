@@ -1,8 +1,8 @@
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { isDenylisted, isVisible } from '../../extensions/web/element-filter';
 import { buildSelectorPath } from '../../extensions/web/selector-path';
 import { HTML_NODE_CAP, TEXT_NODE_CAP, clampString } from '../../extensions/web/truncation';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Tool } from '../types';
 
 const DEFAULT_LIMIT = 50;
@@ -60,8 +60,10 @@ function numericOrNull(value: number): number | null {
 }
 
 function readBounds(el: Element): BoundsT | null {
-	if (typeof (el as Element & { getBoundingClientRect?: () => DOMRect }).getBoundingClientRect !==
-		'function') {
+	if (
+		typeof (el as Element & { getBoundingClientRect?: () => DOMRect }).getBoundingClientRect !==
+		'function'
+	) {
 		return null;
 	}
 	const rect = el.getBoundingClientRect();
@@ -81,7 +83,10 @@ function safeSelectorPath(el: Element): string {
 	}
 }
 
-function projectNode(el: Element, include: Set<IncludeKey>): { node: DomNodeT; truncated: boolean } {
+function projectNode(
+	el: Element,
+	include: Set<IncludeKey>,
+): { node: DomNodeT; truncated: boolean } {
 	const node: DomNodeT = {
 		selector_path: safeSelectorPath(el),
 		text: null,
@@ -147,7 +152,7 @@ export const querySelector: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'web_query_selector',
 		description:
-			"Return matched elements for a CSS selector, optionally with their text content, outer HTML, attributes, and bounding box. Hidden and safety-denylisted elements are elided. `truncated` indicates that some matches or per-node bodies were trimmed.",
+			'Return matched elements for a CSS selector, optionally with their text content, outer HTML, attributes, and bounding box. Hidden and safety-denylisted elements are elided. `truncated` indicates that some matches or per-node bodies were trimmed.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 5_000,
@@ -157,6 +162,6 @@ export const querySelector: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(args) {
-		return executeQuerySelector(args);
+		return await executeQuerySelector(args);
 	},
 };

@@ -1,7 +1,7 @@
+import { READABILITY_BODY_CAP, clampString } from '../../extensions/web/truncation';
+import { Readability } from '@mozilla/readability';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { Readability } from '@mozilla/readability';
-import { READABILITY_BODY_CAP, clampString } from '../../extensions/web/truncation';
 import type { Tool } from '../types';
 
 const Args = z.object({}).strict();
@@ -51,7 +51,7 @@ export const getReadabilityArticle: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'web_get_readability_article',
 		description:
-			"Run Mozilla Readability against the active page and return the main article content as cleaned-up HTML plus plain text, along with title, byline, site name, language, and excerpt. Both bodies are truncated; `length` reports the pre-truncation character count.",
+			'Run Mozilla Readability against the active page and return the main article content as cleaned-up HTML plus plain text, along with title, byline, site name, language, and excerpt. Both bodies are truncated; `length` reports the pre-truncation character count.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 5_000,
@@ -61,6 +61,6 @@ export const getReadabilityArticle: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(_args) {
-		return executeGetReadabilityArticle();
+		return await executeGetReadabilityArticle();
 	},
 };

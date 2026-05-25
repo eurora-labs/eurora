@@ -83,6 +83,6 @@ export const getSelectedText: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(_args) {
-		return executeGetSelectedText();
+		return await executeGetSelectedText();
 	},
 };

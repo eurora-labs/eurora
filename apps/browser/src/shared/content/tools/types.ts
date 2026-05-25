@@ -1,5 +1,5 @@
-import type { z } from 'zod';
 import type { InvokeResponse, WireToolDescriptor } from './wire';
+import type { z } from 'zod';
 
 /// One LLM-facing tool: descriptor for advertising, schemas for runtime
 /// argument validation and (optional) return validation, plus the

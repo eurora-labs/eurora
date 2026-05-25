@@ -1,5 +1,5 @@
-import { installToolHandlers } from '../../../shared/content/tools/install';
 import { watcherFromTools } from '../../../shared/content/tools/build_watcher';
+import { installToolHandlers } from '../../../shared/content/tools/install';
 import { webTools } from '../../../shared/content/tools/web';
 
 let initialized = false;

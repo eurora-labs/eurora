@@ -1,5 +1,5 @@
-import browser from 'webextension-polyfill';
 import { cancelInflight } from './invoke';
+import browser from 'webextension-polyfill';
 import type { Watcher } from './types';
 
 /// Bridge message types the tool framework owns. The background script
@@ -27,21 +27,21 @@ function isToolMessage(value: unknown): value is ToolMessage {
 /// the bundle's other listeners, etc.) are passed through by returning
 /// `undefined` from the listener, which lets sibling listeners reply.
 export function installToolHandlers(watcher: Watcher): void {
-	browser.runtime.onMessage.addListener((message) => {
+	browser.runtime.onMessage.addListener(async (message) => {
 		if (!isToolMessage(message)) {
 			return undefined;
 		}
 
 		switch (message.type) {
 			case 'LIST_TOOLS':
-				return Promise.resolve({ tools: watcher.listTools() });
+				return await Promise.resolve({ tools: watcher.listTools() });
 
 			case 'INVOKE_TOOL':
-				return watcher.invoke(message.call_id, message.name, message.arguments);
+				return await watcher.invoke(message.call_id, message.name, message.arguments);
 
 			case 'CANCEL_TOOL':
 				cancelInflight(message.call_id);
-				return Promise.resolve({});
+				return await Promise.resolve({});
 		}
 	});
 }

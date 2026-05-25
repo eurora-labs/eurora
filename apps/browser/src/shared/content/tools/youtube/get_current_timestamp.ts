@@ -1,6 +1,6 @@
+import { requireCurrentVideoId, requirePlayer } from './_lib';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { requireCurrentVideoId, requirePlayer } from './_lib';
 import type { Tool } from '../types';
 
 const Args = z.object({}).strict();
@@ -39,6 +39,6 @@ export const getCurrentTimestamp: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(_args) {
-		return executeGetCurrentTimestamp();
+		return await executeGetCurrentTimestamp();
 	},
 };

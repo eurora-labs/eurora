@@ -1,6 +1,6 @@
+import { requireCurrentVideoId, requirePlayer } from './_lib';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { requireCurrentVideoId, requirePlayer } from './_lib';
 import type { Tool } from '../types';
 
 const Args = z.object({}).strict();
@@ -40,7 +40,7 @@ export const getCurrentFrame: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'youtube_get_current_frame',
 		description:
-			"Capture the visible YouTube video frame as a PNG (base64-encoded), along with frame dimensions and the playback timestamp at capture. Useful for grounding the model in what the user is actually seeing on the video right now.",
+			'Capture the visible YouTube video frame as a PNG (base64-encoded), along with frame dimensions and the playback timestamp at capture. Useful for grounding the model in what the user is actually seeing on the video right now.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 3_000,
@@ -50,6 +50,6 @@ export const getCurrentFrame: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(_args) {
-		return executeGetCurrentFrame();
+		return await executeGetCurrentFrame();
 	},
 };

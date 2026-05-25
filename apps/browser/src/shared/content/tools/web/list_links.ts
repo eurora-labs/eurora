@@ -1,7 +1,7 @@
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { isVisible } from '../../extensions/web/element-filter';
 import { buildSelectorPath } from '../../extensions/web/selector-path';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Tool } from '../types';
 
 const DEFAULT_LIMIT = 100;
@@ -42,7 +42,11 @@ function resolveHref(anchor: HTMLAnchorElement, href: string): string | null {
 	const trimmed = href.trim();
 	if (!trimmed) return null;
 	const lower = trimmed.toLowerCase();
-	if (lower.startsWith('javascript:') || lower.startsWith('mailto:') || lower.startsWith('tel:')) {
+	if (
+		lower.startsWith('javascript:') ||
+		lower.startsWith('mailto:') ||
+		lower.startsWith('tel:')
+	) {
 		return null;
 	}
 	if (lower.startsWith('#')) return null;
@@ -112,7 +116,7 @@ export const listLinks: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'web_list_links',
 		description:
-			"Inventory of clickable navigations rooted at `root_selector` (defaults to the whole document). Only resolvable `http(s)` URLs are emitted; hash-only, `javascript:`, `mailto:`, and `tel:` links are excluded. `total` reports the pre-`limit` count so the model can opt into a higher limit when needed.",
+			'Inventory of clickable navigations rooted at `root_selector` (defaults to the whole document). Only resolvable `http(s)` URLs are emitted; hash-only, `javascript:`, `mailto:`, and `tel:` links are excluded. `total` reports the pre-`limit` count so the model can opt into a higher limit when needed.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 3_000,
@@ -122,6 +126,6 @@ export const listLinks: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(args) {
-		return executeListLinks(args);
+		return await executeListLinks(args);
 	},
 };

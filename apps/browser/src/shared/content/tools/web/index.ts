@@ -1,4 +1,3 @@
-import type { z } from 'zod';
 import { getAccessibilityTree } from './get_accessibility_tree';
 import { getPageMetadata } from './get_page_metadata';
 import { getReadabilityArticle } from './get_readability_article';
@@ -8,6 +7,7 @@ import { listFormInputs } from './list_form_inputs';
 import { listLinks } from './list_links';
 import { querySelector } from './query_selector';
 import type { Tool } from '../types';
+import type { z } from 'zod';
 
 export {
 	getAccessibilityTree,
