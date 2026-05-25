@@ -695,8 +695,8 @@ fn main() {
             {
                 let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                     .join("../../../")
-                    .join(DESKTOP_BINDINGS_PATH);
-                export_desktop_bindings(&bindings_path)
+                    .join(euro_tauri::DESKTOP_BINDINGS_PATH);
+                euro_tauri::export_desktop_bindings(&bindings_path)
                     .expect("Failed to export tauri-specta bindings");
             }
 
