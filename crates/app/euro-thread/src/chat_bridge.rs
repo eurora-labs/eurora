@@ -399,16 +399,18 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn capability_update_precedes_opening_frame() {
-        let backend = StubBackend::new(json!({"ok": true}), vec![sample_descriptor(TIMESTAMP_TOOL)]);
+        let backend =
+            StubBackend::new(json!({"ok": true}), vec![sample_descriptor(TIMESTAMP_TOOL)]);
         let bridge = ChatBridge::new(backend.clone());
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
-        let run = tokio::spawn(async move {
-            bridge.run_turn(socket, send_opening(), cancel, &sink).await
-        });
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
 
         match next_outbound(&mut harness).await {
             ChatClientMessage::CapabilityUpdate(payload) => {
@@ -441,9 +443,10 @@ mod tests {
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
-        let run = tokio::spawn(async move {
-            bridge.run_turn(socket, send_opening(), cancel, &sink).await
-        });
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
 
         match next_outbound(&mut harness).await {
             ChatClientMessage::CapabilityUpdate(payload) => {
@@ -478,9 +481,10 @@ mod tests {
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
-        let run = tokio::spawn(async move {
-            bridge.run_turn(socket, send_opening(), cancel, &sink).await
-        });
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
 
         // CapabilityUpdate + Send.
         let _ = next_outbound(&mut harness).await;
@@ -536,9 +540,10 @@ mod tests {
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
-        let run = tokio::spawn(async move {
-            bridge.run_turn(socket, send_opening(), cancel, &sink).await
-        });
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
 
         let _ = next_outbound(&mut harness).await;
         let _ = next_outbound(&mut harness).await;
@@ -646,9 +651,10 @@ mod tests {
         };
         let cancel = CancellationToken::new();
 
-        let run = tokio::spawn(async move {
-            bridge.run_turn(socket, send_opening(), cancel, &sink).await
-        });
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
 
         let _ = next_outbound(&mut harness).await;
         let _ = next_outbound(&mut harness).await;
@@ -681,9 +687,10 @@ mod tests {
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
-        let run = tokio::spawn(async move {
-            bridge.run_turn(socket, send_opening(), cancel, &sink).await
-        });
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
 
         let _ = next_outbound(&mut harness).await;
         let _ = next_outbound(&mut harness).await;
@@ -711,9 +718,10 @@ mod tests {
         let (sink, captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
-        let run = tokio::spawn(async move {
-            bridge.run_turn(socket, send_opening(), cancel, &sink).await
-        });
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
 
         let _ = next_outbound(&mut harness).await;
         let _ = next_outbound(&mut harness).await;

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-pub use euro_bridge::{BridgeService, EventFrame, Frame, FrameKind, RequestFrame, ResponseFrame};
 use euro_bridge::{BridgeError, Payload};
+pub use euro_bridge::{BridgeService, EventFrame, Frame, FrameKind, RequestFrame, ResponseFrame};
 use euro_browser::{NativeMessage, NativeMetadata};
 use euro_process::Browser;
 use focus_tracker::FocusedWindow;
@@ -244,14 +244,13 @@ impl BrowserStrategy {
         let Some(service) = self.bridge_service else {
             return;
         };
-        let payload =
-            match Payload::from_value(&json!({ "tab_id": tab_id, "call_id": call_id })) {
-                Ok(p) => p,
-                Err(err) => {
-                    tracing::debug!("CANCEL_TOOL payload encode failed: {err}");
-                    return;
-                }
-            };
+        let payload = match Payload::from_value(&json!({ "tab_id": tab_id, "call_id": call_id })) {
+            Ok(p) => p,
+            Err(err) => {
+                tracing::debug!("CANCEL_TOOL payload encode failed: {err}");
+                return;
+            }
+        };
         if let Err(err) = service
             .send_request(pid, ACTION_CANCEL_TOOL, Some(payload))
             .await
@@ -461,7 +460,10 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
                 return Ok(Vec::new());
             }
         };
-        let response = match service.send_request(pid, ACTION_LIST_TOOLS, Some(payload)).await {
+        let response = match service
+            .send_request(pid, ACTION_LIST_TOOLS, Some(payload))
+            .await
+        {
             Ok(resp) => resp,
             Err(BridgeError::NotFound { .. }) | Err(BridgeError::ChannelClosed) => {
                 // The browser messenger disconnected between focus and
@@ -571,11 +573,13 @@ fn decode_invoke_response(tool: &str, body: Value) -> Result<Value, ToolErrorWir
         return Ok(value);
     }
     if let Some(err_value) = obj.remove("err") {
-        return Err(serde_json::from_value::<ToolErrorWire>(err_value).unwrap_or_else(|err| {
-            ToolErrorWire::Decode {
-                message: format!("INVOKE_TOOL `{tool}` error decode failed: {err}"),
-            }
-        }));
+        return Err(
+            serde_json::from_value::<ToolErrorWire>(err_value).unwrap_or_else(|err| {
+                ToolErrorWire::Decode {
+                    message: format!("INVOKE_TOOL `{tool}` error decode failed: {err}"),
+                }
+            }),
+        );
     }
 
     Err(ToolErrorWire::Decode {

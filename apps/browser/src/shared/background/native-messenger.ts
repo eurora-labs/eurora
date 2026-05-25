@@ -1,4 +1,3 @@
-import { startContextObserver, stopContextObserver } from './context-observer';
 import { resolveFaviconBase64 } from './favicon';
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
@@ -22,11 +21,11 @@ function connect() {
 	nativePort = browser.runtime.connectNative(host);
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort.onMessage.addListener(onNativePortMessage);
-	// One bus per connection lifecycle. Both observers subscribe; the
-	// bus owns the underlying `chrome.tabs` / `chrome.windows` listeners.
+	// One bus per connection lifecycle. `focus-tracker` is the only
+	// subscriber today; the bus owns the underlying `chrome.tabs` /
+	// `chrome.windows` listeners.
 	tabBus = startTabStateBus();
 	initFocusTracker(nativePort, tabBus);
-	startContextObserver(nativePort, tabBus);
 	startSafariPoller();
 }
 
@@ -35,7 +34,6 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 	console.error('Native port disconnected:', error || 'Unknown error');
 
 	destroyFocusTracker();
-	stopContextObserver();
 	tabBus?.stop();
 	tabBus = null;
 	stopSafariPoller();

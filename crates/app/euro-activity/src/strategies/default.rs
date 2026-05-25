@@ -161,7 +161,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_metadata_reports_window_title_from_constructor() {
-        let mut strategy = DefaultStrategy::new(window(42, "code", Some("main.rs")));
+        let strategy = DefaultStrategy::new(window(42, "code", Some("main.rs")));
         let metadata = strategy.get_metadata().await.unwrap();
         assert_eq!(metadata.title.as_deref(), Some("main.rs"));
         assert!(metadata.url.is_none());
