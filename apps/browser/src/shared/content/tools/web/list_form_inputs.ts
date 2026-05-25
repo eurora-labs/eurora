@@ -1,7 +1,7 @@
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { isVisible, writableFieldKind } from '../../extensions/web/element-filter';
 import { buildSelectorPath } from '../../extensions/web/selector-path';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Tool } from '../types';
 
 const DEFAULT_LIMIT = 100;
@@ -18,7 +18,16 @@ const Args = z
 const FormInput = z.object({
 	field_id: z.string(),
 	label: z.string().nullable(),
-	kind: z.enum(['text', 'search', 'email', 'url', 'tel', 'number', 'textarea', 'content_editable']),
+	kind: z.enum([
+		'text',
+		'search',
+		'email',
+		'url',
+		'tel',
+		'number',
+		'textarea',
+		'content_editable',
+	]),
 	value: z.string(),
 	placeholder: z.string().nullable(),
 	required: z.boolean(),
@@ -148,7 +157,7 @@ export const listFormInputs: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'web_list_form_inputs',
 		description:
-			"Inventory of text-typed editable fields with labels and current values. Password, file, hidden, submit, checkbox, radio, and image inputs are excluded by the safety contract. Disabled, read-only, and invisible fields are excluded too. `total` is the pre-`limit` count.",
+			'Inventory of text-typed editable fields with labels and current values. Password, file, hidden, submit, checkbox, radio, and image inputs are excluded by the safety contract. Disabled, read-only, and invisible fields are excluded too. `total` is the pre-`limit` count.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 3_000,
@@ -158,6 +167,6 @@ export const listFormInputs: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(args) {
-		return executeListFormInputs(args);
+		return await executeListFormInputs(args);
 	},
 };

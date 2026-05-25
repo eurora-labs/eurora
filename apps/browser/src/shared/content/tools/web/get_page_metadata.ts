@@ -106,7 +106,7 @@ export const getPageMetadata: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'web_get_page_metadata',
 		description:
-			"Return page-level metadata for the active tab: URL, title, host, language, charset, description, OpenGraph tags, and viewport metrics. The model uses this to ground itself in what the user is looking at without needing the full page.",
+			'Return page-level metadata for the active tab: URL, title, host, language, charset, description, OpenGraph tags, and viewport metrics. The model uses this to ground itself in what the user is looking at without needing the full page.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 1_000,
@@ -116,6 +116,6 @@ export const getPageMetadata: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(_args) {
-		return executeGetPageMetadata();
+		return await executeGetPageMetadata();
 	},
 };

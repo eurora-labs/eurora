@@ -1,6 +1,6 @@
+import { writableFieldKind } from '../../extensions/web/element-filter';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { writableFieldKind } from '../../extensions/web/element-filter';
 import type { Tool } from '../types';
 
 const Args = z
@@ -121,7 +121,7 @@ export const insertText: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'web_insert_text',
 		description:
-			"The only mutating web tool: insert text into a uniquely-identified writable text field (<input>, <textarea>, or [contenteditable]). `replace=true` overwrites the previous value; otherwise the text is appended. Password, file, submit, and other non-text inputs are rejected; multiple-match selectors are rejected. Never dispatches `change`, `submit`, `keydown`, or focus/blur events.",
+			'The only mutating web tool: insert text into a uniquely-identified writable text field (<input>, <textarea>, or [contenteditable]). `replace=true` overwrites the previous value; otherwise the text is appended. Password, file, submit, and other non-text inputs are rejected; multiple-match selectors are rejected. Never dispatches `change`, `submit`, `keydown`, or focus/blur events.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 2_000,
@@ -131,6 +131,6 @@ export const insertText: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(args) {
-		return executeInsertText(args);
+		return await executeInsertText(args);
 	},
 };

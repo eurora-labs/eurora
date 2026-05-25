@@ -1,7 +1,7 @@
+import { requireCurrentVideoId } from './_lib';
+import { YouTubeTranscriptApi } from '../../../../content/sites/youtube.com/transcript';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { YouTubeTranscriptApi } from '../../../../content/sites/youtube.com/transcript';
-import { requireCurrentVideoId } from './_lib';
 import type { Tool } from '../types';
 
 const Args = z.object({}).strict();
@@ -53,6 +53,6 @@ export const getTranscript: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(_args) {
-		return executeGetTranscript();
+		return await executeGetTranscript();
 	},
 };

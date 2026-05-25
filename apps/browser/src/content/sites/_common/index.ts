@@ -80,8 +80,8 @@ export function main() {
 	if (initialized) return;
 	initialized = true;
 
-	browser.runtime.onMessage.addListener((message) => {
+	browser.runtime.onMessage.addListener(async (message) => {
 		if (!isCommonMessage(message)) return undefined;
-		return handleGetMetadata();
+		return await handleGetMetadata();
 	});
 }

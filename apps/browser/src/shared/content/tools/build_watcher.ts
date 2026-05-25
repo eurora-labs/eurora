@@ -1,6 +1,6 @@
-import type { z } from 'zod';
 import { invokeFrom } from './invoke';
 import type { Tool, Watcher } from './types';
+import type { z } from 'zod';
 
 /// Build a `Watcher` whose tool list is whatever `source()` returns each
 /// time `listTools` / `invoke` is called. The function form is what lets
@@ -10,11 +10,9 @@ import type { Tool, Watcher } from './types';
 ///
 /// For static surfaces (most sites), `source` can just close over a
 /// constant array: `watcherFromTools(() => webTools)`.
-export function watcherFromTools(
-	source: () => readonly Tool<z.ZodTypeAny, unknown>[],
-): Watcher {
+export function watcherFromTools(source: () => readonly Tool<z.ZodTypeAny, unknown>[]): Watcher {
 	return {
 		listTools: () => source().map((tool) => tool.descriptor),
-		invoke: (callId, name, args) => invokeFrom(source(), callId, name, args),
+		invoke: async (callId, name, args) => await invokeFrom(source(), callId, name, args),
 	};
 }

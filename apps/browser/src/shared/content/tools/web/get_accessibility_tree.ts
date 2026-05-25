@@ -1,6 +1,3 @@
-import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
-import { roles as ariaRoles } from 'aria-query';
 import { isVisible } from '../../extensions/web/element-filter';
 import { buildSelectorPath } from '../../extensions/web/selector-path';
 import {
@@ -9,6 +6,9 @@ import {
 	AX_TREE_HARD_CAP_NODES,
 	clampNodeBudget,
 } from '../../extensions/web/truncation';
+import { roles as ariaRoles } from 'aria-query';
+import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Tool } from '../types';
 
 const Args = z
@@ -341,7 +341,7 @@ export const getAccessibilityTree: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'web_get_accessibility_tree',
 		description:
-			"Compact accessibility tree rooted at `root_selector` (defaults to <body>), derived from ARIA attributes and HTML implicit roles. Each node carries role, accessible name, value, description, and a stable selector path. Bounded by `max_depth` (default 12) and `max_nodes` (default 500, hard cap 2000); `truncated` is set when either cap is hit.",
+			'Compact accessibility tree rooted at `root_selector` (defaults to <body>), derived from ARIA attributes and HTML implicit roles. Each node carries role, accessible name, value, description, and a stable selector path. Bounded by `max_depth` (default 12) and `max_nodes` (default 500, hard cap 2000); `truncated` is set when either cap is hit.',
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 8_000,
@@ -351,6 +351,6 @@ export const getAccessibilityTree: Tool<typeof Args, Result> = {
 	},
 	argsSchema: Args,
 	async run(args) {
-		return executeGetAccessibilityTree(args);
+		return await executeGetAccessibilityTree(args);
 	},
 };
