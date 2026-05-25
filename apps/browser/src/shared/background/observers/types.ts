@@ -10,6 +10,10 @@ import type browser from 'webextension-polyfill';
  *     nothing meaningful changed;
  *   - shaping the wire payload sent on `CONTEXT_ACTIVATED`.
  *
+ * Tool dispatch is **not** an observer concern — tools are content-script
+ * driven; each tab's site bundle owns its own tool list and dispatch via
+ * the `Watcher` interface in `shared/content/tools/types`.
+ *
  * Adding a new context key (X, Google Docs, …) is a matter of writing
  * a new `ObserverSpec` and appending it to the dispatcher's list — no
  * other code in this directory changes.
@@ -17,9 +21,7 @@ import type browser from 'webextension-polyfill';
 export interface ObserverSpec<S> {
 	/**
 	 * Context key emitted in `CONTEXT_ACTIVATED`/`CONTEXT_DEACTIVATED`
-	 * payloads. Must match the server-side per-key formatter in
-	 * `be-thread-service::tool_catalog` and the adapter's
-	 * `requires_context` attribute.
+	 * payloads. Must match the server-side per-key formatter.
 	 */
 	readonly key: string;
 

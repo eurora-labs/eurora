@@ -34,6 +34,7 @@ pub mod context_chip;
 pub mod error;
 pub mod messages;
 pub mod thread;
+pub mod tool_backend;
 pub mod tool_wire;
 
 pub use chat::{
@@ -51,6 +52,7 @@ pub use thread::{
     GenerateThreadTitleResponse, GetThreadResponse, ListThreadsQuery, ListThreadsResponse,
     SearchThreadResult, SearchThreadsQuery, SearchThreadsResponse, Thread,
 };
+pub use tool_backend::{ToolBackend, ToolBackendCall};
 pub use tool_wire::{ToolErrorWire, ToolSource, WireActiveContext, WireToolDescriptor};
 
 /// Build a [`specta::Types`] containing every thread wire type the desktop

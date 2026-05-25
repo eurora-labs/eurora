@@ -1,5 +1,0 @@
-error: tool methods require a non-empty rustdoc comment; the first paragraph is sent to the LLM as the tool description
-  --> tests/fail/missing_rustdoc.rs:16:11
-   |
-16 |     async fn boom(
-   |           ^^

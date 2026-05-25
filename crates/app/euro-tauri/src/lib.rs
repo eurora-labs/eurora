@@ -7,12 +7,10 @@
 
 pub mod browser_launcher;
 pub mod chat_context;
-pub mod context_registry;
 pub mod native_messaging;
 pub mod office_addin;
 pub mod procedures;
 pub mod shared_types;
-pub mod tools;
 pub mod util;
 pub mod window;
 
