@@ -8,8 +8,7 @@ use euro_endpoint::EndpointManager;
 use euro_settings::{CloudSettingsCache, SettingsState};
 use euro_tauri::chat_context::TimelineChatContextProvider;
 use euro_tauri::{
-    DESKTOP_BINDINGS_PATH, MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
-    export_desktop_bindings,
+    MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
         accent::accent_from_image,
         activity::{SavedActivity, SavedActivityCreated, SavedActivityEnded},
@@ -25,13 +24,13 @@ use euro_telemetry::{Controller as TelemetryController, sentry_tracing};
 use euro_thread::commands::SharedChatContextProvider;
 use euro_timeline::TimelineManager;
 use euro_vision::rgba_to_base64;
-use thread_core::ToolBackend;
 use tauri::{
     Manager, generate_context,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
 use tauri_specta::Event;
+use thread_core::ToolBackend;
 use tokio::sync::Mutex;
 
 /// Returns `true` when the on-disk messenger binary was replaced during
@@ -369,9 +368,9 @@ fn init_state(
     // `ToolBackend` shares the same `Arc<RwLock<ActivityStrategy>>` the
     // collector swaps on focus changes — the chat side always sees the
     // freshest strategy without any reconnection.
-    let backend: std::sync::Arc<dyn ToolBackend> = std::sync::Arc::new(
-        ActivityToolBackend::new(timeline.collector.active_strategy()),
-    );
+    let backend: std::sync::Arc<dyn ToolBackend> = std::sync::Arc::new(ActivityToolBackend::new(
+        timeline.collector.active_strategy(),
+    ));
     app_handle.manage(Mutex::new(timeline));
     app_handle.manage(backend);
 

@@ -276,7 +276,9 @@ mod tests {
         bus.shutdown();
         let err = handle.await.expect("task didn't panic").unwrap_err();
         match err {
-            ToolErrorWire::Transport { message: msg } => assert!(msg.contains("turn ended"), "{msg}"),
+            ToolErrorWire::Transport { message: msg } => {
+                assert!(msg.contains("turn ended"), "{msg}")
+            }
             other => panic!("expected Transport, got {other:?}"),
         }
     }

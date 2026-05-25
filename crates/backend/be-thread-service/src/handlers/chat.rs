@@ -1134,7 +1134,10 @@ mod tests {
         assert!(!cancel.is_cancelled());
 
         let outcome = pending.await.expect("task didn't panic");
-        assert!(matches!(outcome, Err(ToolErrorWire::Timeout)), "{outcome:?}");
+        assert!(
+            matches!(outcome, Err(ToolErrorWire::Timeout)),
+            "{outcome:?}"
+        );
     }
 
     #[tokio::test]
