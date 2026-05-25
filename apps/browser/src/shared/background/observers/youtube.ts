@@ -2,11 +2,7 @@ import type { ObserverSpec } from './types';
 import type browser from 'webextension-polyfill';
 
 /**
- * Context key for the YouTube watch-page observer. Keep in sync with
- * the server-side per-key formatter
- * (`be-thread-service::tool_catalog::format_youtube_watch_page`) and
- * the adapter's `requires_context` attribute in
- * `eurora-tools-youtube`.
+ * Context key for the YouTube watch-page observer.
  */
 export const YOUTUBE_WATCH_KEY = 'youtube::watch_page';
 

@@ -2,10 +2,7 @@ import type { ObserverSpec } from './types';
 import type browser from 'webextension-polyfill';
 
 /**
- * Context key for the generic web-page observer. Keep in sync with the
- * server-side `format_web_page` arm in
- * `be-thread-service::tool_catalog` and the adapter's
- * `requires_context` attribute in `eurora-tools-web`.
+ * Context key for the generic web-page observer.
  */
 export const WEB_PAGE_KEY = 'web::page';
 

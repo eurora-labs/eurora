@@ -1,38 +1,32 @@
 //! Per-turn chat state machine.
 //!
 //! [`ChatBridge`] owns one chat WebSocket for the duration of a single
-//! turn. At turn start it snapshots the client [`ContextRegistry`],
-//! filters the [`Catalog`] of dispatchers down to tools whose required
-//! contexts are all live, and emits a `CapabilityUpdate` frame describing
-//! the LLM-visible capability surface for the turn. The opening frame
-//! (`Send` or `Regenerate`) follows; from there the bridge multiplexes
-//! three responsibilities over the WS:
+//! turn. At turn start it asks the active [`ToolBackend`] for the
+//! LLM-visible tool surface and emits a `CapabilityUpdate` frame; the
+//! opening frame (`Send` or `Regenerate`) follows. From there the bridge
+//! multiplexes three responsibilities over the WS:
 //!
 //! - forward user-visible chat frames (`Chunk`, `ConfirmedHumanMessage`,
 //!   `Final`, `Error`) to a caller-owned [`ChatEventSink`],
-//! - dispatch incoming `ToolRequest` frames through the catalog and emit
-//!   the matching `ToolResponse` on completion, and
+//! - dispatch incoming `ToolRequest` frames through the [`ToolBackend`]
+//!   and emit the matching `ToolResponse` on completion, and
 //! - propagate cancellation: UI-level cancel triggers
 //!   `ChatClientMessage::Cancel` and cancels every in-flight dispatch,
 //!   server-issued `ToolCancel` targets a single call.
 //!
-//! All in-flight dispatches share a [`tokio::task::JoinSet`] rooted on
-//! `run_turn`'s stack — a grace period after the terminal frame lets
-//! straggler responses ride out the socket, then the set is aborted so
-//! a stuck adapter cannot pin the turn beyond
-//! [`CHAT_DISPATCH_DRAIN`].
+//! The backend is a `Send + Sync` trait object so `ChatBridge` has no
+//! dependency on activity strategies or the bridge service. The
+//! production wiring lives in `euro-activity`; tests stub the trait
+//! directly.
 
-use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dashmap::DashMap;
 use euro_transport_policy::CHAT_DISPATCH_DRAIN;
-use eurora_tools::{ActiveContext, Catalog, ContextRegistry, IncomingCall, Origin, ToolError};
 use serde_json::Value;
 use thread_core::{
     CapabilityUpdatePayload, ChatClientMessage, ChatSendRequest, ChatServerMessage,
-    RegenerateRequest, ToolErrorWire, WireActiveContext, WireToolDescriptor,
+    RegenerateRequest, ToolBackend, ToolBackendCall, ToolErrorWire, WireToolDescriptor,
 };
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -88,19 +82,17 @@ where
 
 /// Per-turn dispatcher and chat-frame router.
 ///
-/// The bridge holds shared references to the client [`ContextRegistry`]
-/// and the [`Catalog`] of registered dispatchers, both of which are
-/// app-wide singletons managed by Tauri. One bridge can drive many
-/// turns sequentially — there's no per-turn state on `self`; all turn
-/// state lives on the stack of [`Self::run_turn`].
+/// The bridge holds a shared reference to whatever [`ToolBackend`] the
+/// app wired in. One bridge can drive many turns sequentially — there's
+/// no per-turn state on `self`; all turn state lives on the stack of
+/// [`Self::run_turn`].
 pub struct ChatBridge {
-    contexts: Arc<ContextRegistry>,
-    catalog: Arc<Catalog>,
+    backend: Arc<dyn ToolBackend>,
 }
 
 impl ChatBridge {
-    pub fn new(contexts: Arc<ContextRegistry>, catalog: Arc<Catalog>) -> Self {
-        Self { contexts, catalog }
+    pub fn new(backend: Arc<dyn ToolBackend>) -> Self {
+        Self { backend }
     }
 
     /// Drive one chat turn end-to-end.
@@ -118,40 +110,12 @@ impl ChatBridge {
         cancel: CancellationToken,
         sink: &S,
     ) -> Result<()> {
-        let snapshot = self.contexts.snapshot();
-        let wire_descriptors = wire_descriptors_for(&self.catalog, &snapshot);
-
-        // `ActiveContext.origin` is already `Arc<Origin>`; we hand each
-        // target out to every `IncomingCall` for this turn via cheap
-        // `Arc::clone`.
-        let targets: HashMap<String, Arc<Origin>> = snapshot
-            .iter()
-            .map(|c| (c.key.clone(), Arc::clone(&c.origin)))
-            .collect();
-        let capabilities: HashSet<String> = wire_descriptors
-            .iter()
-            .map(|d| d.definition.name.clone())
-            .collect();
-
-        // The catalog hands us `Arc<WireToolDescriptor>`s built once at
-        // register time; cloning the inner value is now just a few
-        // string/Value clones — the per-turn JSON schema serialization
-        // already happened.
-        let wire_tools: Vec<WireToolDescriptor> =
-            wire_descriptors.iter().map(|arc| (**arc).clone()).collect();
-        let wire_contexts: Vec<WireActiveContext> = snapshot
-            .into_iter()
-            .map(|c| WireActiveContext {
-                key: c.key,
-                activated_at: c.activated_at,
-                data: c.data,
-            })
-            .collect();
+        let tools: Vec<WireToolDescriptor> = self.backend.list_tools().await;
 
         socket.try_send(ChatClientMessage::CapabilityUpdate(
             CapabilityUpdatePayload {
-                tools: wire_tools,
-                contexts: wire_contexts,
+                tools,
+                contexts: Vec::new(),
             },
         ))?;
         socket.try_send(opening.into())?;
@@ -165,8 +129,6 @@ impl ChatBridge {
         // ordering "Cancel frame first, in-flight dispatches cancelled
         // second" inside the cancel arm below.
         let turn = TurnState {
-            targets,
-            capabilities,
             turn_cancel: CancellationToken::new(),
             inflight: Arc::new(DashMap::new()),
         };
@@ -257,116 +219,42 @@ impl ChatBridge {
         arguments: Value,
         outbound: ChatOutbound,
     ) {
-        let wire_name = descriptor.definition.name.clone();
-
-        // Defense in depth (1): only dispatch what we advertised.
-        // Catches schema drift, server bugs, and stale capability
-        // assumptions.
-        if !turn.capabilities.contains(&wire_name) {
-            let _ = outbound.send(ChatClientMessage::ToolResponse {
-                call_id,
-                result: Err(ToolErrorWire::ContextUnavailable {
-                    tool: wire_name,
-                    reason: "tool not advertised in this turn".into(),
-                }),
-            });
-            return;
-        }
-
-        // Resolve origin from the frozen turn snapshot. v1 tools all
-        // declare at least one `required_context`; a descriptor with
-        // no required contexts has no routing target on the client
-        // side and is rejected here.
-        let origin = descriptor
-            .required_contexts
-            .iter()
-            .find_map(|ctx| turn.targets.get(ctx).cloned());
-
-        // Single catalog read: `lookup` returns the dispatcher plus the
-        // `&'static str` descriptor name in one shot, so the spawned task
-        // doesn't pay for a second linear scan inside the dispatcher.
-        let entry = self.catalog.lookup(&wire_name);
         let cancel = turn.turn_cancel.child_token();
         turn.inflight.insert(call_id, cancel.clone());
         let inflight = turn.inflight.clone();
+        let backend = Arc::clone(&self.backend);
+        let name = descriptor.definition.name;
 
         set.spawn(async move {
-            let result: std::result::Result<Value, ToolError> = match (origin, entry) {
-                (Some(origin), Some((dispatcher, static_name))) => {
-                    dispatcher
-                        .dispatch(IncomingCall {
-                            call_id,
-                            descriptor_name: static_name,
-                            arguments,
-                            origin,
-                            cancel: cancel.clone(),
-                        })
-                        .await
-                }
-                (None, _) => Err(ToolError::ContextUnavailable {
-                    tool: Cow::Owned(wire_name),
-                    reason: Cow::Borrowed("no live context at turn start"),
-                }),
-                (_, None) => Err(ToolError::Remote {
-                    code: 404,
-                    message: format!("no dispatcher for `{wire_name}`"),
-                    details: None,
-                }),
-            };
-
-            inflight.remove(&call_id);
-            let _ = outbound.send(ChatClientMessage::ToolResponse {
+            let call = ToolBackendCall {
                 call_id,
-                result: result.map_err(ToolErrorWire::from),
-            });
+                name,
+                arguments,
+                cancel: cancel.clone(),
+            };
+            let result: std::result::Result<Value, ToolErrorWire> = backend.dispatch(call).await;
+            inflight.remove(&call_id);
+            let _ = outbound.send(ChatClientMessage::ToolResponse { call_id, result });
         });
     }
 }
 
 struct TurnState {
-    /// Frozen per-context routing targets — `context_key → Arc<Origin>`.
-    /// The `Arc` lets every `IncomingCall` for this turn share the same
-    /// origin without deep-cloning the inner variant.
-    targets: HashMap<String, Arc<Origin>>,
-    /// Wire names advertised in `CapabilityUpdate` this turn. Used to
-    /// reject `ToolRequest` frames the server invents or sends past
-    /// the capability surface.
-    capabilities: HashSet<String>,
-    /// Child of the caller's cancel token; fires on UI cancel and at
-    /// the end of `run_turn` to wake every dispatch task.
+    /// Standalone token cancelled when the turn ends (or on UI cancel)
+    /// so every in-flight dispatch wakes up. Independent from the
+    /// caller's UI cancel so the bridge can write the `Cancel` frame
+    /// before signalling dispatches — see `run_turn`'s commentary.
     turn_cancel: CancellationToken,
     /// Per-call cancellation tokens so `ToolCancel { call_id }` can
     /// abort exactly one dispatch without disturbing siblings.
     inflight: Arc<DashMap<u32, CancellationToken>>,
 }
 
-/// Filter the catalog's cached wire descriptors down to those whose
-/// every required context is currently active. The descriptors are
-/// pre-built `Arc<WireToolDescriptor>`s — no per-turn schema
-/// serialization, only an `Arc::clone` per advertised tool.
-fn wire_descriptors_for(
-    catalog: &Catalog,
-    snapshot: &[ActiveContext],
-) -> Vec<Arc<WireToolDescriptor>> {
-    let active: HashSet<&str> = snapshot.iter().map(|c| c.key.as_str()).collect();
-    catalog
-        .all_wire_descriptors()
-        .into_iter()
-        .filter(|w| {
-            w.required_contexts
-                .iter()
-                .all(|c| active.contains(c.as_str()))
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::chat_socket::ChatSocketHarness;
-    use chrono::Utc;
-    use eurora_tools::{BrowserOrigin, Dispatcher, Empty, ToolDescriptor, schema_of};
-    use futures::future::BoxFuture;
+    use async_trait::async_trait;
     use serde_json::json;
     use std::sync::Mutex as StdMutex;
     use std::time::Duration;
@@ -376,137 +264,95 @@ mod tests {
 
     const TIMESTAMP_TOOL: &str = "browser_youtube_get_current_timestamp";
 
-    /// `ToolSource::Bridge { app_kind: String }` can't be constructed in a
-    /// `const`, but the bridge logic ignores `source` (it's a server-side
-    /// concern). `ClientLocal` keeps the descriptor table `const`-friendly.
-    const YOUTUBE_DESCRIPTORS: &[ToolDescriptor] = &[ToolDescriptor {
-        name: TIMESTAMP_TOOL,
-        description: "Return the user's current playback position.",
-        input_schema: schema_of::<Empty>,
-        output_schema: schema_of::<Empty>,
-        timeout: Duration::from_millis(2_000),
-        source: ToolSource::ClientLocal,
-        required_contexts: &["youtube::watch_page"],
-        requires_user_approval: false,
-    }];
-
-    fn youtube_descriptor() -> &'static [ToolDescriptor] {
-        YOUTUBE_DESCRIPTORS
+    fn sample_descriptor(name: &str) -> WireToolDescriptor {
+        WireToolDescriptor {
+            definition: agent_chain_core::tools::ToolDefinition {
+                name: name.to_string(),
+                description: "test tool".to_string(),
+                parameters: json!({"type": "object"}),
+            },
+            output_schema: json!({"type": "object"}),
+            timeout_ms: 2_000,
+            source: ToolSource::Bridge {
+                app_kind: "browser".into(),
+            },
+            required_contexts: Vec::new(),
+            requires_user_approval: false,
+        }
     }
 
-    /// Captures every dispatch and returns a canned value. The
-    /// per-call cancellation token can race the canned response —
-    /// `await_cancel` toggles that for the "block on cancel" tests.
-    struct StubDispatcher {
+    /// Stub `ToolBackend` whose canned outcome is returned to every
+    /// dispatch. Records every call for assertions; can be configured to
+    /// block on the call-level cancel token instead of returning
+    /// immediately for the cancellation tests.
+    struct StubBackend {
         canned: Value,
+        tools: Vec<WireToolDescriptor>,
         await_cancel: bool,
-        descriptors: &'static [ToolDescriptor],
-        seen: Arc<StdMutex<Vec<DispatchObservation>>>,
+        seen: Arc<StdMutex<Vec<ToolBackendCall>>>,
     }
 
-    #[derive(Clone)]
-    struct DispatchObservation {
-        descriptor_name: &'static str,
-        call_id: u32,
-        origin_variant: &'static str,
-        /// `Arc<Origin>` retained so test assertions can verify pointer
-        /// identity across multiple dispatches — the per-turn snapshot
-        /// hands the *same* `Arc<Origin>` to every call.
-        origin_arc: Arc<Origin>,
-    }
-
-    impl std::fmt::Debug for DispatchObservation {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("DispatchObservation")
-                .field("descriptor_name", &self.descriptor_name)
-                .field("call_id", &self.call_id)
-                .field("origin_variant", &self.origin_variant)
-                .finish()
-        }
-    }
-
-    impl StubDispatcher {
-        fn new(canned: Value) -> Arc<Self> {
+    impl StubBackend {
+        fn new(canned: Value, tools: Vec<WireToolDescriptor>) -> Arc<Self> {
             Arc::new(Self {
                 canned,
+                tools,
                 await_cancel: false,
-                descriptors: youtube_descriptor(),
                 seen: Arc::new(StdMutex::new(Vec::new())),
             })
         }
 
-        fn await_cancel(canned: Value) -> Arc<Self> {
+        fn await_cancel(tools: Vec<WireToolDescriptor>) -> Arc<Self> {
             Arc::new(Self {
-                canned,
+                canned: json!({}),
+                tools,
                 await_cancel: true,
-                descriptors: youtube_descriptor(),
                 seen: Arc::new(StdMutex::new(Vec::new())),
             })
         }
 
-        fn seen(&self) -> Vec<DispatchObservation> {
-            self.seen.lock().unwrap().clone()
+        fn seen(&self) -> Vec<ObservedCall> {
+            self.seen
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|c| ObservedCall {
+                    call_id: c.call_id,
+                    name: c.name.clone(),
+                    arguments: c.arguments.clone(),
+                })
+                .collect()
         }
     }
 
-    impl Dispatcher for StubDispatcher {
-        fn descriptors(&self) -> &'static [ToolDescriptor] {
-            self.descriptors
+    #[derive(Debug, Clone)]
+    struct ObservedCall {
+        call_id: u32,
+        name: String,
+        arguments: Value,
+    }
+
+    #[async_trait]
+    impl ToolBackend for StubBackend {
+        async fn list_tools(&self) -> Vec<WireToolDescriptor> {
+            self.tools.clone()
         }
 
-        fn dispatch(
+        async fn dispatch(
             &self,
-            call: IncomingCall,
-        ) -> BoxFuture<'_, std::result::Result<Value, ToolError>> {
+            call: ToolBackendCall,
+        ) -> std::result::Result<Value, ToolErrorWire> {
+            let cancel = call.cancel.clone();
             let canned = self.canned.clone();
-            let await_cancel = self.await_cancel;
-            let seen = self.seen.clone();
-            Box::pin(async move {
-                seen.lock().unwrap().push(DispatchObservation {
-                    descriptor_name: call.descriptor_name,
-                    call_id: call.call_id,
-                    origin_variant: call.origin.variant_name(),
-                    origin_arc: Arc::clone(&call.origin),
-                });
-                let _ = call.arguments;
-                if await_cancel {
-                    call.cancel.cancelled().await;
-                    return Err(ToolError::Cancelled);
-                }
-                Ok(canned)
-            })
+            self.seen.lock().unwrap().push(call);
+            if self.await_cancel {
+                cancel.cancelled().await;
+                return Err(ToolErrorWire::Cancelled);
+            }
+            Ok(canned)
         }
     }
 
-    fn registry_with_youtube_context() -> Arc<ContextRegistry> {
-        let registry = ContextRegistry::new();
-        registry.activate(ActiveContext {
-            key: "youtube::watch_page".into(),
-            activated_at: Utc::now(),
-            data: json!({"video_id": "abc123"}),
-            origin: Arc::new(Origin::Browser(BrowserOrigin {
-                process_id: 4242,
-                tab_id: 19,
-                window_id: Some("win-0".into()),
-                page_url: "https://www.youtube.com/watch?v=abc123".into(),
-            })),
-        });
-        Arc::new(registry)
-    }
-
-    fn empty_registry() -> Arc<ContextRegistry> {
-        Arc::new(ContextRegistry::new())
-    }
-
-    fn catalog_with(dispatcher: Arc<dyn Dispatcher>) -> Arc<Catalog> {
-        let catalog = Catalog::new();
-        catalog.register(dispatcher);
-        Arc::new(catalog)
-    }
-
-    /// Build a `(sink, captured)` pair where `sink` is the
-    /// `ChatEventSink` closure handed to `run_turn` and `captured`
-    /// gives the test read access to the frames it received.
     fn collecting_sink() -> (impl ChatEventSink, Arc<StdMutex<Vec<ChatServerMessage>>>) {
         let captured = Arc::new(StdMutex::new(Vec::<ChatServerMessage>::new()));
         let sink_buf = captured.clone();
@@ -517,15 +363,6 @@ mod tests {
         (sink, captured)
     }
 
-    /// Synthesize a `WireToolDescriptor` for `TIMESTAMP_TOOL` so tests
-    /// can craft `ToolRequest` frames without parsing the actual
-    /// `CapabilityUpdate` the bridge emits.
-    fn timestamp_wire_descriptor() -> WireToolDescriptor {
-        youtube_descriptor()[0].to_wire()
-    }
-
-    /// Receive on `client_to_server` with a small per-message
-    /// timeout — keeps tests responsive on assertion failures.
     async fn next_outbound(harness: &mut ChatSocketHarness) -> ChatClientMessage {
         timeout(Duration::from_secs(2), harness.client_to_server.recv())
             .await
@@ -551,31 +388,33 @@ mod tests {
         }
     }
 
+    fn send_opening() -> TurnOpening {
+        TurnOpening::Send(ChatSendRequest {
+            content_blocks: Vec::new(),
+            parent_message_id: None,
+            asset_chips_json: None,
+            activity_id: None,
+        })
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn capability_update_precedes_opening_frame() {
-        let stub = StubDispatcher::new(json!({"ok": true}));
-        let bridge = ChatBridge::new(registry_with_youtube_context(), catalog_with(stub.clone()));
+        let backend = StubBackend::new(json!({"ok": true}), vec![sample_descriptor(TIMESTAMP_TOOL)]);
+        let bridge = ChatBridge::new(backend.clone());
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
-        let opening = TurnOpening::Send(ChatSendRequest {
-            content_blocks: Vec::new(),
-            parent_message_id: None,
-            asset_chips_json: None,
-            activity_id: None,
+        let run = tokio::spawn(async move {
+            bridge.run_turn(socket, send_opening(), cancel, &sink).await
         });
-
-        let run =
-            tokio::spawn(async move { bridge.run_turn(socket, opening, cancel, &sink).await });
 
         match next_outbound(&mut harness).await {
             ChatClientMessage::CapabilityUpdate(payload) => {
                 assert_eq!(payload.tools.len(), 1);
                 assert_eq!(payload.tools[0].definition.name, TIMESTAMP_TOOL);
-                assert_eq!(payload.contexts.len(), 1);
-                assert_eq!(payload.contexts[0].key, "youtube::watch_page");
+                assert!(payload.contexts.is_empty());
             }
             other => panic!("expected CapabilityUpdate, got {other:?}"),
         }
@@ -594,28 +433,16 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn empty_registry_advertises_no_tools() {
-        let stub = StubDispatcher::new(json!({}));
-        let bridge = ChatBridge::new(empty_registry(), catalog_with(stub.clone()));
+    async fn empty_backend_advertises_no_tools() {
+        let backend = StubBackend::new(json!({}), Vec::new());
+        let bridge = ChatBridge::new(backend);
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
         let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
+            bridge.run_turn(socket, send_opening(), cancel, &sink).await
         });
 
         match next_outbound(&mut harness).await {
@@ -625,7 +452,6 @@ mod tests {
             }
             other => panic!("expected CapabilityUpdate, got {other:?}"),
         }
-        // Drain the Send frame so the harness's recv doesn't lag.
         assert!(matches!(
             next_outbound(&mut harness).await,
             ChatClientMessage::Send(_)
@@ -641,33 +467,19 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn tool_request_dispatches_through_catalog() {
-        let stub = StubDispatcher::new(json!({
-            "video_id": "abc123",
-            "timestamp_seconds": 42.0,
-            "duration_seconds": 100.0,
-            "playing": true,
-        }));
-        let bridge = ChatBridge::new(registry_with_youtube_context(), catalog_with(stub.clone()));
+    async fn tool_request_dispatches_through_backend() {
+        let backend = StubBackend::new(
+            json!({"timestamp_seconds": 42.0}),
+            vec![sample_descriptor(TIMESTAMP_TOOL)],
+        );
+        let bridge = ChatBridge::new(backend.clone());
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
         let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
+            bridge.run_turn(socket, send_opening(), cancel, &sink).await
         });
 
         // CapabilityUpdate + Send.
@@ -678,8 +490,8 @@ mod tests {
             .server_to_client
             .send(Ok(ChatServerMessage::ToolRequest {
                 call_id: 7,
-                descriptor: timestamp_wire_descriptor(),
-                arguments: json!({}),
+                descriptor: sample_descriptor(TIMESTAMP_TOOL),
+                arguments: json!({"k": "v"}),
             }))
             .unwrap();
 
@@ -696,237 +508,15 @@ mod tests {
             .expect("tool response present");
         assert_eq!(response.0, 7);
         match response.1 {
-            Ok(value) => assert_eq!(value["video_id"], json!("abc123")),
+            Ok(value) => assert_eq!(value["timestamp_seconds"], json!(42.0)),
             Err(err) => panic!("expected Ok ToolResponse, got {err:?}"),
         }
 
-        let observations = stub.seen();
+        let observations = backend.seen();
         assert_eq!(observations.len(), 1);
-        assert_eq!(observations[0].descriptor_name, TIMESTAMP_TOOL);
+        assert_eq!(observations[0].name, TIMESTAMP_TOOL);
         assert_eq!(observations[0].call_id, 7);
-        assert_eq!(observations[0].origin_variant, "Browser");
-
-        harness
-            .server_to_client
-            .send(Ok(ChatServerMessage::Final {
-                messages: Vec::new(),
-            }))
-            .unwrap();
-        run.await.unwrap().expect("turn completes");
-    }
-
-    /// The per-turn `TurnState.targets` is built once and hands the
-    /// same `Arc<Origin>` to every `IncomingCall` for that turn — no
-    /// deep clones per tool call. Pin pointer-identity across two
-    /// sequential dispatches.
-    #[tokio::test(flavor = "current_thread")]
-    async fn dispatches_in_a_turn_share_the_same_origin_arc() {
-        let stub = StubDispatcher::new(json!({"ok": true}));
-        let bridge = ChatBridge::new(registry_with_youtube_context(), catalog_with(stub.clone()));
-
-        let (socket, mut harness) = ChatSocket::test_pair();
-        let (sink, _captured) = collecting_sink();
-        let cancel = CancellationToken::new();
-
-        let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
-        });
-
-        // CapabilityUpdate + Send.
-        let _ = next_outbound(&mut harness).await;
-        let _ = next_outbound(&mut harness).await;
-
-        for call_id in [10u32, 11] {
-            harness
-                .server_to_client
-                .send(Ok(ChatServerMessage::ToolRequest {
-                    call_id,
-                    descriptor: timestamp_wire_descriptor(),
-                    arguments: json!({}),
-                }))
-                .unwrap();
-            // Drain until the matching ToolResponse arrives.
-            let _ = drain_until(&mut harness, |f| {
-                matches!(f, ChatClientMessage::ToolResponse { .. })
-            })
-            .await;
-        }
-
-        let observations = stub.seen();
-        assert_eq!(observations.len(), 2);
-        assert!(
-            Arc::ptr_eq(&observations[0].origin_arc, &observations[1].origin_arc),
-            "every dispatch in a turn must share the same Arc<Origin>",
-        );
-
-        harness
-            .server_to_client
-            .send(Ok(ChatServerMessage::Final {
-                messages: Vec::new(),
-            }))
-            .unwrap();
-        run.await.unwrap().expect("turn completes");
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn tool_request_for_unadvertised_tool_returns_context_unavailable() {
-        // Empty registry → no tools advertised, but the catalog still
-        // has a youtube dispatcher. The bridge should refuse the
-        // request without ever invoking the dispatcher.
-        let stub = StubDispatcher::new(json!({}));
-        let bridge = ChatBridge::new(empty_registry(), catalog_with(stub.clone()));
-
-        let (socket, mut harness) = ChatSocket::test_pair();
-        let (sink, _captured) = collecting_sink();
-        let cancel = CancellationToken::new();
-
-        let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
-        });
-
-        let _ = next_outbound(&mut harness).await;
-        let _ = next_outbound(&mut harness).await;
-
-        harness
-            .server_to_client
-            .send(Ok(ChatServerMessage::ToolRequest {
-                call_id: 9,
-                descriptor: timestamp_wire_descriptor(),
-                arguments: json!({}),
-            }))
-            .unwrap();
-
-        match next_outbound(&mut harness).await {
-            ChatClientMessage::ToolResponse {
-                call_id,
-                result: Err(ToolErrorWire::ContextUnavailable { tool, .. }),
-            } => {
-                assert_eq!(call_id, 9);
-                assert_eq!(tool, TIMESTAMP_TOOL);
-            }
-            other => panic!("expected ContextUnavailable, got {other:?}"),
-        }
-        assert!(
-            stub.seen().is_empty(),
-            "dispatcher must not have been invoked"
-        );
-
-        harness
-            .server_to_client
-            .send(Ok(ChatServerMessage::Final {
-                messages: Vec::new(),
-            }))
-            .unwrap();
-        run.await.unwrap().expect("turn completes");
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn tool_request_with_no_resolvable_origin_returns_context_unavailable() {
-        // Custom descriptor with NO required contexts so the bridge
-        // exercises the "no resolvable origin" branch — the dispatcher
-        // is advertised but the snapshot supplies no route.
-        const NO_CTX_TOOL: &str = "browser::test::no_context";
-        const DESCRIPTORS: &[ToolDescriptor] = &[ToolDescriptor {
-            name: NO_CTX_TOOL,
-            description: "No context required.",
-            input_schema: schema_of::<Empty>,
-            output_schema: schema_of::<Empty>,
-            timeout: Duration::from_millis(100),
-            source: ToolSource::ClientLocal,
-            required_contexts: &[],
-            requires_user_approval: false,
-        }];
-
-        struct ContextlessDispatcher;
-        impl Dispatcher for ContextlessDispatcher {
-            fn descriptors(&self) -> &'static [ToolDescriptor] {
-                DESCRIPTORS
-            }
-            fn dispatch(
-                &self,
-                _call: IncomingCall,
-            ) -> BoxFuture<'_, std::result::Result<Value, ToolError>> {
-                Box::pin(async { Ok(json!({})) })
-            }
-        }
-
-        let bridge = ChatBridge::new(
-            empty_registry(),
-            catalog_with(Arc::new(ContextlessDispatcher)),
-        );
-
-        let (socket, mut harness) = ChatSocket::test_pair();
-        let (sink, _captured) = collecting_sink();
-        let cancel = CancellationToken::new();
-
-        let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
-        });
-
-        // CapabilityUpdate is the first frame — confirm the tool is advertised.
-        match next_outbound(&mut harness).await {
-            ChatClientMessage::CapabilityUpdate(payload) => {
-                assert_eq!(payload.tools.len(), 1);
-            }
-            other => panic!("expected CapabilityUpdate, got {other:?}"),
-        }
-        let _ = next_outbound(&mut harness).await;
-
-        harness
-            .server_to_client
-            .send(Ok(ChatServerMessage::ToolRequest {
-                call_id: 11,
-                descriptor: DESCRIPTORS[0].to_wire(),
-                arguments: json!({}),
-            }))
-            .unwrap();
-
-        match next_outbound(&mut harness).await {
-            ChatClientMessage::ToolResponse {
-                call_id,
-                result: Err(ToolErrorWire::ContextUnavailable { tool, .. }),
-            } => {
-                assert_eq!(call_id, 11);
-                assert_eq!(tool, NO_CTX_TOOL);
-            }
-            other => panic!("expected ContextUnavailable, got {other:?}"),
-        }
+        assert_eq!(observations[0].arguments, json!({"k": "v"}));
 
         harness
             .server_to_client
@@ -939,27 +529,15 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn server_tool_cancel_cancels_the_matching_call() {
-        let stub = StubDispatcher::await_cancel(json!({}));
-        let bridge = ChatBridge::new(registry_with_youtube_context(), catalog_with(stub.clone()));
+        let backend = StubBackend::await_cancel(vec![sample_descriptor(TIMESTAMP_TOOL)]);
+        let bridge = ChatBridge::new(backend);
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
         let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
+            bridge.run_turn(socket, send_opening(), cancel, &sink).await
         });
 
         let _ = next_outbound(&mut harness).await;
@@ -969,12 +547,10 @@ mod tests {
             .server_to_client
             .send(Ok(ChatServerMessage::ToolRequest {
                 call_id: 13,
-                descriptor: timestamp_wire_descriptor(),
+                descriptor: sample_descriptor(TIMESTAMP_TOOL),
                 arguments: json!({}),
             }))
             .unwrap();
-
-        // Give the dispatch task a moment to reach `.cancelled().await`.
         tokio::task::yield_now().await;
 
         harness
@@ -1001,8 +577,8 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn ui_cancel_emits_cancel_frame_and_cancels_dispatches() {
-        let stub = StubDispatcher::await_cancel(json!({}));
-        let bridge = ChatBridge::new(registry_with_youtube_context(), catalog_with(stub.clone()));
+        let backend = StubBackend::await_cancel(vec![sample_descriptor(TIMESTAMP_TOOL)]);
+        let bridge = ChatBridge::new(backend);
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, _captured) = collecting_sink();
@@ -1011,17 +587,7 @@ mod tests {
 
         let run = tokio::spawn(async move {
             bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel_clone,
-                    &sink,
-                )
+                .run_turn(socket, send_opening(), cancel_clone, &sink)
                 .await
         });
 
@@ -1032,7 +598,7 @@ mod tests {
             .server_to_client
             .send(Ok(ChatServerMessage::ToolRequest {
                 call_id: 17,
-                descriptor: timestamp_wire_descriptor(),
+                descriptor: sample_descriptor(TIMESTAMP_TOOL),
                 arguments: json!({}),
             }))
             .unwrap();
@@ -1057,7 +623,6 @@ mod tests {
             other => panic!("expected Cancelled ToolResponse, got {other:?}"),
         }
 
-        // Server eventually emits Final once it sees the Cancel frame.
         harness
             .server_to_client
             .send(Ok(ChatServerMessage::Final {
@@ -1069,8 +634,8 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn error_frame_terminates_turn_through_sink() {
-        let stub = StubDispatcher::new(json!({}));
-        let bridge = ChatBridge::new(empty_registry(), catalog_with(stub.clone()));
+        let backend = StubBackend::new(json!({}), Vec::new());
+        let bridge = ChatBridge::new(backend);
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink_tx, mut sink_rx) = mpsc::unbounded_channel::<ChatServerMessage>();
@@ -1082,19 +647,7 @@ mod tests {
         let cancel = CancellationToken::new();
 
         let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
+            bridge.run_turn(socket, send_opening(), cancel, &sink).await
         });
 
         let _ = next_outbound(&mut harness).await;
@@ -1121,34 +674,17 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn unexpected_socket_close_is_an_error() {
-        let stub = StubDispatcher::new(json!({}));
-        let bridge = ChatBridge::new(empty_registry(), catalog_with(stub.clone()));
+        let backend = StubBackend::new(json!({}), Vec::new());
+        let bridge = ChatBridge::new(backend);
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, _captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
         let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
+            bridge.run_turn(socket, send_opening(), cancel, &sink).await
         });
 
-        // Drain CapabilityUpdate + Send so the bridge has progressed
-        // into its inbound loop before we sever the socket; otherwise
-        // the bridge would error on the very first outbound `try_send`
-        // and the test wouldn't exercise the "inbound closed
-        // mid-stream" path it's meant to.
         let _ = next_outbound(&mut harness).await;
         let _ = next_outbound(&mut harness).await;
         drop(harness);
@@ -1168,27 +704,15 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn tool_request_is_not_forwarded_to_ui_sink() {
-        let stub = StubDispatcher::new(json!({}));
-        let bridge = ChatBridge::new(registry_with_youtube_context(), catalog_with(stub.clone()));
+        let backend = StubBackend::new(json!({}), vec![sample_descriptor(TIMESTAMP_TOOL)]);
+        let bridge = ChatBridge::new(backend);
 
         let (socket, mut harness) = ChatSocket::test_pair();
         let (sink, captured) = collecting_sink();
         let cancel = CancellationToken::new();
 
         let run = tokio::spawn(async move {
-            bridge
-                .run_turn(
-                    socket,
-                    TurnOpening::Send(ChatSendRequest {
-                        content_blocks: Vec::new(),
-                        parent_message_id: None,
-                        asset_chips_json: None,
-                        activity_id: None,
-                    }),
-                    cancel,
-                    &sink,
-                )
-                .await
+            bridge.run_turn(socket, send_opening(), cancel, &sink).await
         });
 
         let _ = next_outbound(&mut harness).await;
@@ -1198,12 +722,10 @@ mod tests {
             .server_to_client
             .send(Ok(ChatServerMessage::ToolRequest {
                 call_id: 21,
-                descriptor: timestamp_wire_descriptor(),
+                descriptor: sample_descriptor(TIMESTAMP_TOOL),
                 arguments: json!({}),
             }))
             .unwrap();
-        // Wait for the matching ToolResponse to be flushed so the
-        // dispatch path is exercised end-to-end.
         let _ = drain_until(&mut harness, |f| {
             matches!(f, ChatClientMessage::ToolResponse { .. })
         })

@@ -747,7 +747,7 @@ fn spawn_agent_loop(state: Arc<AppState>, prepared: LlmContext, ctx: SpawnContex
 mod tests {
     use super::*;
 
-    use eurora_tools::{RemoteToolBus, ToolError};
+    use crate::remote_tool_bus::RemoteToolBus;
     use serde_json::json;
     use thread_core::{
         CapabilityUpdatePayload, ChatSendRequest, RegenerateRequest, ToolErrorWire,
@@ -1134,7 +1134,7 @@ mod tests {
         assert!(!cancel.is_cancelled());
 
         let outcome = pending.await.expect("task didn't panic");
-        assert!(matches!(outcome, Err(ToolError::Timeout)), "{outcome:?}");
+        assert!(matches!(outcome, Err(ToolErrorWire::Timeout)), "{outcome:?}");
     }
 
     #[tokio::test]

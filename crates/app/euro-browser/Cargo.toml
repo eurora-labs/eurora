@@ -10,8 +10,6 @@ backon = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-process = { workspace = true }
 euro-transport-policy = { workspace = true }
-eurora-tools-web = { workspace = true, features = ["specta"] }
-eurora-tools-youtube = { workspace = true, features = ["specta"] }
 futures-util = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

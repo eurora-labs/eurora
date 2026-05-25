@@ -3,7 +3,9 @@ use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
 use focus_tracker::FocusedWindow;
+use serde_json::Value;
 use std::sync::Arc;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -130,7 +132,21 @@ pub trait ActivityStrategyFunctionality {
 
     async fn stop_tracking(&mut self) -> ActivityResult<()>;
 
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
+    /// Strategy-side metadata about the currently focused target. Lock-
+    /// free reads only — chat-driven calls share a read guard on the
+    /// active strategy with focus events, so this must not require
+    /// `&mut self`.
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata>;
+
+    /// Tools the LLM should see while this strategy is active. The chat
+    /// bridge snapshots this once per turn and forwards every inbound
+    /// `ToolRequest` back through [`Self::dispatch_tool`].
+    async fn get_context(&self) -> ActivityResult<Vec<WireToolDescriptor>>;
+
+    /// Execute one inbound tool call. The default behaviour for
+    /// strategies that surface no tools is to surface `ContextUnavailable`
+    /// so the LLM treats the call as routed to a stale capability.
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire>;
 }
 
 #[async_trait]

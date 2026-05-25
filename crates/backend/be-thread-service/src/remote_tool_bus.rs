@@ -16,12 +16,28 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use eurora_tools::{RemoteToolBus, ToolError, ToolErrorWire};
+use async_trait::async_trait;
 use request_correlator::{RequestCorrelator, WaitError};
 use serde_json::Value;
-use thread_core::{ChatServerMessage, WireToolDescriptor};
+use thread_core::{ChatServerMessage, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+
+/// Server-side bus used by the agent loop to dispatch a tool whose
+/// `ToolSource` doesn't run in-process.
+///
+/// Returns [`ToolErrorWire`] directly — the wire shape is sufficient for
+/// the loop's tool-message rendering and for the chat-handler tests, and
+/// removing the in-process `eurora_tools::ToolError` shadow drops a whole
+/// crate boundary that used to exist purely for source-preservation.
+#[async_trait]
+pub trait RemoteToolBus: Send + Sync {
+    async fn call(
+        &self,
+        descriptor: &WireToolDescriptor,
+        arguments: Value,
+    ) -> Result<Value, ToolErrorWire>;
+}
 
 /// Per-turn remote-tool dispatcher backed by the chat WebSocket.
 ///
@@ -31,7 +47,7 @@ use tokio_util::sync::CancellationToken;
 /// `ToolResponse` frame arrives.
 pub struct ChatRemoteBus {
     outbound: mpsc::Sender<ChatServerMessage>,
-    correlator: RequestCorrelator<u32, Value, ToolError>,
+    correlator: RequestCorrelator<u32, Value, ToolErrorWire>,
     next_call_id: AtomicU32,
     chat_cancel: CancellationToken,
 }
@@ -57,26 +73,27 @@ impl ChatRemoteBus {
     /// `ChatClientMessage::ToolResponse`. A no-op when no call is pending
     /// under `call_id` (e.g. the call already timed out or was cancelled).
     pub fn resolve(&self, call_id: u32, result: Result<Value, ToolErrorWire>) {
-        self.correlator
-            .resolve(call_id, result.map_err(ToolError::from));
+        self.correlator.resolve(call_id, result);
     }
 
     /// Drop every pending call, waking each waiter with
-    /// [`ToolError::Transport`]. Call when the turn ends so no agent-loop
-    /// task is left awaiting a oneshot that will never resolve.
+    /// [`ToolErrorWire::Transport`]. Call when the turn ends so no
+    /// agent-loop task is left awaiting a oneshot that will never
+    /// resolve.
     pub fn shutdown(&self) {
-        self.correlator.shutdown_with(|_| ToolError::Transport {
+        self.correlator.shutdown_with(|_| ToolErrorWire::Transport {
             message: "turn ended before tool response arrived".into(),
         });
     }
 }
 
+#[async_trait]
 impl RemoteToolBus for ChatRemoteBus {
     async fn call(
         &self,
         descriptor: &WireToolDescriptor,
         arguments: Value,
-    ) -> Result<Value, ToolError> {
+    ) -> Result<Value, ToolErrorWire> {
         let call_id = self.next_call_id.fetch_add(1, Ordering::Relaxed);
         let guard = self.correlator.register(call_id);
 
@@ -86,7 +103,7 @@ impl RemoteToolBus for ChatRemoteBus {
             arguments,
         };
         if self.outbound.send(request).await.is_err() {
-            return Err(ToolError::Transport {
+            return Err(ToolErrorWire::Transport {
                 message: "chat outbound channel closed before ToolRequest sent".into(),
             });
         }
@@ -96,13 +113,13 @@ impl RemoteToolBus for ChatRemoteBus {
             Ok(result) => result,
             Err(WaitError::Cancelled) => {
                 self.send_cancel(call_id).await;
-                Err(ToolError::Cancelled)
+                Err(ToolErrorWire::Cancelled)
             }
             Err(WaitError::Timeout) => {
                 self.send_cancel(call_id).await;
-                Err(ToolError::Timeout)
+                Err(ToolErrorWire::Timeout)
             }
-            Err(WaitError::SenderDropped) => Err(ToolError::Transport {
+            Err(WaitError::SenderDropped) => Err(ToolErrorWire::Transport {
                 message: "tool response channel dropped before result arrived".into(),
             }),
         }
@@ -136,9 +153,6 @@ mod tests {
         crate::test_support::bridge_descriptor("browser::test::echo", timeout_ms)
     }
 
-    /// Await a `ToolRequest` frame on the outbound channel and extract its
-    /// `call_id`. Panics if anything else is observed; the bus must emit
-    /// exactly that frame in response to a `call`.
     async fn expect_tool_request(rx: &mut mpsc::Receiver<ChatServerMessage>) -> u32 {
         match rx.recv().await {
             Some(ChatServerMessage::ToolRequest { call_id, .. }) => call_id,
@@ -189,7 +203,7 @@ mod tests {
         assert_eq!(cancel_id, call_id);
 
         let err = handle.await.expect("task didn't panic").unwrap_err();
-        assert!(matches!(err, ToolError::Timeout), "got {err:?}");
+        assert!(matches!(err, ToolErrorWire::Timeout), "got {err:?}");
     }
 
     #[tokio::test]
@@ -208,7 +222,7 @@ mod tests {
         assert_eq!(cancel_id, call_id);
 
         let err = handle.await.expect("task didn't panic").unwrap_err();
-        assert!(matches!(err, ToolError::Cancelled), "got {err:?}");
+        assert!(matches!(err, ToolErrorWire::Cancelled), "got {err:?}");
     }
 
     #[tokio::test(start_paused = true)]
@@ -225,11 +239,9 @@ mod tests {
         tokio::time::advance(TokioDuration::from_millis(100)).await;
         expect_tool_cancel(&mut rx).await;
 
-        // Now the call has resolved as Timeout. A late resolve must be a
-        // no-op — no panic, no extra frames, no value pushed anywhere.
         bus.resolve(call_id, Ok(json!({"late": true})));
         let err = handle.await.expect("task didn't panic").unwrap_err();
-        assert!(matches!(err, ToolError::Timeout));
+        assert!(matches!(err, ToolErrorWire::Timeout));
         assert!(rx.try_recv().is_err(), "no further outbound frames");
     }
 
@@ -243,7 +255,7 @@ mod tests {
         let descriptor = sample_descriptor(5_000);
         let err = bus.call(&descriptor, json!({})).await.unwrap_err();
         match err {
-            ToolError::Transport { message: msg } => {
+            ToolErrorWire::Transport { message: msg } => {
                 assert!(msg.contains("chat outbound channel closed"), "{msg}");
             }
             other => panic!("expected Transport, got {other:?}"),
@@ -264,7 +276,7 @@ mod tests {
         bus.shutdown();
         let err = handle.await.expect("task didn't panic").unwrap_err();
         match err {
-            ToolError::Transport { message: msg } => assert!(msg.contains("turn ended"), "{msg}"),
+            ToolErrorWire::Transport { message: msg } => assert!(msg.contains("turn ended"), "{msg}"),
             other => panic!("expected Transport, got {other:?}"),
         }
     }

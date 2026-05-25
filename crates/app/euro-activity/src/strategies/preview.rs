@@ -31,6 +31,8 @@ use async_trait::async_trait;
 use euro_pdf::{PreviewableKind, classify_path};
 use focus_tracker::{FocusTrackerError, FocusedWindow};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -296,7 +298,7 @@ impl ActivityStrategyFunctionality for PreviewStrategy {
         Ok(())
     }
 
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata> {
         let path = match self.current_pdf_path()? {
             Some(p) => {
                 self.store_path(Some(p.clone()));
@@ -315,6 +317,17 @@ impl ActivityStrategyFunctionality for PreviewStrategy {
             url: None,
             title,
             icon: None,
+        })
+    }
+
+    async fn get_context(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+        Ok(vec![])
+    }
+
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {
+        Err(ToolErrorWire::ContextUnavailable {
+            tool: call.name,
+            reason: "no tools available for this strategy".to_string(),
         })
     }
 }

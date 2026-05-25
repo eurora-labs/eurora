@@ -104,38 +104,18 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 			}
 			return await onActionMetadata(frame);
 
-		case 'YOUTUBE_GET_CURRENT_TIMESTAMP':
-			return await forwardTabRpc(frame, 'GET_CURRENT_TIMESTAMP');
+		// Tool plumbing is pure forwarding. The desktop decides which
+		// `tab_id` to address; the per-site content-script watcher owns
+		// the tool list and dispatch. Background sees zero tool names,
+		// zero schemas, zero per-site logic.
+		case 'LIST_TOOLS':
+			return await forwardTabRpc(frame, 'LIST_TOOLS');
 
-		case 'YOUTUBE_GET_TRANSCRIPT':
-			return await forwardTabRpc(frame, 'GET_TRANSCRIPT');
+		case 'INVOKE_TOOL':
+			return await forwardTabRpc(frame, 'INVOKE_TOOL');
 
-		case 'YOUTUBE_GET_CURRENT_FRAME':
-			return await forwardTabRpc(frame, 'GET_CURRENT_FRAME');
-
-		case 'WEB_GET_PAGE_METADATA':
-			return await forwardTabRpc(frame, 'GET_PAGE_METADATA');
-
-		case 'WEB_GET_ACCESSIBILITY_TREE':
-			return await forwardTabRpc(frame, 'GET_ACCESSIBILITY_TREE');
-
-		case 'WEB_GET_READABILITY_ARTICLE':
-			return await forwardTabRpc(frame, 'GET_READABILITY_ARTICLE');
-
-		case 'WEB_GET_SELECTED_TEXT':
-			return await forwardTabRpc(frame, 'GET_SELECTED_TEXT');
-
-		case 'WEB_QUERY_SELECTOR':
-			return await forwardTabRpc(frame, 'QUERY_SELECTOR');
-
-		case 'WEB_LIST_LINKS':
-			return await forwardTabRpc(frame, 'LIST_LINKS');
-
-		case 'WEB_LIST_FORM_INPUTS':
-			return await forwardTabRpc(frame, 'LIST_FORM_INPUTS');
-
-		case 'WEB_INSERT_TEXT':
-			return await forwardTabRpc(frame, 'INSERT_TEXT');
+		case 'CANCEL_TOOL':
+			return await forwardTabRpc(frame, 'CANCEL_TOOL');
 
 		default:
 			return errorFrame(frame, 400, `Unknown action: ${frame.action}`);
@@ -144,6 +124,14 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 
 async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+	if (!activeTab || activeTab.id === undefined) {
+		// `NativeMetadata.tab_id` is required by the bridge contract —
+		// without an active tab id there is nothing useful to report.
+		// Return an error frame rather than emit a malformed metadata
+		// payload that the desktop side would have to validate.
+		return errorFrame(frame, 410, 'No active tab found');
+	}
+
 	const iconBase64 = await resolveFaviconBase64(activeTab);
 
 	const response: ResponseFrame = {
@@ -152,9 +140,10 @@ async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 		payload: {
 			kind: 'NativeMetadata',
 			data: {
-				url: activeTab?.url,
+				tab_id: activeTab.id,
+				url: activeTab.url ?? null,
 				icon_base64: iconBase64,
-				title: activeTab?.title ?? null,
+				title: activeTab.title ?? null,
 			},
 		} as Payload,
 	};
