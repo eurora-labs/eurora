@@ -150,6 +150,12 @@ pub struct RegenerateRequest {
 /// semantics) and replace placeholder state with the `Final.messages` payload
 /// when the turn ends. The tool-routing pair `ToolRequest` + `ToolCancel`
 /// drives remote-tool RPC over the same socket.
+///
+/// `TitleUpdated` is non-terminal: the server emits it once per turn (right
+/// before the terminal frame, or right before the socket closes on cancel)
+/// when the thread's auto-generated title changes. Clients should mutate
+/// their thread state in place rather than expecting it bundled with
+/// `Final` — cancelled turns also carry a title but emit no `Final`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -158,6 +164,10 @@ pub enum ChatServerMessage {
     ConfirmedHumanMessage { message: MessageNode },
     /// One streaming chunk from the AI.
     Chunk { chunk: AIMessageChunk },
+    /// The thread's auto-generated title was updated this turn. Non-terminal;
+    /// clients update the thread row in place. Emitted at most once per turn,
+    /// always before any terminal frame.
+    TitleUpdated { title: String },
     /// The turn ended successfully; tree positions for everything that was
     /// persisted during this turn (human + AI + any tool messages).
     Final { messages: Vec<MessageNode> },
@@ -263,6 +273,9 @@ mod tests {
             ChatServerMessage::Chunk {
                 chunk: sample_ai_chunk(),
             },
+            ChatServerMessage::TitleUpdated {
+                title: "Deploy Rust service to Fly.io".into(),
+            },
             ChatServerMessage::Final { messages: vec![] },
             ChatServerMessage::Error {
                 kind: "internal".into(),
@@ -274,6 +287,21 @@ mod tests {
             let back: ChatServerMessage = serde_json::from_str(&s).unwrap();
             assert_eq!(case, back);
         }
+    }
+
+    /// Lock the wire shape of `TitleUpdated`. Clients key off the snake-case
+    /// `type` tag and a single `title` string; any rename here is an explicit
+    /// protocol break.
+    #[test]
+    fn title_updated_golden_json() {
+        let m = ChatServerMessage::TitleUpdated {
+            title: "Deploy Rust service to Fly.io".into(),
+        };
+        let s = serde_json::to_string(&m).unwrap();
+        assert_eq!(
+            s,
+            r#"{"type":"title_updated","title":"Deploy Rust service to Fly.io"}"#
+        );
     }
 
     // ------------------------------------------------------------------
