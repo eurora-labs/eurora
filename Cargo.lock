@@ -3884,6 +3884,7 @@ name = "euro-activity"
 version = "0.0.0"
 dependencies = [
  "activity-core",
+ "agent-chain-core",
  "anyhow",
  "async-trait",
  "base64 0.22.1",

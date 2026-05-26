@@ -5,6 +5,7 @@
 //! The desktop wires it to an activity-strategy wrapper; tests stub it
 //! directly.
 
+use agent_chain_core::messages::ContentBlock;
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
@@ -35,6 +36,21 @@ pub trait ToolBackend: Send + Sync {
     /// Called once at turn start; the bridge advertises the result via
     /// `CapabilityUpdate`.
     async fn list_tools(&self) -> Vec<WireToolDescriptor>;
+
+    /// Snapshot of the system-role prelude the backend wants the LLM to
+    /// see for the upcoming turn — typically a short natural-language
+    /// summary of what the user is currently doing (e.g.
+    /// `"The user is watching a video titled X"`). The bridge ships the
+    /// result inside the same `CapabilityUpdate` frame as
+    /// [`Self::list_tools`].
+    ///
+    /// Best-effort: an empty `Vec` simply means "no prelude this turn"
+    /// and is the right answer for backends that have nothing useful to
+    /// contribute (test stubs, the mobile shell). The default impl
+    /// returns `Vec::new()` so existing backends compile unchanged.
+    async fn collect_system_blocks(&self) -> Vec<ContentBlock> {
+        Vec::new()
+    }
 
     /// Execute one tool call and return the structured result. Errors
     /// land in the `ToolResponse` frame's `Err` arm verbatim.

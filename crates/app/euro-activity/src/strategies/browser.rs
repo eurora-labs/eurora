@@ -1,3 +1,4 @@
+use agent_chain_core::messages::{ContentBlock, ContentBlocks};
 use async_trait::async_trait;
 use euro_bridge::{BridgeError, Payload};
 pub use euro_bridge::{BridgeService, EventFrame, Frame, FrameKind, RequestFrame, ResponseFrame};
@@ -31,11 +32,17 @@ const ACTION_INVOKE_TOOL: &str = "INVOKE_TOOL";
 const ACTION_CANCEL_TOOL: &str = "CANCEL_TOOL";
 
 /// Bridge action used to fetch fresh tab metadata (URL, title, icon,
-/// `tab_id`) from the extension. Reused by `get_context` /
-/// `dispatch_tool` to pull the active `tab_id` at call time rather
+/// `tab_id`) from the extension. Reused by `get_tools`, `get_context`,
+/// and `dispatch_tool` to pull the active `tab_id` at call time rather
 /// than maintaining a desktop-side cache that could drift from the
 /// browser's true focus.
 const ACTION_GET_METADATA: &str = "GET_METADATA";
+
+/// Bridge action that asks the active tab's content script for a
+/// short natural-language summary of what the user is doing right now.
+/// The per-site watcher generates the wording; the desktop wraps it in
+/// a [`ContentBlock`] and surfaces it through the chat-context puller.
+const ACTION_GET_CONTEXT: &str = "GET_CONTEXT";
 
 /// Wire payload returned by the extension for [`ACTION_LIST_TOOLS`]. The
 /// shape stays in sync with `apps/browser/src/shared/background/native-messenger.ts`.
@@ -43,6 +50,19 @@ const ACTION_GET_METADATA: &str = "GET_METADATA";
 struct ListToolsPayload {
     #[serde(default)]
     tools: Vec<WireToolDescriptor>,
+}
+
+/// Wire payload returned by the extension for [`ACTION_GET_CONTEXT`].
+///
+/// Each entry is a fully-formed [`ContentBlock`] (matching
+/// `agent-chain-core`'s wire shape, e.g. `{ "type": "text-plain", ... }`),
+/// so per-site watchers can emit richer payloads later — multiple blocks,
+/// embedded image references, structured metadata — without another
+/// bridge-protocol change.
+#[derive(Debug, Deserialize)]
+struct GetContextPayload {
+    #[serde(default)]
+    blocks: Vec<ContentBlock>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Default)]
@@ -189,8 +209,8 @@ impl BrowserStrategy {
 
     /// Round-trip `GET_METADATA` to the active browser messenger and
     /// return the raw `NativeMetadata`. Centralised so `get_metadata`,
-    /// `get_context`, and `dispatch_tool` all share the same probe —
-    /// `tab_id` resolution is one place, not three.
+    /// `get_tools`, `get_context`, and `dispatch_tool` all share the
+    /// same probe — `tab_id` resolution is one place, not four.
     async fn fetch_native_metadata(&self) -> ActivityResult<NativeMetadata> {
         let service = self.require_service()?;
 
@@ -449,7 +469,7 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
     /// call time (so the strategy never caches a tab id that could
     /// drift from the user's true focus), then `LIST_TOOLS { tab_id }`
     /// asks the matching content-script watcher for its descriptors.
-    async fn get_context(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
         let Some((service, pid, metadata)) = self.fetch_active_tab().await else {
             return Ok(Vec::new());
         };
@@ -485,6 +505,54 @@ impl ActivityStrategyFunctionality for BrowserStrategy {
             Err(err) => {
                 tracing::warn!("LIST_TOOLS payload decode failed: {err}");
                 Ok(Vec::new())
+            }
+        }
+    }
+
+    /// Ask the active browser's content script for a short summary of
+    /// what the user is doing right now (e.g.
+    /// `"The user is currently watching a video titled X"`). The
+    /// per-site watcher owns the wording; this method is plumbing.
+    ///
+    /// Same two-round-trip shape as [`Self::get_tools`]: `GET_METADATA`
+    /// resolves the active tab, then `GET_CONTEXT { tab_id }` asks the
+    /// matching content script for its blocks. Any failure path —
+    /// missing tab, disconnected messenger, malformed payload — returns
+    /// an empty [`ContentBlocks`] rather than aborting the chat turn.
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        let Some((service, pid, metadata)) = self.fetch_active_tab().await else {
+            return Ok(ContentBlocks::new());
+        };
+        let payload = match Payload::from_value(&json!({ "tab_id": metadata.tab_id })) {
+            Ok(p) => p,
+            Err(err) => {
+                tracing::warn!("GET_CONTEXT payload encode failed: {err}");
+                return Ok(ContentBlocks::new());
+            }
+        };
+        let response = match service
+            .send_request(pid, ACTION_GET_CONTEXT, Some(payload))
+            .await
+        {
+            Ok(resp) => resp,
+            Err(BridgeError::NotFound { .. }) | Err(BridgeError::ChannelClosed) => {
+                return Ok(ContentBlocks::new());
+            }
+            Err(err) => {
+                tracing::warn!("GET_CONTEXT bridge call failed: {err}");
+                return Ok(ContentBlocks::new());
+            }
+        };
+
+        let Some(payload) = response.payload else {
+            return Ok(ContentBlocks::new());
+        };
+
+        match payload.deserialize::<GetContextPayload>() {
+            Ok(payload) => Ok(payload.blocks.into()),
+            Err(err) => {
+                tracing::warn!("GET_CONTEXT payload decode failed: {err}");
+                Ok(ContentBlocks::new())
             }
         }
     }
