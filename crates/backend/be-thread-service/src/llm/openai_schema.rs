@@ -33,29 +33,6 @@ const MAX_REF_DEPTH: usize = 8;
 pub fn normalize(schema: &mut Value) {
     inline_refs(schema);
     walk(schema, &mut normalize_node);
-    ensure_required_present(schema);
-}
-
-/// Backfill `required: []` at the schema root when schemars omitted it.
-///
-/// schemars elides the `required` array entirely from object schemas
-/// whose every field is optional. Most strict tool-calling providers
-/// (GLM-family especially) treat `required` as a load-bearing field of
-/// the function-parameter contract: when it's missing, the tool is
-/// silently dropped from the model's callable set. The model can
-/// reference it in its reasoning (`Let me get the readability article`)
-/// but the structured `tool_call` emission never fires. Backfill the
-/// empty array so the schema matches the shape the
-/// `agent-chain-macros::tool` macro produces for working tools.
-fn ensure_required_present(schema: &mut Value) {
-    let Some(obj) = schema.as_object_mut() else {
-        return;
-    };
-    if obj.get("type") != Some(&Value::String("object".to_string())) {
-        return;
-    }
-    obj.entry("required".to_string())
-        .or_insert_with(|| Value::Array(Vec::new()));
 }
 
 fn walk<F: FnMut(&mut Value)>(node: &mut Value, f: &mut F) {
@@ -81,16 +58,6 @@ fn normalize_node(node: &mut Value) {
     };
     obj.remove("$schema");
     obj.remove("title");
-    // Strip every `description` field inside parameters. The tool's
-    // top-level function description (set on the `ToolDefinition`, not
-    // inside `parameters`) is what the model uses to decide whether
-    // to call. Parameter-level descriptions get in the way: the
-    // `agent-chain-macros::tool` macro (the path firecrawl tools take,
-    // which work reliably end-to-end) emits no parameter-level
-    // descriptions at all — schemas are pure structure. Mimicking
-    // that minimal shape removes a class of subtle model-decision
-    // differences between adapter-emitted and macro-emitted tools.
-    obj.remove("description");
     collapse_nullable_type(obj);
     drop_integer_format(obj);
     collapse_anyof_with_null(obj);
