@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use eurora_tools::{Catalog, ContextRegistry};
+use euro_transport_policy::CHAT_STREAM_TIMEOUT;
 use tauri::{AppHandle, Manager, ipc::Channel};
-use thread_core::{ChatSendRequest, ChatServerMessage, RegenerateRequest};
+use thread_core::{ChatSendRequest, ChatServerMessage, RegenerateRequest, ToolBackend};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -12,8 +12,6 @@ use super::context::{ChatContext, SharedChatContextProvider};
 use super::error::StreamError;
 use super::state::ActiveStreamTokens;
 use super::thread::thread_manager;
-
-const STREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 fn active_stream_tokens(
     app_handle: &AppHandle,
@@ -31,18 +29,12 @@ fn context_provider(
         .ok_or(StreamError::StateUnavailable("chat context provider"))
 }
 
-fn tool_catalog(app_handle: &AppHandle) -> Result<tauri::State<'_, Arc<Catalog>>, StreamError> {
-    app_handle
-        .try_state::<Arc<Catalog>>()
-        .ok_or(StreamError::StateUnavailable("tool catalog"))
-}
-
-fn context_registry(
+fn tool_backend(
     app_handle: &AppHandle,
-) -> Result<tauri::State<'_, Arc<ContextRegistry>>, StreamError> {
+) -> Result<tauri::State<'_, Arc<dyn ToolBackend>>, StreamError> {
     app_handle
-        .try_state::<Arc<ContextRegistry>>()
-        .ok_or(StreamError::StateUnavailable("context registry"))
+        .try_state::<Arc<dyn ToolBackend>>()
+        .ok_or(StreamError::StateUnavailable("tool backend"))
 }
 
 #[tauri::command]
@@ -101,10 +93,10 @@ pub async fn chat_cancel_query(app_handle: AppHandle, thread_id: Uuid) -> Result
 /// 1. Allocate a per-thread cancel token and register it so
 ///    `chat_cancel_query` can fire it.
 /// 2. Open the chat WebSocket.
-/// 3. Hand the socket to a fresh [`ChatBridge`] that snapshots the
-///    [`ContextRegistry`], advertises the matching [`Catalog`] surface,
-///    sends the opening frame, and forwards inbound chat frames to
-///    `channel` while dispatching tool calls.
+/// 3. Hand the socket to a fresh [`ChatBridge`] that queries the active
+///    [`ToolBackend`] for the per-turn tool surface, sends the opening
+///    frame, and forwards inbound chat frames to `channel` while routing
+///    tool calls back through the same backend.
 /// 4. Tear down the per-thread cancel token whether the turn finished,
 ///    timed out, or errored.
 async fn run_turn_command(
@@ -115,16 +107,14 @@ async fn run_turn_command(
 ) -> Result<(), StreamError> {
     let thread_manager = thread_manager(app_handle, StreamError::StateUnavailable)?;
     let tokens_state = active_stream_tokens(app_handle)?;
-    let catalog = tool_catalog(app_handle)?;
-    let registry = context_registry(app_handle)?;
+    let backend = tool_backend(app_handle)?;
 
     let cancel = CancellationToken::new();
     tokens_state.lock().await.insert(thread_id, cancel.clone());
 
     let result = open_and_drive(
         thread_manager.inner().clone(),
-        catalog.inner().clone(),
-        registry.inner().clone(),
+        backend.inner().clone(),
         thread_id,
         channel,
         opening,
@@ -138,8 +128,7 @@ async fn run_turn_command(
 
 async fn open_and_drive(
     thread_manager: super::state::SharedThreadManager,
-    catalog: Arc<Catalog>,
-    registry: Arc<ContextRegistry>,
+    backend: Arc<dyn ToolBackend>,
     thread_id: Uuid,
     channel: Channel<ChatServerMessage>,
     opening: TurnOpening,
@@ -148,7 +137,7 @@ async fn open_and_drive(
     let socket = thread_manager
         .open_chat_socket(thread_id, cancel.clone())
         .await?;
-    let bridge = ChatBridge::new(registry, catalog);
+    let bridge = ChatBridge::new(backend);
 
     // `Channel<T>` is internally an `Arc`, so each `send` is independent
     // and the wrapping closure only needs `Fn` — no mut state.
@@ -160,7 +149,7 @@ async fn open_and_drive(
 
     let drive_future = bridge.run_turn(socket, opening, cancel.clone(), &sink);
 
-    match tokio::time::timeout(STREAM_TIMEOUT, drive_future).await {
+    match tokio::time::timeout(CHAT_STREAM_TIMEOUT, drive_future).await {
         Ok(Ok(())) => Ok(()),
         Ok(Err(err)) => {
             cancel.cancel();
@@ -168,7 +157,7 @@ async fn open_and_drive(
         }
         Err(_) => {
             cancel.cancel();
-            Err(StreamError::Timeout(STREAM_TIMEOUT.as_secs() as u32))
+            Err(StreamError::Timeout(CHAT_STREAM_TIMEOUT.as_secs() as u32))
         }
     }
 }

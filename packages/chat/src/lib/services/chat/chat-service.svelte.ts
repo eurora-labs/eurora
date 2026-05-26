@@ -581,16 +581,21 @@ export class ChatService {
 		const isEdit = options.preservedAssetChips !== undefined;
 
 		// On edits we replay the chips that were already attached to the
-		// original turn — there is no fresh activity to sample. On new turns
-		// with attached UI chips we ask the host to assemble per-turn context
-		// (asset bytes, snapshots, the persisted chip). Hosts without a
-		// context source return empty arrays.
-		const context =
+		// original turn — there is no fresh activity to sample. On new
+		// turns with attached UI chips we ask the host for the chip set
+		// to persist alongside the message. Hosts without a context
+		// source return empty arrays.
+		//
+		// The LLM-facing prelude blocks (the strategy's `get_context()`
+		// output) are pulled separately by the chat bridge on the Rust
+		// side and shipped in the `CapabilityUpdate.system_blocks` wire
+		// field — they never round-trip through the frontend.
+		const collectedChips =
 			!isEdit && (options.assetChips?.length ?? 0) > 0
-				? await this.threadClient.collectContext(threadId)
-				: { contentBlocks: [], assetChips: [] };
+				? (await this.threadClient.collectContext(threadId)).assetChips
+				: [];
 
-		const persistedChips = isEdit ? (options.preservedAssetChips ?? []) : context.assetChips;
+		const persistedChips = isEdit ? (options.preservedAssetChips ?? []) : collectedChips;
 
 		const userBlock: ContentBlock = {
 			type: 'text',
@@ -602,7 +607,7 @@ export class ChatService {
 		};
 
 		return {
-			content_blocks: [...context.contentBlocks, userBlock],
+			content_blocks: [userBlock],
 			parent_message_id,
 			asset_chips_json: persistedChips.length > 0 ? JSON.stringify(persistedChips) : null,
 			activity_id: options.activityId ?? null,

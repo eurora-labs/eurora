@@ -45,17 +45,29 @@ async function onTabChange(change: TabChange): Promise<void> {
 	}
 
 	const tab = change.activeTab;
-	if (!tab || !tab.id || !tab.url || !isRealWebUrl(tab.url)) return;
-	await sendMetadataEvent(tab, activeNativePort);
+	if (!tab || tab.id === undefined || !tab.url || !isRealWebUrl(tab.url)) return;
+	await sendMetadataEvent(
+		tab as browser.Tabs.Tab & { id: number; url: string },
+		activeNativePort,
+	);
 }
 
-async function sendMetadataEvent(tab: browser.Tabs.Tab, port: browser.Runtime.Port): Promise<void> {
+async function sendMetadataEvent(
+	tab: browser.Tabs.Tab & { id: number; url: string },
+	port: browser.Runtime.Port,
+): Promise<void> {
 	try {
 		const iconBase64 = await resolveFaviconBase64(tab);
 
 		const metadata = {
 			kind: 'NativeMetadata',
 			data: {
+				// `tab_id` lets the desktop address this exact tab in
+				// follow-up `LIST_TOOLS` / `INVOKE_TOOL` calls without
+				// the extension having to re-query `chrome.tabs`. Always
+				// present — the guard in `onTabChange` rejects tabs
+				// without an id before we get here.
+				tab_id: tab.id,
 				url: tab.url,
 				icon_base64: iconBase64,
 				title: tab.title ?? null,

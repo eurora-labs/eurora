@@ -1,7 +1,0 @@
-error: #[tool] is only valid inside an `#[adapter]` trait body; attach `#[adapter(namespace = "…")]` to the enclosing trait
- --> tests/fail/tool_outside_adapter.rs:6:1
-  |
-6 | #[tool(timeout_ms = 100, source = "client_local")]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the attribute macro `tool` (in Nightly builds, run with -Z macro-backtrace for more info)

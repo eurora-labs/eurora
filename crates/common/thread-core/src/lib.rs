@@ -3,8 +3,8 @@
 //! This crate is the single source of truth for the JSON contract between
 //! `be-thread-service` (Axum + WebSocket) and `euro-tauri` (reqwest +
 //! tokio-tungstenite), and is also the input to the TypeScript bindings
-//! emitted by the workspace-level `euro-api-codegen` orchestrator
-//! (`pnpm specta:backend`).
+//! emitted by the workspace-level `euro-codegen` orchestrator
+//! (`pnpm specta`).
 //!
 //! Types are pure data with `serde` derives; the optional `specta` feature
 //! adds `specta::Type` so the same definitions can be re-exported as TS.
@@ -34,6 +34,7 @@ pub mod context_chip;
 pub mod error;
 pub mod messages;
 pub mod thread;
+pub mod tool_backend;
 pub mod tool_wire;
 
 pub use chat::{
@@ -51,6 +52,7 @@ pub use thread::{
     GenerateThreadTitleResponse, GetThreadResponse, ListThreadsQuery, ListThreadsResponse,
     SearchThreadResult, SearchThreadsQuery, SearchThreadsResponse, Thread,
 };
+pub use tool_backend::{ToolBackend, ToolBackendCall};
 pub use tool_wire::{ToolErrorWire, ToolSource, WireActiveContext, WireToolDescriptor};
 
 /// Build a [`specta::Types`] containing every thread wire type the desktop

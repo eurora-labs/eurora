@@ -1,4 +1,3 @@
-mod process_name;
 pub mod server;
 
 pub use euro_bridge_protocol::{

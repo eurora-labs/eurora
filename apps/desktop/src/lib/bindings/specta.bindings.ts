@@ -305,15 +305,15 @@ export type BrowserExtensionStatusChanged = {
 };
 
 /**
- *  Per-turn host context returned by `chat_collect_context`.
+ *  Per-turn host metadata returned by `chat_collect_context`.
  * 
- *  `content_blocks` are inlined directly — large payloads are rewritten
- *  into asset references server-side at chat-turn time, so the wire
- *  format here can carry raw bytes/text without the client having to
- *  round-trip them.
+ *  Only the UI-facing chip set lives here. The LLM-facing prelude that
+ *  describes the user's current activity is delivered separately, via
+ *  the `system_blocks` field on `CapabilityUpdatePayload`, and is
+ *  pulled by the chat bridge from the [`thread_core::ToolBackend`] at
+ *  turn start — no round trip through the UI is required for that.
  */
 export type ChatContext = {
-	contentBlocks: ContentBlock[],
 	assetChips: ContextChip[],
 };
 

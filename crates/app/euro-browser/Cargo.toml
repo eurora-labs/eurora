@@ -9,8 +9,7 @@ anyhow = { workspace = true }
 backon = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-process = { workspace = true }
-eurora-tools-web = { workspace = true, features = ["specta"] }
-eurora-tools-youtube = { workspace = true, features = ["specta"] }
+euro-transport-policy = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -35,11 +34,6 @@ codegen = ["dep:specta-serde", "dep:specta-typescript"]
 [[bin]]
 name = "euro-native-messaging"
 path = "src/main.rs"
-
-[[bin]]
-name = "euro-browser-codegen"
-path = "src/bin/codegen.rs"
-required-features = ["codegen"]
 
 [lints]
 workspace = true

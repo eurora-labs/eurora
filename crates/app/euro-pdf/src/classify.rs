@@ -4,8 +4,8 @@ use std::path::Path;
 /// "openable in this app".
 ///
 /// PDF viewers like macOS Preview also open images, PostScript, etc. Strategies
-/// use this to ignore non-PDF documents explicitly rather than silently
-/// dropping the whole `retrieve_assets` call on its face.
+/// use this to ignore non-PDF documents explicitly rather than treating every
+/// focused-window file as a candidate for the PDF parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PreviewableKind {
     /// Path points to a PDF (extension `.pdf`, case-insensitive).

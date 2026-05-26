@@ -131,30 +131,11 @@ impl CollectorService {
         self.saved_activity_ended_event_tx.subscribe()
     }
 
-    pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
-        let mut strategy = self.strategy.write().await;
-        let assets = strategy
-            .retrieve_assets()
-            .await
-            .map_err(|e| TimelineError::Storage(e.to_string()))?;
-        let snapshots = strategy
-            .retrieve_snapshots()
-            .await
-            .map_err(|e| TimelineError::Storage(e.to_string()))?;
-
-        let mut storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_all_activities_mut().back_mut() {
-            if !assets.is_empty() {
-                activity.assets.clear();
-                activity.assets.extend(assets);
-            }
-            if !snapshots.is_empty() {
-                activity.snapshots.clear();
-                activity.snapshots.extend(snapshots);
-            }
-        }
-
-        Ok(())
+    /// Handle to the currently active strategy. Cloned `Arc` shares the
+    /// same lock the collector swaps on focus changes, so consumers (the
+    /// chat tool backend) always see the freshest strategy.
+    pub fn active_strategy(&self) -> Arc<RwLock<ActivityStrategy>> {
+        Arc::clone(&self.strategy)
     }
 
     /// Stop the heartbeat and PATCH the current activity's real

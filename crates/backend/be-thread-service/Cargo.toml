@@ -8,6 +8,7 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 agent-chain = { workspace = true, features = ["openai"] }
 agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 axum = { workspace = true, features = ["macros", "ws"] }
 base64 = { workspace = true }
 be-asset = { workspace = true }
@@ -18,7 +19,6 @@ be-storage = { workspace = true }
 bon = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 dashmap = { workspace = true }
-eurora-tools = { workspace = true }
 futures = { workspace = true }
 llm-core = { workspace = true }
 request-correlator = { workspace = true }

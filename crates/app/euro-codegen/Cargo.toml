@@ -1,0 +1,24 @@
+[package]
+name = "euro-codegen"
+version = "0.0.0"
+edition.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+description = "Workspace-level binding generator. Single entry point that emits every TypeScript and Swift bindings file from the Rust wire types; CI runs `cargo run -p euro-codegen` followed by `git diff --exit-code` to enforce that wire-type edits regenerate the bindings."
+
+[dependencies]
+activity-core = { workspace = true, features = ["specta"] }
+anyhow = { workspace = true }
+asset-core = { workspace = true, features = ["specta"] }
+auth-core = { workspace = true, features = ["specta"] }
+euro-bridge-protocol = { workspace = true, features = ["codegen"] }
+euro-browser = { workspace = true, features = ["codegen"] }
+euro-office = { workspace = true, features = ["codegen"] }
+euro-tauri = { workspace = true }
+settings-core = { workspace = true, features = ["specta"] }
+specta = { workspace = true }
+specta-serde = "0.0.12"
+specta-typescript = { workspace = true }
+thread-core = { workspace = true, features = ["specta"] }
+
+[lints]
+workspace = true

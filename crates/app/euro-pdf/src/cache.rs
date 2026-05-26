@@ -7,11 +7,11 @@ use crate::{PdfAsset, PdfError, parse::parse_path};
 
 /// `(path, mtime)` keyed cache for parsed PDFs.
 ///
-/// Activity strategies poll `retrieve_assets()` repeatedly while the user has
-/// the same PDF focused; without this cache, every poll would re-read and
-/// re-parse the same multi-page document. We key on modification time so an
-/// in-place edit (e.g. annotation save in Preview) invalidates the cache and
-/// the next poll re-parses, but a stable file is parsed only once.
+/// Reserved for the forthcoming `office::pdf::*` adapter: repeated reads of the
+/// same focused document avoid re-parsing the multi-page body. We key on
+/// modification time so an in-place edit (e.g. annotation save in Preview)
+/// invalidates the cache and the next read re-parses, but a stable file is
+/// parsed only once.
 #[derive(Debug, Default)]
 pub struct PdfCache {
     inner: Mutex<HashMap<PathBuf, CachedEntry>>,

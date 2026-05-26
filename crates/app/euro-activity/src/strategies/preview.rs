@@ -2,8 +2,8 @@
 //!
 //! Activates whenever the focus tracker reports the macOS Preview process.
 //! Preview opens both PDFs and image files through the same window class —
-//! we ignore the latter (see [`PreviewableKind`]) and only emit assets for
-//! actual PDFs.
+//! we ignore the latter (see [`PreviewableKind`]) and only emit activities
+//! for actual PDFs.
 //!
 //! Document path discovery uses
 //! [`focus_tracker::focused_document_url`], which queries the macOS
@@ -12,26 +12,28 @@
 //! opened a real on-disk PDF; freshly-imported scans or unsaved markups
 //! return `None`, so a missing URL is a soft signal, not an error.
 //!
-//! Parsing is delegated to `euro-pdf`, with a per-strategy
-//! [`PdfCache`] keyed on `(path, mtime)` so the multi-megabyte Markdown
-//! output is reused across the many `retrieve_assets` polls that happen
-//! while the user keeps the same document focused.
+//! Parsing remains the responsibility of `euro-pdf`. This strategy only
+//! caches the focused-document path so the timeline's activity row carries
+//! a meaningful name immediately — extracting the document body is a
+//! future `office::pdf::*` adapter's concern.
 //!
 //! Other PDF viewers (Adobe Reader, Skim, …) will land as sibling
-//! strategies that consume the same `euro-pdf` building blocks; the
-//! per-app dispatch is intentionally narrow so each app's quirks
-//! (process name, AX behaviour, fallback heuristics) stay in one file.
+//! strategies that share the per-app focus-resolution glue while
+//! delegating any content extraction to dedicated adapter tools.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{
     Arc, RwLock,
     atomic::{AtomicU32, Ordering},
 };
 
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
-use euro_pdf::{PdfAsset, PdfCache, PreviewableKind, classify_path};
+use euro_pdf::{PreviewableKind, classify_path};
 use focus_tracker::{FocusTrackerError, FocusedWindow};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -42,7 +44,6 @@ use crate::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
         StrategySupport,
     },
-    types::{ActivityAsset, ActivitySnapshot},
 };
 
 /// Process name reported by the focus tracker on macOS for Preview.app.
@@ -62,12 +63,6 @@ pub struct PreviewStrategy {
     /// not currently tracking.
     #[serde(skip)]
     focused_pid: Arc<AtomicU32>,
-
-    /// Cache of parsed PDFs keyed on `(path, mtime)`. Shared across every
-    /// `retrieve_assets` call so a multi-megabyte document is parsed once
-    /// per `mtime` change rather than once per poll.
-    #[serde(skip)]
-    cache: Arc<PdfCache>,
 
     /// Filesystem path of the most recently observed PDF. Used as a
     /// fallback when the Accessibility API briefly fails to return the
@@ -144,13 +139,6 @@ impl PreviewStrategy {
         }
     }
 
-    async fn fetch_asset_for_path(&self, path: &Path) -> ActivityResult<PdfAsset> {
-        self.cache
-            .get_or_parse(path)
-            .await
-            .map_err(|err| ActivityError::strategy(format!("failed to parse PDF: {err}")))
-    }
-
     /// Build the [`Activity`] reported when Preview becomes focused.
     ///
     /// The activity name prefers the cached PDF's filename (if any) so the
@@ -176,7 +164,6 @@ impl PreviewStrategy {
             focus_window.icon.clone(),
             focus_window.process_name.clone(),
             focus_window.process_id,
-            vec![],
         )
     }
 
@@ -262,8 +249,7 @@ impl ActivityStrategyFunctionality for PreviewStrategy {
         self.store_path(None);
 
         // Best-effort: pre-resolve the focused document so the Activity we
-        // emit carries a meaningful name immediately, instead of waiting
-        // for the next `retrieve_assets` poll.
+        // emit carries a meaningful name immediately.
         if let Ok(Some(path)) = self.current_pdf_path() {
             self.store_path(Some(path));
         }
@@ -310,28 +296,10 @@ impl ActivityStrategyFunctionality for PreviewStrategy {
         tracing::debug!("Preview strategy stopping tracking");
         self.focused_pid.store(0, Ordering::Relaxed);
         self.store_path(None);
-        // Cache is intentionally retained: the user may immediately
-        // re-focus Preview on the same document, in which case we want
-        // to skip the re-parse.
         Ok(())
     }
 
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        let Some(path) = self.current_pdf_path()? else {
-            return Ok(vec![]);
-        };
-
-        self.store_path(Some(path.clone()));
-
-        let asset = self.fetch_asset_for_path(&path).await?;
-        Ok(vec![ActivityAsset::PdfAsset(asset)])
-    }
-
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        Ok(vec![])
-    }
-
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata> {
         let path = match self.current_pdf_path()? {
             Some(p) => {
                 self.store_path(Some(p.clone()));
@@ -350,6 +318,21 @@ impl ActivityStrategyFunctionality for PreviewStrategy {
             url: None,
             title,
             icon: None,
+        })
+    }
+
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+        Ok(vec![])
+    }
+
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        Ok(ContentBlocks::new())
+    }
+
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {
+        Err(ToolErrorWire::ContextUnavailable {
+            tool: call.name,
+            reason: "no tools available for this strategy".to_string(),
         })
     }
 }
@@ -411,20 +394,5 @@ mod tests {
     fn file_url_to_path_rejects_garbage() {
         assert!(file_url_to_path("").is_none());
         assert!(file_url_to_path("not a url").is_none());
-    }
-
-    #[tokio::test]
-    async fn retrieve_snapshots_is_always_empty() {
-        let mut strategy = PreviewStrategy::new();
-        let snapshots = strategy.retrieve_snapshots().await.unwrap();
-        assert!(snapshots.is_empty());
-    }
-
-    #[tokio::test]
-    async fn retrieve_assets_returns_empty_when_no_pid_tracked() {
-        let mut strategy = PreviewStrategy::new();
-        // focused_pid is 0 by default.
-        let assets = strategy.retrieve_assets().await.unwrap();
-        assert!(assets.is_empty());
     }
 }

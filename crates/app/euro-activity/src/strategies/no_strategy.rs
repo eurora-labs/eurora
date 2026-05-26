@@ -1,7 +1,10 @@
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
 use euro_process::AppProcess;
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -10,7 +13,6 @@ use crate::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
         StrategySupport,
     },
-    types::{ActivityAsset, ActivitySnapshot},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -61,33 +63,22 @@ impl ActivityStrategyFunctionality for NoStrategy {
         Ok(())
     }
 
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        tracing::debug!("NoStrategy: skipping asset retrieval");
-        Ok(vec![])
-    }
-
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        tracing::debug!("NoStrategy: skipping snapshot retrieval");
-        Ok(vec![])
-    }
-
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata::default())
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+        Ok(vec![])
+    }
 
-    #[tokio::test]
-    async fn test_no_strategy_returns_empty() {
-        let mut strategy = NoStrategy;
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        Ok(ContentBlocks::new())
+    }
 
-        let assets = strategy.retrieve_assets().await.unwrap();
-        assert!(assets.is_empty());
-
-        let snapshots = strategy.retrieve_snapshots().await.unwrap();
-        assert!(snapshots.is_empty());
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {
+        Err(ToolErrorWire::ContextUnavailable {
+            tool: call.name,
+            reason: "no tools available for this strategy".to_string(),
+        })
     }
 }
