@@ -2,6 +2,13 @@
 /// classification is URL-driven so it works before the DOM has settled;
 /// per-page selectors live with the individual tool files.
 
+import {
+	NoTranscriptFound,
+	YouTubeTranscriptApi,
+	type FetchedTranscript,
+} from '../../../../content/sites/youtube.com/transcript';
+import { z } from 'zod';
+
 export type PageKind =
 	| 'watch'
 	| 'shorts'
@@ -130,5 +137,71 @@ export function videoIdFromUrl(url: string): string | null {
 		return new URL(url, window.location.href).searchParams.get('v');
 	} catch {
 		return null;
+	}
+}
+
+/// Shared singleton — the API instance carries no per-call state, so
+/// the transcript tools (`get_transcript`, `get_timed_transcript`,
+/// `list_captions`) can all reuse one instance instead of each
+/// spinning up its own.
+export const TRANSCRIPT_API = new YouTubeTranscriptApi();
+
+/// Single source of truth for the args both transcript tools take:
+/// optional time-window bounds plus an optional language code. Adding
+/// a new field (e.g. `preserve_formatting`) later happens here in one
+/// place. The cross-field refinement requires `end > start` whenever
+/// both are present.
+export const TranscriptArgs = z
+	.object({
+		start: z.number().nonnegative().optional(),
+		end: z.number().nonnegative().optional(),
+		language: z.string().min(2).optional(),
+	})
+	.strict()
+	.refine((a) => a.start === undefined || a.end === undefined || a.end > a.start, {
+		message: '`end` must be greater than `start`',
+	});
+
+export type TranscriptArgsT = z.infer<typeof TranscriptArgs>;
+
+/// Overlap-include filter: a snippet that spans either window edge is
+/// kept whole rather than silently dropped. Used by both transcript
+/// tools so the text and timed forms slice the same entries.
+export function filterTranscriptRange<T extends { start: number; duration: number }>(
+	snippets: readonly T[],
+	start: number | undefined,
+	end: number | undefined,
+): T[] {
+	const lo = start ?? 0;
+	const hi = end ?? Number.POSITIVE_INFINITY;
+	return snippets.filter((s) => s.start + s.duration > lo && s.start < hi);
+}
+
+/// Fetch a transcript via the shared [`TRANSCRIPT_API`], rewriting a
+/// language miss into a message that names the codes that *are*
+/// available on this video plus a pointer at `youtube_list_captions`.
+///
+/// Policy choices encoded here:
+/// - No `requested` → try only `'en'`. Most-common path; spelled out
+///   so the model sees the fallback in the JSON-schema default.
+/// - Explicit `requested` → try only that code, no silent fallback to
+///   `'en'`. Returning English under the guise of e.g. `'fr'` would be
+///   worse than failing with a clear error.
+export async function fetchTranscriptOrExplain(
+	videoId: string,
+	requested: string | undefined,
+): Promise<FetchedTranscript> {
+	const languages = requested ? [requested] : ['en'];
+	try {
+		return await TRANSCRIPT_API.fetch(videoId, { languages });
+	} catch (err) {
+		if (!(err instanceof NoTranscriptFound)) throw err;
+		const list = await TRANSCRIPT_API.list(videoId);
+		const codes = [...list].map((t) => t.languageCode);
+		throw new Error(
+			`no transcript available for language(s) [${languages.join(', ')}]. ` +
+				`Available codes on this video: [${codes.join(', ')}]. ` +
+				'Call `youtube_list_captions` for the full caption tracks list.',
+		);
 	}
 }
