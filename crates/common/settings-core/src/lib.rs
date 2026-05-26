@@ -3,8 +3,8 @@
 //! This crate is the single source of truth for the JSON contract
 //! between `be-settings-service` (Axum) and the desktop / mobile / web
 //! HTTP clients, and is also the input to the TypeScript bindings
-//! emitted by the workspace-level `euro-api-codegen` orchestrator
-//! (`pnpm specta:backend`).
+//! emitted by the workspace-level `euro-codegen` orchestrator
+//! (`pnpm specta`).
 //!
 //! Types are pure data with `serde` derives; the optional `specta`
 //! feature adds `specta::Type` so the same definitions can be

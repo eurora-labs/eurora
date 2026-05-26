@@ -103,7 +103,7 @@ mod tests {
     }
 
     fn fresh_activity(name: &str) -> Activity {
-        Activity::new(name.to_string(), None, None, "proc".to_string(), 1, vec![])
+        Activity::new(name.to_string(), None, None, "proc".to_string(), 1)
     }
 
     /// The collector's `NewActivity` branch must end the previous

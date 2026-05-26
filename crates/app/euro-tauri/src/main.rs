@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+use euro_activity::ActivityToolBackend;
 use euro_endpoint::EndpointManager;
 use euro_settings::{CloudSettingsCache, SettingsState};
 use euro_tauri::chat_context::TimelineChatContextProvider;
@@ -29,6 +30,7 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_specta::Event;
+use thread_core::ToolBackend;
 use tokio::sync::Mutex;
 
 /// Returns `true` when the on-disk messenger binary was replaced during
@@ -363,7 +365,14 @@ fn init_state(
         .endpoint_manager(endpoint_manager.clone())
         .auth_manager(auth_manager.clone())
         .build()?;
+    // `ToolBackend` shares the same `Arc<RwLock<ActivityStrategy>>` the
+    // collector swaps on focus changes — the chat side always sees the
+    // freshest strategy without any reconnection.
+    let backend: std::sync::Arc<dyn ToolBackend> = std::sync::Arc::new(ActivityToolBackend::new(
+        timeline.collector.active_strategy(),
+    ));
     app_handle.manage(Mutex::new(timeline));
+    app_handle.manage(backend);
 
     let context_provider: SharedChatContextProvider =
         std::sync::Arc::new(TimelineChatContextProvider::new(app_handle.clone()));
@@ -675,18 +684,19 @@ fn main() {
             let telemetry_controller = telemetry_controller.clone();
             let specta = build_specta();
 
-            // Regenerate the TypeScript bindings on every dev launch.
-            // `specta-typescript` 0.0.12 fails the export by default if any
-            // `i64`/`u64` field crosses the wire without an explicit
-            // `#[specta(type = ...)]` override, which is the strictness we
-            // want — silently bridging through `bigint` masks lossy round
-            // trips on the JS side.
+            // Regenerate the TypeScript bindings on every dev launch so
+            // editing a wire type and re-running the desktop binary is a
+            // single round-trip. The canonical generator is the
+            // workspace-level `euro-codegen` orchestrator (see
+            // `export_desktop_bindings`); this hook just runs the same
+            // function with a path resolved relative to the crate
+            // manifest because Tauri dev sets cwd to the manifest dir.
             #[cfg(debug_assertions)]
             {
                 let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../../apps/desktop/src/lib/bindings/specta.bindings.ts");
-                specta
-                    .export(specta_typescript::Typescript::default(), &bindings_path)
+                    .join("../../../")
+                    .join(euro_tauri::DESKTOP_BINDINGS_PATH);
+                euro_tauri::export_desktop_bindings(&bindings_path)
                     .expect("Failed to export tauri-specta bindings");
             }
 
@@ -857,32 +867,10 @@ fn main() {
                     spawn_timeline_listeners(tauri_app.handle().clone());
                     spawn_browser_status_bridge(tauri_app.handle().clone());
 
-                    // Track active client-side contexts (browser tabs,
-                    // focused apps, ACP sessions) so `ChatBridge` can
-                    // snapshot them at turn start. Fed by bridge
-                    // `EventFrame`s; readable from any Tauri command
-                    // via managed state.
-                    let context_registry =
-                        std::sync::Arc::new(eurora_tools::ContextRegistry::new());
-                    euro_tauri::context_registry::spawn_context_listener(context_registry.clone());
-                    tauri_app.manage(context_registry);
-
-                    // Build the per-process catalog of client-side
-                    // dispatchers and register every available adapter.
-                    // `ChatBridge` looks tools up against this catalog
-                    // at turn start; missing entries surface as
-                    // `ContextUnavailable` / `Remote 404` to the LLM.
-                    // The bridge service was bound by
-                    // `bind_and_serve_bridge()` above, so
-                    // `get_or_init()` resolves to the live singleton.
-                    let bridge_service = euro_bridge::BridgeService::get_or_init();
-                    let catalog = std::sync::Arc::new(eurora_tools::Catalog::new());
-                    catalog.register(std::sync::Arc::new(
-                        eurora_tools_youtube::YoutubeDispatcher::new(
-                            euro_tauri::tools::YoutubeBridgeImpl::new(bridge_service),
-                        ),
-                    ));
-                    tauri_app.manage(catalog);
+                    // The chat-side `ToolBackend` is constructed and
+                    // managed inside `init_state`; tools are sourced
+                    // dynamically from the active activity strategy, so
+                    // there's no per-app catalog to register here.
 
                     Ok(())
                 })

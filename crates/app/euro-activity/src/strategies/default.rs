@@ -8,45 +8,22 @@
 //! `DefaultStrategy` for the new window — so the stored `FocusedWindow`
 //! is always the one this strategy is responsible for.
 //!
-//! ### What it contributes
-//!
-//! When chat context is collected, [`retrieve_snapshots`] captures the
-//! focused window via `xcap` and emits a [`ScreenshotSnapshot`] so the
-//! image lands on the LLM as an `ImageContentBlock` alongside the
-//! activity metadata.
-//!
-//! ### Privacy
-//!
-//! Capture only happens inside [`retrieve_snapshots`], which is itself
-//! only invoked from
-//! `crates/app/euro-timeline/src/collector.rs::refresh_current_activity`
-//! — and that runs on demand when a chat turn collects context. If the
-//! user removes the activity chip from the chat composer, the refresh
-//! never fires for it and no screenshot is taken. There is no background
-//! capture loop.
-//!
-//! ### Failure handling
-//!
-//! Capture is best-effort. A failure (denied permission on macOS, no
-//! Wayland portal grant, child-process window the compositor doesn't
-//! expose, …) is logged once per instance at `warn` and then at `debug`
-//! for subsequent attempts, and the snapshot list comes back empty
-//! rather than aborting the chat turn.
+//! The strategy emits a single `NewActivity` report at construction time
+//! and otherwise has no per-turn work to do — the LLM pulls any
+//! contextual data it needs through granular tools, not through this
+//! strategy.
 
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
-use euro_vision::capture;
 use focus_tracker::FocusedWindow;
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use serde_json::Value;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 
 use crate::{
     error::ActivityResult,
-    snapshots::DefaultSnapshot,
     strategies::{ActivityReport, ActivityStrategyFunctionality, StrategyMetadata},
-    types::{Activity, ActivityAsset, ActivitySnapshot},
+    types::Activity,
 };
 
 #[derive(Clone)]
@@ -59,12 +36,6 @@ pub struct DefaultStrategy {
     /// Channel back to the collector. Populated by `start_tracking` so
     /// the construction site doesn't need to know about IPC.
     sender: Option<mpsc::UnboundedSender<ActivityReport>>,
-
-    /// Flipped to `true` the first time a capture fails. Subsequent
-    /// failures degrade to `debug` logging so we don't flood the log on
-    /// systems where capture is unavailable. Wrapped in `Arc` so
-    /// `Clone` instances share the warn state.
-    capture_warned: Arc<AtomicBool>,
 }
 
 impl DefaultStrategy {
@@ -72,7 +43,6 @@ impl DefaultStrategy {
         Self {
             focused_window,
             sender: None,
-            capture_warned: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -83,25 +53,7 @@ impl DefaultStrategy {
             self.focused_window.icon.clone(),
             self.focused_window.process_name.clone(),
             self.focused_window.process_id,
-            vec![],
         )
-    }
-
-    fn note_capture_failure(&self, reason: impl std::fmt::Display) {
-        let pid = self.focused_window.process_id;
-        if self
-            .capture_warned
-            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-            .is_ok()
-        {
-            tracing::warn!(
-                "default strategy: window capture failed for pid {pid} ({reason}); falling back to no snapshot. On Wayland this requires an xdg-desktop-portal grant; on macOS, Screen Recording permission."
-            );
-        } else {
-            tracing::debug!(
-                "default strategy: window capture still failing for pid {pid} ({reason})"
-            );
-        }
     }
 }
 
@@ -162,38 +114,26 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         Ok(())
     }
 
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>> {
-        // Screenshots belong in snapshots; this strategy contributes no
-        // persistent assets.
-        Ok(vec![])
-    }
-
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>> {
-        let pid = self.focused_window.process_id;
-        match capture::capture_window_by_pid(pid).await {
-            Ok(Some(image)) => Ok(vec![ActivitySnapshot::DefaultSnapshot(
-                DefaultSnapshot::new(
-                    self.focused_window.process_name.clone(),
-                    self.focused_window.window_title.clone(),
-                    image,
-                ),
-            )]),
-            Ok(None) => {
-                self.note_capture_failure("no matching window");
-                Ok(vec![])
-            }
-            Err(err) => {
-                self.note_capture_failure(err);
-                Ok(vec![])
-            }
-        }
-    }
-
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata {
             url: None,
             title: self.focused_window.window_title.clone(),
             icon: self.focused_window.icon.clone(),
+        })
+    }
+
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+        Ok(vec![])
+    }
+
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        Ok(ContentBlocks::new())
+    }
+
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {
+        Err(ToolErrorWire::ContextUnavailable {
+            tool: call.name,
+            reason: "no tools available for this strategy".to_string(),
         })
     }
 }
@@ -212,13 +152,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retrieve_assets_is_always_empty() {
-        let mut strategy = DefaultStrategy::new(window(42, "notes", Some("Untitled")));
-        let assets = strategy.retrieve_assets().await.unwrap();
-        assert!(assets.is_empty());
-    }
-
-    #[tokio::test]
     async fn handle_process_change_returns_false_to_force_redispatch() {
         let mut strategy = DefaultStrategy::new(window(42, "notes", None));
         // The argument represents the *new* focus the dispatcher is
@@ -233,7 +166,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_metadata_reports_window_title_from_constructor() {
-        let mut strategy = DefaultStrategy::new(window(42, "code", Some("main.rs")));
+        let strategy = DefaultStrategy::new(window(42, "code", Some("main.rs")));
         let metadata = strategy.get_metadata().await.unwrap();
         assert_eq!(metadata.title.as_deref(), Some("main.rs"));
         assert!(metadata.url.is_none());

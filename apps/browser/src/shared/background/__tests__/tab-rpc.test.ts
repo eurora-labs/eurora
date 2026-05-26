@@ -75,6 +75,51 @@ describe('forwardTabRpc', () => {
 		expect(sendMessageMock).toHaveBeenCalledWith(19, { type: 'GET_CURRENT_TIMESTAMP' });
 	});
 
+	it('forwards caller args alongside type, dropping tab_id', async () => {
+		sendMessageMock.mockResolvedValueOnce({ matches: [] });
+
+		const frame: RequestFrame = {
+			id: 1,
+			action: 'WEB_QUERY_SELECTOR',
+			payload: {
+				tab_id: 19,
+				selector: 'textarea',
+				limit: 5,
+				include: ['text', 'attributes'],
+			} as Payload,
+		};
+		await rpc.forwardTabRpc(frame, 'QUERY_SELECTOR');
+
+		expect(sendMessageMock).toHaveBeenCalledWith(19, {
+			selector: 'textarea',
+			limit: 5,
+			include: ['text', 'attributes'],
+			type: 'QUERY_SELECTOR',
+		});
+	});
+
+	it('refuses to let an arg named "type" override the message type', async () => {
+		sendMessageMock.mockResolvedValueOnce({ ok: true });
+
+		const frame: RequestFrame = {
+			id: 1,
+			action: 'WEB_INSERT_TEXT',
+			payload: {
+				tab_id: 19,
+				field_id: '#x',
+				text: 'hello',
+				// Hostile arg — the routing key must win.
+				type: 'NOT_THE_REAL_TYPE',
+			} as Payload,
+		};
+		await rpc.forwardTabRpc(frame, 'INSERT_TEXT');
+
+		expect(sendMessageMock).toHaveBeenCalledWith(
+			19,
+			expect.objectContaining({ type: 'INSERT_TEXT', field_id: '#x', text: 'hello' }),
+		);
+	});
+
 	it('returns 400 for missing payload', async () => {
 		const result = await rpc.forwardTabRpc(requestFrame(null), 'GET_CURRENT_TIMESTAMP');
 		expect(asError(result).code).toBe(400);
@@ -113,5 +158,78 @@ describe('forwardTabRpc', () => {
 
 		const result = await rpc.forwardTabRpc(requestFrame(), 'GET_CURRENT_TIMESTAMP');
 		expect(asError(result).message).toBe('{"code":1,"reason":"x"}');
+	});
+
+	it('returns 400 when the content script reports a safety violation', async () => {
+		sendMessageMock.mockResolvedValueOnce({
+			kind: 'Error',
+			code: 'SAFETY_VIOLATION',
+			data: 'field_id "input[type=password]" is not a writable text field',
+		});
+
+		const result = await rpc.forwardTabRpc(requestFrame(), 'INSERT_TEXT');
+		const err = asError(result);
+		expect(err.code).toBe(400);
+		expect(err.message).toBe('field_id "input[type=password]" is not a writable text field');
+	});
+
+	it('serializes non-string safety-violation data into the 400 message', async () => {
+		sendMessageMock.mockResolvedValueOnce({
+			kind: 'Error',
+			code: 'SAFETY_VIOLATION',
+			data: { field_id: '#x', reason: 'disabled' },
+		});
+
+		const result = await rpc.forwardTabRpc(requestFrame(), 'INSERT_TEXT');
+		const err = asError(result);
+		expect(err.code).toBe(400);
+		expect(err.message).toBe('{"field_id":"#x","reason":"disabled"}');
+	});
+
+	it('treats unrelated content-script error codes as 500', async () => {
+		sendMessageMock.mockResolvedValueOnce({
+			kind: 'Error',
+			code: 'something-else',
+			data: 'boom',
+		});
+
+		const result = await rpc.forwardTabRpc(requestFrame(), 'INSERT_TEXT');
+		expect(asError(result).code).toBe(500);
+	});
+});
+
+describe('extractArgs', () => {
+	it('returns {} for null/undefined payloads', () => {
+		expect(rpc.extractArgs(null)).toEqual({});
+		expect(rpc.extractArgs(undefined)).toEqual({});
+	});
+
+	it('returns every non-tab_id field', () => {
+		expect(rpc.extractArgs({ tab_id: 1, selector: 'p', limit: 5 } as Payload)).toEqual({
+			selector: 'p',
+			limit: 5,
+		});
+	});
+
+	it('throws when payload is not a plain object', () => {
+		expect(() => rpc.extractArgs([] as unknown as Payload)).toThrow(/JSON object/);
+	});
+});
+
+describe('isSafetyViolation', () => {
+	it('matches Error frames whose code is the SAFETY_VIOLATION sentinel', () => {
+		expect(rpc.isSafetyViolation({ kind: 'Error', code: 'SAFETY_VIOLATION', data: 'x' })).toBe(
+			true,
+		);
+	});
+
+	it('rejects Error frames without a code field', () => {
+		expect(rpc.isSafetyViolation({ kind: 'Error', data: 'x' })).toBe(false);
+	});
+
+	it('rejects non-Error replies', () => {
+		expect(rpc.isSafetyViolation({ kind: 'Response', data: {} })).toBe(false);
+		expect(rpc.isSafetyViolation(null)).toBe(false);
+		expect(rpc.isSafetyViolation('SAFETY_VIOLATION')).toBe(false);
 	});
 });

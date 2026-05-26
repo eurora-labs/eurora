@@ -64,8 +64,9 @@ export class ThreadService implements IThreadService {
 
 	async collectContext(_threadId: string): Promise<ChatContext> {
 		// Mobile has no desktop activity timeline — chat turns carry only the
-		// user's text.
-		return { contentBlocks: [], assetChips: [] };
+		// user's text. The chat bridge ships an empty `system_blocks` prelude
+		// over the WebSocket on this platform.
+		return { assetChips: [] };
 	}
 
 	sendMessage(

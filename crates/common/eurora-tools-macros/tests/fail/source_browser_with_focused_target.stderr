@@ -1,5 +1,0 @@
-error: source kind expects `&::eurora_tools::BrowserOrigin`, but the method declares `&FocusedOrigin`
-  --> tests/fail/source_browser_with_focused_target.rs:19:17
-   |
-19 |         target: &FocusedOrigin,
-   |                 ^^^^^^^^^^^^^^
