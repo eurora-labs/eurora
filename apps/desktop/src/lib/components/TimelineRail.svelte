@@ -119,7 +119,7 @@
 					color={item.accent?.hex}
 					active={i === activityService.activeIndex}
 					iconSrc={item.iconBase64}
-					name={item.name}
+					name={item.displayName}
 					onSelect={() => activityService.selectIndex(i)}
 				/>
 			{/each}

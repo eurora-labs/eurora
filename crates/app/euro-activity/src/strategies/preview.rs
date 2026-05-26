@@ -38,7 +38,7 @@ use tokio::sync::mpsc;
 use url::Url;
 
 use crate::{
-    Activity, ActivityError,
+    ActivityError, ActivitySession,
     error::ActivityResult,
     strategies::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
@@ -139,31 +139,26 @@ impl PreviewStrategy {
         }
     }
 
-    /// Build the [`Activity`] reported when Preview becomes focused.
+    /// Build the [`ActivitySession`] reported when Preview becomes
+    /// focused.
     ///
-    /// The activity name prefers the cached PDF's filename (if any) so the
-    /// timeline shows "My Notes.pdf" rather than the process name; falls
-    /// back to the focused-window title and finally the process name so we
-    /// always have a coherent entry.
-    fn build_activity_for_focus(&self, focus_window: &FocusedWindow) -> Activity {
+    /// The session rolls up to a process-keyed parent (one bucket per
+    /// "Preview" process, not one per PDF). The cached filename feeds
+    /// the per-session `window_title` so the rail shows
+    /// "My Notes.pdf" rather than the bare process name.
+    fn build_session_for_focus(&self, focus_window: &FocusedWindow) -> ActivitySession {
         let cached_name = self.cached_path().as_deref().and_then(|p| {
             p.file_name()
                 .and_then(|s| s.to_str())
                 .map(ToOwned::to_owned)
         });
-
-        let activity_name = cached_name
-            .clone()
-            .or_else(|| focus_window.window_title.clone())
-            .unwrap_or_else(|| focus_window.process_name.clone());
         let title = cached_name.or_else(|| focus_window.window_title.clone());
 
-        Activity::new(
-            activity_name,
-            title,
-            focus_window.icon.clone(),
+        ActivitySession::new_process(
             focus_window.process_name.clone(),
             focus_window.process_id,
+            title,
+            focus_window.icon.clone(),
         )
     }
 
@@ -174,9 +169,9 @@ impl PreviewStrategy {
             .ok_or_else(|| ActivityError::strategy("Sender not initialized"))?
             .clone();
 
-        let activity = self.build_activity_for_focus(focus_window);
+        let session = self.build_session_for_focus(focus_window);
 
-        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+        if sender.send(ActivityReport::NewActivity(session)).is_err() {
             tracing::warn!("Preview strategy: receiver dropped while emitting activity");
         }
         Ok(())

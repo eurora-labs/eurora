@@ -3,29 +3,33 @@
 //! Three responsibilities live here:
 //!
 //! - [`activity_list`] — the one-shot fetch the rail uses on mount to
-//!   hydrate from the most recent persisted activities. Bridges the
+//!   hydrate from the most recent persisted activities (parents, with
+//!   their latest session embedded inline). Bridges the
 //!   `GET /activities` HTTP endpoint and the `GET /v1/assets/{id}` icon
-//!   endpoint, decorates each row with a precomputed [`AccentColor`] and
-//!   a `data:` URL the frontend can drop straight into `<img src>`.
-//! - [`SavedActivityCreated`] — the tauri-specta event the persist path
-//!   emits *after* a successful `POST /activities`, so the rail can
-//!   prepend a freshly-tracked activity without re-polling the listing.
-//! - [`SavedActivityEnded`] — the tauri-specta event the persist path
-//!   emits *after* a successful closing PATCH of `ended_at`, so the rail
-//!   can patch the row's `endedAt` in place. Without this the rail keeps
-//!   `endedAt: null` for every row it received via
-//!   [`SavedActivityCreated`] and falls back to the minimum connector
-//!   height in its duration-based size calculation.
+//!   endpoint, decorating each row with a precomputed [`AccentColor`]
+//!   and a `data:` URL the frontend can drop straight into `<img src>`.
+//! - [`SavedActivityUpserted`] — the tauri-specta event the persist
+//!   path emits *after* a successful `POST /activity-sessions`. Carries
+//!   the (possibly upserted) parent activity and the new live session
+//!   atomically, so the rail can update both the row position and the
+//!   live indicator in one transaction.
+//! - [`SavedActivityLiveSessionEnded`] — the tauri-specta event the
+//!   persist path emits *after* a successful closing PATCH on the live
+//!   session's `ended_at`. Lets the rail strip the live indicator from
+//!   the matching parent row without a re-fetch.
 //!
-//! The frontend wire shape ([`SavedActivity`]) is intentionally distinct
-//! from `activity_core::Activity`: that one is the JSON-HTTP contract
-//! between the desktop and the backend, this one is the
+//! The frontend wire shape ([`SavedActivity`]) is intentionally
+//! distinct from `activity_core::Activity`: that one is the JSON-HTTP
+//! contract between the desktop and the backend, this one is the
 //! tauri-specta-typed presentation DTO. Keeping them separate means the
 //! rail can carry precomputed accent / icon-data-URL fields without
 //! polluting the network type.
 
 use std::sync::Arc;
 
+use activity_core::{
+    Activity as WireActivity, ActivitySession as WireActivitySession, ActivityWithLatestSession,
+};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use chrono::{DateTime, Utc};
 use euro_activity::ActivityStorage;
@@ -42,48 +46,73 @@ use uuid::Uuid;
 use crate::procedures::accent::{accent_from_image, decode_image};
 use crate::procedures::timeline::AccentColor;
 
-/// Frontend-facing view of one persisted activity.
+/// Frontend-facing view of one persisted parent activity, with its
+/// most recent session embedded inline.
 ///
 /// `accent` and `icon_base64` are populated by the desktop tauri layer
 /// (decoded from the asset's PNG bytes); both are `None` whenever the
 /// activity has no icon or the icon fetch failed — treat them as
 /// presentation hints, never as load-bearing fields.
+///
+/// `live_session` carries the most recent session and is the only
+/// signal the rail uses to render "live now": when
+/// `live_session.ended_at` is `None` the activity is currently in use.
+/// The desktop emits an [`SavedActivityLiveSessionEnded`] event when
+/// the active session closes, so the rail can flip the indicator
+/// without re-fetching.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedActivity {
     pub id: Uuid,
-    pub name: String,
-    pub process_name: String,
-    pub window_title: String,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub identity_key: String,
+    pub display_name: String,
+    pub last_used_at: DateTime<Utc>,
     pub accent: Option<AccentColor>,
     /// `data:<mime>;base64,...` URL suitable for direct embedding in
     /// `<img src>`. Bare base64 would force the frontend to know the
     /// mime out-of-band, which it currently does not.
     pub icon_base64: Option<String>,
+    pub live_session: Option<SavedActivitySession>,
 }
 
-/// Push event fired after the cloud `POST /activities` succeeds for a
-/// freshly-tracked activity. Lets the desktop frontend prepend the new
-/// row to the timeline rail without re-polling `GET /activities`.
-#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
-#[serde(rename_all = "camelCase")]
-pub struct SavedActivityCreated(pub SavedActivity);
-
-/// Push event fired after the cloud closing PATCH of `ended_at` succeeds
-/// for a previously-tracked activity. Lets the desktop frontend update
-/// the matching row's `endedAt` in place — without it the row keeps the
-/// `null` it was created with and the timeline rail's duration-based
-/// connector height stays clamped to the minimum until the next reload.
+/// Frontend-facing view of one persisted activity session.
 ///
-/// Payload is intentionally minimal: the frontend already has the rest
-/// of the row in memory, so only the id and the now-known end timestamp
-/// are shipped over the wire.
+/// A subset of `activity_core::ActivitySession` — the rail only needs
+/// the bits that drive the live indicator and per-tab labelling, not
+/// the full audit columns (`created_at` / `updated_at` are server
+/// bookkeeping and never surface).
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedActivitySession {
+    pub id: Uuid,
+    pub activity_id: Uuid,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub window_title: Option<String>,
+    pub url: Option<String>,
+}
+
+/// Push event fired after the cloud `POST /activity-sessions` succeeds.
+///
+/// Carries the (possibly upserted) parent activity *and* the new
+/// session it created, so the desktop frontend can prepend the row to
+/// the timeline rail with the right "live" indicator without re-polling
+/// `GET /activities`.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 #[serde(rename_all = "camelCase")]
-pub struct SavedActivityEnded {
-    pub id: Uuid,
+pub struct SavedActivityUpserted(pub SavedActivity);
+
+/// Push event fired after the cloud closing PATCH of `ended_at`
+/// succeeds for the live session of a parent activity.
+///
+/// Payload is intentionally minimal: the frontend already has the
+/// parent row in memory, so only the parent id, the session id, and
+/// the now-known end timestamp are shipped over the wire.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedActivityLiveSessionEnded {
+    pub activity_id: Uuid,
+    pub session_id: Uuid,
     pub ended_at: DateTime<Utc>,
 }
 
@@ -109,14 +138,14 @@ impl From<euro_activity::ActivityError> for SavedActivityError {
     }
 }
 
-/// Fetch the most-recent persisted activities and decorate each with the
-/// presentation data the timeline rail needs (accent colour + a
-/// `data:`-URL icon).
+/// Fetch the most-recent persisted activities and decorate each with
+/// the presentation data the timeline rail needs (accent colour +
+/// `data:`-URL icon + embedded live session).
 ///
 /// Per-row icon fetches fan out concurrently via `join_all`; reqwest's
-/// HTTP/2 pool multiplexes them over a single connection. Failures on a
-/// single icon log + degrade to `(accent: None, icon_base64: None)` so
-/// one bad asset can't block the rest of the page from rendering.
+/// HTTP/2 pool multiplexes them over a single connection. Failures on
+/// a single icon log + degrade to `(accent: None, icon_base64: None)`
+/// so one bad asset can't block the rest of the page from rendering.
 #[tauri::command]
 #[specta::specta]
 pub async fn activity_list(
@@ -126,30 +155,49 @@ pub async fn activity_list(
 ) -> Result<Vec<SavedActivity>, SavedActivityError> {
     let activity_storage = activity_storage(&app_handle).await?;
 
-    let activities = activity_storage.list_activities(limit, offset).await?;
+    let rows = activity_storage.list_activities(limit, offset).await?;
 
     let storage: &ActivityStorage = &activity_storage;
-    let enriched =
-        future::join_all(activities.into_iter().map(|row| enrich_row(storage, row))).await;
+    let enriched = future::join_all(rows.into_iter().map(|row| enrich_row(storage, row))).await;
 
     Ok(enriched)
 }
 
-async fn enrich_row(storage: &ActivityStorage, row: activity_core::Activity) -> SavedActivity {
-    let (accent, icon_base64) = match row.icon_asset_id {
+async fn enrich_row(storage: &ActivityStorage, row: ActivityWithLatestSession) -> SavedActivity {
+    let (accent, icon_base64) = match row.activity.icon_asset_id {
         Some(asset_id) => fetch_icon_assets(storage, asset_id).await,
         None => (None, None),
     };
 
+    saved_activity_from_parts(row.activity, row.latest_session, accent, icon_base64)
+}
+
+/// Assemble a `SavedActivity` from the persisted wire types plus the
+/// already-resolved accent / icon. Shared between [`activity_list`]
+/// (which fans out a fresh icon fetch per row) and the push-event
+/// path in `main.rs` (which already has the icon bytes in hand from
+/// the strategy that just produced them).
+pub fn saved_activity_from_parts(
+    activity: WireActivity,
+    latest_session: Option<WireActivitySession>,
+    accent: Option<AccentColor>,
+    icon_base64: Option<String>,
+) -> SavedActivity {
     SavedActivity {
-        id: row.id,
-        name: row.name,
-        process_name: row.process_name,
-        window_title: row.window_title,
-        started_at: row.started_at,
-        ended_at: row.ended_at,
+        id: activity.id,
+        identity_key: activity.identity_key,
+        display_name: activity.display_name,
+        last_used_at: activity.last_used_at,
         accent,
         icon_base64,
+        live_session: latest_session.map(|s| SavedActivitySession {
+            id: s.id,
+            activity_id: s.activity_id,
+            started_at: s.started_at,
+            ended_at: s.ended_at,
+            window_title: s.window_title,
+            url: s.url,
+        }),
     }
 }
 

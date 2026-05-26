@@ -1,6 +1,7 @@
 use activity_core::{
-    Activity as WireActivity, ActivityErrorResponse, InsertActivityRequest, InsertActivityResponse,
-    ListActivitiesResponse, UpdateActivityRequest, UpdateActivityResponse,
+    ActivityErrorResponse, ActivityInsert, ActivityWithLatestSession, InsertActivitySessionRequest,
+    InsertActivitySessionResponse, ListActivitiesResponse, UpdateActivitySessionRequest,
+    UpdateActivitySessionResponse,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use chrono::{DateTime, Utc};
@@ -11,13 +12,15 @@ use secrecy::ExposeSecret;
 use std::{io::Cursor, sync::Arc};
 use uuid::Uuid;
 
-use crate::{Activity, ActivityError, error::ActivityResult};
+use crate::{ActivityError, ActivitySession, error::ActivityResult};
 
-/// HTTP client wrapper used to persist activities.
+/// HTTP client wrapper used to persist activity sessions.
 ///
-/// The activity write path (`POST /activities`) speaks JSON over HTTPS.
-/// A single [`AuthManager`] drives token refresh and an [`EndpointManager`]
-/// provides the base URL so config changes flip endpoints in lock-step.
+/// The session write path (`POST /activity-sessions`) speaks JSON over
+/// HTTPS. The backend's transaction upserts the parent activity by
+/// `(user_id, identity_key)` *and* inserts the child session in the same
+/// round trip; the response carries both rows so the caller can update
+/// the rail without a follow-up `GET /activities`.
 ///
 /// Asset persistence was removed alongside the bundled-context channel —
 /// the LLM pulls page contents through granular tools per turn, so there
@@ -51,17 +54,19 @@ impl ActivityStorage {
         Ok(format!("Bearer {}", token.expose_secret()))
     }
 
-    /// Create the activity on the backend.
+    /// Insert one session against its parent activity.
     ///
-    /// The client-supplied `id` and `ended_at` are sent in the same request so
-    /// that a subsequent PATCH targets the same row (idempotent retries / heartbeat),
-    /// and so an unexpected crash before the first heartbeat still leaves a
-    /// row with a bounded `ended_at` instead of `NULL`.
-    pub async fn save_activity_to_service(
+    /// The client-supplied session id flows through unchanged so a
+    /// subsequent PATCH (heartbeat-style end ratchet or final close)
+    /// targets the same row even after a retry. The session is sent
+    /// *without* `ended_at`: the parent's `ended_at IS NULL` invariant
+    /// is the rail's live indicator; the backend bumps `last_used_at`
+    /// when the session closes for real.
+    pub async fn save_session_to_service(
         &self,
-        activity: &Activity,
-    ) -> ActivityResult<InsertActivityResponse> {
-        let icon_png_base64 = match activity.icon.as_ref() {
+        session: &ActivitySession,
+    ) -> ActivityResult<InsertActivitySessionResponse> {
+        let icon_png_base64 = match session.icon.as_ref() {
             Some(icon) => {
                 let mut bytes: Vec<u8> = Vec::new();
                 icon.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
@@ -71,49 +76,55 @@ impl ActivityStorage {
             None => None,
         };
 
-        let request = InsertActivityRequest {
-            id: Some(activity.id),
-            name: activity.name.clone(),
-            process_name: activity.process_name.clone(),
-            window_title: activity.window_title(),
-            icon_png_base64,
-            started_at: activity.start,
-            ended_at: Some(activity.end.unwrap_or_else(Utc::now)),
+        let request = InsertActivitySessionRequest {
+            session_id: Some(session.id),
+            activity: ActivityInsert {
+                identity_key: session.activity.key.clone(),
+                display_name: session.activity.display_name.clone(),
+                icon_png_base64,
+            },
+            process_name: session.process_name.clone(),
+            process_id: Some(session.process_id as i32),
+            window_title: session.window_title.clone(),
+            url: session.url.as_ref().map(|u| u.to_string()),
+            started_at: session.started_at,
+            ended_at: session.ended_at,
         };
 
         let bearer = self.bearer().await?;
         let response = self
             .http
-            .post(self.url("/activities"))
+            .post(self.url("/activity-sessions"))
             .header("Authorization", bearer)
             .json(&request)
             .send()
             .await
-            .map_err(|e| ActivityError::network(format!("activity request failed: {e}")))?;
+            .map_err(|e| ActivityError::network(format!("activity session request failed: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
             return Err(map_http_error_response(status, response).await);
         }
 
-        let body: InsertActivityResponse = response.json().await.map_err(|e| {
-            ActivityError::network(format!("Failed to decode activity response: {e}"))
+        let body: InsertActivitySessionResponse = response.json().await.map_err(|e| {
+            ActivityError::network(format!("Failed to decode activity session response: {e}"))
         })?;
         Ok(body)
     }
 
-    /// Fetch the most recent persisted activities for the authenticated user.
+    /// Fetch the most-recent persisted parent activities (and the latest
+    /// session for each) for the authenticated user.
     ///
-    /// The server returns rows in `started_at DESC` order, capped at the
-    /// service-side maximum (`activity_core::MAX_LIST_LIMIT`). Pagination
-    /// parameters are forwarded verbatim — invalid values surface as a
-    /// network error carrying the server's typed `ActivityErrorResponse`
-    /// body.
+    /// The server returns rows ordered by `last_used_at DESC`, capped at
+    /// the service-side maximum (`activity_core::MAX_LIST_LIMIT`).
+    /// Pagination parameters are forwarded verbatim — invalid values
+    /// surface as a network error carrying the server's typed
+    /// [`ActivityErrorResponse`] body.
     pub async fn list_activities(
         &self,
         limit: u32,
         offset: u32,
-    ) -> ActivityResult<Vec<WireActivity>> {
+    ) -> ActivityResult<Vec<ActivityWithLatestSession>> {
         let bearer = self.bearer().await?;
         let response = self
             .http
@@ -137,15 +148,11 @@ impl ActivityStorage {
 
     /// Fetch the raw bytes for an asset by id.
     ///
-    /// `None` indicates a clean 404 (the asset does not exist, or is not
-    /// owned by the authenticated user — the backend deliberately conflates
-    /// the two so foreign ids can't be probed). Any other non-success
-    /// status surfaces as [`ActivityError::Network`]. The returned MIME
-    /// type mirrors the value recorded at upload time.
-    ///
-    /// Kept around for historical assets that were uploaded prior to the
-    /// bundled-context channel's removal; the desktop no longer writes new
-    /// assets through this client.
+    /// `None` indicates a clean 404 (the asset does not exist, or is
+    /// not owned by the authenticated user — the backend deliberately
+    /// conflates the two so foreign ids can't be probed). Any other
+    /// non-success status surfaces as [`ActivityError::Network`]. The
+    /// returned MIME type mirrors the value recorded at upload time.
     pub async fn fetch_asset_bytes(
         &self,
         asset_id: Uuid,
@@ -182,63 +189,72 @@ impl ActivityStorage {
         Ok(Some((bytes.to_vec(), mime_type)))
     }
 
-    /// PATCH the activity's `ended_at` on the backend.
+    /// PATCH a session's `ended_at` on the backend.
     ///
-    /// Used both for heartbeat ticks (best-known end so far) and for real
-    /// transitions (`Stopping` / `NewActivity` overrides the previous). The
-    /// server-side update is idempotent and partial: only `ended_at` is set.
-    pub async fn update_activity_end(
+    /// Used by the collector when a new session arrives (closes the
+    /// previous one with its real end time) and during graceful
+    /// shutdown. The first NULL→set transition on the server also bumps
+    /// the parent's `last_used_at`, so a long-lived session that's just
+    /// closed keeps its parent fresh at the top of the rail.
+    pub async fn update_session_end(
         &self,
-        id: Uuid,
+        session_id: Uuid,
         ended_at: DateTime<Utc>,
-    ) -> ActivityResult<UpdateActivityResponse> {
-        let request = UpdateActivityRequest {
-            name: None,
+    ) -> ActivityResult<UpdateActivitySessionResponse> {
+        let request = UpdateActivitySessionRequest {
             window_title: None,
+            url: None,
             ended_at: Some(ended_at),
         };
-        self.patch_activity(id, &request).await
+        self.patch_session(session_id, &request).await
     }
 
-    /// PATCH the activity's `window_title` on the backend.
+    /// PATCH a session's `window_title` (and optionally `url`) without
+    /// closing it.
     ///
-    /// Fired when a browser strategy reports a title-only update without a
-    /// new activity (e.g. SPA route change inside the same domain).
-    pub async fn update_activity_title(
+    /// Fired when a browser strategy reports a title-only update inside
+    /// the same base domain (SPA route change) — the parent stays put
+    /// and we keep the rail in sync with the live tab. `url` is only
+    /// set when the strategy also passes the new URL alongside the
+    /// title update.
+    pub async fn update_session_title(
         &self,
-        id: Uuid,
+        session_id: Uuid,
         window_title: String,
-    ) -> ActivityResult<UpdateActivityResponse> {
-        let request = UpdateActivityRequest {
-            name: None,
+        url: Option<String>,
+    ) -> ActivityResult<UpdateActivitySessionResponse> {
+        let request = UpdateActivitySessionRequest {
             window_title: Some(window_title),
+            url,
             ended_at: None,
         };
-        self.patch_activity(id, &request).await
+        self.patch_session(session_id, &request).await
     }
 
-    async fn patch_activity(
+    async fn patch_session(
         &self,
-        id: Uuid,
-        request: &UpdateActivityRequest,
-    ) -> ActivityResult<UpdateActivityResponse> {
+        session_id: Uuid,
+        request: &UpdateActivitySessionRequest,
+    ) -> ActivityResult<UpdateActivitySessionResponse> {
         let bearer = self.bearer().await?;
         let response = self
             .http
-            .patch(self.url(&format!("/activities/{id}")))
+            .patch(self.url(&format!("/activity-sessions/{session_id}")))
             .header("Authorization", bearer)
             .json(request)
             .send()
             .await
-            .map_err(|e| ActivityError::network(format!("activity patch failed: {e}")))?;
+            .map_err(|e| ActivityError::network(format!("activity session patch failed: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
             return Err(map_http_error_response(status, response).await);
         }
 
-        let body: UpdateActivityResponse = response.json().await.map_err(|e| {
-            ActivityError::network(format!("Failed to decode activity patch response: {e}"))
+        let body: UpdateActivitySessionResponse = response.json().await.map_err(|e| {
+            ActivityError::network(format!(
+                "Failed to decode activity session patch response: {e}"
+            ))
         })?;
         Ok(body)
     }

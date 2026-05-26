@@ -35,6 +35,4 @@ pub struct CreateAssetRequest {
     #[serde(default)]
     #[cfg_attr(feature = "specta", specta(type = Option<Unknown>))]
     pub metadata: Option<serde_json::Value>,
-    #[serde(default)]
-    pub activity_id: Option<Uuid>,
 }
