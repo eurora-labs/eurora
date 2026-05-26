@@ -7,10 +7,12 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 agent-chain-core = { workspace = true }
+async-trait = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+tokio-util = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 
 specta = { workspace = true, optional = true, features = [

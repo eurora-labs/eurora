@@ -1,5 +1,0 @@
-error: tool method has too many parameters; client_local/server_local sources must not declare a target — expected `(&self, args: <ArgsType>)`
-  --> tests/fail/client_local_with_target.rs:19:17
-   |
-19 |         target: &BrowserOrigin,
-   |                 ^^^^^^^^^^^^^^

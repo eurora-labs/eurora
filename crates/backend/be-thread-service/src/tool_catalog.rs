@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::sync::{Arc, OnceLock};
 
+use agent_chain::messages::ContentBlock;
 use agent_chain::{BaseTool, SystemMessage, language_models::ToolLike};
 use serde_json::Value;
 use thiserror::Error;
@@ -174,6 +175,23 @@ impl TurnCatalog {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+}
+
+/// Wrap the client-supplied prelude blocks in a `SystemMessage` so the
+/// LLM sees them as host-authored context rather than a user turn.
+///
+/// Returns `None` for an empty input so the caller can skip the prepend
+/// entirely (no zero-content system message that would just consume
+/// context-window budget). The blocks themselves are passed through
+/// untouched — strategies own the wording, and any inline payloads are
+/// rewritten into asset references upstream by
+/// [`crate::preliminary::rewrite_preliminary_blocks`] before this
+/// function is reached.
+pub fn build_prelude_system_message(blocks: Vec<ContentBlock>) -> Option<SystemMessage> {
+    if blocks.is_empty() {
+        return None;
+    }
+    Some(SystemMessage::builder().content(blocks).build())
 }
 
 /// Render the live contexts the client advertised into a single LLM-facing
@@ -491,6 +509,24 @@ mod tests {
     #[test]
     fn build_context_system_message_returns_none_when_empty() {
         assert!(build_context_system_message(&[]).is_none());
+    }
+
+    #[test]
+    fn build_prelude_system_message_returns_none_when_empty() {
+        assert!(build_prelude_system_message(Vec::new()).is_none());
+    }
+
+    #[test]
+    fn build_prelude_system_message_wraps_blocks_verbatim() {
+        let blocks = vec![ContentBlock::Text(
+            agent_chain::messages::TextContentBlock::builder()
+                .text("The user is watching `Tokio async patterns`.")
+                .build(),
+        )];
+        let msg = build_prelude_system_message(blocks.clone()).expect("rendered");
+        // The strategy owns the wording; the helper must not add a
+        // preface or footer that would compete with that authorship.
+        assert_eq!(msg.content.iter().cloned().collect::<Vec<_>>(), blocks);
     }
 
     #[test]

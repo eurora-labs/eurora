@@ -45,35 +45,11 @@ pub fn type_collection() -> specta::Types {
     let mut types = euro_bridge_protocol::type_collection();
     types
         .register_mut::<NativeMessage>()
-        .register_mut::<NativeMetadata>()
-        // YouTube adapter types — `CapturedFrame` is the canonical
-        // YouTube-frame shape returned by `browser_youtube_get_current_frame`.
-        .register_mut::<eurora_tools_youtube::TranscriptEntry>()
-        .register_mut::<eurora_tools_youtube::CurrentTimestamp>()
-        .register_mut::<eurora_tools_youtube::Transcript>()
-        .register_mut::<eurora_tools_youtube::CapturedFrame>()
-        // Web adapter types — one entry per type that crosses the bridge.
-        .register_mut::<eurora_tools_web::PageMetadata>()
-        .register_mut::<eurora_tools_web::ViewportMetrics>()
-        .register_mut::<eurora_tools_web::GetAccessibilityTreeArgs>()
-        .register_mut::<eurora_tools_web::AccessibilityTree>()
-        .register_mut::<eurora_tools_web::AxNode>()
-        .register_mut::<eurora_tools_web::ReadabilityArticle>()
-        .register_mut::<eurora_tools_web::SelectedText>()
-        .register_mut::<eurora_tools_web::QuerySelectorArgs>()
-        .register_mut::<eurora_tools_web::QuerySelectorInclude>()
-        .register_mut::<eurora_tools_web::QuerySelectorResult>()
-        .register_mut::<eurora_tools_web::DomNode>()
-        .register_mut::<eurora_tools_web::BoundingBox>()
-        .register_mut::<eurora_tools_web::ListLinksArgs>()
-        .register_mut::<eurora_tools_web::LinksList>()
-        .register_mut::<eurora_tools_web::Link>()
-        .register_mut::<eurora_tools_web::ListFormInputsArgs>()
-        .register_mut::<eurora_tools_web::FormInputsList>()
-        .register_mut::<eurora_tools_web::FormInput>()
-        .register_mut::<eurora_tools_web::FormInputKind>()
-        .register_mut::<eurora_tools_web::InsertTextArgs>()
-        .register_mut::<eurora_tools_web::InsertTextResult>();
+        .register_mut::<NativeMetadata>();
+    // Per-tool argument/return types now live entirely in the extension's
+    // TypeScript (`apps/browser/src/shared/background/observers/*`) and
+    // are surfaced to the desktop via `WireToolDescriptor` schemas in
+    // `LIST_TOOLS` responses. No Rust-side type registration is needed.
     types
 }
 
@@ -109,30 +85,6 @@ mod tests {
             // native-messaging payloads
             "NativeMessage",
             "NativeMetadata",
-            // youtube adapter
-            "TranscriptEntry",
-            "CurrentTimestamp",
-            "Transcript",
-            "CapturedFrame",
-            // web adapter — at least one representative type per tool
-            "PageMetadata",
-            "ViewportMetrics",
-            "AccessibilityTree",
-            "AxNode",
-            "ReadabilityArticle",
-            "SelectedText",
-            "QuerySelectorArgs",
-            "QuerySelectorInclude",
-            "QuerySelectorResult",
-            "DomNode",
-            "BoundingBox",
-            "LinksList",
-            "Link",
-            "FormInputsList",
-            "FormInput",
-            "FormInputKind",
-            "InsertTextArgs",
-            "InsertTextResult",
         ] {
             assert!(
                 names.iter().any(|n| n == required),

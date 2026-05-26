@@ -10,15 +10,15 @@ use agent_chain::{
     messages::{AIMessageChunk, ToolCall, ToolMessage, ToolStatus},
 };
 use be_remote_db::{DatabaseManager, MessageType};
-use eurora_tools::{RemoteToolBus, ToolError};
 use serde_json::Value;
-use thread_core::{ChatServerMessage, MessageNode};
+use thread_core::{ChatServerMessage, MessageNode, ToolErrorWire};
 use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::conversion::convert_db_message_to_base_message;
+use crate::remote_tool_bus::RemoteToolBus;
 use crate::tool_catalog::{TurnCatalog, TurnEntry};
 
 /// Appended as a system message on the forced-synthesis turn so the model
@@ -227,7 +227,7 @@ where
                 };
                 match outcome {
                     Ok(value) => remote_success_message(&tool_call_id, value),
-                    Err(ToolError::Cancelled) if token.is_cancelled() => {
+                    Err(ToolErrorWire::Cancelled) if token.is_cancelled() => {
                         return ToolExecOutcome::Cancelled(results);
                     }
                     Err(err) => remote_error_message(&tool_name, &tool_call_id, err),
@@ -262,7 +262,7 @@ fn remote_success_message(tool_call_id: &str, value: Value) -> AnyMessage {
         .into()
 }
 
-fn remote_error_message(tool_name: &str, tool_call_id: &str, err: ToolError) -> AnyMessage {
+fn remote_error_message(tool_name: &str, tool_call_id: &str, err: ToolErrorWire) -> AnyMessage {
     tracing::warn!(tool = %tool_name, error = %err, "Remote tool call failed");
     ToolMessage::builder()
         .content(format!("Error: {err}"))
@@ -401,10 +401,10 @@ async fn finalize(
 ///
 /// `catalog` is the per-turn tool catalog produced by
 /// [`crate::tool_catalog::TurnCatalog::build`]; `remote_bus` is the
-/// [`eurora_tools::RemoteToolBus`] used to dispatch tools whose
-/// [`TurnEntry`] is `Remote`. The bus is taken as a concrete `Arc<B>` so
-/// the agent loop can be exercised with stub buses in tests; production
-/// callers pass [`crate::remote_tool_bus::ChatRemoteBus`].
+/// [`crate::remote_tool_bus::RemoteToolBus`] used to dispatch tools
+/// whose [`TurnEntry`] is `Remote`. The bus is taken as a concrete
+/// `Arc<B>` so the agent loop can be exercised with stub buses in
+/// tests; production callers pass [`crate::remote_tool_bus::ChatRemoteBus`].
 #[bon::builder]
 pub async fn run_agent_loop<B>(
     tx: mpsc::Sender<ChatServerMessage>,
@@ -509,7 +509,6 @@ mod tests {
     use agent_chain::error::Result as ChainResult;
     use agent_chain::runnables::RunnableConfig;
     use agent_chain::tools::{ArgsSchema, BaseTool, ToolInput, ToolOutput};
-    use eurora_tools::ToolError;
     use serde_json::json;
     use thread_core::WireToolDescriptor;
 
@@ -563,7 +562,7 @@ mod tests {
     /// to the `ToolMessage`.
     struct StubBus {
         recorded: Mutex<Vec<(String, Value)>>,
-        outcome: Mutex<Box<dyn FnMut() -> Result<Value, ToolError> + Send>>,
+        outcome: Mutex<Box<dyn FnMut() -> Result<Value, ToolErrorWire> + Send>>,
     }
 
     impl StubBus {
@@ -574,7 +573,7 @@ mod tests {
             })
         }
 
-        fn err(err: ToolError) -> Arc<Self> {
+        fn err(err: ToolErrorWire) -> Arc<Self> {
             let err = Mutex::new(Some(err));
             Arc::new(Self {
                 recorded: Mutex::new(Vec::new()),
@@ -589,12 +588,13 @@ mod tests {
         }
     }
 
+    #[async_trait]
     impl RemoteToolBus for StubBus {
         async fn call(
             &self,
             descriptor: &WireToolDescriptor,
             arguments: Value,
-        ) -> Result<Value, ToolError> {
+        ) -> Result<Value, ToolErrorWire> {
             self.recorded
                 .lock()
                 .unwrap()
@@ -709,7 +709,7 @@ mod tests {
         let catalog = Arc::new(
             TurnCatalog::build([], [remote_descriptor("browser::test::fail")], &[]).unwrap(),
         );
-        let bus = StubBus::err(ToolError::Remote {
+        let bus = StubBus::err(ToolErrorWire::Remote {
             code: 500,
             message: "upstream boom".to_string(),
             details: None,
@@ -744,7 +744,7 @@ mod tests {
         let catalog = Arc::new(
             TurnCatalog::build([], [remote_descriptor("browser::test::slow")], &[]).unwrap(),
         );
-        let bus = StubBus::err(ToolError::Cancelled);
+        let bus = StubBus::err(ToolErrorWire::Cancelled);
         let cancel = CancellationToken::new();
         cancel.cancel();
 
@@ -763,7 +763,7 @@ mod tests {
     }
 
     /// Guards the `if token.is_cancelled()` arm in `execute_tool_calls`: a
-    /// bus that returns `ToolError::Cancelled` *without* the chat token
+    /// bus that returns `ToolErrorWire::Cancelled` *without* the chat token
     /// having fired is a misbehaving bus, not a cancellation. The round
     /// must continue and surface a normal error tool message rather than
     /// aborting the turn.
@@ -772,7 +772,7 @@ mod tests {
         let catalog = Arc::new(
             TurnCatalog::build([], [remote_descriptor("browser::test::cancel")], &[]).unwrap(),
         );
-        let bus = StubBus::err(ToolError::Cancelled);
+        let bus = StubBus::err(ToolErrorWire::Cancelled);
         let cancel = CancellationToken::new();
 
         let outcome = execute_tool_calls(
@@ -800,7 +800,7 @@ mod tests {
         });
         assert!(
             content_text.contains("tool call cancelled"),
-            "expected ToolError::Cancelled rendering, got {content_text:?}"
+            "expected ToolErrorWire::Cancelled rendering, got {content_text:?}"
         );
     }
 

@@ -1,5 +1,0 @@
-error: tool method must return `Result<_, eurora_tools::ToolError>` (got `Output`)
-  --> tests/fail/return_type_not_result.rs:17:66
-   |
-17 |     async fn boom(&self, target: &BrowserOrigin, args: Empty) -> Output;
-   |                                                                  ^^^^^^

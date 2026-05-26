@@ -131,6 +131,13 @@ impl CollectorService {
         self.saved_activity_ended_event_tx.subscribe()
     }
 
+    /// Handle to the currently active strategy. Cloned `Arc` shares the
+    /// same lock the collector swaps on focus changes, so consumers (the
+    /// chat tool backend) always see the freshest strategy.
+    pub fn active_strategy(&self) -> Arc<RwLock<ActivityStrategy>> {
+        Arc::clone(&self.strategy)
+    }
+
     /// Stop the heartbeat and PATCH the current activity's real
     /// `ended_at` (best-effort, bounded by [`SHUTDOWN_FLUSH_TIMEOUT`]).
     /// Called by [`crate::TimelineManager::stop`] so a clean shutdown

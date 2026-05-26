@@ -63,12 +63,18 @@ export type BlockIndex = number | string;
  *  Payload of a [`ChatClientMessage::CapabilityUpdate`] frame.
  * 
  *  The `tools` list is the client's catalog of remote-dispatch descriptors
- *  for the upcoming turn; the `contexts` list is the set of live contexts
- *  (e.g. the currently-focused YouTube watch page). Both are filtered into
- *  the server's per-turn catalog and rendered into the LLM context.
+ *  for the upcoming turn; the `contexts` list is the set of live structured
+ *  contexts (e.g. the currently-focused YouTube watch page) the server
+ *  renders into a system message via its per-key formatter; the
+ *  `system_blocks` list carries pre-rendered content blocks the host wants
+ *  to prepend to the turn as a separate `SystemMessage` (typically a short
+ *  natural-language summary of what the user is doing right now, produced
+ *  by the active activity strategy). All three are filtered into the
+ *  server's per-turn catalog and LLM context.
  * 
  *  On the wire the payload's fields sit alongside the `type` discriminator,
- *  producing `{"type":"capability_update","tools":[...],"contexts":[...]}`.
+ *  producing
+ *  `{"type":"capability_update","tools":[...],"contexts":[...],"system_blocks":[...]}`.
  *  This is automatic for newtype variants of an internally-tagged enum
  *  (`#[serde(tag = "type")]`) whose inner type serializes as a map — no
  *  `#[serde(flatten)]` is required, and adding one would be redundant. The
@@ -77,6 +83,16 @@ export type BlockIndex = number | string;
 export type CapabilityUpdatePayload = {
 	tools?: WireToolDescriptor[],
 	contexts?: WireActiveContext[],
+	/**
+	 *  Pre-rendered content blocks the host wants the LLM to see as a
+	 *  system-role prelude for the upcoming turn. The blocks are
+	 *  authored client-side (e.g. by the active activity strategy's
+	 *  `get_context()` impl); the server wraps them in a `SystemMessage`
+	 *  and prepends to the LLM context. Inline payloads are routed
+	 *  through the asset-rewrite pass before LLM dispatch, identically
+	 *  to user-supplied blocks.
+	 */
+	system_blocks?: ContentBlock[],
 };
 
 /**

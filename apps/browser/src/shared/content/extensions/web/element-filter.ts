@@ -1,4 +1,17 @@
-import type { FormInputKind } from '../../bindings';
+/// Categorisation of writable text fields surfaced by
+/// [`writableFieldKind`]. The set deliberately excludes password / file /
+/// hidden / submit-style inputs (those are denied by the safety
+/// contract regardless of dispatch path) and non-text input types
+/// (checkbox, radio, range) that don't accept text.
+export type FormInputKind =
+	| 'text'
+	| 'search'
+	| 'email'
+	| 'url'
+	| 'tel'
+	| 'number'
+	| 'textarea'
+	| 'content_editable';
 
 /**
  * Selectors elided from every `query_selector` result regardless of what
