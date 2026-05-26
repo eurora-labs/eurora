@@ -21,6 +21,7 @@ mod message_projection;
 mod preliminary;
 mod remote_tool_bus;
 mod service;
+mod title;
 mod tool_catalog;
 mod tools;
 
