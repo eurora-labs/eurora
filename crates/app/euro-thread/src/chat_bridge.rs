@@ -21,6 +21,7 @@
 
 use std::sync::Arc;
 
+use agent_chain_core::messages::ContentBlock;
 use dashmap::DashMap;
 use euro_transport_policy::CHAT_DISPATCH_DRAIN;
 use serde_json::Value;
@@ -110,12 +111,20 @@ impl ChatBridge {
         cancel: CancellationToken,
         sink: &S,
     ) -> Result<()> {
-        let tools: Vec<WireToolDescriptor> = self.backend.list_tools().await;
+        // `list_tools` and `collect_system_blocks` are independent backend
+        // probes — for the browser strategy each round-trips through the
+        // native-messenger bridge — so we issue them concurrently to keep
+        // the prelude overhead bounded by the slower of the two.
+        let (tools, system_blocks): (Vec<WireToolDescriptor>, Vec<ContentBlock>) = tokio::join!(
+            self.backend.list_tools(),
+            self.backend.collect_system_blocks(),
+        );
 
         socket.try_send(ChatClientMessage::CapabilityUpdate(
             CapabilityUpdatePayload {
                 tools,
                 contexts: Vec::new(),
+                system_blocks,
             },
         ))?;
         socket.try_send(opening.into())?;
@@ -288,6 +297,7 @@ mod tests {
     struct StubBackend {
         canned: Value,
         tools: Vec<WireToolDescriptor>,
+        system_blocks: Vec<ContentBlock>,
         await_cancel: bool,
         seen: Arc<StdMutex<Vec<ToolBackendCall>>>,
     }
@@ -297,6 +307,21 @@ mod tests {
             Arc::new(Self {
                 canned,
                 tools,
+                system_blocks: Vec::new(),
+                await_cancel: false,
+                seen: Arc::new(StdMutex::new(Vec::new())),
+            })
+        }
+
+        fn with_system_blocks(
+            canned: Value,
+            tools: Vec<WireToolDescriptor>,
+            system_blocks: Vec<ContentBlock>,
+        ) -> Arc<Self> {
+            Arc::new(Self {
+                canned,
+                tools,
+                system_blocks,
                 await_cancel: false,
                 seen: Arc::new(StdMutex::new(Vec::new())),
             })
@@ -306,6 +331,7 @@ mod tests {
             Arc::new(Self {
                 canned: json!({}),
                 tools,
+                system_blocks: Vec::new(),
                 await_cancel: true,
                 seen: Arc::new(StdMutex::new(Vec::new())),
             })
@@ -336,6 +362,10 @@ mod tests {
     impl ToolBackend for StubBackend {
         async fn list_tools(&self) -> Vec<WireToolDescriptor> {
             self.tools.clone()
+        }
+
+        async fn collect_system_blocks(&self) -> Vec<ContentBlock> {
+            self.system_blocks.clone()
         }
 
         async fn dispatch(
@@ -417,6 +447,7 @@ mod tests {
                 assert_eq!(payload.tools.len(), 1);
                 assert_eq!(payload.tools[0].definition.name, TIMESTAMP_TOOL);
                 assert!(payload.contexts.is_empty());
+                assert!(payload.system_blocks.is_empty());
             }
             other => panic!("expected CapabilityUpdate, got {other:?}"),
         }
@@ -452,6 +483,51 @@ mod tests {
             ChatClientMessage::CapabilityUpdate(payload) => {
                 assert!(payload.tools.is_empty());
                 assert!(payload.contexts.is_empty());
+                assert!(payload.system_blocks.is_empty());
+            }
+            other => panic!("expected CapabilityUpdate, got {other:?}"),
+        }
+        assert!(matches!(
+            next_outbound(&mut harness).await,
+            ChatClientMessage::Send(_)
+        ));
+
+        harness
+            .server_to_client
+            .send(Ok(ChatServerMessage::Final {
+                messages: Vec::new(),
+            }))
+            .unwrap();
+        run.await.unwrap().expect("turn completes");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn capability_update_carries_system_blocks_from_backend() {
+        let prelude = vec![ContentBlock::Text(
+            agent_chain_core::messages::TextContentBlock::builder()
+                .text("The user is watching `Tokio async patterns`.")
+                .build(),
+        )];
+        let backend = StubBackend::with_system_blocks(
+            json!({"ok": true}),
+            vec![sample_descriptor(TIMESTAMP_TOOL)],
+            prelude.clone(),
+        );
+        let bridge = ChatBridge::new(backend);
+
+        let (socket, mut harness) = ChatSocket::test_pair();
+        let (sink, _captured) = collecting_sink();
+        let cancel = CancellationToken::new();
+
+        let run =
+            tokio::spawn(
+                async move { bridge.run_turn(socket, send_opening(), cancel, &sink).await },
+            );
+
+        match next_outbound(&mut harness).await {
+            ChatClientMessage::CapabilityUpdate(payload) => {
+                assert_eq!(payload.tools.len(), 1);
+                assert_eq!(payload.system_blocks, prelude);
             }
             other => panic!("expected CapabilityUpdate, got {other:?}"),
         }

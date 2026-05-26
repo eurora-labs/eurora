@@ -1,10 +1,14 @@
 //! Desktop implementation of [`euro_thread::commands::ChatContextProvider`].
 //!
-//! Surfaces a single [`ContextChip`] describing the current activity so the
-//! UI can render it; the LLM receives the active-context summary through
-//! the system message built by `be-thread-service::tool_catalog::build_context_system_message`
-//! and pulls page contents through granular tool calls. The desktop no
-//! longer speculatively bundles asset/snapshot blocks into every turn.
+//! Returns the single [`ContextChip`] describing the user's current
+//! activity, used by the UI to render a chip alongside the in-flight
+//! human message and to persist the chip set on `ChatSendRequest.asset_chips_json`.
+//!
+//! The LLM-facing prelude (`"The user is currently watching ..."`) is
+//! delivered separately — it ships in the `system_blocks` field of the
+//! chat bridge's `CapabilityUpdate` frame, pulled directly from the
+//! active activity strategy via the `ToolBackend::collect_system_blocks`
+//! hook in `euro-activity`. No round trip through the UI is required.
 //!
 //! Activity rows themselves are pushed to the remote service by the
 //! collector at creation time — there is no duplicate upload here.
@@ -45,9 +49,6 @@ impl ChatContextProvider for TimelineChatContextProvider {
             .map(|chip| vec![chip])
             .unwrap_or_default();
 
-        Ok(ChatContext {
-            content_blocks: Vec::new(),
-            asset_chips,
-        })
+        Ok(ChatContext { asset_chips })
     }
 }

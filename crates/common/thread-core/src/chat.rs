@@ -13,7 +13,7 @@
 //! the per-turn catalog (`be-thread-service`), and the agent-loop wiring
 //! that actually exercises them land in later phases.
 
-use agent_chain_core::messages::AIMessageChunk;
+use agent_chain_core::messages::{AIMessageChunk, ContentBlock};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -78,12 +78,18 @@ pub enum ChatClientMessage {
 /// Payload of a [`ChatClientMessage::CapabilityUpdate`] frame.
 ///
 /// The `tools` list is the client's catalog of remote-dispatch descriptors
-/// for the upcoming turn; the `contexts` list is the set of live contexts
-/// (e.g. the currently-focused YouTube watch page). Both are filtered into
-/// the server's per-turn catalog and rendered into the LLM context.
+/// for the upcoming turn; the `contexts` list is the set of live structured
+/// contexts (e.g. the currently-focused YouTube watch page) the server
+/// renders into a system message via its per-key formatter; the
+/// `system_blocks` list carries pre-rendered content blocks the host wants
+/// to prepend to the turn as a separate `SystemMessage` (typically a short
+/// natural-language summary of what the user is doing right now, produced
+/// by the active activity strategy). All three are filtered into the
+/// server's per-turn catalog and LLM context.
 ///
 /// On the wire the payload's fields sit alongside the `type` discriminator,
-/// producing `{"type":"capability_update","tools":[...],"contexts":[...]}`.
+/// producing
+/// `{"type":"capability_update","tools":[...],"contexts":[...],"system_blocks":[...]}`.
 /// This is automatic for newtype variants of an internally-tagged enum
 /// (`#[serde(tag = "type")]`) whose inner type serializes as a map — no
 /// `#[serde(flatten)]` is required, and adding one would be redundant. The
@@ -95,6 +101,15 @@ pub struct CapabilityUpdatePayload {
     pub tools: Vec<WireToolDescriptor>,
     #[serde(default)]
     pub contexts: Vec<WireActiveContext>,
+    /// Pre-rendered content blocks the host wants the LLM to see as a
+    /// system-role prelude for the upcoming turn. The blocks are
+    /// authored client-side (e.g. by the active activity strategy's
+    /// `get_context()` impl); the server wraps them in a `SystemMessage`
+    /// and prepends to the LLM context. Inline payloads are routed
+    /// through the asset-rewrite pass before LLM dispatch, identically
+    /// to user-supplied blocks.
+    #[serde(default)]
+    pub system_blocks: Vec<ContentBlock>,
 }
 
 /// Payload of a [`ChatClientMessage::Send`] frame.
@@ -276,6 +291,7 @@ mod tests {
                     .with_timezone(&Utc),
                 data: json!({"video_id": "abc123"}),
             }],
+            system_blocks: vec![sample_text_block()],
         });
         let s = serde_json::to_string(&m).unwrap();
         let back: ChatClientMessage = serde_json::from_str(&s).unwrap();
@@ -288,7 +304,8 @@ mod tests {
         // tag rename, default-on-encode change) must update this golden
         // and is reviewable in the diff. The newtype `CapabilityUpdatePayload`
         // is inlined into the externally-tagged enum so the JSON object's
-        // top-level fields are `type`, `tools`, and `contexts` — same as the
+        // top-level fields are `type`, `tools`, `contexts`, and
+        // `system_blocks` — flat with the discriminator, same as the
         // pre-struct shape.
         let m = ChatClientMessage::CapabilityUpdate(CapabilityUpdatePayload {
             tools: vec![WireToolDescriptor {
@@ -312,11 +329,16 @@ mod tests {
                     .with_timezone(&Utc),
                 data: json!({"video_id": "abc123"}),
             }],
+            system_blocks: vec![ContentBlock::Text(
+                TextContentBlock::builder()
+                    .text("The user is watching `Tokio async patterns`.")
+                    .build(),
+            )],
         });
         let s = serde_json::to_string(&m).unwrap();
         assert_eq!(
             s,
-            r#"{"type":"capability_update","tools":[{"name":"browser_youtube_get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false}],"contexts":[{"key":"youtube::watch_page","activated_at":"2026-01-15T12:00:00Z","data":{"video_id":"abc123"}}]}"#
+            r#"{"type":"capability_update","tools":[{"name":"browser_youtube_get_current_timestamp","description":"x","parameters":{},"output_schema":{},"timeout_ms":2000,"source":{"kind":"bridge","app_kind":"browser"},"required_contexts":["youtube::watch_page"],"requires_user_approval":false}],"contexts":[{"key":"youtube::watch_page","activated_at":"2026-01-15T12:00:00Z","data":{"video_id":"abc123"}}],"system_blocks":[{"type":"text","id":null,"text":"The user is watching `Tokio async patterns`.","annotations":null,"index":null,"extras":null}]}"#
         );
     }
 

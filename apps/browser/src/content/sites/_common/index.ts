@@ -80,8 +80,18 @@ export function main() {
 	if (initialized) return;
 	initialized = true;
 
-	browser.runtime.onMessage.addListener(async (message) => {
+	// Listener is intentionally NOT `async`: an async listener returning
+	// `undefined` resolves to `Promise<undefined>`, which webextension-
+	// polyfill treats as "I'm replying asynchronously" and forwards the
+	// `undefined` to the sender — stealing the response from siblings
+	// (notably `installToolHandlers`'s `LIST_TOOLS` / `GET_CONTEXT` /
+	// `INVOKE_TOOL` cases that are registered on the same runtime).
+	// Returning a bare `undefined` lets the polyfill return `false` to
+	// Chrome and fall through to the next listener; only the matching
+	// `GET_METADATA` case returns a Promise.
+	// eslint-disable-next-line @typescript-eslint/promise-function-async -- see comment above; converting this to `async` reintroduces the listener-ownership race.
+	browser.runtime.onMessage.addListener((message) => {
 		if (!isCommonMessage(message)) return undefined;
-		return await handleGetMetadata();
+		return handleGetMetadata();
 	});
 }

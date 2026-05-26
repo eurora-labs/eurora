@@ -29,7 +29,7 @@ export const getCurrentTimestamp: Tool<typeof Args, Result> = {
 	descriptor: {
 		name: 'youtube_get_current_timestamp',
 		description:
-			"Return the user's current playback position on the active YouTube watch page, plus total duration and whether the video is playing. Fails if the page has no player or the player hasn't loaded.",
+			"Return the user's current playback position on the active YouTube watch or shorts page, plus total duration and whether the video is playing. Fails if the page has no player or the player hasn't loaded.",
 		parameters: zodToJsonSchema(Args) as Record<string, unknown>,
 		output_schema: zodToJsonSchema(Out) as Record<string, unknown>,
 		timeout_ms: 2_000,

@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use agent_chain_core::messages::ContentBlock;
 use async_trait::async_trait;
 use serde_json::Value;
 use thread_core::{ToolBackend, ToolBackendCall, ToolErrorWire, WireToolDescriptor};
@@ -20,7 +21,7 @@ use crate::strategies::ActivityStrategyFunctionality;
 ///
 /// Holds an `Arc` to the same `RwLock` `CollectorService` swaps on focus
 /// changes, so the chat side always sees the freshest strategy without
-/// any reconnection. Reads only — strategies expose `get_context` /
+/// any reconnection. Reads only — strategies expose `get_tools` /
 /// `dispatch_tool` as `&self` so tool dispatch never blocks focus
 /// updates.
 pub struct ActivityToolBackend {
@@ -36,10 +37,20 @@ impl ActivityToolBackend {
 #[async_trait]
 impl ToolBackend for ActivityToolBackend {
     async fn list_tools(&self) -> Vec<WireToolDescriptor> {
-        match self.strategy.read().await.get_context().await {
+        match self.strategy.read().await.get_tools().await {
             Ok(tools) => tools,
             Err(err) => {
-                tracing::warn!("strategy get_context failed: {err}");
+                tracing::warn!("strategy get_tools failed: {err}");
+                Vec::new()
+            }
+        }
+    }
+
+    async fn collect_system_blocks(&self) -> Vec<ContentBlock> {
+        match self.strategy.read().await.get_context().await {
+            Ok(blocks) => blocks.into_inner(),
+            Err(err) => {
+                tracing::debug!("strategy get_context failed: {err}");
                 Vec::new()
             }
         }

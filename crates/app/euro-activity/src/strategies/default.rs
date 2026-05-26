@@ -13,6 +13,7 @@
 //! contextual data it needs through granular tools, not through this
 //! strategy.
 
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
 use focus_tracker::FocusedWindow;
 use serde_json::Value;
@@ -121,8 +122,12 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         })
     }
 
-    async fn get_context(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
         Ok(vec![])
+    }
+
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        Ok(ContentBlocks::new())
     }
 
     async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {

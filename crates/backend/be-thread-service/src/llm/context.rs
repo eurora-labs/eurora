@@ -15,7 +15,9 @@ use crate::error::ThreadServiceError;
 use crate::llm::Providers;
 use crate::llm::openai_schema;
 use crate::message_projection::{collect_thread_images, project_for_text_llm};
-use crate::tool_catalog::{TurnCatalog, build_context_system_message};
+use crate::tool_catalog::{
+    TurnCatalog, build_context_system_message, build_prelude_system_message,
+};
 
 /// Per-turn LLM context: the messages to invoke the model with, the bound
 /// model itself, and the unified tool catalog the agent loop will dispatch
@@ -35,19 +37,35 @@ pub struct LlmContext {
 /// them lazily, and prepend a system prompt teaching the model how to use it.
 ///
 /// `remote_descriptors` are the tool descriptors the client advertised in
-/// its `CapabilityUpdate` frame, and `active_contexts` are the contexts the
-/// client said are live. Both are filtered into the merged
-/// [`TurnCatalog`] alongside the server-local tools; the LLM is bound with
-/// the union so it sees one flat catalog.
+/// its `CapabilityUpdate` frame, `active_contexts` are the structured
+/// contexts the client said are live, and `prelude_blocks` is the
+/// host-authored summary of what the user is currently doing (e.g. a
+/// short natural-language block from the active activity strategy).
+/// Tool descriptors and active contexts are filtered into the merged
+/// [`TurnCatalog`] alongside the server-local tools; the LLM is bound
+/// with the union so it sees one flat catalog. Prelude blocks and
+/// active contexts each render into their own `SystemMessage`, with the
+/// prelude first (what the user is doing) and the contexts second (which
+/// tools are pinned to what) so the model reads context before tool
+/// guidance.
 pub async fn prepare_llm_context(
     providers: &Providers,
     asset_service: &Arc<AssetService>,
     mut messages: Vec<AnyMessage>,
     remote_descriptors: Vec<WireToolDescriptor>,
     active_contexts: &[WireActiveContext],
+    prelude_blocks: Vec<ContentBlock>,
 ) -> Result<LlmContext, ThreadServiceError> {
+    // Insertion order matters: the deepest `insert(0, ...)` ends up
+    // closest to index 0, so push the *later*-rendered system message
+    // first and the *earlier*-rendered one last. After both inserts the
+    // head of `messages` reads: prelude (what the user is doing),
+    // contexts (which tools are pinned to what), original history.
     if let Some(system_message) = build_context_system_message(active_contexts) {
         messages.insert(0, system_message.into());
+    }
+    if let Some(prelude_message) = build_prelude_system_message(prelude_blocks) {
+        messages.insert(0, prelude_message.into());
     }
 
     resolve_blocks::<PlainTextBlock>(asset_service, &mut messages).await;

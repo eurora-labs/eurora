@@ -1,3 +1,4 @@
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
 use euro_process::AppProcess;
 use focus_tracker::FocusedWindow;
@@ -66,8 +67,12 @@ impl ActivityStrategyFunctionality for NoStrategy {
         Ok(StrategyMetadata::default())
     }
 
-    async fn get_context(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
         Ok(vec![])
+    }
+
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        Ok(ContentBlocks::new())
     }
 
     async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {

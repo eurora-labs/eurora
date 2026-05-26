@@ -104,10 +104,13 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 
 		// Tool plumbing is pure forwarding. The desktop decides which
 		// `tab_id` to address; the per-site content-script watcher owns
-		// the tool list and dispatch. Background sees zero tool names,
-		// zero schemas, zero per-site logic.
+		// the tool list, the context summary, and dispatch. Background
+		// sees zero tool names, zero schemas, zero per-site logic.
 		case 'LIST_TOOLS':
 			return await forwardTabRpc(frame, 'LIST_TOOLS');
+
+		case 'GET_CONTEXT':
+			return await forwardTabRpc(frame, 'GET_CONTEXT');
 
 		case 'INVOKE_TOOL':
 			return await forwardTabRpc(frame, 'INVOKE_TOOL');

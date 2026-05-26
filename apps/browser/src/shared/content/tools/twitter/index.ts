@@ -7,7 +7,7 @@ import type { Tool } from '../types';
 import type { z } from 'zod';
 
 export { fetchTweetImages, getPageContext, getTweetThread, listTimelineTweets };
-export { getPageKind } from './_lib';
+export { getPageKind, resolveProfileHandle, resolveSearchQuery } from './_lib';
 export type { PageKind } from './_lib';
 
 type ToolList = readonly Tool<z.ZodTypeAny, unknown>[];

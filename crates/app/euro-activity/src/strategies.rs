@@ -1,4 +1,5 @@
 use crate::utils::render_svg_bytes;
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
@@ -141,7 +142,23 @@ pub trait ActivityStrategyFunctionality {
     /// Tools the LLM should see while this strategy is active. The chat
     /// bridge snapshots this once per turn and forwards every inbound
     /// `ToolRequest` back through [`Self::dispatch_tool`].
-    async fn get_context(&self) -> ActivityResult<Vec<WireToolDescriptor>>;
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>>;
+
+    /// Curated per-turn context describing what the user is currently
+    /// doing, returned as a short list of [`ContentBlocks`] that the chat
+    /// layer prepends to the outgoing turn.
+    ///
+    /// Unlike the legacy "stuff the whole page body in" approach, the
+    /// expectation here is a *summary*: a single short natural-language
+    /// block (e.g. `"The user is currently watching a video titled X"`)
+    /// produced by whichever side knows best — for browsers, the
+    /// per-site content script; for native integrations, the strategy
+    /// itself. The LLM still pulls page contents through granular tools
+    /// when it actually needs them.
+    ///
+    /// Best-effort: implementations must not fail a chat turn. An empty
+    /// [`ContentBlocks`] simply means "nothing to add this turn".
+    async fn get_context(&self) -> ActivityResult<ContentBlocks>;
 
     /// Execute one inbound tool call. The default behaviour for
     /// strategies that surface no tools is to surface `ContextUnavailable`

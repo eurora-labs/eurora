@@ -1,5 +1,4 @@
 import { InjectionToken } from '@eurora/shared/context';
-import type { ContentBlock } from '$lib/models/content-blocks/index.js';
 import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
 import type { MessageSearchResult, ThreadSearchResult } from '$lib/models/search.model.js';
 import type { ChatServerMessage } from '$lib/models/streaming.js';
@@ -9,15 +8,18 @@ import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
 export type BranchDirection = -1 | 0 | 1;
 
 /**
- * Per-turn context contributed by the host environment.
+ * Per-turn UI metadata contributed by the host environment.
  *
- * On desktop this is the active timeline activity (asset bytes, snapshot
- * blocks, the matching context chips); on web it is empty. The chat service
- * merges `contentBlocks` into the user's message and persists `assetChips`
- * alongside it via `ChatSendRequest.asset_chips_json`.
+ * On desktop this carries the active timeline activity's context chip;
+ * on web it is empty. The chat service persists `assetChips` alongside
+ * the user message via `ChatSendRequest.asset_chips_json`.
+ *
+ * The LLM-facing prelude (a short summary of what the user is doing,
+ * authored by the active activity strategy) is delivered separately
+ * over the chat WebSocket via the `system_blocks` field on the
+ * `CapabilityUpdate` frame; the frontend never sees it.
  */
 export interface ChatContext {
-	contentBlocks: ContentBlock[];
 	assetChips: AssetChip[];
 }
 

@@ -117,7 +117,7 @@ export class ThreadService implements IThreadService {
 	}
 
 	async collectContext(_threadId: string): Promise<ChatContext> {
-		return { contentBlocks: [], assetChips: [] };
+		return { assetChips: [] };
 	}
 
 	sendMessage(

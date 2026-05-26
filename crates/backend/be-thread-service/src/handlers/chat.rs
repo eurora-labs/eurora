@@ -541,7 +541,7 @@ async fn run_turn(
     // Prepare the LLM context *before* persisting the human message so that
     // a context-prep failure doesn't leave a half-completed turn (a human
     // row with no AI response) in the thread history.
-    let prepared = prepare_turn(&state, messages, capability).await?;
+    let prepared = prepare_turn(&state, user_id, messages, capability).await?;
 
     let human_db_message = state
         .db
@@ -656,7 +656,7 @@ async fn regenerate_ai_response(
         .await?;
 
     let messages = load_active_branch_context(&state, user_id, thread_id).await?;
-    let prepared = prepare_turn(&state, messages, capability).await?;
+    let prepared = prepare_turn(&state, user_id, messages, capability).await?;
 
     spawn_agent_loop(
         state,
@@ -688,22 +688,30 @@ struct SpawnContext {
 
 /// Build the per-turn LLM context from the active branch and the client's
 /// `CapabilityUpdate`. Centralised so both `run_turn` and
-/// `regenerate_ai_response` route through the same prep path.
+/// `regenerate_ai_response` route through the same prep path. The prelude
+/// blocks in `CapabilityUpdatePayload` are routed through
+/// [`rewrite_preliminary_blocks`] alongside any user content so inline
+/// payloads (large text, base64 images) become asset references before
+/// reaching the LLM — identical to the user-content rewrite path.
 async fn prepare_turn(
     state: &AppState,
+    user_id: Uuid,
     messages: Vec<AnyMessage>,
     capability: CapabilityUpdatePayload,
 ) -> ThreadServiceResult<LlmContext> {
     let CapabilityUpdatePayload {
         tools: remote_tools,
         contexts: active_contexts,
+        system_blocks: prelude_blocks,
     } = capability;
+    let prelude_blocks = rewrite_preliminary_blocks(state, user_id, prelude_blocks).await?;
     prepare_llm_context(
         &state.providers,
         &state.asset_service,
         messages,
         remote_tools,
         &active_contexts,
+        prelude_blocks,
     )
     .await
 }

@@ -110,7 +110,7 @@ export class FakeThreadService implements IThreadService {
 	streamFrames: ChatServerMessage[] = [];
 	streamDelay = 0;
 
-	context: ChatContext = { contentBlocks: [], assetChips: [] };
+	context: ChatContext = { assetChips: [] };
 
 	seed(count: number): void {
 		this.threads = Array.from({ length: count }, (_, i) =>
