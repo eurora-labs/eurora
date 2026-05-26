@@ -351,12 +351,24 @@ export type ChatSendRequest = {
  *  semantics) and replace placeholder state with the `Final.messages` payload
  *  when the turn ends. The tool-routing pair `ToolRequest` + `ToolCancel`
  *  drives remote-tool RPC over the same socket.
+ * 
+ *  `TitleUpdated` is non-terminal: the server emits it once per turn (right
+ *  before the terminal frame, or right before the socket closes on cancel)
+ *  when the thread's auto-generated title changes. Clients should mutate
+ *  their thread state in place rather than expecting it bundled with
+ *  `Final` — cancelled turns also carry a title but emit no `Final`.
  */
 export type ChatServerMessage = 
 /**  The user's message has been persisted; clients should display it. */
 { type: "confirmed_human_message"; message: MessageNode } | 
 /**  One streaming chunk from the AI. */
 { type: "chunk"; chunk: AIMessageChunk } | 
+/**
+ *  The thread's auto-generated title was updated this turn. Non-terminal;
+ *  clients update the thread row in place. Emitted at most once per turn,
+ *  always before any terminal frame.
+ */
+{ type: "title_updated"; title: string } | 
 /**
  *  The turn ended successfully; tree positions for everything that was
  *  persisted during this turn (human + AI + any tool messages).

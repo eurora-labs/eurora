@@ -256,7 +256,6 @@ export class ChatService {
 		const needsNewThread = !current || existing?.isTransient === true;
 
 		let threadId: string;
-		let isNewThread = false;
 
 		if (needsNewThread) {
 			if (current && existing?.isTransient) {
@@ -269,7 +268,6 @@ export class ChatService {
 			this.activeThreadId = thread.id;
 			threadId = thread.id;
 			this.newThread = thread;
-			isNewThread = true;
 		} else {
 			threadId = current!;
 		}
@@ -279,17 +277,8 @@ export class ChatService {
 
 		const { humanNode, sink } = this.appendPlaceholders(entry, text, assetChips);
 
-		const onFirstChunk = isNewThread
-			? () => {
-					this.threadClient.generateTitle(threadId).then((updated) => {
-						this.updateThread(updated);
-					});
-				}
-			: undefined;
-
 		const receivedFinal = await this.consumeStream(entry, threadId, text, humanNode, sink, {
 			assetChips,
-			onFirstChunk,
 			activityId,
 		});
 
@@ -448,24 +437,21 @@ export class ChatService {
 
 	/**
 	 * Shared chat-stream consumer. Drains the wire envelopes from `stream`
-	 * into `entry`: routes streaming chunks through the sink and swaps the
-	 * placeholder for the persisted message on `final`. Returns `true` iff
-	 * a `final` frame was observed; callers reconcile against the server
-	 * when the stream ends without one.
+	 * into `entry`: routes streaming chunks through the sink, applies
+	 * server-pushed title updates, and swaps the placeholder for the
+	 * persisted message on `final`. Returns `true` iff a `final` frame was
+	 * observed; callers reconcile against the server when the stream ends
+	 * without one (cancellation, error, transport drop).
 	 *
 	 * The discriminator is matched exhaustively — any future
 	 * [`ChatServerMessage`] variant will fail the build at the `default`
 	 * arm rather than silently dropping into a fallthrough.
 	 *
 	 * Per-turn divergence between `send` and `regenerate` is funnelled
-	 * through `policy`:
-	 * - `onConfirmedHumanMessage` runs when the server reports the user
-	 *   message has been persisted. `send` uses the hook to swap the
-	 *   temp human node and bind the abort controller; `regenerate`
-	 *   passes `null` because no new human message exists.
-	 * - `onFirstChunk` fires exactly once, immediately before the first
-	 *   content chunk is appended. Used by `send` to lazily generate a
-	 *   thread title.
+	 * through `policy.onConfirmedHumanMessage`: `send` uses the hook to
+	 * swap the temp human node and bind the abort controller;
+	 * `regenerate` passes `null` because no new human message exists, so
+	 * stray envelopes are ignored.
 	 */
 	private async consumeChatStream(
 		entry: ThreadMessages,
@@ -473,7 +459,6 @@ export class ChatService {
 		policy: ChatStreamPolicy,
 	): Promise<boolean> {
 		const { sink } = policy;
-		let onFirstChunk = policy.onFirstChunk;
 		let receivedFinal = false;
 
 		try {
@@ -483,11 +468,16 @@ export class ChatService {
 						policy.onConfirmedHumanMessage?.(event.message);
 						break;
 					case 'chunk':
-						if (onFirstChunk) {
-							onFirstChunk();
-							onFirstChunk = undefined;
-						}
 						sink.appendChunk(event.chunk);
+						break;
+					case 'title_updated':
+						// The backend's agent loop auto-titles untitled threads
+						// at the end of every turn and emits this frame before
+						// the terminal `final`/`error` (or before dropping the
+						// socket on cancel). Mutating the thread in place lets
+						// the sidebar's Svelte `$state` binding repaint without
+						// an extra HTTP round trip.
+						this.updateThread({ ...entry.thread, title: event.title });
 						break;
 					case 'final': {
 						const aiMsg = event.messages[0];
@@ -540,7 +530,6 @@ export class ChatService {
 			parentMessageId?: string | null;
 			assetChips?: AssetChip[];
 			preservedAssetChips?: AssetChip[];
-			onFirstChunk?: () => void;
 			activityId?: string | undefined;
 		} = {},
 	): Promise<boolean> {
@@ -563,7 +552,6 @@ export class ChatService {
 				});
 				this.abortController = abortController;
 			},
-			onFirstChunk: options.onFirstChunk,
 		});
 	}
 
@@ -679,8 +667,6 @@ interface ChatStreamPolicy {
 	 * confirm and passes `null` — stray envelopes are then ignored.
 	 */
 	onConfirmedHumanMessage: ((confirmed: MessageNode) => void) | null;
-	/** Fires exactly once, immediately before the first content chunk lands. */
-	onFirstChunk?: () => void;
 }
 
 export const CHAT_SERVICE = new InjectionToken<ChatService>('ChatService');

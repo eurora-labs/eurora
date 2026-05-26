@@ -344,98 +344,100 @@ async fn save_accumulated_message(
     Some(ai_message)
 }
 
-async fn finalize(
-    tx: &mpsc::Sender<ChatServerMessage>,
+/// What a turn produced, viewed by the outer orchestrator. Carries the
+/// information the wire layer needs to choose between `Final`, `Error`,
+/// or no terminal frame at all.
+///
+/// `MessageNode` is large (~470 B) so it is boxed in `Completed`: keeps
+/// the enum's stack footprint to one pointer when present and zero when
+/// absent, instead of inlining the full node into every variant.
+enum AgentTurnOutcome {
+    /// The turn finished normally. `ai_node` is `Some` when the model
+    /// produced content that was persisted and projected into wire shape;
+    /// `None` when the model returned nothing (e.g. an empty refusal) or
+    /// the DB row exists but projection failed — in the latter case the
+    /// row is in the DB and the client will reconcile on its next
+    /// message fetch, but we have no node to put in `Final.messages`.
+    Completed { ai_node: Option<Box<MessageNode>> },
+    /// The turn ended because the user cancelled mid-stream (or the
+    /// socket dropped). Any partial response was persisted on a
+    /// best-effort basis; the client owns its placeholder.
+    Cancelled,
+    /// The turn aborted before completing. The pair propagates verbatim
+    /// to `ChatServerMessage::Error`.
+    Errored { kind: String, message: String },
+}
+
+/// Persist the accumulated AI response and project it into a wire node.
+///
+/// Returns `Ok(None)` when there is nothing to save (empty accumulator)
+/// or when the DB row was written but the wire projection failed (logged;
+/// the client will reconcile via the next message fetch). Returns
+/// `Err(msg)` when the DB write itself failed. The wire node is boxed so
+/// the caller can hand it straight to [`AgentTurnOutcome::Completed`]
+/// without copying the ~470-byte payload back onto the stack.
+async fn save_turn_result(
     db: &DatabaseManager,
     thread_id: Uuid,
     user_id: Uuid,
     human_message_id: Uuid,
     acc: &ChatAccumulator,
-    cancelled: bool,
-) {
+) -> Result<Option<Box<MessageNode>>, String> {
     if !acc.has_content() {
-        return;
+        return Ok(None);
     }
-
     let Some(ai_message) = save_accumulated_message(db, thread_id, user_id, acc).await else {
-        if !cancelled {
-            let _ = tx
-                .send(ChatServerMessage::Error {
-                    kind: "internal_error".to_string(),
-                    message: "Failed to save AI message".to_string(),
-                })
-                .await;
-        }
-        return;
+        return Err("Failed to save AI message".to_string());
     };
-
-    if cancelled {
-        return;
-    }
-
-    let ai_node = match convert_db_message_to_base_message(ai_message) {
-        Ok(message) => MessageNode {
+    match convert_db_message_to_base_message(ai_message) {
+        Ok(message) => Ok(Some(Box::new(MessageNode {
             parent_id: Some(human_message_id),
             message,
             children: vec![],
             sibling_index: 0,
             depth: 0,
-        },
+        }))),
         Err(e) => {
             tracing::error!("Failed to project AI message for final frame: {e}");
-            return;
+            Ok(None)
         }
-    };
-
-    let _ = tx
-        .send(ChatServerMessage::Final {
-            messages: vec![ai_node],
-        })
-        .await;
+    }
 }
 
-/// Run the full agent loop: up to `max_tool_rounds` tool-using rounds,
-/// followed by a forced-synthesis round if the budget is exhausted with
-/// pending tool calls. Streamed chunks and the terminal `Final` envelope are
-/// forwarded to `tx`. The aggregated AI message is persisted on completion.
-///
-/// `catalog` is the per-turn tool catalog produced by
-/// [`crate::tool_catalog::TurnCatalog::build`]; `remote_bus` is the
-/// [`crate::remote_tool_bus::RemoteToolBus`] used to dispatch tools
-/// whose [`TurnEntry`] is `Remote`. The bus is taken as a concrete
-/// `Arc<B>` so the agent loop can be exercised with stub buses in
-/// tests; production callers pass [`crate::remote_tool_bus::ChatRemoteBus`].
-#[bon::builder]
-pub async fn run_agent_loop<B>(
-    tx: mpsc::Sender<ChatServerMessage>,
-    token: CancellationToken,
-    db: Arc<DatabaseManager>,
-    chat_model: Arc<dyn BaseChatModel + Send + Sync>,
-    catalog: Arc<TurnCatalog>,
-    remote_bus: Arc<B>,
+/// Drive the agent loop to a single [`AgentTurnOutcome`]. Streams `Chunk`
+/// frames over `tx` during the loop but never emits a terminal frame —
+/// the caller maps the outcome to `Final`/`Error`/silence so any
+/// post-turn work (e.g. auto-title) can land between the loop body and
+/// the terminal.
+#[allow(clippy::too_many_arguments)]
+async fn drive_turn<B>(
+    tx: &mpsc::Sender<ChatServerMessage>,
+    token: &CancellationToken,
+    db: &DatabaseManager,
+    chat_model: &(dyn BaseChatModel + Send + Sync),
+    catalog: &TurnCatalog,
+    remote_bus: &B,
     mut messages: Vec<AnyMessage>,
     thread_id: Uuid,
     user_id: Uuid,
     human_message_id: Uuid,
     max_tool_rounds: usize,
-) where
-    B: RemoteToolBus + Send + Sync + 'static,
+) -> AgentTurnOutcome
+where
+    B: RemoteToolBus + Send + Sync,
 {
     let mut acc = ChatAccumulator::default();
     let mut cancelled = false;
     let mut budget_exhausted = false;
 
     for round in 0..max_tool_rounds {
-        let result = match run_round(&*chat_model, &messages, &tx, &token, &mut acc).await {
+        let result = match run_round(chat_model, &messages, tx, token, &mut acc).await {
             Ok(r) => r,
             Err(detail) => {
-                let _ = tx
-                    .send(ChatServerMessage::Error {
-                        kind: "internal_error".to_string(),
-                        message: detail,
-                    })
-                    .await;
-                return;
+                return AgentTurnOutcome::Errored {
+                    kind: "internal_error".to_string(),
+                    message: detail,
+                };
             }
         };
 
@@ -455,7 +457,7 @@ pub async fn run_agent_loop<B>(
                 .into(),
         );
 
-        match execute_tool_calls(&catalog, remote_bus.as_ref(), result.tool_calls, &token).await {
+        match execute_tool_calls(catalog, remote_bus, result.tool_calls, token).await {
             ToolExecOutcome::Completed(tool_msgs) => messages.extend(tool_msgs),
             ToolExecOutcome::Cancelled(tool_msgs) => {
                 messages.extend(tool_msgs);
@@ -476,9 +478,7 @@ pub async fn run_agent_loop<B>(
             "Tool-call budget exhausted; running forced synthesis with tool_choice=none"
         );
         let tool_likes = catalog.tool_likes();
-        match run_forced_synthesis(&*chat_model, &tool_likes, &messages, &tx, &token, &mut acc)
-            .await
-        {
+        match run_forced_synthesis(chat_model, &tool_likes, &messages, tx, token, &mut acc).await {
             Ok(synth_cancelled) => cancelled = synth_cancelled,
             Err(e) => {
                 tracing::warn!("Forced synthesis failed: {e}; saving accumulated response as-is");
@@ -486,16 +486,125 @@ pub async fn run_agent_loop<B>(
         }
     }
 
-    finalize(
+    match save_turn_result(db, thread_id, user_id, human_message_id, &acc).await {
+        Ok(_) if cancelled => AgentTurnOutcome::Cancelled,
+        Ok(node) => AgentTurnOutcome::Completed { ai_node: node },
+        Err(_) if cancelled => {
+            // Save failures during a user cancel are best-effort — the
+            // client tore the turn down deliberately and we don't want
+            // to overlay an error on top of that.
+            AgentTurnOutcome::Cancelled
+        }
+        Err(msg) => AgentTurnOutcome::Errored {
+            kind: "internal_error".to_string(),
+            message: msg,
+        },
+    }
+}
+
+/// Run the full agent loop: up to `max_tool_rounds` tool-using rounds,
+/// followed by a forced-synthesis round if the budget is exhausted with
+/// pending tool calls. Streamed chunks land on `tx` during the loop; the
+/// terminal frame (`Final`/`Error`) and the auto-title (`TitleUpdated`)
+/// land on the same channel after the loop settles.
+///
+/// Title generation is wedged between the loop body and the terminal
+/// frame so the new title arrives over the same WebSocket as the
+/// response — no extra HTTP round-trip on the happy path, and cancelled
+/// turns get titled too (the user message is persisted in `run_turn`
+/// before this loop spawns, so the title model always has something to
+/// summarise).
+///
+/// `title_model` is the dedicated title-generation provider from
+/// [`crate::llm::Providers::title`]; threaded through here rather than
+/// looked up at use site so the agent loop has no dependency on
+/// `AppState`. `catalog` is the per-turn tool catalog produced by
+/// [`crate::tool_catalog::TurnCatalog::build`]; `remote_bus` is the
+/// [`crate::remote_tool_bus::RemoteToolBus`] used to dispatch tools
+/// whose [`TurnEntry`] is `Remote`. The bus is taken as a concrete
+/// `Arc<B>` so the agent loop can be exercised with stub buses in
+/// tests; production callers pass [`crate::remote_tool_bus::ChatRemoteBus`].
+#[bon::builder]
+pub async fn run_agent_loop<B>(
+    title_model: Arc<dyn BaseChatModel + Send + Sync>,
+    tx: mpsc::Sender<ChatServerMessage>,
+    token: CancellationToken,
+    db: Arc<DatabaseManager>,
+    chat_model: Arc<dyn BaseChatModel + Send + Sync>,
+    catalog: Arc<TurnCatalog>,
+    remote_bus: Arc<B>,
+    messages: Vec<AnyMessage>,
+    thread_id: Uuid,
+    user_id: Uuid,
+    human_message_id: Uuid,
+    max_tool_rounds: usize,
+) where
+    B: RemoteToolBus + Send + Sync + 'static,
+{
+    let outcome = drive_turn(
         &tx,
+        &token,
         db.as_ref(),
+        chat_model.as_ref(),
+        catalog.as_ref(),
+        remote_bus.as_ref(),
+        messages,
         thread_id,
         user_id,
         human_message_id,
-        &acc,
-        cancelled,
+        max_tool_rounds,
     )
     .await;
+
+    // Auto-title runs in every outcome — completed, cancelled, or
+    // errored. The user message is already in the DB (persisted by
+    // `run_turn` before this loop spawned), so even a cancel before the
+    // first chunk has something for the title model to summarise.
+    // Failures here never tear down the turn; the thread keeps its
+    // placeholder title until the next manual rename.
+    match crate::title::auto_generate_title_if_needed(
+        db.as_ref(),
+        title_model.as_ref(),
+        thread_id,
+        user_id,
+    )
+    .await
+    {
+        Ok(Some(title)) => {
+            let _ = tx.send(ChatServerMessage::TitleUpdated { title }).await;
+        }
+        Ok(None) => {}
+        Err(e) => {
+            tracing::warn!(
+                thread_id = %thread_id,
+                error = %e,
+                "Auto-title generation failed during turn finalisation"
+            );
+        }
+    }
+
+    match outcome {
+        AgentTurnOutcome::Completed {
+            ai_node: Some(node),
+        } => {
+            let _ = tx
+                .send(ChatServerMessage::Final {
+                    messages: vec![*node],
+                })
+                .await;
+        }
+        AgentTurnOutcome::Completed { ai_node: None } => {
+            // Nothing accumulated — let the channel drop so `handle_socket`
+            // notices the empty queue and closes the WebSocket cleanly.
+        }
+        AgentTurnOutcome::Cancelled => {
+            // The client tore the turn down and is already in its
+            // post-cancel state; no terminal frame to send.
+        }
+        AgentTurnOutcome::Errored { kind, message } => {
+            let _ = tx.send(ChatServerMessage::Error { kind, message }).await;
+        }
+    }
 }
 
 #[cfg(test)]
