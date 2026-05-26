@@ -15,14 +15,14 @@ export const commands = {
 	authRefreshSession: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_refresh_session")),
 	authResendVerificationEmail: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_resend_verification_email")),
 	/**
-	 *  Fetch the most-recent persisted activities and decorate each with the
-	 *  presentation data the timeline rail needs (accent colour + a
-	 *  `data:`-URL icon).
+	 *  Fetch the most-recent persisted activities and decorate each with
+	 *  the presentation data the timeline rail needs (accent colour +
+	 *  `data:`-URL icon + embedded live session).
 	 * 
 	 *  Per-row icon fetches fan out concurrently via `join_all`; reqwest's
-	 *  HTTP/2 pool multiplexes them over a single connection. Failures on a
-	 *  single icon log + degrade to `(accent: None, icon_base64: None)` so
-	 *  one bad asset can't block the rest of the page from rendering.
+	 *  HTTP/2 pool multiplexes them over a single connection. Failures on
+	 *  a single icon log + degrade to `(accent: None, icon_base64: None)`
+	 *  so one bad asset can't block the rest of the page from rendering.
 	 */
 	activityList: (limit: number, offset: number) => typedError<SavedActivity[], SavedActivityError>(__TAURI_INVOKE("activity_list", { limit, offset })),
 	chatCollectContext: (threadId: string) => typedError<ChatContext, StreamError>(__TAURI_INVOKE("chat_collect_context", { threadId })),
@@ -138,8 +138,8 @@ export const events = {
 	authStateChanged: makeEvent<AuthStateChanged>("auth-state-changed"),
 	browserExtensionStatusChanged: makeEvent<BrowserExtensionStatusChanged>("browser-extension-status-changed"),
 	consentGate: makeEvent<ConsentGate>("consent-gate"),
-	savedActivityCreated: makeEvent<SavedActivityCreated>("saved-activity-created"),
-	savedActivityEnded: makeEvent<SavedActivityEnded>("saved-activity-ended"),
+	savedActivityLiveSessionEnded: makeEvent<SavedActivityLiveSessionEnded>("saved-activity-live-session-ended"),
+	savedActivityUpserted: makeEvent<SavedActivityUpserted>("saved-activity-upserted"),
 	timelineAppEvent: makeEvent<TimelineAppEvent>("timeline-app-event"),
 	timelineAssetsEvent: makeEvent<TimelineAssetsEvent>("timeline-assets-event"),
 };
@@ -691,20 +691,26 @@ export type Roles = {
 };
 
 /**
- *  Frontend-facing view of one persisted activity.
+ *  Frontend-facing view of one persisted parent activity, with its
+ *  most recent session embedded inline.
  * 
  *  `accent` and `icon_base64` are populated by the desktop tauri layer
  *  (decoded from the asset's PNG bytes); both are `None` whenever the
  *  activity has no icon or the icon fetch failed — treat them as
  *  presentation hints, never as load-bearing fields.
+ * 
+ *  `live_session` carries the most recent session and is the only
+ *  signal the rail uses to render "live now": when
+ *  `live_session.ended_at` is `None` the activity is currently in use.
+ *  The desktop emits an [`SavedActivityLiveSessionEnded`] event when
+ *  the active session closes, so the rail can flip the indicator
+ *  without re-fetching.
  */
 export type SavedActivity = {
 	id: string,
-	name: string,
-	processName: string,
-	windowTitle: string,
-	startedAt: string,
-	endedAt: string | null,
+	identityKey: string,
+	displayName: string,
+	lastUsedAt: string,
 	accent: AccentColor | null,
 	/**
 	 *  `data:<mime>;base64,...` URL suitable for direct embedding in
@@ -712,29 +718,7 @@ export type SavedActivity = {
 	 *  mime out-of-band, which it currently does not.
 	 */
 	iconBase64: string | null,
-};
-
-/**
- *  Push event fired after the cloud `POST /activities` succeeds for a
- *  freshly-tracked activity. Lets the desktop frontend prepend the new
- *  row to the timeline rail without re-polling `GET /activities`.
- */
-export type SavedActivityCreated = SavedActivity;
-
-/**
- *  Push event fired after the cloud closing PATCH of `ended_at` succeeds
- *  for a previously-tracked activity. Lets the desktop frontend update
- *  the matching row's `endedAt` in place — without it the row keeps the
- *  `null` it was created with and the timeline rail's duration-based
- *  connector height stays clamped to the minimum until the next reload.
- * 
- *  Payload is intentionally minimal: the frontend already has the rest
- *  of the row in memory, so only the id and the now-known end timestamp
- *  are shipped over the wire.
- */
-export type SavedActivityEnded = {
-	id: string,
-	endedAt: string,
+	liveSession: SavedActivitySession | null,
 };
 
 /**
@@ -747,6 +731,47 @@ export type SavedActivityEnded = {
  *  the whole call.
  */
 export type SavedActivityError = { type: "StateUnavailable"; data: string } | { type: "Network"; data: string };
+
+/**
+ *  Push event fired after the cloud closing PATCH of `ended_at`
+ *  succeeds for the live session of a parent activity.
+ * 
+ *  Payload is intentionally minimal: the frontend already has the
+ *  parent row in memory, so only the parent id, the session id, and
+ *  the now-known end timestamp are shipped over the wire.
+ */
+export type SavedActivityLiveSessionEnded = {
+	activityId: string,
+	sessionId: string,
+	endedAt: string,
+};
+
+/**
+ *  Frontend-facing view of one persisted activity session.
+ * 
+ *  A subset of `activity_core::ActivitySession` — the rail only needs
+ *  the bits that drive the live indicator and per-tab labelling, not
+ *  the full audit columns (`created_at` / `updated_at` are server
+ *  bookkeeping and never surface).
+ */
+export type SavedActivitySession = {
+	id: string,
+	activityId: string,
+	startedAt: string,
+	endedAt: string | null,
+	windowTitle: string | null,
+	url: string | null,
+};
+
+/**
+ *  Push event fired after the cloud `POST /activity-sessions` succeeds.
+ * 
+ *  Carries the (possibly upserted) parent activity *and* the new
+ *  session it created, so the desktop frontend can prepend the row to
+ *  the timeline rail with the right "live" indicator without re-polling
+ *  `GET /activities`.
+ */
+export type SavedActivityUpserted = SavedActivity;
 
 /**  One message hit returned by full-text search. */
 export type SearchMessageResult = {

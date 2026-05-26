@@ -23,7 +23,7 @@ pub use no_strategy::NoStrategy;
 pub use preview::PreviewStrategy;
 pub use word::WordStrategy;
 
-use crate::{error::ActivityResult, types::Activity};
+use crate::{error::ActivityResult, types::ActivitySession};
 
 /// Metadata returned by a strategy about the currently focused target.
 ///
@@ -39,8 +39,18 @@ pub struct StrategyMetadata {
 
 #[derive(Debug, Clone)]
 pub enum ActivityReport {
-    NewActivity(Activity),
+    /// A new activity instance is starting. From the strategy's
+    /// perspective this is always "the user is now on a different
+    /// activity than a moment ago" — the backend's parent-versus-session
+    /// split is downstream of this signal, not reflected in the verb.
+    NewActivity(ActivitySession),
+    /// SPA navigation inside the same base domain — the title (and
+    /// optionally the URL) changed but the parent activity stayed put,
+    /// so we patch the live session in place rather than starting a new
+    /// one.
     TitleUpdated { title: String, url: Url },
+    /// The strategy is winding down (typically: its process exited).
+    /// The collector closes the live session.
     Stopping,
 }
 

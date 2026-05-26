@@ -18,7 +18,8 @@ use url::Url;
 pub use crate::strategies::ActivityStrategyFunctionality;
 use crate::strategies::{ActivityReport, StrategyMetadata};
 pub use crate::strategies::{ActivityStrategy, StrategySupport};
-use crate::{Activity, ActivityError, error::ActivityResult};
+use crate::types::base_domain_label;
+use crate::{ActivityError, ActivitySession, error::ActivityResult};
 
 /// Bridge action the extension answers with the active tab's tool list.
 const ACTION_LIST_TOOLS: &str = "LIST_TOOLS";
@@ -165,7 +166,7 @@ impl BrowserStrategy {
 
                     let mut prev = last_url.lock().await;
                     if let Some(prev_url) = prev.take()
-                        && prev_url.domain() == url.domain()
+                        && base_domain_label(&prev_url) == base_domain_label(&url)
                     {
                         let title = metadata.title.unwrap_or_else(|| url.to_string());
                         *prev = Some(url.clone());
@@ -180,20 +181,23 @@ impl BrowserStrategy {
                         .and_then(|guard| guard.clone())
                         .unwrap_or_default();
 
-                    let activity = Activity::new_browser(
-                        url,
+                    let Some(session) = ActivitySession::new_browser(
+                        url.clone(),
                         metadata.title,
                         metadata.icon,
                         process_name,
                         browser_pid,
-                    );
+                    ) else {
+                        tracing::debug!("Skipping browser activity for non-trackable URL: {}", url);
+                        continue;
+                    };
 
                     tracing::info!(
-                        "Creating new activity from event: browser_pid={}, name={}",
+                        "Creating new activity from event: browser_pid={}, identity_key={}",
                         browser_pid,
-                        activity.name
+                        session.activity.key
                     );
-                    if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+                    if sender.send(ActivityReport::NewActivity(session)).is_err() {
                         tracing::warn!("Failed to send new activity report - receiver dropped");
                         break;
                     }
@@ -312,47 +316,59 @@ impl BrowserStrategy {
             .clone()
             .ok_or_else(|| ActivityError::Strategy("Sender not initialized".to_string()))?;
 
-        let activity = match self.get_metadata().await {
+        let session = match self.get_metadata().await {
             Ok(metadata) => match metadata.url {
-                Some(url) => {
-                    *self.last_url.lock().await = Some(url.clone());
-                    Activity::new_browser(
-                        url,
-                        metadata.title,
-                        metadata.icon,
-                        process_name.clone(),
-                        focus_pid,
-                    )
-                }
+                Some(url) => match ActivitySession::new_browser(
+                    url.clone(),
+                    metadata.title,
+                    metadata.icon,
+                    process_name.clone(),
+                    focus_pid,
+                ) {
+                    Some(session) => {
+                        *self.last_url.lock().await = Some(url);
+                        session
+                    }
+                    None => {
+                        tracing::debug!(
+                            "Browser metadata URL has no trackable domain ({url}); falling back to process-level session"
+                        );
+                        *self.last_url.lock().await = None;
+                        ActivitySession::new_process(
+                            process_name.clone(),
+                            focus_pid,
+                            None,
+                            focus_window.icon.clone(),
+                        )
+                    }
+                },
                 None => {
                     tracing::warn!(
                         "Browser metadata arrived without a URL; emitting process-level fallback for {}",
                         process_name
                     );
                     *self.last_url.lock().await = None;
-                    Activity::new(
-                        process_name.clone(),
-                        None,
-                        focus_window.icon.clone(),
+                    ActivitySession::new_process(
                         process_name.clone(),
                         focus_pid,
+                        None,
+                        focus_window.icon.clone(),
                     )
                 }
             },
             Err(err) => {
                 tracing::warn!("Failed to get browser metadata: {}", err);
                 *self.last_url.lock().await = None;
-                Activity::new(
-                    process_name.clone(),
-                    None,
-                    focus_window.icon.clone(),
+                ActivitySession::new_process(
                     process_name.clone(),
                     focus_pid,
+                    None,
+                    focus_window.icon.clone(),
                 )
             }
         };
 
-        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+        if sender.send(ActivityReport::NewActivity(session)).is_err() {
             tracing::warn!("Failed to send new activity report - receiver dropped");
         }
 

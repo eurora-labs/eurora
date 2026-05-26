@@ -23,9 +23,6 @@ pub enum AssetError {
     #[error("failed to create asset in database")]
     DatabaseCreate(#[source] be_remote_db::DbError),
 
-    #[error("failed to link asset to activity")]
-    DatabaseLinkActivity(#[source] be_remote_db::DbError),
-
     #[error("failed to read asset from database")]
     DatabaseRead(#[source] be_remote_db::DbError),
 

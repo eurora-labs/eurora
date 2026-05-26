@@ -23,7 +23,7 @@ use tokio::sync::mpsc;
 use crate::{
     error::ActivityResult,
     strategies::{ActivityReport, ActivityStrategyFunctionality, StrategyMetadata},
-    types::Activity,
+    types::ActivitySession,
 };
 
 #[derive(Clone)]
@@ -46,13 +46,12 @@ impl DefaultStrategy {
         }
     }
 
-    fn build_activity(&self) -> Activity {
-        Activity::new(
-            self.focused_window.window_title.clone().unwrap_or_default(),
-            self.focused_window.window_title.clone(),
-            self.focused_window.icon.clone(),
+    fn build_session(&self) -> ActivitySession {
+        ActivitySession::new_process(
             self.focused_window.process_name.clone(),
             self.focused_window.process_id,
+            self.focused_window.window_title.clone(),
+            self.focused_window.icon.clone(),
         )
     }
 }
@@ -88,7 +87,7 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         self.focused_window = focus_window.clone();
         self.sender = Some(sender.clone());
 
-        let _ = sender.send(ActivityReport::NewActivity(self.build_activity()));
+        let _ = sender.send(ActivityReport::NewActivity(self.build_session()));
 
         Ok(())
     }
@@ -173,22 +172,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn start_tracking_emits_activity_with_window_fields() {
-        let mut strategy = DefaultStrategy::new(window(42, "code", Some("main.rs")));
+    async fn start_tracking_emits_session_with_normalized_identity() {
+        let mut strategy = DefaultStrategy::new(window(42, "Code.exe", Some("main.rs")));
         let (tx, mut rx) = mpsc::unbounded_channel::<ActivityReport>();
 
         strategy
-            .start_tracking(&window(42, "code", Some("main.rs")), tx)
+            .start_tracking(&window(42, "Code.exe", Some("main.rs")), tx)
             .await
             .unwrap();
 
         let report = rx.recv().await.expect("activity report");
         match report {
-            ActivityReport::NewActivity(activity) => {
-                assert_eq!(activity.process_id, 42);
-                assert_eq!(activity.process_name, "code");
-                assert_eq!(activity.title.as_deref(), Some("main.rs"));
-                assert_eq!(activity.name, "main.rs");
+            ActivityReport::NewActivity(session) => {
+                assert_eq!(session.process_id, 42);
+                assert_eq!(session.process_name, "Code.exe");
+                assert_eq!(session.window_title.as_deref(), Some("main.rs"));
+                // Identity normalises the process name; display defaults
+                // to capitalize_first(key).
+                assert_eq!(session.activity.key, "code");
+                assert_eq!(session.activity.display_name, "Code");
             }
             other => panic!("expected NewActivity, got {other:?}"),
         }
@@ -210,8 +212,8 @@ mod tests {
 
         let report = rx.recv().await.expect("activity report");
         match report {
-            ActivityReport::NewActivity(activity) => {
-                assert_eq!(activity.title.as_deref(), Some("main.rs"));
+            ActivityReport::NewActivity(session) => {
+                assert_eq!(session.window_title.as_deref(), Some("main.rs"));
             }
             other => panic!("expected NewActivity, got {other:?}"),
         }

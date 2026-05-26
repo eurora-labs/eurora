@@ -54,10 +54,9 @@ impl TimelineManager {
 
     pub async fn stop(&mut self) -> TimelineResult<()> {
         tracing::debug!("Stopping timeline manager");
-        // Override the last heartbeat value with the precise local
-        // `end` timestamp before the process exits. Best-effort and
-        // bounded internally by a short timeout — a slow network must
-        // not stall shutdown.
+        // Close the live session with a precise `ended_at` before the
+        // process exits. Best-effort and bounded internally by a short
+        // timeout — a slow network must not stall shutdown.
         self.collector.flush_current_end().await;
         tracing::info!("Timeline manager stopped");
         Ok(())
@@ -66,8 +65,8 @@ impl TimelineManager {
     pub async fn get_context_chip(&self) -> Option<ContextChip> {
         let storage = self.storage.lock().await;
         storage
-            .get_current_activity()
-            .map(|activity| activity.get_context_chip())
+            .get_current_session()
+            .map(|session| session.get_context_chip())
     }
 
     pub fn subscribe_to_activity_events(&self) -> tokio::sync::broadcast::Receiver<ActivityEvent> {

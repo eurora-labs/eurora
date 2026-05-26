@@ -30,7 +30,7 @@ use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 
 use crate::{
-    Activity, ActivityError,
+    ActivityError, ActivitySession,
     error::ActivityResult,
     strategies::{
         ActivityReport, ActivityStrategy, ActivityStrategyFunctionality, StrategyMetadata,
@@ -97,12 +97,13 @@ impl WordStrategy {
             .and_then(|guard| guard.clone())
     }
 
-    /// Build the [`Activity`] we report when Word becomes the focused
-    /// window. Prefers the live document name from the add-in; falls
-    /// back to the cached name and, finally, to the OS process name so
-    /// the timeline always has a coherent entry even if the add-in
-    /// hasn't connected yet.
-    async fn build_activity_for_focus(&self, focus_window: &FocusedWindow) -> Activity {
+    /// Build the [`ActivitySession`] we report when Word becomes the
+    /// focused window. The session rolls up to a process-keyed parent
+    /// activity (so every Word visit lands under the same "Winword"
+    /// bucket); the live document name only feeds the per-session
+    /// `window_title`, which is what the rail surfaces under the
+    /// activity row.
+    async fn build_session_for_focus(&self, focus_window: &FocusedWindow) -> ActivitySession {
         let live_name = self
             .refresh_document()
             .await
@@ -110,18 +111,13 @@ impl WordStrategy {
         let document_name = live_name
             .or_else(|| self.cached_document_name())
             .filter(|name| !name.is_empty());
-
-        let activity_name = document_name
-            .clone()
-            .unwrap_or_else(|| focus_window.process_name.clone());
         let title = document_name.or_else(|| focus_window.window_title.clone());
 
-        Activity::new(
-            activity_name,
-            title,
-            focus_window.icon.clone(),
+        ActivitySession::new_process(
             focus_window.process_name.clone(),
             focus_window.process_id,
+            title,
+            focus_window.icon.clone(),
         )
     }
 
@@ -132,9 +128,9 @@ impl WordStrategy {
             .ok_or_else(|| ActivityError::strategy("Sender not initialized"))?
             .clone();
 
-        let activity = self.build_activity_for_focus(focus_window).await;
+        let session = self.build_session_for_focus(focus_window).await;
 
-        if sender.send(ActivityReport::NewActivity(activity)).is_err() {
+        if sender.send(ActivityReport::NewActivity(session)).is_err() {
             tracing::warn!("Word strategy: receiver dropped while emitting activity");
         }
         Ok(())

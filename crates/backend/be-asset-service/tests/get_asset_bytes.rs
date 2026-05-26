@@ -138,7 +138,6 @@ fn png_input() -> CreateAssetInput {
         content: PNG_BYTES.to_vec(),
         mime_type: "image/png".into(),
         metadata: None,
-        activity_id: None,
     }
 }
 
