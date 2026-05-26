@@ -19,11 +19,14 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
 };
 
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
 use euro_bridge::BridgeService;
 use euro_office::{OfficeApp, WordDocumentAsset, fetch_word_asset};
 use focus_tracker::FocusedWindow;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -220,7 +223,7 @@ impl ActivityStrategyFunctionality for WordStrategy {
         Ok(())
     }
 
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata> {
         let _ = self.require_service()?;
 
         let title = match self.refresh_document().await {
@@ -232,6 +235,21 @@ impl ActivityStrategyFunctionality for WordStrategy {
             url: None,
             title,
             icon: None,
+        })
+    }
+
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+        Ok(vec![])
+    }
+
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        Ok(ContentBlocks::new())
+    }
+
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {
+        Err(ToolErrorWire::ContextUnavailable {
+            tool: call.name,
+            reason: "no tools available for this strategy".to_string(),
         })
     }
 }

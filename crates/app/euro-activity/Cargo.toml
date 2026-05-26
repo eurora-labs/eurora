@@ -10,6 +10,7 @@ ignored = ["humantime-serde"]
 
 [dependencies]
 activity-core = { workspace = true }
+agent-chain-core = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }

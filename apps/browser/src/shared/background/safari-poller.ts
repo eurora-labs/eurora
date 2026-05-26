@@ -118,7 +118,7 @@ async function handleGetMetadata(reqFrame: RequestFrame): Promise<void> {
 	try {
 		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
 
-		if (!activeTab || !activeTab.id) {
+		if (!activeTab || activeTab.id === undefined) {
 			await sendErrorResponse(reqFrame, 'No active tab found');
 			return;
 		}
@@ -133,7 +133,8 @@ async function handleGetMetadata(reqFrame: RequestFrame): Promise<void> {
 					payload: {
 						kind: 'NativeMetadata',
 						data: {
-							url: activeTab.url,
+							tab_id: activeTab.id,
+							url: activeTab.url ?? null,
 							icon_base64: iconBase64,
 							title: activeTab.title ?? null,
 						} as NativeMetadata,

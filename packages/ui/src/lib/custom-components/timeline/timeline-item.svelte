@@ -12,18 +12,12 @@
 		iconSrc?: string | null;
 		name?: string;
 		/**
-		 * Pixel length of the visible line extension beyond the icon, split
-		 * equally above and below. The rendered line element itself is taller
-		 * than this — it spans the full item, with the icon stacked on top of
-		 * its midpoint — but only this many pixels show past the icon. Callers
-		 * that want a duration-proportional line pass the computed value here;
-		 * omit it for the default.
+		 * Fires when the user clicks the item. The parent listbox owns
+		 * the selection state — the item itself is purely a visual
+		 * affordance plus a click target.
 		 */
-		connectorHeight?: number | null;
+		onSelect?: () => void;
 	}
-
-	const DEFAULT_CONNECTOR_HEIGHT_PX = 8;
-	const ICON_PX = 32;
 </script>
 
 <script lang="ts">
@@ -33,37 +27,38 @@
 		active = false,
 		iconSrc = null,
 		name = '',
-		connectorHeight = null,
+		onSelect,
 	}: TimelineItemProps = $props();
 
-	let resolvedConnector = $derived(color ?? 'var(--sidebar-border)');
-	let resolvedConnectorHeight = $derived(connectorHeight ?? DEFAULT_CONNECTOR_HEIGHT_PX);
-	let lineHeight = $derived(resolvedConnectorHeight + ICON_PX);
+	let accent = $derived(color ?? 'var(--sidebar-border)');
 </script>
 
+<!--
+  Items follow the W3C listbox pattern: keyboard navigation lives on
+  the parent `[role="listbox"]` container (which owns Tab focus and
+  arrow-key handling via `aria-activedescendant`), so an option only
+  needs a mouse click handler to be selectable. The Svelte a11y lint
+  expects every clickable element to have a paired keydown handler;
+  that rule doesn't model listboxes, hence the suppression below.
+-->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <li
 	{id}
-	class="bg-sidebar"
 	title={name}
 	role="option"
 	aria-selected={active}
 	aria-current={active ? 'true' : undefined}
+	class="bg-sidebar cursor-pointer transition-[transform,filter] duration-150 ease-out"
+	style="transform: scale({active ? 1.1 : 0.9}); filter: saturate({active ? 1.6 : 0.5});"
+	onclick={onSelect}
 >
-	<div
-		class="grid place-items-center transition-[transform,filter] duration-150 ease-out"
-		style="transform: scale({active ? 1.1 : 0.9}); filter: saturate({active ? 1.6 : 0.5});"
-	>
-		<span
-			class="timeline-connector col-start-1 row-start-1 w-4 rounded-full"
-			style="background-color: {resolvedConnector}; height: {lineHeight}px;"
-			aria-hidden="true"
-		></span>
+	<span class="grid place-items-center">
 		<span
 			class="col-start-1 row-start-1 size-8 rounded-md shadow-md"
 			class:ring-2={active}
 			class:ring-offset-1={active}
 			class:ring-offset-sidebar={active}
-			style="background-color: {resolvedConnector}; --tw-ring-color: {resolvedConnector};"
+			style="background-color: {accent}; --tw-ring-color: {accent};"
 			aria-hidden="true"
 		></span>
 		{#if iconSrc}
@@ -75,5 +70,5 @@
 				{name.charAt(0).toUpperCase()}
 			</div>
 		{/if}
-	</div>
+	</span>
 </li>

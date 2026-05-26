@@ -13,8 +13,11 @@
 //! contextual data it needs through granular tools, not through this
 //! strategy.
 
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
 use focus_tracker::FocusedWindow;
+use serde_json::Value;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 
 use crate::{
@@ -111,11 +114,26 @@ impl ActivityStrategyFunctionality for DefaultStrategy {
         Ok(())
     }
 
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata> {
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata> {
         Ok(StrategyMetadata {
             url: None,
             title: self.focused_window.window_title.clone(),
             icon: self.focused_window.icon.clone(),
+        })
+    }
+
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>> {
+        Ok(vec![])
+    }
+
+    async fn get_context(&self) -> ActivityResult<ContentBlocks> {
+        Ok(ContentBlocks::new())
+    }
+
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire> {
+        Err(ToolErrorWire::ContextUnavailable {
+            tool: call.name,
+            reason: "no tools available for this strategy".to_string(),
         })
     }
 }
@@ -148,7 +166,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_metadata_reports_window_title_from_constructor() {
-        let mut strategy = DefaultStrategy::new(window(42, "code", Some("main.rs")));
+        let strategy = DefaultStrategy::new(window(42, "code", Some("main.rs")));
         let metadata = strategy.get_metadata().await.unwrap();
         assert_eq!(metadata.title.as_deref(), Some("main.rs"));
         assert!(metadata.url.is_none());
