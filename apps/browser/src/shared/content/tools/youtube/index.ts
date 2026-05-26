@@ -2,6 +2,7 @@ import { getPageKind, type PageKind } from './_lib';
 import { getCurrentFrame } from './get_current_frame';
 import { getCurrentTimestamp } from './get_current_timestamp';
 import { getPageContext } from './get_page_context';
+import { getTimedTranscript } from './get_timed_transcript';
 import { getTranscript } from './get_transcript';
 import { getVideoMetadata } from './get_video_metadata';
 import { listCaptions } from './list_captions';
@@ -16,6 +17,7 @@ export {
 	getCurrentFrame,
 	getCurrentTimestamp,
 	getPageContext,
+	getTimedTranscript,
 	getTranscript,
 	getVideoMetadata,
 	listCaptions,
@@ -46,10 +48,11 @@ const WATCH: ToolList = [
 	getPageContext,
 	getCurrentTimestamp,
 	getCurrentFrame,
+	listCaptions,
 	getTranscript,
+	getTimedTranscript,
 	getVideoMetadata,
 	listChapters,
-	listCaptions,
 	listRecommendations,
 	seekTo,
 ] as const;

@@ -1,5 +1,4 @@
-import { requireCurrentVideoId } from './_lib';
-import { YouTubeTranscriptApi } from '../../../../content/sites/youtube.com/transcript';
+import { TRANSCRIPT_API, requireCurrentVideoId } from './_lib';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Tool } from '../types';
@@ -27,8 +26,6 @@ const Out = z.object({
 type Result = z.infer<typeof Out>;
 type TrackEntryT = z.infer<typeof TrackEntry>;
 type TranslationLanguageT = z.infer<typeof TranslationLanguage>;
-
-const TRANSCRIPT_API = new YouTubeTranscriptApi();
 
 export async function executeListCaptions(): Promise<Result> {
 	const videoId = requireCurrentVideoId();
