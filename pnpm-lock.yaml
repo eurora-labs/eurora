@@ -226,6 +226,9 @@ importers:
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
+      '@types/aria-query':
+        specifier: ^5.0.4
+        version: 5.0.4
       '@types/chrome':
         specifier: ^0.1.42
         version: 0.1.42
