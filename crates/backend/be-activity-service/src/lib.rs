@@ -13,10 +13,7 @@ mod service;
 
 use std::sync::Arc;
 
-use axum::{
-    Router,
-    routing::{get, patch},
-};
+use axum::{Router, routing::get, routing::patch};
 use be_asset::AssetService;
 use be_remote_db::DatabaseManager;
 use tower::ServiceBuilder;
@@ -32,11 +29,19 @@ pub use service::AppState;
 /// REST services share the same outer pipeline.
 pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
+        .route("/activities", get(handlers::list_activities))
         .route(
-            "/activities",
-            get(handlers::list_activities).post(handlers::insert_activity),
+            "/activities/{id}/sessions",
+            get(handlers::list_activity_sessions),
         )
-        .route("/activities/{id}", patch(handlers::patch_activity))
+        .route(
+            "/activity-sessions",
+            axum::routing::post(handlers::insert_activity_session),
+        )
+        .route(
+            "/activity-sessions/{id}",
+            patch(handlers::patch_activity_session),
+        )
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http()))
         .with_state(state)
 }

@@ -121,7 +121,6 @@ async fn upload_block_content(
                 content: content.to_vec(),
                 mime_type: mime_type.to_string(),
                 metadata,
-                activity_id: None,
             },
             user_id,
         )

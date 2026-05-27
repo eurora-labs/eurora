@@ -11,7 +11,9 @@ use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
         accent::accent_from_image,
-        activity::{SavedActivity, SavedActivityCreated, SavedActivityEnded},
+        activity::{
+            SavedActivityLiveSessionEnded, SavedActivityUpserted, saved_activity_from_parts,
+        },
         system::{
             BrowserExtensionStatusChanged, SAFARI_BRIDGE_APP_KIND, resolve_browser_extension_state,
         },
@@ -483,24 +485,20 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
         )
         .await;
         forward_broadcast("timeline_saved_activity", rx, |event| {
-            tracing::debug!(activity_id = %event.id, "Saved activity emitted");
+            tracing::debug!(
+                activity_id = %event.activity.id,
+                session_id = %event.session.id,
+                "Saved activity upsert emitted"
+            );
 
             let (accent, icon_base64) = match event.icon.as_ref() {
                 Some(icon) => (accent_from_image(icon), rgba_to_base64(icon).ok()),
                 None => (None, None),
             };
 
-            let payload = SavedActivity {
-                id: event.id,
-                name: event.name,
-                process_name: event.process_name,
-                window_title: event.window_title,
-                started_at: event.started_at,
-                ended_at: event.ended_at,
-                accent,
-                icon_base64,
-            };
-            let _ = SavedActivityCreated(payload).emit(&saved_handle);
+            let payload =
+                saved_activity_from_parts(event.activity, Some(event.session), accent, icon_base64);
+            let _ = SavedActivityUpserted(payload).emit(&saved_handle);
         })
         .await;
     });
@@ -518,9 +516,14 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
         )
         .await;
         forward_broadcast("timeline_saved_activity_ended", rx, |event| {
-            tracing::debug!(activity_id = %event.id, "Saved activity end emitted");
-            let _ = SavedActivityEnded {
-                id: event.id,
+            tracing::debug!(
+                activity_id = %event.activity_id,
+                session_id = %event.session_id,
+                "Saved activity live session ended"
+            );
+            let _ = SavedActivityLiveSessionEnded {
+                activity_id: event.activity_id,
+                session_id: event.session_id,
                 ended_at: event.ended_at,
             }
             .emit(&ended_handle);

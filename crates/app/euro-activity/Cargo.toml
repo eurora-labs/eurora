@@ -26,6 +26,7 @@ euro-process = { workspace = true }
 focus-tracker = { workspace = true }
 humantime-serde = { workspace = true }
 image = { workspace = true }
+psl = "2"
 regex = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 resvg = { version = "0.47" }
