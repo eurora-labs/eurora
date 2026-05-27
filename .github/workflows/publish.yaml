@@ -363,10 +363,6 @@ jobs:
                   name: sveltekit-build
                   path: ./apps/desktop/build/
 
-            - name: Generate office add-in bindings
-              shell: bash
-              run: pnpm specta
-
             - name: Build office add-in
               shell: bash
               run: pnpm --filter @eurora/office-addin run build
