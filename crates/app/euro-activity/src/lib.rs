@@ -17,4 +17,7 @@ pub use strategies::{
     ActivityReport, BrowserStrategy, DefaultStrategy, NoStrategy, PreviewStrategy,
 };
 pub use tool_backend::ActivityToolBackend;
-pub use types::{Activity, ContextChip};
+pub use types::{
+    ActivityIdentity, ActivitySession, ContextChip, base_domain_label, capitalize_first,
+    normalize_process_name,
+};

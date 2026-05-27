@@ -2,10 +2,10 @@ use std::collections::VecDeque;
 
 use chrono::Utc;
 
-use crate::{Activity, config::StorageConfig};
+use crate::{ActivitySession, config::StorageConfig};
 
 pub struct TimelineStorage {
-    activities: VecDeque<Activity>,
+    sessions: VecDeque<ActivitySession>,
     config: StorageConfig,
 }
 
@@ -18,57 +18,57 @@ impl TimelineStorage {
         );
 
         Self {
-            activities: VecDeque::with_capacity(config.max_activities),
+            sessions: VecDeque::with_capacity(config.max_activities),
             config,
         }
     }
 
-    pub fn add_activity(&mut self, activity: Activity) {
+    pub fn add_session(&mut self, session: ActivitySession) {
         tracing::debug!(
-            "Adding activity: {} (process: {})",
-            activity.name,
-            activity.process_name
+            "Adding session: {} (process: {})",
+            session.activity.key,
+            session.process_name
         );
 
-        self.activities.push_back(activity);
+        self.sessions.push_back(session);
 
-        while self.activities.len() > self.config.max_activities {
-            if let Some(removed) = self.activities.pop_front() {
+        while self.sessions.len() > self.config.max_activities {
+            if let Some(removed) = self.sessions.pop_front() {
                 tracing::debug!(
-                    "Removed old activity due to capacity limit: {}",
-                    removed.name
+                    "Removed old session due to capacity limit: {}",
+                    removed.activity.key
                 );
             }
         }
 
         if self.config.auto_cleanup {
-            self.cleanup_old_activities();
+            self.cleanup_old_sessions();
         }
     }
 
-    pub fn get_current_activity(&self) -> Option<&Activity> {
-        self.activities.back()
+    pub fn get_current_session(&self) -> Option<&ActivitySession> {
+        self.sessions.back()
     }
 
-    pub fn get_all_activities_mut(&mut self) -> &mut VecDeque<Activity> {
-        &mut self.activities
+    pub fn get_all_sessions_mut(&mut self) -> &mut VecDeque<ActivitySession> {
+        &mut self.sessions
     }
 
-    fn cleanup_old_activities(&mut self) {
+    fn cleanup_old_sessions(&mut self) {
         let now = Utc::now();
         let cutoff_time = now
             - chrono::Duration::from_std(self.config.max_age)
                 .unwrap_or_else(|_| chrono::Duration::seconds(3600));
 
-        let initial_count = self.activities.len();
+        let initial_count = self.sessions.len();
 
-        while let Some(activity) = self.activities.front() {
-            if activity.start < cutoff_time {
-                if let Some(removed) = self.activities.pop_front() {
+        while let Some(session) = self.sessions.front() {
+            if session.started_at < cutoff_time {
+                if let Some(removed) = self.sessions.pop_front() {
                     tracing::debug!(
-                        "Cleaned up old activity: {} (age: {:?})",
-                        removed.name,
-                        now - removed.start
+                        "Cleaned up old session: {} (age: {:?})",
+                        removed.activity.key,
+                        now - removed.started_at
                     );
                 }
             } else {
@@ -76,9 +76,9 @@ impl TimelineStorage {
             }
         }
 
-        let removed_count = initial_count - self.activities.len();
+        let removed_count = initial_count - self.sessions.len();
         if removed_count > 0 {
-            tracing::debug!("Cleaned up {} old activities", removed_count);
+            tracing::debug!("Cleaned up {} old sessions", removed_count);
         }
     }
 }
@@ -92,7 +92,7 @@ impl Default for TimelineStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use euro_activity::Activity;
+    use euro_activity::ActivitySession;
 
     fn fresh_storage() -> TimelineStorage {
         TimelineStorage::new(StorageConfig {
@@ -102,64 +102,58 @@ mod tests {
         })
     }
 
-    fn fresh_activity(name: &str) -> Activity {
-        Activity::new(name.to_string(), None, None, "proc".to_string(), 1)
+    fn fresh_session(key: &str) -> ActivitySession {
+        ActivitySession::new_process(key.to_string(), 1, None, None)
     }
 
     /// The collector's `NewActivity` branch must end the previous
-    /// activity locally before pushing the new one, so chat-context
+    /// session locally before pushing the new one, so chat-context
     /// reads and the closing PATCH agree on the row's lifetime.
     #[test]
     fn ending_previous_then_adding_new_records_end_on_previous_only() {
         let mut storage = fresh_storage();
-        let first = fresh_activity("first");
+        let first = fresh_session("first");
         let first_id = first.id;
-        storage.add_activity(first);
+        storage.add_session(first);
 
-        // Mirror the collector lifecycle: end the back-most activity
-        // before pushing the next one.
-        if let Some(prev) = storage.get_all_activities_mut().back_mut() {
-            prev.end_activity();
+        if let Some(prev) = storage.get_all_sessions_mut().back_mut() {
+            prev.end_session();
         }
-        let second = fresh_activity("second");
+        let second = fresh_session("second");
         let second_id = second.id;
-        storage.add_activity(second);
+        storage.add_session(second);
 
-        let activities = storage.get_all_activities_mut();
-        let first_back = activities
+        let sessions = storage.get_all_sessions_mut();
+        let first_back = sessions
             .iter()
-            .find(|a| a.id == first_id)
-            .expect("first activity retained");
-        let second_back = activities
+            .find(|s| s.id == first_id)
+            .expect("first session retained");
+        let second_back = sessions
             .iter()
-            .find(|a| a.id == second_id)
-            .expect("second activity retained");
+            .find(|s| s.id == second_id)
+            .expect("second session retained");
 
-        assert!(first_back.end.is_some(), "previous activity must be ended");
         assert!(
-            second_back.end.is_none(),
-            "newly-added activity has no end yet"
+            first_back.ended_at.is_some(),
+            "previous session must be ended"
         );
-        assert_eq!(
-            storage.get_current_activity().map(|a| a.id),
-            Some(second_id)
+        assert!(
+            second_back.ended_at.is_none(),
+            "newly-added session has no end yet"
         );
+        assert_eq!(storage.get_current_session().map(|s| s.id), Some(second_id));
     }
 
-    /// `end_activity` is idempotent at the field level — calling it
-    /// twice keeps the first timestamp rather than ratcheting forward.
-    /// The collector relies on this so a `Stopping` after `NewActivity`
-    /// can't accidentally extend the row's `ended_at`.
+    /// `end_session` is idempotent — a second call leaves the existing
+    /// timestamp untouched so a `Stopping` after `NewActivity` can't
+    /// accidentally extend the row's `ended_at`.
     #[test]
-    fn end_activity_is_one_shot_at_field_level() {
-        let mut activity = fresh_activity("once");
-        activity.end_activity();
-        let first = activity.end;
+    fn end_session_is_idempotent() {
+        let mut session = fresh_session("once");
+        session.end_session();
+        let first = session.ended_at;
         std::thread::sleep(std::time::Duration::from_millis(2));
-        // Re-calling overwrites, which is intentional for heartbeat
-        // semantics — confirm the field is writable, not pinned.
-        activity.end_activity();
-        assert!(activity.end.is_some());
-        assert!(activity.end > first);
+        session.end_session();
+        assert_eq!(session.ended_at, first);
     }
 }

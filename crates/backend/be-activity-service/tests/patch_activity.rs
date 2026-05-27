@@ -1,4 +1,5 @@
-//! End-to-end HTTP round-trips for `PATCH /activities/{id}`.
+//! End-to-end HTTP round-trips for the `/activity-sessions/*` and
+//! `/activities*` endpoints.
 //!
 //! Uses `#[sqlx::test]` to provision a fresh, isolated Postgres database
 //! per test (migrations applied automatically) and mounts the real
@@ -10,16 +11,14 @@
 //! tests alone with
 //! `cargo test -p be-activity-service --lib --test auth_extractor`
 //! when no database is available.
-//!
-//! The PATCH handler is the heartbeat / end-of-activity path: the
-//! desktop collector ratchets `ended_at` forward every 30 s while an
-//! activity is live, then writes the precise `ended_at` once on
-//! transition or graceful shutdown. These tests cover the cross-user
-//! safety net, partial-field semantics, and the empty-body guard.
 
 use std::sync::{Arc, Mutex};
 
-use activity_core::{ActivityErrorResponse, UpdateActivityRequest, UpdateActivityResponse};
+use activity_core::{
+    ActivityErrorResponse, ActivityInsert, InsertActivitySessionRequest,
+    InsertActivitySessionResponse, ListActivitiesResponse, UpdateActivitySessionRequest,
+    UpdateActivitySessionResponse,
+};
 use axum::Router;
 use axum::extract::Request;
 use axum::middleware::Next;
@@ -45,27 +44,6 @@ async fn seed_user(pool: &PgPool) -> Uuid {
     id
 }
 
-async fn seed_activity(
-    pool: &PgPool,
-    user_id: Uuid,
-    started_at: DateTime<Utc>,
-    ended_at: Option<DateTime<Utc>>,
-) -> Uuid {
-    let id = Uuid::now_v7();
-    sqlx::query(
-        "INSERT INTO activities (id, user_id, name, process_name, window_title, started_at, ended_at) \
-         VALUES ($1, $2, 'seed', 'seed-proc', 'seed-title', $3, $4)",
-    )
-    .bind(id)
-    .bind(user_id)
-    .bind(started_at)
-    .bind(ended_at)
-    .execute(pool)
-    .await
-    .expect("seed activity");
-    id
-}
-
 fn claims_for(user_id: Uuid) -> Claims {
     Claims {
         sub: user_id.to_string(),
@@ -84,7 +62,9 @@ fn claims_for(user_id: Uuid) -> Claims {
 struct AppHarness {
     base_url: String,
     pool: PgPool,
-    primary: Uuid,
+    /// Tests are scoped to this user by default; held so individual
+    /// tests can re-activate it after switching identity via [`act_as`].
+    _primary: Uuid,
     other: Uuid,
     active: Arc<Mutex<Option<Uuid>>>,
     _storage_root: TempDir,
@@ -104,10 +84,6 @@ impl AppHarness {
     }
 }
 
-/// Stand up the activity router on an ephemeral port with the real
-/// asset service wired through filesystem storage rooted at a tempdir.
-/// Activity PATCH does not touch assets, but `AppState::new` still
-/// requires an `AssetService` instance.
 async fn spawn_app(pool: PgPool) -> AppHarness {
     let primary = seed_user(&pool).await;
     let other = seed_user(&pool).await;
@@ -152,7 +128,7 @@ async fn spawn_app(pool: PgPool) -> AppHarness {
     AppHarness {
         base_url: format!("http://{addr}"),
         pool,
-        primary,
+        _primary: primary,
         other,
         active,
         _storage_root: storage_root,
@@ -167,105 +143,167 @@ fn fixed_ended_at() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 5, 16, 12, 30, 0).unwrap()
 }
 
-#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
-async fn patch_sets_ended_at(pool: PgPool) {
-    let app = spawn_app(pool).await;
-    let activity_id = seed_activity(&app.pool, app.primary, fixed_started_at(), None).await;
+fn insert_body(identity_key: &str, display_name: &str) -> InsertActivitySessionRequest {
+    InsertActivitySessionRequest {
+        session_id: None,
+        activity: ActivityInsert {
+            identity_key: identity_key.to_string(),
+            display_name: display_name.to_string(),
+            icon_png_base64: None,
+        },
+        process_name: "chrome".to_string(),
+        process_id: Some(42),
+        window_title: Some("Watching a video".to_string()),
+        url: Some("https://youtube.com/watch?v=abc".to_string()),
+        started_at: fixed_started_at(),
+        ended_at: None,
+    }
+}
 
-    let body = UpdateActivityRequest {
-        name: None,
+async fn post_session(
+    app: &AppHarness,
+    body: &InsertActivitySessionRequest,
+) -> InsertActivitySessionResponse {
+    let response = reqwest::Client::new()
+        .post(app.url("/activity-sessions"))
+        .json(body)
+        .send()
+        .await
+        .expect("POST");
+    assert_eq!(response.status(), StatusCode::OK);
+    response.json().await.expect("decode")
+}
+
+#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
+async fn post_creates_parent_and_session(pool: PgPool) {
+    let app = spawn_app(pool).await;
+    let body = insert_body("youtube", "Youtube");
+    let resp = post_session(&app, &body).await;
+
+    assert_eq!(resp.activity.identity_key, "youtube");
+    assert_eq!(resp.activity.display_name, "Youtube");
+    assert_eq!(resp.session.activity_id, resp.activity.id);
+    assert_eq!(
+        resp.session.url.as_deref(),
+        Some("https://youtube.com/watch?v=abc")
+    );
+    assert!(resp.session.ended_at.is_none());
+}
+
+#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
+async fn post_with_same_identity_reuses_parent(pool: PgPool) {
+    let app = spawn_app(pool).await;
+    let first = post_session(&app, &insert_body("youtube", "Youtube")).await;
+    let second = post_session(&app, &insert_body("youtube", "Youtube")).await;
+
+    assert_eq!(
+        first.activity.id, second.activity.id,
+        "parent id must be stable across visits"
+    );
+    assert_ne!(
+        first.session.id, second.session.id,
+        "each visit gets its own session"
+    );
+}
+
+#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
+async fn post_display_name_is_set_once(pool: PgPool) {
+    let app = spawn_app(pool).await;
+    post_session(&app, &insert_body("youtube", "Youtube")).await;
+    let second = post_session(&app, &insert_body("youtube", "Something Else")).await;
+
+    // Server preserves the original display_name — a future rename
+    // endpoint is the only thing that mutates it.
+    assert_eq!(second.activity.display_name, "Youtube");
+}
+
+#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
+async fn post_closes_prior_live_session_for_same_activity(pool: PgPool) {
+    let app = spawn_app(pool).await;
+    let first = post_session(&app, &insert_body("youtube", "Youtube")).await;
+    let _second = post_session(&app, &insert_body("youtube", "Youtube")).await;
+
+    let prior_ended_at: Option<DateTime<Utc>> =
+        sqlx::query_scalar("SELECT ended_at FROM activity_sessions WHERE id = $1")
+            .bind(first.session.id)
+            .fetch_one(&app.pool)
+            .await
+            .expect("fetch prior session");
+
+    assert!(
+        prior_ended_at.is_some(),
+        "prior live session must be auto-closed when a new one opens",
+    );
+}
+
+#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
+async fn patch_sets_ended_at_and_bumps_parent(pool: PgPool) {
+    let app = spawn_app(pool).await;
+    let inserted = post_session(&app, &insert_body("youtube", "Youtube")).await;
+
+    let body = UpdateActivitySessionRequest {
         window_title: None,
+        url: None,
         ended_at: Some(fixed_ended_at()),
     };
 
     let response = reqwest::Client::new()
-        .patch(app.url(&format!("/activities/{activity_id}")))
+        .patch(app.url(&format!("/activity-sessions/{}", inserted.session.id)))
         .json(&body)
         .send()
         .await
         .expect("PATCH");
-
     assert_eq!(response.status(), StatusCode::OK);
-    let parsed: UpdateActivityResponse = response.json().await.expect("parse body");
-    assert_eq!(parsed.activity.id, activity_id);
-    assert_eq!(parsed.activity.ended_at, Some(fixed_ended_at()));
-    // Unset fields are preserved (COALESCE on the SQL side).
-    assert_eq!(parsed.activity.name, "seed");
-    assert_eq!(parsed.activity.window_title, "seed-title");
+    let parsed: UpdateActivitySessionResponse = response.json().await.expect("parse body");
+    assert_eq!(parsed.session.id, inserted.session.id);
+    assert_eq!(parsed.session.ended_at, Some(fixed_ended_at()));
+
+    let last_used_at: DateTime<Utc> =
+        sqlx::query_scalar("SELECT last_used_at FROM activities WHERE id = $1")
+            .bind(inserted.activity.id)
+            .fetch_one(&app.pool)
+            .await
+            .expect("fetch parent");
+    assert!(
+        last_used_at > inserted.activity.last_used_at,
+        "closing PATCH must advance the parent's last_used_at",
+    );
 }
 
 #[sqlx::test(migrations = "../be-remote-db/src/migrations")]
 async fn patch_updates_window_title_only(pool: PgPool) {
     let app = spawn_app(pool).await;
-    let activity_id = seed_activity(&app.pool, app.primary, fixed_started_at(), None).await;
+    let inserted = post_session(&app, &insert_body("youtube", "Youtube")).await;
 
-    let body = UpdateActivityRequest {
-        name: None,
+    let body = UpdateActivitySessionRequest {
         window_title: Some("Refined Title".to_string()),
+        url: None,
         ended_at: None,
     };
 
     let response = reqwest::Client::new()
-        .patch(app.url(&format!("/activities/{activity_id}")))
+        .patch(app.url(&format!("/activity-sessions/{}", inserted.session.id)))
         .json(&body)
         .send()
         .await
         .expect("PATCH");
-
     assert_eq!(response.status(), StatusCode::OK);
-    let parsed: UpdateActivityResponse = response.json().await.expect("parse body");
-    assert_eq!(parsed.activity.window_title, "Refined Title");
-    assert!(parsed.activity.ended_at.is_none());
-}
-
-#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
-async fn heartbeat_then_final_end_overrides(pool: PgPool) {
-    let app = spawn_app(pool).await;
-    let activity_id = seed_activity(&app.pool, app.primary, fixed_started_at(), None).await;
-
-    // Heartbeat ratchet: the collector pushes a coarse `ended_at` every
-    // 30 s while the activity is live.
-    let heartbeat_value = fixed_started_at() + chrono::Duration::seconds(30);
-    let heartbeat_body = UpdateActivityRequest {
-        name: None,
-        window_title: None,
-        ended_at: Some(heartbeat_value),
-    };
-    let response = reqwest::Client::new()
-        .patch(app.url(&format!("/activities/{activity_id}")))
-        .json(&heartbeat_body)
-        .send()
-        .await
-        .expect("PATCH heartbeat");
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Real transition / shutdown: the precise `ended_at` overwrites the
-    // last heartbeat value.
-    let final_body = UpdateActivityRequest {
-        name: None,
-        window_title: None,
-        ended_at: Some(fixed_ended_at()),
-    };
-    let response = reqwest::Client::new()
-        .patch(app.url(&format!("/activities/{activity_id}")))
-        .json(&final_body)
-        .send()
-        .await
-        .expect("PATCH final");
-    assert_eq!(response.status(), StatusCode::OK);
-    let parsed: UpdateActivityResponse = response.json().await.expect("parse body");
-    assert_eq!(parsed.activity.ended_at, Some(fixed_ended_at()));
+    let parsed: UpdateActivitySessionResponse = response.json().await.expect("parse body");
+    assert_eq!(
+        parsed.session.window_title.as_deref(),
+        Some("Refined Title")
+    );
+    assert!(parsed.session.ended_at.is_none());
 }
 
 #[sqlx::test(migrations = "../be-remote-db/src/migrations")]
 async fn patch_rejects_empty_body(pool: PgPool) {
     let app = spawn_app(pool).await;
-    let activity_id = seed_activity(&app.pool, app.primary, fixed_started_at(), None).await;
+    let inserted = post_session(&app, &insert_body("youtube", "Youtube")).await;
 
-    let body = UpdateActivityRequest::default();
-
+    let body = UpdateActivitySessionRequest::default();
     let response = reqwest::Client::new()
-        .patch(app.url(&format!("/activities/{activity_id}")))
+        .patch(app.url(&format!("/activity-sessions/{}", inserted.session.id)))
         .json(&body)
         .send()
         .await
@@ -279,21 +317,17 @@ async fn patch_rejects_empty_body(pool: PgPool) {
 #[sqlx::test(migrations = "../be-remote-db/src/migrations")]
 async fn patch_cross_user_returns_404(pool: PgPool) {
     let app = spawn_app(pool).await;
-    let activity_id = seed_activity(&app.pool, app.primary, fixed_started_at(), None).await;
+    let inserted = post_session(&app, &insert_body("youtube", "Youtube")).await;
 
-    // Switch the injected identity to a different real user. The row
-    // exists but doesn't belong to them, so the WHERE clause on
-    // `user_id` rejects it as "not found" rather than leaking existence
-    // via 403.
     app.act_as(app.other);
 
-    let body = UpdateActivityRequest {
-        name: None,
+    let body = UpdateActivitySessionRequest {
         window_title: None,
+        url: None,
         ended_at: Some(fixed_ended_at()),
     };
     let response = reqwest::Client::new()
-        .patch(app.url(&format!("/activities/{activity_id}")))
+        .patch(app.url(&format!("/activity-sessions/{}", inserted.session.id)))
         .json(&body)
         .send()
         .await
@@ -307,26 +341,62 @@ async fn patch_cross_user_returns_404(pool: PgPool) {
 #[sqlx::test(migrations = "../be-remote-db/src/migrations")]
 async fn patch_unauthenticated_returns_401(pool: PgPool) {
     let app = spawn_app(pool).await;
-    let activity_id = seed_activity(&app.pool, app.primary, fixed_started_at(), None).await;
+    let inserted = post_session(&app, &insert_body("youtube", "Youtube")).await;
 
     app.act_anonymously();
 
-    let body = UpdateActivityRequest {
-        name: None,
+    let body = UpdateActivitySessionRequest {
         window_title: None,
+        url: None,
         ended_at: Some(fixed_ended_at()),
     };
     let response = reqwest::Client::new()
-        .patch(app.url(&format!("/activities/{activity_id}")))
+        .patch(app.url(&format!("/activity-sessions/{}", inserted.session.id)))
         .json(&body)
         .send()
         .await
         .expect("PATCH");
 
-    // When the authz middleware is absent, the `AuthUser` extractor's
-    // own `MissingClaims` rejection short-circuits before the handler
-    // runs. That rejection renders a plain-text body (defence-in-depth
-    // for a misconfigured router), not the JSON envelope — assert on
-    // the status only.
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test(migrations = "../be-remote-db/src/migrations")]
+async fn list_activities_returns_parents_with_latest_session(pool: PgPool) {
+    let app = spawn_app(pool).await;
+    let youtube = post_session(&app, &insert_body("youtube", "Youtube")).await;
+    let code = post_session(
+        &app,
+        &InsertActivitySessionRequest {
+            session_id: None,
+            activity: ActivityInsert {
+                identity_key: "code".into(),
+                display_name: "Code".into(),
+                icon_png_base64: None,
+            },
+            process_name: "code".into(),
+            process_id: Some(99),
+            window_title: Some("main.rs".into()),
+            url: None,
+            started_at: fixed_started_at() + chrono::Duration::seconds(1),
+            ended_at: None,
+        },
+    )
+    .await;
+
+    let response = reqwest::Client::new()
+        .get(app.url("/activities"))
+        .send()
+        .await
+        .expect("GET");
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let parsed: ListActivitiesResponse = response.json().await.expect("decode");
+    assert_eq!(parsed.activities.len(), 2);
+    // Most recently used (Code) sorts first.
+    assert_eq!(parsed.activities[0].activity.id, code.activity.id);
+    assert_eq!(parsed.activities[1].activity.id, youtube.activity.id);
+    assert_eq!(
+        parsed.activities[0].latest_session.as_ref().map(|s| s.id),
+        Some(code.session.id),
+    );
 }

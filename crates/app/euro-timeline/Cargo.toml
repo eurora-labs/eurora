@@ -6,6 +6,7 @@ description = "Timeline storage for capturing system state over time"
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
+activity-core = { workspace = true }
 agent-chain-core = { workspace = true }
 # euro-personal-db = { workspace = true }
 bon = { workspace = true }

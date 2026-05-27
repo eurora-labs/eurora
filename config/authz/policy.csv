@@ -13,8 +13,9 @@ p, Free, /payment/checkout-status, GET
 
 # Free: activity endpoints (limited externally by token count)
 p, Free, /activities, GET
-p, Free, /activities, POST
-p, Free, /activities/{id}, PATCH
+p, Free, /activities/{id}/sessions, GET
+p, Free, /activity-sessions, POST
+p, Free, /activity-sessions/{id}, PATCH
 
 # Free: asset endpoints (limited externally by token count). GET serves
 # asset bytes for the owning user only; the handler enforces ownership and

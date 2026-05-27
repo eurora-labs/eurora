@@ -3900,6 +3900,7 @@ dependencies = [
  "focus-tracker",
  "humantime-serde",
  "image",
+ "psl",
  "regex",
  "reqwest 0.12.28",
  "resvg",
@@ -4271,6 +4272,7 @@ dependencies = [
 name = "euro-timeline"
 version = "0.0.0"
 dependencies = [
+ "activity-core",
  "agent-chain-core",
  "bon",
  "chrono",
@@ -8592,6 +8594,15 @@ checksum = "4488a4a36b9a4ba6b9334a32a39971f77c1436ec82c38707bce707699cc3bbcb"
 dependencies = [
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "psl"
+version = "2.1.210"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27fbd4d9b2eb0b6e0cbd654bce70243f460cbc8dc92df6747e3fb911ce1cd4a8"
+dependencies = [
+ "psl-types",
 ]
 
 [[package]]

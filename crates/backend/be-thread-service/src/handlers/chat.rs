@@ -719,6 +719,10 @@ async fn prepare_turn(
 /// Spawn the agent loop with the prepared context. Mirror image of
 /// [`prepare_turn`] — both call sites in this module use it to keep the
 /// `run_agent_loop` builder wiring in exactly one place.
+///
+/// `state.providers.title` is forwarded into the loop so the orchestrator
+/// can auto-title untitled threads at the end of every turn without
+/// reaching back through `AppState`.
 fn spawn_agent_loop(state: Arc<AppState>, prepared: LlmContext, ctx: SpawnContext) {
     let LlmContext {
         messages,
@@ -734,8 +738,10 @@ fn spawn_agent_loop(state: Arc<AppState>, prepared: LlmContext, ctx: SpawnContex
         bus,
     } = ctx;
     let db = state.db.clone();
+    let title_model = state.providers.title.clone();
     tokio::spawn(
         run_agent_loop()
+            .title_model(title_model)
             .tx(tx)
             .token(cancel)
             .db(db)

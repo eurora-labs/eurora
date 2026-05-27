@@ -7,7 +7,8 @@
 //! multiplexes three responsibilities over the WS:
 //!
 //! - forward user-visible chat frames (`Chunk`, `ConfirmedHumanMessage`,
-//!   `Final`, `Error`) to a caller-owned [`ChatEventSink`],
+//!   `TitleUpdated`, `Final`, `Error`) to a caller-owned
+//!   [`ChatEventSink`],
 //! - dispatch incoming `ToolRequest` frames through the [`ToolBackend`]
 //!   and emit the matching `ToolResponse` on completion, and
 //! - propagate cancellation: UI-level cancel triggers
@@ -188,7 +189,8 @@ impl ChatBridge {
                             }
                         }
                         ev @ (ChatServerMessage::Chunk { .. }
-                            | ChatServerMessage::ConfirmedHumanMessage { .. }) => {
+                            | ChatServerMessage::ConfirmedHumanMessage { .. }
+                            | ChatServerMessage::TitleUpdated { .. }) => {
                             sink.send(ev).map_err(Error::Sink)?;
                         }
                         ev @ ChatServerMessage::Final { .. } => {

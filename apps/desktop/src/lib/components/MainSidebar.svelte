@@ -168,7 +168,7 @@
 				onThreadSelect={handleThreadSelect}
 				onThreadDelete={handleThreadDelete}
 				label={selectedApp ? 'Other chats' : 'Chats'}
-				pinnedLabel={selectedApp ? `Chats in ${selectedApp.name}` : undefined}
+				pinnedLabel={selectedApp ? `Chats in ${selectedApp.displayName}` : undefined}
 				pinnedThreads={selectedApp ? matched : undefined}
 				pinnedAccentColor={selectedApp?.accent?.hex}
 			/>
