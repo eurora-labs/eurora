@@ -339,10 +339,17 @@ fn init_tracing() {
     } else {
         LevelFilter::INFO
     };
+    // `Targets` uses longest-prefix match. The OpenAI SSE dump in
+    // `agent_chain::providers::openai::base` is emitted on the dedicated
+    // target `agent_chain::providers::openai::sse` so it can be cranked
+    // up to TRACE without dragging the rest of `agent_chain` along —
+    // useful when diagnosing GLM-family tool-call failures where the
+    // raw wire format is the only ground truth.
     let global_filter = Targets::new()
         .with_default(LevelFilter::WARN)
         .with_target("be_", app_level)
         .with_target("agent_", app_level)
+        .with_target("agent_chain::providers::openai::sse", LevelFilter::TRACE)
         .with_target("hyper", LevelFilter::OFF)
         .with_target("tokio", LevelFilter::OFF);
 
