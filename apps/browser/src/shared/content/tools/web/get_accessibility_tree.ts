@@ -167,10 +167,17 @@ const IMPLICIT_ROLES: Record<string, string | ((el: Element) => string | null)> 
 	ul: 'list',
 };
 
+/// `aria-query`'s typed `roles` map keys to `ARIARoleDefinitionKey` (a
+/// string-literal union of the spec's known roles). We only need
+/// membership testing on user-controlled `role` attribute tokens, so
+/// pin to the wider `string` key type — narrowing the token first
+/// would just re-derive what `.has` already answers.
+const KNOWN_ROLES = ariaRoles as unknown as ReadonlyMap<string, unknown>;
+
 function computeRole(el: Element): string {
 	const explicit = el.getAttribute('role');
 	if (explicit) {
-		const candidate = explicit.split(/\s+/).find((token) => ariaRoles.has(token));
+		const candidate = explicit.split(/\s+/).find((token) => KNOWN_ROLES.has(token));
 		if (candidate) return candidate;
 	}
 	const implicit = IMPLICIT_ROLES[el.localName];

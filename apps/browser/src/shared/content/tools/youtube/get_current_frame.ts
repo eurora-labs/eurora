@@ -17,22 +17,31 @@ type Result = z.infer<typeof Out>;
 
 /// Single canvas reused across captures — `drawImage` to an existing
 /// canvas is cheap; recreating it per call would just churn GC.
-const CANVAS = document.createElement('canvas');
+/// Lazily created on first capture so the module can be loaded outside
+/// a browser (e.g. by the e2e test process that imports tool
+/// descriptors for type derivation).
+let canvas: HTMLCanvasElement | null = null;
+
+function getCanvas(): HTMLCanvasElement {
+	if (canvas === null) canvas = document.createElement('canvas');
+	return canvas;
+}
 
 export async function executeGetCurrentFrame(): Promise<Result> {
 	const videoId = requireCurrentVideoId();
 	const player = requirePlayer();
-	CANVAS.width = player.videoWidth;
-	CANVAS.height = player.videoHeight;
-	const ctx = CANVAS.getContext('2d');
+	const target = getCanvas();
+	target.width = player.videoWidth;
+	target.height = player.videoHeight;
+	const ctx = target.getContext('2d');
 	if (!ctx) throw new Error('2D canvas context unavailable');
-	ctx.drawImage(player, 0, 0, CANVAS.width, CANVAS.height);
+	ctx.drawImage(player, 0, 0, target.width, target.height);
 	return {
 		video_id: videoId,
 		current_time: player.currentTime,
-		width: CANVAS.width,
-		height: CANVAS.height,
-		image_base64: CANVAS.toDataURL('image/png').split(',')[1],
+		width: target.width,
+		height: target.height,
+		image_base64: target.toDataURL('image/png').split(',')[1],
 	};
 }
 

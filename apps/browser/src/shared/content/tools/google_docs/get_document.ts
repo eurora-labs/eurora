@@ -1,6 +1,5 @@
 import { getDocTitle, getResourceId, requireDocKind, siteName, type GoogleDocKind } from './_lib';
 import { READABILITY_BODY_CAP, clampString } from '../../extensions/web/truncation';
-import browser from 'webextension-polyfill';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { Tool } from '../types';
@@ -58,6 +57,12 @@ async function fetchExport(
 	signal: AbortSignal,
 ): Promise<string> {
 	if (signal.aborted) throw new DOMException('aborted', 'AbortError');
+	/// Lazy `webextension-polyfill` import — the package throws on
+	/// load outside an extension context, so a static import would
+	/// break Node-side consumers of this module (e.g. the e2e test
+	/// process that imports the tool barrel for type derivation and
+	/// descriptor listings).
+	const { default: browser } = await import('webextension-polyfill');
 	const url = `https://docs.google.com/${kind}/d/${resourceId}/export?format=${exportFormat(kind)}`;
 	const response = await new Promise<unknown>((resolve, reject) => {
 		function onAbort() {
