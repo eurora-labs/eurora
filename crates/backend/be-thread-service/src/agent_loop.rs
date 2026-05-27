@@ -1277,7 +1277,7 @@ mod tests {
             let mut acc = ChatAccumulator::default();
             // Drain the receiver concurrently so the round's `tx.send`
             // calls don't deadlock on a full channel.
-            let drain = tokio::spawn(async move { while let Some(_) = rx.recv().await {} });
+            let drain = tokio::spawn(async move { while rx.recv().await.is_some() {} });
             let result = run_round(&model, &[], &tx, &token, &mut acc)
                 .await
                 .expect("scripted stream never errors");
