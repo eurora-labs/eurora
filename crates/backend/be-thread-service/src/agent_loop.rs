@@ -18,25 +18,48 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use crate::conversion::convert_db_message_to_base_message;
+use crate::glm_xml_tool_calls;
 use crate::remote_tool_bus::RemoteToolBus;
 use crate::tool_catalog::{TurnCatalog, TurnEntry};
 
-/// Appended as a system message on the forced-synthesis turn so the model
-/// understands why its tools have been taken away.
-const SYNTHESIS_NUDGE: &str = "You have reached the maximum number of tool calls for this turn. \
-Based on the information you have gathered so far, provide your complete final answer to the \
-user now. Do not request additional tools.";
+/// Appended on the forced-synthesis turn that fires when the tool-call
+/// budget runs out. The model has actually called tools and gathered
+/// information by this point; we just need it to wrap up.
+const BUDGET_EXHAUSTED_SYNTHESIS_NUDGE: &str = "You have reached the maximum number of tool calls \
+for this turn. Based on the information you have gathered so far, provide your complete final \
+answer to the user now. Do not request additional tools.";
 
-/// Appended as a system message when the provider reports
-/// `finish_reason: \"tool_calls\"` but emits no actual tool-call deltas.
-/// This is a known GLM-family failure mode: the model decides to call a
-/// tool mid-stream but never emits the call. The retry asks the model to
-/// either follow through with the function-calling interface or answer
-/// directly — both outcomes recover the turn from what would otherwise be
-/// a silent termination.
-const EMPTY_TOOL_CALL_NUDGE: &str = "Your previous response indicated a tool call but no tool call was emitted. \
-Either call a tool now using the function-calling interface, or answer the user \
-directly without tools.";
+/// Appended on the forced-synthesis turn that fires when the model
+/// promised tool calls but never actually emitted any (the GLM-5.1
+/// give-up shape). Unlike the budget-exhaustion case, the model has
+/// *no* gathered information — so it must not be invited to "summarize
+/// what it found", and must be explicitly told not to write tool names
+/// as a substitute for calling them (which is what GLM does when it
+/// can't structurally emit a call).
+const STALLED_SYNTHESIS_NUDGE: &str = "Tool calling failed for this turn — you attempted to call \
+tools but none were dispatched. You cannot call any tools now. Answer the user's request \
+directly using only information already in this conversation. Do not describe tools you would \
+call, do not write tool names, do not narrate your thought process. If you cannot answer with \
+the information available, briefly tell the user what you would need to know to help them.";
+
+/// Appended as a system message on the second tool-call retry, after
+/// the first `tool_choice=none` attempt also produced no XML envelope.
+/// Spells out GLM-5.1's native tool-call format so the model has an
+/// explicit template to follow when the wire-side structured path is
+/// unavailable (vLLM's GLM parser drops structured calls — see
+/// [`crate::glm_xml_tool_calls`] for the parser that reads them back).
+const FAILED_TOOL_CALL_NUDGE: &str = "Your previous response did not include a usable tool call. \
+If you need to use a tool, emit it on its own using exactly this format: \
+<tool_call>tool_name<arg_key>parameter_name</arg_key><arg_value>parameter_value</arg_value></tool_call>. \
+Repeat the <arg_key>/<arg_value> pair for each parameter. For tools without parameters, write \
+<tool_call>tool_name</tool_call>. Use only the tool names from the tools you were given. \
+If no tool is needed, answer the user directly.";
+
+/// Maximum number of attempts to coax a tool call out of the model
+/// per round: the original `auto` attempt, then `tool_choice=any`,
+/// then `tool_choice=any` with the nudge prepended. After this many
+/// attempts the round falls back to forced-text synthesis (no tools).
+const TOOL_CALL_RETRY_ATTEMPTS: usize = 3;
 
 /// Running totals of an AI response as it is streamed across one or more LLM rounds.
 #[derive(Default)]
@@ -76,6 +99,26 @@ impl ChatAccumulator {
         self.content.push_str(text);
     }
 
+    /// Replace a just-pushed round-content segment with its stripped
+    /// form. Used when the GLM XML extractor lifts tool calls out of
+    /// the round's content and the persisted message must no longer
+    /// carry the raw envelope. The suffix match is defensive: if a
+    /// future refactor changes who pushes into the accumulator and the
+    /// expected tail is not present, we leave the buffer untouched
+    /// rather than corrupt the message.
+    fn replace_round_content(&mut self, original: &str, stripped: &str) {
+        let Some(prefix_len) = self.content.len().checked_sub(original.len()) else {
+            tracing::warn!("ChatAccumulator: round content longer than accumulator on strip");
+            return;
+        };
+        if &self.content[prefix_len..] != original {
+            tracing::warn!("ChatAccumulator: round content suffix mismatch on strip");
+            return;
+        }
+        self.content.truncate(prefix_len);
+        self.content.push_str(stripped);
+    }
+
     fn has_content(&self) -> bool {
         !self.content.is_empty() || !self.reasoning.is_empty()
     }
@@ -99,7 +142,7 @@ impl ChatAccumulator {
 /// orchestrator uses it to disambiguate "the model finished a normal turn
 /// with no tools to call" from "the model said it wanted to call tools
 /// but emitted no deltas" — the latter is a known GLM-family failure
-/// mode and triggers a retry-with-nudge in [`drive_turn`].
+/// mode handled by [`try_round_with_retries`].
 #[derive(Debug)]
 struct RoundResult {
     content: String,
@@ -277,16 +320,38 @@ where
     ToolExecOutcome::Completed(results)
 }
 
-/// Detect the GLM-family failure mode where the provider reports
-/// `finish_reason: "tool_calls"` but the stream contained no tool-call
-/// deltas. The accumulator-side conditions (`content.is_empty()`,
-/// `tool_calls.is_empty()`) rule out the legitimate cases of "model
-/// answered and is also calling tools" and "model answered without
-/// tools"; only the pathological combination triggers a retry.
-fn is_empty_tool_call_signal(result: &RoundResult) -> bool {
-    result.tool_calls.is_empty()
-        && result.content.is_empty()
-        && result.finish_reason.as_deref() == Some("tool_calls")
+/// Did the model promise a tool call and fail to deliver one?
+///
+/// True when the provider reports `finish_reason: "tool_calls"` but
+/// the stream carried no structured tool-call deltas. The model may or
+/// may not have produced prose along the way (GLM-family providers
+/// commonly narrate "Let me check…" before stalling); the visible text
+/// is irrelevant — what matters is the broken promise. [`try_round_with_retries`]
+/// uses this to decide whether to re-invoke the model with progressively
+/// stronger constraints.
+fn needs_tool_call_retry(result: &RoundResult) -> bool {
+    result.tool_calls.is_empty() && result.finish_reason.as_deref() == Some("tool_calls")
+}
+
+/// Truncate a string to at most `max_bytes`, snapping back to the
+/// nearest UTF-8 boundary so the slice is always valid. Appends `…`
+/// when truncation occurred so the consumer can tell from the log line
+/// alone that more content followed.
+///
+/// Returns `String` rather than `&str` so the caller can pass it
+/// straight into `tracing` field arguments without lifetime juggling.
+fn truncate_for_log(s: &str, max_bytes: usize) -> String {
+    if s.len() <= max_bytes {
+        return s.to_string();
+    }
+    let mut end = max_bytes;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    let mut out = String::with_capacity(end + 3);
+    out.push_str(&s[..end]);
+    out.push('…');
+    out
 }
 
 /// Pull `finish_reason` off a streaming chunk. OpenAI-compatible adapters
@@ -339,6 +404,7 @@ async fn run_forced_synthesis(
     chat_model: &(dyn BaseChatModel + Send + Sync),
     tool_likes: &[ToolLike],
     base_messages: &[AnyMessage],
+    nudge: &str,
     tx: &mpsc::Sender<ChatServerMessage>,
     token: &CancellationToken,
     acc: &mut ChatAccumulator,
@@ -349,18 +415,190 @@ async fn run_forced_synthesis(
 
     let mut synthesis_messages = Vec::with_capacity(base_messages.len() + 1);
     synthesis_messages.extend_from_slice(base_messages);
-    synthesis_messages.push(
-        SystemMessage::builder()
-            .content(SYNTHESIS_NUDGE)
-            .build()
-            .into(),
-    );
+    synthesis_messages.push(SystemMessage::builder().content(nudge).build().into());
 
     let result = run_round(&*synthesis_model, &synthesis_messages, tx, token, acc)
         .await
         .map_err(agent_chain::Error::other)?;
 
     Ok(result.cancelled)
+}
+
+/// Run one round, retrying with progressively stronger constraints if
+/// the model promises a tool call (`finish_reason: "tool_calls"`) but
+/// emits no structured deltas. The attempt sequence is:
+///
+/// 1. Original `tool_choice=auto` (the caller's normal model).
+/// 2. `tool_choice=none` + parse `<tool_call>…</tool_call>` envelopes
+///    out of `content`. GLM-5.1 on vLLM emits its native XML format
+///    when the structured tool-call path is disabled — see
+///    [`crate::glm_xml_tool_calls`].
+/// 3. `tool_choice=none` + a [`FAILED_TOOL_CALL_NUDGE`] system message
+///    that spells out the expected XML format, then parse again.
+///
+/// Returns the last [`RoundResult`] produced regardless of whether a
+/// tool call was eventually emitted; the caller decides whether to
+/// dispatch tools, fall back to forced text synthesis, or surface an
+/// error frame.
+///
+/// `base_messages` is mutated: if the nudge attempt runs, the system
+/// message is appended in-place so subsequent rounds and any fallback
+/// synthesis observe it. The retry chain bails early if `bind_tools`
+/// fails or the tool catalog is empty (a contradictory state with the
+/// retry trigger — log it and return the original failure).
+///
+/// Outcome of [`try_round_with_retries`]. `result` is the latest
+/// [`RoundResult`] produced (across all attempts); `retries_attempted`
+/// is `true` when any retry beyond the original `auto` attempt ran. The
+/// caller uses the flag to detect "model wanted tools at some point in
+/// this round" even when the retry chain converted that intent into a
+/// non-`tool_calls` finish reason (e.g. GLM-5.1 returning `stop` under
+/// `tool_choice=required`).
+struct RoundAttemptOutcome {
+    result: RoundResult,
+    retries_attempted: bool,
+}
+
+/// Streaming UX: each retry's content is streamed live to `tx`, so the
+/// user may see preamble text from the failed attempt before the
+/// successful attempt's content/tool call. Suppressing the failed
+/// attempt would require buffering rounds rather than streaming them
+/// — out of scope for this defensive layer.
+#[allow(clippy::too_many_arguments)]
+async fn try_round_with_retries(
+    chat_model: &(dyn BaseChatModel + Send + Sync),
+    tool_likes: &[ToolLike],
+    base_messages: &mut Vec<AnyMessage>,
+    tx: &mpsc::Sender<ChatServerMessage>,
+    token: &CancellationToken,
+    acc: &mut ChatAccumulator,
+    thread_id: Uuid,
+    round: usize,
+) -> Result<RoundAttemptOutcome, String> {
+    let mut result = run_round(chat_model, base_messages, tx, token, acc).await?;
+    let mut retries_attempted = false;
+
+    for attempt in 1..TOOL_CALL_RETRY_ATTEMPTS {
+        if result.cancelled || !result.tool_calls.is_empty() || !needs_tool_call_retry(&result) {
+            return Ok(RoundAttemptOutcome {
+                result,
+                retries_attempted,
+            });
+        }
+
+        if tool_likes.is_empty() {
+            tracing::warn!(
+                thread_id = %thread_id,
+                round = round,
+                "Model reported finish_reason=tool_calls with no tools registered; \
+                 skipping retry (no candidates to force)"
+            );
+            return Ok(RoundAttemptOutcome {
+                result,
+                retries_attempted,
+            });
+        }
+
+        let inject_nudge = attempt == TOOL_CALL_RETRY_ATTEMPTS - 1;
+        tracing::warn!(
+            thread_id = %thread_id,
+            round = round,
+            attempt = attempt,
+            content_len = result.content.len(),
+            content_sample = %truncate_for_log(&result.content, 200),
+            nudge = inject_nudge,
+            "Model promised a tool call but emitted none; retrying with tool_choice=none \
+             and GLM XML parsing"
+        );
+
+        let xml_model = match chat_model.bind_tools(tool_likes, Some(ToolChoice::none())) {
+            Ok(bound) => {
+                let arc: Arc<dyn BaseChatModel + Send + Sync> =
+                    Arc::from(bound as Box<dyn BaseChatModel + Send + Sync>);
+                arc
+            }
+            Err(e) => {
+                tracing::error!(
+                    thread_id = %thread_id,
+                    round = round,
+                    attempt = attempt,
+                    error = %e,
+                    "bind_tools(none) failed; aborting retry chain"
+                );
+                return Ok(RoundAttemptOutcome {
+                    result,
+                    retries_attempted,
+                });
+            }
+        };
+
+        if inject_nudge {
+            base_messages.push(
+                SystemMessage::builder()
+                    .content(FAILED_TOOL_CALL_NUDGE)
+                    .build()
+                    .into(),
+            );
+        }
+
+        retries_attempted = true;
+        result = run_round(xml_model.as_ref(), base_messages, tx, token, acc).await?;
+
+        if try_lift_glm_xml(&mut result, acc, thread_id, round, attempt) {
+            return Ok(RoundAttemptOutcome {
+                result,
+                retries_attempted,
+            });
+        }
+    }
+
+    Ok(RoundAttemptOutcome {
+        result,
+        retries_attempted,
+    })
+}
+
+/// If `result.content` carries a GLM `<tool_call>` envelope, lift the
+/// calls into `result.tool_calls`, strip the envelope from
+/// `result.content` and from `acc.content`, and return `true`. Returns
+/// `false` when nothing was lifted — the caller continues the retry
+/// chain.
+fn try_lift_glm_xml(
+    result: &mut RoundResult,
+    acc: &mut ChatAccumulator,
+    thread_id: Uuid,
+    round: usize,
+    attempt: usize,
+) -> bool {
+    if !glm_xml_tool_calls::looks_like_glm_xml_tool_calls(&result.content) {
+        return false;
+    }
+    let extracted = glm_xml_tool_calls::extract_tool_calls(&result.content);
+    if extracted.is_empty() {
+        tracing::warn!(
+            thread_id = %thread_id,
+            round = round,
+            attempt = attempt,
+            content_len = result.content.len(),
+            content_sample = %truncate_for_log(&result.content, 1000),
+            "GLM XML probe matched but extractor returned no tool calls"
+        );
+        return false;
+    }
+    let names: Vec<&str> = extracted.iter().map(|c| c.name.as_str()).collect();
+    tracing::info!(
+        thread_id = %thread_id,
+        round = round,
+        attempt = attempt,
+        recovered = extracted.len(),
+        tools = ?names,
+        "Lifted GLM XML tool calls from content"
+    );
+    let stripped = glm_xml_tool_calls::strip_tool_call_envelopes(&result.content);
+    acc.replace_round_content(&result.content, &stripped);
+    result.content = stripped;
+    result.tool_calls = extracted;
+    true
 }
 
 async fn save_accumulated_message(
@@ -492,17 +730,24 @@ where
     let mut acc = ChatAccumulator::default();
     let mut cancelled = false;
     let mut budget_exhausted = false;
-    // GLM-family providers occasionally signal `finish_reason: "tool_calls"`
-    // without emitting any tool-call deltas, leaving the loop with nothing
-    // to dispatch and nothing to show the user. We retry the round once
-    // with a system-message nudge before giving up. One-shot guard so a
-    // pathological provider can't burn the whole tool-call budget on
-    // empty-call rounds.
-    let mut empty_tool_call_retry_used = false;
+    let mut model_wanted_tools = false;
+    let mut tools_ever_dispatched = false;
+    let tool_likes = catalog.tool_likes();
 
     for round in 0..max_tool_rounds {
-        let result = match run_round(chat_model, &messages, tx, token, &mut acc).await {
-            Ok(r) => r,
+        let outcome = match try_round_with_retries(
+            chat_model,
+            &tool_likes,
+            &mut messages,
+            tx,
+            token,
+            &mut acc,
+            thread_id,
+            round,
+        )
+        .await
+        {
+            Ok(o) => o,
             Err(detail) => {
                 return AgentTurnOutcome::Errored {
                     kind: "internal_error".to_string(),
@@ -510,42 +755,86 @@ where
                 };
             }
         };
+        let RoundAttemptOutcome {
+            result,
+            retries_attempted,
+        } = outcome;
+
+        tracing::debug!(
+            thread_id = %thread_id,
+            round = round,
+            content_len = result.content.len(),
+            reasoning_len = acc.reasoning.len(),
+            tool_calls = result.tool_calls.len(),
+            finish_reason = ?result.finish_reason,
+            cancelled = result.cancelled,
+            retries_attempted = retries_attempted,
+            "Round complete"
+        );
+        // TRACE-level dump of the raw model output so a `RUST_LOG=trace`
+        // run shows exactly what the provider produced — useful when
+        // diagnosing GLM-family tool-call failures.
+        tracing::trace!(
+            thread_id = %thread_id,
+            round = round,
+            content = %result.content,
+            reasoning = %acc.reasoning,
+            "Round raw content"
+        );
 
         if result.cancelled {
             cancelled = true;
             break;
         }
+
+        // Remember the model's intent across rounds. GLM-5.1 can promise
+        // a tool call (`finish_reason=tool_calls`) on the first attempt,
+        // then capitulate under `tool_choice=any` and return
+        // `finish_reason=stop` with no calls and no answer. The retry
+        // helper reports `retries_attempted` so we catch that case even
+        // when the final round result no longer carries the
+        // `tool_calls` finish reason; either signal flips the flag.
+        if result.finish_reason.as_deref() == Some("tool_calls") || retries_attempted {
+            model_wanted_tools = true;
+        }
+
         if result.tool_calls.is_empty() {
-            // An empty turn (no tool calls, no text) is always a failure —
-            // either the GLM `finish_reason: tool_calls` shape we know how
-            // to recover from, or some other provider hiccup. Either way,
-            // surface a single warn with the visible signals so the
-            // condition is diagnosable from logs without bumping verbosity.
-            if result.content.is_empty() {
+            if needs_tool_call_retry(&result) {
+                // try_round_with_retries burned its full attempt budget
+                // and the model is still in the failure shape. Fall
+                // through; the post-loop synthesis check picks this up
+                // via `model_wanted_tools && !tools_ever_dispatched`.
                 tracing::warn!(
                     thread_id = %thread_id,
                     round = round,
                     finish_reason = ?result.finish_reason,
-                    retry_available = !empty_tool_call_retry_used,
+                    content_len = result.content.len(),
+                    content_sample = %truncate_for_log(&result.content, 1000),
+                    "Tool-call retry budget exhausted; will fall back to forced text synthesis"
+                );
+            } else if model_wanted_tools && !tools_ever_dispatched {
+                // Retries converted the failure shape into `stop` (or
+                // similar) without ever emitting a call AND no prior
+                // round dispatched either — the GLM give-up shape.
+                // Synthesis fallback handles it. (Don't fire on the
+                // happy path where earlier rounds dispatched tools and
+                // the final round simply returns the answer.)
+                tracing::warn!(
+                    thread_id = %thread_id,
+                    round = round,
+                    finish_reason = ?result.finish_reason,
+                    content_len = result.content.len(),
+                    content_sample = %truncate_for_log(&result.content, 1000),
+                    "Model promised tools but gave up after retries with no dispatchable call; \
+                     will fall back to forced text synthesis"
+                );
+            } else if result.content.is_empty() {
+                tracing::warn!(
+                    thread_id = %thread_id,
+                    round = round,
+                    finish_reason = ?result.finish_reason,
                     "Round ended with no content and no tool calls"
                 );
-            }
-            if !empty_tool_call_retry_used && is_empty_tool_call_signal(&result) {
-                tracing::warn!(
-                    thread_id = %thread_id,
-                    round = round,
-                    finish_reason = ?result.finish_reason,
-                    "Provider reported finish_reason=tool_calls with no tool-call deltas; \
-                     retrying with nudge"
-                );
-                empty_tool_call_retry_used = true;
-                messages.push(
-                    SystemMessage::builder()
-                        .content(EMPTY_TOOL_CALL_NUDGE)
-                        .build()
-                        .into(),
-                );
-                continue;
             }
             break;
         }
@@ -566,20 +855,47 @@ where
                 break;
             }
         }
+        tools_ever_dispatched = true;
 
         if round + 1 == max_tool_rounds {
             budget_exhausted = true;
         }
     }
 
-    if !cancelled && budget_exhausted {
+    let stalled_after_promising_tools = model_wanted_tools && !tools_ever_dispatched;
+    if !cancelled && (budget_exhausted || stalled_after_promising_tools) {
+        // Pick the synthesis prompt that matches the failure mode. The
+        // budget-exhausted case has gathered information to summarise;
+        // the stalled case has none, so we explicitly tell the model
+        // not to "summarise what it found" or write tool names as
+        // pseudo-calls. Same machinery, different prompt.
+        let (reason, nudge) = if budget_exhausted {
+            (
+                "tool-call budget exhausted",
+                BUDGET_EXHAUSTED_SYNTHESIS_NUDGE,
+            )
+        } else {
+            (
+                "model promised tools but never dispatched any",
+                STALLED_SYNTHESIS_NUDGE,
+            )
+        };
         tracing::info!(
             thread_id = %thread_id,
-            rounds = max_tool_rounds,
-            "Tool-call budget exhausted; running forced synthesis with tool_choice=none"
+            reason = reason,
+            "Running forced text synthesis with tool_choice=none"
         );
-        let tool_likes = catalog.tool_likes();
-        match run_forced_synthesis(chat_model, &tool_likes, &messages, tx, token, &mut acc).await {
+        match run_forced_synthesis(
+            chat_model,
+            &tool_likes,
+            &messages,
+            nudge,
+            tx,
+            token,
+            &mut acc,
+        )
+        .await
+        {
             Ok(synth_cancelled) => cancelled = synth_cancelled,
             Err(e) => {
                 tracing::warn!("Forced synthesis failed: {e}; saving accumulated response as-is");
@@ -1043,13 +1359,13 @@ mod tests {
         assert!(content_text.contains("unknown tool 'ghost::tool'"));
     }
 
-    /// Truth table for [`is_empty_tool_call_signal`]. The detector exists
-    /// to recognise the GLM-family failure mode — `finish_reason:
-    /// "tool_calls"` with no actual tool-call deltas — without
-    /// misfiring on the three adjacent shapes (model answered normally,
-    /// model answered and is also calling tools, model is calling tools
-    /// without prose). All four cases are exercised here so a future
-    /// tweak to the detector can't quietly broaden it.
+    /// Truth table for [`needs_tool_call_retry`]. The detector flags
+    /// the GLM-family failure mode — `finish_reason: "tool_calls"` with
+    /// no structured deltas — regardless of whether the model also
+    /// streamed visible prose (the observed shape often has both). It
+    /// must not fire on the three legitimate adjacent shapes (model
+    /// answered normally, model answered and also called tools, model
+    /// called tools without prose).
     fn round_result(
         content: &str,
         finish_reason: Option<&str>,
@@ -1064,20 +1380,29 @@ mod tests {
     }
 
     #[test]
-    fn empty_tool_call_signal_fires_on_glm_failure_shape() {
+    fn needs_retry_fires_on_glm_failure_shape_no_content() {
         let result = round_result("", Some("tool_calls"), Vec::new());
-        assert!(is_empty_tool_call_signal(&result));
+        assert!(needs_tool_call_retry(&result));
     }
 
     #[test]
-    fn empty_tool_call_signal_ignores_normal_text_turn() {
+    fn needs_retry_fires_on_glm_failure_shape_with_preface_content() {
+        // The observed GLM-5.1 shape: the model streams a prose preface
+        // ("Let me check…") before stalling. Visible content does not
+        // disqualify the retry — the broken promise does.
+        let result = round_result("Let me check.", Some("tool_calls"), Vec::new());
+        assert!(needs_tool_call_retry(&result));
+    }
+
+    #[test]
+    fn needs_retry_ignores_normal_text_turn() {
         // Plain answer: model said its piece and stopped. No retry warranted.
         let result = round_result("Here is the answer.", Some("stop"), Vec::new());
-        assert!(!is_empty_tool_call_signal(&result));
+        assert!(!needs_tool_call_retry(&result));
     }
 
     #[test]
-    fn empty_tool_call_signal_ignores_normal_tool_call_turn() {
+    fn needs_retry_ignores_normal_tool_call_turn() {
         // Model emitted at least one tool call — the legitimate
         // tool-calls finish_reason path. Must not retry.
         let result = round_result(
@@ -1089,11 +1414,11 @@ mod tests {
                 "c1",
             )],
         );
-        assert!(!is_empty_tool_call_signal(&result));
+        assert!(!needs_tool_call_retry(&result));
     }
 
     #[test]
-    fn empty_tool_call_signal_ignores_mixed_text_and_tool_call_turn() {
+    fn needs_retry_ignores_mixed_text_and_tool_call_turn() {
         // Model answered AND scheduled a tool call. Also a legitimate
         // shape that the detector must let through.
         let result = round_result(
@@ -1105,27 +1430,27 @@ mod tests {
                 "c1",
             )],
         );
-        assert!(!is_empty_tool_call_signal(&result));
+        assert!(!needs_tool_call_retry(&result));
     }
 
     #[test]
-    fn empty_tool_call_signal_ignores_missing_finish_reason() {
+    fn needs_retry_ignores_missing_finish_reason() {
         // Some providers (or mocked streams) end without ever sending a
         // `finish_reason`. That's ambiguous, not a known failure mode —
         // the detector stays conservative and does not retry.
         let result = round_result("", None, Vec::new());
-        assert!(!is_empty_tool_call_signal(&result));
+        assert!(!needs_tool_call_retry(&result));
     }
 
     #[test]
-    fn empty_tool_call_signal_ignores_unknown_finish_reasons() {
+    fn needs_retry_ignores_unknown_finish_reasons() {
         // Only `tool_calls` triggers the retry; `length`, `stop`,
         // `content_filter`, and anything else mean something different
         // and must not retry.
         for reason in ["stop", "length", "content_filter", "function_call"] {
             let result = round_result("", Some(reason), Vec::new());
             assert!(
-                !is_empty_tool_call_signal(&result),
+                !needs_tool_call_retry(&result),
                 "finish_reason={reason:?} must not trigger retry",
             );
         }
@@ -1135,9 +1460,10 @@ mod tests {
     /// yields chunks that carry `finish_reason` in `response_metadata`
     /// (the OpenAI-compatible client's contract — see
     /// `agent_chain::providers::openai`), [`RoundResult::finish_reason`]
-    /// must reflect that value. The retry-with-nudge path in
-    /// [`drive_turn`] depends on this; if propagation breaks, the GLM
-    /// empty-tool-calls failure mode silently terminates the turn.
+    /// must reflect that value. The retry path in
+    /// [`try_round_with_retries`] depends on this; if propagation
+    /// breaks, the GLM empty-tool-calls failure mode silently terminates
+    /// the turn.
     mod run_round_propagation {
         use super::*;
         use agent_chain::AIMessage;
@@ -1289,9 +1615,9 @@ mod tests {
         /// The GLM failure shape: provider yields a single empty chunk
         /// with `finish_reason: "tool_calls"` in `response_metadata` and
         /// no tool-call deltas. `run_round` must surface that
-        /// `finish_reason` on the returned [`RoundResult`] so the
-        /// retry-with-nudge path in [`drive_turn`] can detect the
-        /// condition via [`is_empty_tool_call_signal`].
+        /// `finish_reason` on the returned [`RoundResult`] so the retry
+        /// path in [`try_round_with_retries`] can detect the condition
+        /// via [`needs_tool_call_retry`].
         #[tokio::test]
         async fn run_round_captures_finish_reason_from_response_metadata() {
             let model = ScriptedChatModel::new(vec![ai_chunk_with_finish_reason("", "tool_calls")]);
@@ -1302,7 +1628,7 @@ mod tests {
             // End-to-end coherence: the upstream signal must satisfy the
             // downstream detector, otherwise the retry path is dead code.
             assert!(
-                is_empty_tool_call_signal(&result),
+                needs_tool_call_retry(&result),
                 "round result {result:?} should trigger retry-with-nudge",
             );
         }
@@ -1327,8 +1653,8 @@ mod tests {
 
         /// Sanity check the other direction: a normal `stop` turn must
         /// not look like the failure mode. Combined with the
-        /// `empty_tool_call_signal_*` truth-table tests, this pins down
-        /// both ends of the retry-trigger contract.
+        /// `needs_retry_*` truth-table tests, this pins down both ends
+        /// of the retry-trigger contract.
         #[tokio::test]
         async fn run_round_normal_stop_does_not_trigger_retry() {
             let model = ScriptedChatModel::new(vec![ai_chunk_with_finish_reason(
@@ -1337,7 +1663,7 @@ mod tests {
             )]);
             let result = drain_round(model).await;
             assert_eq!(result.finish_reason.as_deref(), Some("stop"));
-            assert!(!is_empty_tool_call_signal(&result));
+            assert!(!needs_tool_call_retry(&result));
         }
 
         /// Some non-OpenAI adapters place `finish_reason` in
@@ -1355,7 +1681,7 @@ mod tests {
             let model = ScriptedChatModel::new(vec![message]);
             let result = drain_round(model).await;
             assert_eq!(result.finish_reason.as_deref(), Some("tool_calls"));
-            assert!(is_empty_tool_call_signal(&result));
+            assert!(needs_tool_call_retry(&result));
         }
     }
 }
