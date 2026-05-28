@@ -137,6 +137,8 @@ fn build_chat_model(
             let model = ChatOpenAI::builder()
                 .model(model_ref.model.clone())
                 .api_base(base_url.as_str().to_string())
+                .temperature(0.0)
+                .top_p(1.0)
                 .api_key(api_key_value)
                 .build();
             Ok(Arc::new(model))
