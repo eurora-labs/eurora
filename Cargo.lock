@@ -1938,6 +1938,7 @@ dependencies = [
  "dashmap",
  "futures",
  "llm-core",
+ "regex",
  "request-correlator",
  "reqwest 0.12.28",
  "secrecy",

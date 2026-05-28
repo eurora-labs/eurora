@@ -15,6 +15,7 @@ mod agent_loop;
 mod conversion;
 mod describe_image_tool;
 mod error;
+mod glm_xml_tool_calls;
 mod handlers;
 mod llm;
 mod message_projection;
