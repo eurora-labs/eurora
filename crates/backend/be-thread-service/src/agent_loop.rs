@@ -7,7 +7,10 @@ use std::sync::Arc;
 use agent_chain::{
     AIMessage, AnyMessage, BaseChatModel, SystemMessage,
     language_models::{ToolChoice, ToolLike},
-    messages::{AIMessageChunk, ToolCall, ToolMessage, ToolStatus},
+    messages::{
+        AIMessageChunk, ContentBlock, ContentBlocks, TextContentBlock, ToolCall, ToolMessage,
+        ToolStatus,
+    },
 };
 use be_remote_db::{DatabaseManager, MessageType};
 use serde_json::Value;
@@ -60,6 +63,222 @@ If no tool is needed, answer the user directly.";
 /// then `tool_choice=any` with the nudge prepended. After this many
 /// attempts the round falls back to forced-text synthesis (no tools).
 const TOOL_CALL_RETRY_ATTEMPTS: usize = 3;
+
+/// Per-round input-token budget enforced before every provider call.
+///
+/// Sized for GLM-5.1's 202_752-token context, leaving:
+/// - ~8K for the model's reply
+/// - ~4K safety margin to cover the inaccuracy of the chars-per-token
+///   heuristic in [`estimate_message_tokens`] (real tokenisation can
+///   be denser than 4 chars per token for non-English / code-heavy
+///   content)
+///
+/// A future change should make this per-model — see the trailing
+/// comment in [`crate::llm::providers`]. Hardcoding it here is the
+/// pragmatic v1 for one deployed model. The runtime cost of an over-
+/// estimate is a few extra trimmed exchanges; the cost of an under-
+/// estimate is a 400 from the provider and a failed turn, so the
+/// margin is generous on purpose.
+const MAX_INPUT_TOKENS: usize = 190_000;
+
+/// Per-tool-result hard cap on the text content surfaced to the model.
+/// Bounds how badly a single misbehaving tool (a Firecrawl page dump,
+/// a search-result blob) can blow the context window on its own. The
+/// existing Firecrawl helpers in [`crate::tools`] already truncate at
+/// 30K/50K — this is the catch-all for the rest.
+const MAX_TOOL_RESULT_BYTES: usize = 50_000;
+
+/// Trailer appended to truncated tool results so the model can tell
+/// the buffer was cut short rather than completing naturally.
+const TOOL_TRUNCATION_NOTICE: &str = "\n\n[…tool result truncated to fit context window…]";
+
+/// Injected as a system message right after the original system prefix
+/// when [`trim_messages_to_token_budget`] drops one or more historical
+/// exchanges. The placeholder `{n}` is replaced with the dropped count
+/// at call site. This keeps the model from being silently confused by
+/// references to earlier conversation it can no longer see.
+const TRIM_NOTICE_TEMPLATE: &str = "Note: {n} earlier message(s) in this thread were trimmed to fit the model's context \
+window. The user may reference details from those messages that are no longer visible to you.";
+
+/// Result of one trimming pass — what changed and the rough token
+/// counts before/after. Logged at WARN when `dropped_messages > 0` so
+/// operators can correlate "the model forgot" with a real cause.
+#[derive(Debug, Default, Clone, Copy)]
+struct TrimResult {
+    dropped_exchanges: usize,
+    dropped_messages: usize,
+    estimated_tokens_before: usize,
+    estimated_tokens_after: usize,
+    budget: usize,
+}
+
+impl TrimResult {
+    fn did_trim(&self) -> bool {
+        self.dropped_messages > 0
+    }
+
+    /// True when even the most-recent exchange is too large to fit and
+    /// the trimmer ran out of historical exchanges to drop. The caller
+    /// should emit a louder log — the model will likely 400.
+    fn still_over_budget(&self) -> bool {
+        self.estimated_tokens_after > self.budget
+    }
+}
+
+/// Rough per-message token estimate. Serialises the message to JSON
+/// and divides character count by 4 — a deliberately pessimistic
+/// heuristic (real OpenAI tokenisation averages ~3.5 chars per token
+/// for English; JSON adds field-name overhead the provider doesn't
+/// actually receive). The [`MAX_INPUT_TOKENS`] safety margin
+/// compensates for the inverse direction: tokenisation that is
+/// *denser* than 4 chars per token (CJK, code, base64).
+///
+/// We intentionally avoid pulling in a full tokeniser (`tiktoken`) for
+/// v1: it would tie this crate to a specific tokenisation family and
+/// be wrong anyway for GLM-5.1. The heuristic is correct in the
+/// directions that matter — over-trimming is recoverable, an over-
+/// budget 400 is not.
+fn estimate_message_tokens(msg: &AnyMessage) -> usize {
+    serde_json::to_string(msg)
+        .map(|s| s.len() / 4 + 1)
+        .unwrap_or(16)
+}
+
+fn estimate_total_tokens(messages: &[AnyMessage]) -> usize {
+    messages.iter().map(estimate_message_tokens).sum()
+}
+
+/// Trim `messages` in place so its total estimated token count fits
+/// within `budget_tokens`. The strategy:
+///
+/// 1. Preserve every leading [`AnyMessage::SystemMessage`] verbatim —
+///    those are load-bearing for behavior and tiny in token cost.
+/// 2. Group the remaining messages into "exchanges". An exchange
+///    starts with a [`AnyMessage::HumanMessage`] and includes every
+///    subsequent message up to (but not including) the next
+///    `HumanMessage`. This keeps `AIMessage(tool_calls=…)` bonded to
+///    its matching `ToolMessage(tool_call_id=…)` responses — required
+///    by the OpenAI/GLM contract, which 400s on dangling
+///    `tool_call_id`s.
+/// 3. Drop oldest exchanges (FIFO) until the total fits, or only one
+///    exchange remains. The most recent exchange is always kept; if
+///    it alone exceeds the budget the caller will see
+///    [`TrimResult::still_over_budget`] and can log loudly before
+///    sending the doomed request.
+/// 4. If anything was dropped, inject a single synthetic
+///    `SystemMessage` right after the original system prefix so the
+///    model is told its history was trimmed (prevents silent
+///    confusion about references to elided content).
+///
+/// Returns a [`TrimResult`] describing what happened, suitable for
+/// structured logging.
+fn trim_messages_to_token_budget(
+    messages: &mut Vec<AnyMessage>,
+    budget_tokens: usize,
+) -> TrimResult {
+    let tokens_before = estimate_total_tokens(messages);
+    let mut result = TrimResult {
+        budget: budget_tokens,
+        estimated_tokens_before: tokens_before,
+        estimated_tokens_after: tokens_before,
+        ..TrimResult::default()
+    };
+    if tokens_before <= budget_tokens {
+        return result;
+    }
+
+    let sys_end = messages
+        .iter()
+        .position(|m| !matches!(m, AnyMessage::SystemMessage(_)))
+        .unwrap_or(messages.len());
+    let body: Vec<AnyMessage> = messages.split_off(sys_end);
+
+    let mut exchanges: Vec<Vec<AnyMessage>> = Vec::new();
+    let mut current: Vec<AnyMessage> = Vec::new();
+    for msg in body {
+        if matches!(msg, AnyMessage::HumanMessage(_)) && !current.is_empty() {
+            exchanges.push(std::mem::take(&mut current));
+        }
+        current.push(msg);
+    }
+    if !current.is_empty() {
+        exchanges.push(current);
+    }
+
+    let system_tokens: usize = estimate_total_tokens(messages);
+
+    loop {
+        let body_tokens: usize = exchanges.iter().map(|ex| estimate_total_tokens(ex)).sum();
+        if system_tokens + body_tokens <= budget_tokens || exchanges.len() <= 1 {
+            break;
+        }
+        let dropped = exchanges.remove(0);
+        result.dropped_messages += dropped.len();
+        result.dropped_exchanges += 1;
+    }
+
+    if result.did_trim() {
+        let notice = TRIM_NOTICE_TEMPLATE.replace("{n}", &result.dropped_messages.to_string());
+        messages.push(SystemMessage::builder().content(notice).build().into());
+    }
+
+    for ex in exchanges {
+        messages.extend(ex);
+    }
+
+    result.estimated_tokens_after = estimate_total_tokens(messages);
+    result
+}
+
+/// If `msg` is a [`AnyMessage::ToolMessage`] whose text content
+/// exceeds `max_bytes`, truncate it to fit and append
+/// [`TOOL_TRUNCATION_NOTICE`]. Returns the original text length when a
+/// truncation happened (for logging), `None` otherwise.
+///
+/// Truncation collapses every text [`ContentBlock`] into a single
+/// trimmed text block — non-text blocks (images, video) are dropped
+/// because they would compete for the same byte budget and tool
+/// results are overwhelmingly text in practice. If the use case
+/// changes (image-returning tools), revisit the block-walking
+/// approach.
+fn truncate_tool_message_if_needed(msg: &mut AnyMessage, max_bytes: usize) -> Option<usize> {
+    let AnyMessage::ToolMessage(tm) = msg else {
+        return None;
+    };
+
+    let original_text: String = tm
+        .content
+        .iter()
+        .filter_map(|b| match b {
+            ContentBlock::Text(t) => Some(t.text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    let original_len = original_text.len();
+    if original_len <= max_bytes {
+        return None;
+    }
+
+    let body_budget = max_bytes.saturating_sub(TOOL_TRUNCATION_NOTICE.len());
+    let mut cut = body_budget.min(original_text.len());
+    while cut > 0 && !original_text.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    let mut truncated = String::with_capacity(cut + TOOL_TRUNCATION_NOTICE.len());
+    truncated.push_str(&original_text[..cut]);
+    truncated.push_str(TOOL_TRUNCATION_NOTICE);
+
+    tm.content = ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock {
+        id: None,
+        text: truncated,
+        annotations: None,
+        index: None,
+        extras: None,
+    })]);
+
+    Some(original_len)
+}
 
 /// Running totals of an AI response as it is streamed across one or more LLM rounds.
 #[derive(Default)]
@@ -151,6 +370,23 @@ struct RoundResult {
     finish_reason: Option<String>,
 }
 
+/// Wrap streamed visible text in a `ContentBlocks`. Empty text yields
+/// empty blocks (a no-op delta the client appends nothing for); used to
+/// rebuild the outbound chunk's text channel after envelope filtering.
+fn text_content_blocks(text: String) -> ContentBlocks {
+    if text.is_empty() {
+        ContentBlocks::from(Vec::new())
+    } else {
+        ContentBlocks::from(vec![ContentBlock::Text(TextContentBlock {
+            id: None,
+            text,
+            annotations: None,
+            index: None,
+            extras: None,
+        })])
+    }
+}
+
 async fn run_round(
     chat_model: &(dyn BaseChatModel + Send + Sync),
     messages: &[AnyMessage],
@@ -162,8 +398,36 @@ async fn run_round(
     // clone here. The clone is bounded by the chat history length and the
     // tool-call budget; if this becomes a hotspot, push the slice through
     // the trait instead.
+    let mut messages_for_stream = messages.to_vec();
+
+    // Trim the outgoing message list to fit the model's context window.
+    // The caller's history (`messages`) is unaffected — only the
+    // request payload is shaped. Trimming the request rather than the
+    // canonical history means subsequent rounds still see the full
+    // conversation and can re-evaluate which exchanges to drop given
+    // any newly-arrived tool results.
+    let trim_result = trim_messages_to_token_budget(&mut messages_for_stream, MAX_INPUT_TOKENS);
+    if trim_result.did_trim() {
+        tracing::warn!(
+            dropped_exchanges = trim_result.dropped_exchanges,
+            dropped_messages = trim_result.dropped_messages,
+            estimated_tokens_before = trim_result.estimated_tokens_before,
+            estimated_tokens_after = trim_result.estimated_tokens_after,
+            budget_tokens = trim_result.budget,
+            "Trimmed conversation history to fit context window"
+        );
+    }
+    if trim_result.still_over_budget() {
+        tracing::warn!(
+            estimated_tokens = trim_result.estimated_tokens_after,
+            budget_tokens = trim_result.budget,
+            "Conversation still over context budget after trimming \
+             (most-recent exchange alone exceeds limit); provider will likely 400"
+        );
+    }
+
     let provider_stream = tokio::select! {
-        result = chat_model.stream(messages.to_vec(), None, None) => {
+        result = chat_model.stream(messages_for_stream, None, None) => {
             result.map_err(|e| {
                 tracing::error!("Error starting chat stream: {e}");
                 e.to_string()
@@ -183,6 +447,13 @@ async fn run_round(
     tokio::pin!(provider_stream);
     let mut round_content = String::new();
     let mut tool_calls: Vec<ToolCall> = Vec::new();
+    // Suppress GLM `<tool_call>` envelopes from the *streamed* content so
+    // the raw markup never flashes in the UI. The filter is fed the
+    // cumulative `round_content` and reuses the same stripper the
+    // persisted message uses, so the live view and the stored view stay
+    // consistent. `round_content` itself keeps the full, unfiltered text
+    // — the post-hoc extractor in `try_lift_glm_xml` still needs it.
+    let mut stream_filter = glm_xml_tool_calls::ToolCallStreamFilter::new();
     // Providers attach `finish_reason` to the final SSE chunk; intermediate
     // chunks carry `None`. The last non-`None` value across the round wins.
     let mut finish_reason: Option<String> = None;
@@ -222,7 +493,12 @@ async fn run_round(
             finish_reason = Some(reason);
         }
 
-        let outbound_chunk = chunk.clone();
+        // Forward the chunk with the envelope-suppressed visible text.
+        // Only the text channel is rewritten; reasoning
+        // (`additional_kwargs`), usage, and structured tool-call chunks
+        // ride along untouched on the clone.
+        let mut outbound_chunk = chunk.clone();
+        outbound_chunk.content = text_content_blocks(stream_filter.push(&round_content));
 
         // Move tool calls out of the chunk into our running list. Done after
         // the clone above so the streamed chunk keeps the tool calls visible.
@@ -238,6 +514,32 @@ async fn run_round(
             .is_err()
         {
             tracing::info!("Chat stream receiver dropped, client disconnected");
+            acc.push_content(&round_content);
+            return Ok(RoundResult {
+                content: round_content,
+                tool_calls,
+                cancelled: true,
+                finish_reason,
+            });
+        }
+    }
+
+    // Flush any text the filter held back waiting on a `</tool_call>`
+    // that never came (a trailing partial that turned out to be prose,
+    // or an unclosed envelope the stripper keeps verbatim). Sending it
+    // here keeps the streamed text equal to the persisted, stripped
+    // content.
+    let tail = stream_filter.finish(&round_content);
+    if !tail.is_empty() {
+        let tail_chunk = AIMessageChunk::builder()
+            .content(text_content_blocks(tail))
+            .build();
+        if tx
+            .send(ChatServerMessage::Chunk { chunk: tail_chunk })
+            .await
+            .is_err()
+        {
+            tracing::info!("Chat stream receiver dropped before final flush");
             acc.push_content(&round_content);
             return Ok(RoundResult {
                 content: round_content,
@@ -286,7 +588,7 @@ where
             continue;
         };
 
-        let result_msg = match entry {
+        let mut result_msg = match entry {
             TurnEntry::ServerLocal { tool } => {
                 tokio::select! {
                     msg = tool.invoke_tool_call(call) => msg,
@@ -314,6 +616,21 @@ where
                 }
             }
         };
+        // Cap individual tool results so a single oversized payload
+        // (a long page scrape, a verbose search response) can't blow
+        // the context window. The per-tool truncation in
+        // [`crate::tools`] is the first line of defence; this is the
+        // catch-all for any tool that doesn't enforce its own cap.
+        if let Some(original_len) =
+            truncate_tool_message_if_needed(&mut result_msg, MAX_TOOL_RESULT_BYTES)
+        {
+            tracing::info!(
+                tool = %tool_name,
+                original_bytes = original_len,
+                truncated_to_bytes = MAX_TOOL_RESULT_BYTES,
+                "Tool result exceeded byte cap; truncated to fit context window"
+            );
+        }
         results.push(result_msg);
     }
 
