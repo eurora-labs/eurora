@@ -1,12 +1,16 @@
 <script lang="ts" module>
 	export interface TimelineItemProps {
 		id?: string;
+		/**
+		 * Accent colour for the active-state border, given as any CSS
+		 * colour string. Falls back to the sidebar border colour when unset.
+		 */
 		color?: string | null;
 		/**
-		 * The currently-selected item in the rail. Renders with full
-		 * saturation, a slight scale-up, and a ring in the accent colour;
-		 * non-active items dim and shrink so the active one reads at a
-		 * glance.
+		 * The currently-selected item in the rail. Renders scaled up with a
+		 * thin square border in the accent colour framing the icon;
+		 * non-active items render as a bare, slightly smaller icon so the
+		 * active one reads at a glance.
 		 */
 		active?: boolean;
 		iconSrc?: string | null;
@@ -48,17 +52,17 @@
 	role="option"
 	aria-selected={active}
 	aria-current={active ? 'true' : undefined}
-	class="bg-sidebar cursor-pointer transition-[transform,filter] duration-150 ease-out"
-	style="transform: scale({active ? 1.1 : 0.9}); filter: saturate({active ? 1.6 : 0.5});"
+	class="cursor-pointer transition-transform duration-150 ease-out"
+	style="transform: scale({active ? 1.1 : 0.9});"
 	onclick={onSelect}
 >
 	<span class="grid place-items-center">
 		<span
-			class="col-start-1 row-start-1 size-8 rounded-md shadow-md"
-			class:ring-2={active}
-			class:ring-offset-1={active}
+			class="col-start-1 row-start-1 size-8 rounded-md"
+			class:ring-1={active}
+			class:ring-offset-2={active}
 			class:ring-offset-sidebar={active}
-			style="background-color: {accent}; --tw-ring-color: {accent};"
+			style="--tw-ring-color: {accent};"
 			aria-hidden="true"
 		></span>
 		{#if iconSrc}
