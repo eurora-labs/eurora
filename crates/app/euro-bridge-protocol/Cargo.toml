@@ -7,6 +7,7 @@ description = "Wire protocol shared between the Eurora desktop app and connected
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["raw_value"] }
 specta = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 
@@ -15,18 +16,11 @@ specta-serde = { version = "0.0.12", optional = true }
 specta-swift = { version = "0.0.3", optional = true }
 
 [dev-dependencies]
-serde_json = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
 
 [features]
 default = []
 codegen = ["dep:anyhow", "dep:specta-serde", "dep:specta-swift"]
 
-[[bin]]
-name = "euro-bridge-protocol"
-path = "src/bin/codegen.rs"
-required-features = ["codegen"]
-
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

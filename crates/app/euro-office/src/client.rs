@@ -49,8 +49,7 @@ pub async fn fetch_word_asset(service: &BridgeService) -> Option<WordDocumentAss
         }
     };
 
-    let payload = response.payload?;
-    match serde_json::from_str::<WordDocumentAsset>(&payload) {
+    match response.payload?.deserialize::<WordDocumentAsset>() {
         Ok(asset) => Some(asset),
         Err(err) => {
             tracing::warn!("Word add-in returned malformed {ACTION_GET_ASSETS} payload: {err}");

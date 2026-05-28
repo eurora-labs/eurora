@@ -6,50 +6,38 @@ import {
 	type IconLinkRecord,
 } from '../../../shared/background/favicon-ranker';
 import browser from 'webextension-polyfill';
-import type { CommonBrowserMessage, WatcherParams } from './types.js';
-import type { WatcherResponse } from '../../../shared/content/extensions/watchers/watcher';
 
-export class CommonWatcher {
-	public params: WatcherParams;
+interface NativeMetadataPayload {
+	kind: 'NativeMetadata';
+	data: {
+		url: string;
+		icon_base64: string;
+		title: string | null;
+	};
+}
 
-	constructor(params: WatcherParams) {
-		this.params = params;
-	}
+interface ErrorPayload {
+	kind: 'Error';
+	data: string;
+}
 
-	public listen(
-		obj: CommonBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-		response: (response?: WatcherResponse) => void,
-	): boolean {
-		const { type } = obj;
+type CommonMessage = { type: 'GET_METADATA' };
 
-		let promise: Promise<WatcherResponse>;
+function isCommonMessage(value: unknown): value is CommonMessage {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		(value as { type?: unknown }).type === 'GET_METADATA'
+	);
+}
 
-		switch (type) {
-			case 'GET_METADATA':
-				promise = this.handleGetMetadata(obj, _sender);
-				break;
-			default:
-				return false;
-		}
-
-		promise
-			.then((result) => {
-				response(result);
-			})
-			.catch((error) => {
-				const message = error instanceof Error ? error.message : String(error);
-				console.error('Common watcher failed', { error });
-				response({ kind: 'Error', data: message });
-			});
-
-		return true;
-	}
-
-	public async handleGetMetadata(
-		_obj: CommonBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
+/// Page-metadata content-script handler. Separate from the tool
+/// framework because `GET_METADATA` answers the bridge's
+/// "what tab is the user looking at" probe, not a model-issued tool
+/// call — it's plumbing that always answers regardless of the active
+/// site bundle.
+async function handleGetMetadata(): Promise<NativeMetadataPayload | ErrorPayload> {
+	try {
 		const icon_base64 = await resolveDocumentFavicon();
 		return {
 			kind: 'NativeMetadata',
@@ -59,6 +47,10 @@ export class CommonWatcher {
 				title: document.title || null,
 			},
 		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error('Common watcher failed', { error });
+		return { kind: 'Error', data: message };
 	}
 }
 
@@ -88,6 +80,18 @@ export function main() {
 	if (initialized) return;
 	initialized = true;
 
-	const watcher = new CommonWatcher({});
-	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	// Listener is intentionally NOT `async`: an async listener returning
+	// `undefined` resolves to `Promise<undefined>`, which webextension-
+	// polyfill treats as "I'm replying asynchronously" and forwards the
+	// `undefined` to the sender — stealing the response from siblings
+	// (notably `installToolHandlers`'s `LIST_TOOLS` / `GET_CONTEXT` /
+	// `INVOKE_TOOL` cases that are registered on the same runtime).
+	// Returning a bare `undefined` lets the polyfill return `false` to
+	// Chrome and fall through to the next listener; only the matching
+	// `GET_METADATA` case returns a Promise.
+	// eslint-disable-next-line @typescript-eslint/promise-function-async -- see comment above; converting this to `async` reintroduces the listener-ownership race.
+	browser.runtime.onMessage.addListener((message) => {
+		if (!isCommonMessage(message)) return undefined;
+		return handleGetMetadata();
+	});
 }

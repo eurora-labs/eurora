@@ -60,20 +60,72 @@ export type AudioContentBlock = {
 export type BlockIndex = number | string;
 
 /**
+ *  Payload of a [`ChatClientMessage::CapabilityUpdate`] frame.
+ * 
+ *  The `tools` list is the client's catalog of remote-dispatch descriptors
+ *  for the upcoming turn; the `contexts` list is the set of live structured
+ *  contexts (e.g. the currently-focused YouTube watch page) the server
+ *  renders into a system message via its per-key formatter; the
+ *  `system_blocks` list carries pre-rendered content blocks the host wants
+ *  to prepend to the turn as a separate `SystemMessage` (typically a short
+ *  natural-language summary of what the user is doing right now, produced
+ *  by the active activity strategy). All three are filtered into the
+ *  server's per-turn catalog and LLM context.
+ * 
+ *  On the wire the payload's fields sit alongside the `type` discriminator,
+ *  producing
+ *  `{"type":"capability_update","tools":[...],"contexts":[...],"system_blocks":[...]}`.
+ *  This is automatic for newtype variants of an internally-tagged enum
+ *  (`#[serde(tag = "type")]`) whose inner type serializes as a map — no
+ *  `#[serde(flatten)]` is required, and adding one would be redundant. The
+ *  `capability_update_golden_json` test below pins the exact shape.
+ */
+export type CapabilityUpdatePayload = {
+	tools?: WireToolDescriptor[],
+	contexts?: WireActiveContext[],
+	/**
+	 *  Pre-rendered content blocks the host wants the LLM to see as a
+	 *  system-role prelude for the upcoming turn. The blocks are
+	 *  authored client-side (e.g. by the active activity strategy's
+	 *  `get_context()` impl); the server wraps them in a `SystemMessage`
+	 *  and prepends to the LLM context. Inline payloads are routed
+	 *  through the asset-rewrite pass before LLM dispatch, identically
+	 *  to user-supplied blocks.
+	 */
+	system_blocks?: ContentBlock[],
+};
+
+/**
  *  Frame sent by the client over the chat WebSocket.
  * 
  *  Bidirectional from day one; the current set is `Send` (start a turn from
  *  a new human message), `Regenerate` (re-roll an existing AI response under
- *  the same human parent so it becomes a sibling variant), and `Cancel`
- *  (interrupt the in-flight turn). New variants can be added without breaking
- *  older clients because serde rejects unknown tagged variants only on
- *  deserialize, never on encode.
+ *  the same human parent so it becomes a sibling variant), `Cancel`
+ *  (interrupt the in-flight turn), and the tool-routing pair
+ *  `CapabilityUpdate` + `ToolResponse`. New variants can be added without
+ *  breaking older clients because serde rejects unknown tagged variants only
+ *  on deserialize, never on encode.
  */
 export type ChatClientMessage = {
 	type: "send",
 } & ChatSendRequest | {
 	type: "regenerate",
-} & RegenerateRequest | { type: "cancel" };
+} & RegenerateRequest | ({ type: "cancel" }) & { call_id?: never; result?: never } | 
+/**
+ *  Declaration of the client's available tools and active contexts for
+ *  the upcoming turn. Sent before every `Send`/`Regenerate` so the
+ *  catalog reflects the freshest state of the user's session.
+ */
+{
+	type: "capability_update",
+} & CapabilityUpdatePayload | 
+/**
+ *  Resolution of a previously-issued `ToolRequest`. The result uses
+ *  serde's default `Result` repr (`{"Ok": ...}` / `{"Err": ...}`); the
+ *  shape is pinned by tests in this module. See [`WireToolResult`] for
+ *  why the specta override is needed.
+ */
+{ type: "tool_response"; call_id: number; result: WireToolResult };
 
 export type ChatMessage = {
 	content: ContentBlocks,
@@ -107,7 +159,14 @@ export type ChatSendRequest = {
  * 
  *  Clients should accumulate `Chunk` payloads (using agent-chain's chunk-merge
  *  semantics) and replace placeholder state with the `Final.messages` payload
- *  when the turn ends.
+ *  when the turn ends. The tool-routing pair `ToolRequest` + `ToolCancel`
+ *  drives remote-tool RPC over the same socket.
+ * 
+ *  `TitleUpdated` is non-terminal: the server emits it once per turn (right
+ *  before the terminal frame, or right before the socket closes on cancel)
+ *  when the thread's auto-generated title changes. Clients should mutate
+ *  their thread state in place rather than expecting it bundled with
+ *  `Final` — cancelled turns also carry a title but emit no `Final`.
  */
 export type ChatServerMessage = 
 /**  The user's message has been persisted; clients should display it. */
@@ -115,12 +174,30 @@ export type ChatServerMessage =
 /**  One streaming chunk from the AI. */
 { type: "chunk"; chunk: AIMessageChunk } | 
 /**
+ *  The thread's auto-generated title was updated this turn. Non-terminal;
+ *  clients update the thread row in place. Emitted at most once per turn,
+ *  always before any terminal frame.
+ */
+{ type: "title_updated"; title: string } | 
+/**
  *  The turn ended successfully; tree positions for everything that was
  *  persisted during this turn (human + AI + any tool messages).
  */
 { type: "final"; messages: MessageNode[] } | 
 /**  The turn aborted with an error. The connection is closed after this. */
-{ type: "error"; kind: string; message: string };
+{ type: "error"; kind: string; message: string } | 
+/**
+ *  Request the client to execute a tool on its side and return the
+ *  result via [`ChatClientMessage::ToolResponse`] correlated by
+ *  `call_id`.
+ */
+{ type: "tool_request"; call_id: number; descriptor: WireToolDescriptor; arguments: unknown } | 
+/**
+ *  Abort an in-flight `ToolRequest`. Sent when the user cancels the
+ *  turn or the server's tool budget is exhausted before the client's
+ *  response arrives.
+ */
+{ type: "tool_cancel"; call_id: number };
 
 export type ChunkPosition = "last";
 
@@ -473,6 +550,22 @@ export type ToolCallChunkBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
+export type ToolDefinition = {
+	name: string,
+	description: string,
+	parameters: unknown,
+};
+
+/**
+ *  Wire-side counterpart to `eurora_tools::ToolError`.
+ * 
+ *  The framework's `ToolError` carries non-serializable payloads
+ *  (`serde_json::Error`, boxed `dyn Error`); converting to `ToolErrorWire`
+ *  is lossy on purpose (the `Adapter` variant collapses to a single
+ *  `message: String`) so the wire shape stays serde-friendly.
+ */
+export type ToolErrorWire = { kind: "context_unavailable"; tool: string; reason: string } | { kind: "origin_mismatch"; tool: string; expected: string; got: string } | { kind: "timeout" } | { kind: "cancelled" } | { kind: "transport"; message: string } | { kind: "remote"; code: number; message: string; details?: unknown | null } | { kind: "decode"; message: string } | { kind: "encode"; message: string } | { kind: "adapter"; message: string };
+
 export type ToolMessage = {
 	content: ContentBlocks,
 	tool_call_id: string,
@@ -483,6 +576,29 @@ export type ToolMessage = {
 	additional_kwargs?: { [key in string]: unknown },
 	response_metadata?: { [key in string]: unknown },
 };
+
+/**
+ *  Where a tool runs. The server uses this to dispatch each call:
+ *  `ServerLocal` tools execute in-process on the backend; everything else
+ *  is routed back to the client over the chat WebSocket as a `ToolRequest`,
+ *  and from there the client picks the right destination (bridge, native
+ *  app, ACP session).
+ * 
+ *  `#[non_exhaustive]` so adding new sources later is non-breaking for
+ *  downstream consumers that `match` on the enum.
+ */
+export type ToolSource = 
+/**
+ *  Routed via `euro-bridge` to a registered app of `app_kind` (in v1,
+ *  `"browser"`).
+ */
+{ kind: "bridge"; app_kind: string } | 
+/**  Runs in-process on the client (native Tauri tools). */
+{ kind: "client_local" } | 
+/**  Runs in-process on the backend (Firecrawl, describe-image). */
+{ kind: "server_local" } | 
+/**  Piped through an ACP session. */
+{ kind: "acp" };
 
 export type ToolStatus = "success" | "error";
 
@@ -503,3 +619,83 @@ export type VideoContentBlock = {
 	base64?: string | null,
 	extras?: { [key in string]: unknown } | null,
 };
+
+/**
+ *  Wire-side projection of an active context, sent in `CapabilityUpdate`.
+ * 
+ *  Carries only the parts the server needs: the key (used to template the
+ *  system message), the activation timestamp, and the opaque per-key data
+ *  blob (surfaced to the LLM). Routing information — which window, which
+ *  tab, which session — is intentionally absent: that's `Origin`, and it
+ *  stays client-side.
+ */
+export type WireActiveContext = {
+	/**  Stable namespaced key, e.g. `"youtube::watch_page"`. */
+	key: string,
+	/**  When the client activated this context. */
+	activated_at: string,
+	/**
+	 *  Opaque per-key payload. Shape is determined by `key`; the server's
+	 *  per-key formatter renders it into the system message.
+	 */
+	data: unknown,
+};
+
+/**
+ *  Wire-side descriptor for a tool. One per call, one per entry in the
+ *  per-turn `CapabilityUpdate.tools` list.
+ * 
+ *  `WireToolDescriptor` is a [`ToolDefinition`] (name, description,
+ *  parameters schema) plus dispatch metadata (timeout, source, required
+ *  contexts, approval flag) and the tool's output schema. The framework
+ *  form (`eurora_tools::ToolDescriptor`) is the in-process
+ *  `&'static`-everywhere shape; this is its serializable counterpart, owned
+ *  and ready for transport. The server only ever sees this form.
+ * 
+ *  The `definition` field is flattened on the wire so the JSON shape stays
+ *  flat (`{"name": ..., "description": ..., "parameters": ..., ...}`),
+ *  while in Rust the typed relationship `WireToolDescriptor IS-A
+ *  ToolDefinition + dispatch metadata` is explicit.
+ */
+export type WireToolDescriptor = {
+	/**  JSON Schema for the tool's success payload. */
+	output_schema: unknown,
+	/**
+	 *  Per-call timeout in milliseconds. Used by the server's bus to bound
+	 *  in-flight remote calls; the framework's `ToolDescriptor.timeout`
+	 *  converts to/from this field. `u32` ms (~49 days) is bounded well
+	 *  above any sensible per-tool budget and keeps the wire shape inside
+	 *  JS's safe integer range.
+	 */
+	timeout_ms: number,
+	/**  Where the tool runs. The server uses this to pick a dispatch path. */
+	source: ToolSource,
+	/**
+	 *  Context keys whose presence is required for this tool to be
+	 *  surfaced to the LLM in a given turn (e.g.
+	 *  `["youtube::watch_page"]`).
+	 */
+	required_contexts?: string[],
+	/**
+	 *  If true, the server must obtain explicit user approval before
+	 *  dispatching the call. Not enforced in v1 (all v1 tools are
+	 *  read-only) but declared so the protocol is stable.
+	 */
+	requires_user_approval?: boolean,
+} & ToolDefinition;
+
+/**
+ *  Specta-only proxy for the `ToolResponse.result` field's TypeScript shape.
+ * 
+ *  Rust uses `Result<serde_json::Value, ToolErrorWire>` which serde encodes
+ *  as `{"Ok": ...}` / `{"Err": ...}` (the externally-tagged default). The
+ *  auto-generated `Result<T, E>` that `specta-typescript` emits for
+ *  `std::result::Result` is `{ ok: T, err: E }` — both fields present, no
+ *  discriminator — which doesn't match the wire. We override the field
+ *  with this proxy so the TS binding renders as `{ Ok: unknown } |
+ *  { Err: ToolErrorWire }`, matching what serde actually produces.
+ * 
+ *  Only the type information matters — specta never serializes or
+ *  deserializes this; the original field handles all I/O.
+ */
+export type WireToolResult = ({ Ok: unknown }) & { Err?: never } | ({ Err: ToolErrorWire }) & { Ok?: never };

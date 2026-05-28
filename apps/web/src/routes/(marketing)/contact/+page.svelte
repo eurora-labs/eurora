@@ -1,10 +1,14 @@
 <script lang="ts">
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Separator } from '@eurora/ui/components/separator/index';
-	import { SiBluesky, SiDiscord, SiGithub, SiReddit, SiX } from '@icons-pack/svelte-simple-icons';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import MailIcon from '@lucide/svelte/icons/mail';
 	import MapPinIcon from '@lucide/svelte/icons/map-pin';
+	import IconBrandBluesky from '@tabler/icons-svelte-runes/icons/brand-bluesky';
+	import IconBrandDiscord from '@tabler/icons-svelte-runes/icons/brand-discord';
+	import IconBrandGithub from '@tabler/icons-svelte-runes/icons/brand-github';
+	import IconBrandReddit from '@tabler/icons-svelte-runes/icons/brand-reddit';
+	import IconBrandX from '@tabler/icons-svelte-runes/icons/brand-x';
 
 	const email = 'contact@eurora-labs.com';
 	let copied = $state(false);
@@ -16,15 +20,15 @@
 	}
 
 	const socials = [
-		{ name: 'GitHub', href: 'https://github.com/eurora-labs/eurora', icon: SiGithub },
-		{ name: 'Discord', href: 'https://discord.gg/xRT9EpBEwc', icon: SiDiscord },
-		{ name: 'Reddit', href: 'https://reddit.com/r/eurora', icon: SiReddit },
+		{ name: 'GitHub', href: 'https://github.com/eurora-labs/eurora', icon: IconBrandGithub },
+		{ name: 'Discord', href: 'https://discord.gg/xRT9EpBEwc', icon: IconBrandDiscord },
+		{ name: 'Reddit', href: 'https://reddit.com/r/eurora', icon: IconBrandReddit },
 		{
 			name: 'Bluesky',
 			href: 'https://bsky.app/profile/euroralabs.bsky.social',
-			icon: SiBluesky,
+			icon: IconBrandBluesky,
 		},
-		{ name: 'X', href: 'https://x.com/euroralabs', icon: SiX },
+		{ name: 'X', href: 'https://x.com/euroralabs', icon: IconBrandX },
 	];
 </script>
 

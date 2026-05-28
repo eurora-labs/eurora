@@ -1,9 +1,8 @@
-mod process_name;
 pub mod server;
 
 pub use euro_bridge_protocol::{
     BRIDGE_BIND_IP, BRIDGE_HOST, BRIDGE_PATH, BRIDGE_PORT, BRIDGE_SCHEME, BridgeError, CancelFrame,
-    ErrorFrame, EventFrame, Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame,
+    ErrorFrame, EventFrame, Frame, FrameKind, Payload, RegisterFrame, RequestFrame, ResponseFrame,
     bridge_url, bridge_url_for,
 };
 pub use server::{

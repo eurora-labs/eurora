@@ -9,7 +9,7 @@
 //! pass fully qualified paths to `collect_commands!` and let
 //! module-relative macro resolution find them.
 
-use crate::procedures::activity::{SavedActivityCreated, SavedActivityEnded};
+use crate::procedures::activity::{SavedActivityLiveSessionEnded, SavedActivityUpserted};
 use crate::procedures::system::{BrowserExtensionStatusChanged, ConsentGate};
 use crate::procedures::timeline::{TimelineAppEvent, TimelineAssetsEvent};
 use euro_auth::tauri::AuthStateChanged;
@@ -82,8 +82,8 @@ pub fn build_specta() -> tauri_specta::Builder<tauri::Wry> {
             AuthStateChanged,
             TimelineAppEvent,
             TimelineAssetsEvent,
-            SavedActivityCreated,
-            SavedActivityEnded,
+            SavedActivityUpserted,
+            SavedActivityLiveSessionEnded,
             BrowserExtensionStatusChanged,
             ConsentGate,
         ])

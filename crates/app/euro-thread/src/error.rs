@@ -1,6 +1,8 @@
 use thiserror::Error;
 use thread_core::ThreadErrorResponse;
 
+use crate::chat_bridge::ChatSinkError;
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Failed to acquire access token: {0}")]
@@ -36,6 +38,9 @@ pub enum Error {
 
     #[error("Chat protocol error: {0}")]
     ChatProtocol(String),
+
+    #[error("Chat event sink failed: {0}")]
+    Sink(#[source] ChatSinkError),
 }
 
 impl Error {

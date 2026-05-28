@@ -12,7 +12,7 @@ export type ErrorFrame = {
 	id: number,
 	code: number,
 	message: string,
-	details?: string | null,
+	details?: Payload | null,
 };
 
 /**
@@ -21,7 +21,7 @@ export type ErrorFrame = {
  */
 export type EventFrame = {
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 /**
@@ -39,6 +39,29 @@ export type Frame = {
  *  already consumes.
  */
 export type FrameKind = ({ Request: RequestFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Response?: never; Shutdown?: never } | ({ Response: ResponseFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Shutdown?: never } | ({ Event: EventFrame }) & { Cancel?: never; Error?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Error: ErrorFrame }) & { Cancel?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Cancel: CancelFrame }) & { Error?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Register: RegisterFrame }) & { Cancel?: never; Error?: never; Event?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Shutdown: ShutdownFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Response?: never };
+
+/**
+ *  Inline JSON payload carried by Request/Response/Event frames.
+ * 
+ *  Stored as a [`Box<RawValue>`] so the payload's JSON serializes
+ *  **inline** into the frame envelope rather than as a JSON-encoded
+ *  string. Compared to the historical `Option<String>` shape, this:
+ * 
+ *  - halves the wire size for large payloads (e.g. base64-encoded
+ *    PNGs) because the outer envelope no longer double-escapes the
+ *    inner JSON;
+ *  - drops one parse + one escape per direction (Rust producers hand
+ *    raw JSON straight to serde; consumers read it without first
+ *    decoding a string layer);
+ *  - typed in Rust as JSON rather than "string of unknown structure",
+ *    which means the encode/decode helpers can be centralised here
+ *    and call sites stop manually `serde_json::to_string`-ing.
+ * 
+ *  Construct via [`Payload::from_value`] for typed Rust data, or
+ *  [`Payload::from_raw_json`] when handing through a literal JSON
+ *  fragment.
+ */
+export type Payload = unknown;
 
 /**
  *  Mandatory first frame on every connection. Identifies the host
@@ -66,14 +89,14 @@ export type RegisterFrame = {
 export type RequestFrame = {
 	id: number,
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 /**  Client reply to a [`RequestFrame`], correlated by `id`. */
 export type ResponseFrame = {
 	id: number,
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 /**

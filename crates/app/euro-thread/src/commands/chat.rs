@@ -1,15 +1,17 @@
+use std::sync::Arc;
+
+use euro_transport_policy::CHAT_STREAM_TIMEOUT;
 use tauri::{AppHandle, Manager, ipc::Channel};
-use thread_core::{ChatSendRequest, ChatServerMessage};
-use tokio::sync::mpsc;
+use thread_core::{ChatSendRequest, ChatServerMessage, RegenerateRequest, ToolBackend};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+
+use crate::chat_bridge::{ChatBridge, ChatSinkError, TurnOpening};
 
 use super::context::{ChatContext, SharedChatContextProvider};
 use super::error::StreamError;
 use super::state::ActiveStreamTokens;
 use super::thread::thread_manager;
-
-const STREAM_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 fn active_stream_tokens(
     app_handle: &AppHandle,
@@ -25,6 +27,14 @@ fn context_provider(
     app_handle
         .try_state::<SharedChatContextProvider>()
         .ok_or(StreamError::StateUnavailable("chat context provider"))
+}
+
+fn tool_backend(
+    app_handle: &AppHandle,
+) -> Result<tauri::State<'_, Arc<dyn ToolBackend>>, StreamError> {
+    app_handle
+        .try_state::<Arc<dyn ToolBackend>>()
+        .ok_or(StreamError::StateUnavailable("tool backend"))
 }
 
 #[tauri::command]
@@ -45,23 +55,7 @@ pub async fn chat_send_query(
     channel: Channel<ChatServerMessage>,
     request: ChatSendRequest,
 ) -> Result<(), StreamError> {
-    let thread_state = thread_manager(&app_handle, StreamError::StateUnavailable)?;
-    let tokens_state = active_stream_tokens(&app_handle)?;
-
-    let cancel = CancellationToken::new();
-    tokens_state.lock().await.insert(thread_id, cancel.clone());
-
-    let stream_result = forward_chat_stream(
-        thread_state
-            .chat_stream(thread_id, request, cancel.clone())
-            .await,
-        cancel.clone(),
-        &channel,
-    )
-    .await;
-
-    tokens_state.lock().await.remove(&thread_id);
-    stream_result
+    run_turn_command(&app_handle, thread_id, channel, TurnOpening::Send(request)).await
 }
 
 #[tauri::command]
@@ -72,23 +66,13 @@ pub async fn chat_regenerate(
     ai_message_id: Uuid,
     channel: Channel<ChatServerMessage>,
 ) -> Result<(), StreamError> {
-    let thread_state = thread_manager(&app_handle, StreamError::StateUnavailable)?;
-    let tokens_state = active_stream_tokens(&app_handle)?;
-
-    let cancel = CancellationToken::new();
-    tokens_state.lock().await.insert(thread_id, cancel.clone());
-
-    let stream_result = forward_chat_stream(
-        thread_state
-            .chat_regenerate(thread_id, ai_message_id, cancel.clone())
-            .await,
-        cancel.clone(),
-        &channel,
+    run_turn_command(
+        &app_handle,
+        thread_id,
+        channel,
+        TurnOpening::Regenerate(RegenerateRequest { ai_message_id }),
     )
-    .await;
-
-    tokens_state.lock().await.remove(&thread_id);
-    stream_result
+    .await
 }
 
 #[tauri::command]
@@ -104,39 +88,76 @@ pub async fn chat_cancel_query(app_handle: AppHandle, thread_id: Uuid) -> Result
     Ok(())
 }
 
-async fn forward_chat_stream(
-    open_result: crate::Result<mpsc::UnboundedReceiver<crate::Result<ChatServerMessage>>>,
-    cancel: CancellationToken,
-    channel: &Channel<ChatServerMessage>,
+/// Drive one chat turn end-to-end:
+///
+/// 1. Allocate a per-thread cancel token and register it so
+///    `chat_cancel_query` can fire it.
+/// 2. Open the chat WebSocket.
+/// 3. Hand the socket to a fresh [`ChatBridge`] that queries the active
+///    [`ToolBackend`] for the per-turn tool surface, sends the opening
+///    frame, and forwards inbound chat frames to `channel` while routing
+///    tool calls back through the same backend.
+/// 4. Tear down the per-thread cancel token whether the turn finished,
+///    timed out, or errored.
+async fn run_turn_command(
+    app_handle: &AppHandle,
+    thread_id: Uuid,
+    channel: Channel<ChatServerMessage>,
+    opening: TurnOpening,
 ) -> Result<(), StreamError> {
-    let mut rx = open_result?;
+    let thread_manager = thread_manager(app_handle, StreamError::StateUnavailable)?;
+    let tokens_state = active_stream_tokens(app_handle)?;
+    let backend = tool_backend(app_handle)?;
 
-    let stream_future = async {
-        while let Some(item) = rx.recv().await {
-            let event = item?;
-            let is_terminal = matches!(
-                &event,
-                ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
-            );
-            channel
-                .send(event)
-                .map_err(|e| StreamError::Channel(e.to_string()))?;
-            if is_terminal {
-                return Ok(());
-            }
-        }
-        Ok(())
+    let cancel = CancellationToken::new();
+    tokens_state.lock().await.insert(thread_id, cancel.clone());
+
+    let result = open_and_drive(
+        thread_manager.inner().clone(),
+        backend.inner().clone(),
+        thread_id,
+        channel,
+        opening,
+        cancel.clone(),
+    )
+    .await;
+
+    tokens_state.lock().await.remove(&thread_id);
+    result
+}
+
+async fn open_and_drive(
+    thread_manager: super::state::SharedThreadManager,
+    backend: Arc<dyn ToolBackend>,
+    thread_id: Uuid,
+    channel: Channel<ChatServerMessage>,
+    opening: TurnOpening,
+    cancel: CancellationToken,
+) -> Result<(), StreamError> {
+    let socket = thread_manager
+        .open_chat_socket(thread_id, cancel.clone())
+        .await?;
+    let bridge = ChatBridge::new(backend);
+
+    // `Channel<T>` is internally an `Arc`, so each `send` is independent
+    // and the wrapping closure only needs `Fn` — no mut state.
+    let sink = move |event: ChatServerMessage| {
+        channel
+            .send(event)
+            .map_err(|e| ChatSinkError(e.to_string()))
     };
 
-    match tokio::time::timeout(STREAM_TIMEOUT, stream_future).await {
+    let drive_future = bridge.run_turn(socket, opening, cancel.clone(), &sink);
+
+    match tokio::time::timeout(CHAT_STREAM_TIMEOUT, drive_future).await {
         Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => {
+        Ok(Err(err)) => {
             cancel.cancel();
-            Err(e)
+            Err(err.into())
         }
         Err(_) => {
             cancel.cancel();
-            Err(StreamError::Timeout(STREAM_TIMEOUT.as_secs() as u32))
+            Err(StreamError::Timeout(CHAT_STREAM_TIMEOUT.as_secs() as u32))
         }
     }
 }

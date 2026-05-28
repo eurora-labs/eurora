@@ -5,6 +5,7 @@ excluded:
     - Pods
     - Carthage
     - Shared/Generated
+    - Shared/BridgeProtocol.swift
 
 # Align with SwiftFormat (--commas always) and modern Swift style: multi-line
 # collection literals must end with a trailing comma. Cleaner diffs and avoids

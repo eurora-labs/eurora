@@ -1,9 +1,14 @@
 //! Desktop implementation of [`euro_thread::commands::ChatContextProvider`].
 //!
-//! Pulls per-turn chat context from the timeline: refreshes the active
-//! activity (best-effort) so the strategy can attach fresh assets and
-//! snapshots, then surfaces the most recent asset/snapshot content
-//! blocks plus a single context chip for the current activity.
+//! Returns the single [`ContextChip`] describing the user's current
+//! activity, used by the UI to render a chip alongside the in-flight
+//! human message and to persist the chip set on `ChatSendRequest.asset_chips_json`.
+//!
+//! The LLM-facing prelude (`"The user is currently watching ..."`) is
+//! delivered separately — it ships in the `system_blocks` field of the
+//! chat bridge's `CapabilityUpdate` frame, pulled directly from the
+//! active activity strategy via the `ToolBackend::collect_system_blocks`
+//! hook in `euro-activity`. No round trip through the UI is required.
 //!
 //! Activity rows themselves are pushed to the remote service by the
 //! collector at creation time — there is no duplicate upload here.
@@ -38,29 +43,12 @@ impl ChatContextProvider for TimelineChatContextProvider {
 
         let timeline = timeline_state.lock().await;
 
-        // Refreshing the activity is best-effort: a missing tab or stale
-        // browser bridge shouldn't abort the chat turn — we just contribute
-        // no fresh context for it.
-        if let Err(e) = timeline.refresh_current_activity().await {
-            tracing::debug!("collect_context: refresh failed: {e}");
-        }
-
-        let asset_blocks = timeline.construct_messages_from_last_asset().await;
-        let snapshot_blocks = timeline.construct_messages_from_last_snapshot().await;
-
-        let mut content_blocks = Vec::with_capacity(asset_blocks.len() + snapshot_blocks.len());
-        content_blocks.extend(asset_blocks.into_inner());
-        content_blocks.extend(snapshot_blocks.into_inner());
-
         let asset_chips = timeline
             .get_context_chip()
             .await
             .map(|chip| vec![chip])
             .unwrap_or_default();
 
-        Ok(ChatContext {
-            content_blocks,
-            asset_chips,
-        })
+        Ok(ChatContext { asset_chips })
     }
 }

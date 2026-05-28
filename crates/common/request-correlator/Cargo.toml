@@ -1,0 +1,18 @@
+[package]
+name = "request-correlator"
+version = "0.1.0"
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+dashmap = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time", "rt", "macros"] }
+tokio-util = { workspace = true, features = ["rt"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["sync", "time", "rt", "rt-multi-thread", "macros", "test-util"] }

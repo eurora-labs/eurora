@@ -12,7 +12,7 @@ export type ErrorFrame = {
 	id: number,
 	code: number,
 	message: string,
-	details?: string | null,
+	details?: Payload | null,
 };
 
 /**
@@ -21,7 +21,7 @@ export type ErrorFrame = {
  */
 export type EventFrame = {
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 /**
@@ -40,79 +40,62 @@ export type Frame = {
  */
 export type FrameKind = ({ Request: RequestFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Response?: never; Shutdown?: never } | ({ Response: ResponseFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Shutdown?: never } | ({ Event: EventFrame }) & { Cancel?: never; Error?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Error: ErrorFrame }) & { Cancel?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Cancel: CancelFrame }) & { Error?: never; Event?: never; Register?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Register: RegisterFrame }) & { Cancel?: never; Error?: never; Event?: never; Request?: never; Response?: never; Shutdown?: never } | ({ Shutdown: ShutdownFrame }) & { Cancel?: never; Error?: never; Event?: never; Register?: never; Request?: never; Response?: never };
 
-export type NativeArticleAsset = {
-	title: string,
-	url: string,
-	content: string,
-	text_content: string,
-	site_name: string,
-	selected_text: string | null,
-	language: string,
-	excerpt: string,
-	length: number,
-};
-
-export type NativeArticleSnapshot = {
-	highlighted_text: string | null,
-};
-
-export type NativeImage = {
-	base64: string,
-	mime_type: string,
-};
-
 /**
  *  Envelope for every payload the browser native-messaging host
  *  exchanges with the desktop bridge. Externally tagged on `kind` with
- *  the inner payload under `data` so the JSON shape matches what the
- *  browser extension already constructs.
+ *  the inner payload under `data` so the JSON shape stays stable as
+ *  new wire-payload variants are added.
+ * 
+ *  At present only [`NativeMetadata`] crosses the bridge — page content
+ *  is delivered through granular adapter tools (`browser_web_*`,
+ *  `browser_youtube_*`, …) rather than through pre-bundled assets or
+ *  snapshots.
  */
-export type NativeMessage = { kind: "NativeYoutubeAsset"; data: NativeYoutubeAsset } | { kind: "NativeArticleAsset"; data: NativeArticleAsset } | { kind: "NativeTwitterAsset"; data: NativeTwitterAsset } | { kind: "NativeYoutubeSnapshot"; data: NativeYoutubeSnapshot } | { kind: "NativeArticleSnapshot"; data: NativeArticleSnapshot } | { kind: "NativeMetadata"; data: NativeMetadata };
+export type NativeMessage = { kind: "NativeMetadata"; data: NativeMetadata };
 
 export type NativeMetadata = {
+	/**
+	 *  Browser-side tab id of the focused tab. `i32` rather than `i64`
+	 *  because specta's TypeScript binding emits `number` (an `f64`) for
+	 *  any integer and the safe-integer range is `±2^53 - 1` — `i64`
+	 *  values can silently lose precision when round-tripping. Chrome
+	 *  tab ids are well within `i32` range in practice.
+	 * 
+	 *  Required: the extension only sends metadata when it can identify
+	 *  a concrete tab, so the desktop can rely on this for `LIST_TOOLS`
+	 *  / `INVOKE_TOOL` / `CANCEL_TOOL` routing without a fallback path.
+	 *  URL, title, and icon all come from the same tab record, so there
+	 *  is no scenario where the desktop receives metadata without a tab
+	 *  id.
+	 */
+	tab_id: number,
 	url: string | null,
 	icon_base64: string | null,
 	title: string | null,
 };
 
-export type NativeTwitterAsset = {
-	url: string,
-	title: string,
-	result: ParseResult,
-	timestamp: string,
-};
-
-export type NativeTwitterTweet = {
-	text: string,
-	timestamp: string | null,
-	author: string | null,
-	images?: NativeImage[],
-};
-
-export type NativeYoutubeAsset = {
-	url: string,
-	title: string,
-	transcript: string,
-	current_time: number | null,
-};
-
-export type NativeYoutubeSnapshot = {
-	current_time: number | null,
-	video_frame_base64: string,
-	video_frame_width: number,
-	video_frame_height: number,
-};
-
-export type NotificationsData = {
-	tweets: NativeTwitterTweet[],
-};
-
-export type ParseResult = { page: "tweet"; data: TweetPageData } | { page: "profile"; data: ProfilePageData } | { page: "home"; data: TimelineData } | { page: "search"; data: SearchData } | { page: "notifications"; data: NotificationsData } | { page: "unsupported"; data: UnsupportedPageData };
-
-export type ProfilePageData = {
-	username: string,
-	tweets: NativeTwitterTweet[],
-};
+/**
+ *  Inline JSON payload carried by Request/Response/Event frames.
+ * 
+ *  Stored as a [`Box<RawValue>`] so the payload's JSON serializes
+ *  **inline** into the frame envelope rather than as a JSON-encoded
+ *  string. Compared to the historical `Option<String>` shape, this:
+ * 
+ *  - halves the wire size for large payloads (e.g. base64-encoded
+ *    PNGs) because the outer envelope no longer double-escapes the
+ *    inner JSON;
+ *  - drops one parse + one escape per direction (Rust producers hand
+ *    raw JSON straight to serde; consumers read it without first
+ *    decoding a string layer);
+ *  - typed in Rust as JSON rather than "string of unknown structure",
+ *    which means the encode/decode helpers can be centralised here
+ *    and call sites stop manually `serde_json::to_string`-ing.
+ * 
+ *  Construct via [`Payload::from_value`] for typed Rust data, or
+ *  [`Payload::from_raw_json`] when handing through a literal JSON
+ *  fragment.
+ */
+export type Payload = unknown;
 
 /**
  *  Mandatory first frame on every connection. Identifies the host
@@ -140,19 +123,14 @@ export type RegisterFrame = {
 export type RequestFrame = {
 	id: number,
 	action: string,
-	payload?: string | null,
+	payload?: Payload | null,
 };
 
 /**  Client reply to a [`RequestFrame`], correlated by `id`. */
 export type ResponseFrame = {
 	id: number,
 	action: string,
-	payload?: string | null,
-};
-
-export type SearchData = {
-	query: string,
-	tweets: NativeTwitterTweet[],
+	payload?: Payload | null,
 };
 
 /**
@@ -164,17 +142,4 @@ export type SearchData = {
  */
 export type ShutdownFrame = {
 	reason?: string | null,
-};
-
-export type TimelineData = {
-	tweets: NativeTwitterTweet[],
-};
-
-export type TweetPageData = {
-	tweet: NativeTwitterTweet | null,
-	replies: NativeTwitterTweet[],
-};
-
-export type UnsupportedPageData = {
-	url: string,
 };

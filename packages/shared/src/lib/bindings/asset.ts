@@ -20,5 +20,4 @@ export type CreateAssetRequest = {
 	content: string,
 	mime_type: string,
 	metadata?: unknown | null,
-	activity_id?: string | null,
 };

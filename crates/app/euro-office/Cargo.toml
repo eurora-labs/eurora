@@ -18,7 +18,7 @@ uuid = { workspace = true, features = ["v4"] }
 
 anyhow = { workspace = true, optional = true }
 specta-serde = { version = "0.0.12", optional = true }
-specta-typescript = { version = "0.0.12", optional = true }
+specta-typescript = { workspace = true, optional = true }
 
 [dev-dependencies]
 futures-util = { workspace = true }
@@ -30,12 +30,5 @@ tokio-tungstenite = { workspace = true }
 default = []
 codegen = ["dep:anyhow", "dep:specta-serde", "dep:specta-typescript"]
 
-[[bin]]
-name = "euro-office"
-path = "src/bin/codegen.rs"
-required-features = ["codegen"]
-
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

@@ -65,7 +65,9 @@ use crate::chat_models::{
 use crate::error::{Error, Result};
 use crate::language_models::ChatGenerationStream;
 use crate::language_models::{BaseLanguageModel, LanguageModelConfig};
-use crate::language_models::{ChatModelRunnable, ToolLike, extract_tool_name_from_schema};
+use crate::language_models::{
+    ChatModelRunnable, ToolLike, extract_tool_name_from_schema, partition_tool_likes,
+};
 use crate::messages::{
     AIMessage, AnyMessage, ContentBlock, ContentBlocks, InvalidToolCall, PlainTextContentBlock,
     ToolCall,
@@ -2533,7 +2535,24 @@ impl ChatOpenAI {
                             for line in event_data.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
                                     if data == "[DONE]" {
-                                        let mut final_chunk = ChatChunk::final_chunk(usage.take(), finish_reason.take());
+                                        let finish = finish_reason.take();
+                                        // GLM-family providers occasionally
+                                        // report `finish_reason: "tool_calls"`
+                                        // without emitting any tool_call
+                                        // deltas. Surface it here so the
+                                        // condition is visible in logs;
+                                        // the orchestrator (be-thread-service
+                                        // `drive_turn`) handles recovery.
+                                        if finish.as_deref() == Some("tool_calls")
+                                            && tool_call_acc.is_empty()
+                                        {
+                                            tracing::warn!(
+                                                "Provider stream ended with finish_reason=tool_calls \
+                                                 but no tool-call deltas were emitted; final chunk \
+                                                 will carry an empty tool_calls list",
+                                            );
+                                        }
+                                        let mut final_chunk = ChatChunk::final_chunk(usage.take(), finish);
                                         if !tool_call_acc.is_empty() {
                                             let mut sorted: Vec<_> = tool_call_acc.drain().collect();
                                             sorted.sort_by_key(|(idx, _)| *idx);
@@ -3005,6 +3024,20 @@ impl BaseChatModel for ChatOpenAI {
                         response_metadata
                             .entry("model_provider".to_string())
                             .or_insert_with(|| serde_json::json!("openai"));
+                        // Propagate `finish_reason` through `response_metadata`
+                        // so it survives the `ChatChunk` → `AIMessageChunk`
+                        // conversion in `BaseChatModel::stream`. Downstream
+                        // orchestrators rely on it to disambiguate "model
+                        // finished normally" from provider-specific failure
+                        // modes (e.g. GLM-family models that emit
+                        // `finish_reason: \"tool_calls\"` with no tool-call
+                        // deltas).
+                        if let Some(ref reason) = chat_chunk.finish_reason {
+                            response_metadata.insert(
+                                "finish_reason".to_string(),
+                                serde_json::json!(reason),
+                            );
+                        }
                         let message = AIMessage::builder()
                             .content(&chat_chunk.content)
                             .tool_calls(chat_chunk.tool_calls.clone())
@@ -3042,23 +3075,12 @@ impl BaseChatModel for ChatOpenAI {
         tool_choice: Option<ToolChoice>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
-            .iter()
-            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        let (function_tools, builtin_tools) = partition_tool_likes(tools);
         bound.bound_tools = function_tools
             .iter()
             .map(|t| t.to_definition())
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        bound.bound_builtin_tools = builtin_tools
-            .iter()
-            .filter_map(|t| {
-                if let ToolLike::Builtin(v) = t {
-                    Some(v.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
+        bound.bound_builtin_tools = builtin_tools;
         bound.bound_tool_choice = tool_choice;
         Ok(Box::new(bound))
     }
@@ -3103,23 +3125,12 @@ impl ChatOpenAI {
         response_format: Option<serde_json::Value>,
     ) -> Result<Box<dyn BaseChatModel>> {
         let mut bound = self.clone();
-        let (function_tools, builtin_tools): (Vec<_>, Vec<_>) = tools
-            .iter()
-            .partition(|t| !matches!(t, ToolLike::Builtin(_)));
+        let (function_tools, builtin_tools) = partition_tool_likes(tools);
         bound.bound_tools = function_tools
             .iter()
             .map(|t| t.to_definition())
             .collect::<std::result::Result<Vec<_>, _>>()?;
-        bound.bound_builtin_tools = builtin_tools
-            .iter()
-            .filter_map(|t| {
-                if let ToolLike::Builtin(v) = t {
-                    Some(v.clone())
-                } else {
-                    None
-                }
-            })
-            .collect();
+        bound.bound_builtin_tools = builtin_tools;
         bound.bound_tool_choice = tool_choice;
         bound.bound_strict = strict;
         bound.bound_parallel_tool_calls = parallel_tool_calls;

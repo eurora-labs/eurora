@@ -13,26 +13,25 @@ use axum_server::Handle as AxumHandle;
 use dashmap::DashMap;
 use euro_bridge_protocol::{
     BRIDGE_BIND_IP, BRIDGE_PATH, BRIDGE_PORT, BridgeError, CancelFrame, ErrorFrame, EventFrame,
-    Frame, FrameKind, RegisterFrame, RequestFrame, ResponseFrame, ShutdownFrame, bridge_url_for,
+    Frame, FrameKind, Payload, RegisterFrame, RequestFrame, ResponseFrame, ShutdownFrame,
+    bridge_url_for,
+};
+use euro_process::lookup_process_name;
+use euro_transport_policy::{
+    BRIDGE_HEARTBEAT_INTERVAL, BRIDGE_REGISTER_TIMEOUT, BRIDGE_REQUEST_TIMEOUT,
+    BRIDGE_SHUTDOWN_GRACE,
 };
 use futures_util::{SinkExt, StreamExt};
+use request_correlator::{RequestCorrelator, WaitError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot};
-
-use crate::process_name::get_process_name;
 
 /// `EventFrame.action` clients send to publish a fresh
 /// [`BundledExtensionState`] to the desktop. Payload is JSON-encoded
 /// [`ExtensionStatePayload`].
 pub const EXTENSION_STATE_EVENT: &str = "EXTENSION_STATE_CHANGED";
 
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
-const FIRST_FRAME_TIMEOUT: Duration = Duration::from_secs(5);
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 const OUTBOUND_QUEUE_SIZE: usize = 32;
-/// Time we let in-flight connections drain on shutdown before forcing
-/// the listener closed.
-const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
 
 static GLOBAL_SERVICE: OnceLock<BridgeService> = OnceLock::new();
 
@@ -357,7 +356,7 @@ pub struct BridgeService {
     registrations_tx: broadcast::Sender<RegistrationEvent>,
     disconnects_tx: broadcast::Sender<RegistrationEvent>,
     extension_states_tx: broadcast::Sender<ExtensionStateUpdate>,
-    pending_requests: Arc<DashMap<u32, oneshot::Sender<Result<ResponseFrame, ErrorFrame>>>>,
+    pending_requests: RequestCorrelator<u32, ResponseFrame, ErrorFrame>,
     request_id_counter: Arc<AtomicU32>,
     server: Arc<StdMutex<Option<ServerHandle>>>,
     /// Browser-purge deadline. While `Instant::now() < purge_until`,
@@ -398,7 +397,7 @@ impl BridgeService {
             registrations_tx,
             disconnects_tx,
             extension_states_tx,
-            pending_requests: Arc::new(DashMap::new()),
+            pending_requests: RequestCorrelator::new(),
             request_id_counter: Arc::new(AtomicU32::new(1)),
             server: Arc::new(StdMutex::new(None)),
             purge_until_nanos: Arc::new(AtomicU64::new(0)),
@@ -424,7 +423,7 @@ impl BridgeService {
     }
 
     fn spawn_frame_handler(&self) {
-        let pending_requests = Arc::clone(&self.pending_requests);
+        let pending_requests = self.pending_requests.clone();
         let events_tx = self.events_tx.clone();
         let extension_states = Arc::clone(&self.extension_states);
         let extension_states_tx = self.extension_states_tx.clone();
@@ -452,20 +451,13 @@ impl BridgeService {
                     }
                     FrameKind::Response(resp) => {
                         let id = resp.id;
-                        if let Some((_, sender)) = pending_requests.remove(&id) {
-                            if sender.send(Ok(resp)).is_err() {
-                                tracing::debug!(
-                                    request_id = id,
-                                    "Pending request was dropped before response arrived",
-                                );
-                            }
-                        } else {
-                            tracing::debug!(
-                                request_id = id,
-                                action = %resp.action,
-                                "Received response for unknown request id",
-                            );
-                        }
+                        let action = resp.action.clone();
+                        pending_requests.resolve(id, Ok(resp));
+                        tracing::trace!(
+                            request_id = id,
+                            action = %action,
+                            "Resolved pending request with response",
+                        );
                     }
                     FrameKind::Event(evt) => {
                         if evt.action == EXTENSION_STATE_EVENT {
@@ -491,19 +483,16 @@ impl BridgeService {
                             message = %err.message,
                             "Received error frame from client",
                         );
-                        if let Some((_, sender)) = pending_requests.remove(&id)
-                            && sender.send(Err(err)).is_err()
-                        {
-                            tracing::debug!(
-                                request_id = id,
-                                "Pending request was dropped before error arrived",
-                            );
-                        }
+                        pending_requests.resolve(id, Err(err));
                     }
                     FrameKind::Cancel(cancel) => {
-                        if pending_requests.remove(&cancel.id).is_some() {
-                            tracing::debug!(request_id = cancel.id, "Cancelled pending request");
-                        }
+                        // Drop the pending entry without synthesizing a
+                        // structured error: the waiter wakes with
+                        // `WaitError::SenderDropped`, which `send_request`
+                        // maps to `BridgeError::ChannelClosed` — preserving
+                        // the pre-correlator behaviour.
+                        pending_requests.drop_silently(cancel.id);
+                        tracing::debug!(request_id = cancel.id, "Cancelled pending request");
                     }
                     FrameKind::Register(_) => {
                         tracing::warn!(app_pid, "Received Register frame outside the handshake",);
@@ -681,7 +670,7 @@ impl BridgeService {
         };
 
         tracing::info!("Sending shutdown signal to bridge WebSocket server");
-        axum_handle.graceful_shutdown(Some(SHUTDOWN_GRACE));
+        axum_handle.graceful_shutdown(Some(BRIDGE_SHUTDOWN_GRACE));
 
         if let Some(done) = done {
             // Fired by `serve` when its accept loop ends, or by
@@ -806,18 +795,19 @@ impl BridgeService {
     }
 
     /// Send a request to `app_pid` and await a correlated response.
-    /// Times out after [`DEFAULT_REQUEST_TIMEOUT`]; on timeout a
+    /// Times out after [`BRIDGE_REQUEST_TIMEOUT`]; on timeout a
     /// `Cancel` frame is sent so the client can drop any work it
     /// started.
     pub async fn send_request(
         &self,
         app_pid: u32,
         action: &str,
-        payload: Option<String>,
+        payload: Option<Payload>,
     ) -> Result<ResponseFrame, BridgeError> {
         let request_id = self.request_id_counter.fetch_add(1, Ordering::Relaxed);
-        let (tx, rx) = oneshot::channel();
-        self.pending_requests.insert(request_id, tx);
+        // Drop-guard removes the pending entry on every exit path,
+        // including the early return on send failure and panics.
+        let guard = self.pending_requests.register(request_id);
 
         let request = Frame::from(RequestFrame {
             id: request_id,
@@ -827,23 +817,18 @@ impl BridgeService {
 
         tracing::debug!(app_pid, request_id, action, "Sending bridge request");
 
-        if let Err(err) = self.send_to_client(app_pid, request).await {
-            self.pending_requests.remove(&request_id);
-            return Err(err);
-        }
+        self.send_to_client(app_pid, request).await?;
 
-        match tokio::time::timeout(DEFAULT_REQUEST_TIMEOUT, rx).await {
-            Ok(Ok(Ok(resp))) => Ok(resp),
-            Ok(Ok(Err(err))) => Err(BridgeError::Client {
+        match guard.wait(BRIDGE_REQUEST_TIMEOUT).await {
+            Ok(Ok(resp)) => Ok(resp),
+            Ok(Err(err)) => Err(BridgeError::Client {
+                code: err.code,
                 message: err.message,
                 details: err.details,
             }),
-            Ok(Err(_)) => {
-                self.pending_requests.remove(&request_id);
-                Err(BridgeError::ChannelClosed)
-            }
-            Err(_) => {
-                self.pending_requests.remove(&request_id);
+            Err(WaitError::SenderDropped) => Err(BridgeError::ChannelClosed),
+            Err(WaitError::Cancelled) => Err(BridgeError::ChannelClosed),
+            Err(WaitError::Timeout) => {
                 let cancel = Frame::from(CancelFrame { id: request_id });
                 if let Err(err) = self.send_to_client(app_pid, cancel).await {
                     tracing::debug!(
@@ -911,7 +896,7 @@ async fn handle_socket(service: BridgeService, socket: WebSocket, peer: SocketAd
     let app_kind = register.app_kind;
     let app_name = match &app_kind {
         Some(kind) => kind.clone(),
-        None => get_process_name(app_pid).unwrap_or_else(|| format!("unknown_{app_pid}")),
+        None => lookup_process_name(app_pid).unwrap_or_else(|| format!("unknown_{app_pid}")),
     };
 
     let (outbound_tx, outbound_rx) = mpsc::channel::<Frame>(OUTBOUND_QUEUE_SIZE);
@@ -1022,7 +1007,7 @@ async fn read_register_frame<S>(stream: &mut S) -> Result<RegisterFrame, String>
 where
     S: futures_util::Stream<Item = Result<Message, axum::Error>> + Unpin,
 {
-    let next = tokio::time::timeout(FIRST_FRAME_TIMEOUT, stream.next())
+    let next = tokio::time::timeout(BRIDGE_REGISTER_TIMEOUT, stream.next())
         .await
         .map_err(|_| "timed out waiting for Register frame".to_string())?;
 
@@ -1057,7 +1042,7 @@ async fn writer_task(
     mut sink: futures_util::stream::SplitSink<WebSocket, Message>,
     mut outbound_rx: mpsc::Receiver<Frame>,
 ) {
-    let mut heartbeat = tokio::time::interval(HEARTBEAT_INTERVAL);
+    let mut heartbeat = tokio::time::interval(BRIDGE_HEARTBEAT_INTERVAL);
     heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // Skip the immediate first tick.
     heartbeat.tick().await;
@@ -1153,11 +1138,11 @@ fn handle_extension_state_event(
     extension_states: &DashMap<String, BundledExtensionState>,
     extension_states_tx: &broadcast::Sender<ExtensionStateUpdate>,
 ) {
-    let Some(payload_str) = evt.payload.as_deref() else {
+    let Some(payload_value) = evt.payload.as_ref() else {
         tracing::warn!(app_pid, "EXTENSION_STATE_CHANGED event missing payload");
         return;
     };
-    let payload: ExtensionStatePayload = match serde_json::from_str(payload_str) {
+    let payload: ExtensionStatePayload = match payload_value.deserialize() {
         Ok(payload) => payload,
         Err(err) => {
             tracing::warn!(
@@ -1276,7 +1261,7 @@ mod tests {
                 Frame::from(ResponseFrame {
                     id: req.id,
                     action: req.action,
-                    payload: Some("pong".into()),
+                    payload: Some(Payload::from_value(&"pong").unwrap()),
                 }),
             ))
             .expect("broadcast send");
@@ -1286,7 +1271,13 @@ mod tests {
             .expect("request future")
             .expect("join")
             .expect("response");
-        assert_eq!(response.payload.as_deref(), Some("pong"));
+        let payload: String = response
+            .payload
+            .as_ref()
+            .expect("payload present")
+            .deserialize()
+            .expect("decode payload");
+        assert_eq!(payload, "pong");
     }
 
     #[tokio::test]
@@ -1324,7 +1315,7 @@ mod tests {
                     id: req.id,
                     code: 42,
                     message: "boom".into(),
-                    details: Some("trace".into()),
+                    details: Some(Payload::from_value(&"trace").unwrap()),
                 }),
             ))
             .expect("broadcast send");
@@ -1334,9 +1325,19 @@ mod tests {
             .expect("request future")
             .expect("join");
         match result {
-            Err(BridgeError::Client { message, details }) => {
+            Err(BridgeError::Client {
+                code,
+                message,
+                details,
+            }) => {
+                assert_eq!(code, 42);
                 assert_eq!(message, "boom");
-                assert_eq!(details.as_deref(), Some("trace"));
+                let details: String = details
+                    .as_ref()
+                    .expect("details present")
+                    .deserialize()
+                    .expect("decode details");
+                assert_eq!(details, "trace");
             }
             other => panic!("expected Client error, got {other:?}"),
         }
@@ -1543,7 +1544,7 @@ mod tests {
             BundledExtensionState::Unknown,
         );
 
-        let payload = serde_json::to_string(&ExtensionStatePayload {
+        let payload = Payload::from_value(&ExtensionStatePayload {
             app_kind: "safari".into(),
             state: BundledExtensionState::Disabled,
         })
@@ -1576,7 +1577,7 @@ mod tests {
         let service = BridgeService::new();
         let mut updates = service.subscribe_to_extension_states();
 
-        let payload = serde_json::to_string(&ExtensionStatePayload {
+        let payload = Payload::from_value(&ExtensionStatePayload {
             app_kind: "safari".into(),
             state: BundledExtensionState::Enabled,
         })
@@ -1617,7 +1618,10 @@ mod tests {
                 1,
                 Frame::from(EventFrame {
                     action: EXTENSION_STATE_EVENT.into(),
-                    payload: Some("not json".into()),
+                    // Valid JSON (a bare string), but not the
+                    // `ExtensionStatePayload` shape — the handler
+                    // should refuse to decode it.
+                    payload: Some(Payload::from_value(&"not the right shape").unwrap()),
                 }),
             ))
             .expect("broadcast send");

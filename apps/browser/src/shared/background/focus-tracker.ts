@@ -1,55 +1,27 @@
 import { resolveFaviconBase64 } from './favicon';
 import browser from 'webextension-polyfill';
-import type { NativeMetadata, Frame } from '../content/bindings';
+import type { TabChange, TabStateBus } from './tab-state-bus';
+import type { NativeMetadata, Frame, Payload } from '../content/bindings';
 
 let activeNativePort: browser.Runtime.Port | null = null;
+let unsubscribe: (() => void) | null = null;
 
-export function initFocusTracker(port: browser.Runtime.Port): void {
+export function initFocusTracker(port: browser.Runtime.Port, bus: TabStateBus): void {
+	destroyFocusTracker();
 	activeNativePort = port;
-
-	browser.tabs.onActivated.addListener(onTabActivated);
-	browser.tabs.onUpdated.addListener(onTabUpdated);
-	browser.tabs.onRemoved.addListener(onTabRemoved);
-	browser.windows.onFocusChanged.addListener(onWindowFocusChanged);
-
-	sendMetadataForActiveTab().catch(console.error);
+	unsubscribe = bus.subscribe(onTabChange);
 }
 
 export function destroyFocusTracker(): void {
+	if (unsubscribe) {
+		unsubscribe();
+		unsubscribe = null;
+	}
 	activeNativePort = null;
-
-	browser.tabs.onActivated.removeListener(onTabActivated);
-	browser.tabs.onUpdated.removeListener(onTabUpdated);
-	browser.tabs.onRemoved.removeListener(onTabRemoved);
-	browser.windows.onFocusChanged.removeListener(onWindowFocusChanged);
 }
 
 export function setNativePort(port: browser.Runtime.Port | null): void {
 	activeNativePort = port;
-}
-
-function onTabRemoved(_tabId: number, _removeInfo: browser.Tabs.OnRemovedRemoveInfoType): void {}
-
-async function onTabActivated(_activeInfo: browser.Tabs.OnActivatedActiveInfoType): Promise<void> {
-	if (!activeNativePort) return;
-	await sendMetadataForActiveTab();
-}
-
-async function onTabUpdated(
-	_tabId: number,
-	changeInfo: browser.Tabs.OnUpdatedChangeInfoType,
-	tab: browser.Tabs.Tab,
-): Promise<void> {
-	if (!activeNativePort) return;
-	if (!tab.active) return;
-	if (changeInfo.status !== 'complete' && !changeInfo.title) return;
-	await sendMetadataForActiveTab();
-}
-
-async function onWindowFocusChanged(windowId: number): Promise<void> {
-	if (windowId === browser.windows.WINDOW_ID_NONE) return;
-	if (!activeNativePort) return;
-	await sendMetadataForActiveTab();
 }
 
 function isRealWebUrl(url: string): boolean {
@@ -57,24 +29,45 @@ function isRealWebUrl(url: string): boolean {
 	return /^https?:\/\//i.test(url);
 }
 
-async function sendMetadataForActiveTab(): Promise<void> {
+async function onTabChange(change: TabChange): Promise<void> {
 	if (!activeNativePort) return;
-	try {
-		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-		if (!activeTab || !activeTab.id || !activeTab.url || !isRealWebUrl(activeTab.url)) return;
-		await sendMetadataEvent(activeTab, activeNativePort);
-	} catch (error) {
-		console.error('sendMetadataForActiveTab failed:', error);
+
+	// Mirror the previous filters: ignore window-focus-lost
+	// (WINDOW_ID_NONE) transitions, ignore tab-removed entirely, and on
+	// `updated` events only react when status completed or the title
+	// changed.
+	if (change.cause === 'removed') return;
+	if (change.cause === 'window-focus' && change.windowId === -1) return;
+	if (change.cause === 'updated') {
+		const changeInfo = change.changeInfo ?? {};
+		if (changeInfo.status !== 'complete' && !changeInfo.title) return;
+		if (change.activeTab && !change.activeTab.active) return;
 	}
+
+	const tab = change.activeTab;
+	if (!tab || tab.id === undefined || !tab.url || !isRealWebUrl(tab.url)) return;
+	await sendMetadataEvent(
+		tab as browser.Tabs.Tab & { id: number; url: string },
+		activeNativePort,
+	);
 }
 
-async function sendMetadataEvent(tab: browser.Tabs.Tab, port: browser.Runtime.Port): Promise<void> {
+async function sendMetadataEvent(
+	tab: browser.Tabs.Tab & { id: number; url: string },
+	port: browser.Runtime.Port,
+): Promise<void> {
 	try {
 		const iconBase64 = await resolveFaviconBase64(tab);
 
 		const metadata = {
 			kind: 'NativeMetadata',
 			data: {
+				// `tab_id` lets the desktop address this exact tab in
+				// follow-up `LIST_TOOLS` / `INVOKE_TOOL` calls without
+				// the extension having to re-query `chrome.tabs`. Always
+				// present — the guard in `onTabChange` rejects tabs
+				// without an id before we get here.
+				tab_id: tab.id,
 				url: tab.url,
 				icon_base64: iconBase64,
 				title: tab.title ?? null,
@@ -85,7 +78,10 @@ async function sendMetadataEvent(tab: browser.Tabs.Tab, port: browser.Runtime.Po
 			kind: {
 				Event: {
 					action: 'TAB_ACTIVATED',
-					payload: JSON.stringify(metadata),
+					// Inline JSON payload — the bridge protocol decodes it
+					// as a typed value at the Rust boundary, no double
+					// `JSON.parse` required.
+					payload: metadata as Payload,
 				},
 			},
 		};

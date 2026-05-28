@@ -2,8 +2,8 @@
 	import { Button } from '@eurora/ui/components/button/index';
 	import { Separator } from '@eurora/ui/components/separator/index';
 	import EuroraIcon from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { SiGithub } from '@icons-pack/svelte-simple-icons';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import IconBrandGithub from '@tabler/icons-svelte-runes/icons/brand-github';
 </script>
 
 <div
@@ -47,7 +47,7 @@
 			class="hover:bg-muted rounded-full transition-colors"
 		>
 			<div class="text-muted-foreground hover:text-foreground h-5 w-5">
-				<SiGithub size={20} />
+				<IconBrandGithub size={20} />
 			</div>
 		</Button>
 	</div>

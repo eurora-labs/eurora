@@ -2,7 +2,7 @@
 name = "auth-core"
 version = "0.0.0"
 edition.workspace = true
-description = "Shared HTTP wire types for the Eurora auth service. Consumed by both the backend (be-auth-service) and the desktop/web apps, and exported as TypeScript bindings via the workspace-level `euro-api-codegen` orchestrator."
+description = "Shared HTTP wire types for the Eurora auth service. Consumed by both the backend (be-auth-service) and the desktop/web apps, and exported as TypeScript bindings via the workspace-level `euro-codegen` orchestrator."
 license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
@@ -12,7 +12,7 @@ specta = { workspace = true, optional = true, features = ["derive"] }
 # Provides the `BigInt` marker type used by `#[specta(type = BigInt)]` overrides
 # on `i64` JWT-NumericDate fields, mapping them to TypeScript `bigint` so the
 # wire shape is lossless.
-specta-typescript = { version = "0.0.12", optional = true }
+specta-typescript = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

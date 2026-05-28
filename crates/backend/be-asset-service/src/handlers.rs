@@ -32,7 +32,6 @@ pub async fn create_asset_handler(
         content,
         mime_type: payload.mime_type,
         metadata: payload.metadata,
-        activity_id: payload.activity_id,
     };
 
     let asset: Asset = state.core.create_asset(input, user_id).await?;

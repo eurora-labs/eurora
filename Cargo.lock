@@ -1925,6 +1925,7 @@ dependencies = [
  "agent-chain",
  "agent-chain-core",
  "anyhow",
+ "async-trait",
  "axum",
  "base64 0.22.1",
  "be-asset",
@@ -1934,8 +1935,11 @@ dependencies = [
  "be-storage",
  "bon",
  "chrono",
+ "dashmap",
  "futures",
  "llm-core",
+ "regex",
+ "request-correlator",
  "reqwest 0.12.28",
  "secrecy",
  "serde",
@@ -3883,7 +3887,6 @@ dependencies = [
  "activity-core",
  "agent-chain-core",
  "anyhow",
- "asset-core",
  "async-trait",
  "base64 0.22.1",
  "chrono",
@@ -3895,18 +3898,16 @@ dependencies = [
  "euro-office",
  "euro-pdf",
  "euro-process",
- "euro-vision",
  "focus-tracker",
  "humantime-serde",
  "image",
+ "psl",
  "regex",
  "reqwest 0.12.28",
  "resvg",
  "secrecy",
  "serde",
  "serde_json",
- "specta",
- "tauri-specta",
  "thiserror 2.0.18",
  "thread-core",
  "tiny-skia 0.12.0",
@@ -3915,20 +3916,6 @@ dependencies = [
  "url",
  "usvg",
  "uuid",
-]
-
-[[package]]
-name = "euro-api-codegen"
-version = "0.0.0"
-dependencies = [
- "activity-core",
- "anyhow",
- "asset-core",
- "auth-core",
- "specta",
- "specta-serde",
- "specta-typescript",
- "thread-core",
 ]
 
 [[package]]
@@ -3968,11 +3955,15 @@ dependencies = [
  "axum-server",
  "dashmap",
  "euro-bridge-protocol",
+ "euro-process",
+ "euro-transport-policy",
  "futures-util",
+ "request-correlator",
  "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
+ "tokio-util",
  "tracing",
 ]
 
@@ -3997,6 +3988,7 @@ dependencies = [
  "backon",
  "euro-bridge-protocol",
  "euro-process",
+ "euro-transport-policy",
  "futures-util",
  "serde",
  "serde_json",
@@ -4008,6 +4000,25 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "winreg 0.56.0",
+]
+
+[[package]]
+name = "euro-codegen"
+version = "0.0.0"
+dependencies = [
+ "activity-core",
+ "anyhow",
+ "asset-core",
+ "auth-core",
+ "euro-bridge-protocol",
+ "euro-browser",
+ "euro-office",
+ "euro-tauri",
+ "settings-core",
+ "specta",
+ "specta-serde",
+ "specta-typescript",
+ "thread-core",
 ]
 
 [[package]]
@@ -4235,8 +4246,10 @@ dependencies = [
  "agent-chain-core",
  "async-trait",
  "chrono",
+ "dashmap",
  "euro-auth",
  "euro-endpoint",
+ "euro-transport-policy",
  "futures",
  "reqwest 0.12.28",
  "secrecy",
@@ -4260,6 +4273,7 @@ dependencies = [
 name = "euro-timeline"
 version = "0.0.0"
 dependencies = [
+ "activity-core",
  "agent-chain-core",
  "bon",
  "chrono",
@@ -4277,6 +4291,10 @@ dependencies = [
  "uuid",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "euro-transport-policy"
+version = "0.0.0"
 
 [[package]]
 name = "euro-vision"
@@ -8580,6 +8598,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "psl"
+version = "2.1.210"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27fbd4d9b2eb0b6e0cbd654bce70243f460cbc8dc92df6747e3fb911ce1cd4a8"
+dependencies = [
+ "psl-types",
+]
+
+[[package]]
 name = "psl-types"
 version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9054,6 +9081,15 @@ dependencies = [
  "sha1 0.10.6",
  "sha2 0.10.9",
  "tokio",
+]
+
+[[package]]
+name = "request-correlator"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -11890,10 +11926,14 @@ name = "thread-core"
 version = "0.0.0"
 dependencies = [
  "agent-chain-core",
+ "async-trait",
  "chrono",
  "serde",
  "serde_json",
  "specta",
+ "specta-typescript",
+ "thiserror 2.0.18",
+ "tokio-util",
  "uuid",
 ]
 
@@ -12145,6 +12185,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]

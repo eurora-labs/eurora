@@ -3,34 +3,28 @@
 //! Mirrors `euro-activity::ActivityStorage` in shape: a single
 //! [`EndpointManager`] gives the live base URL, an [`AuthManager`] supplies
 //! bearer tokens, and a shared [`reqwest::Client`] handles the JSON request
-//! / response round-trips. Streaming chat goes over a WebSocket established
-//! via `tokio-tungstenite`.
+//! / response round-trips. Streaming chat is delegated to
+//! [`crate::chat_bridge::ChatBridge`] via the [`ChatSocket`] returned from
+//! [`ThreadManager::open_chat_socket`].
 
 use std::sync::Arc;
 
 use euro_auth::AuthManager;
 use euro_endpoint::EndpointManager;
-use futures::{SinkExt, StreamExt};
 use reqwest::header;
 use secrecy::ExposeSecret;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use thread_core::{
-    ChatClientMessage, ChatSendRequest, ChatServerMessage, CreateThreadRequest,
-    CreateThreadResponse, DeleteThreadResponse, GenerateThreadTitleRequest,
+    CreateThreadRequest, CreateThreadResponse, DeleteThreadResponse, GenerateThreadTitleRequest,
     GenerateThreadTitleResponse, GetMessagesQuery, GetMessagesResponse, GetThreadResponse,
-    ListThreadsQuery, ListThreadsResponse, MessageNode, RegenerateRequest, SearchMessagesQuery,
+    ListThreadsQuery, ListThreadsResponse, MessageNode, SearchMessagesQuery,
     SearchMessagesResponse, SearchThreadsQuery, SearchThreadsResponse, SwitchBranchRequest, Thread,
 };
-use tokio::net::TcpStream;
-use tokio::sync::mpsc;
-use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::http::HeaderValue;
-use tokio_tungstenite::tungstenite::protocol::Message;
-use tokio_tungstenite::{Connector, MaybeTlsStream, WebSocketStream};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
+use crate::chat_socket::ChatSocket;
 use crate::error::{Error, Result};
 
 /// HTTP / WebSocket client for the thread service.
@@ -251,133 +245,22 @@ impl ThreadManager {
             .await
     }
 
-    /// Open a chat WebSocket and stream a fresh turn back to the caller.
+    /// Open a bidirectional chat WebSocket for `thread_id`.
     ///
-    /// Sends a single [`ChatClientMessage::Send`] frame, then yields each
-    /// inbound [`ChatServerMessage`] on the returned receiver. The receiver
-    /// closes when the server emits a `Final` or `Error` frame, or when
-    /// `cancel` fires (which prompts a `Cancel` frame and a clean close).
-    pub async fn chat_stream(
+    /// The handshake authenticates with a fresh bearer; the returned
+    /// [`ChatSocket`] owns the multiplexing driver task and exposes
+    /// typed `recv` / `try_send` halves. The caller — typically
+    /// [`crate::chat_bridge::ChatBridge`] — is responsible for sending
+    /// the per-turn `CapabilityUpdate` and opening frame and driving the
+    /// inbound loop.
+    pub async fn open_chat_socket(
         &self,
         thread_id: Uuid,
-        request: ChatSendRequest,
         cancel: CancellationToken,
-    ) -> Result<mpsc::UnboundedReceiver<Result<ChatServerMessage>>> {
-        self.open_chat_socket(thread_id, ChatClientMessage::Send(request), cancel)
-            .await
-    }
-
-    /// Open a chat WebSocket and stream a regenerated AI variant back to the
-    /// caller.
-    ///
-    /// Sends a single [`ChatClientMessage::Regenerate`] frame; the server
-    /// rewinds `active_leaf` to the AI message's human parent and runs the
-    /// agent loop on the existing context. The new AI message lands as a
-    /// sibling of the one identified by `ai_message_id`.
-    pub async fn chat_regenerate(
-        &self,
-        thread_id: Uuid,
-        ai_message_id: Uuid,
-        cancel: CancellationToken,
-    ) -> Result<mpsc::UnboundedReceiver<Result<ChatServerMessage>>> {
-        let request = RegenerateRequest { ai_message_id };
-        self.open_chat_socket(thread_id, ChatClientMessage::Regenerate(request), cancel)
-            .await
-    }
-
-    async fn open_chat_socket(
-        &self,
-        thread_id: Uuid,
-        opening: ChatClientMessage,
-        cancel: CancellationToken,
-    ) -> Result<mpsc::UnboundedReceiver<Result<ChatServerMessage>>> {
+    ) -> Result<ChatSocket> {
         let url = self.ws_url(&format!("/threads/{thread_id}/chat"))?;
         let bearer = self.bearer().await?;
-
-        let mut req = url
-            .as_str()
-            .into_client_request()
-            .map_err(|e| Error::InvalidUrl(e.to_string()))?;
-        req.headers_mut().insert(
-            header::AUTHORIZATION,
-            HeaderValue::from_str(&bearer)
-                .map_err(|e| Error::ChatProtocol(format!("Invalid bearer header: {e}")))?,
-        );
-
-        let (mut stream, _response) = tokio_tungstenite::connect_async_tls_with_config(
-            req,
-            None,
-            false,
-            None as Option<Connector>,
-        )
-        .await?;
-
-        let opening_frame = serde_json::to_string(&opening).map_err(Error::Encode)?;
-        stream.send(Message::Text(opening_frame.into())).await?;
-
-        let (tx, rx) = mpsc::unbounded_channel::<Result<ChatServerMessage>>();
-        tokio::spawn(drive_chat(stream, tx, cancel));
-        Ok(rx)
-    }
-}
-
-async fn drive_chat(
-    mut stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    tx: mpsc::UnboundedSender<Result<ChatServerMessage>>,
-    cancel: CancellationToken,
-) {
-    loop {
-        tokio::select! {
-            biased;
-            () = cancel.cancelled() => {
-                let cancel_frame = serde_json::to_string(&ChatClientMessage::Cancel)
-                    .expect("cancel frame serializes");
-                let _ = stream.send(Message::Text(cancel_frame.into())).await;
-                let _ = stream.close(None).await;
-                let _ = tx.send(Err(Error::Cancelled));
-                return;
-            }
-            msg = stream.next() => {
-                let Some(msg) = msg else { return };
-                let msg = match msg {
-                    Ok(m) => m,
-                    Err(e) => {
-                        let _ = tx.send(Err(Error::WebSocket(e)));
-                        return;
-                    }
-                };
-                match msg {
-                    Message::Text(text) => match serde_json::from_str::<ChatServerMessage>(&text) {
-                        Ok(event) => {
-                            let is_terminal = matches!(
-                                &event,
-                                ChatServerMessage::Final { .. } | ChatServerMessage::Error { .. }
-                            );
-                            if tx.send(Ok(event)).is_err() {
-                                let _ = stream.close(None).await;
-                                return;
-                            }
-                            if is_terminal {
-                                let _ = stream.close(None).await;
-                                return;
-                            }
-                        }
-                        Err(e) => {
-                            let _ = tx.send(Err(Error::Decode(e)));
-                            return;
-                        }
-                    },
-                    Message::Close(_) => return,
-                    Message::Ping(payload) => {
-                        // Respond to pings to keep the connection alive; some proxies require this.
-                        let _ = stream.send(Message::Pong(payload)).await;
-                    }
-                    Message::Binary(_) | Message::Pong(_) | Message::Frame(_) => {
-                        // Ignore — the wire protocol is text-only.
-                    }
-                }
-            }
-        }
+        ChatSocket::connect(url, bearer, cancel).await
     }
 }
 

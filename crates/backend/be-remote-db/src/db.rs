@@ -11,7 +11,7 @@ use crate::{
     MessageType, PaginationParams,
     error::{DbError, DbResult},
     types::{
-        Activity, ActivityAsset, ActivityThread, Asset, AssetStatus, ClaimedProvisioningJob,
+        Activity, ActivitySession, ActivityThread, Asset, AssetStatus, ClaimedProvisioningJob,
         EmailVerificationToken, LoginToken, Message, OAuthCredentials, OAuthProvider, OAuthState,
         PasswordCredentials, RefreshToken, SearchResultMessage, SearchResultThread, Thread,
         TokenUsage, UpsertOutcome, User, UserSettingsRow,
@@ -899,227 +899,264 @@ impl DatabaseManager {
         Ok(())
     }
 
+    /// Upsert the parent activity by `(user_id, identity_key)` and insert a
+    /// new session referencing it, in a single transaction.
+    ///
+    /// `display_name` and `icon_asset_id` are *set-once*: subsequent calls
+    /// with the same identity leave the existing values intact. A future
+    /// rename / re-icon endpoint will be the only thing that mutates them.
+    /// Any prior live session for the same parent is closed in the same
+    /// transaction, so a crashed-then-restarted client never leaves more
+    /// than one open session per activity.
     #[builder]
-    pub async fn create_activity(
+    pub async fn insert_activity_session(
         &self,
-        id: Option<Uuid>,
         user_id: Uuid,
-        name: String,
+        session_id: Option<Uuid>,
+        identity_key: String,
+        display_name: String,
         icon_asset_id: Option<Uuid>,
         process_name: String,
-        window_title: String,
+        process_id: Option<i32>,
+        window_title: Option<String>,
+        url: Option<String>,
         started_at: DateTime<Utc>,
         ended_at: Option<DateTime<Utc>>,
-    ) -> DbResult<Activity> {
-        let id = id.unwrap_or_else(Uuid::now_v7);
-        let now = Utc::now();
+    ) -> DbResult<(Activity, ActivitySession)> {
+        let session_id = session_id.unwrap_or_else(Uuid::now_v7);
+        let tentative_activity_id = Uuid::now_v7();
+
+        let mut tx = self.pool.begin().await?;
 
         let activity = sqlx::query_as::<_, Activity>(
             r#"
-            INSERT INTO activities (id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
+            INSERT INTO activities (id, user_id, identity_key, display_name, icon_asset_id, last_used_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, now(), now(), now())
+            ON CONFLICT (user_id, identity_key) DO UPDATE
+                SET last_used_at  = now(),
+                    icon_asset_id = COALESCE(activities.icon_asset_id, EXCLUDED.icon_asset_id),
+                    updated_at    = now()
+            RETURNING id, user_id, identity_key, display_name, icon_asset_id, last_used_at, created_at, updated_at
             "#,
         )
-        .bind(id)
+        .bind(tentative_activity_id)
         .bind(user_id)
-        .bind(&name)
+        .bind(&identity_key)
+        .bind(&display_name)
         .bind(icon_asset_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // Close any prior live sessions for this parent — a crash that
+        // skipped the closing PATCH would otherwise leave them open
+        // forever, and the rail's live-indicator would point at a stale
+        // session id. Bounded blast radius: only the same (user, parent).
+        sqlx::query(
+            r#"
+            UPDATE activity_sessions
+            SET ended_at = now(), updated_at = now()
+            WHERE activity_id = $1 AND user_id = $2 AND ended_at IS NULL
+            "#,
+        )
+        .bind(activity.id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+
+        let session = sqlx::query_as::<_, ActivitySession>(
+            r#"
+            INSERT INTO activity_sessions (id, activity_id, user_id, process_name, process_id, window_title, url, started_at, ended_at, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now())
+            RETURNING id, activity_id, user_id, process_name, process_id, window_title, url, started_at, ended_at, created_at, updated_at
+            "#,
+        )
+        .bind(session_id)
+        .bind(activity.id)
+        .bind(user_id)
         .bind(&process_name)
+        .bind(process_id)
         .bind(&window_title)
+        .bind(&url)
         .bind(started_at)
         .bind(ended_at)
-        .bind(now)
-        .bind(now)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
-        Ok(activity)
+        tx.commit().await?;
+
+        Ok((activity, session))
     }
 
+    /// Update a session row.
+    ///
+    /// When `ended_at` transitions from NULL to a value (the session
+    /// closing for real), also bumps the parent's `last_used_at` so a
+    /// long-lived session keeps the parent fresh at the top of the rail
+    /// after close. Idempotent: a second PATCH that re-sets `ended_at`
+    /// on an already-closed session is a no-op on the parent.
     #[builder]
-    pub async fn get_activity_for_user(
+    pub async fn update_activity_session(
         &self,
-        activity_id: Uuid,
+        session_id: Uuid,
         user_id: Uuid,
-    ) -> DbResult<Activity> {
-        let activity = sqlx::query_as::<_, Activity>(
+        window_title: Option<String>,
+        url: Option<String>,
+        ended_at: Option<DateTime<Utc>>,
+    ) -> DbResult<ActivitySession> {
+        let mut tx = self.pool.begin().await?;
+
+        let previous_ended_at: Option<Option<DateTime<Utc>>> = sqlx::query_scalar(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
-            FROM activities
+            SELECT ended_at
+            FROM activity_sessions
             WHERE id = $1 AND user_id = $2
+            FOR UPDATE
             "#,
         )
-        .bind(activity_id)
+        .bind(session_id)
         .bind(user_id)
-        .fetch_one(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?;
 
-        Ok(activity)
+        let Some(previous_ended_at) = previous_ended_at else {
+            return Err(DbError::not_found_with_id("activity_session", session_id));
+        };
+
+        let session = sqlx::query_as::<_, ActivitySession>(
+            r#"
+            UPDATE activity_sessions
+            SET window_title = COALESCE($3, window_title),
+                url          = COALESCE($4, url),
+                ended_at     = COALESCE($5, ended_at),
+                updated_at   = now()
+            WHERE id = $1 AND user_id = $2
+            RETURNING id, activity_id, user_id, process_name, process_id, window_title, url, started_at, ended_at, created_at, updated_at
+            "#,
+        )
+        .bind(session_id)
+        .bind(user_id)
+        .bind(&window_title)
+        .bind(&url)
+        .bind(ended_at)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if previous_ended_at.is_none() && ended_at.is_some() {
+            sqlx::query(
+                r#"
+                UPDATE activities
+                SET last_used_at = now(), updated_at = now()
+                WHERE id = $1 AND user_id = $2
+                "#,
+            )
+            .bind(session.activity_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+
+        Ok(session)
     }
 
+    /// Page of parent activities, each carrying its most recent session.
+    ///
+    /// Two queries on purpose: the parent query is dirt simple and the
+    /// `DISTINCT ON` follow-up is bounded by the page size (typically
+    /// ≤20). A single LATERAL join would also work but introduces a
+    /// custom row shape that's noisier than the savings warrant.
     #[builder]
-    pub async fn list_activities(
+    pub async fn list_activities_with_latest_session(
         &self,
         user_id: Uuid,
         params: PaginationParams,
-    ) -> DbResult<Vec<Activity>> {
-        let query = format!(
+    ) -> DbResult<Vec<(Activity, Option<ActivitySession>)>> {
+        let parents_query = format!(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
+            SELECT id, user_id, identity_key, display_name, icon_asset_id, last_used_at, created_at, updated_at
             FROM activities
             WHERE user_id = $1
-            ORDER BY started_at {}
+            ORDER BY last_used_at {}
             LIMIT $2 OFFSET $3
             "#,
             params.order()
         );
 
-        let activities = sqlx::query_as::<_, Activity>(&query)
+        let parents = sqlx::query_as::<_, Activity>(&parents_query)
             .bind(user_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
             .await?;
 
-        Ok(activities)
-    }
+        if parents.is_empty() {
+            return Ok(Vec::new());
+        }
 
-    #[builder]
-    pub async fn update_activity(
-        &self,
-        id: Uuid,
-        user_id: Uuid,
-        name: Option<String>,
-        icon_asset_id: Option<Uuid>,
-        process_name: Option<String>,
-        window_title: Option<String>,
-        started_at: Option<DateTime<Utc>>,
-        ended_at: Option<DateTime<Utc>>,
-    ) -> DbResult<Activity> {
-        let now = Utc::now();
+        let parent_ids: Vec<Uuid> = parents.iter().map(|a| a.id).collect();
 
-        let activity = sqlx::query_as::<_, Activity>(
+        let latest_sessions = sqlx::query_as::<_, ActivitySession>(
             r#"
-            UPDATE activities
-            SET name = COALESCE($3, name),
-                icon_asset_id = COALESCE($4, icon_asset_id),
-                process_name = COALESCE($5, process_name),
-                window_title = COALESCE($6, window_title),
-                started_at = COALESCE($7, started_at),
-                ended_at = COALESCE($8, ended_at),
-                updated_at = $9
-            WHERE id = $1 AND user_id = $2
-            RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
+            SELECT DISTINCT ON (activity_id)
+                id, activity_id, user_id, process_name, process_id, window_title, url, started_at, ended_at, created_at, updated_at
+            FROM activity_sessions
+            WHERE user_id = $1 AND activity_id = ANY($2)
+            ORDER BY activity_id, started_at DESC
             "#,
         )
-        .bind(id)
         .bind(user_id)
-        .bind(&name)
-        .bind(icon_asset_id)
-        .bind(&process_name)
-        .bind(&window_title)
-        .bind(started_at)
-        .bind(ended_at)
-        .bind(now)
-        .fetch_one(&self.pool)
+        .bind(&parent_ids)
+        .fetch_all(&self.pool)
         .await?;
 
-        Ok(activity)
+        let mut by_parent = std::collections::HashMap::with_capacity(latest_sessions.len());
+        for session in latest_sessions {
+            by_parent.insert(session.activity_id, session);
+        }
+
+        Ok(parents
+            .into_iter()
+            .map(|parent| {
+                let session = by_parent.remove(&parent.id);
+                (parent, session)
+            })
+            .collect())
     }
 
+    /// Paginated list of sessions for one parent activity.
+    ///
+    /// User-scoped on both sides so a caller can't surface another user's
+    /// sessions by guessing an activity id. Powers the "when did I use
+    /// this?" view; the rail itself never reads from here.
     #[builder]
-    pub async fn update_activity_end_time(
+    pub async fn list_sessions_for_activity(
         &self,
+        user_id: Uuid,
         activity_id: Uuid,
-        user_id: Uuid,
-        ended_at: DateTime<Utc>,
-    ) -> DbResult<()> {
-        let now = Utc::now();
-
-        sqlx::query(
-            r#"
-            UPDATE activities
-            SET ended_at = $3, updated_at = $4
-            WHERE id = $1 AND user_id = $2
-            "#,
-        )
-        .bind(activity_id)
-        .bind(user_id)
-        .bind(ended_at)
-        .bind(now)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
-
-    #[builder]
-    pub async fn get_last_active_activity(&self, user_id: Uuid) -> DbResult<Option<Activity>> {
-        let activity = sqlx::query_as::<_, Activity>(
-            r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
-            FROM activities
-            WHERE user_id = $1 AND ended_at IS NULL
-            ORDER BY started_at DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(activity)
-    }
-
-    #[builder]
-    pub async fn delete_activity(&self, activity_id: Uuid, user_id: Uuid) -> DbResult<Activity> {
-        let activity = sqlx::query_as::<_, Activity>(
-            r#"
-            DELETE FROM activities
-            WHERE id = $1 AND user_id = $2
-            RETURNING id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
-            "#,
-        )
-        .bind(activity_id)
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(activity)
-    }
-
-    #[builder]
-    pub async fn get_activities_by_time_range(
-        &self,
-        user_id: Uuid,
-        start_time: DateTime<Utc>,
-        end_time: DateTime<Utc>,
         params: PaginationParams,
-    ) -> DbResult<Vec<Activity>> {
+    ) -> DbResult<Vec<ActivitySession>> {
         let query = format!(
             r#"
-            SELECT id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at
-            FROM activities
-            WHERE user_id = $1
-              AND started_at >= $2
-              AND started_at <= $3
-            ORDER BY started_at {}
-            LIMIT $4 OFFSET $5
+            SELECT s.id, s.activity_id, s.user_id, s.process_name, s.process_id, s.window_title, s.url, s.started_at, s.ended_at, s.created_at, s.updated_at
+            FROM activity_sessions s
+            JOIN activities a ON a.id = s.activity_id
+            WHERE s.user_id = $1 AND a.user_id = $1 AND s.activity_id = $2
+            ORDER BY s.started_at {}
+            LIMIT $3 OFFSET $4
             "#,
             params.order()
         );
 
-        let activities = sqlx::query_as::<_, Activity>(&query)
+        let sessions = sqlx::query_as::<_, ActivitySession>(&query)
             .bind(user_id)
-            .bind(start_time)
-            .bind(end_time)
+            .bind(activity_id)
             .bind(params.limit())
             .bind(params.offset())
             .fetch_all(&self.pool)
             .await?;
 
-        Ok(activities)
+        Ok(sessions)
     }
 
     #[builder]
@@ -1187,39 +1224,6 @@ impl DatabaseManager {
         .await?;
 
         Ok(asset)
-    }
-
-    #[builder]
-    pub async fn link_asset_to_activity(
-        &self,
-        activity_id: Uuid,
-        asset_id: Uuid,
-        user_id: Uuid,
-    ) -> DbResult<ActivityAsset> {
-        let now = Utc::now();
-
-        let activity_asset = sqlx::query_as::<_, ActivityAsset>(
-            r#"
-            WITH verified_activity AS (
-                SELECT id FROM activities WHERE id = $1 AND user_id = $3
-            ),
-            verified_asset AS (
-                SELECT id FROM assets WHERE id = $2 AND user_id = $3
-            )
-            INSERT INTO activity_assets (activity_id, asset_id, created_at)
-            SELECT va.id, vas.id, $4
-            FROM verified_activity va, verified_asset vas
-            RETURNING activity_id, asset_id, created_at
-            "#,
-        )
-        .bind(activity_id)
-        .bind(asset_id)
-        .bind(user_id)
-        .bind(now)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(activity_asset)
     }
 
     /// Insert a link between `activity_id` and `thread_id` for the given user.

@@ -115,15 +115,6 @@ fn render_asset(err: &AssetError) -> Rendered {
                 details: None,
             }
         }
-        AssetError::DatabaseLinkActivity(e) => {
-            tracing::error!(error = %e, "database link-activity failed");
-            Rendered {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                kind: "database_link_activity",
-                message: Cow::Borrowed("Failed to link asset to activity"),
-                details: None,
-            }
-        }
         AssetError::DatabaseRead(e) => {
             tracing::error!(error = %e, "database read failed");
             Rendered {

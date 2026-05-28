@@ -55,6 +55,7 @@
 		"@sveltejs/kit": "catalog:svelte",
 		"@sveltejs/package": "^2.5.7",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
+		"@types/node": "^22.9.0",
 		"jsdom": "^25.0.1",
 		"publint": "^0.3.19",
 		"runed": "catalog:svelte",

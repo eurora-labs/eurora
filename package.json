@@ -24,7 +24,7 @@
 		"build:ui": "turbo run build --filter @eurora/ui...",
 		"build:test": "cd crates/app/euro-tauri && tauri build --config tauri.conf.test.json -- --profile dev",
 		"build:browser": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:all",
-		"build:office-addin": "pnpm specta:office && pnpm --filter @eurora/office-addin run build",
+		"build:office-addin": "pnpm specta && pnpm --filter @eurora/office-addin run build",
 		"build:firefox": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:firefox",
 		"build:chrome": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:chrome",
 		"build:edge": "turbo run build --filter @eurora/browser^... && pnpm --filter @eurora/browser run build:edge",
@@ -40,9 +40,7 @@
 		"tauri": "tauri",
 		"dev:internal-tauri": "turbo watch --filter @eurora/desktop dev",
 		"commit": "cz",
-		"specta:backend": "cargo run -p euro-api-codegen && turbo run build --filter @eurora/shared --force",
-		"specta:bridge": "cargo run -p euro-bridge-protocol --features codegen -- --generate_specta && cargo run -p euro-browser --features codegen --bin euro-browser-codegen -- --generate_specta",
-		"specta:office": "cargo run -p euro-office --features codegen -- --generate_specta",
+		"specta": "cargo run -p euro-codegen && turbo run build --filter @eurora/shared --force",
 		"prettier": "prettier --check",
 		"fix": "eslint --fix .",
 		"format": "prettier --write .",
@@ -88,7 +86,7 @@
 		"typescript-eslint": "^8.59.4",
 		"web-ext": "^8.10.0"
 	},
-	"packageManager": "pnpm@11.1.2",
+	"packageManager": "pnpm@11.2.2",
 	"engines": {
 		"node": ">=20.11"
 	},

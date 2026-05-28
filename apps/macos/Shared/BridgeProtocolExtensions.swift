@@ -90,6 +90,26 @@ public extension ErrorFrame {
     }
 }
 
+public extension Payload {
+    /// Wrap a `Codable` value as an inline bridge `Payload`.
+    ///
+    /// Round-trips through `JSONSerialization` so the JSON-value enum's
+    /// `case` is filled from the encoded shape — i.e. `[String: Any]`
+    /// for an object, `[Any]` for an array, scalars for primitives.
+    /// Mirrors the Rust [`Payload::from_value`] helper.
+    static func encoding(_ value: some Encodable) throws -> Payload {
+        let data = try BridgeProtocol.encoder.encode(value)
+        return try BridgeProtocol.decoder.decode(Payload.self, from: data)
+    }
+
+    /// Decode the payload into a typed Rust-mirror value. Mirrors the
+    /// Rust [`Payload::deserialize`] helper.
+    func decode<T: Decodable>(as type: T.Type = T.self) throws -> T {
+        let data = try BridgeProtocol.encoder.encode(self)
+        return try BridgeProtocol.decoder.decode(type, from: data)
+    }
+}
+
 public extension Frame {
     /// Encode the frame as a UTF-8 JSON `Data` payload using the wire shape
     /// the Rust bridge expects.
@@ -188,15 +208,9 @@ public struct ExtensionStateEventPayload: Codable {
 /// fixed shape — but JSON encoding is fallible by signature, so we fall
 /// back to an empty payload rather than crashing the launcher.
 public func makeExtensionStateEvent(state: BundledExtensionState) -> Frame {
-    let payload = ExtensionStateEventPayload(appKind: kSafariBridgeAppKind, state: state)
-    let payloadJson: String?
-    do {
-        let data = try BridgeProtocol.encoder.encode(payload)
-        payloadJson = String(data: data, encoding: .utf8)
-    } catch {
-        payloadJson = nil
-    }
-    return Frame(EventFrame(action: BridgeAction.extensionStateChanged, payload: payloadJson))
+    let body = ExtensionStateEventPayload(appKind: kSafariBridgeAppKind, state: state)
+    let payload = try? Payload.encoding(body)
+    return Frame(EventFrame(action: BridgeAction.extensionStateChanged, payload: payload))
 }
 
 public extension FrameKind {

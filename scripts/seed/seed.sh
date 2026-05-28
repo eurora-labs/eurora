@@ -38,8 +38,8 @@ BEGIN;
 
 -- Clear existing data in dependency order
 TRUNCATE
-    activity_assets,
     activity_threads,
+    activity_sessions,
     message_assets,
     token_usage,
     monthly_token_totals,
@@ -81,9 +81,6 @@ $PSQL -c "\COPY messages (id, thread_id, user_id, parent_message_id, message_typ
 echo "  Setting threads.active_leaf_id..."
 $PSQL -f "$DATA_DIR/threads_active_leaf.sql"
 
-echo "  Loading activities..."
-$PSQL -c "\COPY activities (id, user_id, name, icon_asset_id, process_name, window_title, started_at, ended_at, created_at, updated_at) FROM '$DATA_DIR/activities.csv' WITH (FORMAT csv, HEADER true);"
-
 echo "  Loading token_usage..."
 $PSQL -c "\COPY token_usage (id, user_id, thread_id, message_id, input_tokens, output_tokens, reasoning_tokens, cache_creation_tokens, cache_read_tokens, created_at) FROM '$DATA_DIR/token_usage.csv' WITH (FORMAT csv, HEADER true);"
 
@@ -98,7 +95,6 @@ UNION ALL SELECT 'users', count(*) FROM users
 UNION ALL SELECT 'threads', count(*) FROM threads
 UNION ALL SELECT 'messages', count(*) FROM messages
 UNION ALL SELECT 'assets', count(*) FROM assets
-UNION ALL SELECT 'activities', count(*) FROM activities
 UNION ALL SELECT 'token_usage', count(*) FROM token_usage
 UNION ALL SELECT 'monthly_token_totals', count(*) FROM monthly_token_totals
 ORDER BY 1;

@@ -6,8 +6,10 @@
 	import * as DropdownMenu from '@eurora/ui/components/dropdown-menu/index';
 	import { Spinner } from '@eurora/ui/components/spinner/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import { SiApple, SiGithub, SiGoogle } from '@icons-pack/svelte-simple-icons';
 	import MoreHorizontalIcon from '@lucide/svelte/icons/more-horizontal';
+	import IconBrandApple from '@tabler/icons-svelte-runes/icons/brand-apple';
+	import IconBrandGithub from '@tabler/icons-svelte-runes/icons/brand-github';
+	import IconBrandGoogle from '@tabler/icons-svelte-runes/icons/brand-google';
 	import type { LoginOutcome } from '$lib/bindings/specta.bindings.js';
 
 	const user = inject(USER_SERVICE);
@@ -113,15 +115,15 @@
 
 			<div class="flex flex-col gap-2">
 				<Button class="w-full" size="lg" onclick={signInWithApple}>
-					<SiApple />
+					<IconBrandApple />
 					Continue with Apple
 				</Button>
 				<Button class="w-full" size="lg" variant="outline" onclick={signInWithGoogle}>
-					<SiGoogle />
+					<IconBrandGoogle />
 					Continue with Google
 				</Button>
 				<Button class="w-full" size="lg" variant="outline" onclick={signInWithGitHub}>
-					<SiGithub />
+					<IconBrandGithub />
 					Continue with GitHub
 				</Button>
 				<Button

@@ -86,7 +86,6 @@ pub struct CreateAssetInput {
     pub content: Vec<u8>,
     pub mime_type: String,
     pub metadata: Option<serde_json::Value>,
-    pub activity_id: Option<Uuid>,
 }
 
 #[derive(Debug)]
@@ -137,7 +136,6 @@ impl AssetService {
             content,
             mime_type,
             metadata,
-            activity_id,
         } = input;
 
         if content.is_empty() {
@@ -201,20 +199,6 @@ impl AssetService {
                 tracing::error!("Failed to create asset in database: {}", e);
                 AssetError::DatabaseCreate(e)
             })?;
-
-        if let Some(activity_id) = activity_id {
-            self.db
-                .link_asset_to_activity()
-                .activity_id(activity_id)
-                .asset_id(asset.id)
-                .user_id(user_id)
-                .call()
-                .await
-                .map_err(|e| {
-                    tracing::error!("Failed to link asset to activity: {}", e);
-                    AssetError::DatabaseLinkActivity(e)
-                })?;
-        }
 
         tracing::debug!("Created asset {}", asset.id);
 

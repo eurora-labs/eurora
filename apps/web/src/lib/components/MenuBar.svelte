@@ -7,9 +7,9 @@
 	import { navigationMenuTriggerStyle } from '@eurora/ui/components/navigation-menu/navigation-menu-trigger.svelte';
 	import * as Sheet from '@eurora/ui/components/sheet/index';
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
 	import LogInIcon from '@lucide/svelte/icons/log-in';
 	import MenuIcon from '@lucide/svelte/icons/menu';
+	import IconBrandGithub from '@tabler/icons-svelte-runes/icons/brand-github';
 	import type { Snippet } from 'svelte';
 
 	let { mobileNav }: { mobileNav?: Snippet<[() => void]> } = $props();
@@ -58,7 +58,7 @@
 		<!-- Desktop actions -->
 		<div class="hidden md:flex items-center gap-4">
 			<Button variant="ghost" size="icon" href="https://github.com/eurora-labs/eurora">
-				<SiGithub />
+				<IconBrandGithub class="size-6" />
 			</Button>
 			{#if auth.isAuthenticated}
 				<UserButton />
@@ -139,7 +139,7 @@
 							size="icon"
 							href="https://github.com/eurora-labs/eurora"
 						>
-							<SiGithub />
+							<IconBrandGithub />
 						</Button>
 					</div>
 				</Sheet.Content>

@@ -58,7 +58,7 @@ secrecy = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["arbitrary_precision", "std"] }
 specta = { workspace = true, features = ["derive", "function"] }
-specta-typescript = { version = "0.0.12" }
+specta-typescript = { workspace = true }
 tauri = { workspace = true, features = [
   "wry",
   "compression",
@@ -114,7 +114,5 @@ error-context = ["dep:backtrace"]
 ## A forwarding to all crates that have windows-specific adjustments for testing on non-Windows.
 windows = []
 
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

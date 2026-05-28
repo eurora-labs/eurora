@@ -250,20 +250,26 @@ pub struct MessageAsset {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ActivityAsset {
-    pub activity_id: Uuid,
-    pub asset_id: Uuid,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Activity {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub name: String,
+    pub identity_key: String,
+    pub display_name: String,
     pub icon_asset_id: Option<Uuid>,
+    pub last_used_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ActivitySession {
+    pub id: Uuid,
+    pub activity_id: Uuid,
+    pub user_id: Uuid,
     pub process_name: String,
-    pub window_title: String,
+    pub process_id: Option<i32>,
+    pub window_title: Option<String>,
+    pub url: Option<String>,
     pub started_at: DateTime<Utc>,
     pub ended_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
