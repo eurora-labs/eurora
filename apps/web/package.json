@@ -18,7 +18,7 @@
 		"@eurora/chat": "workspace:*",
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
-		"@icons-pack/svelte-simple-icons": "^5.0.0",
+		"@tabler/icons-svelte-runes": "catalog:",
 		"@lucide/svelte": "catalog:",
 		"@playwright/test": "^1.60.0",
 		"@sentry/sveltekit": "^10",

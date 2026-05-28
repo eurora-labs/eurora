@@ -5,10 +5,10 @@
 	import { inject } from '@eurora/shared/context';
 	import { Button } from '@eurora/ui/components/button/index';
 	import * as Collapsible from '@eurora/ui/components/collapsible/index';
-	import AppleIcon from '@lucide/svelte/icons/apple';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
+	import AppleIcon from '@tabler/icons-svelte-runes/icons/brand-apple';
 	import type { Component } from 'svelte';
 
 	const downloadService = inject(DOWNLOAD_SERVICE);

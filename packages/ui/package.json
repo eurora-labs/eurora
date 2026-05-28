@@ -21,7 +21,7 @@
 		"test:watch": "vitest --watch --mode development"
 	},
 	"peerDependencies": {
-		"@icons-pack/svelte-simple-icons": "^5.0.0",
+		"@tabler/icons-svelte-runes": "catalog:",
 		"svelte": "^5.0.0"
 	},
 	"devDependencies": {

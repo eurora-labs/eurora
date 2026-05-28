@@ -16,7 +16,7 @@
 		"@eurora/shared": "workspace:*",
 		"@eurora/ui": "workspace:*",
 		"@gitbutler/svelte-comment-injector": "^1.0.0",
-		"@icons-pack/svelte-simple-icons": "^5.0.0",
+		"@tabler/icons-svelte-runes": "catalog:",
 		"@lucide/svelte": "catalog:",
 		"@sveltejs/adapter-static": "catalog:svelte",
 		"@sveltejs/kit": "catalog:svelte",

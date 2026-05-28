@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Button } from '$lib/components/button/index.js';
-	import { SiApple, SiGoogle, SiGithub } from '@icons-pack/svelte-simple-icons';
+	import IconBrandApple from '@tabler/icons-svelte-runes/icons/brand-apple';
+	import IconBrandGithub from '@tabler/icons-svelte-runes/icons/brand-github';
+	import IconBrandGoogle from '@tabler/icons-svelte-runes/icons/brand-google';
 
 	export interface Props {
 		mode: 'login' | 'register';
@@ -28,15 +30,15 @@
 
 <div class="space-y-3">
 	<Button variant="outline" class="w-full" onclick={onApple} {disabled}>
-		<SiApple />
+		<IconBrandApple />
 		{buttonText[mode].apple}
 	</Button>
 	<Button variant="outline" class="w-full" onclick={onGoogle} {disabled}>
-		<SiGoogle />
+		<IconBrandGoogle />
 		{buttonText[mode].google}
 	</Button>
 	<Button variant="outline" class="w-full" onclick={onGitHub} {disabled}>
-		<SiGithub />
+		<IconBrandGithub />
 		{buttonText[mode].github}
 	</Button>
 </div>
