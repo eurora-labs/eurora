@@ -2534,11 +2534,6 @@ impl ChatOpenAI {
 
                             for line in event_data.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
-                                    // Raw SSE dump for diagnosing providers
-                                    // whose deltas land in non-standard fields
-                                    // (GLM-family in particular). Enable with
-                                    // `RUST_LOG=agent_chain::providers::openai=trace`.
-                                    tracing::trace!(target: "agent_chain::providers::openai::sse", data = %data, "SSE data line");
                                     if data == "[DONE]" {
                                         let finish = finish_reason.take();
                                         // GLM-family providers occasionally
