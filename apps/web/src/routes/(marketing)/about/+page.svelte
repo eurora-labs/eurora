@@ -2,9 +2,9 @@
 	import ReadyToStart from '$lib/components/marketing/ReadyToStart.svelte';
 	import { Badge } from '@eurora/ui/components/badge/index';
 	import { Button } from '@eurora/ui/components/button/index';
-	import GithubIcon from '@lucide/svelte/icons/github';
-	import LinkedinIcon from '@lucide/svelte/icons/linkedin';
 	import MailIcon from '@lucide/svelte/icons/mail';
+	import GithubIcon from '@tabler/icons-svelte-runes/icons/brand-github';
+	import LinkedinIcon from '@tabler/icons-svelte-runes/icons/brand-linkedin';
 
 	let copiedLaura = $state(false);
 	let copiedAndre = $state(false);

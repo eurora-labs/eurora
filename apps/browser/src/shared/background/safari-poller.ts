@@ -1,8 +1,7 @@
 import { resolveFaviconBase64 } from './favicon';
-import { sendMessageWithRetry } from './messaging';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
-import type { Frame, RequestFrame, NativeMetadata } from '../content/bindings';
+import type { Frame, NativeMetadata, Payload, RequestFrame } from '../content/bindings';
 
 declare const __DEV__: boolean;
 const host = __DEV__ ? 'com.eurora.dev' : 'com.eurora.app';
@@ -44,18 +43,16 @@ async function pollForRequests(): Promise<void> {
 		if (!('Response' in kind)) return;
 
 		const respFrame = (kind as Record<string, unknown>)['Response'] as {
-			payload?: string;
+			payload?: Payload | null;
 		};
-		if (!respFrame.payload) return;
+		// The inline payload is the bridge's `Payload` (TypeScript `unknown`)
+		// — already decoded by the outer-frame parse. The Safari poll
+		// contract is a list of pending `Request` frames; reject anything
+		// else as a shape mismatch.
+		if (!Array.isArray(respFrame.payload)) return;
+		const requests: unknown[] = respFrame.payload;
 
-		let requests: unknown[];
-		try {
-			requests = JSON.parse(respFrame.payload) as unknown[];
-		} catch {
-			return;
-		}
-
-		if (!Array.isArray(requests) || requests.length === 0) return;
+		if (requests.length === 0) return;
 
 		for (const request of requests) {
 			await handlePendingRequest(request);
@@ -78,22 +75,16 @@ async function handlePendingRequest(request: unknown): Promise<void> {
 		case 'GET_METADATA':
 			await handleGetMetadata(reqFrame);
 			break;
-		case 'GET_ASSETS':
-			await handleGetContentData(reqFrame, 'GENERATE_ASSETS');
-			break;
-		case 'GET_SNAPSHOT':
-			await handleGetContentData(reqFrame, 'GENERATE_SNAPSHOT');
-			break;
 		default: {
 			const resp: Frame = {
 				kind: {
 					Response: {
 						id: reqFrame.id,
 						action: reqFrame.action,
-						payload: JSON.stringify({
+						payload: {
 							kind: 'Error',
 							data: `Unknown action: ${reqFrame.action}`,
-						}),
+						} as Payload,
 					},
 				},
 			};
@@ -107,46 +98,16 @@ async function handlePendingRequest(request: unknown): Promise<void> {
 	}
 }
 
-async function handleGetContentData(reqFrame: RequestFrame, messageType: string): Promise<void> {
-	try {
-		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-
-		if (!activeTab || !activeTab.id) {
-			await sendErrorResponse(reqFrame, 'No active tab found');
-			return;
-		}
-
-		const contentResponse = await sendMessageWithRetry(activeTab.id, { type: messageType });
-
-		const resp: Frame = {
-			kind: {
-				Response: {
-					id: reqFrame.id,
-					action: reqFrame.action,
-					payload: JSON.stringify(contentResponse),
-				},
-			},
-		};
-		await browser.runtime.sendNativeMessage(host, resp);
-	} catch (error) {
-		try {
-			await sendErrorResponse(reqFrame, `Failed to get ${messageType}: ${error}`);
-		} catch {
-			/* ignore */
-		}
-	}
-}
-
 async function sendErrorResponse(reqFrame: RequestFrame, message: string): Promise<void> {
 	const resp: Frame = {
 		kind: {
 			Response: {
 				id: reqFrame.id,
 				action: reqFrame.action,
-				payload: JSON.stringify({
+				payload: {
 					kind: 'Error',
 					data: message,
-				}),
+				} as Payload,
 			},
 		},
 	};
@@ -157,7 +118,7 @@ async function handleGetMetadata(reqFrame: RequestFrame): Promise<void> {
 	try {
 		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
 
-		if (!activeTab || !activeTab.id) {
+		if (!activeTab || activeTab.id === undefined) {
 			await sendErrorResponse(reqFrame, 'No active tab found');
 			return;
 		}
@@ -169,14 +130,15 @@ async function handleGetMetadata(reqFrame: RequestFrame): Promise<void> {
 				Response: {
 					id: reqFrame.id,
 					action: reqFrame.action,
-					payload: JSON.stringify({
+					payload: {
 						kind: 'NativeMetadata',
 						data: {
-							url: activeTab.url,
+							tab_id: activeTab.id,
+							url: activeTab.url ?? null,
 							icon_base64: iconBase64,
 							title: activeTab.title ?? null,
 						} as NativeMetadata,
-					}),
+					} as Payload,
 				},
 			},
 		};

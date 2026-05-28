@@ -20,10 +20,10 @@ describe('frame constructors', () => {
 		});
 	});
 
-	it('builds a Response frame with a string payload', () => {
-		const frame = responseFrame(7, 'GET_ASSETS', '"hello"');
+	it('builds a Response frame with an inline JSON payload', () => {
+		const frame = responseFrame(7, 'GET_ASSETS', { hello: 'world' });
 		expect(frame).toEqual({
-			kind: { Response: { id: 7, action: 'GET_ASSETS', payload: '"hello"' } },
+			kind: { Response: { id: 7, action: 'GET_ASSETS', payload: { hello: 'world' } } },
 		});
 	});
 

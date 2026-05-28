@@ -1,9 +1,9 @@
 <script lang="ts">
 	import DownloadButton from '$lib/components/marketing/DownloadButton.svelte';
 	import { Button } from '@eurora/ui/components/button/index';
-	import Chromium from '@lucide/svelte/icons/chromium';
 	import Globe from '@lucide/svelte/icons/globe';
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
+	import Chromium from '@tabler/icons-svelte-runes/icons/brand-chrome';
 
 	const FIREFOX_EXTENSION_URL = 'https://addons.mozilla.org/en-US/firefox/addon/eurora';
 	const CHROME_EXTENSION_URL =

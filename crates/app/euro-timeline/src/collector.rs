@@ -6,7 +6,9 @@ use crate::{
 };
 use chrono::{DateTime, Utc};
 use euro_activity::strategies::{ActivityReport, StrategySupport};
-use euro_activity::{Activity, ContextChip, NoStrategy, strategies::ActivityStrategyFunctionality};
+use euro_activity::{
+    ActivitySession, ContextChip, NoStrategy, strategies::ActivityStrategyFunctionality,
+};
 use focus_tracker::{
     FocusTracker, FocusTrackerConfig, FocusedWindow, IconConfig, IgnoreRule, WindowTitleMatch,
 };
@@ -18,19 +20,13 @@ use std::time::Duration;
 use tokio::{
     sync::{Mutex, RwLock, Semaphore, broadcast, mpsc},
     task::JoinHandle,
-    time::Instant,
 };
 use uuid::Uuid;
-
-/// How often the collector PATCHes `ended_at` for the live activity so
-/// that an unexpected shutdown leaves a bounded end time on the server
-/// instead of a row that stays open forever.
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Upper bound on concurrent in-flight HTTP syncs spawned by the
 /// collector. Prevents a flaky network from piling up unbounded tokio
 /// tasks (each one holds an `Arc<ActivityStorage>` clone plus the
-/// activity payload).
+/// session payload).
 const MAX_IN_FLIGHT_SYNCS: usize = 8;
 
 /// How long [`CollectorService::flush_current_end`] waits for the final
@@ -45,11 +41,6 @@ pub struct CollectorService {
     current_task: Option<JoinHandle<()>>,
     focus_thread_handle: Option<JoinHandle<()>>,
     focus_shutdown_signal: Option<Arc<AtomicBool>>,
-    /// Heartbeat handle for the currently-live activity. Replaced on
-    /// every `NewActivity` and aborted on `Stopping` / shutdown. Held
-    /// behind a mutex so the report-drain task and `flush_current_end`
-    /// can rotate it without racing.
-    heartbeat: Arc<Mutex<Option<JoinHandle<()>>>>,
     activity_event_tx: broadcast::Sender<ActivityEvent>,
     assets_event_tx: broadcast::Sender<Vec<ContextChip>>,
     saved_activity_event_tx: broadcast::Sender<SavedActivityEvent>,
@@ -87,7 +78,6 @@ impl CollectorService {
             current_task: None,
             focus_thread_handle: None,
             focus_shutdown_signal: None,
-            heartbeat: Arc::new(Mutex::new(None)),
             activity_event_tx,
             assets_event_tx,
             saved_activity_event_tx,
@@ -131,60 +121,39 @@ impl CollectorService {
         self.saved_activity_ended_event_tx.subscribe()
     }
 
-    pub async fn refresh_current_activity(&self) -> TimelineResult<()> {
-        let mut strategy = self.strategy.write().await;
-        let assets = strategy
-            .retrieve_assets()
-            .await
-            .map_err(|e| TimelineError::Storage(e.to_string()))?;
-        let snapshots = strategy
-            .retrieve_snapshots()
-            .await
-            .map_err(|e| TimelineError::Storage(e.to_string()))?;
-
-        let mut storage = self.storage.lock().await;
-        if let Some(activity) = storage.get_all_activities_mut().back_mut() {
-            if !assets.is_empty() {
-                activity.assets.clear();
-                activity.assets.extend(assets);
-            }
-            if !snapshots.is_empty() {
-                activity.snapshots.clear();
-                activity.snapshots.extend(snapshots);
-            }
-        }
-
-        Ok(())
+    /// Handle to the currently active strategy. Cloned `Arc` shares the
+    /// same lock the collector swaps on focus changes, so consumers (the
+    /// chat tool backend) always see the freshest strategy.
+    pub fn active_strategy(&self) -> Arc<RwLock<ActivityStrategy>> {
+        Arc::clone(&self.strategy)
     }
 
-    /// Stop the heartbeat and PATCH the current activity's real
-    /// `ended_at` (best-effort, bounded by [`SHUTDOWN_FLUSH_TIMEOUT`]).
-    /// Called by [`crate::TimelineManager::stop`] so a clean shutdown
-    /// overrides the last heartbeat value with the precise end timestamp.
+    /// PATCH the current session's real `ended_at` (best-effort, bounded
+    /// by [`SHUTDOWN_FLUSH_TIMEOUT`]). Called by
+    /// [`crate::TimelineManager::stop`] so a clean shutdown closes the
+    /// live row in the cloud before the process exits.
     pub async fn flush_current_end(&self) {
-        abort_heartbeat(&self.heartbeat).await;
-
-        let (id, ended_at) = {
+        let (session_id, ended_at) = {
             let mut storage = self.storage.lock().await;
-            let Some(activity) = storage.get_all_activities_mut().back_mut() else {
+            let Some(session) = storage.get_all_sessions_mut().back_mut() else {
                 return;
             };
-            if activity.end.is_none() {
-                activity.end_activity();
+            if session.ended_at.is_none() {
+                session.end_session();
             }
-            let Some(ended_at) = activity.end else {
+            let Some(ended_at) = session.ended_at else {
                 return;
             };
-            (activity.id, ended_at)
+            (session.id, ended_at)
         };
 
         let storage = Arc::clone(&self.activity_storage);
         let patch = async move {
-            if let Err(err) = storage.update_activity_end(id, ended_at).await {
+            if let Err(err) = storage.update_session_end(session_id, ended_at).await {
                 tracing::warn!(
-                    activity_id = %id,
+                    session_id = %session_id,
                     error = %err,
-                    "Final activity end PATCH failed during shutdown",
+                    "Final session end PATCH failed during shutdown",
                 );
             }
         };
@@ -192,7 +161,7 @@ impl CollectorService {
             .await
             .is_err()
         {
-            tracing::warn!(activity_id = %id, "Final activity end PATCH timed out during shutdown");
+            tracing::warn!(session_id = %session_id, "Final session end PATCH timed out during shutdown");
         }
     }
 
@@ -206,63 +175,64 @@ impl CollectorService {
         let storage_for_reports = Arc::clone(&self.storage);
         let activity_storage = Arc::clone(&self.activity_storage);
         let sync_permits = Arc::clone(&self.sync_permits);
-        let heartbeat = Arc::clone(&self.heartbeat);
         let assets_event_tx_for_reports = assets_event_tx.clone();
         let saved_activity_event_tx_for_reports = self.saved_activity_event_tx.clone();
         let saved_activity_ended_event_tx_for_reports = self.saved_activity_ended_event_tx.clone();
         self.current_task = Some(tokio::spawn(async move {
             let activity_event_tx_inner = activity_event_tx.clone();
-            let mut last_activity_name: Option<String> = None;
+            // Dedupe key for back-to-back identical reports — same
+            // intent as the old `last_activity_name` guard, but keyed
+            // on the canonical `identity_key` so different URLs on the
+            // same domain (or different windows of the same process)
+            // don't open spurious new sessions.
+            let mut last_identity_key: Option<String> = None;
             while let Some(report) = activity_rx.recv().await {
                 match report {
-                    ActivityReport::NewActivity(activity) => {
-                        let is_duplicate = last_activity_name
+                    ActivityReport::NewActivity(session) => {
+                        let identity_key = session.activity.key.clone();
+                        let is_duplicate = last_identity_key
                             .as_ref()
-                            .is_some_and(|prev| prev == &activity.name);
+                            .is_some_and(|prev| prev == &identity_key);
 
                         if is_duplicate {
                             tracing::debug!(
                                 "Suppressing duplicate activity report: {}",
-                                activity.name
+                                identity_key
                             );
                             continue;
                         }
 
-                        tracing::debug!("Received new activity report: {}", activity.name);
-                        last_activity_name = Some(activity.name.clone());
+                        tracing::debug!("Received new activity report: {}", identity_key);
+                        last_identity_key = Some(identity_key);
 
-                        // End the previous activity locally and capture
-                        // its (id, ended_at) for the closing PATCH.
-                        // Then push the new one into storage.
+                        // Close the previous session locally and snapshot
+                        // its (id, ended_at) for the closing PATCH. Then
+                        // push the new one into storage.
                         let previous_end = {
                             let mut storage = storage_for_reports.lock().await;
-                            let prev =
-                                storage
-                                    .get_all_activities_mut()
-                                    .back_mut()
-                                    .and_then(|prev| {
-                                        if prev.end.is_none() {
-                                            prev.end_activity();
-                                        }
-                                        prev.end.map(|ended_at| (prev.id, ended_at))
-                                    });
-                            storage.add_activity(activity.clone());
+                            let prev = storage.get_all_sessions_mut().back_mut().and_then(|prev| {
+                                if prev.ended_at.is_none() {
+                                    prev.end_session();
+                                }
+                                prev.ended_at.map(|ended_at| (prev.id, ended_at))
+                            });
+                            storage.add_session(session.clone());
                             prev
                         };
 
-                        let context_chip = activity.get_context_chip();
+                        let context_chip = session.get_context_chip();
                         let _ = assets_event_tx_for_reports.send(vec![context_chip]);
 
                         let focus_event = ActivityEvent {
-                            name: activity.name.clone(),
-                            process_name: activity.process_name.clone(),
-                            process_id: activity.process_id,
-                            icon: activity.icon.clone(),
+                            name: session.activity.display_name.clone(),
+                            process_name: session.process_name.clone(),
+                            process_id: session.process_id,
+                            icon: session.icon.clone(),
                         };
                         let _ = activity_event_tx_inner.send(focus_event);
 
                         if let Some((prev_id, prev_ended_at)) = previous_end {
-                            spawn_patch_end(
+                            spawn_session_patch_end(
                                 &activity_storage,
                                 &sync_permits,
                                 &saved_activity_ended_event_tx_for_reports,
@@ -271,54 +241,52 @@ impl CollectorService {
                             );
                         }
 
-                        // The initial POST sends `id` and
-                        // `ended_at = now()` so a crash before the
-                        // first heartbeat still leaves a bounded row.
-                        let new_id = activity.id;
-                        spawn_insert(
+                        spawn_session_insert(
                             &activity_storage,
                             &sync_permits,
                             &saved_activity_event_tx_for_reports,
-                            activity,
+                            session,
                         );
-
-                        restart_heartbeat(&heartbeat, &activity_storage, &sync_permits, new_id)
-                            .await;
                     }
                     ActivityReport::TitleUpdated { title, url } => {
                         tracing::debug!("Received title update: {} ({})", title, url);
-                        last_activity_name = Some(url.to_string());
+                        // Track-by-domain dedupe key — same parent, so
+                        // the next NewActivity from elsewhere can still
+                        // dedupe correctly.
                         let updated = {
                             let mut storage = storage_for_reports.lock().await;
-                            storage.get_all_activities_mut().back_mut().map(|activity| {
-                                activity.title = Some(title.clone());
-                                activity.set_url(url);
-                                let chip = activity.get_context_chip();
-                                (activity.id, chip)
+                            storage.get_all_sessions_mut().back_mut().map(|session| {
+                                session.window_title = Some(title.clone());
+                                session.set_url(url.clone());
+                                let chip = session.get_context_chip();
+                                (session.id, chip)
                             })
                         };
-                        if let Some((id, chip)) = updated {
+                        if let Some((session_id, chip)) = updated {
                             let _ = assets_event_tx_for_reports.send(vec![chip]);
-                            spawn_patch_title(&activity_storage, &sync_permits, id, title);
+                            spawn_session_patch_title(
+                                &activity_storage,
+                                &sync_permits,
+                                session_id,
+                                title,
+                                Some(url.to_string()),
+                            );
                         }
                     }
                     ActivityReport::Stopping => {
                         tracing::debug!("Strategy reported stopping");
-                        abort_heartbeat(&heartbeat).await;
+                        last_identity_key = None;
                         let ending = {
                             let mut storage = storage_for_reports.lock().await;
-                            storage
-                                .get_all_activities_mut()
-                                .back_mut()
-                                .and_then(|prev| {
-                                    if prev.end.is_none() {
-                                        prev.end_activity();
-                                    }
-                                    prev.end.map(|ended_at| (prev.id, ended_at))
-                                })
+                            storage.get_all_sessions_mut().back_mut().and_then(|prev| {
+                                if prev.ended_at.is_none() {
+                                    prev.end_session();
+                                }
+                                prev.ended_at.map(|ended_at| (prev.id, ended_at))
+                            })
                         };
                         if let Some((id, ended_at)) = ending {
-                            spawn_patch_end(
+                            spawn_session_patch_end(
                                 &activity_storage,
                                 &sync_permits,
                                 &saved_activity_ended_event_tx_for_reports,
@@ -447,91 +415,72 @@ impl Drop for CollectorService {
         if let Some(thread_handle) = self.focus_thread_handle.take() {
             thread_handle.abort();
         }
-
-        // Best-effort heartbeat abort. We cannot await the mutex from
-        // a sync Drop, so fall back to `try_lock`; if it's contended,
-        // the runtime will collect the orphan when the task itself
-        // attempts its next HTTP call.
-        if let Ok(mut guard) = self.heartbeat.try_lock()
-            && let Some(handle) = guard.take()
-        {
-            handle.abort();
-        }
     }
 }
 
-/// Spawn a bounded-concurrency tokio task that POSTs the activity.
-/// Failures log-and-drop; the collector loop must never block on the
-/// network. Offline resilience is intentionally out of scope here.
+/// Spawn a bounded-concurrency tokio task that POSTs the session.
 ///
 /// On a successful insert the task fires [`SavedActivityEvent`] on
-/// `saved_tx` so subscribers (the desktop tauri layer in particular)
-/// can surface the freshly-persisted row in the timeline rail without
-/// re-polling `GET /activities`. The send is best-effort: a closed
-/// channel (no listeners) is normal during boot and not an error.
-fn spawn_insert(
+/// `saved_tx` carrying both the (possibly upserted) parent and the new
+/// session, so subscribers can update the timeline rail atomically.
+/// Failures log-and-drop; the collector loop must never block on the
+/// network.
+fn spawn_session_insert(
     storage: &Arc<ActivityStorage>,
     permits: &Arc<Semaphore>,
     saved_tx: &broadcast::Sender<SavedActivityEvent>,
-    activity: Activity,
+    session: ActivitySession,
 ) {
     let storage = Arc::clone(storage);
     let permits = Arc::clone(permits);
     let saved_tx = saved_tx.clone();
-    let id = activity.id;
-    let name = activity.name.clone();
+    let session_id = session.id;
+    let identity_key = session.activity.key.clone();
     tokio::spawn(async move {
         let _permit = match permits.try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
                 tracing::warn!(
-                    activity_id = %id,
-                    name = %name,
-                    "Dropping activity insert: in-flight sync cap reached",
+                    session_id = %session_id,
+                    identity_key = %identity_key,
+                    "Dropping session insert: in-flight sync cap reached",
                 );
                 return;
             }
         };
-        match storage.save_activity_to_service(&activity).await {
-            Ok(_) => {
+        match storage.save_session_to_service(&session).await {
+            Ok(response) => {
                 let event = SavedActivityEvent {
-                    id: activity.id,
-                    name: activity.name.clone(),
-                    process_name: activity.process_name.clone(),
-                    window_title: activity.window_title(),
-                    started_at: activity.start,
-                    ended_at: activity.end,
-                    icon: activity.icon.clone(),
+                    activity: response.activity,
+                    session: response.session,
+                    icon: session.icon.clone(),
                 };
                 let _ = saved_tx.send(event);
             }
             Err(err) => {
                 tracing::warn!(
-                    activity_id = %id,
-                    name = %name,
+                    session_id = %session_id,
+                    identity_key = %identity_key,
                     error = %err,
-                    "Activity insert failed",
+                    "Session insert failed",
                 );
             }
         }
     });
 }
 
-/// PATCH the closing `ended_at` for `id` and, on success, fan out a
-/// [`SavedActivityEndedEvent`] so subscribers (the desktop tauri layer in
-/// particular) can patch the row's `endedAt` in place. Without that
-/// event the frontend keeps `endedAt: null` for every row it received
-/// via [`SavedActivityEvent`] and the timeline rail collapses them all
-/// to the minimum connector height until the next page reload.
+/// PATCH the closing `ended_at` for a session and, on success, fan out
+/// a [`SavedActivityEndedEvent`] so subscribers can flip the rail's
+/// live indicator off in place.
 ///
 /// The broadcast is fire-and-forget: a closed channel (no listeners) is
 /// normal during boot and a `Lagged` consumer is handled on the receive
 /// side, so we don't propagate either back up to the patch task.
-fn spawn_patch_end(
+fn spawn_session_patch_end(
     storage: &Arc<ActivityStorage>,
     permits: &Arc<Semaphore>,
     ended_tx: &broadcast::Sender<SavedActivityEndedEvent>,
-    id: Uuid,
+    session_id: Uuid,
     ended_at: DateTime<Utc>,
 ) {
     let storage = Arc::clone(storage);
@@ -541,26 +490,38 @@ fn spawn_patch_end(
         let _permit = match permits.try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
-                tracing::warn!(activity_id = %id, "Dropping end PATCH: in-flight sync cap reached");
+                tracing::warn!(
+                    session_id = %session_id,
+                    "Dropping end PATCH: in-flight sync cap reached",
+                );
                 return;
             }
         };
-        match storage.update_activity_end(id, ended_at).await {
-            Ok(_) => {
-                let _ = ended_tx.send(SavedActivityEndedEvent { id, ended_at });
+        match storage.update_session_end(session_id, ended_at).await {
+            Ok(response) => {
+                let _ = ended_tx.send(SavedActivityEndedEvent {
+                    activity_id: response.session.activity_id,
+                    session_id,
+                    ended_at,
+                });
             }
             Err(err) => {
-                tracing::warn!(activity_id = %id, error = %err, "Activity end PATCH failed");
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %err,
+                    "Session end PATCH failed",
+                );
             }
         }
     });
 }
 
-fn spawn_patch_title(
+fn spawn_session_patch_title(
     storage: &Arc<ActivityStorage>,
     permits: &Arc<Semaphore>,
-    id: Uuid,
+    session_id: Uuid,
     title: String,
+    url: Option<String>,
 ) {
     let storage = Arc::clone(storage);
     let permits = Arc::clone(permits);
@@ -568,71 +529,19 @@ fn spawn_patch_title(
         let _permit = match permits.try_acquire_owned() {
             Ok(p) => p,
             Err(_) => {
-                tracing::warn!(activity_id = %id, "Dropping title PATCH: in-flight sync cap reached");
+                tracing::warn!(
+                    session_id = %session_id,
+                    "Dropping title PATCH: in-flight sync cap reached",
+                );
                 return;
             }
         };
-        if let Err(err) = storage.update_activity_title(id, title).await {
-            tracing::warn!(activity_id = %id, error = %err, "Activity title PATCH failed");
+        if let Err(err) = storage.update_session_title(session_id, title, url).await {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %err,
+                "Session title PATCH failed",
+            );
         }
     });
-}
-
-/// Replace the active heartbeat task with one bound to `activity_id`.
-///
-/// The first tick fires [`HEARTBEAT_INTERVAL`] after the call (not
-/// immediately) so the initial POST has time to land — otherwise the
-/// heartbeat would 404 on a freshly-created row.
-async fn restart_heartbeat(
-    heartbeat: &Arc<Mutex<Option<JoinHandle<()>>>>,
-    storage: &Arc<ActivityStorage>,
-    permits: &Arc<Semaphore>,
-    activity_id: Uuid,
-) {
-    let mut guard = heartbeat.lock().await;
-    if let Some(prev) = guard.take() {
-        prev.abort();
-    }
-
-    let storage = Arc::clone(storage);
-    let permits = Arc::clone(permits);
-    let handle = tokio::spawn(async move {
-        let mut ticker =
-            tokio::time::interval_at(Instant::now() + HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL);
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        loop {
-            ticker.tick().await;
-
-            let permit = match permits.clone().try_acquire_owned() {
-                Ok(p) => p,
-                Err(_) => {
-                    tracing::debug!(
-                        activity_id = %activity_id,
-                        "Skipping heartbeat: in-flight sync cap reached",
-                    );
-                    continue;
-                }
-            };
-
-            let now = Utc::now();
-            if let Err(err) = storage.update_activity_end(activity_id, now).await {
-                tracing::debug!(
-                    activity_id = %activity_id,
-                    error = %err,
-                    "Heartbeat PATCH failed",
-                );
-            }
-            drop(permit);
-        }
-    });
-
-    *guard = Some(handle);
-}
-
-async fn abort_heartbeat(heartbeat: &Arc<Mutex<Option<JoinHandle<()>>>>) {
-    let mut guard = heartbeat.lock().await;
-    if let Some(handle) = guard.take() {
-        handle.abort();
-    }
 }

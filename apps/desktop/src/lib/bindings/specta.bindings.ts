@@ -15,14 +15,14 @@ export const commands = {
 	authRefreshSession: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_refresh_session")),
 	authResendVerificationEmail: () => typedError<null, AuthError>(__TAURI_INVOKE("auth_resend_verification_email")),
 	/**
-	 *  Fetch the most-recent persisted activities and decorate each with the
-	 *  presentation data the timeline rail needs (accent colour + a
-	 *  `data:`-URL icon).
+	 *  Fetch the most-recent persisted activities and decorate each with
+	 *  the presentation data the timeline rail needs (accent colour +
+	 *  `data:`-URL icon + embedded live session).
 	 * 
 	 *  Per-row icon fetches fan out concurrently via `join_all`; reqwest's
-	 *  HTTP/2 pool multiplexes them over a single connection. Failures on a
-	 *  single icon log + degrade to `(accent: None, icon_base64: None)` so
-	 *  one bad asset can't block the rest of the page from rendering.
+	 *  HTTP/2 pool multiplexes them over a single connection. Failures on
+	 *  a single icon log + degrade to `(accent: None, icon_base64: None)`
+	 *  so one bad asset can't block the rest of the page from rendering.
 	 */
 	activityList: (limit: number, offset: number) => typedError<SavedActivity[], SavedActivityError>(__TAURI_INVOKE("activity_list", { limit, offset })),
 	chatCollectContext: (threadId: string) => typedError<ChatContext, StreamError>(__TAURI_INVOKE("chat_collect_context", { threadId })),
@@ -138,8 +138,8 @@ export const events = {
 	authStateChanged: makeEvent<AuthStateChanged>("auth-state-changed"),
 	browserExtensionStatusChanged: makeEvent<BrowserExtensionStatusChanged>("browser-extension-status-changed"),
 	consentGate: makeEvent<ConsentGate>("consent-gate"),
-	savedActivityCreated: makeEvent<SavedActivityCreated>("saved-activity-created"),
-	savedActivityEnded: makeEvent<SavedActivityEnded>("saved-activity-ended"),
+	savedActivityLiveSessionEnded: makeEvent<SavedActivityLiveSessionEnded>("saved-activity-live-session-ended"),
+	savedActivityUpserted: makeEvent<SavedActivityUpserted>("saved-activity-upserted"),
 	timelineAppEvent: makeEvent<TimelineAppEvent>("timeline-app-event"),
 	timelineAssetsEvent: makeEvent<TimelineAssetsEvent>("timeline-assets-event"),
 };
@@ -305,15 +305,15 @@ export type BrowserExtensionStatusChanged = {
 };
 
 /**
- *  Per-turn host context returned by `chat_collect_context`.
+ *  Per-turn host metadata returned by `chat_collect_context`.
  * 
- *  `content_blocks` are inlined directly — large payloads are rewritten
- *  into asset references server-side at chat-turn time, so the wire
- *  format here can carry raw bytes/text without the client having to
- *  round-trip them.
+ *  Only the UI-facing chip set lives here. The LLM-facing prelude that
+ *  describes the user's current activity is delivered separately, via
+ *  the `system_blocks` field on `CapabilityUpdatePayload`, and is
+ *  pulled by the chat bridge from the [`thread_core::ToolBackend`] at
+ *  turn start — no round trip through the UI is required for that.
  */
 export type ChatContext = {
-	contentBlocks: ContentBlock[],
 	assetChips: ContextChip[],
 };
 
@@ -349,7 +349,14 @@ export type ChatSendRequest = {
  * 
  *  Clients should accumulate `Chunk` payloads (using agent-chain's chunk-merge
  *  semantics) and replace placeholder state with the `Final.messages` payload
- *  when the turn ends.
+ *  when the turn ends. The tool-routing pair `ToolRequest` + `ToolCancel`
+ *  drives remote-tool RPC over the same socket.
+ * 
+ *  `TitleUpdated` is non-terminal: the server emits it once per turn (right
+ *  before the terminal frame, or right before the socket closes on cancel)
+ *  when the thread's auto-generated title changes. Clients should mutate
+ *  their thread state in place rather than expecting it bundled with
+ *  `Final` — cancelled turns also carry a title but emit no `Final`.
  */
 export type ChatServerMessage = 
 /**  The user's message has been persisted; clients should display it. */
@@ -357,12 +364,30 @@ export type ChatServerMessage =
 /**  One streaming chunk from the AI. */
 { type: "chunk"; chunk: AIMessageChunk } | 
 /**
+ *  The thread's auto-generated title was updated this turn. Non-terminal;
+ *  clients update the thread row in place. Emitted at most once per turn,
+ *  always before any terminal frame.
+ */
+{ type: "title_updated"; title: string } | 
+/**
  *  The turn ended successfully; tree positions for everything that was
  *  persisted during this turn (human + AI + any tool messages).
  */
 { type: "final"; messages: MessageNode[] } | 
 /**  The turn aborted with an error. The connection is closed after this. */
-{ type: "error"; kind: string; message: string };
+{ type: "error"; kind: string; message: string } | 
+/**
+ *  Request the client to execute a tool on its side and return the
+ *  result via [`ChatClientMessage::ToolResponse`] correlated by
+ *  `call_id`.
+ */
+{ type: "tool_request"; call_id: number; descriptor: WireToolDescriptor; arguments: unknown } | 
+/**
+ *  Abort an in-flight `ToolRequest`. Sent when the user cancels the
+ *  turn or the server's tool budget is exhausted before the client's
+ *  response arrives.
+ */
+{ type: "tool_cancel"; call_id: number };
 
 export type ChunkPosition = "last";
 
@@ -678,20 +703,26 @@ export type Roles = {
 };
 
 /**
- *  Frontend-facing view of one persisted activity.
+ *  Frontend-facing view of one persisted parent activity, with its
+ *  most recent session embedded inline.
  * 
  *  `accent` and `icon_base64` are populated by the desktop tauri layer
  *  (decoded from the asset's PNG bytes); both are `None` whenever the
  *  activity has no icon or the icon fetch failed — treat them as
  *  presentation hints, never as load-bearing fields.
+ * 
+ *  `live_session` carries the most recent session and is the only
+ *  signal the rail uses to render "live now": when
+ *  `live_session.ended_at` is `None` the activity is currently in use.
+ *  The desktop emits an [`SavedActivityLiveSessionEnded`] event when
+ *  the active session closes, so the rail can flip the indicator
+ *  without re-fetching.
  */
 export type SavedActivity = {
 	id: string,
-	name: string,
-	processName: string,
-	windowTitle: string,
-	startedAt: string,
-	endedAt: string | null,
+	identityKey: string,
+	displayName: string,
+	lastUsedAt: string,
 	accent: AccentColor | null,
 	/**
 	 *  `data:<mime>;base64,...` URL suitable for direct embedding in
@@ -699,29 +730,7 @@ export type SavedActivity = {
 	 *  mime out-of-band, which it currently does not.
 	 */
 	iconBase64: string | null,
-};
-
-/**
- *  Push event fired after the cloud `POST /activities` succeeds for a
- *  freshly-tracked activity. Lets the desktop frontend prepend the new
- *  row to the timeline rail without re-polling `GET /activities`.
- */
-export type SavedActivityCreated = SavedActivity;
-
-/**
- *  Push event fired after the cloud closing PATCH of `ended_at` succeeds
- *  for a previously-tracked activity. Lets the desktop frontend update
- *  the matching row's `endedAt` in place — without it the row keeps the
- *  `null` it was created with and the timeline rail's duration-based
- *  connector height stays clamped to the minimum until the next reload.
- * 
- *  Payload is intentionally minimal: the frontend already has the rest
- *  of the row in memory, so only the id and the now-known end timestamp
- *  are shipped over the wire.
- */
-export type SavedActivityEnded = {
-	id: string,
-	endedAt: string,
+	liveSession: SavedActivitySession | null,
 };
 
 /**
@@ -734,6 +743,47 @@ export type SavedActivityEnded = {
  *  the whole call.
  */
 export type SavedActivityError = { type: "StateUnavailable"; data: string } | { type: "Network"; data: string };
+
+/**
+ *  Push event fired after the cloud closing PATCH of `ended_at`
+ *  succeeds for the live session of a parent activity.
+ * 
+ *  Payload is intentionally minimal: the frontend already has the
+ *  parent row in memory, so only the parent id, the session id, and
+ *  the now-known end timestamp are shipped over the wire.
+ */
+export type SavedActivityLiveSessionEnded = {
+	activityId: string,
+	sessionId: string,
+	endedAt: string,
+};
+
+/**
+ *  Frontend-facing view of one persisted activity session.
+ * 
+ *  A subset of `activity_core::ActivitySession` — the rail only needs
+ *  the bits that drive the live indicator and per-tab labelling, not
+ *  the full audit columns (`created_at` / `updated_at` are server
+ *  bookkeeping and never surface).
+ */
+export type SavedActivitySession = {
+	id: string,
+	activityId: string,
+	startedAt: string,
+	endedAt: string | null,
+	windowTitle: string | null,
+	url: string | null,
+};
+
+/**
+ *  Push event fired after the cloud `POST /activity-sessions` succeeds.
+ * 
+ *  Carries the (possibly upserted) parent activity *and* the new
+ *  session it created, so the desktop frontend can prepend the row to
+ *  the timeline rail with the right "live" indicator without re-polling
+ *  `GET /activities`.
+ */
+export type SavedActivityUpserted = SavedActivity;
 
 /**  One message hit returned by full-text search. */
 export type SearchMessageResult = {
@@ -1040,6 +1090,12 @@ export type ToolCallChunkBlock = {
 	extras?: { [key in string]: unknown } | null,
 };
 
+export type ToolDefinition = {
+	name: string,
+	description: string,
+	parameters: unknown,
+};
+
 export type ToolMessage = {
 	content: ContentBlocks,
 	tool_call_id: string,
@@ -1050,6 +1106,29 @@ export type ToolMessage = {
 	additional_kwargs?: { [key in string]: unknown },
 	response_metadata?: { [key in string]: unknown },
 };
+
+/**
+ *  Where a tool runs. The server uses this to dispatch each call:
+ *  `ServerLocal` tools execute in-process on the backend; everything else
+ *  is routed back to the client over the chat WebSocket as a `ToolRequest`,
+ *  and from there the client picks the right destination (bridge, native
+ *  app, ACP session).
+ * 
+ *  `#[non_exhaustive]` so adding new sources later is non-breaking for
+ *  downstream consumers that `match` on the enum.
+ */
+export type ToolSource = 
+/**
+ *  Routed via `euro-bridge` to a registered app of `app_kind` (in v1,
+ *  `"browser"`).
+ */
+{ kind: "bridge"; app_kind: string } | 
+/**  Runs in-process on the client (native Tauri tools). */
+{ kind: "client_local" } | 
+/**  Runs in-process on the backend (Firecrawl, describe-image). */
+{ kind: "server_local" } | 
+/**  Piped through an ACP session. */
+{ kind: "acp" };
 
 export type ToolStatus = "success" | "error";
 
@@ -1075,6 +1154,49 @@ export type VideoContentBlock = {
 	base64?: string | null,
 	extras?: { [key in string]: unknown } | null,
 };
+
+/**
+ *  Wire-side descriptor for a tool. One per call, one per entry in the
+ *  per-turn `CapabilityUpdate.tools` list.
+ * 
+ *  `WireToolDescriptor` is a [`ToolDefinition`] (name, description,
+ *  parameters schema) plus dispatch metadata (timeout, source, required
+ *  contexts, approval flag) and the tool's output schema. The framework
+ *  form (`eurora_tools::ToolDescriptor`) is the in-process
+ *  `&'static`-everywhere shape; this is its serializable counterpart, owned
+ *  and ready for transport. The server only ever sees this form.
+ * 
+ *  The `definition` field is flattened on the wire so the JSON shape stays
+ *  flat (`{"name": ..., "description": ..., "parameters": ..., ...}`),
+ *  while in Rust the typed relationship `WireToolDescriptor IS-A
+ *  ToolDefinition + dispatch metadata` is explicit.
+ */
+export type WireToolDescriptor = {
+	/**  JSON Schema for the tool's success payload. */
+	output_schema: unknown,
+	/**
+	 *  Per-call timeout in milliseconds. Used by the server's bus to bound
+	 *  in-flight remote calls; the framework's `ToolDescriptor.timeout`
+	 *  converts to/from this field. `u32` ms (~49 days) is bounded well
+	 *  above any sensible per-tool budget and keeps the wire shape inside
+	 *  JS's safe integer range.
+	 */
+	timeout_ms: number,
+	/**  Where the tool runs. The server uses this to pick a dispatch path. */
+	source: ToolSource,
+	/**
+	 *  Context keys whose presence is required for this tool to be
+	 *  surfaced to the LLM in a given turn (e.g.
+	 *  `["youtube::watch_page"]`).
+	 */
+	required_contexts?: string[],
+	/**
+	 *  If true, the server must obtain explicit user approval before
+	 *  dispatching the call. Not enforced in v1 (all v1 tools are
+	 *  read-only) but declared so the protocol is stable.
+	 */
+	requires_user_approval?: boolean,
+} & ToolDefinition;
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

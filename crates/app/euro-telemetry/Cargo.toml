@@ -24,7 +24,5 @@ tracing = { workspace = true }
 [dev-dependencies]
 serde_json = { workspace = true, features = ["std"] }
 
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

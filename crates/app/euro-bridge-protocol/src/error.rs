@@ -2,6 +2,8 @@ use std::net::SocketAddr;
 
 use thiserror::Error;
 
+use crate::Payload;
+
 /// Errors surfaced by the bridge service to its callers.
 #[derive(Debug, Error)]
 pub enum BridgeError {
@@ -21,10 +23,16 @@ pub enum BridgeError {
 
     /// The client returned an [`crate::ErrorFrame`] in response to the
     /// request.
-    #[error("client returned error: {message}")]
+    ///
+    /// `code` carries the application-level status the client populated
+    /// on the `ErrorFrame`. Conventional values follow HTTP semantics
+    /// (`400` malformed request, `410` resource gone, `500` internal),
+    /// with `0` reserved for "no code supplied".
+    #[error("client returned error {code}: {message}")]
     Client {
+        code: u32,
         message: String,
-        details: Option<String>,
+        details: Option<Payload>,
     },
 
     /// The frame could not be delivered to the client's outbound

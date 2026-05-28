@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+use euro_activity::ActivityToolBackend;
 use euro_endpoint::EndpointManager;
 use euro_settings::{CloudSettingsCache, SettingsState};
 use euro_tauri::chat_context::TimelineChatContextProvider;
@@ -10,7 +11,9 @@ use euro_tauri::{
     MAIN_WINDOW_LABEL, WindowState, build_specta, create_window,
     procedures::{
         accent::accent_from_image,
-        activity::{SavedActivity, SavedActivityCreated, SavedActivityEnded},
+        activity::{
+            SavedActivityLiveSessionEnded, SavedActivityUpserted, saved_activity_from_parts,
+        },
         system::{
             BrowserExtensionStatusChanged, SAFARI_BRIDGE_APP_KIND, resolve_browser_extension_state,
         },
@@ -29,6 +32,7 @@ use tauri::{
     tray::TrayIconBuilder,
 };
 use tauri_specta::Event;
+use thread_core::ToolBackend;
 use tokio::sync::Mutex;
 
 /// Returns `true` when the on-disk messenger binary was replaced during
@@ -363,7 +367,14 @@ fn init_state(
         .endpoint_manager(endpoint_manager.clone())
         .auth_manager(auth_manager.clone())
         .build()?;
+    // `ToolBackend` shares the same `Arc<RwLock<ActivityStrategy>>` the
+    // collector swaps on focus changes — the chat side always sees the
+    // freshest strategy without any reconnection.
+    let backend: std::sync::Arc<dyn ToolBackend> = std::sync::Arc::new(ActivityToolBackend::new(
+        timeline.collector.active_strategy(),
+    ));
     app_handle.manage(Mutex::new(timeline));
+    app_handle.manage(backend);
 
     let context_provider: SharedChatContextProvider =
         std::sync::Arc::new(TimelineChatContextProvider::new(app_handle.clone()));
@@ -474,24 +485,20 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
         )
         .await;
         forward_broadcast("timeline_saved_activity", rx, |event| {
-            tracing::debug!(activity_id = %event.id, "Saved activity emitted");
+            tracing::debug!(
+                activity_id = %event.activity.id,
+                session_id = %event.session.id,
+                "Saved activity upsert emitted"
+            );
 
             let (accent, icon_base64) = match event.icon.as_ref() {
                 Some(icon) => (accent_from_image(icon), rgba_to_base64(icon).ok()),
                 None => (None, None),
             };
 
-            let payload = SavedActivity {
-                id: event.id,
-                name: event.name,
-                process_name: event.process_name,
-                window_title: event.window_title,
-                started_at: event.started_at,
-                ended_at: event.ended_at,
-                accent,
-                icon_base64,
-            };
-            let _ = SavedActivityCreated(payload).emit(&saved_handle);
+            let payload =
+                saved_activity_from_parts(event.activity, Some(event.session), accent, icon_base64);
+            let _ = SavedActivityUpserted(payload).emit(&saved_handle);
         })
         .await;
     });
@@ -509,9 +516,14 @@ fn spawn_timeline_listeners(app_handle: tauri::AppHandle) {
         )
         .await;
         forward_broadcast("timeline_saved_activity_ended", rx, |event| {
-            tracing::debug!(activity_id = %event.id, "Saved activity end emitted");
-            let _ = SavedActivityEnded {
-                id: event.id,
+            tracing::debug!(
+                activity_id = %event.activity_id,
+                session_id = %event.session_id,
+                "Saved activity live session ended"
+            );
+            let _ = SavedActivityLiveSessionEnded {
+                activity_id: event.activity_id,
+                session_id: event.session_id,
                 ended_at: event.ended_at,
             }
             .emit(&ended_handle);
@@ -675,18 +687,19 @@ fn main() {
             let telemetry_controller = telemetry_controller.clone();
             let specta = build_specta();
 
-            // Regenerate the TypeScript bindings on every dev launch.
-            // `specta-typescript` 0.0.12 fails the export by default if any
-            // `i64`/`u64` field crosses the wire without an explicit
-            // `#[specta(type = ...)]` override, which is the strictness we
-            // want — silently bridging through `bigint` masks lossy round
-            // trips on the JS side.
+            // Regenerate the TypeScript bindings on every dev launch so
+            // editing a wire type and re-running the desktop binary is a
+            // single round-trip. The canonical generator is the
+            // workspace-level `euro-codegen` orchestrator (see
+            // `export_desktop_bindings`); this hook just runs the same
+            // function with a path resolved relative to the crate
+            // manifest because Tauri dev sets cwd to the manifest dir.
             #[cfg(debug_assertions)]
             {
                 let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../../apps/desktop/src/lib/bindings/specta.bindings.ts");
-                specta
-                    .export(specta_typescript::Typescript::default(), &bindings_path)
+                    .join("../../../")
+                    .join(euro_tauri::DESKTOP_BINDINGS_PATH);
+                euro_tauri::export_desktop_bindings(&bindings_path)
                     .expect("Failed to export tauri-specta bindings");
             }
 
@@ -856,6 +869,11 @@ fn main() {
 
                     spawn_timeline_listeners(tauri_app.handle().clone());
                     spawn_browser_status_bridge(tauri_app.handle().clone());
+
+                    // The chat-side `ToolBackend` is constructed and
+                    // managed inside `init_state`; tools are sourced
+                    // dynamically from the active activity strategy, so
+                    // there's no per-app catalog to register here.
 
                     Ok(())
                 })

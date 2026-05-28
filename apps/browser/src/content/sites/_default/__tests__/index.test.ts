@@ -1,4 +1,4 @@
-import { main } from '../index.js';
+import { formatDefaultContext, main } from '../index.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('webextension-polyfill', () => ({
@@ -10,17 +10,6 @@ vi.mock('webextension-polyfill', () => ({
 			sendMessage: vi.fn(),
 		},
 	},
-}));
-
-vi.mock('../../../../shared/content/extensions/article/util', () => ({
-	createArticleAsset: vi.fn().mockResolvedValue({
-		kind: 'NativeArticleAsset',
-		data: { url: 'test-url', title: 'test-title' },
-	}),
-	createArticleSnapshot: vi.fn().mockResolvedValue({
-		kind: 'NativeArticleSnapshot',
-		data: { screenshot: 'base64-data' },
-	}),
 }));
 
 describe('_default site handler', () => {
@@ -42,38 +31,49 @@ describe('_default site handler', () => {
 
 		expect(browser.default.runtime.onMessage.addListener).toHaveBeenCalled();
 	});
+});
 
-	it('should handle NEW message type', async () => {
-		const message = {
-			type: 'NEW',
-		};
+describe('formatDefaultContext', () => {
+	const URL = 'https://example.com/article';
 
-		expect(message.type).toBe('NEW');
+	it('reports title and url when nothing is selected', () => {
+		expect(formatDefaultContext({ title: 'Example Article', url: URL, selection: '' })).toBe(
+			`The user is on the web page "Example Article" at ${URL}.`,
+		);
 	});
 
-	it('should handle GENERATE_ASSETS message type', async () => {
-		const message = {
-			type: 'GENERATE_ASSETS',
-		};
-
-		expect(message.type).toBe('GENERATE_ASSETS');
+	it('falls back to a url-only sentence when the title is empty', () => {
+		expect(formatDefaultContext({ title: '', url: URL, selection: '' })).toBe(
+			`The user is on the web page at ${URL}.`,
+		);
 	});
 
-	it('should handle GENERATE_SNAPSHOT message type', async () => {
-		const message = {
-			type: 'GENERATE_SNAPSHOT',
-		};
-
-		expect(message.type).toBe('GENERATE_SNAPSHOT');
+	it('appends a highlight clause when there is a selection', () => {
+		expect(
+			formatDefaultContext({
+				title: 'Example Article',
+				url: URL,
+				selection: 'a notable sentence',
+			}),
+		).toBe(
+			`The user is on the web page "Example Article" at ${URL}. They have the following text highlighted: "a notable sentence".`,
+		);
 	});
 
-	it('should return error for invalid message type', () => {
-		const message = {
-			type: 'INVALID_TYPE',
-		};
+	it('appends a highlight clause to the url-only intro when the title is empty', () => {
+		expect(
+			formatDefaultContext({
+				title: '',
+				url: URL,
+				selection: 'a notable sentence',
+			}),
+		).toBe(
+			`The user is on the web page at ${URL}. They have the following text highlighted: "a notable sentence".`,
+		);
+	});
 
-		expect(message.type).not.toBe('NEW');
-		expect(message.type).not.toBe('GENERATE_ASSETS');
-		expect(message.type).not.toBe('GENERATE_SNAPSHOT');
+	it('omits the highlight clause entirely when the selection is empty', () => {
+		const out = formatDefaultContext({ title: 'T', url: URL, selection: '' });
+		expect(out).not.toContain('highlighted');
 	});
 });

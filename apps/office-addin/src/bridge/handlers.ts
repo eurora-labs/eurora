@@ -1,7 +1,7 @@
 import { errorFrame, responseFrame } from '$lib/bridge/frames';
 import * as log from '$lib/util/log';
 import { getDocumentAsset, getDocumentMetadata } from '$lib/word/extract';
-import type { Frame, RequestFrame } from '$lib/shared/bindings';
+import type { Frame, Payload, RequestFrame } from '$lib/shared/bindings';
 
 export type Action = 'GET_ASSETS' | 'GET_METADATA';
 
@@ -23,11 +23,11 @@ export async function dispatchRequest(
 		switch (req.action) {
 			case 'GET_ASSETS': {
 				const asset = await deps.getAsset();
-				return responseFrame(req.id, req.action, JSON.stringify(asset));
+				return responseFrame(req.id, req.action, asset as Payload);
 			}
 			case 'GET_METADATA': {
 				const metadata = await deps.getMetadata();
-				return responseFrame(req.id, req.action, JSON.stringify(metadata));
+				return responseFrame(req.id, req.action, metadata as Payload);
 			}
 			default:
 				log.warn('unknown action', req.action);

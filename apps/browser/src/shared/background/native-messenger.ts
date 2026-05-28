@@ -1,15 +1,17 @@
 import { resolveFaviconBase64 } from './favicon';
 import { initFocusTracker, destroyFocusTracker } from './focus-tracker';
-import { sendMessageWithRetry } from './messaging';
 import { startSafariPoller, stopSafariPoller } from './safari-poller';
+import { errorFrame, forwardTabRpc } from './tab-rpc';
+import { type TabStateBus, startTabStateBus } from './tab-state-bus';
 import { isSafari } from './util';
 import browser from 'webextension-polyfill';
-import type { Frame, RequestFrame, ResponseFrame } from '../content/bindings';
+import type { Frame, Payload, RequestFrame, ResponseFrame } from '../content/bindings';
 
 declare const __DEV__: boolean;
 const host = __DEV__ ? 'com.eurora.dev' : 'com.eurora.app';
 const connectTimeout = 5000;
 let nativePort: browser.Runtime.Port | null = null;
+let tabBus: TabStateBus | null = null;
 
 export function startNativeMessenger() {
 	connect();
@@ -19,7 +21,11 @@ function connect() {
 	nativePort = browser.runtime.connectNative(host);
 	nativePort.onDisconnect.addListener(onNativePortDisconnect);
 	nativePort.onMessage.addListener(onNativePortMessage);
-	initFocusTracker(nativePort);
+	// One bus per connection lifecycle. `focus-tracker` is the only
+	// subscriber today; the bus owns the underlying `chrome.tabs` /
+	// `chrome.windows` listeners.
+	tabBus = startTabStateBus();
+	initFocusTracker(nativePort, tabBus);
 	startSafariPoller();
 }
 
@@ -28,6 +34,8 @@ function onNativePortDisconnect(port: browser.Runtime.Port) {
 	console.error('Native port disconnected:', error || 'Unknown error');
 
 	destroyFocusTracker();
+	tabBus?.stop();
+	tabBus = null;
 	stopSafariPoller();
 	nativePort = null;
 
@@ -71,7 +79,7 @@ async function onNativePortMessage(message: unknown, sender: browser.Runtime.Por
 		}
 	} else if ('Response' in kind) {
 		const resp = kind.Response as { action?: string };
-		const pollerActions = ['POLL_REQUESTS', 'GET_METADATA', 'GET_ASSETS', 'GET_SNAPSHOT'];
+		const pollerActions = ['POLL_REQUESTS', 'GET_METADATA'];
 		if (!pollerActions.includes(resp.action ?? '')) {
 			console.warn('Unexpected response frame:', kind.Response);
 		}
@@ -94,82 +102,51 @@ async function onRequestFrame(frame: RequestFrame): Promise<Frame> {
 			}
 			return await onActionMetadata(frame);
 
-		case 'GET_ASSETS':
-			return await onActionContentData(frame, 'GENERATE_ASSETS');
+		// Tool plumbing is pure forwarding. The desktop decides which
+		// `tab_id` to address; the per-site content-script watcher owns
+		// the tool list, the context summary, and dispatch. Background
+		// sees zero tool names, zero schemas, zero per-site logic.
+		case 'LIST_TOOLS':
+			return await forwardTabRpc(frame, 'LIST_TOOLS');
 
-		case 'GET_SNAPSHOT':
-			return await onActionContentData(frame, 'GENERATE_SNAPSHOT');
+		case 'GET_CONTEXT':
+			return await forwardTabRpc(frame, 'GET_CONTEXT');
+
+		case 'INVOKE_TOOL':
+			return await forwardTabRpc(frame, 'INVOKE_TOOL');
+
+		case 'CANCEL_TOOL':
+			return await forwardTabRpc(frame, 'CANCEL_TOOL');
 
 		default:
-			return {
-				kind: {
-					Error: {
-						id: frame.id,
-						code: 0,
-						message: `Unknown action: ${frame.action}`,
-						details: null,
-					},
-				},
-			} as Frame;
-	}
-}
-
-async function onActionContentData(frame: RequestFrame, messageType: string): Promise<Frame> {
-	try {
-		const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-
-		if (!activeTab || !activeTab.id) {
-			return {
-				kind: {
-					Response: {
-						id: frame.id,
-						action: frame.action,
-						payload: JSON.stringify({ kind: 'Error', data: 'No active tab found' }),
-					},
-				},
-			} as Frame;
-		}
-
-		const contentResponse = await sendMessageWithRetry(activeTab.id, { type: messageType });
-
-		return {
-			kind: {
-				Response: {
-					id: frame.id,
-					action: frame.action,
-					payload: JSON.stringify(contentResponse),
-				},
-			},
-		} as Frame;
-	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		return {
-			kind: {
-				Response: {
-					id: frame.id,
-					action: frame.action,
-					payload: JSON.stringify({ kind: 'Error', data: errorMessage }),
-				},
-			},
-		} as Frame;
+			return errorFrame(frame, 400, `Unknown action: ${frame.action}`);
 	}
 }
 
 async function onActionMetadata(frame: RequestFrame): Promise<Frame> {
 	const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
+	if (!activeTab || activeTab.id === undefined) {
+		// `NativeMetadata.tab_id` is required by the bridge contract —
+		// without an active tab id there is nothing useful to report.
+		// Return an error frame rather than emit a malformed metadata
+		// payload that the desktop side would have to validate.
+		return errorFrame(frame, 410, 'No active tab found');
+	}
+
 	const iconBase64 = await resolveFaviconBase64(activeTab);
 
 	const response: ResponseFrame = {
 		id: frame.id,
 		action: frame.action,
-		payload: JSON.stringify({
+		payload: {
 			kind: 'NativeMetadata',
 			data: {
-				url: activeTab?.url,
+				tab_id: activeTab.id,
+				url: activeTab.url ?? null,
 				icon_base64: iconBase64,
-				title: activeTab?.title ?? null,
+				title: activeTab.title ?? null,
 			},
-		}),
+		} as Payload,
 	};
 
 	return { kind: { Response: response } } as Frame;
@@ -182,10 +159,10 @@ async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<F
 		const response: ResponseFrame = {
 			id: frame.id,
 			action: frame.action,
-			payload: JSON.stringify({
+			payload: {
 				kind: 'Error',
 				data: 'No active tab found',
-			}),
+			} as Payload,
 		};
 		return { kind: { Response: response } } as Frame;
 	}
@@ -198,7 +175,7 @@ async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<F
 		const response: ResponseFrame = {
 			id: frame.id,
 			action: frame.action,
-			payload: JSON.stringify(contentResponse),
+			payload: contentResponse as Payload,
 		};
 
 		return { kind: { Response: response } } as Frame;
@@ -207,10 +184,10 @@ async function onActionMetadataFromContentScript(frame: RequestFrame): Promise<F
 		const response: ResponseFrame = {
 			id: frame.id,
 			action: frame.action,
-			payload: JSON.stringify({
+			payload: {
 				kind: 'Error',
 				data: `Failed to get metadata from content script: ${errorMessage}`,
-			}),
+			} as Payload,
 		};
 		return { kind: { Response: response } } as Frame;
 	}

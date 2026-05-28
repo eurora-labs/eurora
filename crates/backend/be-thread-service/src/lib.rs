@@ -15,12 +15,19 @@ mod agent_loop;
 mod conversion;
 mod describe_image_tool;
 mod error;
+mod glm_xml_tool_calls;
 mod handlers;
 mod llm;
 mod message_projection;
 mod preliminary;
+mod remote_tool_bus;
 mod service;
+mod title;
+mod tool_catalog;
 mod tools;
+
+#[cfg(test)]
+mod test_support;
 
 use std::sync::Arc;
 

@@ -146,9 +146,7 @@ describe('startBridgeClient', () => {
 	});
 
 	it('dispatches incoming Request frames and writes the Response back', async () => {
-		const dispatch = vi
-			.fn()
-			.mockResolvedValue(responseFrame(7, 'GET_ASSETS', JSON.stringify({ ok: true })));
+		const dispatch = vi.fn().mockResolvedValue(responseFrame(7, 'GET_ASSETS', { ok: true }));
 		makeClient(dispatch);
 		const sock = FakeWebSocket.instances[0]!;
 		sock.emitOpen();
@@ -166,9 +164,11 @@ describe('startBridgeClient', () => {
 		await vi.waitFor(() => {
 			expect(sock.sent).toHaveLength(2);
 		});
+		// The bridge wire embeds the payload inline as JSON, not as a
+		// JSON-encoded string.
 		expect(JSON.parse(sock.sent[1]!)).toEqual({
 			kind: {
-				Response: { id: 7, action: 'GET_ASSETS', payload: JSON.stringify({ ok: true }) },
+				Response: { id: 7, action: 'GET_ASSETS', payload: { ok: true } },
 			},
 		});
 	});

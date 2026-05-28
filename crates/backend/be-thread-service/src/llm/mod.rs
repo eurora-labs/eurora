@@ -1,4 +1,5 @@
 mod context;
+mod openai_schema;
 mod providers;
 
 pub use context::{LlmContext, prepare_llm_context};

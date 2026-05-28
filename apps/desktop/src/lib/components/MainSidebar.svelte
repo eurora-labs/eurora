@@ -53,13 +53,12 @@
 		}
 	});
 
-	// Lazy-fetch the per-activity thread bucket whenever the user's
-	// scrolled-to selection changes. The chat service short-circuits
-	// repeat calls for cached buckets, so cycling through the rail and
-	// back is free after the first visit. We skip index 0 — the
-	// most-recent slot is the "no selection" default and never filters.
+	// Lazy-fetch the per-activity thread bucket whenever the active
+	// selection changes. The chat service short-circuits repeat calls
+	// for cached buckets, so cycling through the rail and back is free
+	// after the first visit. The live activity (index 0) is fetched too
+	// — the sidebar filters on whatever the rail's selection points at.
 	$effect(() => {
-		if (activityService.activeIndex === 0) return;
 		const app = activityService.activeApp;
 		if (!app) return;
 		if (!user.authenticated) return;
@@ -77,12 +76,13 @@
 		};
 	});
 
-	// Index 0 is the most-recent slot — treated as "no user selection"
-	// so the sidebar falls back to the full chronological list. Only an
-	// explicit scroll to a non-top rail position counts as filtering.
-	const selectedApp = $derived(
-		activityService.activeIndex === 0 ? undefined : activityService.activeApp,
-	);
+	// The rail's active selection drives the filter. `activeApp` tracks
+	// the live activity while following live (index 0) and pins to a
+	// chosen activity once the user picks an older row, so the sidebar
+	// filters uniformly across both. It's `undefined` only before any
+	// activity has loaded, where the sidebar falls back to the full
+	// chronological list.
+	const selectedApp = $derived(activityService.activeApp);
 	const activityThreads = $derived(
 		selectedApp ? chatService.threadsByActivity.get(selectedApp.id) : undefined,
 	);
@@ -168,7 +168,7 @@
 				onThreadSelect={handleThreadSelect}
 				onThreadDelete={handleThreadDelete}
 				label={selectedApp ? 'Other chats' : 'Chats'}
-				pinnedLabel={selectedApp ? `Chats in ${selectedApp.name}` : undefined}
+				pinnedLabel={selectedApp ? `Chats in ${selectedApp.displayName}` : undefined}
 				pinnedThreads={selectedApp ? matched : undefined}
 				pinnedAccentColor={selectedApp?.accent?.hex}
 			/>

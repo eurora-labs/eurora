@@ -25,6 +25,30 @@ pub use window::{
     MAIN_WINDOW_LABEL, create as create_window, show_and_focus_main, state::WindowState,
 };
 
+/// Workspace-relative path of the desktop frontend's tauri-specta
+/// bindings. The workspace-level `euro-codegen` orchestrator runs from
+/// the workspace root so it resolves this directly; the dev-launch
+/// hook in `main.rs` joins it onto `CARGO_MANIFEST_DIR` because Tauri
+/// dev sets the working directory to the manifest folder.
+pub const DESKTOP_BINDINGS_PATH: &str = "apps/desktop/src/lib/bindings/specta.bindings.ts";
+
+/// Export the desktop tauri-specta TypeScript bindings to `out_path`.
+///
+/// `specta-typescript` 0.0.12 fails the export by default if any
+/// `i64`/`u64` field crosses the wire without an explicit
+/// `#[specta(type = ...)]` override, which is the strictness we want
+/// — silently bridging through `bigint` masks lossy round trips on the
+/// JS side.
+pub fn export_desktop_bindings(out_path: &std::path::Path) -> anyhow::Result<()> {
+    use anyhow::Context as _;
+
+    build_specta()
+        .export(specta_typescript::Typescript::default(), out_path)
+        .with_context(|| format!("exporting tauri-specta bindings to {}", out_path.display()))?;
+    println!("wrote {}", out_path.display());
+    Ok(())
+}
+
 /// Inject build-time URL bake-ins into the process environment so the
 /// `std::env::var(...)` call sites in `procedures::*` work in packaged
 /// release builds where `.env` isn't available on disk. `build.rs`
@@ -46,24 +70,5 @@ pub fn load_env() {
         }
         // SAFETY: see function-level note.
         unsafe { std::env::set_var(key, v) };
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Regenerate the TypeScript bindings on every `cargo test` run.
-    /// Mirrors the export `main.rs` runs at app launch but executes on
-    /// the host without booting the full Tauri runtime, so CI and local
-    /// hosts keep `apps/desktop/src/lib/bindings/specta.bindings.ts`
-    /// in sync without having to spin the desktop binary.
-    #[test]
-    fn export_specta_bindings() {
-        let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../apps/desktop/src/lib/bindings/specta.bindings.ts");
-        build_specta()
-            .export(specta_typescript::Typescript::default(), &bindings_path)
-            .expect("Failed to export tauri-specta bindings");
     }
 }

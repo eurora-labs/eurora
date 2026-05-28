@@ -18,7 +18,7 @@
 </script>
 
 <script lang="ts">
-	import { getAssetChipsFromMessage, getReasoningFromMessage } from '$lib/utils/asset-chips.js';
+	import { readAssetChips, readReasoningContent } from '$lib/models/messages/index.js';
 	import { getTextContent, messageId } from '$lib/utils/message-content.js';
 	import { middleTruncate } from '$lib/utils/text.js';
 	import * as Attachment from '@eurora/ui/components/ai-elements/attachments/index';
@@ -55,9 +55,9 @@
 	const user = $derived(node.message?.type === 'human');
 	const content = $derived(isStreaming ? streamingContent : getTextContent(node));
 	const reasoning = $derived(
-		isStreaming ? streamingReasoning : getReasoningFromMessage(node.message),
+		isStreaming ? streamingReasoning : readReasoningContent(node.message),
 	);
-	const assetChips = $derived(getAssetChipsFromMessage(node.message));
+	const assetChips = $derived(readAssetChips(node.message));
 	const siblings = $derived(node.children ?? []);
 
 	let copied = $state(false);

@@ -13,8 +13,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use euro_bridge::{
-    BridgeError, BridgeService, EventFrame, Frame, FrameKind, RegisterFrame, ResponseFrame,
-    bridge_url_for,
+    BridgeError, BridgeService, EventFrame, Frame, FrameKind, Payload, RegisterFrame,
+    ResponseFrame, bridge_url_for,
 };
 use futures_util::{SinkExt, StreamExt};
 use tokio::time::timeout;
@@ -60,9 +60,13 @@ async fn round_trip_request_response() {
 
     let svc = service.clone();
     let request_handle = tokio::spawn(async move {
-        svc.send_request(app_pid, "PING", Some("hi".into()))
-            .await
-            .unwrap()
+        svc.send_request(
+            app_pid,
+            "PING",
+            Some(Payload::from_value(&"hi").expect("encode payload")),
+        )
+        .await
+        .unwrap()
     });
 
     let next = timeout(Duration::from_secs(2), ws.next())
@@ -78,12 +82,18 @@ async fn round_trip_request_response() {
         panic!("expected Request frame");
     };
     assert_eq!(req.action, "PING");
-    assert_eq!(req.payload.as_deref(), Some("hi"));
+    assert_eq!(
+        req.payload
+            .as_ref()
+            .and_then(|p| p.deserialize::<String>().ok())
+            .as_deref(),
+        Some("hi")
+    );
 
     let reply = serde_json::to_string(&Frame::from(ResponseFrame {
         id: req.id,
         action: req.action.clone(),
-        payload: Some("pong".into()),
+        payload: Some(Payload::from_value(&"pong").unwrap()),
     }))
     .unwrap();
     ws.send(TMessage::text(reply)).await.unwrap();
@@ -92,12 +102,19 @@ async fn round_trip_request_response() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(response.payload.as_deref(), Some("pong"));
+    assert_eq!(
+        response
+            .payload
+            .as_ref()
+            .and_then(|p| p.deserialize::<String>().ok())
+            .as_deref(),
+        Some("pong")
+    );
 
     let mut events = service.subscribe_to_events();
     let event_payload = serde_json::to_string(&Frame::from(EventFrame {
         action: "TAB_ACTIVATED".into(),
-        payload: Some("{}".into()),
+        payload: Some(Payload::from_value(&serde_json::json!({})).unwrap()),
     }))
     .unwrap();
     ws.send(TMessage::text(event_payload)).await.unwrap();

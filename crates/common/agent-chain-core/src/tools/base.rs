@@ -12,6 +12,9 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[cfg(feature = "specta")]
+use specta_typescript::Unknown;
+
 pub const FILTERED_ARGS: &[&str] = &["run_manager", "callbacks"];
 
 pub const TOOL_MESSAGE_BLOCK_TYPES: &[&str] = &[
@@ -73,10 +76,12 @@ impl ArgsSchema {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct ToolDefinition {
     pub name: String,
     pub description: String,
+    #[cfg_attr(feature = "specta", specta(type = Unknown))]
     pub parameters: Value,
 }
 

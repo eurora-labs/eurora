@@ -12,14 +12,14 @@ public struct ErrorFrame: Codable {
     public let id: UInt32
     public let code: UInt32
     public let message: String
-    public let details: String?
+    public let details: Payload?
 }
 
 /// Unsolicited notification pushed by a client (e.g. browser tab
 /// activation, Word selection change).
 public struct EventFrame: Codable {
     public let action: String
-    public let payload: String?
+    public let payload: Payload?
 }
 
 /// Top-level envelope sent in both directions on the bridge. Every
@@ -41,9 +41,7 @@ public enum FrameKind {
     case register(RegisterFrame)
     case shutdown(ShutdownFrame)
 }
-
 // MARK: - FrameKind Codable Implementation
-
 extension FrameKind: Codable {
     private enum CodingKeys: String, CodingKey {
         case request = "Request"
@@ -57,13 +55,10 @@ extension FrameKind: Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-
+        
         if container.allKeys.count != 1 {
             throw DecodingError.dataCorrupted(
-                DecodingError.Context(
-                    codingPath: decoder.codingPath,
-                    debugDescription: "Invalid number of keys found, expected one."
-                )
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid number of keys found, expected one.")
             )
         }
 
@@ -95,29 +90,100 @@ extension FrameKind: Codable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-
+        
         switch self {
-        case let .request(data):
+        case .request(let data):
             try container.encode(data, forKey: .request)
-        case let .response(data):
+        case .response(let data):
             try container.encode(data, forKey: .response)
-        case let .event(data):
+        case .event(let data):
             try container.encode(data, forKey: .event)
-        case let .error(data):
+        case .error(let data):
             try container.encode(data, forKey: .error)
-        case let .cancel(data):
+        case .cancel(let data):
             try container.encode(data, forKey: .cancel)
-        case let .register(data):
+        case .register(let data):
             try container.encode(data, forKey: .register)
-        case let .shutdown(data):
+        case .shutdown(let data):
             try container.encode(data, forKey: .shutdown)
+        }
+    }
+}
+
+
+/// Inline JSON payload carried by Request/Response/Event frames.
+///
+/// Mirrors `euro_bridge_protocol::frame::Payload` on the wire: any JSON
+/// value (`null`, `Bool`, `Double`, `String`, array, object) embedded
+/// inline in the outer Frame envelope. The Rust producer hands the
+/// payload to serde as a `RawValue`, so consumers see the original
+/// shape rather than an escaped JSON string layer.
+///
+/// Numbers are decoded as `Double` only — Chrome's native-messaging
+/// bridge cannot round-trip 64-bit integers safely, so the wire never
+/// carries one. Use `.number(Double)` for any numeric value.
+public enum Payload: Codable {
+    case null
+    case bool(Bool)
+    case number(Double)
+    case string(String)
+    case array([Payload])
+    case object([String: Payload])
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+            return
+        }
+        if let value = try? container.decode(Bool.self) {
+            self = .bool(value)
+            return
+        }
+        if let value = try? container.decode(Double.self) {
+            self = .number(value)
+            return
+        }
+        if let value = try? container.decode(String.self) {
+            self = .string(value)
+            return
+        }
+        if let value = try? container.decode([Payload].self) {
+            self = .array(value)
+            return
+        }
+        if let value = try? container.decode([String: Payload].self) {
+            self = .object(value)
+            return
+        }
+        throw DecodingError.dataCorruptedError(
+            in: container,
+            debugDescription: "Payload: value did not match any known JSON shape"
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .null:
+            try container.encodeNil()
+        case .bool(let value):
+            try container.encode(value)
+        case .number(let value):
+            try container.encode(value)
+        case .string(let value):
+            try container.encode(value)
+        case .array(let value):
+            try container.encode(value)
+        case .object(let value):
+            try container.encode(value)
         }
     }
 }
 
 /// Mandatory first frame on every connection. Identifies the host
 /// process (the bridge) and the application process being represented.
-///
+/// 
 /// `app_pid` is the OS PID for clients that have one (browsers via the
 /// native-messaging host, the macOS launcher representing Safari).
 /// Sandboxed clients without access to a real PID — Office.js add-ins
@@ -140,14 +206,14 @@ public struct RegisterFrame: Codable {
 public struct RequestFrame: Codable {
     public let id: UInt32
     public let action: String
-    public let payload: String?
+    public let payload: Payload?
 }
 
 /// Client reply to a [`RequestFrame`], correlated by `id`.
 public struct ResponseFrame: Codable {
     public let id: UInt32
     public let action: String
-    public let payload: String?
+    public let payload: Payload?
 }
 
 /// Desktop-initiated request that the receiving client (currently:
@@ -158,3 +224,4 @@ public struct ResponseFrame: Codable {
 public struct ShutdownFrame: Codable {
     public let reason: String?
 }
+

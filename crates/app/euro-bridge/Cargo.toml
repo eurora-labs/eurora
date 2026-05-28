@@ -7,9 +7,12 @@ license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 [dependencies]
 axum = { workspace = true, features = ["ws"] }
 axum-server = { workspace = true }
-dashmap = "6.1.0"
+dashmap = { workspace = true }
 euro-bridge-protocol = { workspace = true }
+euro-process = { workspace = true }
+euro-transport-policy = { workspace = true }
 futures-util = { workspace = true }
+request-correlator = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = [
@@ -19,12 +22,11 @@ tokio = { workspace = true, features = [
   "sync",
   "time",
 ] }
+tokio-util = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
 tokio-tungstenite = { workspace = true }
 
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

@@ -31,7 +31,7 @@ impl From<crate::Error> for ThreadError {
             E::WebSocket(ref e) => ThreadError::Backend(e.to_string()),
             E::Service { .. } => ThreadError::BadResponse(err.to_string()),
             E::Encode(e) | E::Decode(e) => ThreadError::BadResponse(e.to_string()),
-            E::Auth(_) | E::InvalidUrl(_) | E::ChatProtocol(_) | E::Cancelled => {
+            E::Auth(_) | E::InvalidUrl(_) | E::ChatProtocol(_) | E::Sink(_) | E::Cancelled => {
                 ThreadError::Internal(err.to_string())
             }
         }
@@ -64,6 +64,7 @@ impl From<crate::Error> for StreamError {
     fn from(err: crate::Error) -> Self {
         match err {
             crate::Error::Cancelled => StreamError::Cancelled,
+            crate::Error::Sink(sink_err) => StreamError::Channel(sink_err.to_string()),
             other => StreamError::Thread(ThreadError::from(other)),
         }
     }

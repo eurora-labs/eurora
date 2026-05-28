@@ -1,9 +1,12 @@
 use crate::utils::render_svg_bytes;
+use agent_chain_core::messages::ContentBlocks;
 use async_trait::async_trait;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use enum_dispatch::enum_dispatch;
 use focus_tracker::FocusedWindow;
+use serde_json::Value;
 use std::sync::Arc;
+use thread_core::{ToolBackendCall, ToolErrorWire, WireToolDescriptor};
 use tokio::sync::mpsc;
 use url::Url;
 
@@ -20,10 +23,7 @@ pub use no_strategy::NoStrategy;
 pub use preview::PreviewStrategy;
 pub use word::WordStrategy;
 
-use crate::{
-    error::ActivityResult,
-    types::{Activity, ActivityAsset, ActivitySnapshot},
-};
+use crate::{error::ActivityResult, types::ActivitySession};
 
 /// Metadata returned by a strategy about the currently focused target.
 ///
@@ -39,8 +39,18 @@ pub struct StrategyMetadata {
 
 #[derive(Debug, Clone)]
 pub enum ActivityReport {
-    NewActivity(Activity),
+    /// A new activity instance is starting. From the strategy's
+    /// perspective this is always "the user is now on a different
+    /// activity than a moment ago" — the backend's parent-versus-session
+    /// split is downstream of this signal, not reflected in the verb.
+    NewActivity(ActivitySession),
+    /// SPA navigation inside the same base domain — the title (and
+    /// optionally the URL) changed but the parent activity stayed put,
+    /// so we patch the live session in place rather than starting a new
+    /// one.
     TitleUpdated { title: String, url: Url },
+    /// The strategy is winding down (typically: its process exited).
+    /// The collector closes the live session.
     Stopping,
 }
 
@@ -133,9 +143,37 @@ pub trait ActivityStrategyFunctionality {
 
     async fn stop_tracking(&mut self) -> ActivityResult<()>;
 
-    async fn retrieve_assets(&mut self) -> ActivityResult<Vec<ActivityAsset>>;
-    async fn retrieve_snapshots(&mut self) -> ActivityResult<Vec<ActivitySnapshot>>;
-    async fn get_metadata(&mut self) -> ActivityResult<StrategyMetadata>;
+    /// Strategy-side metadata about the currently focused target. Lock-
+    /// free reads only — chat-driven calls share a read guard on the
+    /// active strategy with focus events, so this must not require
+    /// `&mut self`.
+    async fn get_metadata(&self) -> ActivityResult<StrategyMetadata>;
+
+    /// Tools the LLM should see while this strategy is active. The chat
+    /// bridge snapshots this once per turn and forwards every inbound
+    /// `ToolRequest` back through [`Self::dispatch_tool`].
+    async fn get_tools(&self) -> ActivityResult<Vec<WireToolDescriptor>>;
+
+    /// Curated per-turn context describing what the user is currently
+    /// doing, returned as a short list of [`ContentBlocks`] that the chat
+    /// layer prepends to the outgoing turn.
+    ///
+    /// Unlike the legacy "stuff the whole page body in" approach, the
+    /// expectation here is a *summary*: a single short natural-language
+    /// block (e.g. `"The user is currently watching a video titled X"`)
+    /// produced by whichever side knows best — for browsers, the
+    /// per-site content script; for native integrations, the strategy
+    /// itself. The LLM still pulls page contents through granular tools
+    /// when it actually needs them.
+    ///
+    /// Best-effort: implementations must not fail a chat turn. An empty
+    /// [`ContentBlocks`] simply means "nothing to add this turn".
+    async fn get_context(&self) -> ActivityResult<ContentBlocks>;
+
+    /// Execute one inbound tool call. The default behaviour for
+    /// strategies that surface no tools is to surface `ContextUnavailable`
+    /// so the LLM treats the call as routed to a stale capability.
+    async fn dispatch_tool(&self, call: ToolBackendCall) -> Result<Value, ToolErrorWire>;
 }
 
 #[async_trait]

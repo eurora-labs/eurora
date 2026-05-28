@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { ACTIVITY_SERVICE } from '$lib/services/activity-service.svelte.js';
 	import { inject } from '@eurora/shared/context';
+	import { Button } from '@eurora/ui/components/button/index';
 	import * as Timeline from '@eurora/ui/custom-components/timeline/index';
+	import ArrowUpToLineIcon from '@lucide/svelte/icons/arrow-up-to-line';
 	import { onMount } from 'svelte';
 
 	const activityService = inject(ACTIVITY_SERVICE);
@@ -15,83 +17,33 @@
 		return () => document.body.classList.remove('has-timeline-rail');
 	});
 
-	// Connector height is mapped from activity duration on a log scale so the
-	// rail stays legible across the realistic range (a few seconds of
-	// task-switching up to multi-hour focus blocks). The anchors below define
-	// the linear interpolation in log-space: REF_SHORT collapses to
-	// MIN_HEIGHT, REF_LONG saturates at MAX_HEIGHT, anything between is
-	// proportional. Tuning these is a pure UX decision — no other code
-	// depends on the exact mapping.
-	const MIN_CONNECTOR_HEIGHT_PX = 8;
-	const MAX_CONNECTOR_HEIGHT_PX = 96;
-	const REF_SHORT_SECONDS = 1;
-	const REF_LONG_SECONDS = 30;
+	let scrollContainer: HTMLDivElement | undefined = $state();
+	let sentinel: HTMLLIElement | undefined = $state();
+	let scrollTop = $state(0);
 
-	const LOG_REF_SHORT = Math.log(REF_SHORT_SECONDS);
-	const LOG_REF_LONG = Math.log(REF_LONG_SECONDS);
+	// The jump-to-live affordance overlays the top of the rail whenever
+	// the user has either picked an older row (`activeIndex > 0`) or
+	// scrolled the viewport down. Either signal alone is enough — both
+	// mean "the live row isn't where the eye lands right now."
+	const showJumpToLive = $derived(activityService.activeIndex > 0 || scrollTop > 0);
 
-	// Minimum gap between wheel-driven cycles. Each non-zero wheel event
-	// fires exactly one cycle in the direction of its `deltaY`, but we
-	// rate-limit to keep trackpad inertia and fast wheel echoes from
-	// runaway-cycling past the user's intended target. 80ms tolerates
-	// deliberate wheel spinning (~12 notches/sec) while still throttling
-	// kinetic-scroll bursts.
-	const WHEEL_COOLDOWN_MS = 80;
-
-	function connectorHeightFor(startedAt: string, endedAt: string | null): number {
-		// `endedAt: null` uniquely identifies the in-progress activity:
-		// once a row stops being current, the `savedActivityEnded` event
-		// patches its `endedAt` in place (see ActivityService.applyEnded).
-		// The in-progress row's connector is hidden by Timeline.Root's
-		// :first-child rule, so a precise value here is cosmetic at best
-		// — falling back to MIN avoids needing a ticking clock for it.
-		if (endedAt === null) return MIN_CONNECTOR_HEIGHT_PX;
-
-		const durationSeconds = (Date.parse(endedAt) - Date.parse(startedAt)) / 1000;
-		if (!Number.isFinite(durationSeconds) || durationSeconds <= REF_SHORT_SECONDS) {
-			return MIN_CONNECTOR_HEIGHT_PX;
-		}
-		if (durationSeconds >= REF_LONG_SECONDS) return MAX_CONNECTOR_HEIGHT_PX;
-
-		const t = (Math.log(durationSeconds) - LOG_REF_SHORT) / (LOG_REF_LONG - LOG_REF_SHORT);
-		return MIN_CONNECTOR_HEIGHT_PX + t * (MAX_CONNECTOR_HEIGHT_PX - MIN_CONNECTOR_HEIGHT_PX);
+	function onScroll(event: Event): void {
+		scrollTop = (event.currentTarget as HTMLDivElement).scrollTop;
 	}
 
-	// Rotate the chronological list so the active item is always the
-	// top-most rendered row. The relative chronology between items is
-	// preserved within the cycle — connector heights and visual identity
-	// of each item are unchanged by rotation. Keyed by activity id so
-	// Svelte transitions the rearrangement instead of recreating DOM.
-	const display = $derived.by(() => {
-		const r = activityService.recent;
-		if (r.length === 0) return [] as typeof r;
-		const i = activityService.activeIndex;
-		return [...r.slice(i), ...r.slice(0, i)];
-	});
+	function jumpToLive(): void {
+		activityService.jumpToLive();
+		scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' });
+	}
 
-	// Wheel handling — one cycle per event, gated by a cooldown. The
-	// accumulator-with-threshold pattern we tried first was too sensitive
-	// to per-platform `deltaY` magnitudes (Linux X11 ~53px, Windows ~120px,
-	// macOS ~100px), leaving some platforms stuck below threshold per
-	// notch. This handles only the *sign* of `deltaY`, so the behaviour is
-	// identical regardless of how loud the platform reports the gesture.
-	// `markScrolling` inside the service still owns the scrolling=false
-	// flip after the user goes idle.
-	let lastWheelCycleAt = 0;
-
-	function onWheel(event: WheelEvent): void {
-		event.preventDefault();
-		if (event.deltaY === 0) return;
-
-		const now = performance.now();
-		if (now - lastWheelCycleAt < WHEEL_COOLDOWN_MS) return;
-
-		const moved =
-			event.deltaY > 0 ? activityService.cycleNext() : activityService.cyclePrevious();
-		// Only charge the cooldown for movements that actually happened.
-		// Hammering scroll-up at index 0 should not later block a deliberate
-		// scroll-down by 80ms of stale throttle.
-		if (moved) lastWheelCycleAt = now;
+	function scrollActiveIntoView(): void {
+		const app = activityService.activeApp;
+		if (!app) return;
+		// `aria-activedescendant` already addresses the active row by
+		// this id, so reusing it for the scroll target keeps the two in
+		// lockstep — no parallel ref-tracking needed.
+		const el = document.getElementById(`timeline-rail-item-${app.id}`);
+		el?.scrollIntoView({ block: 'nearest' });
 	}
 
 	function onKeydown(event: KeyboardEvent): void {
@@ -99,17 +51,48 @@
 			case 'ArrowDown':
 			case 'PageDown':
 				event.preventDefault();
-				activityService.cycleNext();
+				if (activityService.selectNext()) scrollActiveIntoView();
 				break;
 			case 'ArrowUp':
 			case 'PageUp':
 				event.preventDefault();
-				activityService.cyclePrevious();
+				if (activityService.selectPrevious()) scrollActiveIntoView();
+				break;
+			case 'Home':
+				event.preventDefault();
+				jumpToLive();
+				break;
+			case 'End':
+				event.preventDefault();
+				activityService.selectIndex(activityService.recent.length - 1);
+				scrollActiveIntoView();
 				break;
 			default:
 				break;
 		}
 	}
+
+	// Bottom-sentinel observer triggers pagination as soon as the
+	// invisible sentinel row gets within ~200px of the viewport. This
+	// replaces the previous "active index near the loaded edge" prefetch
+	// — with native scrolling, the right signal is viewport proximity,
+	// not selection position. The observer re-attaches when either
+	// element ref first resolves and tears down on unmount.
+	$effect(() => {
+		if (!scrollContainer || !sentinel) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) {
+						void activityService.loadMore();
+					}
+				}
+			},
+			{ root: scrollContainer, rootMargin: '200px 0px 0px 0px' },
+		);
+		observer.observe(sentinel);
+		return () => observer.disconnect();
+	});
 </script>
 
 <aside
@@ -118,27 +101,54 @@
 	aria-label="Recent activity"
 >
 	<div
-		class="contents focus:outline-none"
+		bind:this={scrollContainer}
 		role="listbox"
 		tabindex="0"
 		aria-label="Recent activity"
 		aria-activedescendant={activityService.activeApp
 			? `timeline-rail-item-${activityService.activeApp.id}`
 			: undefined}
-		onwheel={onWheel}
+		class="timeline-rail-scroll flex-1 overflow-x-hidden overflow-y-auto overscroll-contain focus:outline-none"
+		onscroll={onScroll}
 		onkeydown={onKeydown}
 	>
-		<Timeline.Root>
-			{#each display as item, i (item.id)}
+		<Timeline.Root class="py-2">
+			{#each activityService.recent as item, i (item.id)}
 				<Timeline.Item
 					id={`timeline-rail-item-${item.id}`}
 					color={item.accent?.hex}
-					active={i === 0}
+					active={i === activityService.activeIndex}
 					iconSrc={item.iconBase64}
-					name={item.name}
-					connectorHeight={connectorHeightFor(item.startedAt, item.endedAt)}
+					name={item.displayName}
+					onSelect={() => activityService.selectIndex(i)}
 				/>
 			{/each}
+			<li bind:this={sentinel} aria-hidden="true" class="h-px w-full shrink-0"></li>
 		</Timeline.Root>
 	</div>
+
+	{#if showJumpToLive}
+		<Button
+			variant="secondary"
+			size="icon-sm"
+			class="ring-border absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-full shadow-lg ring-1"
+			aria-label="Jump to most-recent activity"
+			onclick={jumpToLive}
+		>
+			<ArrowUpToLineIcon class="size-4" />
+		</Button>
+	{/if}
 </aside>
+
+<style>
+	/* Hide the rail's vertical scrollbar. Scrolling still works via
+	   wheel, trackpad, and keyboard — only the visual scrollbar track
+	   is suppressed. Firefox honours `scrollbar-width`; Webkit/Blink
+	   need the pseudo-element rule. */
+	.timeline-rail-scroll {
+		scrollbar-width: none;
+	}
+	.timeline-rail-scroll::-webkit-scrollbar {
+		display: none;
+	}
+</style>

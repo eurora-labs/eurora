@@ -9,6 +9,7 @@ anyhow = { workspace = true }
 backon = { workspace = true }
 euro-bridge-protocol = { workspace = true }
 euro-process = { workspace = true }
+euro-transport-policy = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -18,7 +19,7 @@ tokio-tungstenite = { workspace = true }
 tracing = { workspace = true }
 
 specta-serde = { version = "0.0.12", optional = true }
-specta-typescript = { version = "0.0.12", optional = true }
+specta-typescript = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
@@ -34,12 +35,5 @@ codegen = ["dep:specta-serde", "dep:specta-typescript"]
 name = "euro-native-messaging"
 path = "src/main.rs"
 
-[[bin]]
-name = "euro-browser-codegen"
-path = "src/bin/codegen.rs"
-required-features = ["codegen"]
-
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

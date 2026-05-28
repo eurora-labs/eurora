@@ -24,7 +24,5 @@ tokio = { workspace = true, features = [
   "sync",
 ] }
 
-[lints.clippy]
-all = "deny"
-correctness = "deny"
-perf = "deny"
+[lints]
+workspace = true

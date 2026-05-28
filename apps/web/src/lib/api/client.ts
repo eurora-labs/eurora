@@ -6,7 +6,7 @@
  * cookies set by the backend. The SPA holds no tokens in JS.
  *
  * The wire types come from the workspace-level `*-core` crates via the
- * `pnpm specta:backend` codegen step (see `packages/shared/src/lib/bindings`).
+ * `pnpm specta` codegen step (see `packages/shared/src/lib/bindings`).
  *
  * CSRF protection is enforced by the backend through an Origin
  * allowlist plus `SameSite=Lax` on the session cookies — the SPA does

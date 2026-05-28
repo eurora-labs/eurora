@@ -1,171 +1,102 @@
-import { YouTubeTranscriptApi } from './transcript/index.js';
-import { createArticleAsset } from '../../../shared/content/extensions/article/util';
+import { watcherFromTools } from '../../../shared/content/tools/build_watcher';
+import { textContext } from '../../../shared/content/tools/context';
+import { installToolHandlers } from '../../../shared/content/tools/install';
+import { webTools } from '../../../shared/content/tools/web';
 import {
-	Watcher,
-	type BrowserObj,
-	type WatcherResponse,
-} from '../../../shared/content/extensions/watchers/watcher';
-import browser from 'webextension-polyfill';
-import type { YoutubeBrowserMessage, WatcherParams } from './types.js';
-import type { NativeYoutubeAsset, NativeYoutubeSnapshot } from '../../../shared/content/bindings';
-
-interface EurImage {
-	dataBase64: string;
-	width: number;
-	height: number;
-}
-
-export class YoutubeWatcher extends Watcher<WatcherParams> {
-	private youtubeTranscriptApi: YouTubeTranscriptApi;
-	constructor(params: WatcherParams) {
-		super(params);
-		this.youtubeTranscriptApi = new YouTubeTranscriptApi();
-	}
-
-	private async fetchTranscript(): Promise<any> {
-		const videoId = getCurrentVideoId();
-		return (await this.youtubeTranscriptApi.fetch(videoId)).snippets;
-	}
-
-	public listen(
-		obj: BrowserObj,
-		sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> | false {
-		if ((obj as YoutubeBrowserMessage).type === 'PLAY') {
-			return this.handlePlay(obj as YoutubeBrowserMessage, sender).catch(() => undefined);
-		}
-		return super.listen(obj, sender);
-	}
-
-	public async handlePlay(
-		obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<any> {
-		const { value } = obj;
-		if (this.params.youtubePlayer) {
-			this.params.youtubePlayer.currentTime = value as number;
-		}
-	}
-
-	public async handleNew(
-		_obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		return { kind: 'Ok', data: null };
-	}
-
-	private async generateVideoAsset(): Promise<any> {
-		try {
-			const currentTime = this.getCurrentVideoTime();
-			const transcript = await this.fetchTranscript();
-
-			const reportData: NativeYoutubeAsset = {
-				url: window.location.href,
-				title: document.title,
-				transcript: JSON.stringify(transcript),
-				current_time: Math.round(currentTime),
-			};
-
-			return { kind: 'NativeYoutubeAsset', data: reportData };
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error('Error generating YouTube report:', {
-				url: window.location.href,
-				videoId: getCurrentVideoId(),
-				error: errorMessage,
-				stack: error instanceof Error ? error.stack : undefined,
-			});
-
-			return {
-				kind: 'Error',
-				data: `Failed to generate YouTube assets for ${window.location.href}: ${errorMessage}`,
-			};
-		}
-	}
-
-	public async handleGenerateAssets(
-		_obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		if (window.location.href.includes('/watch?v=')) {
-			return await this.generateVideoAsset();
-		} else {
-			const articleAsset = createArticleAsset(document);
-			return articleAsset;
-		}
-	}
-
-	public async handleGenerateSnapshot(
-		_obj: YoutubeBrowserMessage,
-		_sender: browser.Runtime.MessageSender,
-	): Promise<WatcherResponse> {
-		const currentTime = this.getCurrentVideoTime();
-		const videoFrame = this.getCurrentVideoFrame();
-
-		const reportData: NativeYoutubeSnapshot = {
-			current_time: Math.round(currentTime),
-			video_frame_base64: videoFrame.dataBase64,
-			video_frame_width: videoFrame.width,
-			video_frame_height: videoFrame.height,
-		};
-
-		return { kind: 'NativeYoutubeSnapshot', data: reportData };
-	}
-
-	getCurrentVideoFrame(): EurImage {
-		const { youtubePlayer, canvas } = this.params;
-		if (!youtubePlayer) return null;
-
-		canvas.width = youtubePlayer.videoWidth;
-		canvas.height = youtubePlayer.videoHeight;
-
-		canvas.getContext('2d')?.drawImage(youtubePlayer, 0, 0, canvas.width, canvas.height);
-
-		return {
-			dataBase64: canvas.toDataURL('image/png').split(',')[1],
-			width: canvas.width,
-			height: canvas.height,
-		};
-	}
-
-	getCurrentVideoTime(): number {
-		const player = this.getYouTubePlayer();
-		if (!player) return -1.0;
-
-		if (player.readyState === 0 || player.duration === 0) return -1.0;
-
-		return player.currentTime;
-	}
-
-	getYouTubePlayer(): HTMLVideoElement | null {
-		const { youtubePlayer } = this.params;
-		if (!youtubePlayer) {
-			this.params.youtubePlayer = document.querySelector(
-				'video.html5-main-video',
-			) as HTMLVideoElement;
-		}
-		return this.params.youtubePlayer;
-	}
-}
-
-function getCurrentVideoId() {
-	if (window.location.search?.includes('v=')) {
-		return window.location.search.split('v=')[1].split('&')[0];
-	}
-	return undefined;
-}
+	getPageKind,
+	readPlayerTime,
+	resolveChannelHandle,
+	resolveSearchQuery,
+	resolveYoutubeTools,
+} from '../../../shared/content/tools/youtube';
 
 let initialized = false;
 
+/// Strip YouTube's `" - YouTube"` suffix so the video title we report
+/// reads cleanly. `document.title` lags behind SPA navigation by a
+/// frame or two but settles before the model has a chance to act on it.
+function watchPageTitle(): string {
+	return document.title.replace(/ - YouTube$/, '').trim();
+}
+
+function pad2(n: number): string {
+	return n.toString().padStart(2, '0');
+}
+
+/// Format a non-negative number of seconds as `H:MM:SS` (or `M:SS` when
+/// under an hour). Mirrors the desktop-side `fmt_hms` helper so the
+/// context message format stays consistent across the two systems.
+function formatHms(seconds: number): string {
+	if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+	const total = Math.round(seconds);
+	const hours = Math.floor(total / 3_600);
+	const minutes = Math.floor((total % 3_600) / 60);
+	const secs = total % 60;
+	return hours > 0 ? `${hours}:${pad2(minutes)}:${pad2(secs)}` : `${minutes}:${pad2(secs)}`;
+}
+
+function describeWatch(): string {
+	const title = watchPageTitle();
+	const time = readPlayerTime();
+	const titleClause = title ? ` titled "${title}"` : '';
+	if (time === null) {
+		return `The user is currently watching a YouTube video${titleClause}.`;
+	}
+	const stamp = formatHms(time.currentTime);
+	if (time.duration !== null) {
+		return `The user is currently watching a YouTube video${titleClause} at timestamp ${stamp} of ${formatHms(time.duration)}.`;
+	}
+	return `The user is currently watching a YouTube video${titleClause} at timestamp ${stamp}.`;
+}
+
+function describeSearch(): string {
+	const query = resolveSearchQuery();
+	return query
+		? `The user is searching YouTube for "${query}".`
+		: 'The user is searching YouTube.';
+}
+
+function describeChannel(): string {
+	const handle = resolveChannelHandle();
+	return handle
+		? `The user is currently viewing the YouTube channel ${handle}.`
+		: 'The user is currently viewing a YouTube channel.';
+}
+
+/// Per-page summary for the YouTube bundle. Mirrors the routing in
+/// `resolveYoutubeTools` so the wording stays in lockstep with the tool
+/// surface the LLM also sees.
+function describeYoutube(): string {
+	const kind = getPageKind();
+	switch (kind) {
+		case 'watch':
+			return describeWatch();
+		case 'shorts':
+			return 'The user is browsing YouTube Shorts.';
+		case 'search':
+			return describeSearch();
+		case 'channel':
+			return describeChannel();
+		case 'playlist':
+			return 'The user is currently viewing a YouTube playlist.';
+		case 'home':
+		case 'unsupported':
+			return 'The user is browsing YouTube.';
+	}
+}
+
+/// YouTube content-script bundle. Surfaces the generic web tools
+/// alongside the YouTube-specific tools appropriate for the current
+/// page — `resolveYoutubeTools` is re-evaluated per `LIST_TOOLS` call so
+/// SPA navigation between e.g. `/watch` and `/results` flips the surface
+/// without a content-script reload.
 export function main() {
 	if (initialized) return;
 	initialized = true;
-
-	const watcher = new YoutubeWatcher({
-		canvas: document.createElement('canvas'),
-		context: document.createElement('canvas').getContext('2d'),
-		youtubePlayer: null,
-	});
-
-	browser.runtime.onMessage.addListener(watcher.listen.bind(watcher));
+	installToolHandlers(
+		watcherFromTools(
+			() => [...webTools, ...resolveYoutubeTools()],
+			() => textContext(describeYoutube()),
+		),
+	);
 }

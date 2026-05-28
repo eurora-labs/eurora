@@ -1,12 +1,27 @@
 import { DEFAULT_MODELS } from '$lib/models/chat-model.js';
+import {
+	AiStreamSink,
+	createAiPlaceholderNode,
+	createHumanPlaceholderNode,
+	createLocalAiNode,
+	createLocalHumanNode,
+	createStubThread,
+	isHumanNode,
+	readAssetChips,
+} from '$lib/models/messages/index.js';
 import { InjectionToken } from '@eurora/shared/context';
 import { SvelteMap } from 'svelte/reactivity';
 import type { ContentBlock } from '$lib/models/content-blocks/index.js';
-import type { AssetChip, MessageNode } from '$lib/models/messages/index.js';
+import type {
+	AiPlaceholderNode,
+	AssetChip,
+	HumanPlaceholderNode,
+	MessageNode,
+} from '$lib/models/messages/index.js';
 import type { ChatServerMessage } from '$lib/models/streaming.js';
 import type { Thread } from '$lib/models/thread.model.js';
 import type { BranchDirection, IThreadService } from '$lib/services/thread/thread-service.js';
-import type { AIMessageChunk, ChatSendRequest } from '@eurora/shared/bindings/thread';
+import type { ChatSendRequest } from '@eurora/shared/bindings/thread';
 
 const PAGE_SIZE = 20;
 const MESSAGE_PAGE_SIZE = 50;
@@ -196,7 +211,7 @@ export class ChatService {
 	async loadMessages(threadId: string): Promise<void> {
 		let entry = this.threadIndex.get(threadId);
 		if (!entry) {
-			entry = new ThreadMessages(makeStubThread(threadId));
+			entry = new ThreadMessages(createStubThread(threadId));
 			this.threadIndex.set(threadId, entry);
 		}
 		if (entry.loading || entry.loaded || entry.streamingMessageId) return;
@@ -241,7 +256,6 @@ export class ChatService {
 		const needsNewThread = !current || existing?.isTransient === true;
 
 		let threadId: string;
-		let isNewThread = false;
 
 		if (needsNewThread) {
 			if (current && existing?.isTransient) {
@@ -254,7 +268,6 @@ export class ChatService {
 			this.activeThreadId = thread.id;
 			threadId = thread.id;
 			this.newThread = thread;
-			isNewThread = true;
 		} else {
 			threadId = current!;
 		}
@@ -262,19 +275,10 @@ export class ChatService {
 		const entry = this.getThreadData(threadId);
 		if (!entry) return;
 
-		this.appendPlaceholders(entry, text, assetChips);
+		const { humanNode, sink } = this.appendPlaceholders(entry, text, assetChips);
 
-		const onFirstChunk = isNewThread
-			? () => {
-					this.threadClient.generateTitle(threadId).then((updated) => {
-						this.updateThread(updated);
-					});
-				}
-			: undefined;
-
-		const receivedFinal = await this.consumeStream(entry, threadId, text, {
+		const receivedFinal = await this.consumeStream(entry, threadId, text, humanNode, sink, {
 			assetChips,
-			onFirstChunk,
 			activityId,
 		});
 
@@ -288,21 +292,18 @@ export class ChatService {
 	}
 
 	addLocalExchange(userText: string, aiText: string): void {
-		const threadId = `transient-${crypto.randomUUID()}`;
-		const entry = new ThreadMessages(makeStubThread(threadId));
+		const thread = createStubThread();
+		const entry = new ThreadMessages(thread);
 		entry.isTransient = true;
 		entry.loaded = true;
 
-		const humanId = `local-${crypto.randomUUID()}`;
-		const aiId = `local-${crypto.randomUUID()}`;
+		const humanNode = createLocalHumanNode(null, userText);
+		const aiNode = createLocalAiNode(humanNode.message.id, aiText);
 
-		entry.messages = [
-			makeHumanNode(humanId, null, userText, []),
-			makeAiNode(aiId, humanId, aiText),
-		];
+		entry.messages = [humanNode, aiNode];
 
-		this.threadIndex.set(threadId, entry);
-		this.activeThreadId = threadId;
+		this.threadIndex.set(thread.id, entry);
+		this.activeThreadId = thread.id;
 	}
 
 	async regenerateAi(aiMessageId: string): Promise<void> {
@@ -316,17 +317,21 @@ export class ChatService {
 		if (targetIndex < 0) return;
 
 		const target = entry.messages[targetIndex];
-		if (target.message.type !== 'ai') return;
-
 		const parentId = target.parent_id ?? null;
-		if (!parentId) return;
+		if (target.message.type !== 'ai' || !parentId) return;
 
 		this.abortController?.abort();
 
-		const placeholderId = `temp-${crypto.randomUUID()}`;
-		const placeholder = makeAiNode(placeholderId, parentId, '');
+		const placeholder = createAiPlaceholderNode(parentId, '');
 		entry.messages = entry.messages.map((node, i) => (i === targetIndex ? placeholder : node));
-		entry.streamingMessageId = placeholderId;
+		// Construct the sink *after* the array assignment so the
+		// resolver hits the reactive (proxied) view of the node, not the
+		// raw reference. See `findStreamingPlaceholder`'s doc comment.
+		const placeholderId = placeholder.message.id;
+		const sink = new AiStreamSink(placeholderId, () =>
+			findStreamingPlaceholder(entry, placeholderId),
+		);
+		entry.streamingMessageId = sink.id;
 
 		const abortController = new AbortController();
 		this.abortController = abortController;
@@ -336,7 +341,10 @@ export class ChatService {
 			aiMessageId,
 			abortController.signal,
 		);
-		const receivedFinal = await this.consumeAiStream(entry, placeholder, stream);
+		const receivedFinal = await this.consumeChatStream(entry, stream, {
+			sink,
+			onConfirmedHumanMessage: null,
+		});
 
 		if (!receivedFinal) {
 			await this.reconcileMessages(entry, threadId);
@@ -368,16 +376,15 @@ export class ChatService {
 
 		const original = entry.messages[nodeIndex];
 		const parentId = original.parent_id ?? null;
-		const preservedAssetChips =
-			original.message.type === 'human' ? extractAssetChips(original.message) : [];
+		const preservedAssetChips = isHumanNode(original) ? readAssetChips(original.message) : [];
 
 		// An edit is a fresh turn — link to whichever activity the user is
 		// actually in *now*, not the one tagged on the original message.
 		const activityId = this.activityContextProvider?.();
 
 		entry.messages = entry.messages.slice(0, nodeIndex);
-		this.appendPlaceholders(entry, text, preservedAssetChips);
-		const receivedFinal = await this.consumeStream(entry, threadId, text, {
+		const { humanNode, sink } = this.appendPlaceholders(entry, text, preservedAssetChips);
+		const receivedFinal = await this.consumeStream(entry, threadId, text, humanNode, sink, {
 			parentMessageId: parentId,
 			preservedAssetChips,
 			activityId,
@@ -428,51 +435,82 @@ export class ChatService {
 		}
 	}
 
-	/// Drive an AI-only chat stream into an existing placeholder node. Used by
-	/// `regenerateAi`, where there is no human-message confirmation envelope —
-	/// the server immediately starts streaming chunks and ends with `final`.
-	private async consumeAiStream(
+	/**
+	 * Shared chat-stream consumer. Drains the wire envelopes from `stream`
+	 * into `entry`: routes streaming chunks through the sink, applies
+	 * server-pushed title updates, and swaps the placeholder for the
+	 * persisted message on `final`. Returns `true` iff a `final` frame was
+	 * observed; callers reconcile against the server when the stream ends
+	 * without one (cancellation, error, transport drop).
+	 *
+	 * The discriminator is matched exhaustively — any future
+	 * [`ChatServerMessage`] variant will fail the build at the `default`
+	 * arm rather than silently dropping into a fallthrough.
+	 *
+	 * Per-turn divergence between `send` and `regenerate` is funnelled
+	 * through `policy.onConfirmedHumanMessage`: `send` uses the hook to
+	 * swap the temp human node and bind the abort controller;
+	 * `regenerate` passes `null` because no new human message exists, so
+	 * stray envelopes are ignored.
+	 */
+	private async consumeChatStream(
 		entry: ThreadMessages,
-		placeholder: MessageNode,
 		stream: AsyncIterable<ChatServerMessage>,
+		policy: ChatStreamPolicy,
 	): Promise<boolean> {
-		const aiMessage = placeholder.message;
-		if (aiMessage.type !== 'ai') return false;
-
-		const placeholderId = aiMessage.id;
+		const { sink } = policy;
 		let receivedFinal = false;
-		const ctx: ChunkAppendState = { hasContent: false, pendingWhitespace: '' };
 
 		try {
-			for await (const event of stream) {
-				if (event.type === 'final') {
-					const aiMsg = event.messages[0];
-					if (aiMsg) {
-						entry.messages = entry.messages.map((node) =>
-							node.message.id === placeholderId ? aiMsg : node,
-						);
+			consume: for await (const event of stream) {
+				switch (event.type) {
+					case 'confirmed_human_message':
+						policy.onConfirmedHumanMessage?.(event.message);
+						break;
+					case 'chunk':
+						sink.appendChunk(event.chunk);
+						break;
+					case 'title_updated':
+						// The backend's agent loop auto-titles untitled threads
+						// at the end of every turn and emits this frame before
+						// the terminal `final`/`error` (or before dropping the
+						// socket on cancel). Mutating the thread in place lets
+						// the sidebar's Svelte `$state` binding repaint without
+						// an extra HTTP round trip.
+						this.updateThread({ ...entry.thread, title: event.title });
+						break;
+					case 'final': {
+						const aiMsg = event.messages[0];
+						if (aiMsg) {
+							entry.messages = entry.messages.map((node) =>
+								node.message.id === sink.id ? aiMsg : node,
+							);
+						}
+						entry.loaded = true;
+						receivedFinal = true;
+						break consume;
 					}
-					entry.loaded = true;
-					receivedFinal = true;
-					break;
+					case 'error':
+						throw new Error(`${event.kind}: ${event.message}`);
+					case 'tool_request':
+					case 'tool_cancel': {
+						// Client-side tool dispatch isn't wired up yet. The
+						// backend's `ChatRemoteBus` already emits these frames;
+						// until the client grows a dispatcher we drop them so
+						// the chat stream still finishes cleanly when a server
+						// runs ahead of the client.
+						break;
+					}
+					default: {
+						const _exhaustive: never = event;
+						void _exhaustive;
+					}
 				}
-
-				if (event.type === 'error') {
-					throw new Error(`${event.kind}: ${event.message}`);
-				}
-
-				if (event.type === 'confirmed_human_message') {
-					// Regenerate never persists a new human message; ignore
-					// stray envelopes rather than asserting on them.
-					continue;
-				}
-
-				appendChunkToAiMessage(aiMessage, event.chunk, ctx);
 			}
 		} catch (e) {
-			console.error('AI stream error:', e);
-			if (aiMessage.content.length === 0) {
-				entry.messages = entry.messages.filter((n) => n.message.id !== placeholderId);
+			console.error(`Chat stream error for thread ${entry.thread.id}:`, e);
+			if (sink.isEmpty) {
+				entry.messages = entry.messages.filter((n) => n.message.id !== sink.id);
 			}
 		} finally {
 			entry.streamingMessageId = null;
@@ -486,81 +524,35 @@ export class ChatService {
 		entry: ThreadMessages,
 		threadId: string,
 		text: string,
+		humanPlaceholder: HumanPlaceholderNode,
+		sink: AiStreamSink,
 		options: {
 			parentMessageId?: string | null;
 			assetChips?: AssetChip[];
 			preservedAssetChips?: AssetChip[];
-			onFirstChunk?: () => void;
 			activityId?: string | undefined;
 		} = {},
 	): Promise<boolean> {
 		this.abortController?.abort();
 
-		const aiNode = entry.messages.at(-1)!;
-		const aiMessage = aiNode.message;
-		if (aiMessage.type === 'remove') return false;
-
-		const tempHumanId = entry.messages.at(-2)?.message.id;
-		const tempAiId = aiMessage.id;
-
-		const ctx: ChunkAppendState = { hasContent: false, pendingWhitespace: '' };
-		let receivedFinal = false;
-
+		const humanPlaceholderId = humanPlaceholder.message.id;
 		const abortController = new AbortController();
 		const request = await this.buildSendRequest(threadId, text, options);
 		const stream = this.threadClient.sendMessage(threadId, request, abortController.signal);
-		let onFirstChunk = options.onFirstChunk;
 
-		try {
-			for await (const event of stream) {
-				if (event.type === 'confirmed_human_message') {
-					const confirmed = event.message;
-					entry.messages = entry.messages.map((node) => {
-						if (node.message.id === tempHumanId) return confirmed;
-						if (node.parent_id === tempHumanId)
-							return { ...node, parent_id: confirmed.message.id };
-						return node;
-					});
-					this.abortController = abortController;
-					continue;
-				}
-
-				if (event.type === 'final') {
-					const aiMsg = event.messages[0];
-					if (aiMsg) {
-						entry.messages = entry.messages.map((node) =>
-							node.message.id === tempAiId ? aiMsg : node,
-						);
+		return this.consumeChatStream(entry, stream, {
+			sink,
+			onConfirmedHumanMessage: (confirmed) => {
+				entry.messages = entry.messages.map((node) => {
+					if (node.message.id === humanPlaceholderId) return confirmed;
+					if (node.parent_id === humanPlaceholderId) {
+						return { ...node, parent_id: confirmed.message.id };
 					}
-					entry.loaded = true;
-					receivedFinal = true;
-					break;
-				}
-
-				if (event.type === 'error') {
-					throw new Error(`${event.kind}: ${event.message}`);
-				}
-
-				if (onFirstChunk) {
-					onFirstChunk();
-					onFirstChunk = undefined;
-				}
-
-				appendChunkToAiMessage(aiMessage, event.chunk, ctx);
-			}
-		} catch (e) {
-			console.error(`Stream error for thread ${threadId}:`, e);
-			if ('content' in aiMessage && aiMessage.content.length === 0) {
-				entry.messages = entry.messages.filter((n) => n.message.id !== aiMessage.id);
-			}
-		} finally {
-			entry.streamingMessageId = null;
-			if (!entry.loaded) {
-				entry.loaded = true;
-			}
-		}
-
-		return receivedFinal;
+					return node;
+				});
+				this.abortController = abortController;
+			},
+		});
 	}
 
 	private async buildSendRequest(
@@ -577,16 +569,21 @@ export class ChatService {
 		const isEdit = options.preservedAssetChips !== undefined;
 
 		// On edits we replay the chips that were already attached to the
-		// original turn — there is no fresh activity to sample. On new turns
-		// with attached UI chips we ask the host to assemble per-turn context
-		// (asset bytes, snapshots, the persisted chip). Hosts without a
-		// context source return empty arrays.
-		const context =
+		// original turn — there is no fresh activity to sample. On new
+		// turns with attached UI chips we ask the host for the chip set
+		// to persist alongside the message. Hosts without a context
+		// source return empty arrays.
+		//
+		// The LLM-facing prelude blocks (the strategy's `get_context()`
+		// output) are pulled separately by the chat bridge on the Rust
+		// side and shipped in the `CapabilityUpdate.system_blocks` wire
+		// field — they never round-trip through the frontend.
+		const collectedChips =
 			!isEdit && (options.assetChips?.length ?? 0) > 0
-				? await this.threadClient.collectContext(threadId)
-				: { contentBlocks: [], assetChips: [] };
+				? (await this.threadClient.collectContext(threadId)).assetChips
+				: [];
 
-		const persistedChips = isEdit ? (options.preservedAssetChips ?? []) : context.assetChips;
+		const persistedChips = isEdit ? (options.preservedAssetChips ?? []) : collectedChips;
 
 		const userBlock: ContentBlock = {
 			type: 'text',
@@ -598,7 +595,7 @@ export class ChatService {
 		};
 
 		return {
-			content_blocks: [...context.contentBlocks, userBlock],
+			content_blocks: [userBlock],
 			parent_message_id,
 			asset_chips_json: persistedChips.length > 0 ? JSON.stringify(persistedChips) : null,
 			activity_id: options.activityId ?? null,
@@ -609,16 +606,17 @@ export class ChatService {
 		entry: ThreadMessages,
 		text: string,
 		assetChips: AssetChip[] = [],
-	): void {
-		const humanId = `temp-${crypto.randomUUID()}`;
-		const aiId = `temp-${crypto.randomUUID()}`;
-
-		entry.messages = [
-			...entry.messages,
-			makeHumanNode(humanId, null, text, assetChips),
-			makeAiNode(aiId, humanId, ''),
-		];
-		entry.streamingMessageId = aiId;
+	): { humanNode: HumanPlaceholderNode; sink: AiStreamSink } {
+		const humanNode = createHumanPlaceholderNode(null, text, assetChips);
+		const aiNode = createAiPlaceholderNode(humanNode.message.id, '');
+		entry.messages = [...entry.messages, humanNode, aiNode];
+		// Resolver looks up the node back through `entry.messages` so
+		// every sink mutation passes through Svelte's `$state` proxy.
+		// See `findStreamingPlaceholder`'s doc comment.
+		const aiId = aiNode.message.id;
+		const sink = new AiStreamSink(aiId, () => findStreamingPlaceholder(entry, aiId));
+		entry.streamingMessageId = sink.id;
+		return { humanNode, sink };
 	}
 
 	destroy() {
@@ -639,165 +637,36 @@ export class ChatService {
 	}
 }
 
-interface ChunkAppendState {
-	hasContent: boolean;
-	pendingWhitespace: string;
+/**
+ * Locate the live `AiPlaceholderNode` for `id` inside `entry.messages`.
+ * Returns `null` if no such node exists (cancellation, error rollback)
+ * or if the matching node is no longer an AI placeholder (it was
+ * swapped for the persisted message when `final` arrived).
+ *
+ * Routed through `entry.messages.find(...)`, the lookup goes through
+ * Svelte's `$state` proxy — handing the result to `AiStreamSink`
+ * ensures every mutation flows through the reactive view, so chunks
+ * render incrementally instead of buffering until the final swap.
+ */
+function findStreamingPlaceholder(entry: ThreadMessages, id: string): AiPlaceholderNode | null {
+	const node = entry.messages.find((n) => n.message.id === id);
+	if (!node || node.message.type !== 'ai') return null;
+	return node as AiPlaceholderNode;
 }
 
-function appendChunkToAiMessage(
-	aiMessage: MessageNode['message'],
-	chunk: AIMessageChunk,
-	ctx: ChunkAppendState,
-): void {
-	if (aiMessage.type !== 'ai') return;
-
-	// Mirror agent-chain's `extract_reasoning_from_additional_kwargs`:
-	// providers like DeepSeek, Ollama, XAI emit reasoning in
-	// additional_kwargs. Accumulate it on the AI message's kwargs (the wire
-	// shape) so the UI can render it without inventing a fake `reasoning`
-	// content block.
-	appendReasoningKwargs(aiMessage, chunk);
-
-	for (const block of chunk.content) {
-		if (block.type === 'text') {
-			let textContent = block.text;
-			if (!ctx.hasContent) {
-				if (textContent.trim().length === 0) {
-					ctx.pendingWhitespace += textContent;
-					continue;
-				}
-				ctx.hasContent = true;
-				textContent = ctx.pendingWhitespace + textContent;
-				ctx.pendingWhitespace = '';
-			}
-			const existing = aiMessage.content.find((b) => b.type === 'text');
-			if (existing && existing.type === 'text') {
-				existing.text += textContent;
-			} else {
-				aiMessage.content.push({ ...block, text: textContent });
-			}
-		} else if (block.type === 'reasoning') {
-			const existing = aiMessage.content.find((b) => b.type === 'reasoning');
-			if (existing && existing.type === 'reasoning') {
-				existing.reasoning = (existing.reasoning ?? '') + (block.reasoning ?? '');
-			} else {
-				aiMessage.content.push({ ...block });
-			}
-		} else {
-			aiMessage.content.push(block);
-		}
-	}
-}
-
-function makeHumanNode(
-	id: string,
-	parentId: string | null,
-	text: string,
-	assetChips: AssetChip[],
-): MessageNode {
-	return {
-		parent_id: parentId,
-		message: {
-			type: 'human',
-			content:
-				text.length > 0
-					? [
-							{
-								type: 'text',
-								text,
-								id: null,
-								annotations: null,
-								index: null,
-								extras: null,
-							},
-						]
-					: [],
-			id,
-			name: null,
-			additional_kwargs: assetChips.length > 0 ? { asset_chips: assetChips } : {},
-			response_metadata: {},
-		},
-		children: [],
-		sibling_index: 0,
-		depth: 0,
-	};
-}
-
-function makeAiNode(id: string, parentId: string | null, text: string): MessageNode {
-	return {
-		parent_id: parentId,
-		message: {
-			type: 'ai',
-			content: text
-				? [{ type: 'text', text, id: null, annotations: null, index: null, extras: null }]
-				: [],
-			id,
-			name: null,
-			tool_calls: [],
-			invalid_tool_calls: [],
-			usage_metadata: null,
-			additional_kwargs: {},
-			response_metadata: {},
-		},
-		children: [],
-		sibling_index: 0,
-		depth: 0,
-	};
-}
-
-function makeStubThread(id: string): Thread {
-	const now = new Date().toISOString();
-	return {
-		id,
-		user_id: '',
-		title: '',
-		created_at: now,
-		updated_at: now,
-	} as Thread;
-}
-
-function appendReasoningKwargs(
-	aiMessage: MessageNode['message'],
-	chunk: { additional_kwargs?: unknown },
-): void {
-	if (aiMessage.type !== 'ai') return;
-	const incoming = chunk.additional_kwargs;
-	if (!isObject(incoming)) return;
-	const reasoning =
-		typeof incoming.reasoning_content === 'string' ? incoming.reasoning_content : null;
-	if (reasoning === null || reasoning.length === 0) return;
-	const kwargs = isObject(aiMessage.additional_kwargs)
-		? (aiMessage.additional_kwargs as Record<string, unknown>)
-		: {};
-	const previous = typeof kwargs.reasoning_content === 'string' ? kwargs.reasoning_content : '';
-	kwargs.reasoning_content = previous + reasoning;
-	(aiMessage as { additional_kwargs: unknown }).additional_kwargs = kwargs;
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-	return v !== null && typeof v === 'object' && !Array.isArray(v);
-}
-
-function extractAssetChips(message: MessageNode['message']): AssetChip[] {
-	if (message.type !== 'human') return [];
-	const kwargs = message.additional_kwargs;
-	if (!isObject(kwargs)) return [];
-	const raw = kwargs.asset_chips;
-	if (!Array.isArray(raw)) return [];
-	const chips: AssetChip[] = [];
-	for (const entry of raw) {
-		if (!isObject(entry)) continue;
-		const id = typeof entry.id === 'string' ? entry.id : null;
-		const name = typeof entry.name === 'string' ? entry.name : null;
-		if (id === null || name === null) continue;
-		chips.push({
-			id,
-			name,
-			icon: typeof entry.icon === 'string' ? entry.icon : null,
-			domain: typeof entry.domain === 'string' ? entry.domain : null,
-		});
-	}
-	return chips;
+interface ChatStreamPolicy {
+	/**
+	 * Drives streaming mutations on the AI placeholder. The sink's
+	 * `id` is the swap target when `final` arrives.
+	 */
+	sink: AiStreamSink;
+	/**
+	 * Invoked when the server confirms the user message has been persisted.
+	 * `send` swaps the temp human node and binds the abort controller from
+	 * inside the callback. `regenerate` has no fresh human message to
+	 * confirm and passes `null` — stray envelopes are then ignored.
+	 */
+	onConfirmedHumanMessage: ((confirmed: MessageNode) => void) | null;
 }
 
 export const CHAT_SERVICE = new InjectionToken<ChatService>('ChatService');

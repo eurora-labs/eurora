@@ -11,7 +11,8 @@
 //! `apps/browser/src/shared/background/native-messenger.ts`.
 //!
 //! TypeScript and Swift bindings are generated from these types via
-//! `cargo run -p euro-bridge-protocol --features codegen -- --generate_specta`.
+//! the workspace-level `cargo run -p euro-codegen` orchestrator, which
+//! calls into [`codegen::run`] (gated behind the `codegen` feature).
 //!
 //! ## Transport
 //!
@@ -31,6 +32,11 @@
 //! [register-frame token check](`crate::frame::RegisterFrame`) is the
 //! authentication boundary, not TLS.
 
+#[cfg(feature = "codegen")]
+pub mod codegen;
+
+pub mod ts_fixup;
+
 mod error;
 mod frame;
 
@@ -38,7 +44,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 pub use error::BridgeError;
 pub use frame::{
-    CancelFrame, ErrorFrame, EventFrame, Frame, FrameKind, RegisterFrame, RequestFrame,
+    CancelFrame, ErrorFrame, EventFrame, Frame, FrameKind, Payload, RegisterFrame, RequestFrame,
     ResponseFrame, ShutdownFrame,
 };
 
@@ -92,6 +98,13 @@ pub fn bridge_url_for(addr: SocketAddr) -> String {
 /// available to other crates that want to merge these types into a
 /// larger collection.
 pub fn type_collection() -> specta::Types {
+    // `Payload` is intentionally NOT registered directly. The frame
+    // types reference it via their `payload` fields, and the field-level
+    // `#[specta(type = ...)]` override (defined in `frame.rs`) decides
+    // whether the binding sees an opaque TypeScript `unknown` or a
+    // named Swift `Payload` placeholder. Registering it here would
+    // double-emit the type for any target that treats `Payload` as a
+    // first-class named definition.
     specta::Types::default()
         .register::<Frame>()
         .register::<FrameKind>()
