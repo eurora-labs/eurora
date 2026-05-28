@@ -9,6 +9,7 @@ packages:
 
 catalog:
     '@lucide/svelte': ^1.16.0
+    '@tabler/icons-svelte-runes': ^3.44.0
     '@tailwindcss/postcss': ^4.3.0
     '@vitest/ui': 3.2.4
     postcss: ^8.5.14

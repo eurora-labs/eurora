@@ -1,9 +1,9 @@
 <script lang="ts">
 	import EuroraLogo from '@eurora/ui/custom-icons/EuroraLogo.svelte';
-	import SiDiscord from '@icons-pack/svelte-simple-icons/icons/SiDiscord';
-	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
-	import SiX from '@icons-pack/svelte-simple-icons/icons/SiX';
-	import LinkedIn from '@lucide/svelte/icons/linkedin';
+	import IconBrandDiscord from '@tabler/icons-svelte-runes/icons/brand-discord';
+	import IconBrandGithub from '@tabler/icons-svelte-runes/icons/brand-github';
+	import LinkedIn from '@tabler/icons-svelte-runes/icons/brand-linkedin';
+	import IconBrandX from '@tabler/icons-svelte-runes/icons/brand-x';
 
 	const footerLinks = {
 		product: {
@@ -112,11 +112,11 @@
 								class="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
 							>
 								{#if link.name === 'GitHub'}
-									<SiGithub size={24} />
+									<IconBrandGithub size={24} />
 								{:else if link.name === 'X (Twitter)'}
-									<SiX size={24} />
+									<IconBrandX size={24} />
 								{:else if link.name === 'Discord'}
-									<SiDiscord size={24} />
+									<IconBrandDiscord size={24} />
 								{:else if link.name === 'LinkedIn'}
 									<LinkedIn class="h-6 w-6" />
 								{/if}

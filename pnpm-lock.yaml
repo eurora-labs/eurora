@@ -9,6 +9,9 @@ catalogs:
     '@lucide/svelte':
       specifier: ^1.16.0
       version: 1.16.0
+    '@tabler/icons-svelte-runes':
+      specifier: ^3.44.0
+      version: 3.44.0
     '@tailwindcss/postcss':
       specifier: ^4.3.0
       version: 4.3.0
@@ -187,9 +190,6 @@ importers:
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@icons-pack/svelte-simple-icons':
-        specifier: ^5.0.0
-        version: 5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@lucide/svelte':
         specifier: 'catalog:'
         version: 1.16.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
@@ -211,6 +211,9 @@ importers:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:svelte
         version: 5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@tabler/icons-svelte-runes':
+        specifier: 'catalog:'
+        version: 3.44.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@tailwindcss/container-queries':
         specifier: ^0.1.1
         version: 0.1.1(tailwindcss@4.3.0)
@@ -344,9 +347,6 @@ importers:
       '@gitbutler/svelte-comment-injector':
         specifier: ^1.0.1
         version: 1.0.1
-      '@icons-pack/svelte-simple-icons':
-        specifier: ^5.0.0
-        version: 5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@lucide/svelte':
         specifier: 'catalog:'
         version: 1.16.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
@@ -368,6 +368,9 @@ importers:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:svelte
         version: 5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@tabler/icons-svelte-runes':
+        specifier: 'catalog:'
+        version: 3.44.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@tailwindcss/postcss':
         specifier: 'catalog:'
         version: 4.3.0
@@ -513,9 +516,6 @@ importers:
       '@gitbutler/svelte-comment-injector':
         specifier: ^1.0.0
         version: 1.0.1
-      '@icons-pack/svelte-simple-icons':
-        specifier: ^5.0.0
-        version: 5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@lucide/svelte':
         specifier: 'catalog:'
         version: 1.16.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
@@ -528,6 +528,9 @@ importers:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:svelte
         version: 5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@tabler/icons-svelte-runes':
+        specifier: 'catalog:'
+        version: 3.44.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@tailwindcss/postcss':
         specifier: 'catalog:'
         version: 4.3.0
@@ -621,9 +624,6 @@ importers:
       '@eurora/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@icons-pack/svelte-simple-icons':
-        specifier: ^5.0.0
-        version: 5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.19)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.19)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@lucide/svelte':
         specifier: 'catalog:'
         version: 1.16.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
@@ -639,6 +639,9 @@ importers:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:svelte
         version: 5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.19)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@tabler/icons-svelte-runes':
+        specifier: 'catalog:'
+        version: 3.44.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@tailwindcss/container-queries':
         specifier: ^0.1.1
         version: 0.1.1(tailwindcss@4.3.0)
@@ -869,15 +872,15 @@ importers:
 
   packages/ui:
     dependencies:
-      '@icons-pack/svelte-simple-icons':
-        specifier: ^5.0.0
-        version: 5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       '@shikijs/langs':
         specifier: ^3.23.0
         version: 3.23.0
       '@shikijs/themes':
         specifier: ^3.23.0
         version: 3.23.0
+      '@tabler/icons-svelte-runes':
+        specifier: 'catalog:'
+        version: 3.44.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))
       ai:
         specifier: ^6.0.187
         version: 6.0.187(zod@3.25.76)
@@ -2045,13 +2048,6 @@ packages:
 
   '@iconify/utils@3.1.0':
     resolution: {integrity: sha512-Zlzem1ZXhI1iHeeERabLNzBHdOa4VhQbqAcOQaMKuTuyZCpwKbC2R4Dd0Zo3g9EAc+Y4fiarO8HIHRAth7+skw==}
-
-  '@icons-pack/svelte-simple-icons@5.0.0':
-    resolution: {integrity: sha512-ROTn/BgVFWubOEu6WeiXKSeGZvzFZ3KrxqQcO/XeF80KGPwBMzTrA35xGgyCj4xnoDY/mWNuTjYLA/MiGD8SLw==}
-    engines: {node: '>=20', pnpm: '>=9'}
-    peerDependencies:
-      '@sveltejs/kit': ^2.5.0
-      svelte: ^4.2.0 || ^5.0.0
 
   '@inquirer/ansi@1.0.2':
     resolution: {integrity: sha512-S8qNSZiYzFd0wAcyG5AXCvUHC5Sr7xpZ9wZ2py9XR88jUz8wooStVx5M6dRzczbBWjic9NP7+rY0Xi7qqK/aMQ==}
@@ -3630,6 +3626,14 @@ packages:
 
   '@swc/helpers@0.5.21':
     resolution: {integrity: sha512-jI/VAmtdjB/RnI8GTnokyX7Ug8c+g+ffD6QRLa6XQewtnGyukKkKSk3wLTM3b5cjt1jNh9x0jfVlagdN2gDKQg==}
+
+  '@tabler/icons-svelte-runes@3.44.0':
+    resolution: {integrity: sha512-kncwVrQByKnhquybudKYQ1m9OT2Pjl2MEyGhAJmySPjm3uG5CjmcE66jag7A9Hz/D+fuRXYNcHtq99ontyi4aA==}
+    peerDependencies:
+      svelte: ^5.0.0
+
+  '@tabler/icons@3.44.0':
+    resolution: {integrity: sha512-Wn0AOZG9sg0L+bjfMqq4eNhC6pQjIrk94LvvWYNYkY8KH8wC3YILRzQlrnVJc4FUeMxH/AK97QsYCX35H3LndA==}
 
   '@tailwindcss/container-queries@0.1.1':
     resolution: {integrity: sha512-p18dswChx6WnTSaJCSGx6lTmrGzNNvm2FtXmiO6AuA1V4U5REyoqwmT6kgAsIMdjo07QdAfYXHJ4hnMtfHzWgA==}
@@ -11320,21 +11324,6 @@ snapshots:
       '@iconify/types': 2.0.0
       mlly: 1.8.0
 
-  '@icons-pack/svelte-simple-icons@5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))':
-    dependencies:
-      '@sveltejs/kit': 2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
-      svelte: 5.55.9(@typescript-eslint/types@8.60.0)
-
-  '@icons-pack/svelte-simple-icons@5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.19)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.19)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))':
-    dependencies:
-      '@sveltejs/kit': 2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@22.19.19)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@22.19.19)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
-      svelte: 5.55.9(@typescript-eslint/types@8.60.0)
-
-  '@icons-pack/svelte-simple-icons@5.0.0(@sveltejs/kit@2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))':
-    dependencies:
-      '@sveltejs/kit': 2.60.1(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.9(@typescript-eslint/types@8.60.0))(vite@6.4.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.9(@typescript-eslint/types@8.60.0))(typescript@5.9.3)(vite@6.4.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.8.4))
-      svelte: 5.55.9(@typescript-eslint/types@8.60.0)
-
   '@inquirer/ansi@1.0.2': {}
 
   '@inquirer/checkbox@4.3.2(@types/node@22.19.19)':
@@ -13198,6 +13187,13 @@ snapshots:
   '@swc/helpers@0.5.21':
     dependencies:
       tslib: 2.8.1
+
+  '@tabler/icons-svelte-runes@3.44.0(svelte@5.55.9(@typescript-eslint/types@8.60.0))':
+    dependencies:
+      '@tabler/icons': 3.44.0
+      svelte: 5.55.9(@typescript-eslint/types@8.60.0)
+
+  '@tabler/icons@3.44.0': {}
 
   '@tailwindcss/container-queries@0.1.1(tailwindcss@4.3.0)':
     dependencies:
