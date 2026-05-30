@@ -3,7 +3,7 @@ name = "euro-activity"
 version = "0.0.0"
 edition.workspace = true
 description = "Refactored activity system with enum-based type-safe design"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license.workspace = true
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde"]

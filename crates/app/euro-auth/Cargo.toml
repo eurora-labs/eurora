@@ -3,7 +3,7 @@ name = "euro-auth"
 version = "0.0.0"
 edition.workspace = true
 description = "Authentication service for Eurora"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license.workspace = true
 
 [package.metadata.cargo-machete]
 ignored = ["humantime-serde", "specta"]
