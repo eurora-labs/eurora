@@ -3,7 +3,7 @@ name = "asset-core"
 version = "0.0.0"
 edition.workspace = true
 description = "Shared HTTP DTOs for the Eurora asset service. Consumed by both the backend (be-asset-service) and the desktop/web apps, and exported as TypeScript bindings via specta."
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license.workspace = true
 
 [dependencies]
 chrono = { workspace = true, features = ["serde"] }

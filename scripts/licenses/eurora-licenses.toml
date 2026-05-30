@@ -16,8 +16,6 @@ accepted = [
   "OpenSSL",
   "Zlib",
   "BSL-1.0",
-  # Custom license for Eurora crates
-  "LicenseRef-Eurora-SUL-AND-Apache-2.0",
   "CDLA-Permissive-2.0"
 ]
 

@@ -3,7 +3,7 @@ name = "be-remote-db"
 version = "0.0.0"
 edition.workspace = true
 description = "Eurora Remote DB"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license.workspace = true
 
 [dependencies]
 auth-core = { workspace = true }
