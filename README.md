@@ -47,9 +47,15 @@ The browser extension captures page content (articles, videos, tweets) through c
 
 ## License
 
-Eurora is open source, licensed under the [Apache License 2.0](https://github.com/eurora-labs/eurora/blob/main/LICENSE).
+Eurora is [fair-code](https://faircode.io/) distributed under the [Sustainable Use License](https://github.com/eurora-labs/eurora/blob/main/LICENSE-SUL-1.0), with each version re-licensed as [Apache-2.0](https://github.com/eurora-labs/eurora/blob/main/LICENSE-APACHE-2.0) two years after its release.
 
 Our primary goal is to provide the community with a powerful and extensible AI platform that can run on your own home hardware, while rivaling the industry leaders in terms of performance and features.
+
+Main points of Sustainable Use License (SUL) are:
+
+- _Source Available_: Always visible source code
+- _Self-Hostable_: Deploy anywhere
+- _Extensible_: Add your own plugins and features
 
 ## Installation
 

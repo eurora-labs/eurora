@@ -3,7 +3,7 @@ name = "be-encrypt"
 version = "0.0.0"
 edition.workspace = true
 description = "Backend encryption for assets at rest"
-license.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 base64 = { workspace = true }

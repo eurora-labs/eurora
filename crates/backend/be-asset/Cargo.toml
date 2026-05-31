@@ -3,7 +3,7 @@ name = "be-asset"
 version = "0.0.0"
 edition.workspace = true
 description = "Asset Service - Logic for managing file assets"
-license.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 asset-core = { workspace = true }
