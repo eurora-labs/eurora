@@ -3,7 +3,7 @@ name = "auth-core"
 version = "0.0.0"
 edition.workspace = true
 description = "Shared HTTP wire types for the Eurora auth service. Consumed by both the backend (be-auth-service) and the desktop/web apps, and exported as TypeScript bindings via the workspace-level `euro-codegen` orchestrator."
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license.workspace = true
 
 [dependencies]
 serde = { workspace = true, features = ["derive", "std"] }
