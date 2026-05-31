@@ -3,7 +3,7 @@ name = "be-update-service"
 version = "0.0.0"
 edition.workspace = true
 description = "Eurora Update Service"
-license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
+license.workspace = true
 publish = false
 
 [dependencies]
