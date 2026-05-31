@@ -3,7 +3,7 @@ name = "euro-vision"
 version = "0.0.0"
 edition.workspace = true
 description = "Vision util for capturing screen, window and ocr'ing"
-license.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 anyhow = { workspace = true }

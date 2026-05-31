@@ -3,7 +3,7 @@ name = "euro-timeline"
 version = "0.0.0"
 edition.workspace = true
 description = "Timeline storage for capturing system state over time"
-license.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 activity-core = { workspace = true }

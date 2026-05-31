@@ -3,7 +3,7 @@ name = "be-asset-service"
 version = "0.0.0"
 edition.workspace = true
 description = "Eurora Asset Service - HTTP service for managing user file assets"
-license.workspace = true
+license = "LicenseRef-Eurora-SUL-AND-Apache-2.0"
 
 [dependencies]
 asset-core = { workspace = true }
