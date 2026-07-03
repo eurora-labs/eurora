@@ -15,7 +15,7 @@ catalog:
     postcss: ^8.5.14
     tailwindcss: ^4.3.0
     vite: 6.4.2
-    vitest: 3.2.4
+    vitest: 3.2.6
 
 catalogs:
     redux:
