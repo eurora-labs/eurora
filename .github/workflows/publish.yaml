@@ -46,7 +46,7 @@ jobs:
                   SENTRY_CRONS_URL: ${{ secrets.SENTRY_CRONS }}
               run: curl "${SENTRY_CRONS_URL}?status=in_progress"
 
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -118,7 +118,7 @@ jobs:
         # Disabled: mobile builds not ready for release.
         if: false
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -145,7 +145,7 @@ jobs:
             matrix:
                 browser: [chrome, firefox, edge]
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -253,7 +253,7 @@ jobs:
               shell: bash
               run: echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=lld-link" >> "$GITHUB_ENV"
 
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -774,7 +774,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -855,7 +855,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -981,7 +981,7 @@ jobs:
                       target: ''
                       source: tauri
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: false
@@ -1063,7 +1063,7 @@ jobs:
         needs: [build-sveltekit, publish-tauri]
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.RELEASE_PAT }}
                   persist-credentials: true
@@ -1105,7 +1105,7 @@ jobs:
         permissions:
             contents: write
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
                   persist-credentials: true

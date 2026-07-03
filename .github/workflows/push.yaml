@@ -29,7 +29,7 @@ jobs:
             rust: ${{ steps.filter.outputs.rust }}
             swift: ${{ steps.filter.outputs.swift }}
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
 
@@ -64,7 +64,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'false' &&  needs.changes.outputs.docs == 'true'}}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -75,7 +75,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -86,7 +86,7 @@ jobs:
         if: ${{ needs.changes.outputs.node == 'true' }}
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
             - uses: ./.github/actions/init-env-node
@@ -111,7 +111,7 @@ jobs:
             # and avoids depending on `just` being in the container image.
             CARGO: cargo
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
                   lfs: true
@@ -129,7 +129,7 @@ jobs:
         if: ${{ needs.changes.outputs.swift == 'true' }}
         runs-on: macos-latest
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
             - name: Install SwiftLint and SwiftFormat
@@ -165,7 +165,7 @@ jobs:
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: -C link-arg=--ld-path=wild
             DATABASE_URL: postgres://postgres:postgres@postgres:5432/eurora
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
                   lfs: true
@@ -201,7 +201,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
                   lfs: true
@@ -219,7 +219,7 @@ jobs:
         env:
             CARGO_TERM_COLOR: always
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
               with:
                   persist-credentials: false
                   lfs: true
