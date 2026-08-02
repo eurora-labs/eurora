@@ -12,7 +12,7 @@ catalog:
     '@tabler/icons-svelte-runes': ^3.44.0
     '@tailwindcss/postcss': ^4.3.0
     '@vitest/ui': 3.2.4
-    postcss: ^8.5.14
+    postcss: ^8.5.18
     tailwindcss: ^4.3.0
     vite: 6.4.2
     vitest: 3.2.4
